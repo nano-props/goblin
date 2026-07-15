@@ -37,12 +37,11 @@ class TestPhysicalWorktreeIdentityResolver extends PhysicalWorktreeIdentityResol
       repoRoot: input.repoRoot ?? '/repo',
       repoRuntimeId: input.repoRuntimeId ?? 'test-runtime',
       worktreePath: endpoint,
-      execution:
-        input.execution ?? {
-          kind: 'local',
-          canonicalWorktreePath: input.identity.endpoint,
-          endpointMarker: { deviceId: 'test-device', inode: 'test-inode' },
-        },
+      execution: input.execution ?? {
+        kind: 'local',
+        canonicalWorktreePath: input.identity.endpoint,
+        endpointMarker: { deviceId: 'test-device', inode: 'test-inode' },
+      },
       runtimeSignal: input.runtimeSignal ?? new AbortController().signal,
       validateExecution: input.validateExecution ?? (async () => undefined),
     })
@@ -59,7 +58,9 @@ export function issueTestPhysicalWorktreeCapability(
 
 export function testPhysicalWorktreeCapability(
   endpoint: string,
-  input: Partial<Pick<ResolvePhysicalWorktreeIdentityInput, 'userId' | 'repoRoot' | 'repoRuntimeId' | 'worktreePath'>> = {},
+  input: Partial<
+    Pick<ResolvePhysicalWorktreeIdentityInput, 'userId' | 'repoRoot' | 'repoRuntimeId' | 'worktreePath'>
+  > = {},
 ): PhysicalWorktreeCapability {
   const worktreePath = input.worktreePath ?? endpoint
   return issueTestPhysicalWorktreeCapability({
@@ -79,14 +80,17 @@ export const testPhysicalWorktrees = {
 
 export function replaceTestWorkspaceTabs(
   runtime: WorkspacePaneTabsRuntime<string>,
-  input: Omit<WorkspacePaneTabsReplaceInput<string>, 'physicalWorktreeIdentity'> & {
+  input: Omit<WorkspacePaneTabsReplaceInput<string>, 'physicalWorktreeIdentity' | 'repoRoot'> & {
+    repoRoot?: string
     physicalWorktreeIdentity?: PhysicalWorktreeIdentity | null
   },
 ): void {
-  runtime.replaceTabs({
+  const plan = runtime.planReplace({
     ...input,
+    repoRoot: input.repoRoot ?? (input.scope.includes('\0') ? input.scope.split('\0')[0]! : '/repo'),
     physicalWorktreeIdentity:
       input.physicalWorktreeIdentity ??
       (input.worktreePath === null ? null : testPhysicalWorktreeIdentity(input.worktreePath)),
   })
+  runtime.commitPlan(plan)
 }

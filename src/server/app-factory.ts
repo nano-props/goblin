@@ -27,6 +27,7 @@ import { createNativeShortcutRegistrationState } from '#/server/modules/native-s
 import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
+import { createRepoMutationApplication } from '#/server/repo-mutation/repo-mutation-application.ts'
 
 export interface ServerAppOptions {
   version: string
@@ -230,7 +231,7 @@ export function createApp(options: ServerAppOptions): Hono {
     '/api/repo',
     createRepoRoutes({
       worktreeRemovalApplication: options.worktreeRemovalApplication,
-      workspacePaneTargetLifecycle: options.workspacePaneTabsHost,
+      repoMutationApplication: createRepoMutationApplication({ workspacePaneTabs: options.workspacePaneTabsHost }),
     }),
   )
   app.route('/api/repo', createRepoViewRoutes())

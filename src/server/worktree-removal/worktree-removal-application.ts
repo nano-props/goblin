@@ -1,8 +1,9 @@
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
-import { terminalSessionRuntimeScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
+import { terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import type { ServerWorkspacePaneTargetLifecycleHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
   PhysicalWorktreeOperationPermit,
@@ -22,8 +23,9 @@ interface WorktreeRemovalApplicationDependencies {
   terminalWorktree: Pick<TerminalSessionManager<string>, 'closeSessionsForPhysicalWorktree'>
   workspaceTabs: Pick<
     WorkspacePaneTabsCoordinator,
-    'physicalWorktreeScopes' | 'reconcilePhysicalWorktreeAfterRemovalFailure' | 'retireTarget'
+    'physicalWorktreeTargets' | 'reconcilePhysicalWorktreeAfterRemovalFailure'
   >
+  workspacePaneTabs: ServerWorkspacePaneTargetLifecycleHost
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
   broadcastSessionsChanged(userId: string, repoRoot: string): void
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
@@ -73,7 +75,8 @@ export class WorktreeRemovalApplication {
         async ({ signal }, permit) => {
           if (!this.isCurrentRuntime(userId, input)) return { ok: false, message: 'error.repo-runtime-stale' }
           signal.throwIfAborted()
-          let affectedScopes: Array<{ userId: string; scope: string }> = []
+          let affectedScopes: Array<{ userId: string; repoRoot: string; scope: string }> = []
+          let affectedTargets: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']> = []
           return await input.remove(
             physicalCapability,
             {
@@ -83,6 +86,7 @@ export class WorktreeRemovalApplication {
                 const quiescence = await this.quiesce(input.repoRoot, worktreePath, physicalCapability)
                 signal.throwIfAborted()
                 affectedScopes = quiescence.scopes
+                affectedTargets = quiescence.targets
                 if (!quiescence.ok) {
                   await this.reconcileAfterFailure(
                     input.repoRoot,
@@ -99,19 +103,18 @@ export class WorktreeRemovalApplication {
                 try {
                   this.deps.worktreeOperations.assertPermit(physicalCapability, permit)
                   await Promise.all(
-                    affectedScopes.map(async ({ userId: affectedUserId, scope }) => {
-                      await this.deps.workspaceTabs.retireTarget({
-                        userId: affectedUserId,
-                        scope,
-                        target: { kind: 'worktree', repoRoot: input.repoRoot, worktreePath },
+                    affectedTargets.map(async ({ userId: affectedUserId, repoRuntimeId, target }) => {
+                      await this.deps.workspacePaneTabs.retireTarget(affectedUserId, {
+                        repoRuntimeId,
+                        target,
                       })
                     }),
                   )
-                  this.broadcast(input.repoRoot, affectedScopes)
+                  this.broadcastSessions(affectedScopes)
                   return { ok: true, message: '' }
                 } catch (error) {
                   worktreeRemovalLogger.error({ error, repoRoot: input.repoRoot, worktreePath }, 'tabs finalize failed')
-                  this.broadcast(input.repoRoot, affectedScopes)
+                  this.broadcast(affectedScopes)
                   return { ok: false, message: error instanceof Error ? error.message : String(error) }
                 }
               },
@@ -131,15 +134,10 @@ export class WorktreeRemovalApplication {
       )
       if (!result.admitted) return { ok: false, message: 'error.worktree-removal-in-progress' }
       if (result.value.ok && input.alsoDeleteBranch) {
-        await this.deps.workspaceTabs.retireTarget({
-          userId,
-          scope: terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId),
+        await this.deps.workspacePaneTabs.retireTarget(userId, {
+          repoRuntimeId: input.repoRuntimeId,
           target: { kind: 'branch', repoRoot: input.repoRoot, branchName: input.branchName },
-          assertCurrent: () => {
-            if (!this.isCurrentRuntime(userId, input)) throw new Error('error.repo-runtime-stale')
-          },
         })
-        this.deps.broadcastWorkspaceTabsChanged(userId, input.repoRoot)
       }
       return result.value
     } catch (error) {
@@ -157,22 +155,38 @@ export class WorktreeRemovalApplication {
     worktreePath: string,
     physicalWorktreeCapability: PhysicalWorktreeCapability,
   ): Promise<
-    | { ok: true; scopes: Array<{ userId: string; scope: string }> }
-    | { ok: false; scopes: Array<{ userId: string; scope: string }>; message: string }
+    | {
+        ok: true
+        scopes: Array<{ userId: string; repoRoot: string; scope: string }>
+        targets: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']>
+      }
+    | {
+        ok: false
+        scopes: Array<{ userId: string; repoRoot: string; scope: string }>
+        targets: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']>
+        message: string
+      }
   > {
+    const targets = this.deps.workspaceTabs.physicalWorktreeTargets(physicalWorktreeCapability.identity)
     const terminal = await this.deps.terminalWorktree.closeSessionsForPhysicalWorktree(physicalWorktreeCapability)
     const scopes = uniqueScopes([
       ...terminal.scopes,
-      ...this.deps.workspaceTabs.physicalWorktreeScopes(physicalWorktreeCapability.identity),
+      ...targets.map(({ userId, scope, target }) => ({ userId, repoRoot: target.repoRoot, scope })),
     ])
-    return terminal.ok ? { ok: true, scopes } : { ok: false, scopes, message: terminal.message }
+    return terminal.ok ? { ok: true, scopes, targets } : { ok: false, scopes, targets, message: terminal.message }
   }
 
-  private broadcast(repoRoot: string, scopes: readonly { userId: string; scope: string }[]): void {
-    for (const userId of new Set(scopes.map((scope) => scope.userId))) {
+  private broadcast(scopes: readonly { userId: string; repoRoot: string }[]): void {
+    const targets = new Map(scopes.map(({ userId, repoRoot }) => [`${userId}\0${repoRoot}`, { userId, repoRoot }]))
+    for (const { userId, repoRoot } of targets.values()) {
       this.deps.broadcastSessionsChanged(userId, repoRoot)
       this.deps.broadcastWorkspaceTabsChanged(userId, repoRoot)
     }
+  }
+
+  private broadcastSessions(scopes: readonly { userId: string; repoRoot: string }[]): void {
+    const targets = new Map(scopes.map(({ userId, repoRoot }) => [`${userId}\0${repoRoot}`, { userId, repoRoot }]))
+    for (const { userId, repoRoot } of targets.values()) this.deps.broadcastSessionsChanged(userId, repoRoot)
   }
 
   private async reconcileAfterFailure(
@@ -180,7 +194,7 @@ export class WorktreeRemovalApplication {
     worktreePath: string,
     physicalWorktreeCapability: PhysicalWorktreeCapability,
     permit: PhysicalWorktreeOperationPermit,
-    scopes: readonly { userId: string; scope: string }[],
+    scopes: readonly { userId: string; repoRoot: string; scope: string }[],
   ): Promise<void> {
     try {
       await this.deps.workspaceTabs.reconcilePhysicalWorktreeAfterRemovalFailure({
@@ -193,7 +207,7 @@ export class WorktreeRemovalApplication {
     } catch (error) {
       worktreeRemovalLogger.error({ error, repoRoot, worktreePath }, 'tabs reconcile failed')
     }
-    this.broadcast(repoRoot, scopes)
+    this.broadcast(scopes)
   }
 }
 
@@ -208,6 +222,8 @@ export function createWorktreeRemovalApplication(
   return new WorktreeRemovalApplication(deps)
 }
 
-function uniqueScopes(scopes: readonly { userId: string; scope: string }[]): Array<{ userId: string; scope: string }> {
+function uniqueScopes(
+  scopes: readonly { userId: string; repoRoot: string; scope: string }[],
+): Array<{ userId: string; repoRoot: string; scope: string }> {
   return Array.from(new Map(scopes.map((scope) => [`${scope.userId}\0${scope.scope}`, scope])).values())
 }

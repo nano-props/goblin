@@ -42,7 +42,7 @@ import { IpcError, type RepoLogResponse } from '#/shared/api-types.ts'
 import { isRemoteRepoRuntimeFailure } from '#/server/modules/remote-runtime-failure.ts'
 import { settleRemoteRuntimeFailure } from '#/server/modules/remote-runtime-failure-settlement.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
-import type { ServerWorkspacePaneTargetLifecycleHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import type { ServerRepoMutationHost } from '#/server/repo-mutation/repo-mutation-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
@@ -56,7 +56,7 @@ const READ_REPO_ERROR = { ok: false as const, message: 'error.failed-read-repo' 
 
 export function createRepoRoutes(options: {
   worktreeRemovalApplication: ServerWorktreeRemovalHost
-  workspacePaneTargetLifecycle: ServerWorkspacePaneTargetLifecycleHost
+  repoMutationApplication: ServerRepoMutationHost
 }) {
   const app = createRouteApp()
   async function jsonOr<T>(run: () => Promise<T>, fallback: T, label: string) {
@@ -274,20 +274,13 @@ export function createRepoRoutes(options: {
       await runtimeReadJsonOrThrow(
         userId,
         async () => {
-          const result = await deleteRepoBranch(
-            cwd,
-            branch,
-            { force, alsoDeleteUpstream },
-            c.req.raw.signal,
-            { repoRuntimeId },
-          )
-          if (result.ok) {
-            await options.workspacePaneTargetLifecycle.retireTarget(userId, {
-              repoRuntimeId,
-              target: { kind: 'branch', repoRoot: cwd, branchName: branch },
-            })
-          }
-          return result
+          return await options.repoMutationApplication.deleteBranch(userId, {
+            repoRoot: cwd,
+            repoRuntimeId,
+            branchName: branch,
+            deleteBranch: async () =>
+              await deleteRepoBranch(cwd, branch, { force, alsoDeleteUpstream }, c.req.raw.signal, { repoRuntimeId }),
+          })
         },
         'delete-branch',
       ),

@@ -5,7 +5,7 @@ import type {
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
-import type { WorkspacePaneTabsTargetIdentity } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
+import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
 
 type MaybePromise<T> = T | Promise<T>
 

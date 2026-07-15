@@ -10,6 +10,7 @@ import {
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import type { ServerWorkspacePaneTargetLifecycleHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
 
 const failRemoteRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
@@ -94,8 +95,8 @@ describe('WorktreeRemovalApplication', () => {
 
   test('reconciles every affected user scope after Git removal fails', async () => {
     const affectedScopes = [
-      { userId: 'user-a', scope: '/repo\0runtime-a' },
-      { userId: 'user-b', scope: '/repo\0runtime-b' },
+      { userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a' },
+      { userId: 'user-b', repoRoot: '/repo', scope: '/repo\0runtime-b' },
     ]
     const reconcilePhysicalWorktreeAfterRemovalFailure = vi.fn(async () => {})
     const retireTarget = vi.fn(async () => ({ revision: 0, entries: [] }))
@@ -261,8 +262,7 @@ describe('WorktreeRemovalApplication', () => {
 
   test('retires the branch target after worktree and branch removal both succeed', async () => {
     const retireTarget = vi.fn(async () => ({ revision: 1, entries: [] }))
-    const broadcastWorkspaceTabsChanged = vi.fn()
-    const application = createApplication({ retireTarget, broadcastWorkspaceTabsChanged })
+    const application = createApplication({ retireTarget })
 
     await expect(
       application.removeWorktree('user-a', {
@@ -278,13 +278,53 @@ describe('WorktreeRemovalApplication', () => {
       }),
     ).resolves.toEqual({ ok: true, message: 'removed' })
 
-    expect(retireTarget).toHaveBeenCalledWith({
-      userId: 'user-a',
-      scope: `${target.repoRoot}\0${target.repoRuntimeId}`,
+    expect(retireTarget).toHaveBeenCalledWith('user-a', {
+      repoRuntimeId: target.repoRuntimeId,
       target: { kind: 'branch', repoRoot: target.repoRoot, branchName: target.branchName },
-      assertCurrent: expect.any(Function),
     })
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', target.repoRoot)
+  })
+
+  test('retires each repository target that references one removed physical worktree', async () => {
+    const retireTarget = vi.fn(async () => ({ revision: 1, entries: [] }))
+    const physicalWorktreeTargets = [
+      {
+        userId: 'user-a',
+        scope: '/repo\0runtime-a',
+        repoRuntimeId: 'runtime-a',
+        target: { kind: 'worktree' as const, repoRoot: '/repo', worktreePath: '/repo/worktree' },
+      },
+      {
+        userId: 'user-a',
+        scope: '/linked-repo\0runtime-b',
+        repoRuntimeId: 'runtime-b',
+        target: { kind: 'worktree' as const, repoRoot: '/linked-repo', worktreePath: '/linked/worktree' },
+      },
+    ]
+    const broadcastSessionsChanged = vi.fn()
+    const application = createApplication({ retireTarget, physicalWorktreeTargets, broadcastSessionsChanged })
+
+    await expect(
+      application.removeWorktree('user-a', {
+        ...target,
+        async remove(_capability, lifecycle) {
+          const prepared = await lifecycle.beforeRemove()
+          if (!prepared.ok) return prepared
+          return await lifecycle.afterWorktreeRemoved()
+        },
+      }),
+    ).resolves.toEqual({ ok: true, message: '' })
+
+    expect(retireTarget).toHaveBeenCalledTimes(2)
+    expect(retireTarget).toHaveBeenNthCalledWith(1, 'user-a', {
+      repoRuntimeId: 'runtime-a',
+      target: { kind: 'worktree', repoRoot: '/repo', worktreePath: '/repo/worktree' },
+    })
+    expect(retireTarget).toHaveBeenNthCalledWith(2, 'user-a', {
+      repoRuntimeId: 'runtime-b',
+      target: { kind: 'worktree', repoRoot: '/linked-repo', worktreePath: '/linked/worktree' },
+    })
+    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', '/repo')
+    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', '/linked-repo')
   })
 })
 
@@ -292,15 +332,16 @@ function createApplication(
   options: {
     operations?: ReturnType<typeof createPhysicalWorktreeOperationCoordinator>
     physicalWorktrees?: typeof testPhysicalWorktrees
-    terminalScopes?: Array<{ userId: string; scope: string }>
+    terminalScopes?: Array<{ userId: string; repoRoot: string; scope: string }>
     terminalQuiescence?:
-      | { ok: true; scopes: Array<{ userId: string; scope: string }> }
-      | { ok: false; scopes: Array<{ userId: string; scope: string }>; message: string }
+      | { ok: true; scopes: Array<{ userId: string; repoRoot: string; scope: string }> }
+      | { ok: false; scopes: Array<{ userId: string; repoRoot: string; scope: string }>; message: string }
     closeSessionsForPhysicalWorktree?: (
       identity: PhysicalWorktreeIdentity,
-    ) => Promise<Array<{ userId: string; scope: string }>>
+    ) => Promise<Array<{ userId: string; repoRoot: string; scope: string }>>
     reconcilePhysicalWorktreeAfterRemovalFailure?: () => Promise<void>
-    retireTarget?: WorkspacePaneTabsCoordinator['retireTarget']
+    retireTarget?: ServerWorkspacePaneTargetLifecycleHost['retireTarget']
+    physicalWorktreeTargets?: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']>
     broadcastWorkspaceTabsChanged?: (userId: string, repoRoot: string) => void
     broadcastSessionsChanged?: (userId: string, repoRoot: string) => void
   } = {},
@@ -319,10 +360,12 @@ function createApplication(
       }),
     },
     workspaceTabs: {
-      physicalWorktreeScopes: () => [],
-      retireTarget: options.retireTarget ?? (async () => ({ revision: 0, entries: [] })),
+      physicalWorktreeTargets: () => options.physicalWorktreeTargets ?? [],
       reconcilePhysicalWorktreeAfterRemovalFailure:
         options.reconcilePhysicalWorktreeAfterRemovalFailure ?? (async () => {}),
+    },
+    workspacePaneTabs: {
+      retireTarget: options.retireTarget ?? (async () => ({ revision: 0, entries: [] })),
     },
     isCurrentRepoRuntime: () => true,
     broadcastSessionsChanged: options.broadcastSessionsChanged ?? (() => {}),

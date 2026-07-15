@@ -100,13 +100,13 @@ function createTestRepoRoutes(
       )
     },
   },
-  workspacePaneTargetLifecycle: Parameters<typeof createRepoRoutes>[0]['workspacePaneTargetLifecycle'] = {
-    retireTarget: vi.fn(async () => ({ revision: 0, entries: [] })),
+  repoMutationApplication: Parameters<typeof createRepoRoutes>[0]['repoMutationApplication'] = {
+    deleteBranch: async (_userId, input) => await input.deleteBranch(),
   },
 ) {
   return createRepoRoutes({
     worktreeRemovalApplication,
-    workspacePaneTargetLifecycle,
+    repoMutationApplication,
   })
 }
 
@@ -1103,9 +1103,9 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     )
   })
 
-  test('retires durable branch layout only after branch deletion succeeds', async () => {
-    const retireTarget = vi.fn(async () => ({ revision: 1, entries: [] }))
-    const app = createTestRepoRoutes(undefined, { retireTarget })
+  test('delegates branch deletion to the repo mutation application', async () => {
+    const deleteBranch = vi.fn(async (_userId, input) => await input.deleteBranch())
+    const app = createTestRepoRoutes(undefined, { deleteBranch })
     const repoRuntimeId = await openTestRepoRuntime(app)
     mocks.deleteRepoBranch.mockResolvedValueOnce({ ok: true, message: 'ok' })
 
@@ -1116,9 +1116,11 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     })
 
     expect(response.status).toBe(200)
-    expect(retireTarget).toHaveBeenCalledWith('user-test', {
+    expect(deleteBranch).toHaveBeenCalledWith('user-test', {
+      repoRoot: '/tmp/repo',
       repoRuntimeId,
-      target: { kind: 'branch', repoRoot: '/tmp/repo', branchName: 'feature/retired' },
+      branchName: 'feature/retired',
+      deleteBranch: expect.any(Function),
     })
 
     mocks.deleteRepoBranch.mockResolvedValueOnce({ ok: false, message: 'delete failed' })
@@ -1127,7 +1129,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, branch: 'feature/kept' }),
     })
-    expect(retireTarget).toHaveBeenCalledTimes(1)
+    expect(deleteBranch).toHaveBeenCalledTimes(2)
   })
 
   test('forwards external workspace app open routes', async () => {

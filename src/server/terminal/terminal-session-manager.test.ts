@@ -434,7 +434,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     expect(supervisor.spawns).toEqual([])
 
     acknowledgeKill()
-    await expect(quiescence).resolves.toEqual({ ok: true, scopes: [{ userId: USER_ID, scope }] })
+    await expect(quiescence).resolves.toEqual({ ok: true, scopes: [{ userId: USER_ID, repoRoot, scope }] })
     await expect(directClose).resolves.toBe(true)
     expect(onSessionClosed).toHaveBeenCalledOnce()
   })
@@ -465,7 +465,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
 
     await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(physicalWorktreePath))).resolves.toEqual({
       ok: true,
-      scopes: [{ userId: USER_ID, scope }],
+      scopes: [{ userId: USER_ID, repoRoot: linkedRepoRoot, scope }],
     })
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
   })
@@ -504,7 +504,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     expect(quiesced).toBe(false)
 
     acknowledgeKill()
-    await expect(quiescence).resolves.toEqual({ ok: true, scopes: [{ userId: USER_ID, scope }] })
+    await expect(quiescence).resolves.toEqual({ ok: true, scopes: [{ userId: USER_ID, repoRoot, scope }] })
     await expect(pendingCreate).resolves.toEqual({ ok: false, message: 'error.unavailable' })
   })
 
@@ -535,7 +535,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
 
     await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(WORKTREE_PATH))).resolves.toEqual({
       ok: false,
-      scopes: [{ userId: USER_ID, scope }],
+      scopes: [{ userId: USER_ID, repoRoot, scope }],
       message: 'PTY close timed out',
     })
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([
@@ -545,7 +545,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     killAndWait.mockResolvedValueOnce(undefined)
     await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(WORKTREE_PATH))).resolves.toEqual({
       ok: true,
-      scopes: [{ userId: USER_ID, scope }],
+      scopes: [{ userId: USER_ID, repoRoot, scope }],
     })
     expect(killAndWait).toHaveBeenCalledTimes(2)
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
@@ -588,7 +588,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     expect(quiesced).toBe(false)
 
     killAcknowledged.resolve()
-    await expect(quiescence).resolves.toEqual({ ok: true, scopes: [{ userId: USER_ID, scope }] })
+    await expect(quiescence).resolves.toEqual({ ok: true, scopes: [{ userId: USER_ID, repoRoot, scope }] })
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
   })
 
@@ -629,7 +629,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
 
     await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(WORKTREE_PATH))).resolves.toEqual({
       ok: true,
-      scopes: [{ userId: USER_ID, scope }],
+      scopes: [{ userId: USER_ID, repoRoot, scope }],
     })
     expect(killAndWait).toHaveBeenCalledTimes(2)
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])

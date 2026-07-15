@@ -1,9 +1,46 @@
 import { describe, expect, test } from 'vitest'
-import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
+import {
+  createWorkspacePaneTabsRuntime,
+  type WorkspacePaneTabsRuntime,
+} from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import { testPhysicalWorktreeIdentity } from '#/server/test-utils/physical-worktree-identity.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 describe('workspace pane tabs runtime storage', () => {
+  test('keeps mutation plans side-effect free until commit', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    const plan = runtime.planReplace({ ...target(), tabs: [workspacePaneStaticTabEntry('history')] })
+
+    expect(runtime.tabs(target())).toEqual([workspacePaneStaticTabEntry('status')])
+    expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(0)
+
+    runtime.commitPlan(plan)
+    expect(runtime.tabs(target())).toEqual([workspacePaneStaticTabEntry('history')])
+    expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(1)
+  })
+
+  test('rejects a plan built from an older aggregate revision', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    const stalePlan = runtime.planReplace({ ...target(), tabs: [workspacePaneStaticTabEntry('history')] })
+    commitReplace(runtime, { ...target(), tabs: [workspacePaneStaticTabEntry('changes')] })
+
+    expect(() => runtime.commitPlan(stalePlan)).toThrow('error.workspace-tabs-plan-stale')
+    expect(runtime.tabs(target())).toEqual([workspacePaneStaticTabEntry('changes')])
+  })
+
+  test('rejects a mutation whose repo root does not own the scope', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    commitReplace(runtime, { ...target(), tabs: [workspacePaneStaticTabEntry('status')] })
+
+    expect(() =>
+      runtime.planRetire({
+        userId: 'user-a',
+        scope: '/repo',
+        target: { kind: 'worktree', repoRoot: '/other-repo', worktreePath: '/repo-linked' },
+      }),
+    ).toThrow('error.workspace-tabs-scope-repo-mismatch')
+  })
+
   test('tracks initialized scope lifecycle independently from stored entries', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     const scope = { userId: 'user-a', scope: '/repo' }
@@ -24,7 +61,7 @@ describe('workspace pane tabs runtime storage', () => {
       workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
     ]
 
-    runtime.replaceTabs({ ...target(), tabs })
+    commitReplace(runtime, { ...target(), tabs })
 
     expect(runtime.tabs(target())).toEqual(tabs)
     expect(runtime.runtimeSessionIds(worktree(), 'terminal')).toEqual([
@@ -39,10 +76,10 @@ describe('workspace pane tabs runtime storage', () => {
       workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
       workspacePaneStaticTabEntry('status'),
     ]
-    runtime.replaceTabs({ ...target(), branchName: 'feature/old', tabs })
+    commitReplace(runtime, { ...target(), branchName: 'feature/old', tabs })
 
     const retargeted = { ...target(), branchName: 'feature/new' }
-    runtime.replaceTabs({ ...retargeted, tabs })
+    commitReplace(runtime, { ...retargeted, tabs })
 
     expect(runtime.tabs(retargeted)).toEqual(tabs)
     expect(runtime.tabsForScope({ userId: 'user-a', scope: '/repo' })).toEqual([
@@ -59,7 +96,7 @@ describe('workspace pane tabs runtime storage', () => {
       physicalWorktreeIdentity: null,
     }
 
-    runtime.replaceTabs({
+    commitReplace(runtime, {
       ...noWorktree,
       tabs: [
         workspacePaneStaticTabEntry('status'),
@@ -74,8 +111,8 @@ describe('workspace pane tabs runtime storage', () => {
   test('isolates identical terminal identities by user', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     const tabs = [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')]
-    runtime.replaceTabs({ ...target(), tabs })
-    runtime.replaceTabs({ ...target(), userId: 'user-b', tabs })
+    commitReplace(runtime, { ...target(), tabs })
+    commitReplace(runtime, { ...target(), userId: 'user-b', tabs })
 
     expect(runtime.runtimeSessionIds(worktree(), 'terminal')).toEqual(['term-111111111111111111111'])
     expect(runtime.runtimeSessionIds({ ...worktree(), userId: 'user-b' }, 'terminal')).toEqual([
@@ -86,9 +123,9 @@ describe('workspace pane tabs runtime storage', () => {
   test('closes user and scope storage without affecting other owners', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     const tabs = [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')]
-    runtime.replaceTabs({ ...target(), tabs })
-    runtime.replaceTabs({ ...target(), userId: 'user-b', tabs })
-    runtime.replaceTabs({ ...target(), scope: 'scope-b', tabs: [workspacePaneStaticTabEntry('history')] })
+    commitReplace(runtime, { ...target(), tabs })
+    commitReplace(runtime, { ...target(), userId: 'user-b', tabs })
+    commitReplace(runtime, { ...target(), scope: 'scope-b', tabs: [workspacePaneStaticTabEntry('history')] })
 
     runtime.closeTabsForScope('user-a', 'scope-b')
     expect(runtime.scopesForUser('user-a')).toEqual(['/repo'])
@@ -105,14 +142,26 @@ describe('workspace pane tabs runtime storage', () => {
   test('enumerates every user and runtime scope across repository entries for one physical worktree', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     const tabs = [workspacePaneStaticTabEntry('status')]
-    runtime.replaceTabs({ ...target(), scope: '/repo\0runtime-a', tabs })
-    runtime.replaceTabs({ ...target(), userId: 'user-b', scope: '/repo\0runtime-b', tabs })
-    runtime.replaceTabs({ ...target(), scope: '/other-repo\0runtime-c', tabs })
+    commitReplace(runtime, { ...target(), scope: '/repo\0runtime-a', tabs })
+    commitReplace(runtime, { ...target(), userId: 'user-b', scope: '/repo\0runtime-b', tabs })
+    commitReplace(runtime, { ...target(), repoRoot: '/other-repo', scope: '/other-repo\0runtime-c', tabs })
 
-    expect(runtime.physicalWorktreeScopes(testPhysicalWorktreeIdentity('/repo-linked'))).toEqual([
-      { userId: 'user-a', scope: '/repo\0runtime-a' },
-      { userId: 'user-b', scope: '/repo\0runtime-b' },
-      { userId: 'user-a', scope: '/other-repo\0runtime-c' },
+    expect(runtime.physicalWorktreeTargets(testPhysicalWorktreeIdentity('/repo-linked'))).toEqual([
+      {
+        userId: 'user-a',
+        scope: '/repo\0runtime-a',
+        target: { kind: 'worktree', repoRoot: '/repo', worktreePath: '/repo-linked' },
+      },
+      {
+        userId: 'user-b',
+        scope: '/repo\0runtime-b',
+        target: { kind: 'worktree', repoRoot: '/repo', worktreePath: '/repo-linked' },
+      },
+      {
+        userId: 'user-a',
+        scope: '/other-repo\0runtime-c',
+        target: { kind: 'worktree', repoRoot: '/other-repo', worktreePath: '/repo-linked' },
+      },
     ])
   })
 
@@ -121,13 +170,13 @@ describe('workspace pane tabs runtime storage', () => {
     const tabs = [workspacePaneStaticTabEntry('status')]
 
     expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(0)
-    runtime.replaceTabs({ ...target(), tabs })
+    commitReplace(runtime, { ...target(), tabs })
     expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(1)
 
-    runtime.replaceTabs({ ...target(), tabs })
+    commitReplace(runtime, { ...target(), tabs })
     expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(1)
 
-    runtime.replaceTabs({ ...target(), userId: 'user-b', tabs })
+    commitReplace(runtime, { ...target(), userId: 'user-b', tabs })
     expect(runtime.revision({ userId: 'user-b', scope: '/repo' })).toBe(1)
     expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(1)
 
@@ -141,7 +190,7 @@ describe('workspace pane tabs runtime storage', () => {
 
   test('does not release a repo-runtime epoch clock while its targets are live', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
-    runtime.replaceTabs({ ...target(), tabs: [workspacePaneStaticTabEntry('status')] })
+    commitReplace(runtime, { ...target(), tabs: [workspacePaneStaticTabEntry('status')] })
 
     expect(() => runtime.releaseRevisionForScope('user-a', '/repo')).toThrow(
       'cannot release workspace pane tabs revision with live targets',
@@ -150,13 +199,13 @@ describe('workspace pane tabs runtime storage', () => {
 
   test('closes every target for one worktree with one revision without affecting sibling worktrees', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
-    runtime.replaceTabs({ ...target(), tabs: [workspacePaneStaticTabEntry('status')] })
-    runtime.replaceTabs({
+    commitReplace(runtime, { ...target(), tabs: [workspacePaneStaticTabEntry('status')] })
+    commitReplace(runtime, {
       ...target(),
       branchName: 'feature/renamed',
       tabs: [workspacePaneStaticTabEntry('history')],
     })
-    runtime.replaceTabs({
+    commitReplace(runtime, {
       ...target(),
       branchName: 'feature/other',
       worktreePath: '/repo-other',
@@ -165,11 +214,12 @@ describe('workspace pane tabs runtime storage', () => {
     })
     const revision = runtime.revision({ userId: 'user-a', scope: '/repo' })
 
-    runtime.retireTarget({
+    const plan = runtime.planRetire({
       userId: 'user-a',
       scope: '/repo',
       target: { kind: 'worktree', repoRoot: '/repo', worktreePath: '/repo-linked' },
     })
+    runtime.commitPlan(plan)
 
     expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(revision + 1)
     expect(runtime.tabsForScope({ userId: 'user-a', scope: '/repo' })).toEqual([
@@ -185,11 +235,19 @@ describe('workspace pane tabs runtime storage', () => {
 function target() {
   return {
     userId: 'user-a',
+    repoRoot: '/repo',
     scope: '/repo',
     branchName: 'feature/worktree',
     worktreePath: '/repo-linked',
     physicalWorktreeIdentity: testPhysicalWorktreeIdentity('/repo-linked'),
   }
+}
+
+function commitReplace(
+  runtime: WorkspacePaneTabsRuntime<string>,
+  input: Parameters<typeof runtime.planReplace>[0],
+): void {
+  runtime.commitPlan(runtime.planReplace(input))
 }
 
 function worktree() {

@@ -189,11 +189,19 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isCurrentRepoRuntime,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
   })
+  const workspacePaneTargetLifecycle: ServerWorkspacePaneTargetLifecycleHost = {
+    async retireTarget(userId, input) {
+      const snapshot = await sessionService.retireTarget(userId, input)
+      broadcastRepoWorkspaceTabsChanged(userId, input.target.repoRoot)
+      return snapshot
+    },
+  }
   const worktreeRemovalApplication = createWorktreeRemovalApplication({
     worktreeOperations,
     physicalWorktrees,
     terminalWorktree: manager,
     workspaceTabs: workspaceTabsCoordinator,
+    workspacePaneTabs: workspacePaneTargetLifecycle,
     isCurrentRepoRuntime,
     broadcastSessionsChanged: broadcastRepoSessionsChanged,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
@@ -225,11 +233,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async updateTabs(clientId, userId, input) {
       return await workspacePaneTabsActions.updateTabs(clientId, userId, input)
     },
-    async retireTarget(userId, input) {
-      const snapshot = await sessionService.retireTarget(userId, input)
-      broadcastRepoWorkspaceTabsChanged(userId, input.target.repoRoot)
-      return snapshot
-    },
+    retireTarget: workspacePaneTargetLifecycle.retireTarget,
   }
 
   const terminalActionHost: ServerTerminalActionHost = {
