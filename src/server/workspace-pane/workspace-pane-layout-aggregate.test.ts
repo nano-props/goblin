@@ -83,9 +83,29 @@ describe('workspace pane layout aggregate', () => {
     expect(repository.compareAndSwap).toHaveBeenCalledTimes(2)
   })
 
+  test('rejects an absolute replace after a CAS conflict instead of replaying stale layout', async () => {
+    const repository = memoryRepository()
+    repository.compareAndSwap = vi.fn(async () => ({
+      kind: 'conflict' as const,
+      snapshot: { layout: { entries: [] } },
+    }))
+    const aggregate = new WorkspacePaneLayoutAggregate({ repository })
+
+    await expect(aggregate.replace({
+      ...scope,
+      ...target,
+      tabs: [workspacePaneStaticTabEntry('history')],
+      providerSnapshots: [],
+    })).rejects.toThrow('error.workspace-tabs-layout-conflict')
+    expect(repository.compareAndSwap).toHaveBeenCalledOnce()
+  })
+
   test('commits no overlay or revision when persistence fails', async () => {
     const repository = memoryRepository()
-    repository.compareAndSwap = vi.fn(async () => { throw new Error('disk full') })
+    repository.compareAndSwap = vi.fn(async () => ({
+      kind: 'failure' as const,
+      error: new Error('disk full'),
+    }))
     const aggregate = new WorkspacePaneLayoutAggregate({ repository })
 
     await expect(aggregate.replace({
@@ -116,13 +136,24 @@ describe('workspace pane layout aggregate', () => {
     ])
   })
 
+  test('does not let overlay metadata synthesize target membership', async () => {
+    const aggregate = new WorkspacePaneLayoutAggregate({ repository: memoryRepository() })
+    aggregate.overlay.registerTargetMetadata({
+      ...scope,
+      target: { kind: 'branch', repoRoot: '/repo', branchName: 'metadata-only' },
+      branchName: 'metadata-only',
+    })
+
+    await expect(aggregate.snapshot(scope, [])).resolves.toMatchObject({ entries: [] })
+  })
+
   test('repairs invalid targets locally while preserving valid siblings', async () => {
     const valid = { repoRoot: '/repo', branchName: 'main', worktreePath: null, tabs: [workspacePaneStaticTabEntry('history')] }
     const invalid = { repoRoot: '/repo', branchName: 'deleted', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')] }
     const repository = memoryRepository({ entries: [valid, invalid] })
     const aggregate = new WorkspacePaneLayoutAggregate({ repository })
 
-    const snapshot = await aggregate.validateRepairAndSnapshot({
+    const result = await aggregate.validateRepairAndSnapshot({
       ...scope,
       validTargets: [{ repoRoot: '/repo', branchName: 'main', worktreePath: null }],
       expectedRepoEntry: { kind: 'local', id: '/repo' },
@@ -130,25 +161,106 @@ describe('workspace pane layout aggregate', () => {
     })
 
     expect(repository.layout).toEqual({ entries: [valid] })
-    expect(snapshot.entries).toEqual([valid])
+    expect(result).toMatchObject({
+      kind: 'validated',
+      snapshot: { entries: [valid] },
+      durableLayoutChanged: true,
+    })
   })
 
-  test('suppresses invalid targets when repair persistence fails', async () => {
-    const repository = memoryRepository({ entries: [{
-      repoRoot: '/repo', branchName: 'deleted', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')],
-    }] })
-    repository.compareAndSwap = vi.fn(async () => { throw new Error('disk full') })
+  test('does not report a durable change when restore validation is a no-op', async () => {
+    const valid = {
+      repoRoot: '/repo',
+      branchName: 'main',
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('history')],
+    }
+    const repository = memoryRepository({ entries: [valid] })
     const aggregate = new WorkspacePaneLayoutAggregate({ repository })
 
-    const snapshot = await aggregate.validateRepairAndSnapshot({
+    const result = await aggregate.validateRepairAndSnapshot({
+      ...scope,
+      validTargets: [{ repoRoot: '/repo', branchName: 'main', worktreePath: null }],
+      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      providerSnapshots: [],
+    })
+
+    expect(result).toMatchObject({
+      kind: 'validated',
+      snapshot: { entries: [valid] },
+      durableLayoutChanged: false,
+    })
+  })
+
+  test('admits a target created by a durable mutation after restore validation', async () => {
+    const repository = memoryRepository()
+    const aggregate = new WorkspacePaneLayoutAggregate({ repository })
+    await aggregate.validateRepairAndSnapshot({
       ...scope,
       validTargets: [],
       expectedRepoEntry: { kind: 'local', id: '/repo' },
       providerSnapshots: [],
     })
 
-    expect(snapshot.entries).toEqual([])
+    const snapshot = await aggregate.update({
+      ...scope,
+      repoRoot: '/repo',
+      branchName: 'feature',
+      worktreePath: null,
+      operation: { type: 'open-static', tabType: 'history' },
+      providerSnapshots: [],
+    })
+
+    expect(snapshot.entries).toEqual([{
+      repoRoot: '/repo',
+      branchName: 'feature',
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+    }])
+  })
+
+  test('suppresses invalid targets when repair persistence fails', async () => {
+    const repository = memoryRepository({ entries: [{
+      repoRoot: '/repo', branchName: 'deleted', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')],
+    }] })
+    repository.compareAndSwap = vi.fn(async () => ({
+      kind: 'failure' as const,
+      error: new Error('disk full'),
+    }))
+    const aggregate = new WorkspacePaneLayoutAggregate({ repository })
+
+    const result = await aggregate.validateRepairAndSnapshot({
+      ...scope,
+      validTargets: [],
+      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      providerSnapshots: [],
+    })
+
+    expect(result).toMatchObject({
+      kind: 'validated',
+      snapshot: { entries: [] },
+      durableLayoutChanged: false,
+    })
     expect(repository.layout.entries).toHaveLength(1)
+    await expect(aggregate.snapshot(scope, [])).resolves.toMatchObject({ entries: [] })
+  })
+
+  test('checks membership before committing restore epoch metadata even when no repair is needed', async () => {
+    const repository = memoryRepository()
+    repository.compareAndSwap = vi.fn(async () => ({
+      kind: 'membership-conflict' as const,
+      snapshot: { layout: { entries: [] } },
+    }))
+    const aggregate = new WorkspacePaneLayoutAggregate({ repository })
+
+    await expect(aggregate.validateRepairAndSnapshot({
+      ...scope,
+      validTargets: [{ repoRoot: '/repo', ...target }],
+      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      providerSnapshots: [],
+    })).resolves.toEqual({ kind: 'membership-conflict' })
+    expect(aggregate.overlay.activeEpochs('/repo')).toEqual([])
+    expect(aggregate.overlay.epochTargets(scope)).toEqual([])
   })
 })
 

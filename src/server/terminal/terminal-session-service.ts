@@ -22,6 +22,7 @@ import {
 import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspacePaneTabsRestoreResult } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
 import {
   createTerminalSessionEnsurer,
@@ -185,10 +186,10 @@ class TerminalSessionService {
       targets: WorkspacePaneTabsTarget[]
       expectedRepoEntry: RepoSessionEntry
     },
-  ): Promise<WorkspacePaneTabsSnapshot> {
+  ): Promise<WorkspacePaneTabsRestoreResult> {
     if (!isValidRepoLocator(input.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
     const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
-    return await this.workspaceTabsCoordinator.restoreScope({
+    const result = await this.workspaceTabsCoordinator.restoreScope({
       userId,
       repoRoot: input.repoRoot,
       scope,
@@ -201,6 +202,13 @@ class TerminalSessionService {
       expectedRepoEntry: input.expectedRepoEntry,
       assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId),
     })
+    if (result.kind === 'membership-conflict') return result
+    if (result.durableLayoutChanged) {
+      for (const affectedUserId of this.workspaceTabsCoordinator.activeUsersForRepo(input.repoRoot)) {
+        this.options.broadcastWorkspaceTabsChanged(affectedUserId, input.repoRoot)
+      }
+    }
+    return result.snapshot
   }
 
   async updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabsSnapshot> {
@@ -237,7 +245,6 @@ class TerminalSessionService {
       userId,
       scope,
       target: input.target,
-      assertCurrent: () => this.assertCurrentRepoRuntime(userId, repoRoot, input.repoRuntimeId),
     })
   }
 

@@ -13,8 +13,6 @@ const mocks = vi.hoisted(() => ({
   getServerWorkspaceState: vi.fn(),
   compareAndReplaceServerWorkspaceRepos: vi.fn(),
   confirmServerWorkspaceRepoEntry: vi.fn(),
-  confirmServerWorkspaceTabsUnchanged: vi.fn(),
-  clearServerWorkspaceTabsIfUnchanged: vi.fn(),
   probeRepo: vi.fn(),
   readRepoProjection: vi.fn(),
   runRemoteLifecycleWrite: vi.fn(),
@@ -30,8 +28,6 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerWorkspaceState: mocks.getServerWorkspaceState,
   compareAndReplaceServerWorkspaceRepos: mocks.compareAndReplaceServerWorkspaceRepos,
   confirmServerWorkspaceRepoEntry: mocks.confirmServerWorkspaceRepoEntry,
-  confirmServerWorkspaceTabsUnchanged: mocks.confirmServerWorkspaceTabsUnchanged,
-  clearServerWorkspaceTabsIfUnchanged: mocks.clearServerWorkspaceTabsIfUnchanged,
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
@@ -61,10 +57,6 @@ describe('restoreServerWorkspace', () => {
       requested: { branch: null, pullRequestMode: 'full' },
       loadedAt: 1,
     })
-    mocks.clearServerWorkspaceTabsIfUnchanged.mockImplementation(async ({ repoRoot }: { repoRoot: string }) => ({
-      cleared: true,
-      workspace: { openRepoEntries: [], workspacePaneTabsByTargetByRepo: {} },
-    }))
     mocks.compareAndReplaceServerWorkspaceRepos.mockImplementation(
       async (_expected: RepoSessionEntry[], replacement: RepoSessionEntry[]) => {
         const workspace = await mocks.getServerWorkspaceState.mock.results.at(-1)?.value
@@ -74,10 +66,6 @@ describe('restoreServerWorkspace', () => {
     mocks.confirmServerWorkspaceRepoEntry.mockImplementation(async (entry: RepoSessionEntry) => ({
       matched: true,
       workspace: { openRepoEntries: [entry], workspacePaneTabsByTargetByRepo: {} },
-    }))
-    mocks.confirmServerWorkspaceTabsUnchanged.mockImplementation(async () => ({
-      matched: true,
-      workspace: await mocks.getServerWorkspaceState.mock.results.at(-1)?.value,
     }))
     mocks.runRemoteLifecycleWrite.mockResolvedValue({
       kind: 'settled',
@@ -127,7 +115,6 @@ describe('restoreServerWorkspace', () => {
         { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', snapshot: { revision: 1, entries: [] } },
       ],
     })
-    expect(mocks.clearServerWorkspaceTabsIfUnchanged).not.toHaveBeenCalled()
   })
 
   test('repairs instead of migrating non-canonical local workspace entries', async () => {
@@ -154,10 +141,9 @@ describe('restoreServerWorkspace', () => {
     expect(result.status).toBe('repaired')
     expect(result.openRepoEntries).toEqual([])
     expect(result.runtime.repos).toEqual([])
-    expect(mocks.clearServerWorkspaceTabsIfUnchanged).not.toHaveBeenCalled()
   })
 
-  test('initializes the workspace tabs scope and returns its canonical snapshot', async () => {
+  test('validates and projects workspace tabs into a canonical snapshot', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
@@ -427,7 +413,6 @@ describe('restoreServerWorkspace', () => {
     }
     const persistError = new Error('settings write failed')
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.clearServerWorkspaceTabsIfUnchanged.mockRejectedValue(persistError)
     const workspacePaneTabsHost = {
       restoreTabs: vi.fn(async () => { throw persistError }),
       listWorkspaceTabs: vi.fn(),
@@ -475,10 +460,6 @@ describe('restoreServerWorkspace', () => {
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
     }
     mocks.getServerWorkspaceState.mockResolvedValueOnce(invalidWorkspace).mockResolvedValueOnce(currentWorkspace)
-    mocks.clearServerWorkspaceTabsIfUnchanged.mockResolvedValueOnce({
-      cleared: false,
-      latestWorkspace: currentWorkspace,
-    })
     mocks.compareAndReplaceServerWorkspaceRepos
       .mockResolvedValueOnce({ matched: true, workspace: invalidWorkspace })
       .mockResolvedValueOnce({ matched: true, workspace: currentWorkspace })
@@ -497,7 +478,6 @@ describe('restoreServerWorkspace', () => {
     })
 
     expect(result.status).toBe('restored')
-    expect(mocks.clearServerWorkspaceTabsIfUnchanged).not.toHaveBeenCalled()
     expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 })

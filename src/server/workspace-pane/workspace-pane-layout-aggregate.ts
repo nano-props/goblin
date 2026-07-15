@@ -40,6 +40,10 @@ interface CanonicalClockState {
   revision: number
 }
 
+export type WorkspacePaneLayoutValidationResult =
+  | { kind: 'validated'; snapshot: WorkspacePaneTabsSnapshot; durableLayoutChanged: boolean }
+  | { kind: 'membership-conflict' }
+
 export class WorkspacePaneLayoutAggregate {
   private readonly repository: WorkspacePaneLayoutRepository
   readonly overlay: WorkspacePaneEpochOverlay
@@ -55,7 +59,7 @@ export class WorkspacePaneLayoutAggregate {
     providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
     assertCurrent?: () => void
   }): Promise<WorkspacePaneTabsSnapshot> {
-    return await this.mutate(input, () => [...input.tabs])
+    return await this.mutate(input, () => [...input.tabs], { retryConflicts: false })
   }
 
   async update(input: WorkspacePaneEpochScope & WorkspacePaneTabsTarget & {
@@ -63,7 +67,9 @@ export class WorkspacePaneLayoutAggregate {
     providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
     assertCurrent?: () => void
   }): Promise<WorkspacePaneTabsSnapshot> {
-    return await this.mutate(input, (current) => workspacePaneTabsWithUpdateOperation(current, input.operation))
+    return await this.mutate(input, (current) => workspacePaneTabsWithUpdateOperation(current, input.operation), {
+      retryConflicts: true,
+    })
   }
 
   async retire(input: WorkspacePaneEpochScope & {
@@ -84,6 +90,7 @@ export class WorkspacePaneLayoutAggregate {
         expected: current.layout,
         replacement,
       })
+      if (outcome.kind === 'failure') throw outcome.error
       if (outcome.kind === 'conflict' && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
       if (outcome.kind !== 'accepted') throw new Error('error.workspace-tabs-layout-conflict')
       this.overlay.retireTarget(input.target)
@@ -96,6 +103,7 @@ export class WorkspacePaneLayoutAggregate {
     providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
     knownLayout?: WorkspacePaneDurableLayout,
   ): Promise<WorkspacePaneTabsSnapshot> {
+    this.overlay.activate(scope)
     const layout = knownLayout ?? (await this.repository.load(scope.repoRoot)).layout
     const entries = projectCanonicalEntries(scope, layout, this.overlay, providerSnapshots)
     return { revision: this.revision(scope, layout, providerSnapshots, entries), entries }
@@ -106,14 +114,7 @@ export class WorkspacePaneLayoutAggregate {
     expectedRepoEntry: RepoSessionEntry
     providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
     assertCurrent?: () => void
-  }): Promise<WorkspacePaneTabsSnapshot> {
-    for (const target of input.validTargets) {
-      this.overlay.registerTargetMetadata({
-        ...input,
-        target: targetIdentity(target),
-        branchName: target.branchName,
-      })
-    }
+  }): Promise<WorkspacePaneLayoutValidationResult> {
     const validKeys = new Set(input.validTargets.map(workspacePaneTabsTargetIdentityKey))
     for (let conflicts = 0; ; conflicts += 1) {
       input.assertCurrent?.()
@@ -121,23 +122,35 @@ export class WorkspacePaneLayoutAggregate {
       const filtered = {
         entries: current.layout.entries.filter((entry) => validKeys.has(workspacePaneTabsTargetIdentityKey(entry))),
       }
-      if (filtered.entries.length === current.layout.entries.length) {
-        return await this.snapshot(input, input.providerSnapshots, current.layout)
+      const outcome = await this.repository.compareAndSwap({
+        repoRoot: input.repoRoot,
+        expected: current.layout,
+        replacement: filtered,
+        expectedRepoEntry: input.expectedRepoEntry,
+      })
+      if (outcome.kind === 'failure') {
+        this.commitValidatedTargetCatalog(input)
+        return {
+          kind: 'validated',
+          snapshot: await this.snapshot(input, input.providerSnapshots, current.layout),
+          durableLayoutChanged: false,
+        }
       }
-      try {
-        const outcome = await this.repository.compareAndSwap({
-          repoRoot: input.repoRoot,
-          expected: current.layout,
-          replacement: filtered,
-          expectedRepoEntry: input.expectedRepoEntry,
-        })
-        if (outcome.kind === 'conflict' && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
-        if (outcome.kind === 'membership-conflict') throw new Error('error.repo-not-in-session')
-        if (outcome.kind !== 'accepted') throw new Error('error.workspace-tabs-layout-conflict')
-        return await this.snapshot(input, input.providerSnapshots, outcome.snapshot.layout)
-      } catch (error) {
-        if (error instanceof Error && error.message === 'error.repo-not-in-session') throw error
-        return await this.snapshot(input, input.providerSnapshots, filtered)
+      if (outcome.kind === 'conflict' && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
+      if (outcome.kind === 'membership-conflict') return { kind: 'membership-conflict' }
+      if (outcome.kind !== 'accepted') {
+        this.commitValidatedTargetCatalog(input)
+        return {
+          kind: 'validated',
+          snapshot: await this.snapshot(input, input.providerSnapshots, current.layout),
+          durableLayoutChanged: false,
+        }
+      }
+      this.commitValidatedTargetCatalog(input)
+      return {
+        kind: 'validated',
+        snapshot: await this.snapshot(input, input.providerSnapshots, outcome.snapshot.layout),
+        durableLayoutChanged: outcome.changed,
       }
     }
   }
@@ -153,6 +166,7 @@ export class WorkspacePaneLayoutAggregate {
       assertCurrent?: () => void
     },
     applyIntent: (current: WorkspacePaneTabEntry[]) => WorkspacePaneTabEntry[],
+    policy: { retryConflicts: boolean },
   ): Promise<WorkspacePaneTabsSnapshot> {
     for (let conflicts = 0; ; conflicts += 1) {
       input.assertCurrent?.()
@@ -174,10 +188,11 @@ export class WorkspacePaneLayoutAggregate {
         expected: current.layout,
         replacement,
       })
-      if (outcome.kind === 'conflict' && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
+      if (outcome.kind === 'failure') throw outcome.error
+      if (outcome.kind === 'conflict' && policy.retryConflicts && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
       if (outcome.kind !== 'accepted') throw new Error('error.workspace-tabs-layout-conflict')
       const target = targetIdentity(input)
-      this.overlay.registerTargetMetadata({ ...input, target, branchName: input.branchName })
+      this.overlay.admitValidatedTarget({ ...input, target, branchName: input.branchName })
       this.overlay.recordMixedOrder({ ...input, target, tabs: mixedTabs })
       return await this.snapshot(input, input.providerSnapshots, outcome.snapshot.layout)
     }
@@ -215,6 +230,15 @@ export class WorkspacePaneLayoutAggregate {
     this.clocks.set(key, next)
     return next.revision
   }
+
+  private commitValidatedTargetCatalog(input: WorkspacePaneEpochScope & {
+    validTargets: readonly WorkspacePaneTabsTarget[]
+  }): void {
+    this.overlay.commitValidatedTargets(input, input.validTargets.map((target) => ({
+      target: targetIdentity(target),
+      branchName: target.branchName,
+    })))
+  }
 }
 
 function projectCanonicalEntries(
@@ -223,19 +247,16 @@ function projectCanonicalEntries(
   overlay: WorkspacePaneEpochOverlay,
   providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
 ): WorkspacePaneTabsSnapshot['entries'] {
+  layout = {
+    entries: layout.entries.filter((entry) =>
+      overlay.isDurableTargetVisible(scope, workspacePaneTabsTargetIdentityKey(entry)),
+    ),
+  }
   const targets = new Map<string, WorkspacePaneTabsTarget>()
   for (const entry of layout.entries) targets.set(workspacePaneTabsTargetIdentityKey(entry), entry)
   for (const provider of providers) {
     for (const session of provider.liveSessions) {
       const target = { repoRoot: scope.repoRoot, branchName: session.branch, worktreePath: session.worktreePath }
-      targets.set(workspacePaneTabsTargetIdentityKey(target), target)
-    }
-  }
-  for (const item of overlay.epochTargets(scope)) {
-    const target = item.target.kind === 'branch'
-      ? { repoRoot: scope.repoRoot, branchName: item.target.branchName, worktreePath: null }
-      : { repoRoot: scope.repoRoot, branchName: item.branchName, worktreePath: item.target.worktreePath }
-    if (!targets.has(workspacePaneTabsTargetIdentityKey(target))) {
       targets.set(workspacePaneTabsTargetIdentityKey(target), target)
     }
   }

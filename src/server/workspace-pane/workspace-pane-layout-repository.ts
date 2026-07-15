@@ -20,6 +20,7 @@ export type WorkspacePaneLayoutRepositoryCasOutcome =
   | { kind: 'accepted'; snapshot: WorkspacePaneLayoutRepositorySnapshot; changed: boolean }
   | { kind: 'conflict'; snapshot: WorkspacePaneLayoutRepositorySnapshot }
   | { kind: 'membership-conflict'; snapshot: WorkspacePaneLayoutRepositorySnapshot }
+  | { kind: 'failure'; error: unknown }
 
 export interface WorkspacePaneLayoutRepositoryCasInput {
   repoRoot: string

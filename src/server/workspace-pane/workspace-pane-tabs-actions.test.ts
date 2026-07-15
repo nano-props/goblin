@@ -18,6 +18,7 @@ function makeActions(
   options: {
     isValidClientId?: (value: unknown) => value is string
     broadcasts?: ReturnType<typeof vi.fn>
+    affectedUsers?: string[]
   } = {},
 ) {
   const broadcasts = options.broadcasts ?? vi.fn()
@@ -50,7 +51,7 @@ function makeActions(
       isValidClientId,
       isCurrentRepoRuntime: isCurrentRepoRuntime,
       broadcastWorkspaceTabsChanged: broadcasts as unknown as (userId: string, repoRoot: string) => void,
-      affectedUsersForRepo: () => [],
+      affectedUsersForRepo: () => options.affectedUsers ?? [],
     }),
     broadcasts,
     sessionService,
@@ -119,6 +120,25 @@ describe('workspace-pane-tabs-actions', () => {
 
     expect(broadcasts).toHaveBeenCalledTimes(1)
     expect(broadcasts).toHaveBeenCalledWith(USER_ID, REPO_ROOT)
+  })
+
+  test('invalidates every active user after a durable layout mutation', async () => {
+    clearRepoRuntimesForUser(USER_ID)
+    syncCurrentRepoRuntime()
+    const { actions, broadcasts } = makeActions({ affectedUsers: [USER_ID, 'user-other'] })
+
+    await actions.updateTabs(CLIENT_ID, USER_ID, {
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+      branchName: 'feature/worktree',
+      worktreePath: '/repo',
+      operation: { type: 'open-static', tabType: 'status' },
+    })
+
+    expect(broadcasts.mock.calls).toEqual([
+      [USER_ID, REPO_ROOT],
+      ['user-other', REPO_ROOT],
+    ])
   })
 
   test('rejects invalid replaceTabs input without emitting', async () => {

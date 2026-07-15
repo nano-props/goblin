@@ -23,14 +23,6 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
     matched: true,
     workspace: { openRepoEntries: [entry], workspacePaneTabsByTargetByRepo: {} },
   })),
-  confirmServerWorkspaceTabsUnchanged: vi.fn(async (input) => ({
-    matched: true,
-    workspace: {
-      openRepoEntries: [input.expectedRepoEntry],
-      workspacePaneTabsByTargetByRepo: { [input.repoRoot]: input.expectedTabsByTarget },
-    },
-  })),
-  clearServerWorkspaceTabsIfUnchanged: vi.fn(),
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({

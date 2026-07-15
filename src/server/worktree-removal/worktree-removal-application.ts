@@ -109,7 +109,7 @@ export class WorktreeRemovalApplication {
                     target: { kind: 'worktree' as const, repoRoot: input.repoRoot, worktreePath },
                   }
                   const targetsByStableIdentity = new Map(
-                    [requestedTarget, ...affectedTargets].map((target) => [
+                    [...affectedTargets, requestedTarget].map((target) => [
                       workspacePaneTabsTargetIdentityKeyFromIdentity(target.target),
                       target,
                     ]),

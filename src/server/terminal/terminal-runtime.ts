@@ -203,7 +203,13 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const workspacePaneTargetLifecycle: ServerWorkspacePaneTargetLifecycleHost = {
     async retireTarget(userId, input) {
       const snapshot = await sessionService.retireTarget(userId, input)
-      broadcastRepoWorkspaceTabsChanged(userId, input.target.repoRoot)
+      const affectedUsers = new Set([
+        userId,
+        ...workspacePaneLayout.overlay.activeEpochs(input.target.repoRoot).map((scope) => scope.userId),
+      ])
+      for (const affectedUserId of affectedUsers) {
+        broadcastRepoWorkspaceTabsChanged(affectedUserId, input.target.repoRoot)
+      }
       return snapshot
     },
   }

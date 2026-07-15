@@ -807,16 +807,7 @@ describe('server terminal runtime', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         'req_list_after_exit',
       ),
-    ).resolves.toMatchObject({
-      entries: [
-        {
-          repoRoot: REPO_ROOT,
-          branchName: 'feature',
-          worktreePath: '/repo-linked',
-          tabs: [expect.objectContaining({ type: 'status' })],
-        },
-      ],
-    })
+    ).resolves.toMatchObject({ entries: [] })
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
@@ -865,16 +856,7 @@ describe('server terminal runtime', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         'req_list_after_prune',
       ),
-    ).resolves.toMatchObject({
-      entries: [
-        {
-          repoRoot: REPO_ROOT,
-          branchName: 'feature',
-          worktreePath: '/repo-linked',
-          tabs: [expect.objectContaining({ type: 'status' })],
-        },
-      ],
-    })
+    ).resolves.toMatchObject({ entries: [] })
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
@@ -1551,7 +1533,7 @@ describe('server terminal runtime', () => {
       },
       workspacePaneTabs: {
         revision: expect.any(Number),
-        entries: [{ tabs: [{ type: 'status', tabId: 'workspace-pane:status' }] }],
+        entries: [],
       },
     })
     await expect(

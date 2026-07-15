@@ -34,12 +34,17 @@ interface EpochState {
   placementsByTarget: Map<string, WorkspacePaneRuntimePlacementHint[]>
   physicalKeysByTarget: Map<string, string>
   branchNamesByTarget: Map<string, string>
+  validatedTargetKeys: Set<string> | null
 }
 
 export class WorkspacePaneEpochOverlay {
   private readonly epochs = new Map<string, EpochState>()
   private readonly targetsByPhysicalKey = new Map<string, Map<string, WorkspacePaneEpochTargetRef>>()
   private readonly epochsByRepoRoot = new Map<string, Map<string, WorkspacePaneEpochScope>>()
+
+  activate(scope: WorkspacePaneEpochScope): void {
+    this.state(scope)
+  }
 
   recordMixedOrder(input: WorkspacePaneEpochTargetRef & { tabs: readonly WorkspacePaneTabEntry[] }): boolean {
     const state = this.state(input)
@@ -76,6 +81,16 @@ export class WorkspacePaneEpochOverlay {
     state.branchNamesByTarget.set(workspacePaneTabsTargetIdentityKeyFromIdentity(input.target), input.branchName)
   }
 
+  admitValidatedTarget(input: WorkspacePaneEpochTargetRef & { branchName: string }): void {
+    const state = this.state(input)
+    const targetKey = workspacePaneTabsTargetIdentityKeyFromIdentity(input.target)
+    const metadataChanged = state.branchNamesByTarget.get(targetKey) !== input.branchName
+    const catalogChanged = state.validatedTargetKeys !== null && !state.validatedTargetKeys.has(targetKey)
+    state.branchNamesByTarget.set(targetKey, input.branchName)
+    state.validatedTargetKeys?.add(targetKey)
+    if (metadataChanged || catalogChanged) state.overlayRevision += 1
+  }
+
   targetBranchName(input: WorkspacePaneEpochTargetRef): string | null {
     return this.epochs.get(epochKey(input))?.branchNamesByTarget.get(
       workspacePaneTabsTargetIdentityKeyFromIdentity(input.target),
@@ -89,6 +104,39 @@ export class WorkspacePaneEpochOverlay {
       const target = parseWorkspacePaneTabsTargetIdentityKey(key)
       return target ? [{ target, branchName }] : []
     })
+  }
+
+  commitValidatedTargets(
+    scope: WorkspacePaneEpochScope,
+    targets: readonly { target: WorkspacePaneTabsTargetIdentity; branchName: string }[],
+  ): void {
+    const state = this.state(scope)
+    const next = new Set(targets.map((item) => workspacePaneTabsTargetIdentityKeyFromIdentity(item.target)))
+    const catalogChanged = state.validatedTargetKeys === null || !setsEqual(state.validatedTargetKeys, next)
+    let metadataChanged = false
+    const currentTargetKeys = new Set([
+      ...state.branchNamesByTarget.keys(),
+      ...state.placementsByTarget.keys(),
+      ...state.physicalKeysByTarget.keys(),
+    ])
+    for (const key of currentTargetKeys) {
+      if (next.has(key)) continue
+      metadataChanged = this.removeTargetFromState(scope, state, key) || metadataChanged
+    }
+    for (const item of targets) {
+      const key = workspacePaneTabsTargetIdentityKeyFromIdentity(item.target)
+      if (state.branchNamesByTarget.get(key) === item.branchName) continue
+      state.branchNamesByTarget.set(key, item.branchName)
+      metadataChanged = true
+    }
+    if (!catalogChanged && !metadataChanged) return
+    state.validatedTargetKeys = next
+    state.overlayRevision += 1
+  }
+
+  isDurableTargetVisible(scope: WorkspacePaneEpochScope, targetKey: string): boolean {
+    const catalog = this.epochs.get(epochKey(scope))?.validatedTargetKeys ?? null
+    return catalog === null || catalog.has(targetKey)
   }
 
   physicalTargets(identity: PhysicalWorktreeIdentity): WorkspacePaneEpochTargetRef[] {
@@ -137,13 +185,14 @@ export class WorkspacePaneEpochOverlay {
     for (const [key, state] of this.epochs) {
       const branchChanged = state.branchNamesByTarget.delete(targetKey)
       const placementChanged = state.placementsByTarget.delete(targetKey)
+      const catalogChanged = state.validatedTargetKeys?.delete(targetKey) ?? false
       const physicalKey = state.physicalKeysByTarget.get(targetKey)
       if (physicalKey) {
         const scope = scopeFromEpochKey(key)
         this.removePhysicalTarget(physicalKey, scope, targetKey)
         state.physicalKeysByTarget.delete(targetKey)
       }
-      if (!branchChanged && !placementChanged && !physicalKey) continue
+      if (!branchChanged && !placementChanged && !catalogChanged && !physicalKey) continue
       state.overlayRevision += 1
       affected.push(scopeFromEpochKey(key))
     }
@@ -159,6 +208,7 @@ export class WorkspacePaneEpochOverlay {
         placementsByTarget: new Map(),
         physicalKeysByTarget: new Map(),
         branchNamesByTarget: new Map(),
+        validatedTargetKeys: null,
       }
       this.epochs.set(key, state)
       const active = this.epochsByRepoRoot.get(scope.repoRoot) ?? new Map<string, WorkspacePaneEpochScope>()
@@ -176,6 +226,17 @@ export class WorkspacePaneEpochOverlay {
     const refs = this.targetsByPhysicalKey.get(physicalKey)
     refs?.delete(epochTargetKey(scope, targetKey))
     if (refs?.size === 0) this.targetsByPhysicalKey.delete(physicalKey)
+  }
+
+  private removeTargetFromState(scope: WorkspacePaneEpochScope, state: EpochState, targetKey: string): boolean {
+    const branchChanged = state.branchNamesByTarget.delete(targetKey)
+    const placementChanged = state.placementsByTarget.delete(targetKey)
+    const physicalKey = state.physicalKeysByTarget.get(targetKey)
+    if (physicalKey) {
+      this.removePhysicalTarget(physicalKey, scope, targetKey)
+      state.physicalKeysByTarget.delete(targetKey)
+    }
+    return branchChanged || placementChanged || physicalKey !== undefined
   }
 }
 
@@ -257,4 +318,8 @@ function cloneHint(hint: WorkspacePaneRuntimePlacementHint): WorkspacePaneRuntim
 
 function cloneTargetRef(ref: WorkspacePaneEpochTargetRef): WorkspacePaneEpochTargetRef {
   return { ...ref, target: { ...ref.target } }
+}
+
+function setsEqual(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
+  return a.size === b.size && Array.from(a).every((value) => b.has(value))
 }

@@ -13,11 +13,21 @@ import {
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabsTargetIdentityKeyFromIdentity } from '#/shared/workspace-pane-tabs-target.ts'
 
 const scope = { userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a' }
 const target = { kind: 'worktree' as const, repoRoot: '/repo', worktreePath: '/repo/worktree' }
 
 describe('workspace pane epoch overlay', () => {
+  test('tracks read-only active projections until their epoch closes', () => {
+    const overlay = new WorkspacePaneEpochOverlay()
+    overlay.activate(scope)
+
+    expect(overlay.activeEpochs('/repo')).toEqual([scope])
+    overlay.closeEpoch(scope)
+    expect(overlay.activeEpochs('/repo')).toEqual([])
+  })
+
   test('projects runtime tabs through static gaps without copying static order', () => {
     const status = workspacePaneStaticTabEntry('status')
     const files = workspacePaneStaticTabEntry('files')
@@ -63,6 +73,22 @@ describe('workspace pane epoch overlay', () => {
     overlay.closeEpoch(scope)
     expect(overlay.activeEpochs('/repo')).toHaveLength(1)
     expect(overlay.physicalTargets(identity)).toHaveLength(1)
+  })
+
+  test('reconciles invalid target metadata, placement, and physical indexes with the validated catalog', () => {
+    const overlay = new WorkspacePaneEpochOverlay()
+    const identity = testPhysicalWorktreeIdentity('/repo/worktree')
+    const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-invalidinvalidinvalid1')
+    overlay.registerTargetMetadata({ ...scope, target, branchName: 'deleted' })
+    overlay.recordMixedOrder({ ...scope, target, tabs: [terminal] })
+    overlay.registerPhysicalTarget({ ...scope, target, identity })
+
+    overlay.commitValidatedTargets(scope, [])
+
+    expect(overlay.epochTargets(scope)).toEqual([])
+    expect(overlay.placementHints({ ...scope, target })).toEqual([])
+    expect(overlay.physicalTargets(identity)).toEqual([])
+    expect(overlay.isDurableTargetVisible(scope, workspacePaneTabsTargetIdentityKeyFromIdentity(target))).toBe(false)
   })
 
   test('rejects duplicate provider types and keys revisions by type', () => {

@@ -341,7 +341,7 @@ describe('WorktreeRemovalApplication', () => {
 
     expect(retireTarget).toHaveBeenCalledTimes(2)
     expect(retireTarget).toHaveBeenNthCalledWith(1, 'user-a', {
-      repoRuntimeId: 'runtime-a',
+      repoRuntimeId: 'repo-runtime-test',
       target: { kind: 'worktree', repoRoot: '/repo', worktreePath: '/repo/worktree' },
     })
     expect(retireTarget).toHaveBeenNthCalledWith(2, 'user-a', {

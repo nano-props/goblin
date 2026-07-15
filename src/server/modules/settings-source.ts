@@ -549,37 +549,41 @@ export const serverWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository 
   },
 
   async compareAndSwap(input) {
-    return await mutateUserSettings<WorkspacePaneLayoutRepositoryCasOutcome>(async (data) => {
-      const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
-      const snapshot = { layout: currentLayout }
-      if (input.expectedRepoEntry) {
-        const currentRepoEntry = data.workspace.openRepoEntries.find(
-          (entry) => repoSessionEntryId(entry) === input.repoRoot,
-        )
-        if (!sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry)) {
-          return unchangedUserSettings(data, { kind: 'membership-conflict', snapshot })
+    try {
+      return await mutateUserSettings<WorkspacePaneLayoutRepositoryCasOutcome>(async (data) => {
+        const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
+        const snapshot = { layout: currentLayout }
+        if (input.expectedRepoEntry) {
+          const currentRepoEntry = data.workspace.openRepoEntries.find(
+            (entry) => repoSessionEntryId(entry) === input.repoRoot,
+          )
+          if (!sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry)) {
+            return unchangedUserSettings(data, { kind: 'membership-conflict', snapshot })
+          }
         }
-      }
-      if (!workspacePaneDurableLayoutsEqual(input.repoRoot, currentLayout, input.expected)) {
-        return unchangedUserSettings(data, { kind: 'conflict', snapshot })
-      }
-      const replacement = normalizeWorkspacePaneDurableLayout(input.repoRoot, input.replacement)
-      if (workspacePaneDurableLayoutsEqual(input.repoRoot, currentLayout, replacement)) {
-        return unchangedUserSettings(data, { kind: 'accepted', snapshot, changed: false })
-      }
-      const byTarget = Object.fromEntries(
-        replacement.entries.map((entry) => [workspacePaneTabsTargetIdentityKey(entry), entry.tabs]),
-      )
-      const workspacePaneTabsByTargetByRepo = Object.keys(byTarget).length === 0
-        ? recordWithoutKey(data.workspace.workspacePaneTabsByTargetByRepo, input.repoRoot)
-        : { ...data.workspace.workspacePaneTabsByTargetByRepo, [input.repoRoot]: byTarget }
-      const workspace = normalizeWorkspace({ ...data.workspace, workspacePaneTabsByTargetByRepo })
-      const committed = { layout: workspacePaneLayoutFromWorkspace(workspace, input.repoRoot) }
-      return {
-        next: { ...data, workspace },
-        result: { kind: 'accepted', snapshot: committed, changed: true },
-      }
-    })
+        if (!workspacePaneDurableLayoutsEqual(input.repoRoot, currentLayout, input.expected)) {
+          return unchangedUserSettings(data, { kind: 'conflict', snapshot })
+        }
+        const replacement = normalizeWorkspacePaneDurableLayout(input.repoRoot, input.replacement)
+        if (workspacePaneDurableLayoutsEqual(input.repoRoot, currentLayout, replacement)) {
+          return unchangedUserSettings(data, { kind: 'accepted', snapshot, changed: false })
+        }
+        const byTarget = Object.fromEntries(
+          replacement.entries.map((entry) => [workspacePaneTabsTargetIdentityKey(entry), entry.tabs]),
+        )
+        const workspacePaneTabsByTargetByRepo = Object.keys(byTarget).length === 0
+          ? recordWithoutKey(data.workspace.workspacePaneTabsByTargetByRepo, input.repoRoot)
+          : { ...data.workspace.workspacePaneTabsByTargetByRepo, [input.repoRoot]: byTarget }
+        const workspace = normalizeWorkspace({ ...data.workspace, workspacePaneTabsByTargetByRepo })
+        const committed = { layout: workspacePaneLayoutFromWorkspace(workspace, input.repoRoot) }
+        return {
+          next: { ...data, workspace },
+          result: { kind: 'accepted', snapshot: committed, changed: true },
+        }
+      })
+    } catch (error) {
+      return { kind: 'failure', error }
+    }
   },
 }
 

@@ -10,11 +10,15 @@ import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
+export type WorkspacePaneTabsRestoreResult =
+  | WorkspacePaneTabsSnapshot
+  | { kind: 'membership-conflict' }
+
 export interface ServerWorkspacePaneTabsHost {
   restoreTabs(
     userId: string,
     input: WorkspacePaneTabsListInput & { targets: WorkspacePaneTabsTarget[]; expectedRepoEntry: RepoSessionEntry },
-  ): MaybePromise<WorkspacePaneTabsSnapshot>
+  ): MaybePromise<WorkspacePaneTabsRestoreResult>
   listWorkspaceTabs(
     clientId: string,
     userId: string,
