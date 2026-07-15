@@ -5,9 +5,7 @@ import { runRepoProjectionPromotion } from '#/web/repo-projection-promotion-comm
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
 export type RepoProjectionPromotionViewState =
-  | { phase: 'idle' }
-  | { phase: 'promoting' }
-  | { phase: 'failed'; message: string }
+  { phase: 'idle' } | { phase: 'promoting' } | { phase: 'failed'; message: string }
 
 interface LazyRestoreTarget {
   repoRoot: string
@@ -15,6 +13,18 @@ interface LazyRestoreTarget {
   projectionState: 'projected' | 'stub'
   entry: RepoSessionEntry | null
 }
+
+interface PromotionTargetIdentity {
+  repoRoot: string
+  repoRuntimeId: string
+}
+
+interface TargetPromotionViewState {
+  target: PromotionTargetIdentity
+  state: RepoProjectionPromotionViewState
+}
+
+const IDLE_PROMOTION_VIEW_STATE: RepoProjectionPromotionViewState = { phase: 'idle' }
 
 export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) {
   const target = useReposStore(
@@ -31,15 +41,13 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
     }),
   )
   const [attempt, setAttempt] = useState(0)
-  const [state, setState] = useState<RepoProjectionPromotionViewState>({ phase: 'idle' })
+  const [targetState, setTargetState] = useState<TargetPromotionViewState | null>(null)
 
   useEffect(() => {
-    if (target?.projectionState !== 'stub' || !target.entry) {
-      setState({ phase: 'idle' })
-      return
-    }
+    if (target?.projectionState !== 'stub' || !target.entry) return
+    const targetIdentity = { repoRoot: target.repoRoot, repoRuntimeId: target.repoRuntimeId }
     let current = true
-    setState({ phase: 'promoting' })
+    setTargetState({ target: targetIdentity, state: { phase: 'promoting' } })
     void runRepoProjectionPromotion({
       repoRoot: target.repoRoot,
       repoRuntimeId: target.repoRuntimeId,
@@ -47,7 +55,7 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
     }).then((result) => {
       if (!current) return
       if (!result.ok) {
-        setState({ phase: 'failed', message: result.message })
+        setTargetState({ target: targetIdentity, state: { phase: 'failed', message: result.message } })
         return
       }
       useReposStore.getState().promoteRestoredWorkspaceRepo({ repo: result.repo, snapshot: result.snapshot })
@@ -58,5 +66,21 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
   }, [attempt, target])
 
   const retry = useCallback(() => setAttempt((value) => value + 1), [])
+  const state = promotionStateForCurrentTarget(targetState, target)
   return { state, retry }
+}
+
+function promotionStateForCurrentTarget(
+  targetState: TargetPromotionViewState | null,
+  target: LazyRestoreTarget | null,
+): RepoProjectionPromotionViewState {
+  if (
+    !targetState ||
+    target?.projectionState !== 'stub' ||
+    targetState.target.repoRoot !== target.repoRoot ||
+    targetState.target.repoRuntimeId !== target.repoRuntimeId
+  ) {
+    return IDLE_PROMOTION_VIEW_STATE
+  }
+  return targetState.state
 }

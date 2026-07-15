@@ -221,10 +221,65 @@ describe('useRestoreRepoTabsOnView', () => {
     expect(mocks.promoteRestoredWorkspaceRepo).not.toHaveBeenCalled()
   })
 
+  test('does not expose a previous repo failure after switching targets', async () => {
+    mocks.storeState = {
+      repos: {
+        'repo-a': stubRepo('repo-a', 'rta'),
+        'repo-b': stubRepo('repo-b', 'rtb'),
+      },
+      promoteRestoredWorkspaceRepo: mocks.promoteRestoredWorkspaceRepo,
+    }
+    mocks.restoreRepoTabsOnView
+      .mockRejectedValueOnce(new Error('repo-a failed'))
+      .mockImplementation(() => new Promise(() => {}))
+
+    function Host({ repoId }: { repoId: string }) {
+      const restore = useRestoreRepoTabsOnView({ repoId })
+      return <div>{restore.state.phase === 'failed' ? restore.state.message : restore.state.phase}</div>
+    }
+
+    const host = renderInJsdom(<Host repoId="repo-a" />)
+    await waitFor(() => expect(host.container.textContent).toBe('repo-a failed'))
+
+    host.rerender(<Host repoId="repo-b" />)
+
+    expect(host.container.textContent).not.toBe('repo-a failed')
+    await waitFor(() => expect(mocks.restoreRepoTabsOnView).toHaveBeenCalledTimes(2))
+  })
+
+  test('does not expose a previous failure after the repo runtime changes', async () => {
+    mocks.storeState = {
+      repos: { 'repo-a': stubRepo('repo-a', 'runtime-old') },
+      promoteRestoredWorkspaceRepo: mocks.promoteRestoredWorkspaceRepo,
+    }
+    mocks.restoreRepoTabsOnView
+      .mockRejectedValueOnce(new Error('old runtime failed'))
+      .mockImplementation(() => new Promise(() => {}))
+
+    function Host() {
+      const restore = useRestoreRepoTabsOnView({ repoId: 'repo-a' })
+      return <div>{restore.state.phase === 'failed' ? restore.state.message : restore.state.phase}</div>
+    }
+
+    const host = renderInJsdom(<Host />)
+    await waitFor(() => expect(host.container.textContent).toBe('old runtime failed'))
+    mocks.storeState = {
+      repos: { 'repo-a': stubRepo('repo-a', 'runtime-new') },
+      promoteRestoredWorkspaceRepo: mocks.promoteRestoredWorkspaceRepo,
+    }
+
+    host.rerender(<Host />)
+
+    expect(host.container.textContent).not.toBe('old runtime failed')
+    await waitFor(() => expect(mocks.restoreRepoTabsOnView).toHaveBeenCalledTimes(2))
+  })
+
   test('allows an explicit retry after a failure', async () => {
     function Host() {
       const restore = useRestoreRepoTabsOnView({ repoId: 'repo-retry' })
-      return <button onClick={restore.retry}>{restore.state.phase === 'failed' ? restore.state.message : 'retry'}</button>
+      return (
+        <button onClick={restore.retry}>{restore.state.phase === 'failed' ? restore.state.message : 'retry'}</button>
+      )
     }
     mocks.storeState = {
       repos: { 'repo-retry': stubRepo('repo-retry', 'rtr') },
