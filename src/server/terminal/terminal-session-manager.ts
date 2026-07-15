@@ -127,6 +127,11 @@ export type TerminalPhysicalWorktreeQuiescenceResult<TUser extends string | numb
   | { ok: true; scopes: TerminalPhysicalWorktreeScope<TUser>[] }
   | { ok: false; scopes: TerminalPhysicalWorktreeScope<TUser>[]; message: string }
 
+export interface TerminalBatchRetirementResult {
+  removedEffects: TerminalSessionSummary[]
+  failures: Array<{ terminalRuntimeSessionId: string; message: string }>
+}
+
 export class TerminalSessionManager<TUser extends string | number> {
   private readonly directory = new TerminalDirectory<TUser, TerminalSessionView<TUser>>()
   private readonly closeOperationsByTerminalRuntimeSessionId = new Map<string, Promise<boolean>>()
@@ -404,22 +409,32 @@ export class TerminalSessionManager<TUser extends string | number> {
     return closedSession
   }
 
-  async closeSessionsForUser(userId: TUser): Promise<boolean> {
+  async closeSessionsForUser(userId: TUser): Promise<TerminalBatchRetirementResult> {
     const sessions = Array.from(this.directory.entries()).filter(
       (session) => session.userId === userId,
     )
-    const results = await Promise.all(
-      sessions.map(async (session) => await this.closeSession(session.id, 'detached-user')),
-    )
-    return results.every(Boolean)
+    return await this.retireSessions(sessions, 'detached-user')
   }
 
-  async closeSessionsForRepo(userId: TUser, scope: string): Promise<boolean> {
+  async closeSessionsForRepo(userId: TUser, scope: string): Promise<TerminalBatchRetirementResult> {
     const sessions = Array.from(this.directory.entries()).filter(
       (session) => session.userId === userId && session.scope === scope,
     )
-    const results = await Promise.all(sessions.map(async (session) => await this.closeSession(session.id, 'scope')))
-    return results.every(Boolean)
+    return await this.retireSessions(sessions, 'scope')
+  }
+
+  private async retireSessions(
+    sessions: readonly TerminalSessionView<TUser>[],
+    reason: TerminalSessionCloseReason,
+  ): Promise<TerminalBatchRetirementResult> {
+    const removedEffects: TerminalSessionSummary[] = []
+    const failures: TerminalBatchRetirementResult['failures'] = []
+    for (const session of sessions) {
+      const summary = this.sessionSummary(session)
+      if (await this.closeSession(session.id, reason)) removedEffects.push(summary)
+      else failures.push({ terminalRuntimeSessionId: session.id, message: session.message ?? 'error.unavailable' })
+    }
+    return { removedEffects, failures }
   }
 
   /**

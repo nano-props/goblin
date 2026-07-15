@@ -178,8 +178,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     const scope = terminalSessionRuntimeScope(event.repoRoot, event.repoRuntimeId)
     void manager
       .closeSessionsForRepo(event.userId, scope)
-      .then(async (closed) => {
-        if (!closed) throw new Error('terminal session close failed')
+      .then(async (retirement) => {
+        if (retirement.failures.length > 0) throw new Error('terminal session close failed')
         manager.releaseProjectionRevisionForScope(event.userId, scope)
         await workspaceTabsCoordinator.closeInvalidatedScope({ userId: event.userId, scope })
         broadcastRepoSessionsChanged(event.userId, event.repoRoot)

@@ -84,7 +84,8 @@ export function createTerminalRuntimeCoordinator(
   }
 
   async function closeDetachedUserRuntime(userId: string): Promise<void> {
-    if (!(await manager.closeSessionsForUser(userId))) return
+    const retirement = await manager.closeSessionsForUser(userId)
+    if (retirement.failures.length > 0) return
     await workspaceTabsCoordinator.closeUser({ userId })
   }
 
