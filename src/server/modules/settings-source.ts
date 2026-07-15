@@ -36,6 +36,12 @@ import {
   type WorkspacePaneTabsTargetIdentity,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
+import {
+  normalizeWorkspacePaneDurableLayout,
+  workspacePaneDurableLayoutsEqual,
+  type WorkspacePaneLayoutRepository,
+  type WorkspacePaneLayoutRepositoryCasOutcome,
+} from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
 import {
@@ -606,6 +612,59 @@ export async function recordServerWorkspacePaneLayout(
     })
     return { next: { ...data, workspace }, result: cloneWorkspace(workspace) }
   })
+}
+
+function workspacePaneLayoutFromWorkspace(workspace: ServerWorkspaceState, repoRoot: string): WorkspacePaneDurableLayout {
+  const entries: WorkspacePaneDurableLayout['entries'] = []
+  for (const [targetKey, tabs] of Object.entries(workspace.workspacePaneTabsByTargetByRepo[repoRoot] ?? {})) {
+    const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
+    if (!target || target.repoRoot !== repoRoot) continue
+    entries.push(target.kind === 'branch'
+      ? { repoRoot, branchName: target.branchName, worktreePath: null, tabs }
+      : { repoRoot, branchName: '', worktreePath: target.worktreePath, tabs })
+  }
+  return normalizeWorkspacePaneDurableLayout(repoRoot, { entries })
+}
+
+export const serverWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository = {
+  async load(repoRoot) {
+    const workspace = (await loadUserSettings()).workspace
+    return { layout: workspacePaneLayoutFromWorkspace(workspace, repoRoot) }
+  },
+
+  async compareAndSwap(input) {
+    return await mutateUserSettings<WorkspacePaneLayoutRepositoryCasOutcome>(async (data) => {
+      const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
+      const snapshot = { layout: currentLayout }
+      if (input.expectedRepoEntry) {
+        const currentRepoEntry = data.workspace.openRepoEntries.find(
+          (entry) => repoSessionEntryId(entry) === input.repoRoot,
+        )
+        if (!sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry)) {
+          return unchangedUserSettings(data, { kind: 'membership-conflict', snapshot })
+        }
+      }
+      if (!workspacePaneDurableLayoutsEqual(input.repoRoot, currentLayout, input.expected)) {
+        return unchangedUserSettings(data, { kind: 'conflict', snapshot })
+      }
+      const replacement = normalizeWorkspacePaneDurableLayout(input.repoRoot, input.replacement)
+      if (workspacePaneDurableLayoutsEqual(input.repoRoot, currentLayout, replacement)) {
+        return unchangedUserSettings(data, { kind: 'accepted', snapshot, changed: false })
+      }
+      const byTarget = Object.fromEntries(
+        replacement.entries.map((entry) => [workspacePaneTabsTargetIdentityKey(entry), entry.tabs]),
+      )
+      const workspacePaneTabsByTargetByRepo = Object.keys(byTarget).length === 0
+        ? recordWithoutKey(data.workspace.workspacePaneTabsByTargetByRepo, input.repoRoot)
+        : { ...data.workspace.workspacePaneTabsByTargetByRepo, [input.repoRoot]: byTarget }
+      const workspace = normalizeWorkspace({ ...data.workspace, workspacePaneTabsByTargetByRepo })
+      const committed = { layout: workspacePaneLayoutFromWorkspace(workspace, input.repoRoot) }
+      return {
+        next: { ...data, workspace },
+        result: { kind: 'accepted', snapshot: committed, changed: true },
+      }
+    })
+  },
 }
 
 export async function getServerRecentRepos(): Promise<RepoSessionEntry[]> {

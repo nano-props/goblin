@@ -326,6 +326,50 @@ test('does not clear repo tabs after workspace membership is removed', async () 
   expect((await mod.getServerWorkspaceState()).workspacePaneTabsByTargetByRepo['/repo-a']).toBeDefined()
 })
 
+test('workspace pane layout repository loads and applies normalized CAS outcomes', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const mod = await import('#/server/modules/settings-source.ts')
+  const repoEntry = { kind: 'local' as const, id: '/repo-a' }
+  const empty = { entries: [] }
+  const history = {
+    entries: [{
+      repoRoot: '/repo-a',
+      branchName: 'main',
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('history')],
+    }],
+  }
+  await mod.addServerWorkspaceRepo(repoEntry)
+
+  await expect(mod.serverWorkspacePaneLayoutRepository.load('/repo-a')).resolves.toEqual({ layout: empty })
+  await expect(mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
+    repoRoot: '/repo-a',
+    expected: empty,
+    replacement: history,
+    expectedRepoEntry: repoEntry,
+  })).resolves.toMatchObject({ kind: 'accepted', changed: true, snapshot: { layout: history } })
+  await expect(mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
+    repoRoot: '/repo-a',
+    expected: history,
+    replacement: history,
+  })).resolves.toMatchObject({ kind: 'accepted', changed: false })
+  await expect(mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
+    repoRoot: '/repo-a',
+    expected: empty,
+    replacement: empty,
+  })).resolves.toMatchObject({ kind: 'conflict', snapshot: { layout: history } })
+
+  await mod.removeServerWorkspaceRepo('/repo-a')
+  await expect(mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
+    repoRoot: '/repo-a',
+    expected: history,
+    replacement: empty,
+    expectedRepoEntry: repoEntry,
+  })).resolves.toMatchObject({ kind: 'membership-conflict', snapshot: { layout: history } })
+})
+
 test('confirms repo tabs only while membership and layout are unchanged', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
