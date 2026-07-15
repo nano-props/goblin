@@ -12,7 +12,7 @@ import {
   writeUserSettingsJson,
 } from '#/server/modules/settings-persistence.ts'
 import type { LangPref, ServerWorkspaceState, UserSettings, ThemePref } from '#/shared/api-types.ts'
-import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { repoSessionEntryId, sameRepoSessionEntry, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { recordWithoutKey } from '#/shared/record.ts'
 import {
   isKnownWorkspaceExternalAppItemId,
@@ -482,15 +482,17 @@ export async function removeServerWorkspaceRepo(repoRoot: string): Promise<Serve
   })
 }
 
+export type ServerWorkspaceMatchOutcome =
+  { matched: true; workspace: ServerWorkspaceState } | { matched: false; latestWorkspace: ServerWorkspaceState }
+
+export type ServerWorkspaceClearOutcome =
+  { cleared: true; workspace: ServerWorkspaceState } | { cleared: false; latestWorkspace: ServerWorkspaceState }
+
 export async function compareAndReplaceServerWorkspaceRepos(
   expected: RepoSessionEntry[],
   replacement: RepoSessionEntry[],
-): Promise<
-  { matched: true; workspace: ServerWorkspaceState } | { matched: false; latestWorkspace: ServerWorkspaceState }
-> {
-  type Result =
-    { matched: true; workspace: ServerWorkspaceState } | { matched: false; latestWorkspace: ServerWorkspaceState }
-  return await mutateUserSettings<Result>(async (data) => {
+): Promise<ServerWorkspaceMatchOutcome> {
+  return await mutateUserSettings<ServerWorkspaceMatchOutcome>(async (data) => {
     if (!sameRepoEntries(data.workspace.openRepoEntries, expected)) {
       return unchangedUserSettings(data, { matched: false, latestWorkspace: cloneWorkspace(data.workspace) })
     }
@@ -507,18 +509,14 @@ export async function compareAndReplaceServerWorkspaceRepos(
 
 export async function confirmServerWorkspaceRepoEntry(
   expected: RepoSessionEntry,
-): Promise<
-  { matched: true; workspace: ServerWorkspaceState } | { matched: false; latestWorkspace: ServerWorkspaceState }
-> {
-  type Result =
-    { matched: true; workspace: ServerWorkspaceState } | { matched: false; latestWorkspace: ServerWorkspaceState }
-  return await mutateUserSettings<Result>(async (data) => {
+): Promise<ServerWorkspaceMatchOutcome> {
+  return await mutateUserSettings<ServerWorkspaceMatchOutcome>(async (data) => {
     const current = data.workspace.openRepoEntries.find(
       (entry) => repoSessionEntryId(entry) === repoSessionEntryId(expected),
     )
     return unchangedUserSettings(
       data,
-      current && sameRepoEntry(current, expected)
+      sameRepoSessionEntry(current, expected)
         ? { matched: true, workspace: cloneWorkspace(data.workspace) }
         : { matched: false, latestWorkspace: cloneWorkspace(data.workspace) },
     )
@@ -526,37 +524,22 @@ export async function confirmServerWorkspaceRepoEntry(
 }
 
 function sameRepoEntries(a: RepoSessionEntry[], b: RepoSessionEntry[]): boolean {
-  return a.length === b.length && a.every((entry, index) => sameRepoEntry(entry, b[index]))
-}
-
-function sameRepoEntry(a: RepoSessionEntry, b: RepoSessionEntry | undefined): boolean {
-  if (!b || a.kind !== b.kind || a.id !== b.id) return false
-  if (a.kind === 'local' || b.kind === 'local') return true
-  return (
-    a.ref.id === b.ref.id &&
-    a.ref.alias === b.ref.alias &&
-    a.ref.remotePath === b.ref.remotePath &&
-    a.ref.displayName === b.ref.displayName
-  )
+  return a.length === b.length && a.every((entry, index) => sameRepoSessionEntry(entry, b[index]))
 }
 
 export async function clearServerWorkspaceTabsIfUnchanged(input: {
   repoRoot: string
   expectedRepoEntry: RepoSessionEntry
   expectedTabsByTarget: Record<string, WorkspacePaneTabEntry[]>
-}): Promise<
-  { cleared: true; workspace: ServerWorkspaceState } | { cleared: false; latestWorkspace: ServerWorkspaceState }
-> {
-  type ClearResult =
-    { cleared: true; workspace: ServerWorkspaceState } | { cleared: false; latestWorkspace: ServerWorkspaceState }
-  return await mutateUserSettings<ClearResult>(async (data) => {
+}): Promise<ServerWorkspaceClearOutcome> {
+  return await mutateUserSettings<ServerWorkspaceClearOutcome>(async (data) => {
     const currentRepoEntry = data.workspace.openRepoEntries.find(
       (entry) => repoSessionEntryId(entry) === input.repoRoot,
     )
     const currentTabsByTarget = data.workspace.workspacePaneTabsByTargetByRepo[input.repoRoot] ?? {}
     if (
       !currentRepoEntry ||
-      !sameRepoEntry(currentRepoEntry, input.expectedRepoEntry) ||
+      !sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry) ||
       !sameServerWorkspaceTabsForRepo(input.repoRoot, currentTabsByTarget, input.expectedTabsByTarget)
     ) {
       return unchangedUserSettings(data, { cleared: false as const, latestWorkspace: cloneWorkspace(data.workspace) })
@@ -577,19 +560,15 @@ export async function confirmServerWorkspaceTabsUnchanged(input: {
   repoRoot: string
   expectedRepoEntry: RepoSessionEntry
   expectedTabsByTarget: Record<string, WorkspacePaneTabEntry[]>
-}): Promise<
-  { matched: true; workspace: ServerWorkspaceState } | { matched: false; latestWorkspace: ServerWorkspaceState }
-> {
-  type Result =
-    { matched: true; workspace: ServerWorkspaceState } | { matched: false; latestWorkspace: ServerWorkspaceState }
-  return await mutateUserSettings<Result>(async (data) => {
+}): Promise<ServerWorkspaceMatchOutcome> {
+  return await mutateUserSettings<ServerWorkspaceMatchOutcome>(async (data) => {
     const currentRepoEntry = data.workspace.openRepoEntries.find(
       (entry) => repoSessionEntryId(entry) === input.repoRoot,
     )
     const currentTabsByTarget = data.workspace.workspacePaneTabsByTargetByRepo[input.repoRoot] ?? {}
     const matched =
       !!currentRepoEntry &&
-      sameRepoEntry(currentRepoEntry, input.expectedRepoEntry) &&
+      sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry) &&
       sameServerWorkspaceTabsForRepo(input.repoRoot, currentTabsByTarget, input.expectedTabsByTarget)
     return unchangedUserSettings(
       data,

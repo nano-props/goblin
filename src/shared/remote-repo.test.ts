@@ -5,9 +5,23 @@ import {
   normalizeRemoteTarget,
   remoteRepoRefFromTarget,
   remoteRepoSessionEntry,
+  sameRepoSessionEntry,
 } from '#/shared/remote-repo.ts'
 
 describe('remote repository normalization', () => {
+  test('compares complete persisted repo entry identity', () => {
+    const entry = remoteRepoSessionEntry({
+      id: 'ssh-config://host/repo',
+      alias: 'host',
+      remotePath: '/repo',
+      displayName: 'host:repo',
+    })
+    expect(sameRepoSessionEntry(entry, { ...entry, ref: { ...entry.ref } })).toBe(true)
+    expect(sameRepoSessionEntry(entry, { ...entry, ref: { ...entry.ref, displayName: 'host:renamed' } })).toBe(false)
+    expect(sameRepoSessionEntry({ kind: 'local', id: '/repo' }, { kind: 'local', id: '/repo' })).toBe(true)
+    expect(sameRepoSessionEntry(null, entry)).toBe(false)
+  })
+
   test('derives ref display names from the normalized remote path', () => {
     expect(
       normalizeRemoteRepoRef({

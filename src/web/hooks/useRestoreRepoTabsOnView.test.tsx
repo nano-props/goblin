@@ -10,11 +10,11 @@ const mocks = vi.hoisted(() => ({
   promoteRestoredWorkspaceRepo: vi.fn(),
   storeState: {
     repos: {},
-    restoredSessionBaseline: null,
+    restoredClientWorkspaceBaseline: null,
     promoteRestoredWorkspaceRepo: vi.fn(),
   } as {
     repos: Record<string, ReturnType<typeof stubRepo> | undefined>
-    restoredSessionBaseline?: import('#/shared/api-types.ts').ClientWorkspaceState | null
+    restoredClientWorkspaceBaseline?: import('#/shared/api-types.ts').ClientWorkspaceState | null
     promoteRestoredWorkspaceRepo: ReturnType<typeof vi.fn>
   },
 }))
@@ -72,7 +72,7 @@ describe('useRestoreRepoTabsOnView', () => {
     mocks.promoteRestoredWorkspaceRepo.mockReset()
     mocks.storeState = {
       repos: {},
-      restoredSessionBaseline: null,
+      restoredClientWorkspaceBaseline: null,
       promoteRestoredWorkspaceRepo: mocks.promoteRestoredWorkspaceRepo,
     }
   })

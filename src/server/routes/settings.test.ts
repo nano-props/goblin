@@ -48,6 +48,9 @@ vi.mock('#/server/modules/settings-write-paths.ts', () => ({
 
 vi.mock('#/server/modules/session-restore.ts', () => ({
   restoreServerWorkspace: mocks.restoreServerWorkspace,
+}))
+
+vi.mock('#/server/modules/repo-workspace-tabs-restore.ts', () => ({
   restoreRepoTabsForRepo: mocks.restoreRepoTabsForRepo,
 }))
 

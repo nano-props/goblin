@@ -68,7 +68,7 @@ describe('repo session hydration', () => {
         restoredRepoId: REPO_A,
       },
       {
-        restoredSession: {
+        restoredClientWorkspace: {
           ...defaultClientWorkspaceState(),
           preferredWorkspacePaneTabByTargetByRepo: { [REPO_A]: { [targetKey]: 'history' } },
         },
@@ -79,7 +79,7 @@ describe('repo session hydration', () => {
       [targetKey]: 'history',
     })
     expect(
-      useReposStore.getState().restoredSessionBaseline?.preferredWorkspacePaneTabByTargetByRepo[REPO_A],
+      useReposStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByRepo[REPO_A],
     ).toBeUndefined()
   })
 
@@ -254,7 +254,7 @@ describe('repo session hydration', () => {
         restoredRepoId: REPO_A,
       },
       {
-        restoredSession: {
+        restoredClientWorkspace: {
           ...defaultClientWorkspaceState(),
           preferredWorkspacePaneTabByTargetByRepo: { [REPO_A]: { [targetKey]: 'history' } },
         },
@@ -293,7 +293,7 @@ describe('repo session hydration', () => {
       [targetKey]: 'history',
     })
     expect(
-      useReposStore.getState().restoredSessionBaseline?.preferredWorkspacePaneTabByTargetByRepo[REPO_A],
+      useReposStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByRepo[REPO_A],
     ).toBeUndefined()
   })
 

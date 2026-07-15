@@ -120,7 +120,7 @@ export function seedRepoShellForTest(options: {
     workspaceMembershipReady: true,
     sessionPersistenceReady: true,
     sessionRestoreError: null,
-    restoredSessionBaseline: null,
+    restoredClientWorkspaceBaseline: null,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
   })
@@ -512,7 +512,7 @@ export function resetReposStore(): void {
     workspaceMembershipReady: false,
     sessionPersistenceReady: false,
     sessionRestoreError: null,
-    restoredSessionBaseline: null,
+    restoredClientWorkspaceBaseline: null,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionIdByTerminalWorktree: {},
@@ -991,7 +991,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return init?.method === 'POST' ? call('externalApps.refresh', body) : call('externalApps.get', undefined)
         }
         if (url.pathname === '/api/settings/recent-repos/add') return call('settings.addRecentRepo', body)
-        if (url.pathname === '/api/settings/workspace/restore') return call('settings.restoreSession', body)
+        if (url.pathname === '/api/settings/workspace/restore') return call('settings.restoreWorkspace', body)
         if (url.pathname === '/api/settings/workspace/repos/add') return call('settings.addWorkspaceRepo', body)
         if (url.pathname === '/api/settings/workspace/repos/remove') return call('settings.removeWorkspaceRepo', body)
         if (url.pathname === '/api/settings/fetch-interval') return call('settings.setFetchInterval', body)

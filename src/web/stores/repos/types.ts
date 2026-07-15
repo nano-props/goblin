@@ -192,17 +192,17 @@ export interface WorkspaceNavigationHistoryTraversal {
   target: WorkspaceNavigationHistoryEntry
 }
 
-export interface RepoSessionHydrationOptions {
+export interface RepoWorkspaceHydrationOptions {
   signal?: AbortSignal
-  restoredSession?: ClientWorkspaceState
+  restoredClientWorkspace?: ClientWorkspaceState
 }
 
 interface LocalWorkspaceState {
   /** Client-only workspace UI state that should never be serialized into
    *  ClientWorkspaceState or treated as restorable workspace state. */
-  /** Workspace membership restore flag. True once boot session entries have
+  /** Workspace membership restore flag. True once boot workspace entries have
    *  produced the placeholder repo set (or proved there are no repos), so the
-   *  workspace shell can render without overwriting the saved session with an
+   *  workspace shell can render without overwriting the saved workspace with an
    *  empty one before restore. Repo content hydration may still be running. */
   workspaceMembershipReady: boolean
   /** Persistence gate — true only after all boot-restored state that can
@@ -213,7 +213,7 @@ interface LocalWorkspaceState {
    *  is resolved by a successful boot. */
   sessionRestoreError: string | null
   /** Client-owned state from boot restore, retained while repos remain stubs. */
-  restoredSessionBaseline: ClientWorkspaceState | null
+  restoredClientWorkspaceBaseline: ClientWorkspaceState | null
   /** Chrome-tab-style "opener" tracking, covering every workspace pane tab
    *  (static and terminal): maps a tab's identity (see
    *  `workspacePaneTabEntryIdentity`) to the identity of the tab that was
@@ -279,7 +279,7 @@ interface RuntimeCoherentRepoProjectionActions {
   clearEvents: (id: string, eventIds: number[]) => void
   hydrateRestoredWorkspaceRuntime: (
     runtime: WorkspaceRuntimeRestoreSnapshot,
-    options?: RepoSessionHydrationOptions,
+    options?: RepoWorkspaceHydrationOptions,
   ) => Promise<void>
   promoteRestoredWorkspaceRepo: (result: RepoWorkspaceTabsRestoreResult) => boolean
   /** Clear the fetchFailed flag — called by manual fetch success and

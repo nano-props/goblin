@@ -4,7 +4,7 @@ import {
   type RestoredWorkspaceRepoRuntime,
   type WorkspaceRuntimeRestoreSnapshot,
 } from '#/shared/api-types.ts'
-import type { RepoSessionHydrationOptions, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
+import type { RepoWorkspaceHydrationOptions, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 import {
   addResolvedRepo,
   createRuntimeRepoSessionActions,
@@ -17,7 +17,7 @@ import { acceptRepoProjectionReadModel } from '#/web/stores/repos/projection-rea
 import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneTabsByTargetFromQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { restoredPreferredWorkspacePaneTabByTarget } from '#/web/session-persistence-state.ts'
+import { restoredPreferredWorkspacePaneTabByTarget } from '#/web/restorable-workspace-state.ts'
 import { recordWithoutKey } from '#/shared/record.ts'
 
 interface InitialRepoRefresh {
@@ -34,12 +34,12 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
   return {
     async hydrateRestoredWorkspaceRuntime(
       runtime: WorkspaceRuntimeRestoreSnapshot,
-      options?: RepoSessionHydrationOptions,
+      options?: RepoWorkspaceHydrationOptions,
     ) {
       const { signal } = options ?? {}
       if (signal?.aborted) return
-      if (options && 'restoredSession' in options) {
-        set({ restoredSessionBaseline: options.restoredSession ?? null })
+      if (options && 'restoredClientWorkspace' in options) {
+        set({ restoredClientWorkspaceBaseline: options.restoredClientWorkspace ?? null })
       }
       const rankById = new Map<string, number>()
       runtime.repos.forEach((repo, index) => {
@@ -165,7 +165,7 @@ function applyRestoredPreferredWorkspacePaneTabs(
   const state = get()
   const repo = state.repos[repoRoot]
   const branches = repo ? readRepoBranchQueryProjection(repo)?.branches : null
-  const restoredPreferred = state.restoredSessionBaseline?.preferredWorkspacePaneTabByTargetByRepo[repoRoot]
+  const restoredPreferred = state.restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByRepo[repoRoot]
   if (!repo || !branches || !restoredPreferred) return
   const preferredWorkspacePaneTabByTarget = restoredPreferredWorkspacePaneTabByTarget(
     repoRoot,
@@ -176,7 +176,7 @@ function applyRestoredPreferredWorkspacePaneTabs(
   set((current) => {
     const currentRepo = current.repos[repoRoot]
     if (!currentRepo || currentRepo.repoRuntimeId !== repo.repoRuntimeId) return current
-    const baseline = current.restoredSessionBaseline
+    const baseline = current.restoredClientWorkspaceBaseline
     return {
       repos: {
         ...current.repos,
@@ -191,7 +191,7 @@ function applyRestoredPreferredWorkspacePaneTabs(
           },
         },
       },
-      restoredSessionBaseline: baseline
+      restoredClientWorkspaceBaseline: baseline
         ? {
             ...baseline,
             preferredWorkspacePaneTabByTargetByRepo: recordWithoutKey(
