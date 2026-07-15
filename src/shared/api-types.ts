@@ -582,14 +582,16 @@ function createValidatedNamespace<THandlers extends Record<string, (...args: nev
   return procedures
 }
 
-export interface AppRouter {
-  createCaller: () => {
-    settings: {
-      [K in keyof NativeHostIpcHandlers['settings']]: (
-        input: unknown,
-      ) => Promise<Awaited<ReturnType<NativeHostIpcHandlers['settings'][K]>>>
-    }
+type AppRouterCaller = {
+  [NS in keyof NativeHostIpcHandlers]: {
+    [K in keyof NativeHostIpcHandlers[NS]]: NativeHostIpcHandlers[NS][K] extends (...args: never[]) => infer TOutput
+      ? (input: unknown) => Promise<Awaited<TOutput>>
+      : never
   }
+}
+
+export interface AppRouter {
+  createCaller: () => AppRouterCaller
 }
 
 type NativeHostIpcProcedureSchemas = {
@@ -598,8 +600,12 @@ type NativeHostIpcProcedureSchemas = {
 
 export function createAppRouter(handlers: NativeHostIpcHandlers, schemas: NativeHostIpcProcedureSchemas): AppRouter {
   return {
-    createCaller: () => ({
-      settings: createValidatedNamespace(handlers.settings, schemas.settings),
-    }),
+    createCaller: () => {
+      const caller: Record<string, unknown> = {}
+      for (const namespace of Object.keys(schemas) as Array<keyof NativeHostIpcHandlers>) {
+        caller[namespace] = createValidatedNamespace(handlers[namespace], schemas[namespace])
+      }
+      return caller as AppRouterCaller
+    },
   }
 }

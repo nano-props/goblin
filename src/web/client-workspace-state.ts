@@ -3,7 +3,7 @@ import type {
   FiletreeSessionViewState,
   NativeClientWorkspaceReadResult,
 } from '#/shared/api-types.ts'
-import { toSafeRepoLocator } from '#/shared/input-validation.ts'
+import { toSafeCanonicalRepoLocator } from '#/shared/repo-locator.ts'
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 import { isWorkspacePaneSessionTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneSessionTabType } from '#/shared/workspace-pane.ts'
@@ -55,7 +55,7 @@ export function normalizeClientWorkspaceState(value: unknown): ClientWorkspaceSt
   const raw = value as Partial<ClientWorkspaceState>
   const layout = normalizeWorkspaceSessionLayoutState(raw)
   return {
-    restoredRepoId: toSafeRepoLocator(raw.restoredRepoId) ?? null,
+    restoredRepoId: toSafeCanonicalRepoLocator(raw.restoredRepoId),
     ...layout,
     selectedTerminalSessionIdByTerminalWorktree: normalizeSelectedTerminals(
       raw.selectedTerminalSessionIdByTerminalWorktree,
@@ -70,7 +70,7 @@ function normalizeSelectedTerminals(value: unknown): Record<string, string> {
   const result: Record<string, string> = {}
   for (const [key, sessionId] of Object.entries(value)) {
     const [repoRoot, worktreePath, extra] = key.split('\0')
-    if (extra !== undefined || !toSafeRepoLocator(repoRoot) || !worktreePath) continue
+    if (extra !== undefined || !toSafeCanonicalRepoLocator(repoRoot) || !worktreePath) continue
     if (typeof sessionId !== 'string' || !sessionId) continue
     result[key] = sessionId
   }
@@ -81,7 +81,7 @@ function normalizePreferredTabs(value: unknown): ClientWorkspaceState['preferred
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const result: ClientWorkspaceState['preferredWorkspacePaneTabByTargetByRepo'] = {}
   for (const [repoRoot, rawByTarget] of Object.entries(value)) {
-    const safeRepoRoot = toSafeRepoLocator(repoRoot)
+    const safeRepoRoot = toSafeCanonicalRepoLocator(repoRoot)
     if (!safeRepoRoot || !rawByTarget || typeof rawByTarget !== 'object' || Array.isArray(rawByTarget)) continue
     const byTarget: Record<string, WorkspacePaneSessionTabType | null> = {}
     for (const [targetKey, preferredTab] of Object.entries(rawByTarget)) {
@@ -101,7 +101,7 @@ function normalizeFiletreeState(value: unknown): ClientWorkspaceState['filetreeV
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const result: ClientWorkspaceState['filetreeViewStateByWorktreeByRepo'] = {}
   for (const [repoRoot, rawByWorktree] of Object.entries(value)) {
-    const safeRepoRoot = toSafeRepoLocator(repoRoot)
+    const safeRepoRoot = toSafeCanonicalRepoLocator(repoRoot)
     if (!safeRepoRoot || !rawByWorktree || typeof rawByWorktree !== 'object' || Array.isArray(rawByWorktree)) continue
     const byWorktree: Record<string, FiletreeSessionViewState> = {}
     for (const [worktreePath, rawSnapshot] of Object.entries(rawByWorktree)) {

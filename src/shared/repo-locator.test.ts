@@ -6,7 +6,19 @@ import {
   formatRemoteWorktreeLocator,
   formatRepoLocator,
   formatRepoSessionEntryLocator,
+  toSafeCanonicalRepoLocator,
 } from '#/shared/repo-locator.ts'
+
+describe('toSafeCanonicalRepoLocator', () => {
+  test.each(['/repo', 'C:\\repo', 'C:/repo', '\\\\server\\repo', 'ssh-config://host/repo'])(
+    'preserves canonical locator %s',
+    (locator) => expect(toSafeCanonicalRepoLocator(locator)).toBe(locator),
+  )
+
+  test.each(['', 'relative/repo', 'repo\0suffix'] as const)('rejects invalid locator %s', (locator) => {
+    expect(toSafeCanonicalRepoLocator(locator)).toBeNull()
+  })
+})
 
 describe('repo locators', () => {
   test('formats local repo locators as tildified paths', () => {

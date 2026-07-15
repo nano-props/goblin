@@ -13,6 +13,11 @@ beforeEach(() => localStorage.clear())
 afterEach(() => vi.restoreAllMocks())
 
 describe('client workspace persistence', () => {
+  test('accepts canonical repo locators without Node path APIs', () => {
+    expect(normalizeClientWorkspaceState({ restoredRepoId: 'C:\\repo' }).restoredRepoId).toBe('C:\\repo')
+    expect(normalizeClientWorkspaceState({ restoredRepoId: 'relative/repo' }).restoredRepoId).toBeNull()
+  })
+
   test('fails fast when native workspace state cannot be read', async () => {
     const readError = new Error('native workspace unavailable')
     vi.spyOn(nativeBridge, 'readNativeBridge').mockReturnValue({} as Window['goblinNative'])
