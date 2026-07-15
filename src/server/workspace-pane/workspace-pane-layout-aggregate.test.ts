@@ -214,14 +214,14 @@ describe('workspace pane layout aggregate', () => {
     const repository = memoryRepository({ entries: [valid, invalidA, invalidB] })
     const repairs: string[][] = []
     const restoreTransaction: WorkspacePaneLayoutRestoreTransaction = {
-      async validateMembershipAndRepair(input) {
-        repairs.push([...input.validTargetKeys])
+      async validateMembershipAndLoad(input) {
+        repairs.push([...input.projectedTargetKeys])
         const current = await repository.load(input.repoRoot)
         const outcome = await repository.compareAndSwap({
           repoRoot: input.repoRoot,
           expected: current.layout,
           replacement: { entries: current.layout.entries.filter((entry) =>
-            input.validTargetKeys.includes(workspacePaneTabsTargetIdentityKey(entry))) },
+            input.projectedTargetKeys.includes(workspacePaneTabsTargetIdentityKey(entry))) },
         })
         if (outcome.kind !== 'accepted') throw new Error('test repair transaction failed')
         return outcome
@@ -362,7 +362,7 @@ describe('workspace pane layout aggregate', () => {
     const aggregate = new WorkspacePaneLayoutAggregate({
       repository,
       restoreTransaction: {
-        async validateMembershipAndRepair() {
+        async validateMembershipAndLoad() {
           return { kind: 'membership-conflict', snapshot: { layout: { entries: [] } } }
         },
       },
@@ -382,7 +382,7 @@ describe('workspace pane layout aggregate', () => {
     const repository = memoryRepository()
     let current = true
     const aggregate = aggregateFor(repository, {
-      async validateMembershipAndRepair() {
+      async validateMembershipAndLoad() {
         current = false
         return { kind: 'accepted', changed: false, snapshot: { layout: { entries: [] } } }
       },
@@ -405,7 +405,7 @@ describe('workspace pane layout aggregate', () => {
     const repository = memoryRepository()
     const failure = new Error('settings unavailable')
     const aggregate = aggregateFor(repository, {
-      async validateMembershipAndRepair() {
+      async validateMembershipAndLoad() {
         throw failure
       },
     })
@@ -523,7 +523,7 @@ function memoryRepository(initial: WorkspacePaneDurableLayout = { entries: [] })
 function aggregateFor(
   repository: WorkspacePaneLayoutRepository,
   restoreTransaction: WorkspacePaneLayoutRestoreTransaction = {
-    async validateMembershipAndRepair(input) {
+    async validateMembershipAndLoad(input) {
       const current = await repository.load(input.repoRoot)
       return { kind: 'accepted' as const, changed: false, snapshot: current }
     },

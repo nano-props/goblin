@@ -553,7 +553,7 @@ export const serverWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository 
 }
 
 export const serverWorkspacePaneLayoutRestoreTransaction: WorkspacePaneLayoutRestoreTransaction = {
-  async validateMembershipAndRepair(input) {
+  async validateMembershipAndLoad(input) {
     return await mutateUserSettings<WorkspacePaneLayoutRestoreTransactionOutcome>(async (data) => {
       const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
       const snapshot = { layout: currentLayout }

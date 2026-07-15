@@ -126,7 +126,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const aggregate = new WorkspacePaneLayoutAggregate({
       repository,
       restoreTransaction: {
-        async validateMembershipAndRepair() {
+        async validateMembershipAndLoad() {
           return { kind: 'membership-conflict', snapshot: { layout: { entries: [] } } }
         },
       },
@@ -482,13 +482,13 @@ function memoryRepository(initial: WorkspacePaneDurableLayout = { entries: [] })
 function aggregateFor(
   repository: WorkspacePaneLayoutRepository,
   restoreTransaction: WorkspacePaneLayoutRestoreTransaction = {
-    async validateMembershipAndRepair(input) {
+    async validateMembershipAndLoad(input) {
       const current = await repository.load(input.repoRoot)
       const outcome = await repository.compareAndSwap({
         repoRoot: input.repoRoot,
         expected: current.layout,
         replacement: { entries: current.layout.entries.filter((entry) =>
-          input.validTargetKeys.includes(workspacePaneTabsTargetIdentityKey(entry))) },
+          input.projectedTargetKeys.includes(workspacePaneTabsTargetIdentityKey(entry))) },
       })
       if (outcome.kind === 'write-failure') return { ...outcome, snapshot: current }
       if (outcome.kind !== 'accepted') throw new Error('test repair transaction failed')

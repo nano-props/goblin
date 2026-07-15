@@ -285,9 +285,9 @@ test('workspace pane layout repository loads and applies normalized CAS outcomes
     expected: empty,
     replacement: history,
   })
-  await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndRepair({
+  await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
     repoRoot: '/repo-a',
-    validTargetKeys: [workspacePaneTabsTargetIdentityKey(historyTarget)],
+    projectedTargetKeys: [workspacePaneTabsTargetIdentityKey(historyTarget)],
     expectedRepoEntry: repoEntry,
   })).resolves.toMatchObject({ kind: 'accepted', changed: false, snapshot: { layout: history } })
   await expect(mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
@@ -302,9 +302,9 @@ test('workspace pane layout repository loads and applies normalized CAS outcomes
   })).resolves.toMatchObject({ kind: 'conflict', snapshot: { layout: history } })
 
   await mod.removeServerWorkspaceRepo('/repo-a')
-  await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndRepair({
+  await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
     repoRoot: '/repo-a',
-    validTargetKeys: [],
+    projectedTargetKeys: [],
     expectedRepoEntry: repoEntry,
   })).resolves.toMatchObject({ kind: 'membership-conflict', snapshot: { layout: history } })
 })
@@ -362,10 +362,10 @@ test('workspace pane restore does not write or classify persistence failures', a
   await mod.addServerWorkspaceRepo(repoEntry)
   await writeWorkspacePaneLayout(mod, '/repo-a', staleLayout)
   const settingsFile = path.join(tmp, 'user-settings.json')
-  await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndRepair({
+  await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
     repoRoot: '/repo-a',
     expectedRepoEntry: repoEntry,
-    validTargetKeys: [],
+    projectedTargetKeys: [],
   })).resolves.toMatchObject({ kind: 'accepted', snapshot: { layout: staleLayout }, changed: false })
 })
 

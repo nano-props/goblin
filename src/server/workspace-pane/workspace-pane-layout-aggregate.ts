@@ -187,10 +187,10 @@ export class WorkspacePaneLayoutAggregate {
   ): Promise<WorkspacePaneLayoutValidationResult> {
     const validKeys = new Set(input.validTargets.map(workspacePaneTabsTargetIdentityKey))
     input.assertCurrent?.()
-    const outcome = await this.restoreTransaction.validateMembershipAndRepair({
+    const outcome = await this.restoreTransaction.validateMembershipAndLoad({
         repoRoot: input.repoRoot,
         expectedRepoEntry: input.expectedRepoEntry,
-        validTargetKeys: [...validKeys],
+        projectedTargetKeys: [...validKeys],
       })
     if (outcome.kind === 'membership-conflict') return { kind: 'membership-conflict' }
     input.assertCurrent?.()

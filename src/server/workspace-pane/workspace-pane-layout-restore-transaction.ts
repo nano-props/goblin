@@ -7,7 +7,7 @@ export type WorkspacePaneLayoutRestoreTransactionOutcome =
   | { kind: 'write-failure'; error: unknown; snapshot: WorkspacePaneLayoutRepositorySnapshot }
 
 export interface WorkspacePaneLayoutRestoreTransaction {
-  validateMembershipAndRepair(
-    input: { repoRoot: string; expectedRepoEntry: RepoSessionEntry; validTargetKeys: readonly string[] },
+  validateMembershipAndLoad(
+    input: { repoRoot: string; expectedRepoEntry: RepoSessionEntry; projectedTargetKeys: readonly string[] },
   ): Promise<WorkspacePaneLayoutRestoreTransactionOutcome>
 }
