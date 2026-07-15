@@ -115,6 +115,25 @@ describe('shared terminal validators', () => {
     ).toBeNull()
   })
 
+  test('normalizes structured terminal write results and rejects legacy booleans', () => {
+    const response = {
+      type: 'response' as const,
+      requestId: 'request_write_123',
+      ok: true as const,
+      action: 'write' as const,
+    }
+
+    expect(normalizeTerminalSocketServerMessage({ ...response, payload: { status: 'accepted' } })).toEqual({
+      ...response,
+      payload: { status: 'accepted' },
+    })
+    expect(normalizeTerminalSocketServerMessage({ ...response, payload: true })).toMatchObject({
+      type: 'response',
+      ok: false,
+      action: 'write',
+    })
+  })
+
   test('rejects empty terminal ids in workspace tab replacement requests', () => {
     expect(
       normalizeAppRealtimeClientMessage({
@@ -326,7 +345,7 @@ describe('shared terminal validators', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalSessionsRevision: 11,
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open',
@@ -344,7 +363,7 @@ describe('shared terminal validators', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalSessionsRevision: 11,
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       snapshotSeq: 1,
       outputEra: 0,
     })
@@ -397,7 +416,7 @@ describe('shared terminal validators', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           data: 'hi',
           seq: 1,
@@ -647,7 +666,7 @@ describe('shared terminal validators', () => {
         payload: {
           ok: true,
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open',
@@ -675,7 +694,7 @@ describe('shared terminal validators', () => {
         payload: {
           ok: true,
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open',
@@ -719,7 +738,7 @@ describe('shared terminal validators', () => {
     ).toEqual({
       type: 'session-closed',
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       repoRoot: '/repo',
       worktreePath: '/repo/worktree',

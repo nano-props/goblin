@@ -19,6 +19,7 @@ import type {
   TerminalTestNotificationInput,
   TerminalTitleEvent,
   TerminalWriteInput,
+  TerminalWriteResult,
   TerminalSessionsRecoveryResult,
 } from '#/shared/terminal-types.ts'
 import type {
@@ -38,7 +39,7 @@ import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } fr
 export interface ClientTerminal {
   attach: (input: TerminalAttachInput) => Promise<TerminalAttachResult>
   restart: (input: TerminalRestartInput) => Promise<TerminalAttachResult>
-  write: (input: TerminalWriteInput) => Promise<TerminalMutationResult>
+  write: (input: TerminalWriteInput) => Promise<TerminalWriteResult>
   resize: (input: TerminalResizeInput) => Promise<TerminalMutationResult>
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
   close: (input: TerminalSessionInput) => Promise<TerminalMutationResult>

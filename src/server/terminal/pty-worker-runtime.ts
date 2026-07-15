@@ -57,7 +57,7 @@ export class PtyWorkerRuntime {
         this.handleSpawn(message.requestId, message.input)
         return
       case 'pty-write':
-        this.ptys.get(message.ptySessionId)?.runtime.write(message.data)
+        this.handleWrite(message.requestId, message.ptySessionId, message.data)
         return
       case 'pty-resize':
         this.ptys.get(message.ptySessionId)?.runtime.resize(message.cols, message.rows)
@@ -68,6 +68,20 @@ export class PtyWorkerRuntime {
       case 'shutdown':
         this.shutdown()
         return
+    }
+  }
+
+  private handleWrite(requestId: string, ptySessionId: string, data: string): void {
+    const entry = this.ptys.get(ptySessionId)
+    if (!entry) {
+      this.options.emit({ type: 'pty-write-result', requestId, status: 'rejected' })
+      return
+    }
+    try {
+      entry.runtime.write(data)
+      this.options.emit({ type: 'pty-write-result', requestId, status: 'accepted' })
+    } catch {
+      this.options.emit({ type: 'pty-write-result', requestId, status: 'indeterminate' })
     }
   }
 

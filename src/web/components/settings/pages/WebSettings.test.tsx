@@ -73,7 +73,7 @@ function seedElectronBootstrap() {
     terminal: () => ({
       attach: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
       restart: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
-      write: vi.fn(async () => false),
+      write: vi.fn(async () => ({ status: 'rejected' as const })),
       resize: vi.fn(async () => false),
       takeover: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
       close: vi.fn(async () => false),
@@ -142,7 +142,7 @@ function seedWebBootstrap() {
     terminal: () => ({
       attach: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
       restart: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
-      write: vi.fn(async () => false),
+      write: vi.fn(async () => ({ status: 'rejected' as const })),
       resize: vi.fn(async () => false),
       takeover: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
       close: vi.fn(async () => false),

@@ -132,11 +132,35 @@ describe('createInProcessPtySupervisor', () => {
     expect(fake.exitDisposable.dispose).toHaveBeenCalledOnce()
     subscription.dispose()
   })
+
+  test('confirms a runtime write and rejects a missing handle', async () => {
+    const fake = createFakeRuntime()
+    runtimeMocks.spawn.mockReturnValue({ ok: true, runtime: fake.runtime })
+    const supervisor = createInProcessPtySupervisor()
+    const result = await supervisor.spawn(SPAWN_INPUT)
+    if (!result.ok) throw new Error(result.message)
+
+    await expect(supervisor.write(result.handle, 'input')).resolves.toEqual({ status: 'accepted' })
+    fake.emitExit()
+    await Promise.resolve()
+    await expect(supervisor.write(result.handle, 'late')).resolves.toEqual({ status: 'rejected' })
+  })
+
+  test('marks a throwing native write as indeterminate', async () => {
+    const fake = createFakeRuntime()
+    vi.mocked(fake.runtime.write).mockImplementationOnce(() => {
+      throw new Error('write failed')
+    })
+    runtimeMocks.spawn.mockReturnValue({ ok: true, runtime: fake.runtime })
+    const supervisor = createInProcessPtySupervisor()
+    const result = await supervisor.spawn(SPAWN_INPUT)
+    if (!result.ok) throw new Error(result.message)
+
+    await expect(supervisor.write(result.handle, 'input')).resolves.toEqual({ status: 'indeterminate' })
+  })
 })
 
-function createFakeRuntime(
-  options: { observerError?: Error; exitDuringSubscribe?: boolean } = {},
-): FakeRuntime {
+function createFakeRuntime(options: { observerError?: Error; exitDuringSubscribe?: boolean } = {}): FakeRuntime {
   let exitListener: (() => void) | null = null
   const exitDisposable = { dispose: vi.fn() }
   const kill = vi.fn()

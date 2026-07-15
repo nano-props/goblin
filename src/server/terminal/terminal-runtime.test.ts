@@ -2020,20 +2020,20 @@ describe('server terminal runtime', () => {
     // with not-controller. The client-side AuthorityGate catches
     // this and fires a takeover before retrying; this test pins the
     // server invariant.
-    const aWrite = host.write('client_a', USER_1, {
+    const aWrite = await host.write('client_a', USER_1, {
       terminalRuntimeSessionId,
       data: 'ls\n',
       clientId: 'client_a',
     })
-    expect(aWrite).toBe(false)
+    expect(aWrite).toEqual({ status: 'rejected' })
 
     // B's write still works.
-    const bWrite = host.write('client_a', USER_1, {
+    const bWrite = await host.write('client_a', USER_1, {
       terminalRuntimeSessionId,
       data: 'pwd\n',
       clientId: 'client_b',
     })
-    expect(bWrite).toBe(true)
+    expect(bWrite).toEqual({ status: 'accepted' })
     await new Promise<void>((resolve) => queueMicrotask(resolve))
 
     // listSessions confirms the global view: B is the controller,
@@ -2129,11 +2129,9 @@ describe('server terminal runtime', () => {
     })
     expect(attach.ok).toBe(true)
 
-    host.write('client_a', USER_1, { terminalRuntimeSessionId, data: 'c', clientId: 'client_a' })
-    host.write('client_a', USER_1, { terminalRuntimeSessionId, data: 'l', clientId: 'client_a' })
-    host.write('client_a', USER_1, { terminalRuntimeSessionId, data: 'e', clientId: 'client_a' })
-    host.write('client_a', USER_1, { terminalRuntimeSessionId, data: 'a', clientId: 'client_a' })
-    host.write('client_a', USER_1, { terminalRuntimeSessionId, data: 'r', clientId: 'client_a' })
+    const writes = ['c', 'l', 'e', 'a', 'r'].map((data) =>
+      host.write('client_a', USER_1, { terminalRuntimeSessionId, data, clientId: 'client_a' }),
+    )
 
     expect(mockPtys[0]?.write).toHaveBeenCalledTimes(0)
 
@@ -2141,6 +2139,7 @@ describe('server terminal runtime', () => {
 
     expect(mockPtys[0]?.write).toHaveBeenCalledTimes(1)
     expect(mockPtys[0]?.write).toHaveBeenCalledWith('clear')
+    await expect(Promise.all(writes)).resolves.toEqual(Array.from({ length: 5 }, () => ({ status: 'accepted' })))
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()

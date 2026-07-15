@@ -12,6 +12,7 @@ import type {
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalWriteInput,
+  TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
 
 type MaybePromise<T> = T | Promise<T>
@@ -78,7 +79,7 @@ export interface ServerTerminalActionHost {
   isClientOnline(userId: string, clientId: string): boolean
   attach(clientId: string, userId: string, input: TerminalAttachInput): MaybePromise<TerminalAttachResult>
   restart(clientId: string, userId: string, input: TerminalRestartInput): MaybePromise<TerminalAttachResult>
-  write(clientId: string, userId: string, input: TerminalWriteInput): MaybePromise<TerminalMutationResult>
+  write(clientId: string, userId: string, input: TerminalWriteInput): MaybePromise<TerminalWriteResult>
   resize(clientId: string, userId: string, input: TerminalResizeInput): MaybePromise<TerminalMutationResult>
   takeover(clientId: string, userId: string, input: TerminalTakeoverInput): MaybePromise<TerminalTakeoverResult>
   close(clientId: string, userId: string, input: TerminalSessionInput): MaybePromise<TerminalMutationResult>

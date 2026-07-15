@@ -586,7 +586,7 @@ beforeEach(() => {
           canonicalCols: 80,
           canonicalRows: 24,
         })),
-        write: vi.fn(async () => true),
+        write: vi.fn(async () => ({ status: 'accepted' as const })),
         resize: vi.fn(async () => true),
         takeover: vi.fn(async () => ({
           ok: true as const,
@@ -699,7 +699,7 @@ beforeEach(() => {
     terminal: () => ({
       attach: vi.fn(async () => attachResult()),
       restart: vi.fn(async () => attachResult()),
-      write: vi.fn(async () => true),
+      write: vi.fn(async () => ({ status: 'accepted' as const })),
       resize: vi.fn(async () => true),
       takeover: vi.fn(async () => ({
         ok: true as const,

@@ -9,6 +9,7 @@
 // (`pty-supervisor-inprocess.ts`, `pty-supervisor-worker.ts`).
 
 import type { PtySupervisorDiagnostics, PtySupervisorMode } from '#/server/terminal/terminal-host.ts'
+import type { TerminalWriteResult } from '#/shared/terminal-types.ts'
 
 export interface PtyHandle {
   readonly ptySessionId: string
@@ -33,7 +34,7 @@ export type PtySpawnResult = { ok: true; handle: PtyHandle; processName: string 
 export interface PtySupervisor {
   readonly mode: PtySupervisorMode
   spawn(input: PtySpawnInput): Promise<PtySpawnResult>
-  write(handle: PtyHandle, data: string): void
+  write(handle: PtyHandle, data: string): Promise<TerminalWriteResult>
   resize(handle: PtyHandle, cols: number, rows: number): void
   kill(handle: PtyHandle): void
   killAndWait(handle: PtyHandle): Promise<void>

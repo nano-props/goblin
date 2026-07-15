@@ -49,6 +49,10 @@ import {
 } from '#/web/components/terminal/terminal-render-queue.ts'
 import { WRITE_BLOCKED_KEY_BY_REASON } from '#/web/components/terminal/authority-denial-feedback.ts'
 import { terminalLog } from '#/web/logger.ts'
+import {
+  createTerminalWriteFailureReporter,
+  type TerminalWriteFailureReporter,
+} from '#/web/components/terminal/terminal-write-failure-feedback.ts'
 import { t } from 'i18next'
 import { toast } from 'sonner'
 import type {
@@ -71,6 +75,7 @@ export class TerminalSession {
   descriptor: TerminalDescriptor
   private readonly notify: (reason: TerminalNotifyReason) => void
   private readonly requestDurableClose: (terminalRuntimeSessionId: string) => Promise<void>
+  private readonly writeFailureReporter: TerminalWriteFailureReporter
   private readonly runtime = new TerminalSessionRuntime()
   private readonly view: TerminalSessionView
   // Authority gate owns the "am I the controller?" cache and the
@@ -115,10 +120,12 @@ export class TerminalSession {
     // the server PTY alive and the next create reattaching to the
     // orphan. See `TerminalSessionLifecycleQueues`.
     requestDurableClose: (terminalRuntimeSessionId: string) => Promise<void> = () => Promise.resolve(),
+    writeFailureReporter: TerminalWriteFailureReporter = createTerminalWriteFailureReporter(),
   ) {
     this.descriptor = descriptor
     this.notify = notify
     this.requestDurableClose = requestDurableClose
+    this.writeFailureReporter = writeFailureReporter
     this.view = new TerminalSessionView({
       onInput: (data) => this.writeInput(data),
       onResize: ({ cols, rows }) => this.queueResize(cols, rows),
@@ -273,10 +280,14 @@ export class TerminalSession {
           this.reportGateDenial('write', result.reason, terminalRuntimeSessionId)
           return
         }
-        return terminalClient.write({ terminalRuntimeSessionId, data })
+        return terminalClient.write({ terminalRuntimeSessionId, data }).then((result) => {
+          if (result.status !== 'accepted') {
+            this.writeFailureReporter.report({ terminalRuntimeSessionId, failure: { kind: 'result', result } })
+          }
+        })
       })
       .catch((err) => {
-        terminalLog.warn('write failed for session', { terminalRuntimeSessionId, err })
+        this.writeFailureReporter.report({ terminalRuntimeSessionId, failure: { kind: 'error', error: err } })
       })
   }
 

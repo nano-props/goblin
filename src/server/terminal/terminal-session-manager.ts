@@ -12,6 +12,7 @@ import {
   type TerminalSessionsSnapshot,
   type TerminalTakeoverResult,
   type TerminalTitleEvent,
+  type TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
 import { isValidTerminalRuntimeSessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
@@ -231,18 +232,25 @@ export class TerminalSessionManager<TUser extends string | number> {
     return spawn.result
   }
 
-  writeSession(userId: TUser, terminalRuntimeSessionId: string, data: string, clientId: string): boolean {
-    if (!isValidTerminalRuntimeSessionId(terminalRuntimeSessionId) || !isValidTerminalWriteData(data)) return false
+  async writeSession(
+    userId: TUser,
+    terminalRuntimeSessionId: string,
+    data: string,
+    clientId: string,
+  ): Promise<TerminalWriteResult> {
+    if (!isValidTerminalRuntimeSessionId(terminalRuntimeSessionId) || !isValidTerminalWriteData(data)) {
+      return { status: 'rejected' }
+    }
     const session = this.getSession(userId, terminalRuntimeSessionId)
-    if (this.isSessionClosing(terminalRuntimeSessionId)) return false
-    if (!session?.ptyBinding.hasPty()) return false
-    if (session.phase !== 'open') return false
+    if (this.isSessionClosing(terminalRuntimeSessionId)) return { status: 'rejected' }
+    if (!session?.ptyBinding.hasPty()) return { status: 'rejected' }
+    if (session.phase !== 'open') return { status: 'rejected' }
     // Register the attachment first so a brand-new socket can satisfy
     // the unknown-attachment gate, then defer to the shared
     // authority helper so write/resize/restart stay in lockstep.
     registerTerminalClient(session, clientId, session.cols, session.rows)
-    if (!isAuthoritative(session, clientId, 'write', this.sessionPresence(session))) return false
-    return session.ptyBinding.write(session, data)
+    if (!isAuthoritative(session, clientId, 'write', this.sessionPresence(session))) return { status: 'rejected' }
+    return await session.ptyBinding.write(session, data)
   }
 
   async attachSession(

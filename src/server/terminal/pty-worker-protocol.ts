@@ -8,11 +8,11 @@
 // concern (terminal session lifecycle, worktree grouping, controllers, sockets, session service) is handled
 // in-process by the main runtime.
 //
-// Protocol surface (8 message types total):
+// Protocol surface:
 //
 //   main → worker:
 //     pty-spawn    (request)            → pty-spawn-result (with ptySessionId)
-//     pty-write    (fire-and-forget)
+//     pty-write    (request)            → pty-write-result
 //     pty-resize   (fire-and-forget)
 //     pty-kill     (fire-and-forget)
 //     shutdown     (fire-and-forget)
@@ -27,7 +27,7 @@ import type { PtySpawnInput } from '#/server/terminal/pty-supervisor.ts'
 
 export type PtyWorkerRequest =
   | { type: 'pty-spawn'; requestId: string; input: PtySpawnInput }
-  | { type: 'pty-write'; ptySessionId: string; data: string }
+  | { type: 'pty-write'; requestId: string; ptySessionId: string; data: string }
   | { type: 'pty-resize'; ptySessionId: string; cols: number; rows: number }
   | { type: 'pty-kill'; ptySessionId: string }
   | { type: 'shutdown' }
@@ -56,6 +56,7 @@ export type PtyWorkerSpawnFailureCode = 'native-pty-spawn-failed' | 'unknown'
 export type PtyWorkerMessage =
   | PtyWorkerSpawnSuccess
   | PtyWorkerSpawnFailure
+  | { type: 'pty-write-result'; requestId: string; status: 'accepted' | 'rejected' | 'indeterminate' }
   | { type: 'pty-data'; ptySessionId: string; data: string }
   | { type: 'pty-exit'; ptySessionId: string; code: number | null; signal: NodeJS.Signals | null }
   | { type: 'pty-process-name-changed'; ptySessionId: string; processName: string }
@@ -91,6 +92,11 @@ const PtyDataMessageSchema = v.object({
   ptySessionId: PtySessionIdStringSchema,
   data: v.string(),
 })
+const PtyWriteResultMessageSchema = v.object({
+  type: v.literal('pty-write-result'),
+  requestId: PtySessionIdStringSchema,
+  status: v.picklist(['accepted', 'rejected', 'indeterminate']),
+})
 const PtyExitMessageSchema = v.object({
   type: v.literal('pty-exit'),
   ptySessionId: PtySessionIdStringSchema,
@@ -105,6 +111,7 @@ const PtyProcessNameChangedMessageSchema = v.object({
 export const PtyWorkerMessageSchema = v.variant('type', [
   PtySpawnResultSuccessSchema,
   PtySpawnResultFailureSchema,
+  PtyWriteResultMessageSchema,
   PtyDataMessageSchema,
   PtyExitMessageSchema,
   PtyProcessNameChangedMessageSchema,

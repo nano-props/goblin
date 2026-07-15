@@ -17,6 +17,7 @@ import type {
   TerminalTitleEvent,
   TerminalExitEvent,
   TerminalWriteInput,
+  TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
 
 export type TerminalRealtimeMessage =
@@ -62,7 +63,7 @@ export interface TerminalSocketRequestInputs {
 export interface TerminalSocketResponseOutputs {
   attach: TerminalAttachResult
   restart: TerminalAttachResult
-  write: TerminalMutationResult
+  write: TerminalWriteResult
   resize: TerminalMutationResult
   takeover: TerminalTakeoverResult
   close: TerminalMutationResult

@@ -68,6 +68,12 @@ Create may send a lightweight startup geometry hint before a real view exists. A
 - PTY writes must carry client-side provenance before they cross the terminal client.
 - User intent, terminal-emulator replies, and replay side effects are different classes of input.
 - Replay side effects are local rendering artifacts and must never be forwarded as user stdin.
+- A terminal write result has one narrow meaning: `accepted` confirms that
+  the target PTY runtime `write()` call returned normally, `rejected` means
+  the current authority/binding could not accept it, and `indeterminate`
+  means the call may have happened but its acknowledgement was lost.
+- No write result proves that the shell consumed or executed the input.
+  Indeterminate input must not be replayed automatically.
 
 ### Geometry is part of correctness
 

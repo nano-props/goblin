@@ -42,6 +42,7 @@ import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspac
 import type {
   TerminalAttachResult,
   TerminalMutationResult,
+  TerminalWriteResult,
   TerminalSessionsRecoveryResult,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
@@ -130,7 +131,7 @@ export function seedRepoShellForTest(options: {
 interface TerminalClientTestOutputs {
   'terminal.attach': TerminalAttachResult
   'terminal.restart': TerminalAttachResult
-  'terminal.write': TerminalMutationResult
+  'terminal.write': TerminalWriteResult
   'terminal.resize': TerminalMutationResult
   'terminal.takeover': TerminalTakeoverResult
   'terminal.close': TerminalMutationResult
@@ -289,7 +290,7 @@ export function installWorkspacePaneTabsTestBridge(
     terminal: () => ({
       attach: async () => ({ ok: false, message: 'unhandled terminal attach' }),
       restart: async () => ({ ok: false, message: 'unhandled terminal restart' }),
-      write: async () => true,
+      write: async () => ({ status: 'accepted' }),
       resize: async () => true,
       takeover: async () => ({
         ok: true as const,
@@ -570,7 +571,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         terminal: {
           attach: () => Promise.resolve({ ok: false, message: 'unhandled terminal attach' }),
           restart: () => Promise.resolve({ ok: false, message: 'unhandled terminal restart' }),
-          write: () => Promise.resolve(true),
+          write: () => Promise.resolve({ status: 'accepted' }),
           resize: () => Promise.resolve(true),
           takeover: () =>
             Promise.resolve({
@@ -672,6 +673,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         case 'terminal.restart':
           return { ok: false, message: `unhandled ${name}` }
         case 'terminal.write':
+          return { status: 'accepted' } satisfies TerminalWriteResult
         case 'terminal.resize':
         case 'terminal.close':
         case 'terminal.notifyBell':

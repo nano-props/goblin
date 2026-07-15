@@ -43,7 +43,7 @@ function createDeferredPtySupervisor(): PtySupervisor & {
         spawns.push(resolve)
       })
     },
-    write: vi.fn(),
+    write: vi.fn(async () => ({ status: 'accepted' as const })),
     resize: vi.fn(),
     kill(handle) {
       killed.push(handle.ptySessionId)

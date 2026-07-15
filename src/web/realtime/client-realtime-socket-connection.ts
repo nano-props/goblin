@@ -39,6 +39,30 @@ type RealtimeResponseMessage<TAction extends string> =
 type RealtimePongMessage = { type: 'pong'; requestId: string }
 type SocketDemandIntent = 'open-now' | 'reconnect' | 'idle'
 
+export type ClientRealtimeRequestFailureKind =
+  'unavailable' | 'open-failed' | 'send-failed' | 'disconnected' | 'timeout' | 'app-quitting'
+
+export class ClientRealtimeRequestError extends Error {
+  readonly kind: ClientRealtimeRequestFailureKind
+  readonly delivery: 'not-sent' | 'indeterminate'
+  readonly outageId: number | null
+
+  constructor(
+    message: string,
+    options: {
+      kind: ClientRealtimeRequestFailureKind
+      delivery: 'not-sent' | 'indeterminate'
+      outageId: number | null
+    },
+  ) {
+    super(message)
+    this.name = 'ClientRealtimeRequestError'
+    this.kind = options.kind
+    this.delivery = options.delivery
+    this.outageId = options.outageId
+  }
+}
+
 export interface ClientRealtimeSocketConnectionOptions<
   TInputs extends object,
   TOutputs extends object,
@@ -85,6 +109,8 @@ export function createClientRealtimeSocketConnection<
   let realtimeOpenTimeout: ReturnType<typeof setTimeout> | null = null
   let heartbeatTimer: ReturnType<typeof globalThis.setInterval> | null = null
   let quitting = isAppQuitting()
+  let nextOutageId = 0
+  let activeOutageId: number | null = null
   let pendingSocketOpenRequests = 0
   const pendingSocketRequests = new Map<string, PendingSocketRequest<Action, Output>>()
   const pendingHealthProbes = new Map<
@@ -106,6 +132,7 @@ export function createClientRealtimeSocketConnection<
     onOpen(entry) {
       clearRealtimeOpenTimeout()
       startHeartbeat(entry.socket, entry.generation)
+      activeOutageId = null
       options.onOpen?.(entry.connection.clientId)
     },
     onMessage(event, entry) {
@@ -116,7 +143,14 @@ export function createClientRealtimeSocketConnection<
       clearRealtimeOpenTimeout()
       stopHeartbeat()
       clearPendingHealthProbes()
-      rejectPendingSocketRequests(context.reason)
+      const outageId = context.idleClose ? null : beginOutage()
+      rejectPendingSocketRequests(
+        new ClientRealtimeRequestError(context.reason, {
+          kind: 'disconnected',
+          delivery: 'indeterminate',
+          outageId,
+        }),
+      )
       if (context.idleClose) {
         reconcileSocketDemand('open-now')
         return
@@ -135,7 +169,13 @@ export function createClientRealtimeSocketConnection<
     clearReconnectTimer()
     clearRealtimeOpenTimeout()
     clearPendingHealthProbes()
-    rejectPendingSocketRequests(`${socketLabel} closed`)
+    rejectPendingSocketRequests(
+      new ClientRealtimeRequestError(`${socketLabel} closed`, {
+        kind: 'app-quitting',
+        delivery: 'indeterminate',
+        outageId: null,
+      }),
+    )
     socketLifecycle.closeAndForget()
   })
 
@@ -168,13 +208,17 @@ export function createClientRealtimeSocketConnection<
     realtimeOpenTimeout = null
   }
 
-  function rejectPendingSocketRequests(message: string) {
-    const error = new Error(message)
+  function rejectPendingSocketRequests(error: Error) {
     for (const pending of pendingSocketRequests.values()) {
       clearTimeout(pending.timeout)
       pending.reject(error)
     }
     pendingSocketRequests.clear()
+  }
+
+  function beginOutage(): number {
+    if (activeOutageId === null) activeOutageId = ++nextOutageId
+    return activeOutageId
   }
 
   function clearPendingHealthProbes() {
@@ -359,7 +403,13 @@ export function createClientRealtimeSocketConnection<
         pendingSocketRequests.delete(requestId)
         clearTimeout(pending.timeout)
         forceSocketReconnect(`${requestLabel} timed out`, requestSocket)
-        reject(new Error(`${requestLabel} timed out`))
+        reject(
+          new ClientRealtimeRequestError(`${requestLabel} timed out`, {
+            kind: 'timeout',
+            delivery: 'indeterminate',
+            outageId: beginOutage(),
+          }),
+        )
       }, REALTIME_REQUEST_TIMEOUT_MS)
       pendingSocketRequests.set(requestId, {
         action,
@@ -373,26 +423,32 @@ export function createClientRealtimeSocketConnection<
         clearTimeout(timeout)
         pendingSocketRequests.delete(requestId)
         forceSocketReconnect(`${requestLabel} send failed`, requestSocket)
-        reject(error)
+        reject(
+          new ClientRealtimeRequestError(error instanceof Error ? error.message : `${requestLabel} send failed`, {
+            kind: 'send-failed',
+            delivery: 'not-sent',
+            outageId: beginOutage(),
+          }),
+        )
       }
     })
   }
 
   function waitForSocketOpen(): Promise<WebSocket> {
-    if (typeof WebSocket === 'undefined') return Promise.reject(new Error(`${socketLabel} unavailable`))
+    if (typeof WebSocket === 'undefined') return Promise.reject(unavailableSocketError())
     const current = socketLifecycle.active()
-    if (!current) return Promise.reject(new Error(`${socketLabel} unavailable`))
+    if (!current) return Promise.reject(unavailableSocketError())
     const currentSocket = current.socket
     if (currentSocket.readyState === WebSocket.OPEN) return Promise.resolve(currentSocket)
     if (currentSocket.readyState === WebSocket.CLOSED || currentSocket.readyState === WebSocket.CLOSING) {
-      return Promise.reject(new Error(`${socketLabel} closed before open`))
+      return Promise.reject(openSocketError(`${socketLabel} closed before open`))
     }
     return new Promise<WebSocket>((resolve, reject) => {
       let timeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
         settle(() => {
           if (socketLifecycle.active() === current)
             socketLifecycle.disconnect(`${socketLabel} open timed out`, currentSocket)
-          reject(new Error(`${socketLabel} open timed out`))
+          reject(openSocketError(`${socketLabel} open timed out`))
         })
       }, REALTIME_SOCKET_OPEN_TIMEOUT_MS)
       const settle = (fn: () => void) => {
@@ -403,12 +459,12 @@ export function createClientRealtimeSocketConnection<
         settle(() => {
           if (socketLifecycle.active() === current && currentSocket.readyState === WebSocket.OPEN)
             resolve(currentSocket)
-          else reject(new Error(`${socketLabel} replaced before open`))
+          else reject(openSocketError(`${socketLabel} replaced before open`))
         })
       }
       const handleClose = (event: CloseEvent) =>
-        settle(() => reject(new Error(formatSocketClosedBeforeOpenMessage(socketLabel, event))))
-      const handleError = () => settle(() => reject(new Error(`${socketLabel} error before open`)))
+        settle(() => reject(openSocketError(formatSocketClosedBeforeOpenMessage(socketLabel, event))))
+      const handleError = () => settle(() => reject(openSocketError(`${socketLabel} error before open`)))
       const cleanup = () => {
         if (timeout !== null) {
           clearTimeout(timeout)
@@ -421,6 +477,22 @@ export function createClientRealtimeSocketConnection<
       currentSocket.addEventListener('open', handleOpen)
       currentSocket.addEventListener('close', handleClose)
       currentSocket.addEventListener('error', handleError)
+    })
+  }
+
+  function unavailableSocketError(): ClientRealtimeRequestError {
+    return new ClientRealtimeRequestError(`${socketLabel} unavailable`, {
+      kind: 'unavailable',
+      delivery: 'not-sent',
+      outageId: beginOutage(),
+    })
+  }
+
+  function openSocketError(message: string): ClientRealtimeRequestError {
+    return new ClientRealtimeRequestError(message, {
+      kind: 'open-failed',
+      delivery: 'not-sent',
+      outageId: beginOutage(),
     })
   }
 }

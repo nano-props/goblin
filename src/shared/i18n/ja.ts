@@ -379,6 +379,9 @@ export const ja: Record<DictKey, string> = {
   'terminal.takeover-failed-generic': 'ターミナルの引き継ぎに失敗しました。',
   'terminal.takeover-session-gone': 'ターミナルは既に利用できません。',
   'terminal.write-blocked-reconnecting': '再接続中です。しばらく経ってからお試しください。',
+  'terminal.write-not-sent': '接続できません。入力は送信されませんでした。しばらく経ってから再試行してください。',
+  'terminal.write-delivery-uncertain':
+    '接続が中断されました。直前の入力が届いていない可能性があります。確認してから再試行してください。',
   'terminal.write-blocked-session-gone': 'ターミナルはもう利用できません。',
   'terminal.write-blocked-rejected': 'ターミナルがリクエストを拒否しました。',
   'terminal.write-blocked-client-unavailable': 'ターミナルクライアントが利用できません。',

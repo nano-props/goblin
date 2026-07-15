@@ -80,8 +80,15 @@ export function createInProcessPtySupervisor(): PtySupervisor {
       }
       return { ok: true, handle, processName: entry.runtime.processName() || 'terminal' }
     },
-    write(handle, data) {
-      entries.get(handle.ptySessionId)?.runtime.write(data)
+    async write(handle, data) {
+      const entry = entries.get(handle.ptySessionId)
+      if (!entry) return { status: 'rejected' }
+      try {
+        entry.runtime.write(data)
+        return { status: 'accepted' }
+      } catch {
+        return { status: 'indeterminate' }
+      }
     },
     resize(handle, cols, rows) {
       entries.get(handle.ptySessionId)?.runtime.resize(cols, rows)

@@ -13,6 +13,7 @@ import type {
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalWriteInput,
+  TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
 import { isValidTerminalRuntimeSessionId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
@@ -111,13 +112,13 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return await sessionService.prune(clientId, userId, input.repoRoot, input.repoRuntimeId)
     },
 
-    write(clientId: string, userId: string, input: TerminalWriteInput): TerminalMutationResult {
-      if (!isValidTerminalClientId(clientId)) return false
+    async write(clientId: string, userId: string, input: TerminalWriteInput): Promise<TerminalWriteResult> {
+      if (!isValidTerminalClientId(clientId)) return { status: 'rejected' }
       if (!isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) || !isValidTerminalWriteData(input?.data)) {
-        return false
+        return { status: 'rejected' }
       }
       const terminalClientId = input.clientId ?? clientId
-      return manager.writeSession(userId, input.terminalRuntimeSessionId, input.data, terminalClientId)
+      return await manager.writeSession(userId, input.terminalRuntimeSessionId, input.data, terminalClientId)
     },
 
     resize(clientId: string, userId: string, input: TerminalResizeInput): TerminalMutationResult {

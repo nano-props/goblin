@@ -384,6 +384,9 @@ export const en = {
   // silent (the session vanished, no need to nag) and has no key
   // here; the rest maps 1:1 to `AuthorizationDenialReason`.
   'terminal.write-blocked-reconnecting': 'Reconnecting — try again in a moment.',
+  'terminal.write-not-sent': 'Connection unavailable. Input was not sent; try again in a moment.',
+  'terminal.write-delivery-uncertain':
+    'Connection interrupted. Recent input may not have arrived; check before retrying.',
   'terminal.write-blocked-session-gone': 'Terminal is no longer available.',
   'terminal.write-blocked-rejected': 'Terminal rejected the request.',
   'terminal.write-blocked-client-unavailable': 'Terminal client unavailable.',

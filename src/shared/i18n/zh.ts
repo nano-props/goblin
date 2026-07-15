@@ -363,6 +363,8 @@ export const zh: Record<DictKey, string> = {
   'terminal.takeover-failed-generic': '接管终端失败。',
   'terminal.takeover-session-gone': '终端已关闭,无法接管。',
   'terminal.write-blocked-reconnecting': '正在重新连接,请稍后再试。',
+  'terminal.write-not-sent': '连接不可用，输入未发送，请稍后重试。',
+  'terminal.write-delivery-uncertain': '连接已中断，刚才的输入可能未送达，请确认终端状态后重试。',
   'terminal.write-blocked-session-gone': '终端已关闭,无法写入。',
   'terminal.write-blocked-rejected': '终端拒绝了该请求。',
   'terminal.write-blocked-client-unavailable': '终端客户端不可用。',
