@@ -230,7 +230,10 @@ describe('workspace pane tabs coordinator queues', () => {
 
     releaseFinalSample()
     await expect(list).resolves.toMatchObject({ entries: [{ worktreePath: '/repo/worktree' }] })
-    await expect(removal).resolves.toMatchObject({ admitted: true })
+    await expect(removal).resolves.toEqual({ admitted: false })
+    await expect(operations.runRemoval(capability, async () => {
+      removalTaskStarted = true
+    })).resolves.toMatchObject({ admitted: true })
     expect(removalTaskStarted).toBe(true)
   })
 
@@ -293,7 +296,9 @@ describe('workspace pane tabs coordinator queues', () => {
       repoRuntimeId: 'runtime-a',
       target: { kind: 'worktree', repoRoot: '/repo', worktreePath: '/repo/worktree-c' },
     }])
-    await removal
+    await expect(removal).resolves.toEqual({ admitted: false })
+    await expect(operations.runRemoval(capabilityC, async () => { removalStarted = true }))
+      .resolves.toMatchObject({ admitted: true })
     expect(removalStarted).toBe(true)
     expect(captureCount).toBe(3)
   })

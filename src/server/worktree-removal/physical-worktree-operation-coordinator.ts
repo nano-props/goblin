@@ -24,15 +24,17 @@ export interface PhysicalWorktreeOperationContext {
   readonly signal: AbortSignal
 }
 
-export interface PhysicalWorktreeAdmissionBatch {
-  readonly capabilities: readonly PhysicalWorktreeExecutionCapability[]
-  readonly leases: readonly PhysicalWorktreeAdmissionLease[]
+export interface PhysicalWorktreeAdmissionRecord {
+  readonly identity: PhysicalWorktreeIdentity
+  readonly currentCapability: PhysicalWorktreeExecutionCapability | null
+  readonly indexedLeases: readonly PhysicalWorktreeAdmissionLease[]
 }
 
 /** Serializes runtime mutations and removal admission by physical worktree identity. */
 export class PhysicalWorktreeOperationCoordinator {
   private readonly queues = new Map<string, PQueue>()
   private readonly removalAdmissions = new Set<string>()
+  private readonly batchAdmissions = new Map<string, number>()
   private readonly permitContexts = new WeakMap<
     PhysicalWorktreeOperationPermit,
     { capability: PhysicalWorktreeExecutionCapability; key: string; context: PhysicalWorktreeOperationContext }
@@ -105,27 +107,22 @@ export class PhysicalWorktreeOperationCoordinator {
 
   /** Acquire each stable physical identity once, while validating the newest capability available for it. */
   async runAdmissionBatch<T>(
-    batch: PhysicalWorktreeAdmissionBatch,
+    records: readonly PhysicalWorktreeAdmissionRecord[],
     task: () => Promise<T>,
     externalSignal?: AbortSignal,
   ): Promise<{ admitted: true; value: T } | { admitted: false }> {
-    const capabilitiesByKey = new Map<string, PhysicalWorktreeExecutionCapability>()
-    for (const capability of batch.capabilities) {
-      capabilitiesByKey.set(physicalWorktreeOperationKey(capability), capability)
-    }
-    const leasesByKey = new Map<string, PhysicalWorktreeAdmissionLease>()
-    for (const lease of batch.leases) {
-      const key = physicalWorktreeOperationKey(lease)
-      if (!leasesByKey.has(key)) leasesByKey.set(key, lease)
-    }
-    const keys = [...new Set([...capabilitiesByKey.keys(), ...leasesByKey.keys()])].sort()
-    if (keys.some((key) => this.removalAdmissions.has(key))) return { admitted: false }
+    const normalized = normalizeAdmissionRecords(records)
+    const keys = normalized.map(({ key }) => key)
+    if (!this.reserveBatch(keys)) return { admitted: false }
     const acquire = async (index: number): Promise<T> => {
-      const key = keys[index]
-      if (!key) return await task()
-      const capability = capabilitiesByKey.get(key)
-      const lease = capability ? physicalWorktreeAdmissionLease(capability) : leasesByKey.get(key)
-      if (!lease) throw new Error('error.invalid-worktree-admission-lease')
+      const record = normalized[index]
+      if (!record) return await task()
+      const { key, currentCapability: capability } = record
+      const lease = capability
+        ? physicalWorktreeAdmissionLease(capability)
+        : record.indexedLeases.find((candidate) => !physicalWorktreeAdmissionLeaseSignal(candidate).aborted) ??
+          record.indexedLeases[0]
+      if (!lease) throw new Error('error.invalid-worktree-admission-record')
       const signal = combinedSignal(physicalWorktreeAdmissionLeaseSignal(lease), externalSignal)
       return await this.runByKey(key, async () => {
         signal.throwIfAborted()
@@ -133,14 +130,11 @@ export class PhysicalWorktreeOperationCoordinator {
         return await acquire(index + 1)
       }, signal)
     }
-    const firstCapability = keys.length > 0 ? capabilitiesByKey.get(keys[0]) : undefined
-    const firstLease = firstCapability
-      ? physicalWorktreeAdmissionLease(firstCapability)
-      : (keys.length > 0 ? leasesByKey.get(keys[0])! : null)
-    if (firstLease) {
-      combinedSignal(physicalWorktreeAdmissionLeaseSignal(firstLease), externalSignal).throwIfAborted()
+    try {
+      return { admitted: true, value: await acquire(0) }
+    } finally {
+      this.releaseBatch(keys)
     }
-    return { admitted: true, value: await acquire(0) }
   }
 
   async runRemoval<T>(
@@ -152,7 +146,7 @@ export class PhysicalWorktreeOperationCoordinator {
     const signal = combinedSignal(physicalWorktreeAdmissionLeaseSignal(admissionLease), externalSignal)
     signal.throwIfAborted()
     const key = physicalWorktreeOperationKey(capability)
-    if (this.removalAdmissions.has(key)) return { admitted: false }
+    if (this.removalAdmissions.has(key) || this.batchAdmissions.has(key)) return { admitted: false }
     this.removalAdmissions.add(key)
     const context = Object.freeze({ signal })
     const permit = this.createPermit(capability, key, context)
@@ -196,6 +190,21 @@ export class PhysicalWorktreeOperationCoordinator {
     return queue
   }
 
+  private reserveBatch(keys: readonly string[]): boolean {
+    if (keys.some((key) => this.removalAdmissions.has(key))) return false
+    for (const key of keys) this.batchAdmissions.set(key, (this.batchAdmissions.get(key) ?? 0) + 1)
+    return true
+  }
+
+  private releaseBatch(keys: readonly string[]): void {
+    for (const key of keys) {
+      const count = this.batchAdmissions.get(key)
+      if (count === undefined) throw new Error('physical worktree batch admission underflow')
+      if (count === 1) this.batchAdmissions.delete(key)
+      else this.batchAdmissions.set(key, count - 1)
+    }
+  }
+
   private createPermit(
     capability: PhysicalWorktreeExecutionCapability,
     key: string,
@@ -214,6 +223,24 @@ function combinedSignal(runtimeSignal: AbortSignal, externalSignal: AbortSignal 
 
 function physicalWorktreeOperationKey(target: PhysicalWorktreeAdmissionTarget): string {
   return physicalWorktreeIdentityKey('identity' in target ? target.identity : target)
+}
+
+function normalizeAdmissionRecords(records: readonly PhysicalWorktreeAdmissionRecord[]): Array<
+  PhysicalWorktreeAdmissionRecord & { key: string }
+> {
+  const byKey = new Map<string, PhysicalWorktreeAdmissionRecord & { key: string }>()
+  for (const record of records) {
+    const key = physicalWorktreeIdentityKey(record.identity)
+    if (byKey.has(key)) throw new Error('error.duplicate-worktree-admission-record')
+    if (record.currentCapability && physicalWorktreeOperationKey(record.currentCapability) !== key) {
+      throw new Error('error.invalid-worktree-admission-record')
+    }
+    if (record.indexedLeases.some((lease) => physicalWorktreeOperationKey(lease) !== key)) {
+      throw new Error('error.invalid-worktree-admission-record')
+    }
+    byKey.set(key, { ...record, key })
+  }
+  return [...byKey.values()].sort((a, b) => a.key.localeCompare(b.key))
 }
 
 export function createPhysicalWorktreeOperationCoordinator(): PhysicalWorktreeOperationCoordinator {
