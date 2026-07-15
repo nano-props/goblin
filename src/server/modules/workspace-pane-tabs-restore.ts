@@ -9,6 +9,7 @@ import {
 import {
   clearServerWorkspaceTabsIfUnchanged,
   confirmServerWorkspaceTabsUnchanged,
+  type ServerWorkspaceMatchOutcome,
 } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
@@ -20,9 +21,6 @@ export interface WorkspacePaneTabsRestoreInput {
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   signal?: AbortSignal
 }
-
-type WorkspaceMembershipConfirmation =
-  { matched: true; workspace: ServerWorkspaceState } | { matched: false; latestWorkspace: ServerWorkspaceState }
 
 export async function validateOrRepairWorkspacePaneTabs(
   initialWorkspace: ServerWorkspaceState,
@@ -70,7 +68,7 @@ export async function initializeWorkspacePaneTabsWithMembershipGuard(input: {
   restoreInput: WorkspacePaneTabsRestoreInput
   workspace: ServerWorkspaceState
   repos: ProjectedRestoredWorkspaceRepoRuntime[]
-  confirmMembership: () => Promise<WorkspaceMembershipConfirmation>
+  confirmMembership: () => Promise<ServerWorkspaceMatchOutcome>
   assertCurrent?: () => void
 }): Promise<
   | {
