@@ -24,7 +24,7 @@ interface WorktreeRemovalApplicationDependencies {
   terminalWorktree: Pick<TerminalSessionManager<string>, 'closeSessionsForPhysicalWorktree'>
   workspaceTabs: Pick<
     WorkspacePaneTabsCoordinator,
-    'physicalWorktreeTargets' | 'reconcilePhysicalWorktreeAfterRemovalFailure'
+    'physicalWorktreeTargets' | 'reconcilePhysicalWorktreeAfterRemovalFailure' | 'clearPhysicalWorktreeIndex'
   >
   workspacePaneTabs: Pick<ServerWorkspacePaneTargetLifecycleHost, 'retireTarget'> & {
     retireTargetIfInvalid(
@@ -118,6 +118,7 @@ export class WorktreeRemovalApplication {
                     repoRuntimeId: input.repoRuntimeId,
                     target: requestedTarget.target,
                   })
+                  await this.deps.workspaceTabs.clearPhysicalWorktreeIndex(physicalCapability.identity)
                   this.broadcastSessions(affectedScopes)
                   return { ok: true, message: '' }
                 } catch (error) {

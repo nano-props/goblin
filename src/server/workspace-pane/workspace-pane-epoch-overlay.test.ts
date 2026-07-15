@@ -95,6 +95,20 @@ describe('workspace pane epoch overlay', () => {
     expect(overlay.physicalTargets(identity)).toEqual([])
   })
 
+  test('clears a removed physical identity without deleting target placement', () => {
+    const overlay = new WorkspacePaneEpochOverlay()
+    const identity = testPhysicalWorktreeIdentity('/repo/worktree')
+    const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree')
+    const lease = physicalWorktreeAdmissionLease(capability)
+    const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-stalephysicalidentity1')
+    overlay.recordMixedOrder({ ...scope, target, tabs: [terminal] })
+    overlay.registerPhysicalTarget({ ...scope, target, lease })
+
+    expect(overlay.clearPhysicalIdentity(identity)).toEqual([scope])
+    expect(overlay.physicalTargets(identity)).toEqual([])
+    expect(overlay.placementHints({ ...scope, target })).toHaveLength(1)
+  })
+
   test('rejects duplicate provider types and keys revisions by type', () => {
     expect(providerRevisionMap([{ type: 'terminal', revision: 2 }])).toEqual(new Map([['terminal', 2]]))
     expect(() => providerRevisionMap([

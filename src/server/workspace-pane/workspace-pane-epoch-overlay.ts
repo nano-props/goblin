@@ -94,6 +94,24 @@ export class WorkspacePaneEpochOverlay {
     return Array.from(this.targetsByPhysicalKey.get(physicalWorktreeIdentityKey(identity))?.values() ?? []).map(cloneTargetRef)
   }
 
+  clearPhysicalIdentity(identity: PhysicalWorktreeIdentity): WorkspacePaneEpochScope[] {
+    const physicalKey = physicalWorktreeIdentityKey(identity)
+    const refs = [...(this.targetsByPhysicalKey.get(physicalKey)?.values() ?? [])]
+    const affected: WorkspacePaneEpochScope[] = []
+    for (const ref of refs) {
+      const scope = scopeFromEpochKey(epochKey(ref))
+      const state = this.epochs.get(epochKey(scope))
+      const targetKey = workspacePaneTabsTargetIdentityKeyFromIdentity(ref.target)
+      const lease = state?.physicalLeasesByTarget.get(targetKey)
+      if (!state || !lease || physicalWorktreeIdentityKey(lease.identity) !== physicalKey) continue
+      state.physicalLeasesByTarget.delete(targetKey)
+      this.removePhysicalTarget(physicalKey, scope, targetKey)
+      state.overlayRevision += 1
+      affected.push(scope)
+    }
+    return affected
+  }
+
   indexedAdmissionLeases(scope: WorkspacePaneEpochScope): PhysicalWorktreeAdmissionLease[] {
     const state = this.epochs.get(epochKey(scope))
     if (!state) return []

@@ -362,6 +362,14 @@ export class WorkspacePaneTabsCoordinator {
     }))
   }
 
+  async clearPhysicalWorktreeIndex(identity: PhysicalWorktreeIdentity): Promise<void> {
+    const repoRoots = new Set(this.physicalWorktreeTargets(identity).map((ref) => ref.target.repoRoot))
+    await Promise.all([...repoRoots].map(async (repoRoot) =>
+      await this.runWorkspaceTabsRepoOperation(repoRoot, (layout) => {
+        layout.clearPhysicalIdentity(identity)
+      })))
+  }
+
   async retireTarget(input: {
     userId: string
     scope: string

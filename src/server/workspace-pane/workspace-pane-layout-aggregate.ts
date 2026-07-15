@@ -114,6 +114,7 @@ export interface WorkspacePaneLayoutOperation {
     physicalTargets: readonly { target: WorkspacePaneTabsTargetIdentity; lease: PhysicalWorktreeAdmissionLease }[]
   }): void
   indexedAdmissionLeases(scope: WorkspacePaneEpochScope): PhysicalWorktreeAdmissionLease[]
+  clearPhysicalIdentity(identity: PhysicalWorktreeIdentity): WorkspacePaneEpochScope[]
 }
 
 export class WorkspacePaneLayoutAggregate {
@@ -154,6 +155,7 @@ export class WorkspacePaneLayoutAggregate {
         closeEpoch: (scope) => this.closeEpoch(scope),
         commitProjectionTargets: (input) => this.commitProjectionTargets(input),
         indexedAdmissionLeases: (scope) => this.overlay.indexedAdmissionLeases(scope),
+        clearPhysicalIdentity: (identity) => this.overlay.clearPhysicalIdentity(identity),
       }))
     } finally {
       void queue.onIdle().then(() => {

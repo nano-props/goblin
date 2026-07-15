@@ -139,7 +139,7 @@ describe('workspace pane layout aggregate', () => {
     })
   })
 
-  test('uses one monotonic clock across durable, overlay, and provider dependencies', async () => {
+  test('uses one monotonic clock across durable, target, overlay, and provider dependencies', async () => {
     const branchTarget = { repoRoot: '/repo', branchName: 'main', worktreePath: null }
     const repository = memoryRepository({ entries: [{ ...branchTarget, tabs: [] }] })
     const aggregate = aggregateFor(repository)

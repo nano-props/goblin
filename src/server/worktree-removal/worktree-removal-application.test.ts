@@ -364,6 +364,7 @@ function createApplication(
     retireTarget?: ServerWorkspacePaneTargetLifecycleHost['retireTarget']
     retireTargetIfInvalid?: ServerWorkspacePaneTargetLifecycleHost['retireTarget']
     physicalWorktreeTargets?: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']>
+    clearPhysicalWorktreeIndex?: WorkspacePaneTabsCoordinator['clearPhysicalWorktreeIndex']
     broadcastWorkspaceTabsChanged?: (userId: string, repoRoot: string) => void
     broadcastSessionsChanged?: (userId: string, repoRoot: string) => void
   } = {},
@@ -383,6 +384,7 @@ function createApplication(
     },
     workspaceTabs: {
       physicalWorktreeTargets: () => options.physicalWorktreeTargets ?? [],
+      clearPhysicalWorktreeIndex: options.clearPhysicalWorktreeIndex ?? (async () => {}),
       reconcilePhysicalWorktreeAfterRemovalFailure:
         options.reconcilePhysicalWorktreeAfterRemovalFailure ?? (async () => {}),
     },
