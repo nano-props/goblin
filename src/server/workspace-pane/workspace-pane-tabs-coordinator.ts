@@ -14,6 +14,7 @@ import { workspacePaneTabsUserScopeQueueKey } from '#/server/workspace-pane/work
 import type {
   WorkspacePaneTabsRuntime,
   WorkspacePaneTabsScopeEntry,
+  WorkspacePaneTabsTargetIdentity,
 } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
@@ -38,7 +39,7 @@ import {
 type WorkspacePaneTabsCoordinatorRuntime = Pick<
   WorkspacePaneTabsRuntime<string>,
   | 'closeTabsForScope'
-  | 'closeTabsForWorktree'
+  | 'retireTarget'
   | 'physicalWorktreeScopes'
   | 'initializeScope'
   | 'isScopeInitialized'
@@ -172,21 +173,25 @@ export class WorkspacePaneTabsCoordinator {
   }): Promise<WorkspacePaneTabsSnapshot> {
     let physicalCapability: PhysicalWorktreeCapability | null = null
     const operation = async () =>
-      await this.runWorkspaceTabsScopeOperation(input.userId, input.scope, async () => {
-        input.assertCurrent()
-        const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
-        input.assertCurrent()
-        const replacement = {
-          userId: input.userId,
-          scope: input.scope,
-          branchName: input.branchName,
-          worktreePath: input.worktreePath,
-          physicalWorktreeIdentity: physicalCapability?.identity ?? null,
-          tabs: input.tabs,
-        }
-        await this.persistPlannedLayout(input.repoRoot, input.userId, input.scope, replacement)
-        this.workspaceTabs.replaceTabs(replacement)
-        return this.projectedScopeSnapshot(input.userId, input.repoRoot, input.scope, providerSnapshots)
+      await this.runDurableScopeCommand({
+        userId: input.userId,
+        repoRoot: input.repoRoot,
+        scope: input.scope,
+        validate: input.assertCurrent,
+        plan: () => {
+          const replacement = {
+            userId: input.userId,
+            scope: input.scope,
+            branchName: input.branchName,
+            worktreePath: input.worktreePath,
+            physicalWorktreeIdentity: physicalCapability?.identity ?? null,
+            tabs: input.tabs,
+          }
+          return {
+            layout: this.plannedLayoutWithReplacement(input.repoRoot, input.userId, input.scope, replacement),
+            commit: () => this.workspaceTabs.replaceTabs(replacement),
+          }
+        },
       })
     if (input.worktreePath === null) return await operation()
     physicalCapability = await this.capturePhysicalWorktree(input, input.worktreePath)
@@ -262,32 +267,35 @@ export class WorkspacePaneTabsCoordinator {
   }): Promise<WorkspacePaneTabsSnapshot> {
     let physicalCapability: PhysicalWorktreeCapability | null = null
     const operation = async () =>
-      await this.runWorkspaceTabsScopeOperation(input.userId, input.scope, async () => {
-        input.assertCurrent()
-        const target = {
-          userId: input.userId,
-          scope: input.scope,
-          branchName: input.branchName,
-          worktreePath: input.worktreePath,
-        }
-        const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
-        input.assertCurrent()
-        const layoutTabs = mutateCanonicalWorkspaceTabLayout({
-          branchName: input.branchName,
-          worktreePath: input.worktreePath,
-          layoutTabs: this.workspaceTabs.tabs(target),
-          providerSnapshots,
-          mutate: (currentTabs) => workspacePaneTabsWithUpdateOperation(currentTabs, input.operation),
-        })
-        input.assertCurrent()
-        const replacement = {
-          ...target,
-          physicalWorktreeIdentity: physicalCapability?.identity ?? null,
-          tabs: layoutTabs,
-        }
-        await this.persistPlannedLayout(input.repoRoot, input.userId, input.scope, replacement)
-        this.workspaceTabs.replaceTabs(replacement)
-        return this.projectedScopeSnapshot(input.userId, input.repoRoot, input.scope, providerSnapshots)
+      await this.runDurableScopeCommand({
+        userId: input.userId,
+        repoRoot: input.repoRoot,
+        scope: input.scope,
+        validate: input.assertCurrent,
+        plan: (providerSnapshots) => {
+          const target = {
+            userId: input.userId,
+            scope: input.scope,
+            branchName: input.branchName,
+            worktreePath: input.worktreePath,
+          }
+          const layoutTabs = mutateCanonicalWorkspaceTabLayout({
+            branchName: input.branchName,
+            worktreePath: input.worktreePath,
+            layoutTabs: this.workspaceTabs.tabs(target),
+            providerSnapshots,
+            mutate: (currentTabs) => workspacePaneTabsWithUpdateOperation(currentTabs, input.operation),
+          })
+          const replacement = {
+            ...target,
+            physicalWorktreeIdentity: physicalCapability?.identity ?? null,
+            tabs: layoutTabs,
+          }
+          return {
+            layout: this.plannedLayoutWithReplacement(input.repoRoot, input.userId, input.scope, replacement),
+            commit: () => this.workspaceTabs.replaceTabs(replacement),
+          }
+        },
       })
     if (input.worktreePath === null) return await operation()
     physicalCapability = await this.capturePhysicalWorktree(input, input.worktreePath)
@@ -366,25 +374,22 @@ export class WorkspacePaneTabsCoordinator {
     return this.workspaceTabs.physicalWorktreeScopes(identity)
   }
 
-  async finalizePhysicalWorktreeRemoval(input: {
-    worktreePath: string
-    physicalWorktreeCapability: PhysicalWorktreeCapability
-    permit: PhysicalWorktreeOperationPermit
-    scopes: readonly { userId: string; scope: string }[]
-  }): Promise<void> {
-    this.worktreeOperations.assertPermit(input.physicalWorktreeCapability, input.permit)
-    await Promise.all(
-      input.scopes.map(async ({ userId, scope }) => {
-        await this.runWorkspaceTabsScopeOperation(userId, scope, () => {
-          this.workspaceTabs.closeTabsForWorktree({
-            userId,
-            scope,
-            worktreePath: input.worktreePath,
-            identity: input.physicalWorktreeCapability.identity,
-          })
-        })
+  async retireTarget(input: {
+    userId: string
+    scope: string
+    target: WorkspacePaneTabsTargetIdentity
+    assertCurrent?: () => void
+  }): Promise<WorkspacePaneTabsSnapshot> {
+    return await this.runDurableScopeCommand({
+      userId: input.userId,
+      repoRoot: input.target.repoRoot,
+      scope: input.scope,
+      validate: input.assertCurrent,
+      plan: () => ({
+        layout: this.plannedLayoutWithoutTarget(input.userId, input.scope, input.target),
+        commit: () => this.workspaceTabs.retireTarget(input),
       }),
-    )
+    })
   }
 
   async reconcilePhysicalWorktreeAfterRemovalFailure(input: {
@@ -501,12 +506,12 @@ export class WorkspacePaneTabsCoordinator {
     }
   }
 
-  private async persistPlannedLayout(
+  private plannedLayoutWithReplacement(
     repoRoot: string,
     userId: string,
     scope: string,
     replacement: Parameters<WorkspacePaneTabsCoordinatorRuntime['replaceTabs']>[0],
-  ): Promise<void> {
+  ): WorkspacePaneDurableLayout {
     const entries = this.workspaceTabs
       .tabsForScope({ userId, scope })
       .filter((entry) => entry.branchName !== replacement.branchName || entry.worktreePath !== replacement.worktreePath)
@@ -515,13 +520,52 @@ export class WorkspacePaneTabsCoordinator {
       worktreePath: replacement.worktreePath,
       tabs: [...replacement.tabs],
     })
-    await this.persistLayout(repoRoot, {
+    return {
       entries: entries.map((entry) => ({
         repoRoot,
         branchName: entry.branchName,
         worktreePath: entry.worktreePath,
         tabs: entry.tabs.filter((tab): tab is WorkspacePaneStaticTabEntry => isWorkspacePaneStaticTabType(tab.type)),
       })),
+    }
+  }
+
+  private plannedLayoutWithoutTarget(
+    userId: string,
+    scope: string,
+    target: WorkspacePaneTabsTargetIdentity,
+  ): WorkspacePaneDurableLayout {
+    return {
+      entries: this.workspaceTabs
+        .tabsForScope({ userId, scope })
+        .filter((entry) => !workspacePaneScopeEntryMatchesTarget(entry, target))
+        .map((entry) => ({
+          repoRoot: target.repoRoot,
+          branchName: entry.branchName,
+          worktreePath: entry.worktreePath,
+          tabs: entry.tabs.filter((tab): tab is WorkspacePaneStaticTabEntry => isWorkspacePaneStaticTabType(tab.type)),
+        })),
+    }
+  }
+
+  private async runDurableScopeCommand(input: {
+    userId: string
+    repoRoot: string
+    scope: string
+    validate?: () => void
+    plan: (providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]) => {
+      layout: WorkspacePaneDurableLayout
+      commit: () => unknown
+    }
+  }): Promise<WorkspacePaneTabsSnapshot> {
+    return await this.runWorkspaceTabsScopeOperation(input.userId, input.scope, async () => {
+      input.validate?.()
+      const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
+      input.validate?.()
+      const command = input.plan(providerSnapshots)
+      await this.persistLayout(input.repoRoot, command.layout)
+      command.commit()
+      return this.projectedScopeSnapshot(input.userId, input.repoRoot, input.scope, providerSnapshots)
     })
   }
 
@@ -585,6 +629,15 @@ export class WorkspacePaneTabsCoordinator {
       if (queue.size === 0 && queue.pending === 0) this.operationQueuesByScope.delete(queueKey)
     })
   }
+}
+
+function workspacePaneScopeEntryMatchesTarget(
+  entry: WorkspacePaneTabsScopeEntry,
+  target: WorkspacePaneTabsTargetIdentity,
+): boolean {
+  return target.kind === 'branch'
+    ? entry.worktreePath === null && entry.branchName === target.branchName
+    : entry.worktreePath === target.worktreePath
 }
 
 export function createWorkspacePaneTabsCoordinator(

@@ -165,7 +165,11 @@ describe('workspace pane tabs runtime storage', () => {
     })
     const revision = runtime.revision({ userId: 'user-a', scope: '/repo' })
 
-    runtime.closeTabsForWorktree(worktree())
+    runtime.retireTarget({
+      userId: 'user-a',
+      scope: '/repo',
+      target: { kind: 'worktree', repoRoot: '/repo', worktreePath: '/repo-linked' },
+    })
 
     expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(revision + 1)
     expect(runtime.tabsForScope({ userId: 'user-a', scope: '/repo' })).toEqual([

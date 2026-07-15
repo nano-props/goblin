@@ -9,6 +9,8 @@ export interface ServerWorktreeRemovalHost {
       repoRoot: string
       repoRuntimeId: string
       worktreePath: string
+      branchName: string
+      alsoDeleteBranch: boolean
       signal?: AbortSignal
       remove(
         capability: PhysicalWorktreeCapability,

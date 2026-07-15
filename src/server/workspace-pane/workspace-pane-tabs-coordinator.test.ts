@@ -121,6 +121,134 @@ describe('workspace pane tabs coordinator', () => {
     })
   })
 
+  test('retires one branch target without removing other durable layout', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    replaceTestWorkspaceTabs(workspaceTabs, {
+      userId: USER_ID,
+      scope: SCOPE,
+      branchName: 'feature/retired',
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
+    replaceTestWorkspaceTabs(workspaceTabs, {
+      userId: USER_ID,
+      scope: SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('changes')],
+    })
+    const persistLayout = vi.fn(async () => {})
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
+      runtimeProviders: [],
+      persistLayout,
+    })
+
+    await coordinator.retireTarget({
+      userId: USER_ID,
+      scope: SCOPE,
+      target: { kind: 'branch', repoRoot: REPO_ROOT, branchName: 'feature/retired' },
+      assertCurrent: () => {},
+    })
+
+    expect(persistLayout).toHaveBeenCalledWith(REPO_ROOT, {
+      entries: [
+        {
+          repoRoot: REPO_ROOT,
+          branchName: BRANCH_NAME,
+          worktreePath: WORKTREE_PATH,
+          tabs: [workspacePaneStaticTabEntry('changes')],
+        },
+      ],
+    })
+    expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: SCOPE })).toEqual([
+      {
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: [workspacePaneStaticTabEntry('changes')],
+      },
+    ])
+  })
+
+  test('does not retire a live target when durable cleanup fails', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    replaceTestWorkspaceTabs(workspaceTabs, {
+      userId: USER_ID,
+      scope: SCOPE,
+      branchName: 'feature/retired',
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
+      runtimeProviders: [],
+      persistLayout: async () => {
+        throw new Error('disk unavailable')
+      },
+    })
+
+    await expect(
+      coordinator.retireTarget({
+        userId: USER_ID,
+        scope: SCOPE,
+        target: { kind: 'branch', repoRoot: REPO_ROOT, branchName: 'feature/retired' },
+        assertCurrent: () => {},
+      }),
+    ).rejects.toThrow('disk unavailable')
+    expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: SCOPE })).toHaveLength(1)
+  })
+
+  test('retires one removed worktree without removing other durable layout', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    replaceTestWorkspaceTabs(workspaceTabs, {
+      userId: USER_ID,
+      scope: SCOPE,
+      branchName: 'main',
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
+    replaceTestWorkspaceTabs(workspaceTabs, {
+      ...workspaceTarget(),
+      tabs: [workspacePaneStaticTabEntry('changes')],
+    })
+    const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
+    const persistLayout = vi.fn(async () => {})
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      worktreeOperations,
+      physicalWorktrees: testPhysicalWorktrees,
+      runtimeProviders: [],
+      persistLayout,
+    })
+    await coordinator.retireTarget({
+      userId: USER_ID,
+      scope: SCOPE,
+      target: { kind: 'worktree', repoRoot: REPO_ROOT, worktreePath: WORKTREE_PATH },
+    })
+
+    expect(persistLayout).toHaveBeenCalledWith(REPO_ROOT, {
+      entries: [
+        {
+          repoRoot: REPO_ROOT,
+          branchName: 'main',
+          worktreePath: null,
+          tabs: [workspacePaneStaticTabEntry('history')],
+        },
+      ],
+    })
+    expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: SCOPE })).toEqual([
+      {
+        branchName: 'main',
+        worktreePath: null,
+        tabs: [workspacePaneStaticTabEntry('history')],
+      },
+    ])
+  })
+
   test('does not let restore initialization overwrite an initialized scope', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     const coordinator = createWorkspacePaneTabsCoordinator({

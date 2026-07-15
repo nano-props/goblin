@@ -20,6 +20,7 @@ import {
   type WorkspacePaneTabsCoordinator,
   type WorkspacePaneRuntimeTabsProvider,
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import type { WorkspacePaneTabsTargetIdentity } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
 import {
   createTerminalSessionEnsurer,
@@ -216,6 +217,25 @@ class TerminalSessionService {
       worktreePath,
       operation: input.operation,
       assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId),
+    })
+  }
+
+  async retireTarget(
+    userId: string,
+    input: { repoRuntimeId: string; target: WorkspacePaneTabsTargetIdentity },
+  ): Promise<WorkspacePaneTabsSnapshot> {
+    const { repoRoot } = input.target
+    const validTarget =
+      input.target.kind === 'branch' ? isValidBranch(input.target.branchName) : isValidCwd(input.target.worktreePath)
+    if (!isValidRepoLocator(repoRoot) || !validTarget) {
+      throw new Error('invalid workspace pane target')
+    }
+    const scope = terminalSessionRuntimeScope(repoRoot, input.repoRuntimeId)
+    return await this.workspaceTabsCoordinator.retireTarget({
+      userId,
+      scope,
+      target: input.target,
+      assertCurrent: () => this.assertCurrentRepoRuntime(userId, repoRoot, input.repoRuntimeId),
     })
   }
 

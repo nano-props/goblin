@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
-import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import type {
+  ServerWorkspacePaneTabsHost,
+  ServerWorkspacePaneTargetLifecycleHost,
+} from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
 const mocks = vi.hoisted(() => ({
   access: vi.fn(async () => undefined),
@@ -69,7 +72,8 @@ const workspacePaneTabsHostStub = {
   listWorkspaceTabs: vi.fn(),
   replaceTabs: vi.fn(),
   updateTabs: vi.fn(),
-} satisfies ServerWorkspacePaneTabsHost
+  retireTarget: vi.fn(),
+} satisfies ServerWorkspacePaneTabsHost & ServerWorkspacePaneTargetLifecycleHost
 
 const worktreeRemovalApplicationStub = {
   removeWorktree: vi.fn(async () => ({ ok: false as const, message: 'unused' })),

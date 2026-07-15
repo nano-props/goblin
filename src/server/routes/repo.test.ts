@@ -100,13 +100,20 @@ function createTestRepoRoutes(
       )
     },
   },
+  workspacePaneTargetLifecycle: Parameters<typeof createRepoRoutes>[0]['workspacePaneTargetLifecycle'] = {
+    retireTarget: vi.fn(async () => ({ revision: 0, entries: [] })),
+  },
 ) {
   return createRepoRoutes({
     worktreeRemovalApplication,
+    workspacePaneTargetLifecycle,
   })
 }
 
-async function openTestRepoRuntime(app: ReturnType<typeof createTestRepoRoutes>, repoRoot = '/tmp/repo'): Promise<string> {
+async function openTestRepoRuntime(
+  app: ReturnType<typeof createTestRepoRoutes>,
+  repoRoot = '/tmp/repo',
+): Promise<string> {
   const response = await app.request(
     new Request('http://localhost/runtime-open', {
       method: 'POST',
@@ -502,11 +509,10 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       }),
     )
     expect(response.status).toBe(200)
-    expect(mocks.getRepoPatch).toHaveBeenCalledWith(
-      '/tmp/repo',
-      '/tmp/repo/.worktrees/feature',
-      { signal: expect.any(AbortSignal), repoRuntimeId },
-    )
+    expect(mocks.getRepoPatch).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo/.worktrees/feature', {
+      signal: expect.any(AbortSignal),
+      repoRuntimeId,
+    })
   })
 
   test('hard-fails when repo log reading fails', async () => {
@@ -744,7 +750,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/tree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature', prefix: 'src' }),
+        body: JSON.stringify({
+          cwd: '/tmp/repo',
+          repoRuntimeId,
+          worktreePath: '/tmp/repo/.worktrees/feature',
+          prefix: 'src',
+        }),
       }),
     )
     expect(response.status).toBe(200)
@@ -1090,6 +1101,33 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       expect.any(AbortSignal),
       { repoRuntimeId },
     )
+  })
+
+  test('retires durable branch layout only after branch deletion succeeds', async () => {
+    const retireTarget = vi.fn(async () => ({ revision: 1, entries: [] }))
+    const app = createTestRepoRoutes(undefined, { retireTarget })
+    const repoRuntimeId = await openTestRepoRuntime(app)
+    mocks.deleteRepoBranch.mockResolvedValueOnce({ ok: true, message: 'ok' })
+
+    const response = await app.request('/delete-branch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, branch: 'feature/retired' }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(retireTarget).toHaveBeenCalledWith('user-test', {
+      repoRuntimeId,
+      target: { kind: 'branch', repoRoot: '/tmp/repo', branchName: 'feature/retired' },
+    })
+
+    mocks.deleteRepoBranch.mockResolvedValueOnce({ ok: false, message: 'delete failed' })
+    await app.request('/delete-branch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, branch: 'feature/kept' }),
+    })
+    expect(retireTarget).toHaveBeenCalledTimes(1)
   })
 
   test('forwards external workspace app open routes', async () => {

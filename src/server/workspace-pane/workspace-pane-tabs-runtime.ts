@@ -43,6 +43,10 @@ export interface WorkspacePaneTabsWorktreeInput<TUser extends string | number> {
   worktreePath: string
 }
 
+export type WorkspacePaneTabsTargetIdentity =
+  | { kind: 'branch'; repoRoot: string; branchName: string }
+  | { kind: 'worktree'; repoRoot: string; worktreePath: string }
+
 export interface WorkspacePaneTabsScopeInput<TUser extends string | number> {
   userId: TUser
   scope: string
@@ -79,9 +83,8 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     this.initializedScopes.add(workspacePaneTabsUserScopeQueueKey(input.userId, input.scope))
     const targetKey = this.targetKey(input)
     const tabs = normalizeWorkspacePaneTabs(input.tabs, { hasWorktree: input.worktreePath !== null })
-    const physicalWorktreeKey = input.worktreePath === null
-      ? null
-      : physicalWorktreeIdentityKey(input.physicalWorktreeIdentity!)
+    const physicalWorktreeKey =
+      input.worktreePath === null ? null : physicalWorktreeIdentityKey(input.physicalWorktreeIdentity!)
     const existing = this.tabsByTarget.get(targetKey)
     if (
       existing &&
@@ -159,12 +162,11 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     this.revisionByUserScope.delete(workspacePaneTabsUserScopeQueueKey(userId, scope))
   }
 
-  closeTabsForWorktree(input: WorkspacePaneTabsWorktreeInput<TUser> & { identity: PhysicalWorktreeIdentity }): void {
+  retireTarget(input: WorkspacePaneTabsScopeInput<TUser> & { target: WorkspacePaneTabsTargetIdentity }): void {
     const prefix = workspacePaneTabsRuntimeScopePrefixKey(input.userId, input.scope)
-    const targetKey = physicalWorktreeIdentityKey(input.identity)
     let changed = false
     for (const [key, entry] of Array.from(this.tabsByTarget.entries())) {
-      if (!key.startsWith(prefix) || entry.physicalWorktreeKey !== targetKey) continue
+      if (!key.startsWith(prefix) || !workspacePaneEntryMatchesTarget(entry, input.target)) continue
       this.tabsByTarget.delete(key)
       changed = true
     }
@@ -212,6 +214,15 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     const key = workspacePaneTabsUserScopeQueueKey(userId, scope)
     this.revisionByUserScope.set(key, (this.revisionByUserScope.get(key) ?? 0) + 1)
   }
+}
+
+function workspacePaneEntryMatchesTarget<TUser extends string | number>(
+  entry: StoredWorkspacePaneTabsEntry<TUser>,
+  target: WorkspacePaneTabsTargetIdentity,
+): boolean {
+  return target.kind === 'branch'
+    ? entry.worktreePath === null && entry.branchName === target.branchName
+    : entry.worktreePath === target.worktreePath
 }
 
 export function createWorkspacePaneTabsRuntime<TUser extends string | number>(): WorkspacePaneTabsRuntime<TUser> {

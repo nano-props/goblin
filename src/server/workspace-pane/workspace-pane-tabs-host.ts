@@ -5,6 +5,7 @@ import type {
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsTargetIdentity } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -31,5 +32,12 @@ export interface ServerWorkspacePaneTabsHost {
     clientId: string,
     userId: string,
     input: WorkspacePaneTabsUpdateInput,
+  ): MaybePromise<WorkspacePaneTabsSnapshot>
+}
+
+export interface ServerWorkspacePaneTargetLifecycleHost {
+  retireTarget(
+    userId: string,
+    input: { repoRuntimeId: string; target: WorkspacePaneTabsTargetIdentity },
   ): MaybePromise<WorkspacePaneTabsSnapshot>
 }
