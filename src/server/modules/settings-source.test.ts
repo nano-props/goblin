@@ -96,6 +96,7 @@ test('persists updates and notifies subscribers from the server settings store',
 
   expect(sec).toBe(42)
   expect(listener).toHaveBeenCalledWith(42)
+  expect(listener).toHaveBeenCalledTimes(1)
   mod.resetServerSettingsSourceForTests()
   vi.resetModules()
   const reloaded = await import('#/server/modules/settings-source.ts')

@@ -131,9 +131,12 @@ export class WorkspacePaneTabsCoordinator {
       })
       const resampled = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       const resampledTargets = await this.targetProjection.captureTargets(input.userId, input.repoRoot, input.scope)
+      if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
+      const snapshot = await layout.snapshot({ scope, validTargets: resampledTargets, providerSnapshots: resampled })
+      if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
       return {
         kind: 'committed',
-        snapshot: await layout.snapshot({ scope, validTargets: resampledTargets, providerSnapshots: resampled }),
+        snapshot,
       }
     })
   }
@@ -371,6 +374,21 @@ export class WorkspacePaneTabsCoordinator {
         target: input.target,
         assertCurrent: input.assertCurrent,
       }))
+  }
+
+  async retireTargetIfInvalid(input: {
+    userId: string
+    scope: string
+    target: WorkspacePaneTabsTargetIdentity
+  }): Promise<void> {
+    await this.runWorkspaceTabsRepoOperation(input.target.repoRoot, async (layout) => {
+      const validTargets = await this.targetProjection.captureTargets(input.userId, input.target.repoRoot, input.scope)
+      await layout.retire({
+        ...aggregateScope(input.userId, input.target.repoRoot, input.scope),
+        target: input.target,
+        validTargets,
+      })
+    })
   }
 
   async reconcilePhysicalWorktreeAfterRemovalFailure(input: {

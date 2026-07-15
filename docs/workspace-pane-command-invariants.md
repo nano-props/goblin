@@ -33,8 +33,8 @@ Durable commands obey this lock order:
 ```text
 physical worktree permit
 -> repoRoot layout queue
--> synchronous epoch overlay commit
 -> settings mutation queue inside the repository adapter
+-> synchronous epoch overlay commit
 ```
 
 The aggregate owns the `repoRoot` queue and canonical epoch projection clock. The repository CAS commits before overlay/revision state. A conflict re-reads current layout and re-plans the original intent. Persistence failure commits no overlay. Invalid persisted targets are filtered by the authoritative repo projection even when repair persistence fails. Provider snapshots are sampled again after persistence before returning the canonical snapshot.

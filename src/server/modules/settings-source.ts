@@ -79,11 +79,14 @@ interface UserSettingsData {
 
 export type UserSettingsPatch = Partial<UserSettings>
 
-let cachedFetchIntervalSec = DEFAULT_FETCH_INTERVAL_SEC
 let settingsData: UserSettingsData | null = null
 let settingsLoadPromise: Promise<UserSettingsData> | null = null
 let settingsMutationPromise: Promise<void> = Promise.resolve()
 const listeners = new Set<FetchIntervalListener>()
+
+function notifyFetchIntervalListeners(sec: number): void {
+  for (const listener of listeners) listener(sec)
+}
 
 function normalizeFetchInterval(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -313,7 +316,6 @@ async function loadUserSettings(): Promise<UserSettingsData> {
       await writeUserSettingsFile(data)
     }
     settingsData = data
-    cachedFetchIntervalSec = data.fetchIntervalSec
     return data
   })().catch((err) => {
     settingsLoadPromise = null
@@ -381,8 +383,7 @@ function updateRepoSettingsEntry(
 }
 
 export async function getServerFetchIntervalSec(): Promise<number> {
-  await loadUserSettings()
-  return cachedFetchIntervalSec
+  return (await loadUserSettings()).fetchIntervalSec
 }
 
 export async function getUserSettings(): Promise<UserSettings> {
@@ -402,12 +403,7 @@ export async function setServerFetchIntervalSec(sec: number): Promise<number> {
       next: changed ? { ...data, fetchIntervalSec: next } : data,
       result: next,
       changed,
-      afterCommit: () => {
-        if (cachedFetchIntervalSec !== next) {
-          cachedFetchIntervalSec = next
-          for (const listener of listeners) listener(next)
-        }
-      },
+      afterCommit: changed ? () => notifyFetchIntervalListeners(next) : undefined,
     }
   })
 }
@@ -419,6 +415,7 @@ export async function updateUserSettings(patch: UserSettingsPatch): Promise<User
     const nextColorTheme = patch.colorTheme === undefined ? data.colorTheme : normalizeColorTheme(patch.colorTheme)
     const nextFetchIntervalSec =
       patch.fetchIntervalSec === undefined ? data.fetchIntervalSec : normalizeFetchInterval(patch.fetchIntervalSec)
+    const fetchIntervalChanged = data.fetchIntervalSec !== nextFetchIntervalSec
     const nextTerminalNotificationsEnabled =
       patch.terminalNotificationsEnabled === undefined
         ? data.terminalNotificationsEnabled
@@ -458,12 +455,7 @@ export async function updateUserSettings(patch: UserSettingsPatch): Promise<User
       next: nextData,
       result: userSettingsFromData(nextData),
       changed,
-      afterCommit: () => {
-        if (cachedFetchIntervalSec !== nextFetchIntervalSec) {
-          cachedFetchIntervalSec = nextFetchIntervalSec
-          for (const listener of listeners) listener(nextFetchIntervalSec)
-        }
-      },
+      afterCommit: fetchIntervalChanged ? () => notifyFetchIntervalListeners(nextFetchIntervalSec) : undefined,
     }
   })
 }
@@ -808,6 +800,5 @@ export function resetServerSettingsSourceForTests(): void {
   settingsLoadPromise = null
   settingsMutationPromise = Promise.resolve()
   listeners.clear()
-  cachedFetchIntervalSec = DEFAULT_FETCH_INTERVAL_SEC
   resetUserSettingsPersistenceForTests()
 }

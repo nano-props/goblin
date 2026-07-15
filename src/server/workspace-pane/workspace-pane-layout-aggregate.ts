@@ -99,7 +99,7 @@ export type WorkspacePaneLayoutValidationInput = WorkspacePaneEpochScope & {
 export interface WorkspacePaneLayoutOperation {
   replace(input: WorkspacePaneLayoutReplaceInput): Promise<WorkspacePaneLayoutCommitResult>
   update(input: WorkspacePaneLayoutUpdateInput): Promise<WorkspacePaneLayoutCommitResult>
-  retire(input: WorkspacePaneLayoutRetireInput): Promise<WorkspacePaneLayoutCommitResult>
+  retire(input: WorkspacePaneLayoutRetireInput & { validTargets?: readonly WorkspacePaneTabsTarget[] }): Promise<WorkspacePaneLayoutCommitResult>
   snapshot(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot>
   projectEntriesForAdmission(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot['entries']>
   validateRepairAndSnapshot(input: WorkspacePaneLayoutValidationInput): Promise<WorkspacePaneLayoutValidationResult>
@@ -173,12 +173,15 @@ export class WorkspacePaneLayoutAggregate {
     })
   }
 
-  private async retire(input: WorkspacePaneLayoutRetireInput): Promise<WorkspacePaneLayoutCommitResult> {
+  private async retire(input: WorkspacePaneLayoutRetireInput & { validTargets?: readonly WorkspacePaneTabsTarget[] }): Promise<WorkspacePaneLayoutCommitResult> {
     for (let conflicts = 0; ; conflicts += 1) {
       input.assertCurrent?.()
       const current = await this.repository.load(input.repoRoot)
       input.assertCurrent?.()
       const targetKey = workspacePaneTabsTargetIdentityKeyFromIdentity(input.target)
+      if (input.validTargets && input.validTargets.some((target) => workspacePaneTabsTargetIdentityKey(target) === targetKey)) {
+        return this.commitResult(input, false, [])
+      }
       const replacement = {
         entries: current.layout.entries.filter((entry) => workspacePaneTabsTargetIdentityKey(entry) !== targetKey),
       }

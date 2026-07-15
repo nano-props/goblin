@@ -14,7 +14,7 @@ import type {
   PhysicalWorktreeIdentityResolver,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure-settlement.ts'
-import { workspacePaneTabsTargetIdentityKeyFromIdentity } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
 
 const worktreeRemovalLogger = serverLogger.child({ module: 'worktree-removal-application' })
 
@@ -26,7 +26,12 @@ interface WorktreeRemovalApplicationDependencies {
     WorkspacePaneTabsCoordinator,
     'physicalWorktreeTargets' | 'reconcilePhysicalWorktreeAfterRemovalFailure'
   >
-  workspacePaneTabs: ServerWorkspacePaneTargetLifecycleHost
+  workspacePaneTabs: Pick<ServerWorkspacePaneTargetLifecycleHost, 'retireTarget'> & {
+    retireTargetIfInvalid(
+      userId: string,
+      input: { repoRuntimeId: string; target: WorkspacePaneTabsTargetIdentity },
+    ): Promise<void>
+  }
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
   broadcastSessionsChanged(userId: string, repoRoot: string): void
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
@@ -77,7 +82,6 @@ export class WorktreeRemovalApplication {
           if (!this.isCurrentRuntime(userId, input)) return { ok: false, message: 'error.repo-runtime-stale' }
           signal.throwIfAborted()
           let affectedScopes: Array<{ userId: string; repoRoot: string; scope: string }> = []
-          let affectedTargets: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']> = []
           return await input.remove(
             physicalCapability,
             {
@@ -87,7 +91,6 @@ export class WorktreeRemovalApplication {
                 const quiescence = await this.quiesce(input.repoRoot, worktreePath, physicalCapability)
                 signal.throwIfAborted()
                 affectedScopes = quiescence.scopes
-                affectedTargets = quiescence.targets
                 if (!quiescence.ok) {
                   await this.reconcileAfterFailure(
                     input.repoRoot,
@@ -108,20 +111,13 @@ export class WorktreeRemovalApplication {
                     repoRuntimeId: input.repoRuntimeId,
                     target: { kind: 'worktree' as const, repoRoot: input.repoRoot, worktreePath },
                   }
-                  const targetsByStableIdentity = new Map(
-                    [...affectedTargets, requestedTarget].map((target) => [
-                      workspacePaneTabsTargetIdentityKeyFromIdentity(target.target),
-                      target,
-                    ]),
-                  )
-                  await Promise.all(
-                    Array.from(targetsByStableIdentity.values()).map(async ({ userId: affectedUserId, repoRuntimeId, target }) => {
-                      await this.deps.workspacePaneTabs.retireTarget(affectedUserId, {
-                        repoRuntimeId,
-                        target,
-                      })
-                    }),
-                  )
+                  // Reverse-index refs only identify stale runtime scopes. They
+                  // cannot authorize durable retirement: a stable target may
+                  // already be rebound to a new physical generation.
+                  await this.deps.workspacePaneTabs.retireTargetIfInvalid(userId, {
+                    repoRuntimeId: input.repoRuntimeId,
+                    target: requestedTarget.target,
+                  })
                   this.broadcastSessions(affectedScopes)
                   return { ok: true, message: '' }
                 } catch (error) {
