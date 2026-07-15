@@ -24,16 +24,10 @@ interface TerminalSessionCreateAllocationInput extends TerminalSessionCreateWork
   kind: TerminalCreateKind
 }
 
-interface TerminalSessionIdAllocation {
-  terminalSessionId: string
-  reservationKey: string | null
-}
-
 class TerminalSessionCreateCoordinator {
   private readonly manager: TerminalSessionCreateManager
   private readonly createSessionId: () => string
   private readonly createQueuesByUserWorktree = new Map<string, PQueue>()
-  private readonly reservedTerminalSessionIdsByWorktree = new Map<string, Set<string>>()
 
   constructor(options: TerminalSessionCreateCoordinatorOptions) {
     this.manager = options.manager
@@ -54,50 +48,18 @@ class TerminalSessionCreateCoordinator {
     input: TerminalSessionCreateAllocationInput,
     task: (allocation: { terminalSessionId: string }) => Promise<T>,
   ): Promise<T> {
-    const allocation = await this.allocateSessionIdForCreate(input)
-    try {
-      return await task({ terminalSessionId: allocation.terminalSessionId })
-    } finally {
-      this.releaseSessionIdReservation(allocation)
-    }
+    return await task({ terminalSessionId: await this.allocateSessionIdForCreate(input) })
   }
 
   private async allocateSessionIdForCreate(
     input: TerminalSessionCreateAllocationInput,
-  ): Promise<TerminalSessionIdAllocation> {
+  ): Promise<string> {
     const sessions = await this.manager.listSessionsForUser(input.userId, input.scope)
     const existingSession = sessions.find((session) => session.worktreePath === input.worktreePath)
     if (input.kind === 'primary' && existingSession) {
-      return { terminalSessionId: existingSession.terminalSessionId, reservationKey: null }
+      return existingSession.terminalSessionId
     }
-    const reservationKey = terminalSessionUserWorktreeKey(input)
-    const reservedTerminalSessionId = this.reservedTerminalSessionIdsByWorktree
-      .get(reservationKey)
-      ?.values()
-      .next().value
-    if (input.kind === 'primary' && reservedTerminalSessionId) {
-      return { terminalSessionId: reservedTerminalSessionId, reservationKey: null }
-    }
-    return { terminalSessionId: this.reserveNewSessionId(reservationKey), reservationKey }
-  }
-
-  private reserveNewSessionId(reservationKey: string): string {
-    let reserved = this.reservedTerminalSessionIdsByWorktree.get(reservationKey)
-    if (!reserved) {
-      reserved = new Set()
-      this.reservedTerminalSessionIdsByWorktree.set(reservationKey, reserved)
-    }
-    const terminalSessionId = this.createSessionId()
-    reserved.add(terminalSessionId)
-    return terminalSessionId
-  }
-
-  private releaseSessionIdReservation(allocation: TerminalSessionIdAllocation): void {
-    if (!allocation.reservationKey) return
-    const reserved = this.reservedTerminalSessionIdsByWorktree.get(allocation.reservationKey)
-    if (!reserved) return
-    reserved.delete(allocation.terminalSessionId)
-    if (reserved.size === 0) this.reservedTerminalSessionIdsByWorktree.delete(allocation.reservationKey)
+    return this.createSessionId()
   }
 
   private createQueueForUserWorktree(queueKey: string): PQueue {

@@ -28,36 +28,6 @@ describe('terminal session create coordinator', () => {
     expect(createSessionId).not.toHaveBeenCalled()
   })
 
-  test('reuses an in-flight reservation for primary creates and releases it afterward', async () => {
-    const sessionIds = ['term-reservedreserved00001', 'term-afterreleaseafterrel1']
-    const coordinator = createTerminalSessionCreateCoordinator({
-      manager: {
-        listSessionsForUser: vi.fn(async () => []),
-      },
-      createSessionId: () => sessionIds.shift() ?? 'term-extraextraextraextra1',
-    })
-
-    let nestedPrimarySessionId: string | null = null
-    const outerSessionId = await coordinator.withSessionIdAllocation(
-      { userId: USER_ID, scope: SCOPE, worktreePath: WORKTREE_PATH, kind: 'additional' },
-      async ({ terminalSessionId }) => {
-        nestedPrimarySessionId = await coordinator.withSessionIdAllocation(
-          { userId: USER_ID, scope: SCOPE, worktreePath: WORKTREE_PATH, kind: 'primary' },
-          async (allocation) => allocation.terminalSessionId,
-        )
-        return terminalSessionId
-      },
-    )
-    const afterReleaseSessionId = await coordinator.withSessionIdAllocation(
-      { userId: USER_ID, scope: SCOPE, worktreePath: WORKTREE_PATH, kind: 'primary' },
-      async ({ terminalSessionId }) => terminalSessionId,
-    )
-
-    expect(outerSessionId).toBe('term-reservedreserved00001')
-    expect(nestedPrimarySessionId).toBe('term-reservedreserved00001')
-    expect(afterReleaseSessionId).toBe('term-afterreleaseafterrel1')
-  })
-
   test('serializes creates for the same user scope and worktree', async () => {
     const coordinator = createTerminalSessionCreateCoordinator({
       manager: {

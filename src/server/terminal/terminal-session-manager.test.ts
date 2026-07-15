@@ -111,9 +111,6 @@ function createManager(supervisor: PtySupervisor, sink: Partial<TerminalEventSin
       onExit: vi.fn(),
       ...sink,
     },
-    {
-      terminalSessionIds: vi.fn(() => []),
-    },
     () => true,
   )
 }
@@ -886,8 +883,8 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
   })
 })
 
-describe('TerminalSessionManager versioned recovery projection', () => {
-  test('advances revision when a new binding keeps the default process name', async () => {
+describe('TerminalSessionManager membership catalog', () => {
+  test('does not advance the catalog revision when a published binding becomes ready', async () => {
     const supervisor = createDeferredPtySupervisor()
     supervisor.processName = vi.fn(() => 'terminal')
     const manager = createManager(supervisor)
@@ -913,11 +910,12 @@ describe('TerminalSessionManager versioned recovery projection', () => {
     if (!created.ok) throw new Error(created.message)
     const afterBinding = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
 
-    expect(afterBinding.revision).toBeGreaterThan(beforeBinding.revision)
+    expect(afterBinding.revision).toBe(beforeBinding.revision)
+    expect(created.terminalSessionsRevision).toBe(afterBinding.revision)
     expect(afterBinding.sessions[0]).toMatchObject({ terminalRuntimeGeneration: 1, processName: 'terminal' })
   })
 
-  test('advances revision for visible session fields but not ordinary output', async () => {
+  test('advances the catalog revision only for membership changes', async () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = createManager(supervisor)
     const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
@@ -960,18 +958,18 @@ describe('TerminalSessionManager versioned recovery projection', () => {
     supervisor.setProcessName('node')
     supervisor.emitData('pty_revision_123456', 'process changed')
     const processSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
-    expect(processSnapshot.revision).toBeGreaterThan(openedSnapshot.revision)
+    expect(processSnapshot.revision).toBe(openedSnapshot.revision)
     expect(processSnapshot.sessions[0]).toMatchObject({ processName: 'node' })
 
     const beforeResize = processSnapshot.revision
     expect(manager.resizeSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)).toBe(true)
     const resizedSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
-    expect(resizedSnapshot.revision).toBeGreaterThan(beforeResize)
+    expect(resizedSnapshot.revision).toBe(beforeResize)
     expect(resizedSnapshot.sessions[0]).toMatchObject({ cols: 100, rows: 30 })
 
     await expect(manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)).resolves.toBe(true)
     const closedSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
-    expect(closedSnapshot.revision).toBeGreaterThan(resizedSnapshot.revision)
+    expect(closedSnapshot.revision).toBe(resizedSnapshot.revision + 1)
     expect(closedSnapshot.sessions).toEqual([])
   })
 
