@@ -66,7 +66,7 @@ describe('session restore runtime ownership', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
       restoreRepoTabsForRepo({
         userId: USER_ID,

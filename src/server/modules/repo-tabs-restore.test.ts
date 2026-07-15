@@ -91,7 +91,7 @@ describe('restoreRepoTabsForRepo', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     const result = await restoreRepoTabsForRepo({
       userId: 'user-test',
       clientId: 'client_test000000000000',
@@ -146,7 +146,7 @@ describe('restoreRepoTabsForRepo', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     const result = await restoreRepoTabsForRepo({
       userId: 'user-test',
       clientId: 'client_test000000000000',
@@ -186,7 +186,7 @@ describe('restoreRepoTabsForRepo', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
       restoreRepoTabsForRepo({
         userId: 'user-test',
@@ -212,7 +212,7 @@ describe('restoreRepoTabsForRepo', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
       restoreRepoTabsForRepo({
         userId: 'user-test',
@@ -241,7 +241,7 @@ describe('restoreRepoTabsForRepo', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
       restoreRepoTabsForRepo({
         userId: 'user-test',
@@ -269,7 +269,7 @@ describe('restoreRepoTabsForRepo', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
       restoreRepoTabsForRepo({
         userId: 'user-test',
@@ -308,7 +308,7 @@ describe('restoreRepoTabsForRepo', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
       restoreRepoTabsForRepo({
         userId: 'user-test',
@@ -334,7 +334,7 @@ describe('restoreRepoTabsForRepo', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
       restoreRepoTabsForRepo({
         userId: 'user-test',
@@ -370,7 +370,7 @@ describe('restoreRepoTabsForRepo', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
       restoreRepoTabsForRepo({
         userId: 'user-test',
@@ -401,7 +401,7 @@ describe('restoreRepoTabsForRepo', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
       restoreRepoTabsForRepo({
         userId: 'user-test',

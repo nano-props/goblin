@@ -2,7 +2,8 @@ import { getServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts
 import { getServerGitHubCliState } from '#/server/modules/github-cli.ts'
 import { getSettingsSnapshot } from '#/server/modules/settings-snapshot.ts'
 import { addServerWorkspaceRepo, getUserSettings, removeServerWorkspaceRepo } from '#/server/modules/settings-source.ts'
-import { restoreRepoTabsForRepo, restoreServerWorkspace } from '#/server/modules/session-restore.ts'
+import { restoreServerWorkspace } from '#/server/modules/session-restore.ts'
+import { restoreRepoTabsForRepo } from '#/server/modules/repo-workspace-tabs-restore.ts'
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import {

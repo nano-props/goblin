@@ -1,9 +1,7 @@
 import PQueue from 'p-queue'
 import {
-  IpcError,
   isProjectedRestoredWorkspaceRepo,
   type ProjectedRestoredWorkspaceRepoRuntime,
-  type RepoWorkspaceTabsRestoreResult,
   type RepoRuntimeProjection,
   type RestoredWorkspaceRepoRuntime,
   type WorkspaceRestoreResult,
@@ -20,22 +18,17 @@ import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { probeRepo, readRepoProjection } from '#/server/modules/repo-read-paths.ts'
 import {
   acquireRepoRuntimeLease,
-  isCurrentRepoRuntimeMembership,
   releaseRepoRuntimeMembershipLease,
   type RepoRuntimeMembershipLeaseEntry,
 } from '#/server/modules/repo-runtimes.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
-import {
-  compareAndReplaceServerWorkspaceRepos,
-  confirmServerWorkspaceRepoEntry,
-  getServerWorkspaceState,
-} from '#/server/modules/settings-source.ts'
+import { compareAndReplaceServerWorkspaceRepos, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
 import {
   initializeWorkspacePaneTabsWithMembershipGuard,
   sameWorkspaceRepoEntry,
   validateOrRepairWorkspacePaneTabs,
-  workspaceRepoEntry,
 } from '#/server/modules/workspace-pane-tabs-restore.ts'
 
 export interface RestoreServerWorkspaceInput {
@@ -50,18 +43,7 @@ export interface RestoreServerWorkspaceInput {
   signal?: AbortSignal
 }
 
-export interface RestoreRepoTabsInput {
-  userId: string
-  clientId: string
-  repoRoot: string
-  repoRuntimeId: string
-  workspacePaneTabsHost: ServerWorkspacePaneTabsHost
-  signal?: AbortSignal
-}
-
 type OpenWorkspaceRepoResult = { kind: 'opened'; opened: OpenedWorkspaceRepo } | { kind: 'invalid' }
-type WorkspaceTabsValidationResult = { ok: true } | { ok: false }
-
 type OpenedWorkspaceRepo = RestoredWorkspaceRepoRuntime & {
   lease: RepoRuntimeMembershipLeaseEntry
 }
@@ -259,7 +241,7 @@ async function openWorkspaceRepo(
         entry: { kind: 'local', id: probe.root },
         repoRoot: probe.root,
         repoRuntimeId: lease.repoRuntimeId,
-        name: probe.name ?? lastPathSegment(probe.root),
+        name: probe.name ?? workspaceRepoDisplayName(probe.root),
         projection,
         lease,
       },
@@ -284,7 +266,7 @@ async function openRemoteWorkspaceRepo(
     }
   }
   try {
-    const lifecycle = await abortable(
+    const lifecycle = await abortableWorkspaceRestore(
       runRemoteLifecycleWrite({
         userId: input.userId,
         repoId: entry.id,
@@ -341,7 +323,7 @@ function localRepoStub(
     entry: { kind: 'local', id: repoRoot },
     repoRoot,
     repoRuntimeId: lease.repoRuntimeId,
-    name: name ?? lastPathSegment(repoRoot),
+    name: name ?? workspaceRepoDisplayName(repoRoot),
     projection: null,
     lease,
   }
@@ -362,127 +344,6 @@ function remoteRepoStub(
     projection: null,
     lease,
   }
-}
-
-async function abortable<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
-  if (!signal) return await promise
-  signal.throwIfAborted()
-  let onAbort: (() => void) | null = null
-  const aborted = new Promise<never>((_resolve, reject) => {
-    onAbort = () => reject(signal.reason ?? new Error('workspace restore aborted'))
-    signal.addEventListener('abort', onAbort, { once: true })
-  })
-  try {
-    return await Promise.race([promise, aborted])
-  } finally {
-    if (onAbort) signal.removeEventListener('abort', onAbort)
-  }
-}
-
-/**
- * Restore pane tabs for a single repo on demand (lazy restore from
- * `useRestoreRepoTabsOnView` when the user navigates to a stub repo).
- *
- * Returns the same snapshot shape as the per-repo entry in
- * `WorkspaceRuntimeRestoreSnapshot.workspacePaneTabs`, plus the
- * restored repo (with projection) so the caller can hydrate the store.
- */
-export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promise<RepoWorkspaceTabsRestoreResult> {
-  input.signal?.throwIfAborted()
-  assertCurrentRepoRuntimeMembership(input)
-  const initialWorkspace = await getServerWorkspaceState()
-  assertCurrentRepoRuntimeMembership(input)
-  const entry = workspaceRepoEntry(initialWorkspace, input.repoRoot)
-  if (!entry) throw new IpcError({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
-  const repo = await projectWorkspaceRepo(input, entry)
-  if (!repo) {
-    throw new IpcError({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
-  }
-
-  const membership = await confirmServerWorkspaceRepoEntry(entry)
-  if (!membership.matched) throw new IpcError({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
-  const validatedWorkspace = await validateOrRepairWorkspacePaneTabs(membership.workspace, repo, entry)
-  if (validatedWorkspace.kind === 'membership-conflict') {
-    throw new IpcError({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
-  }
-  const initializedTabs = await initializeWorkspacePaneTabsWithMembershipGuard({
-    restoreInput: {
-      userId: input.userId,
-      clientId: input.clientId,
-      workspacePaneTabsHost: input.workspacePaneTabsHost,
-      signal: input.signal,
-    },
-    workspace: validatedWorkspace.workspace,
-    repos: [repo],
-    confirmMembership: async () => await confirmServerWorkspaceRepoEntry(entry),
-    assertCurrent: () => assertCurrentRepoRuntimeMembership(input),
-  })
-  if (!initializedTabs.matched) {
-    throw new IpcError({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
-  }
-  return {
-    repo,
-    snapshot: initializedTabs.snapshots[0]?.snapshot ?? null,
-  }
-}
-
-async function projectWorkspaceRepo(
-  input: RestoreRepoTabsInput,
-  entry: RepoSessionEntry,
-): Promise<ProjectedRestoredWorkspaceRepoRuntime | null> {
-  if (entry.kind === 'remote') {
-    const lifecycle = await abortable(
-      runRemoteLifecycleWrite({
-        userId: input.userId,
-        repoId: entry.id,
-        repoRuntimeId: input.repoRuntimeId,
-        mode: 'ensure',
-      }),
-      input.signal,
-    )
-    assertCurrentRepoRuntimeMembership(input)
-    if (lifecycle.kind !== 'settled' || lifecycle.lifecycle.kind !== 'ready') return null
-    const projection = await readRepoProjection(entry.id, {
-      repoRuntimeId: input.repoRuntimeId,
-      signal: input.signal,
-      mode: 'full',
-    })
-    assertCurrentRepoRuntimeMembership(input)
-    if (!projection.snapshot) return null
-    return {
-      entry,
-      repoRoot: entry.id,
-      repoRuntimeId: input.repoRuntimeId,
-      name: lifecycle.name,
-      target: lifecycle.lifecycle.target,
-      projection,
-    }
-  }
-
-  const probe = await probeRepo(entry.id)
-  assertCurrentRepoRuntimeMembership(input)
-  if (!probe.ok || !probe.root || probe.root !== entry.id) return null
-  const projection = await readRepoProjection(probe.root, {
-    repoRuntimeId: input.repoRuntimeId,
-    signal: input.signal,
-    mode: 'full',
-  })
-  assertCurrentRepoRuntimeMembership(input)
-  if (!projection.snapshot) return null
-  return {
-    entry: { kind: 'local', id: probe.root },
-    repoRoot: probe.root,
-    repoRuntimeId: input.repoRuntimeId,
-    name: probe.name ?? lastPathSegment(probe.root),
-    projection,
-  }
-}
-
-function assertCurrentRepoRuntimeMembership(input: RestoreRepoTabsInput): void {
-  if (isCurrentRepoRuntimeMembership(input.userId, input.repoRoot, input.repoRuntimeId, input.clientId)) {
-    return
-  }
-  throw new IpcError({ code: 'BAD_REQUEST', message: 'error.repo-runtime-stale' })
 }
 
 function isOpenedProjectedRepo(repo: OpenedWorkspaceRepo): repo is OpenedProjectedWorkspaceRepo {
@@ -519,10 +380,4 @@ function releaseOpenedRepoRuntimes(input: RestoreServerWorkspaceInput, opened: I
 
 function releaseWorkspaceRepoRuntime(input: RestoreServerWorkspaceInput, lease: RepoRuntimeMembershipLeaseEntry): void {
   releaseRepoRuntimeMembershipLease(input.userId, input.clientId, lease)
-}
-
-function lastPathSegment(value: string): string {
-  const trimmed = value.replace(/[\\/]+$/, '')
-  const segment = trimmed.split(/[\\/]/).pop()
-  return segment || value
 }
