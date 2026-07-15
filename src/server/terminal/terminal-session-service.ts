@@ -1,6 +1,5 @@
 import { isValidBranch, isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
 import {
-  type TerminalCreateAction,
   type TerminalCreateResult,
   type TerminalCreateInput,
   type TerminalSessionSummary,
@@ -106,23 +105,12 @@ class TerminalSessionService {
 
     const sessionScope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
     const scopedWorktreePath = terminalSessionWorktreePath(input.repoRoot, input.worktreePath)
-    const existingSessions = await this.options.manager.listSessionsForUser(userId, sessionScope)
-    const existingSession = existingSessions.find(
-      (session) => session.terminalSessionId === terminalSessionId && session.worktreePath === scopedWorktreePath,
-    )
-    const action: TerminalCreateAction = existingSession
-      ? existingSession.controller
-        ? 'restored'
-        : 'reused'
-      : 'created'
-
     return await this.ensurer.ensure(userId, input, {
       terminalSessionId,
       cols,
       rows,
       scopedWorktreePath,
       physicalWorktreeCapability,
-      action,
       signal,
     })
   }

@@ -259,6 +259,7 @@ function preparedResult(
 ): Extract<TerminalSessionPrepareManagerResult, { ok: true }> {
   return {
     ok: true,
+    action: 'created',
     terminalSessionsRevision: 7,
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalRuntimeGeneration: 1,

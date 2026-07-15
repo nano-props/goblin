@@ -33,7 +33,8 @@ export type TerminalSessionEnsureResult =
   | { ok: false; message: string }
 
 export type TerminalSessionPrepareManagerResult =
-  ({ ok: true; terminalSessionsRevision: number } & TerminalRuntimeMetadata) | { ok: false; message: string }
+  | ({ ok: true; terminalSessionsRevision: number; action: TerminalCreateAction } & TerminalRuntimeMetadata)
+  | { ok: false; message: string }
 
 export interface TerminalSessionEnsureManagerInput {
   userId: string
@@ -73,7 +74,6 @@ export interface TerminalSessionEnsureContext {
   rows: number
   scopedWorktreePath: string
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
-  action: TerminalCreateAction
   signal: AbortSignal
 }
 
@@ -128,7 +128,7 @@ class TerminalSessionEnsurer {
     })
     if (!result.ok) return { ok: false, message: result.message }
     this.options.broadcastSessionsChanged(userId, input.repoRoot)
-    return toEnsureResult(context.terminalSessionId, context.action, result)
+    return toEnsureResult(context.terminalSessionId, result)
   }
 
   private async ensureLocal(
@@ -166,7 +166,7 @@ class TerminalSessionEnsurer {
     })
     if (!result.ok) return { ok: false, message: result.message }
     this.options.broadcastSessionsChanged(userId, input.repoRoot)
-    return toEnsureResult(context.terminalSessionId, context.action, result)
+    return toEnsureResult(context.terminalSessionId, result)
   }
 }
 
@@ -176,7 +176,6 @@ export function createTerminalSessionEnsurer(options: TerminalSessionEnsurerOpti
 
 function toEnsureResult(
   terminalSessionId: string,
-  action: TerminalCreateAction,
   prepared: Extract<TerminalSessionPrepareManagerResult, { ok: true }>,
 ): TerminalSessionEnsureResult {
   return {
@@ -185,7 +184,7 @@ function toEnsureResult(
     terminalRuntimeSessionId: prepared.terminalRuntimeSessionId,
     terminalRuntimeGeneration: prepared.terminalRuntimeGeneration,
     terminalSessionId,
-    action,
+    action: prepared.action,
     processName: prepared.processName,
     canonicalTitle: prepared.canonicalTitle,
     phase: prepared.phase,

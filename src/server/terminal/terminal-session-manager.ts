@@ -3,6 +3,7 @@ import {
   type TerminalAttachResult,
   type TerminalBellRealtimeEvent,
   type TerminalController,
+  type TerminalCreateAction,
   type TerminalExitEvent,
   type TerminalIdentityEvent,
   type TerminalHydrationSnapshot,
@@ -51,7 +52,8 @@ interface TerminalPtyRestartResult {
 }
 
 export type TerminalSessionPrepareResult =
-  ({ ok: true; terminalSessionsRevision: number } & TerminalRuntimeMetadata) | { ok: false; message: string }
+  | ({ ok: true; terminalSessionsRevision: number; action: TerminalCreateAction } & TerminalRuntimeMetadata)
+  | { ok: false; message: string }
 
 export interface TerminalEnsureSessionInput<TUser extends string | number> {
   userId: TUser
@@ -175,7 +177,8 @@ export class TerminalSessionManager<TUser extends string | number> {
           attachTerminalClient(existing, input.clientId, this.sessionPresence(existing)),
         )
       }
-      return this.prepareResult(existing)
+      const action = this.effectiveController(existing) ? 'restored' : 'reused'
+      return { ...this.prepareResult(existing), action }
     }
 
     const worktreePath = input.worktreePath
@@ -219,7 +222,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     // single xterm before `attachSession` starts the PTY with exact geometry.
     // Until then this server-owned session is intentionally addressable but
     // has no process and no output history.
-    return this.prepareResult(session)
+    return { ...this.prepareResult(session), action: 'created' }
   }
 
   async writeSession(

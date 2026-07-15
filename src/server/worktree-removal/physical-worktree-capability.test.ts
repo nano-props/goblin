@@ -50,7 +50,6 @@ describe('physical worktree capability boundaries', () => {
         rows: 24,
         scopedWorktreePath: REMOTE_PATH,
         physicalWorktreeCapability: capability,
-        action: 'created',
         signal: new AbortController().signal,
       },
     )
