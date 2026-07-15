@@ -43,10 +43,6 @@ export class WorkspacePaneEpochOverlay {
   private readonly targetsByPhysicalKey = new Map<string, Map<string, WorkspacePaneEpochTargetRef>>()
   private readonly epochsByRepoRoot = new Map<string, Map<string, WorkspacePaneEpochScope>>()
 
-  activate(scope: WorkspacePaneEpochScope): void {
-    this.state(scope)
-  }
-
   recordMixedOrder(input: WorkspacePaneEpochTargetRef & { tabs: readonly WorkspacePaneTabEntry[] }): boolean {
     const state = this.state(input)
     const targetKey = workspacePaneTabsTargetIdentityKeyFromIdentity(input.target)

@@ -79,6 +79,31 @@ describe('physical worktree operation coordinator', () => {
       indexedLeases: [physicalWorktreeAdmissionLease(old), physicalWorktreeAdmissionLease(live)],
     }], async () => 'ok')).resolves.toEqual({ admitted: true, value: 'ok' })
   })
+
+  test('does not execute the batch task after an outer lease aborts while waiting', async () => {
+    const signalA = new AbortController()
+    const a = issueTestPhysicalWorktreeExecutionCapability({
+      identity: testPhysicalWorktreeIdentity('/repo/a'), runtimeSignal: signalA.signal,
+    })
+    const b = issueTestPhysicalWorktreeExecutionCapability({ identity: testPhysicalWorktreeIdentity('/repo/b') })
+    const coordinator = createPhysicalWorktreeOperationCoordinator()
+    const gate = deferred<void>()
+    const held = coordinator.runOperation(b, async () => await gate.promise)
+    await Promise.resolve()
+    let ran = false
+    const batch = coordinator.runAdmissionBatch([
+      { identity: a.identity, currentCapability: a, indexedLeases: [] },
+      { identity: b.identity, currentCapability: b, indexedLeases: [] },
+    ], async () => { ran = true })
+    await Promise.resolve()
+    signalA.abort()
+    gate.resolve()
+    await expect(batch).rejects.toBeDefined()
+    expect(ran).toBe(false)
+    await held
+    const replacement = issueTestPhysicalWorktreeExecutionCapability({ identity: a.identity })
+    await expect(coordinator.runRemoval(replacement, async () => 'removed')).resolves.toMatchObject({ admitted: true })
+  })
 })
 
 function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {

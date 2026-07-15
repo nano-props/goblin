@@ -23,15 +23,6 @@ const scope = { userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a' 
 const target = { kind: 'worktree' as const, repoRoot: '/repo', worktreePath: '/repo/worktree' }
 
 describe('workspace pane epoch overlay', () => {
-  test('tracks read-only active projections until their epoch closes', () => {
-    const overlay = new WorkspacePaneEpochOverlay()
-    overlay.activate(scope)
-
-    expect(overlay.activeEpochs('/repo')).toEqual([scope])
-    overlay.closeEpoch(scope)
-    expect(overlay.activeEpochs('/repo')).toEqual([])
-  })
-
   test('projects runtime tabs through static gaps without copying static order', () => {
     const status = workspacePaneStaticTabEntry('status')
     const files = workspacePaneStaticTabEntry('files')

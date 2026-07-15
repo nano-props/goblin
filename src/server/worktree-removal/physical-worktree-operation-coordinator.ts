@@ -87,24 +87,6 @@ export class PhysicalWorktreeOperationCoordinator {
     }
   }
 
-  async runIndexReconciliation<T>(
-    lease: PhysicalWorktreeAdmissionLease,
-    task: () => Promise<T>,
-    externalSignal?: AbortSignal,
-  ): Promise<{ admitted: true; value: T } | { admitted: false }> {
-    const signal = combinedSignal(physicalWorktreeAdmissionLeaseSignal(lease), externalSignal)
-    signal.throwIfAborted()
-    const key = physicalWorktreeOperationKey(lease)
-    if (this.removalAdmissions.has(key)) return { admitted: false }
-    return {
-      admitted: true,
-      value: await this.runByKey(key, async () => {
-        signal.throwIfAborted()
-        return await task()
-      }, signal),
-    }
-  }
-
   /** Acquire each stable physical identity once, while validating the newest capability available for it. */
   async runAdmissionBatch<T>(
     records: readonly PhysicalWorktreeAdmissionRecord[],
@@ -114,23 +96,29 @@ export class PhysicalWorktreeOperationCoordinator {
     const normalized = normalizeAdmissionRecords(records)
     const keys = normalized.map(({ key }) => key)
     if (!this.reserveBatch(keys)) return { admitted: false }
+    const selectedLeases = normalized.map((record) => {
+      if (record.currentCapability) return physicalWorktreeAdmissionLease(record.currentCapability)
+      return record.indexedLeases.find((candidate) => !physicalWorktreeAdmissionLeaseSignal(candidate).aborted) ??
+        record.indexedLeases[0]
+    })
+    const batchSignals = selectedLeases.map((lease) => {
+      if (!lease) throw new Error('error.invalid-worktree-admission-record')
+      return physicalWorktreeAdmissionLeaseSignal(lease)
+    })
+    if (externalSignal) batchSignals.push(externalSignal)
+    const batchSignal = AbortSignal.any(batchSignals)
     const acquire = async (index: number): Promise<T> => {
       const record = normalized[index]
       if (!record) return await task()
       const { key, currentCapability: capability } = record
-      const lease = capability
-        ? physicalWorktreeAdmissionLease(capability)
-        : record.indexedLeases.find((candidate) => !physicalWorktreeAdmissionLeaseSignal(candidate).aborted) ??
-          record.indexedLeases[0]
-      if (!lease) throw new Error('error.invalid-worktree-admission-record')
-      const signal = combinedSignal(physicalWorktreeAdmissionLeaseSignal(lease), externalSignal)
       return await this.runByKey(key, async () => {
-        signal.throwIfAborted()
-        if (capability) await validatePhysicalWorktreeExecution(capability, signal)
+        batchSignal.throwIfAborted()
+        if (capability) await validatePhysicalWorktreeExecution(capability, batchSignal)
         return await acquire(index + 1)
-      }, signal)
+      }, batchSignal)
     }
     try {
+      batchSignal.throwIfAborted()
       return { admitted: true, value: await acquire(0) }
     } finally {
       this.releaseBatch(keys)
