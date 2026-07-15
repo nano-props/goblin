@@ -28,7 +28,6 @@ import type {
   PhysicalWorktreeCapability,
   PhysicalWorktreeIdentityResolver,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
-import { workspacePaneTabsWithUpdateOperation } from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
 import {
   canonicalWorkspaceRuntimeTabsForTarget,
   projectCanonicalWorkspacePaneTabs,
@@ -157,7 +156,7 @@ export class WorkspacePaneTabsCoordinator {
             insertAfterIdentity: input.insertAfterIdentity ?? null,
           }),
       })
-      const plan = this.workspaceTabs.planUpdate({
+      const plan = this.workspaceTabs.planReplace({
         ...target,
         physicalWorktreeIdentity: physicalCapability.identity,
         tabs: layoutTabs,
@@ -284,17 +283,19 @@ export class WorkspacePaneTabsCoordinator {
             branchName: input.branchName,
             worktreePath: input.worktreePath,
           }
-          const layoutTabs = mutateCanonicalWorkspaceTabLayout({
-            branchName: input.branchName,
-            worktreePath: input.worktreePath,
-            layoutTabs: this.workspaceTabs.tabs(target),
+          const currentTabs = canonicalWorkspaceRuntimeTabsForTarget({
+            entry: {
+              branchName: input.branchName,
+              worktreePath: input.worktreePath,
+              tabs: this.workspaceTabs.tabs(target),
+            },
             providerSnapshots,
-            mutate: (currentTabs) => workspacePaneTabsWithUpdateOperation(currentTabs, input.operation),
           })
           return this.workspaceTabs.planUpdate({
             ...target,
             physicalWorktreeIdentity: physicalCapability?.identity ?? null,
-            tabs: layoutTabs,
+            currentTabs,
+            operation: input.operation,
           })
         },
       })
@@ -524,9 +525,7 @@ export class WorkspacePaneTabsCoordinator {
       const layout: WorkspacePaneDurableLayout = {
         entries: this.workspaceTabs.scopeEntriesForPlan(plan).map((entry) => ({
           ...entry,
-          tabs: entry.tabs.filter(
-            (tab): tab is WorkspacePaneStaticTabEntry => isWorkspacePaneStaticTabType(tab.type),
-          ),
+          tabs: entry.tabs.filter((tab): tab is WorkspacePaneStaticTabEntry => isWorkspacePaneStaticTabType(tab.type)),
         })),
       }
       await this.persistLayout(input.repoRoot, layout)

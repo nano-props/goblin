@@ -8,7 +8,7 @@ import {
   workspacePaneTabEntryIdentity,
   workspacePaneTabRequiresWorktree,
 } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsEntry, WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   workspacePaneTabsRuntimeKey,
@@ -19,7 +19,10 @@ import {
   workspacePaneTabsUserQueuePrefixKey,
   workspacePaneTabsUserScopeQueueKey,
 } from '#/server/workspace-pane/workspace-pane-tabs-user-queue-key.ts'
-import { workspacePaneTabEntryArraysEqual } from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
+import {
+  workspacePaneTabEntryArraysEqual,
+  workspacePaneTabsWithUpdateOperation,
+} from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
 import {
   physicalWorktreeIdentityKey,
   type PhysicalWorktreeIdentity,
@@ -38,6 +41,14 @@ export interface WorkspacePaneTabsReplaceInput<
   repoRoot: string
   tabs: readonly WorkspacePaneTabEntry[]
   physicalWorktreeIdentity: PhysicalWorktreeIdentity | null
+}
+
+export interface WorkspacePaneTabsUpdatePlanInput<TUser extends string | number> extends Omit<
+  WorkspacePaneTabsReplaceInput<TUser>,
+  'tabs'
+> {
+  currentTabs: readonly WorkspacePaneTabEntry[]
+  operation: WorkspacePaneTabsUpdateOperation
 }
 
 export interface WorkspacePaneTabsWorktreeInput<TUser extends string | number> {
@@ -101,8 +112,11 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     return this.planTargetReplacement(input)
   }
 
-  planUpdate(input: WorkspacePaneTabsReplaceInput<TUser>): WorkspacePaneTabsMutationPlan<TUser> {
-    return this.planTargetReplacement(input)
+  planUpdate(input: WorkspacePaneTabsUpdatePlanInput<TUser>): WorkspacePaneTabsMutationPlan<TUser> {
+    return this.planTargetReplacement({
+      ...input,
+      tabs: workspacePaneTabsWithUpdateOperation(input.currentTabs, input.operation),
+    })
   }
 
   planRetire(

@@ -19,6 +19,35 @@ describe('workspace pane tabs runtime storage', () => {
     expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(1)
   })
 
+  test('plans update operations inside the aggregate', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')
+    commitReplace(runtime, { ...target(), tabs: [workspacePaneStaticTabEntry('status')] })
+
+    const plan = runtime.planUpdate({
+      ...target(),
+      currentTabs: [workspacePaneStaticTabEntry('status'), terminal],
+      operation: { type: 'open-static', tabType: 'history' },
+    })
+
+    expect(runtime.tabs(target())).toEqual([workspacePaneStaticTabEntry('status')])
+    expect(runtime.scopeEntriesForPlan(plan)).toEqual([
+      {
+        repoRoot: '/repo',
+        branchName: 'feature/worktree',
+        worktreePath: '/repo-linked',
+        tabs: [workspacePaneStaticTabEntry('status'), terminal, workspacePaneStaticTabEntry('history')],
+      },
+    ])
+
+    runtime.commitPlan(plan)
+    expect(runtime.tabs(target())).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      terminal,
+      workspacePaneStaticTabEntry('history'),
+    ])
+  })
+
   test('rejects a plan built from an older aggregate revision', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     const stalePlan = runtime.planReplace({ ...target(), tabs: [workspacePaneStaticTabEntry('history')] })
