@@ -326,7 +326,13 @@ describe('WorktreeRemovalApplication', () => {
       },
     ]
     const broadcastSessionsChanged = vi.fn()
-    const application = createApplication({ retireTarget, physicalWorktreeTargets, broadcastSessionsChanged })
+    const broadcastWorkspaceTabsChanged = vi.fn()
+    const application = createApplication({
+      retireTarget,
+      physicalWorktreeTargets,
+      broadcastSessionsChanged,
+      broadcastWorkspaceTabsChanged,
+    })
 
     await expect(
       application.removeWorktree('user-a', {
@@ -342,6 +348,8 @@ describe('WorktreeRemovalApplication', () => {
     expect(retireTarget).not.toHaveBeenCalled()
     expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', '/repo')
     expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', '/linked-repo')
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', '/repo')
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', '/linked-repo')
   })
 })
 

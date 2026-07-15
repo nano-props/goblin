@@ -190,7 +190,7 @@ class TerminalSessionService {
     },
   ): Promise<WorkspacePaneTabsRestoreResult> {
     if (!isValidRepoLocator(input.repoRoot)) {
-      return { kind: 'restored', snapshot: emptyWorkspacePaneTabsSnapshot() }
+      return { kind: 'restored', snapshot: emptyWorkspacePaneTabsSnapshot(), repaired: false }
     }
     const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
     const result = await this.workspaceTabsCoordinator.restoreScope({
@@ -208,7 +208,7 @@ class TerminalSessionService {
     })
     if (result.kind === 'membership-conflict') return result
     this.broadcastDurableLayoutChange(input.repoRoot, result.affectedUserIds)
-    return { kind: 'restored', snapshot: result.snapshot }
+    return { kind: 'restored', snapshot: result.snapshot, repaired: result.repaired }
   }
 
   async updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabsSnapshot> {

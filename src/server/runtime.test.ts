@@ -42,7 +42,7 @@ vi.mock('#/server/terminal/terminal-runtime.ts', () => ({
 
 function makeWorkspacePaneTabsHost(): ServerWorkspacePaneTabsHost & ServerWorkspacePaneTargetLifecycleHost {
   return {
-    restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] } })),
+    restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
     listWorkspaceTabs: vi.fn(),
     replaceTabs: vi.fn(),
     updateTabs: vi.fn(),

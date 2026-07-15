@@ -166,7 +166,7 @@ async function restoreServerWorkspaceSnapshot(
   return {
     kind: 'restored',
     value: {
-      status: repoRestoreFailed ? 'repaired' : 'restored',
+      status: repoRestoreFailed || projectedTabs.repaired ? 'repaired' : 'restored',
       openRepoEntries: opened.map((repo) => repo.entry),
       runtime: runtimeSnapshotFromOpened(
         opened,

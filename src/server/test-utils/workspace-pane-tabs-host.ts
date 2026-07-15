@@ -6,6 +6,7 @@ export function createTestWorkspacePaneTabsHost() {
   const restoreTabs = vi.fn<ServerWorkspacePaneTabsHost['restoreTabs']>(async () => ({
     kind: 'restored',
     snapshot: { revision: 0, entries: [] },
+    repaired: false,
   }))
   return {
     restoreTabs,

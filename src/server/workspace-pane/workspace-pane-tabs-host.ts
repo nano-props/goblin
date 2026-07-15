@@ -17,6 +17,7 @@ export interface WorkspacePaneTabsMembershipConflict {
 export interface WorkspacePaneTabsRestored {
   kind: 'restored'
   snapshot: WorkspacePaneTabsSnapshot
+  repaired: boolean
 }
 
 export type WorkspacePaneTabsRestoreResult = WorkspacePaneTabsRestored | WorkspacePaneTabsMembershipConflict

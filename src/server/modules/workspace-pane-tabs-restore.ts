@@ -36,7 +36,7 @@ export async function projectWorkspacePaneTabsWithMembershipGuard(input: {
         const committed = await input.confirmMembership()
         if (!committed.matched) return committed
       }
-      return { matched: true, snapshots: restored.snapshots }
+      return { matched: true, snapshots: restored.snapshots, repaired: restored.repaired }
     }
     const latest = await input.confirmMembership()
     if (!latest.matched) return latest
@@ -48,6 +48,7 @@ async function restoreWorkspacePaneTabsForRepos(
   repos: ProjectedRestoredWorkspaceRepoRuntime[],
 ) {
   const snapshots: Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }> = []
+  let repaired = false
   for (const repo of repos) {
     input.signal?.throwIfAborted()
     const targets = (repo.projection.snapshot?.branches ?? []).map((branch) => ({
@@ -63,8 +64,9 @@ async function restoreWorkspacePaneTabsForRepos(
     })
     if (result.kind === 'membership-conflict') return result
     snapshots.push({ repoRoot: repo.repoRoot, repoRuntimeId: repo.repoRuntimeId, snapshot: result.snapshot })
+    if (result.repaired) repaired = true
   }
-  return { kind: 'restored' as const, snapshots }
+  return { kind: 'restored' as const, snapshots, repaired }
 }
 
 export function workspaceRepoEntry(workspace: ServerWorkspaceState, repoRoot: string) {

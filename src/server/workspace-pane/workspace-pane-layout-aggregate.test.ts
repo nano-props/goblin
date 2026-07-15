@@ -203,6 +203,7 @@ describe('workspace pane layout aggregate', () => {
     expect(repository.layout).toEqual({ entries: [valid] })
     expect(result).toMatchObject({
       kind: 'validated',
+      repaired: true,
       snapshot: { entries: [valid] },
     })
   })
@@ -322,6 +323,7 @@ describe('workspace pane layout aggregate', () => {
 
     expect(result).toMatchObject({
       kind: 'validated',
+      repaired: true,
       snapshot: { entries: [] },
     })
     expect(repository.layout.entries).toHaveLength(1)

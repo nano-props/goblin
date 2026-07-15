@@ -51,6 +51,7 @@ export type WorkspacePaneLayoutValidationResult =
       kind: 'validated'
       snapshot: WorkspacePaneTabsSnapshot
       affectedUserIds: string[]
+      repaired: boolean
     }
   | { kind: 'membership-conflict' }
 
@@ -233,6 +234,9 @@ export class WorkspacePaneLayoutAggregate {
       physicalTargets: input.physicalTargets,
     })
     const durableLayoutChanged = outcome.kind === 'accepted' && outcome.changed
+    const invalidLayoutSuppressed = outcome.kind === 'write-failure' && outcome.snapshot.layout.entries.some((entry) =>
+      !validKeys.has(workspacePaneTabsTargetIdentityKey(entry)),
+    )
     return {
       kind: 'validated',
       snapshot: await this.snapshot({
@@ -242,6 +246,7 @@ export class WorkspacePaneLayoutAggregate {
         knownLayout: outcome.snapshot.layout,
       }),
       affectedUserIds: this.affectedUserIds(input, durableLayoutChanged, overlayChanged ? [input.userId] : []),
+      repaired: durableLayoutChanged || invalidLayoutSuppressed,
     }
   }
 

@@ -68,7 +68,7 @@ const appRealtimeHostStub = {
 } satisfies ServerAppRealtimeHost
 
 const workspacePaneTabsHostStub = {
-  restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] } })),
+  restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
   listWorkspaceTabs: vi.fn(),
   replaceTabs: vi.fn(),
   updateTabs: vi.fn(),

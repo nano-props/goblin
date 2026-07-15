@@ -104,7 +104,7 @@ export class WorktreeRemovalApplication {
                   // cannot authorize durable retirement: a stable target may
                   // already be rebound to a new physical generation.
                   await this.deps.workspaceTabs.clearPhysicalWorktreeIndex(physicalCapability.identity)
-                  this.broadcastSessions(affectedScopes)
+                  this.broadcast(affectedScopes)
                   return { ok: true, message: '' }
                 } catch (error) {
                   worktreeRemovalLogger.error({ error, repoRoot: input.repoRoot, worktreePath }, 'tabs finalize failed')
