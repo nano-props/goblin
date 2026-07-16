@@ -179,6 +179,40 @@ describe('terminal session projection helpers', () => {
     expect(projected?.descriptor.branch).toBe('feature/restored')
   })
 
+  test('keeps the current repo-index branch when catalog metadata is stale', () => {
+    const projected = projectServerTerminalSession({
+      repoIndex: {
+        [REPO_ROOT]: {
+          repoRuntimeId: REPO_RUNTIME_ID,
+          branchByWorktreePath: { [WORKTREE_PATH]: 'feature/current' },
+        },
+      },
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+      clientId: 'client_b',
+      index: 1,
+      serverSession: {
+        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-111111111111111111111',
+        repoRuntimeId: REPO_RUNTIME_ID,
+        repoRoot: REPO_ROOT,
+        branch: 'feature/stale',
+        worktreePath: WORKTREE_PATH,
+        cwd: WORKTREE_PATH,
+        controller: null,
+        processName: 'bash',
+        canonicalTitle: null,
+        phase: 'open',
+        message: null,
+        cols: 80,
+        rows: 24,
+      },
+    })
+
+    expect(projected?.descriptor.branch).toBe('feature/current')
+  })
+
   test('projects attach results into local controller state for the active attachment', () => {
     const projected = projectTerminalAttachResultForClient(
       {
