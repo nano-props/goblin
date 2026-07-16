@@ -2890,20 +2890,6 @@ function terminalEntry(id: string) {
   return workspacePaneRuntimeTabEntry('terminal', id)
 }
 
-function workspacePaneTabsSnapshot(base: TerminalSessionBase, tabs: WorkspacePaneTabEntry[]) {
-  return {
-    revision: 1,
-    entries: [
-      {
-        repoRoot: base.repoRoot,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-        tabs,
-      },
-    ],
-  }
-}
-
 test('rebases the latest queued absolute selection after an earlier route commit', async () => {
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
