@@ -48,14 +48,9 @@ export class TerminalDirectory<
     let settled = false
     return {
       commit: (entry) => {
-        if (
-          settled ||
-          this.reservationsByRuntimeId.get(identity.id) !== identity ||
-          entry.id !== identity.id ||
-          entry.userId !== identity.userId ||
-          entry.scope !== identity.scope ||
-          entry.terminalSessionId !== identity.terminalSessionId
-        ) return false
+        if (settled) return false
+        if (this.reservationsByRuntimeId.get(identity.id) !== identity) return false
+        if (!reservationMatchesEntry(identity, entry)) return false
         settled = true
         this.reservationsByRuntimeId.delete(identity.id)
         this.reservedRuntimeIdByUserSession.delete(durableKey)
@@ -121,4 +116,16 @@ export class TerminalDirectory<
   private scopeKey(userId: TUser, scope: string): string {
     return `${String(userId)}\0${scope}`
   }
+}
+
+function reservationMatchesEntry<TUser extends string | number>(
+  identity: TerminalDirectoryReservation<TUser>,
+  entry: TerminalDirectoryEntry<TUser>,
+): boolean {
+  return (
+    entry.id === identity.id &&
+    entry.userId === identity.userId &&
+    entry.scope === identity.scope &&
+    entry.terminalSessionId === identity.terminalSessionId
+  )
 }
