@@ -14,7 +14,7 @@ import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/w
 import { BranchNavigatorSkeleton } from '#/web/components/Skeleton.tsx'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
-import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
 
 interface Props {
@@ -70,30 +70,41 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
     : 'branches.empty'
 
   const highlightedBranch = currentBranchName ?? null
+  const statusError = statusReadModel.error
+  const statusErrorKey = statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
+  const retryStatus = () => {
+    if (!repoRuntimeId) return
+    void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repoId, repoRuntimeId)
+  }
 
   if (!repo && !statusReadModel.data && statusReadModel.isError && repoRuntimeId) {
-    const messageKey =
-      statusReadModel.error instanceof Error ? statusReadModel.error.message : String(statusReadModel.error)
     return (
       <RepoStatusFailureView
-        messageKey={messageKey}
+        messageKey={statusErrorKey ?? 'error.failed-read-repo'}
         retrying={statusReadModel.isFetching}
-        onRetry={() => {
-          void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repoId, repoRuntimeId)
-        }}
+        onRetry={retryStatus}
       />
     )
   }
   if (!repo) return <BranchNavigatorSkeleton />
 
   return (
-    <BranchList
-      repo={repo}
-      branches={branches}
-      highlightedBranch={highlightedBranch}
-      onSelectBranch={handleSelectBranch}
-      onOpenBranchStatus={handleOpenBranchStatus}
-      emptyState={<EmptyState title={t(emptyLabel)} />}
-    />
+    <>
+      {statusReadModel.data && statusReadModel.isError && statusErrorKey && (
+        <RepoStatusStaleNotice
+          messageKey={statusErrorKey}
+          retrying={statusReadModel.isFetching}
+          onRetry={retryStatus}
+        />
+      )}
+      <BranchList
+        repo={repo}
+        branches={branches}
+        highlightedBranch={highlightedBranch}
+        onSelectBranch={handleSelectBranch}
+        onOpenBranchStatus={handleOpenBranchStatus}
+        emptyState={<EmptyState title={t(emptyLabel)} />}
+      />
+    </>
   )
 }

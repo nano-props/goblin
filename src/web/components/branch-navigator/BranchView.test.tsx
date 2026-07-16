@@ -193,6 +193,37 @@ describe('BranchView', () => {
     fireEvent.click(retry)
     await vi.waitFor(() => expect(readStatus).toHaveBeenCalledTimes(2))
   })
+
+  test('keeps last-good branch status visible with a retryable stale warning', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main')],
+      currentBranchName: 'main',
+    })
+    seedRepoReadModelQueryData(repo, {
+      branches: [createRepoBranch('main')],
+      currentBranch: 'main',
+      status: [{ path: REPO_ID, branch: 'main', isMain: true, entries: [] }],
+    })
+    const readStatus = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('status failed'))
+      .mockResolvedValueOnce({ repoRuntimeId: repo.repoRuntimeId, status: [], loadedAt: 2 })
+    installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
+    renderBranchView()
+
+    await primaryWindowQueryClient.invalidateQueries({
+      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId),
+      exact: true,
+      refetchType: 'active',
+    })
+
+    expect(await screen.findByText('status.stale-title')).toBeTruthy()
+    expect(screen.getByText('main')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'error.try-again' }))
+    await vi.waitFor(() => expect(readStatus).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(screen.queryByText('status.stale-title')).toBeNull())
+  })
 })
 
 function renderBranchView() {
