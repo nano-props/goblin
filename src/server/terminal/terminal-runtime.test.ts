@@ -1600,17 +1600,6 @@ describe('server terminal runtime', () => {
           action: 'created',
           controller: { clientId: 'client_a', status: 'connected' },
         },
-        workspacePaneTabs: {
-          revision: expect.any(Number),
-          entries: [
-            {
-              tabs: [
-                { type: 'status', tabId: 'workspace-pane:status' },
-                { type: 'terminal', runtimeSessionId: expect.any(String) },
-              ],
-            },
-          ],
-        },
       },
     })
     expect(mockPtys).toHaveLength(0)
@@ -1672,10 +1661,6 @@ describe('server terminal runtime', () => {
         action: 'closed',
         terminalSessionId: opened.runtime.terminalSessionId,
         terminalRuntimeSessionId: opened.runtime.terminalRuntimeSessionId,
-      },
-      workspacePaneTabs: {
-        revision: expect.any(Number),
-        entries: [],
       },
     })
     await expect(

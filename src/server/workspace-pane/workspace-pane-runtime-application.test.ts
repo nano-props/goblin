@@ -246,7 +246,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     },
   )
 
-  test('closes a terminal by durable session id and broadcasts workspace invalidation', async () => {
+  test('closes a terminal by durable session id and leaves projection cleanup to the close event', async () => {
     const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
     const close = vi.fn(() => true)
     const workspacePaneTabs = snapshot([{ type: 'status', tabId: 'workspace-pane:status' }])
@@ -290,20 +290,11 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(close).toHaveBeenCalledWith('client-test', 'user-test', {
       terminalRuntimeSessionId: session.terminalRuntimeSessionId,
     })
-    expect(reconcileWorktree).toHaveBeenCalledWith({
-      userId: 'user-test',
-      repoRoot: request.repoRoot,
-      scope: '/repo\0repo-runtime-test',
-      worktreePath: request.worktreePath,
-      physicalWorktreeCapability: expect.objectContaining({
-        identity: testPhysicalWorktreeIdentity(request.worktreePath),
-      }),
-      permit: expect.objectContaining({ operationId: expect.any(Number) }),
-    })
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', request.repoRoot)
+    expect(reconcileWorktree).not.toHaveBeenCalled()
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
 
-  test('reports an already-closed durable identity and still reconciles tabs', async () => {
+  test('reports an already-closed durable identity without redundant projection reconciliation', async () => {
     const close = vi.fn()
     const workspacePaneTabs = snapshot([{ type: 'status', tabId: 'workspace-pane:status' }])
     const reconcileWorktree = vi.fn(async () => workspacePaneTabs)
@@ -342,7 +333,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       },
     })
     expect(close).not.toHaveBeenCalled()
-    expect(reconcileWorktree).toHaveBeenCalledOnce()
+    expect(reconcileWorktree).not.toHaveBeenCalled()
   })
 
   test('does not claim runtime close success or mutate tabs when provider close is unconfirmed', async () => {

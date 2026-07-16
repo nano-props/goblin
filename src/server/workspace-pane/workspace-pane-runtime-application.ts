@@ -11,7 +11,6 @@ import type {
   WorkspacePaneRuntimeOpenInput,
   WorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime.ts'
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
@@ -112,7 +111,7 @@ export class WorkspacePaneRuntimeApplication {
         if (!this.isCurrentTarget(userId, target)) return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
         switch (input.runtimeType) {
           case 'terminal':
-            return await this.closeTerminal(clientId, userId, target, input.sessionId, scope, physicalCapability, permit)
+            return await this.closeTerminal(clientId, userId, target, input.sessionId, scope)
         }
       })
     } catch (error) {
@@ -196,8 +195,6 @@ export class WorkspacePaneRuntimeApplication {
     target: NormalizedRuntimeTarget,
     terminalSessionId: string,
     scope: string,
-    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
-    permit: PhysicalWorktreeOperationPermit,
   ): Promise<WorkspacePaneRuntimeCloseResult> {
     const sessions = await this.listTerminalSessions(userId, scope)
     const session = sessions.find(
@@ -210,7 +207,6 @@ export class WorkspacePaneRuntimeApplication {
       })
       if (!closed) return runtimeFailure('terminal', 'error.unavailable')
     }
-    await this.reconcileTarget(userId, target, scope, physicalWorktreeCapability, permit)
     return {
       ok: true,
       runtimeType: 'terminal',
@@ -225,25 +221,6 @@ export class WorkspacePaneRuntimeApplication {
 
   private async listTerminalSessions(userId: string, scope: string): Promise<TerminalSessionSummary[]> {
     return await this.deps.terminalWorktree.listSessionsForUser(userId, scope)
-  }
-
-  private async reconcileTarget(
-    userId: string,
-    target: NormalizedRuntimeTarget,
-    scope: string,
-    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
-    permit: PhysicalWorktreeOperationPermit,
-  ): Promise<WorkspacePaneTabsSnapshot> {
-    const snapshot = await this.deps.workspaceTabsCoordinator.reconcileWorktreeAdmitted({
-      userId,
-      repoRoot: target.repoRoot,
-      scope,
-      worktreePath: target.worktreePath,
-      physicalWorktreeCapability,
-      permit,
-    })
-    this.deps.broadcastWorkspaceTabsChanged(userId, target.repoRoot)
-    return snapshot
   }
 
   private isCurrentTarget(userId: string, target: WorkspacePaneRuntimeCommandTarget): boolean {
