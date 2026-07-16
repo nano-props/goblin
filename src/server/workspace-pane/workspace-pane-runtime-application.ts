@@ -153,10 +153,6 @@ export class WorkspacePaneRuntimeApplication {
       })
     } catch (error) {
       if (admittedRevision === null) runtime.admission.abort()
-      if (admittedRevision !== null) {
-        runtime.admission.publishCommittedEffects()
-        this.deps.broadcastWorkspaceTabsChanged(userId, input.request.repoRoot)
-      }
       workspacePaneRuntimeApplicationLogger.error(
         { error, userId, repoRoot: input.request.repoRoot, worktreePath },
         'terminal open application command failed',

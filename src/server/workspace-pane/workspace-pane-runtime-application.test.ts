@@ -469,11 +469,12 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
 
-  test('does not roll back membership when projection fails after admission', async () => {
+  test('does not compensate an invariant failure after admission', async () => {
     const runtime = terminalCreateSuccess()
     const publish = vi.fn(() => 1)
     const retire = vi.fn()
-    runtime.admission = { kind: 'prepared', commit: publish, publishCommittedEffects: vi.fn(), abort: retire }
+    const publishCommittedEffects = vi.fn()
+    runtime.admission = { kind: 'prepared', commit: publish, publishCommittedEffects, abort: retire }
     const close = vi.fn(async () => true)
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
@@ -484,7 +485,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       workspaceTabsCoordinator: {
         ensureRuntimeTabForSession: async (input: { commitAdmission?: () => void }) => {
           input.commitAdmission?.()
-          throw new Error('projection failed after admission')
+          throw new Error('invariant failure after admission')
         },
       },
       isCurrentRepoRuntime: () => true,
@@ -499,7 +500,8 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(publish).toHaveBeenCalledOnce()
     expect(retire).not.toHaveBeenCalled()
     expect(close).not.toHaveBeenCalled()
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', request.repoRoot)
+    expect(publishCommittedEffects).not.toHaveBeenCalled()
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
 })
 

@@ -24,6 +24,7 @@ import {
   effectiveTerminalController,
   explainAuthority,
   isAuthoritative,
+  projectAttachedTerminalController,
   registerTerminalClient,
   restartTerminalClientControl,
   terminalIdentityChanged,
@@ -178,14 +179,20 @@ export class TerminalSessionManager<TUser extends string | number> {
         return { ok: false, message: 'error.unavailable' }
       }
       const action = this.effectiveController(existing) ? 'restored' : 'reused'
-      const projected = input.clientId
-        ? this.projectAttachment(existing, input.clientId, size.cols, size.rows)
-        : existing
+      const projectedController = input.clientId
+        ? projectAttachedTerminalController(
+            existing,
+            input.clientId,
+            size.cols,
+            size.rows,
+            this.sessionPresence(existing),
+          )
+        : undefined
       let admissionState: 'pending' | 'committed' | 'aborted' = 'pending'
       let committedEffect: ReturnType<typeof attachTerminalClient> | null = null
       let effectsPublished = false
       return {
-        ...this.prepareResult(projected),
+        ...this.prepareResult(existing, projectedController),
         action,
         admission: {
           kind: 'existing',
@@ -664,7 +671,10 @@ export class TerminalSessionManager<TUser extends string | number> {
     }
   }
 
-  private runtimeMetadata(session: TerminalSessionView<TUser>): TerminalRuntimeMetadata {
+  private runtimeMetadata(
+    session: TerminalSessionView<TUser>,
+    controller: TerminalController | null = this.effectiveController(session),
+  ): TerminalRuntimeMetadata {
     return {
       terminalRuntimeSessionId: session.id,
       terminalRuntimeGeneration: session.terminalRuntimeGeneration,
@@ -672,7 +682,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       canonicalTitle: session.render.title,
       phase: session.phase,
       message: session.message,
-      controller: this.effectiveController(session),
+      controller,
       canonicalCols: session.cols,
       canonicalRows: session.rows,
     }
@@ -680,10 +690,11 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   private prepareResult(
     session: TerminalSessionView<TUser>,
+    controller?: TerminalController | null,
   ): { ok: true } & TerminalRuntimeMetadata {
     return {
       ok: true,
-      ...this.runtimeMetadata(session),
+      ...this.runtimeMetadata(session, controller),
     }
   }
 
@@ -720,18 +731,6 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   private effectiveController(session: TerminalSessionView<TUser>): TerminalController | null {
     return effectiveTerminalController(session, this.sessionPresence(session))
-  }
-
-  private projectAttachment(
-    session: TerminalSessionView<TUser>,
-    clientId: string,
-    cols: number,
-    rows: number,
-  ): TerminalSessionView<TUser> {
-    const projected = { ...session, attachments: new Map(session.attachments) }
-    registerTerminalClient(projected, clientId, cols, rows)
-    attachTerminalClient(projected, clientId, this.sessionPresence(projected))
-    return projected
   }
 
   private effectiveControllerWithOverride(
