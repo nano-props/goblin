@@ -16,6 +16,7 @@ import {
   workspaceNavigationHistoryEntryEqual,
 } from '#/web/stores/repos/navigation-history-entry.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   preferredWorkspacePaneTabByTargetRecordWith,
@@ -34,7 +35,10 @@ type RestorableWorkspaceActions = Pick<
   | 'setSelectedTerminal'
 >
 
-type RuntimeWorkspacePreferenceActions = Pick<ReposStore, 'setBranchViewMode' | 'setWorkspacePaneTab'>
+type RuntimeWorkspacePreferenceActions = Pick<
+  ReposStore,
+  'setBranchViewMode' | 'setWorkspacePaneTab' | 'setWorkspacePaneTabForTarget'
+>
 type WorkspaceNavigationHistoryActions = Pick<
   ReposStore,
   'recordWorkspaceNavigation' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'
@@ -135,6 +139,21 @@ function createRuntimeWorkspacePreferenceActions(set: ReposSet, get: ReposGet): 
     persistRepoSnapshotCacheEntry(set, repo, repoRuntimeId)
   }
 
+  function setWorkspacePaneTabForTarget(target: WorkspacePaneTabsTarget, tab: WorkspacePaneTabType | null): void {
+    let changed = false
+    let repoRuntimeId: string | undefined
+    set((s) => {
+      const repo = s.repos[target.repoRoot]
+      if (!repo || preferredWorkspacePaneTabForTarget(repo.ui, target) === tab) return s
+      changed = true
+      repoRuntimeId = repo.repoRuntimeId
+      return replaceRepoState(s, repo, (r) => {
+        r.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(r.ui, target, tab)
+      })
+    })
+    if (changed && repoRuntimeId !== undefined) afterWorkspacePreferenceChange(target.repoRoot, repoRuntimeId)
+  }
+
   return {
     setBranchViewMode(id: string, viewMode: BranchViewMode) {
       let changed = false
@@ -155,27 +174,14 @@ function createRuntimeWorkspacePreferenceActions(set: ReposSet, get: ReposGet): 
       // Persists the user's target-scoped preferred pane selection verbatim.
       // Opening/closing branch tabs is owned by explicit open/close actions;
       // this action only changes the target-scoped preferred tab/empty pane.
-      let changed = false
-      let repoRuntimeId: string | undefined
-      set((s) => {
-        const repo = s.repos[id]
-        if (!repo) return s
-        const branchModel = requireRepoBranchQueryProjection(repo)
-        const target = workspacePaneTabsTargetForRepoBranch(
-          { repoRoot: repo.id, branches: branchModel.branches },
-          branch,
-        )
-        const current = preferredWorkspacePaneTabForTarget(repo.ui, target)
-        if (!target || current === tab) return s
-        changed = true
-        repoRuntimeId = repo.repoRuntimeId
-        return replaceRepoState(s, repo, (r) => {
-          r.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(r.ui, target, tab)
-        })
-      })
-      if (!changed || repoRuntimeId === undefined) return
-      afterWorkspacePreferenceChange(id, repoRuntimeId)
+      const repo = get().repos[id]
+      if (!repo) return
+      const branchModel = requireRepoBranchQueryProjection(repo)
+      const target = workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branch)
+      if (target) setWorkspacePaneTabForTarget(target, tab)
     },
+
+    setWorkspacePaneTabForTarget,
   }
 }
 

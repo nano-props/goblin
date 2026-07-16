@@ -7,6 +7,7 @@ import type {
   WorkspaceRuntimeRestoreSnapshot,
 } from '#/shared/api-types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoDataLoadBundle } from '#/web/stores/repos/repo-data-load-state.ts'
@@ -274,6 +275,7 @@ interface RuntimeCoherentRepoProjectionActions {
    *  the UI resolves the active pane at read time so session restore preserves
    *  target-scoped user intent. */
   setWorkspacePaneTab: (id: string, branch: string, tab: WorkspacePaneTabType | null) => void
+  setWorkspacePaneTabForTarget: (target: WorkspacePaneTabsTarget, tab: WorkspacePaneTabType | null) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   setLastResult: (id: string, result: ExecResult, repoRuntimeId: string, options?: RepoResultEventOptions) => void
   clearEvents: (id: string, eventIds: number[]) => void

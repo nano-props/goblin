@@ -8,6 +8,7 @@ import {
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RepoWorkspaceStaticTab, RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -99,6 +100,12 @@ describe('workspace pane tab controller transactions', () => {
       { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
       expect.any(Object),
     )
+    const targetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: '/repo',
+      branchName: 'feature/renamed',
+      worktreePath: '/worktree-a',
+    })
+    expect(useReposStore.getState().repos['/repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe('terminal')
   })
 
   test('rejects exact target completion after its runtime is replaced', async () => {

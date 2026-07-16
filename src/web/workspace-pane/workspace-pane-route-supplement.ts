@@ -41,9 +41,12 @@ export function commitWorkspacePaneCommittedRuntimeRouteSupplement(
 ): boolean {
   if (!workspacePaneCommittedRuntimeTargetIsCurrent(target)) return false
   const state = useReposStore.getState()
-  state.setWorkspacePaneTab(
-    target.repoId,
-    target.branchName,
+  state.setWorkspacePaneTabForTarget(
+    {
+      repoRoot: target.repoId,
+      branchName: target.branchName,
+      worktreePath: target.worktreePath,
+    },
     route === null ? null : route.kind === 'static' ? route.tab : 'terminal',
   )
   if (route?.kind === 'terminal' && target.worktreePath) {
