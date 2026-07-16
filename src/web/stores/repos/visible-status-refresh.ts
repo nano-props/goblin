@@ -10,9 +10,9 @@ import type { RepoRefreshStoreAccess } from '#/web/stores/repos/refresh.ts'
 
 // Tab-open and visibility refreshes stay outside the operation lane so they
 // cannot be stalled behind branch actions. React Query owns transport
-// deduplication and stale-result rejection; this set only coalesces the
-// matching presentation load state.
-const visibleStatusRefreshesInFlight = new Set<string>()
+// deduplication and stale-result rejection; this map lets presentation
+// callers join the same load-state lifetime.
+const visibleStatusRefreshesInFlight = new Map<string, Promise<void>>()
 
 function visibleStatusRefreshKey(repoRoot: string, repoRuntimeId: string): string {
   return [repoRoot, repoRuntimeId].join('\0')
@@ -37,10 +37,24 @@ export async function refreshVisibleStatusCache(
   repoRoot: string,
   repoRuntimeId: string,
 ): Promise<void> {
-  if (!visibleStatusRefreshable(store, repoRoot, repoRuntimeId)) return
   const key = visibleStatusRefreshKey(repoRoot, repoRuntimeId)
-  if (visibleStatusRefreshesInFlight.has(key)) return
-  visibleStatusRefreshesInFlight.add(key)
+  const existing = visibleStatusRefreshesInFlight.get(key)
+  if (existing) return await existing
+  if (!visibleStatusRefreshable(store, repoRoot, repoRuntimeId)) return
+  const refresh = runVisibleStatusRefresh(store, repoRoot, repoRuntimeId)
+  visibleStatusRefreshesInFlight.set(key, refresh)
+  try {
+    await refresh
+  } finally {
+    if (visibleStatusRefreshesInFlight.get(key) === refresh) visibleStatusRefreshesInFlight.delete(key)
+  }
+}
+
+async function runVisibleStatusRefresh(
+  store: RepoRefreshStoreAccess,
+  repoRoot: string,
+  repoRuntimeId: string,
+): Promise<void> {
   updateIfFresh(store.set, repoRoot, repoRuntimeId, (repo) => {
     startDataLoad(repo.dataLoads.visibleStatus, {
       hasData: !!getRepoWorktreeStatusQueryData(repoRoot, repoRuntimeId),
@@ -60,7 +74,5 @@ export async function refreshVisibleStatusCache(
       if (isRepoUnavailableReason(message)) markRepoUnavailable(repo, message)
       finishDataLoadError(repo.dataLoads.visibleStatus, message)
     })
-  } finally {
-    visibleStatusRefreshesInFlight.delete(key)
   }
 }

@@ -173,11 +173,7 @@ function RepoWorkspaceLoaded({
   if (!branchReadModel || !projection) {
     return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }
-  let presentationBranchModel: RepoWorkspaceRepo['branchModel'] = {
-    ...branchReadModel,
-    status: branchReadModel.status,
-    statusReady: true,
-  }
+  let presentationBranchModel: RepoWorkspaceRepo['branchModel'] = branchReadModel
   if (currentBranchName && Array.isArray(projection.pullRequests)) {
     const pullRequest = projection.pullRequests.find((entry) => entry.branch === currentBranchName)?.pullRequest
     presentationBranchModel = {

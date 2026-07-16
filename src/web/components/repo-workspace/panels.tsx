@@ -4,7 +4,6 @@ import type { Key } from 'react-aria-components'
 import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
-import { StatusListSkeleton } from '#/web/components/Skeleton.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
 import { useRepoLogQuery } from '#/web/repo-data-query.ts'
 import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
@@ -119,14 +118,13 @@ function HistoryWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }
   )
 }
 
-function ChangesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: WorkspacePanePanelProps) {
+function ChangesWorkspacePanePanel({ detail, workspacePaneId, panelLabel }: WorkspacePanePanelProps) {
   const branch = detail.branch
   if (!branch) return null
   return (
     <BranchChangesTab
       workspacePaneId={workspacePaneId}
       panelLabel={panelLabel}
-      repo={repo}
       branch={branch}
       currentBranchStatus={detail.currentBranchStatus}
       statusLoading={detail.loading.status}
@@ -387,7 +385,6 @@ function BranchHistoryTab({
 function BranchChangesTab({
   workspacePaneId,
   panelLabel,
-  repo,
   branch,
   currentBranchStatus,
   statusLoading,
@@ -396,7 +393,6 @@ function BranchChangesTab({
 }: {
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
-  repo: WorkspacePanePanelRenderInput['repo']
   branch: RepoWorkspaceBranch
   currentBranchStatus: CurrentRepoWorkspacePresentation['currentBranchStatus']
   statusLoading: boolean
@@ -408,11 +404,7 @@ function BranchChangesTab({
 
   return (
     <WorkspacePanePanelFrame id={`${workspacePaneId}-changes-panel`} {...panelLabel} busy={statusLoading}>
-      {branch.worktree?.path && statusLoading && !repo.branchModel.statusReady ? (
-        <StatusListSkeleton rows={8} />
-      ) : branch.worktree?.path && !repo.branchModel.statusReady && statusError ? (
-        <EmptyState title={t(statusError)} />
-      ) : branch.worktree?.path ? (
+      {branch.worktree?.path ? (
         <div className="relative flex min-h-0 flex-1 flex-col">
           {statusStale && statusError && <StaleStatusNotice message={statusError} />}
           {totalEntries > 0 ? (

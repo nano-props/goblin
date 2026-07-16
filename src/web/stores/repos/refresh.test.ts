@@ -645,13 +645,19 @@ describe('projection refresh request ordering', () => {
 
     const first = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
     const second = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
+    let secondSettled = false
+    void second.then(() => {
+      secondSettled = true
+    })
     const fresh = [{ path: '/repo', isMain: true, entries: [{ x: 'M', y: ' ', path: 'fresh.ts' }] }]
 
     await vi.waitFor(() => {
       expect(callCount).toBe(1)
     })
+    expect(secondSettled).toBe(false)
     resolveFirst(fresh)
     await Promise.all([first, second])
+    expect(secondSettled).toBe(true)
     expect(cachedRepoStatus(repoRuntimeId)).toEqual(fresh)
   })
 
