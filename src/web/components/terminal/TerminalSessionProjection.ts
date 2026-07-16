@@ -236,7 +236,6 @@ export class TerminalSessionProjection {
       if (!branch || branch === session.descriptor.branch) continue
       session.updateDescriptor({ ...session.descriptor, branch })
       this.notifySession(session.descriptor.terminalSessionId)
-      this.notifyWorktree(session.descriptor.terminalWorktreeKey)
     }
   }
 

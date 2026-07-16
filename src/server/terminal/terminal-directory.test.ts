@@ -78,6 +78,17 @@ describe('TerminalDirectory', () => {
     expect(directory.catalogRevision('user_a', 'scope_a')).toBe(0)
     expect(directory.reserve(entry('pty_retry', 'term_reserved', 'scope_a'))).not.toBeNull()
   })
+
+  test('rejects a mismatched entry without consuming the reservation', () => {
+    const directory = new TerminalDirectory<string, Entry>()
+    const reserved = entry('pty_reserved', 'term_reserved', 'scope_a')
+    const admission = directory.reserve(reserved)
+
+    expect(admission?.commit(entry('pty_other', 'term_other', 'scope_a'))).toBe(false)
+    expect(directory.catalogRevision('user_a', 'scope_a')).toBe(0)
+    admission?.abort()
+    expect(directory.reserve(entry('pty_retry', 'term_reserved', 'scope_a'))).not.toBeNull()
+  })
 })
 
 function entry(id: string, terminalSessionId: string, scope: string): Entry {

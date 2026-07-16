@@ -48,7 +48,14 @@ export class TerminalDirectory<
     let settled = false
     return {
       commit: (entry) => {
-        if (settled || this.reservationsByRuntimeId.get(identity.id) !== identity) return false
+        if (
+          settled ||
+          this.reservationsByRuntimeId.get(identity.id) !== identity ||
+          entry.id !== identity.id ||
+          entry.userId !== identity.userId ||
+          entry.scope !== identity.scope ||
+          entry.terminalSessionId !== identity.terminalSessionId
+        ) return false
         settled = true
         this.reservationsByRuntimeId.delete(identity.id)
         this.reservedRuntimeIdByUserSession.delete(durableKey)

@@ -240,8 +240,8 @@ export class TerminalSessionManager<TUser extends string | number> {
     }
     // Logical creation stops here. The selected client mounts and fits its
     // single xterm before `attachSession` starts the PTY with exact geometry.
-    // Until then this server-owned session is intentionally addressable but
-    // has no process and no output history.
+    // Until admission commit, this operation-owned session is not addressable
+    // and has no process or output history.
     let settled = false
     const admission: TerminalSessionAdmission = {
       kind: 'prepared',
