@@ -33,7 +33,7 @@ export const ja: Record<DictKey, string> = {
   'menu.file.clone-repo': 'リポジトリをクローン…',
   'menu.file.create-worktree': '新しいワークツリー…',
   'menu.file.open-recent': '最近使った項目を開く',
-  'menu.file.no-recent': '最近使ったリポジトリはありません',
+  'menu.file.no-recent': '最近使ったワークスペースはありません',
   'menu.file.clear-recent': 'メニューを消去',
   'menu.file.open-in-browser': 'ブラウザで開く',
   'menu.file.open-data-folder': 'データフォルダを開く',

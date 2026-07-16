@@ -99,10 +99,10 @@ export function workspacePaneTabsForTargetFromQueryData(
     worktreePath: string | null
   },
 ): WorkspacePaneTabEntry[] {
-  if (!target.branchName) return []
+  if (!target.branchName && target.worktreePath === null) return []
   const entry = workspacePaneTabsEntryForTarget(data.entries, {
     repoRoot: target.repoRoot,
-    branchName: target.branchName,
+    branchName: target.branchName ?? '',
     worktreePath: target.worktreePath,
   })
   return [...(entry?.tabs ?? defaultWorkspacePaneTabs())]
@@ -235,7 +235,12 @@ function workspacePaneTabsEntryForTarget(
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index]
     const runtimeEntryTarget = entry ? workspacePaneTabsTargetFromRuntime(entry.target) : null
-    if (entry && runtimeEntryTarget && workspacePaneTabsTargetIdentityKey(runtimeEntryTarget) === workspacePaneTabsTargetIdentityKey(target)) return entry
+    if (
+      entry &&
+      runtimeEntryTarget &&
+      workspacePaneTabsTargetIdentityKey(runtimeEntryTarget) === workspacePaneTabsTargetIdentityKey(target)
+    )
+      return entry
   }
   return undefined
 }

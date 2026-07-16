@@ -137,6 +137,7 @@ interface RestoredWorkspaceRepoRuntimeBase {
   repoRoot: string
   repoRuntimeId: string
   name: string
+  workspaceProbe: WorkspaceProbeState
   target?: RemoteRepoTarget
 }
 

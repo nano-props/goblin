@@ -70,9 +70,7 @@ export function parseRestorableWorkspacePaneTargetKey(key: string): RestorableWo
   return root === value ? { kind, root } : null
 }
 
-export function restorableWorkspacePaneTarget(
-  target: WorkspacePaneTabsTarget,
-): RestorableWorkspacePaneTarget | null {
+export function restorableWorkspacePaneTarget(target: WorkspacePaneTabsTarget): RestorableWorkspacePaneTarget | null {
   if (target.worktreePath === null) return { kind: 'git-branch', branch: target.branchName }
   if (target.worktreePath === target.repoRoot) return { kind: 'workspace' }
   const platform = typeof process !== 'undefined' && process.platform === 'win32' ? 'win32' : 'posix'
@@ -126,9 +124,7 @@ export function runtimeWorkspacePaneTarget(
   if (!workspaceId || !workspaceRuntimeId) return null
   if (target.worktreePath === target.repoRoot) return { kind: 'workspace', workspaceId, workspaceRuntimeId }
   if (target.worktreePath === null) {
-    return target.branchName
-      ? { kind: 'git-branch', workspaceId, workspaceRuntimeId, branch: target.branchName }
-      : null
+    return target.branchName ? { kind: 'git-branch', workspaceId, workspaceRuntimeId, branch: target.branchName } : null
   }
   const restorable = restorableWorkspacePaneTarget(target)
   return restorable?.kind === 'git-worktree'

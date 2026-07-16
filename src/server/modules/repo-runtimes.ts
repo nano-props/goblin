@@ -278,17 +278,22 @@ export function isCurrentRepoRuntime(userId: string, repoRoot: string, repoRunti
   return repoRuntimesByUser.get(userId)?.get(repoRoot)?.currentRepoRuntimeId === repoRuntimeId
 }
 
-export function workspaceRuntimeHasGitCapability(
-  userId: string,
-  repoRoot: string,
-  repoRuntimeId: string,
-): boolean {
+export function workspaceRuntimeHasGitCapability(userId: string, repoRoot: string, repoRuntimeId: string): boolean {
   const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
   return (
     state?.currentRepoRuntimeId === repoRuntimeId &&
     state.workspaceProbe.status === 'ready' &&
     state.workspaceProbe.capabilities.git.status === 'available'
   )
+}
+
+export function workspaceProbeStateForRuntime(
+  userId: string,
+  repoRoot: string,
+  repoRuntimeId: string,
+): WorkspaceProbeState | null {
+  const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
+  return state?.currentRepoRuntimeId === repoRuntimeId ? state.workspaceProbe : null
 }
 
 export function commitWorkspaceProbeState(input: {
@@ -308,10 +313,7 @@ export async function runSerializedWorkspaceRefresh(input: {
   repoRoot: string
   repoRuntimeId: string
   probe: () => Promise<WorkspaceSettledProbeState>
-  beforeCommit?: (input: {
-    before: WorkspaceProbeState
-    after: WorkspaceSettledProbeState
-  }) => Promise<void>
+  beforeCommit?: (input: { before: WorkspaceProbeState; after: WorkspaceSettledProbeState }) => Promise<void>
 }): Promise<WorkspaceRefreshResult> {
   const state = repoRuntimesByUser.get(input.userId)?.get(input.repoRoot)
   if (!state || state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }

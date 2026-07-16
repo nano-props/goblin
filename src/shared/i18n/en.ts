@@ -33,7 +33,7 @@ export const en = {
   'menu.file.clone-repo': 'Clone Repository…',
   'menu.file.create-worktree': 'New Worktree…',
   'menu.file.open-recent': 'Open Recent',
-  'menu.file.no-recent': 'No Recent Repositories',
+  'menu.file.no-recent': 'No Recent Workspaces',
   'menu.file.clear-recent': 'Clear Menu',
   'menu.file.open-in-browser': 'Open in Browser',
   'menu.file.open-data-folder': 'Open Data Folder',

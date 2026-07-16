@@ -28,7 +28,6 @@ import type {
 } from '#/web/components/terminal/types.ts'
 import {
   createBranchSnapshot,
-  createRepoBranch,
   installWorkspacePaneTabsTestBridge,
   resetReposStore,
   seedRepoWithReadModelForTest,
@@ -85,7 +84,7 @@ vi.mock('#/web/filetree-client.ts', () => ({
   getRepositoryTree: filetreeClientMocks.getRepositoryTree,
   getRepositoryFileViewer: filetreeClientMocks.getRepositoryFileViewer,
 }))
-const REPO_ID = '/tmp/goblin-repo-workspace-content-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-repo-workspace-content-repo'
 
 type RepoWorkspaceContentHarnessProps = Omit<ComponentProps<typeof RepoWorkspaceContent>, 'workspacePaneTabModel'> & {
   workspacePaneRouteMode?: 'preference-route' | 'bare-branch'
@@ -210,7 +209,7 @@ describe('RepoWorkspaceContent', () => {
   test('offers a compact return to the branch list when the last routed branch no longer exists', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [],
+      branchSnapshots: [],
       currentBranchName: null,
     })
     const existingPresentationRepo = repoWorkspaceRepo(repo)
@@ -784,8 +783,8 @@ describe('RepoWorkspaceContent', () => {
   test('renders branch status for a selected branch without a worktree', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch('feature/no-worktree', {
+      branchSnapshots: [
+        createBranchSnapshot('feature/no-worktree', {
           tracking: 'origin/feature/no-worktree',
           lastCommitHash: 'abc1234000000000000000000000000000000000',
           lastCommitShortHash: 'abc1234',
@@ -816,8 +815,8 @@ describe('RepoWorkspaceContent', () => {
   test('shows the workspace empty state when the status tab is closed', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch('feature/no-worktree', {
+      branchSnapshots: [
+        createBranchSnapshot('feature/no-worktree', {
           tracking: 'origin/feature/no-worktree',
           lastCommitHash: 'abc1234000000000000000000000000000000000',
           lastCommitShortHash: 'abc1234',
@@ -845,7 +844,7 @@ describe('RepoWorkspaceContent', () => {
   test('falls back to status when a worktree-scoped preference is unrenderable on a branch without a worktree', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/no-worktree')],
+      branchSnapshots: [createBranchSnapshot('feature/no-worktree')],
       currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/no-worktree': [staticEntry('status')] },
@@ -877,7 +876,7 @@ describe('RepoWorkspaceContent', () => {
     const worktreePath = '/tmp/hook-terminal-empty-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/hook-terminal-empty', { worktree: { path: worktreePath } })],
+      branchSnapshots: [createBranchSnapshot('feature/hook-terminal-empty', { worktree: { path: worktreePath } })],
       currentBranchName: 'feature/hook-terminal-empty',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/hook-terminal-empty': [staticEntry('status')] },
@@ -907,7 +906,7 @@ describe('RepoWorkspaceContent', () => {
     const worktreePath = '/tmp/terminal-empty-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/terminal-empty', { worktree: { path: worktreePath } })],
+      branchSnapshots: [createBranchSnapshot('feature/terminal-empty', { worktree: { path: worktreePath } })],
       currentBranchName: 'feature/terminal-empty',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-empty': [staticEntry('status')] },
@@ -942,7 +941,7 @@ describe('RepoWorkspaceContent', () => {
     const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/terminal-pending', { worktree: { path: worktreePath } })],
+      branchSnapshots: [createBranchSnapshot('feature/terminal-pending', { worktree: { path: worktreePath } })],
       currentBranchName: 'feature/terminal-pending',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-pending': [staticEntry('status')] },
@@ -984,7 +983,7 @@ describe('RepoWorkspaceContent', () => {
     const branchName = 'feature/terminal-pending-empty-strip'
     const seededRepo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
+      branchSnapshots: [createBranchSnapshot(branchName, { worktree: { path: worktreePath } })],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { [branchName]: [] },
@@ -1021,7 +1020,7 @@ describe('RepoWorkspaceContent', () => {
     const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/terminal-loading', { worktree: { path: worktreePath } })],
+      branchSnapshots: [createBranchSnapshot('feature/terminal-loading', { worktree: { path: worktreePath } })],
       currentBranchName: 'feature/terminal-loading',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-loading': [staticEntry('status')] },
@@ -1063,7 +1062,7 @@ describe('RepoWorkspaceContent', () => {
     const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/terminal-reordered', { worktree: { path: worktreePath } })],
+      branchSnapshots: [createBranchSnapshot('feature/terminal-reordered', { worktree: { path: worktreePath } })],
       currentBranchName: 'feature/terminal-reordered',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
@@ -1123,7 +1122,7 @@ describe('RepoWorkspaceContent', () => {
     })
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
+      branchSnapshots: [createBranchSnapshot(branchName, { worktree: { path: worktreePath } })],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: { [branchName]: [staticEntry('files'), staticEntry('status')] },
@@ -1248,7 +1247,7 @@ describe('RepoWorkspaceContent', () => {
   test('falls back to status when a branch preference names a closed tab', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/a'), createRepoBranch('feature/b')],
+      branchSnapshots: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
       currentBranchName: 'feature/b',
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: {
@@ -1307,7 +1306,7 @@ describe('RepoWorkspaceContent', () => {
     ])
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/history')],
+      branchSnapshots: [createBranchSnapshot('feature/history')],
       currentBranchName: 'feature/history',
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
@@ -1356,7 +1355,7 @@ describe('RepoWorkspaceContent', () => {
   test('labels worktree history panels with the static tab id', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/history', { worktree: { path: '/tmp/history-worktree' } })],
+      branchSnapshots: [createBranchSnapshot('feature/history', { worktree: { path: '/tmp/history-worktree' } })],
       currentBranchName: 'feature/history',
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
@@ -1379,7 +1378,7 @@ describe('RepoWorkspaceContent', () => {
     repoClientMocks.getRepoLog.mockRejectedValue(new Error('error.failed-read-repo'))
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/history')],
+      branchSnapshots: [createBranchSnapshot('feature/history')],
       currentBranchName: 'feature/history',
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/history': [staticEntry('history')] },

@@ -58,7 +58,7 @@ describe('repo-tree trash write layer', () => {
   })
 
   test('moves a local worktree file to the system trash', async () => {
-    const result = await trashRepositoryFile('/tmp/repo', '/tmp/repo-feature', 'src/index.ts')
+    const result = await trashRepositoryFile('goblin+file:///tmp/repo', '/tmp/repo-feature', 'src/index.ts')
 
     expect(result).toEqual({ ok: true, message: 'ok', repositoryStateChanged: true })
     expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false, signal: undefined })
@@ -67,7 +67,7 @@ describe('repo-tree trash write layer', () => {
   })
 
   test('rejects an unknown local worktree before touching the file', async () => {
-    const result = await trashRepositoryFile('/tmp/repo', '/tmp/outside', 'src/index.ts')
+    const result = await trashRepositoryFile('goblin+file:///tmp/repo', '/tmp/outside', 'src/index.ts')
 
     expect(result).toEqual({ ok: false, message: 'error.invalid-worktree-path' })
     expect(mocks.lstat).not.toHaveBeenCalled()
@@ -77,7 +77,7 @@ describe('repo-tree trash write layer', () => {
   test('rejects directories', async () => {
     mocks.lstat.mockResolvedValueOnce({ isDirectory: () => true })
 
-    const result = await trashRepositoryFile('/tmp/repo', '/tmp/repo-feature', 'src')
+    const result = await trashRepositoryFile('goblin+file:///tmp/repo', '/tmp/repo-feature', 'src')
 
     expect(result).toEqual({ ok: false, message: 'error.filetree-delete-directory-unsupported' })
     expect(mocks.movePathToTrash).not.toHaveBeenCalled()

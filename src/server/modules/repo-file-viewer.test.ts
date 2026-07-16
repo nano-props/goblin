@@ -67,7 +67,7 @@ describe('repo file viewer read layer', () => {
     mocks.userShellCommandExists.mockResolvedValueOnce(true)
 
     try {
-      const result = await getRepositoryFileViewer('/tmp/repo', '/tmp/repo-feature')
+      const result = await getRepositoryFileViewer('goblin+file:///tmp/repo', '/tmp/repo-feature')
 
       expect(result).toEqual({ viewer: 'bat', shell: 'posix' })
       expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false, signal: undefined })
@@ -82,7 +82,7 @@ describe('repo file viewer read layer', () => {
     mocks.userShellCommandExists.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
 
     try {
-      const result = await getRepositoryFileViewer('/tmp/repo', '/tmp/repo-feature')
+      const result = await getRepositoryFileViewer('goblin+file:///tmp/repo', '/tmp/repo-feature')
 
       expect(result).toEqual({ viewer: 'batcat', shell: 'posix' })
       expect(mocks.userShellCommandExists).toHaveBeenNthCalledWith(1, 'bat', '/tmp/repo-feature', undefined)
@@ -97,7 +97,7 @@ describe('repo file viewer read layer', () => {
     mocks.userShellCommandExists.mockResolvedValueOnce(false).mockResolvedValueOnce(false)
 
     try {
-      await expect(getRepositoryFileViewer('/tmp/repo', '/tmp/repo-feature')).resolves.toEqual({
+      await expect(getRepositoryFileViewer('goblin+file:///tmp/repo', '/tmp/repo-feature')).resolves.toEqual({
         viewer: 'cat',
         shell: 'posix',
       })
@@ -110,7 +110,9 @@ describe('repo file viewer read layer', () => {
     const platformSpy = mockPlatform('linux')
 
     try {
-      await expect(getRepositoryFileViewer('/tmp/repo', '/tmp/outside')).rejects.toThrow('unknown worktree path')
+      await expect(getRepositoryFileViewer('goblin+file:///tmp/repo', '/tmp/outside')).rejects.toThrow(
+        'unknown worktree path',
+      )
 
       expect(mocks.userShellCommandExists).not.toHaveBeenCalled()
     } finally {

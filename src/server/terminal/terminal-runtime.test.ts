@@ -47,6 +47,19 @@ const TEST_NOW = new Date('2026-06-24T00:00:00Z')
 const DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 const HEARTBEAT_SILENCE_MS = HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS
 
+function workspacePaneTabsListInput(workspaceRuntimeId: string) {
+  return { workspaceId: REPO_ROOT, workspaceRuntimeId }
+}
+
+function workspacePaneWorktreeTarget(workspaceRuntimeId: string) {
+  return {
+    kind: 'git-worktree' as const,
+    workspaceId: REPO_ROOT,
+    workspaceRuntimeId,
+    root: 'goblin+file:///repo-linked',
+  }
+}
+
 vi.mock('#/system/git/worktrees.ts', () => ({
   getWorktrees: vi.fn(async () => [{ path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false }]),
 }))
@@ -863,7 +876,7 @@ describe('server terminal runtime', () => {
         host,
         socket,
         WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        workspacePaneTabsListInput(REPO_RUNTIME_ID),
         'req_list_after_exit',
       ),
     ).resolves.toMatchObject({ entries: [] })
@@ -912,7 +925,7 @@ describe('server terminal runtime', () => {
         host,
         socket,
         WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        workspacePaneTabsListInput(REPO_RUNTIME_ID),
         'req_list_after_prune',
       ),
     ).resolves.toMatchObject({ entries: [] })
@@ -943,10 +956,8 @@ describe('server terminal runtime', () => {
         socket,
         WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
         {
-          repoRoot: REPO_ROOT,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branchName: 'feature',
-          worktreePath: '/repo-linked',
+          ...workspacePaneTabsListInput(REPO_RUNTIME_ID),
+          target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
           tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
         },
         'req_replace_workspace_tabs',
@@ -976,7 +987,7 @@ describe('server terminal runtime', () => {
         type: 'request',
         requestId: 'req_list_workspace_tabs',
         action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-        input: { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        input: workspacePaneTabsListInput(REPO_RUNTIME_ID),
       }),
     )
 
@@ -997,9 +1008,7 @@ describe('server terminal runtime', () => {
         revision: expect.any(Number),
         entries: [
           {
-            repoRoot: REPO_ROOT,
-            branchName: 'feature',
-            worktreePath: '/repo-linked',
+            target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
             tabs: [
               { type: 'status', tabId: 'workspace-pane:status' },
               { type: 'terminal', runtimeSessionId: created.terminalSessionId },
@@ -1024,14 +1033,14 @@ describe('server terminal runtime', () => {
       host,
       socketA,
       WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      workspacePaneTabsListInput(REPO_RUNTIME_ID),
       'req_list_user_a',
     )
     await requestWorkspacePaneTabs(
       host,
       socketB,
       WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-      { repoRoot: REPO_ROOT, repoRuntimeId: USER_2_REPO_RUNTIME_ID },
+      workspacePaneTabsListInput(USER_2_REPO_RUNTIME_ID),
       'req_list_user_b',
       { clientId: 'client_b', userId: USER_2 },
     )
@@ -1043,10 +1052,8 @@ describe('server terminal runtime', () => {
       socketA,
       WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
       {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: 'feature',
-        worktreePath: '/repo-linked',
+        ...workspacePaneTabsListInput(REPO_RUNTIME_ID),
+        target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
         operation: { type: 'open-static', tabType: 'history' },
       },
       'req_update_user_a',
@@ -1167,10 +1174,8 @@ describe('server terminal runtime', () => {
         socket,
         WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
         {
-          repoRoot: REPO_ROOT,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branchName: 'feature',
-          worktreePath: '/repo-linked',
+          ...workspacePaneTabsListInput(REPO_RUNTIME_ID),
+          target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
           operation: { type: 'open-static', tabType: 'history' },
         },
         'req_update_before_repo_close',
@@ -1208,14 +1213,13 @@ describe('server terminal runtime', () => {
         host,
         socket,
         WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-        { repoRoot: REPO_ROOT, repoRuntimeId: nextRepoRuntimeId },
+        workspacePaneTabsListInput(nextRepoRuntimeId),
         'req_list_after_repo_reopen',
       ),
     ).resolves.toMatchObject({
       entries: [
         {
-          branchName: 'feature',
-          worktreePath: '/repo-linked',
+          target: workspacePaneWorktreeTarget(nextRepoRuntimeId),
           tabs: [
             { type: 'status', tabId: 'workspace-pane:status' },
             { type: 'history', tabId: 'workspace-pane:history' },
@@ -1991,7 +1995,7 @@ describe('server terminal runtime', () => {
         host,
         socket2,
         WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        workspacePaneTabsListInput(REPO_RUNTIME_ID),
         'req_list_after_detached_ttl',
       ),
     ).resolves.toMatchObject({ entries: [] })

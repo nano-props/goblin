@@ -758,17 +758,18 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           const target = input ? workspacePaneTabsTargetFromRuntime(input.target) : null
           return {
             revision: 1,
-            entries: input && target
-              ? [
-                  {
-                    target: input.target,
-                    tabs: defaultWorkspacePaneTabsOperationResult(
-                      input,
-                      readWorkspacePaneTabsForTarget({ ...target, repoRuntimeId: input.workspaceRuntimeId }),
-                    ),
-                  },
-                ]
-              : [],
+            entries:
+              input && target
+                ? [
+                    {
+                      target: input.target,
+                      tabs: defaultWorkspacePaneTabsOperationResult(
+                        input,
+                        readWorkspacePaneTabsForTarget({ ...target, repoRuntimeId: input.workspaceRuntimeId }),
+                      ),
+                    },
+                  ]
+                : [],
           }
         }
         case 'workspacePaneTabs.list':
@@ -1230,7 +1231,9 @@ export function seedRepoWithReadModelForTest(options: {
           [workspacePaneTabsTargetIdentityKey({
             repoRoot: options.id,
             branchName: currentBranchName,
-            worktreePath: branches.find((branch) => branch.name === currentBranchName)?.worktree?.path ?? null,
+            worktreePath:
+              branchesWithSnapshotWorktreeMetadata.find((branch) => branch.name === currentBranchName)?.worktree
+                ?.path ?? null,
           })]: options.preferredWorkspacePaneTab,
         }
       : undefined)
@@ -1248,7 +1251,7 @@ export function seedRepoWithReadModelForTest(options: {
     status,
   })
   for (const [branchName, tabs] of Object.entries(options.workspacePaneTabsByBranch ?? {})) {
-    const branch = branches.find((candidate) => candidate.name === branchName)
+    const branch = branchesWithSnapshotWorktreeMetadata.find((candidate) => candidate.name === branchName)
     if (!branch) continue
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: options.id,

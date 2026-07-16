@@ -4,13 +4,10 @@ import type { WorktreeInfo } from '#/shared/git-types.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { remoteRuntimeAwareGitRunner, resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
-import {
-  remoteCommandExists,
-  remoteCommandExistsAtWorkspaceRoot,
-  resolveRemoteWorktree,
-} from '#/system/ssh/git.ts'
+import { remoteCommandExists, remoteCommandExistsAtWorkspaceRoot, resolveRemoteWorktree } from '#/system/ssh/git.ts'
 import { userShellCommandExists } from '#/system/user-shell.ts'
 import { resolveWorkspaceScopedPath } from '#/server/modules/workspace-path.ts'
+import { parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const BAT_VIEWERS = ['bat', 'batcat'] as const
 const POSIX_CAT_VIEWER: RepoFileViewerResult = { viewer: 'cat', shell: 'posix' }
@@ -54,7 +51,9 @@ export async function getRepositoryFileViewer(
   }
 
   if (!workspacePath) {
-    const worktrees = await getWorktrees(cwd, { includeStatus: false, signal })
+    const locator = parseWorkspaceLocator(cwd, process.platform === 'win32' ? 'win32' : 'posix')
+    if (!locator || locator.transport !== 'file') throw new Error('error.workspace-locator-malformed')
+    const worktrees = await getWorktrees(locator.path, { includeStatus: false, signal })
     if (!matchesKnownWorktree(worktrees, executionPath)) throw new Error('unknown worktree path')
   }
 

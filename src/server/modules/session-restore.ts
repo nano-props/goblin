@@ -16,19 +16,22 @@ import {
   type WorkspaceSessionEntry,
 } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
-import { probeRepo, readRepoProjection } from '#/server/modules/repo-read-paths.ts'
+import { readRepoProjection } from '#/server/modules/repo-read-paths.ts'
 import {
   acquireRepoRuntimeLease,
+  commitWorkspaceProbeState,
   releaseRepoRuntimeMembershipLease,
+  workspaceProbeStateForRuntime,
   type RepoRuntimeMembershipLeaseEntry,
 } from '#/server/modules/repo-runtimes.ts'
+import { probeWorkspace } from '#/server/modules/workspace-probe.ts'
+import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
+import { parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
 import { compareAndReplaceServerWorkspaceRepos, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
-import {
-  projectWorkspacePaneTabsWithMembershipGuard,
-} from '#/server/modules/workspace-pane-tabs-restore.ts'
+import { projectWorkspacePaneTabsWithMembershipGuard } from '#/server/modules/workspace-pane-tabs-restore.ts'
 
 export interface RestoreServerWorkspaceInput {
   userId: string
@@ -148,11 +151,13 @@ async function restoreServerWorkspaceSnapshot(
 
   // Only the active repo's tabs are validated and restored at startup.
   // Non-active repos carry `projection: null` and are restored lazily.
-  const openedActive = opened.filter(isOpenedProjectedRepo)
+  const openedForLayoutRestore = opened.filter(
+    (repo) => isOpenedProjectedRepo(repo) || conclusivePlainWorkspace(repo.workspaceProbe),
+  )
   const expectedMembership = membership.workspace.openWorkspaceEntries
   const projectedTabs = await projectWorkspacePaneTabsWithMembershipGuard({
     restoreInput: input,
-    repos: openedActive,
+    repos: openedForLayoutRestore,
     confirmMembership: async () => await compareAndReplaceServerWorkspaceRepos(expectedMembership, expectedMembership),
     membershipPolicy: 'confirm-after-restore',
   })
@@ -177,6 +182,10 @@ async function restoreServerWorkspaceSnapshot(
   }
 }
 
+function conclusivePlainWorkspace(probe: WorkspaceProbeState): boolean {
+  return probe.status === 'ready' && probe.capabilities.git.status === 'unavailable' && probe.diagnostics.length === 0
+}
+
 function reconcileOpenedRepoMemberships(
   input: RestoreServerWorkspaceInput,
   entries: readonly WorkspaceSessionEntry[],
@@ -197,38 +206,34 @@ async function openWorkspaceRepo(
   options: { active: boolean },
 ): Promise<OpenWorkspaceRepoResult> {
   input.signal?.throwIfAborted()
+  if (!parseWorkspaceLocator(entry.id, serverLocatorPlatform())) return { kind: 'invalid' }
   if (entry.kind === 'remote') return await openRemoteWorkspaceRepo(input, entry, options)
-  const probe = await probeRepo(entry.id)
-  if (!probe.ok || !probe.root) {
-    const lease = acquireRepoRuntimeLease(input.userId, entry.id, input.clientId)
-    return {
-      kind: 'opened',
-      opened: stubWorkspaceRepo({
-        entry,
+  return await withAcquiredWorkspaceRepoLease(input, entry.id, async (lease) => {
+    const probe = await probeWorkspace(entry.id, serverLocatorPlatform(), { signal: input.signal })
+    if (
+      !commitWorkspaceProbeState({
+        userId: input.userId,
         repoRoot: entry.id,
-        name: workspaceRepoDisplayName(entry.id),
-        lease,
-      }),
+        repoRuntimeId: lease.repoRuntimeId,
+        probe,
+      })
+    ) {
+      throw new Error('workspace runtime was superseded during restore')
     }
-  }
-  if (probe.root !== entry.id) return { kind: 'invalid' }
-  const repoRoot = probe.root
-  return await withAcquiredWorkspaceRepoLease(input, repoRoot, async (lease) => {
-    if (!options.active) {
-      // Stub path: validated lease only. No projection read or pane-tab restore.
-      // Persisted local entries must already be canonical; this branch refuses to
-      // migrate non-canonical paths and lets workspace repair clean them.
+    const name = probe.status === 'ready' ? probe.name : workspaceRepoDisplayName(entry.id)
+    if (probe.status !== 'ready' || probe.capabilities.git.status === 'unavailable' || !options.active) {
       return {
         kind: 'opened',
         opened: stubWorkspaceRepo({
-          entry: { kind: 'local', id: repoRoot },
-          repoRoot,
-          name: probe.name ?? workspaceRepoDisplayName(repoRoot),
+          entry,
+          repoRoot: entry.id,
+          name,
+          workspaceProbe: probe,
           lease,
         }),
       }
     }
-    const projection = await readRepoProjection(repoRoot, {
+    const projection = await readRepoProjection(entry.id, {
       repoRuntimeId: lease.repoRuntimeId,
       signal: input.signal,
       mode: 'full',
@@ -237,9 +242,10 @@ async function openWorkspaceRepo(
       return {
         kind: 'opened',
         opened: stubWorkspaceRepo({
-          entry: { kind: 'local', id: repoRoot },
-          repoRoot,
-          name: probe.name ?? workspaceRepoDisplayName(repoRoot),
+          entry,
+          repoRoot: entry.id,
+          name,
+          workspaceProbe: probe,
           lease,
         }),
       }
@@ -247,9 +253,10 @@ async function openWorkspaceRepo(
     return {
       kind: 'opened',
       opened: projectedWorkspaceRepo({
-        entry: { kind: 'local', id: repoRoot },
-        repoRoot,
-        name: probe.name ?? workspaceRepoDisplayName(repoRoot),
+        entry,
+        repoRoot: entry.id,
+        name,
+        workspaceProbe: probe,
         projection,
         lease,
       }),
@@ -263,13 +270,6 @@ async function openRemoteWorkspaceRepo(
   options: { active: boolean },
 ): Promise<OpenWorkspaceRepoResult> {
   return await withAcquiredWorkspaceRepoLease(input, entry.id, async (lease) => {
-    if (!options.active) {
-      // Stub path for remote repos: still need a name but no lifecycle / projection.
-      return {
-        kind: 'opened',
-        opened: stubWorkspaceRepo({ entry, repoRoot: entry.id, name: entry.ref.displayName, lease }),
-      }
-    }
     const lifecycle = await abortableWorkspaceRestore(
       runRemoteLifecycleWrite({
         userId: input.userId,
@@ -283,10 +283,34 @@ async function openRemoteWorkspaceRepo(
       if (lifecycle.kind === 'settled') {
         return {
           kind: 'opened',
-          opened: stubWorkspaceRepo({ entry, repoRoot: entry.id, name: lifecycle.name, lease }),
+          opened: stubWorkspaceRepo({
+            entry,
+            repoRoot: entry.id,
+            name: lifecycle.name,
+            workspaceProbe: requiredWorkspaceProbe(input.userId, entry.id, lease.repoRuntimeId),
+            lease,
+          }),
         }
       }
       throw new Error('workspace repo runtime was superseded during restore')
+    }
+    const workspaceProbe = requiredWorkspaceProbe(input.userId, entry.id, lease.repoRuntimeId)
+    if (
+      workspaceProbe.status !== 'ready' ||
+      workspaceProbe.capabilities.git.status === 'unavailable' ||
+      !options.active
+    ) {
+      return {
+        kind: 'opened',
+        opened: stubWorkspaceRepo({
+          entry,
+          repoRoot: entry.id,
+          name: lifecycle.name,
+          target: lifecycle.lifecycle.target,
+          workspaceProbe,
+          lease,
+        }),
+      }
     }
     const projection = await readRepoProjection(entry.id, {
       repoRuntimeId: lease.repoRuntimeId,
@@ -301,6 +325,7 @@ async function openRemoteWorkspaceRepo(
           repoRoot: entry.id,
           name: lifecycle.name,
           target: lifecycle.lifecycle.target,
+          workspaceProbe,
           lease,
         }),
       }
@@ -312,6 +337,7 @@ async function openRemoteWorkspaceRepo(
         repoRoot: entry.id,
         name: lifecycle.name,
         target: lifecycle.lifecycle.target,
+        workspaceProbe,
         projection,
         lease,
       }),
@@ -338,7 +364,18 @@ interface OpenedWorkspaceRepoInput {
   repoRoot: string
   name: string
   target?: RemoteRepoTarget
+  workspaceProbe: WorkspaceProbeState
   lease: RepoRuntimeMembershipLeaseEntry
+}
+
+function requiredWorkspaceProbe(userId: string, repoRoot: string, repoRuntimeId: string): WorkspaceProbeState {
+  const probe = workspaceProbeStateForRuntime(userId, repoRoot, repoRuntimeId)
+  if (!probe) throw new Error('workspace runtime was superseded during restore')
+  return probe
+}
+
+function serverLocatorPlatform(): 'posix' | 'win32' {
+  return process.platform === 'win32' ? 'win32' : 'posix'
 }
 
 function stubWorkspaceRepo(input: OpenedWorkspaceRepoInput): OpenedWorkspaceRepo {

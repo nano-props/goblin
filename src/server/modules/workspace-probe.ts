@@ -9,6 +9,7 @@ import {
   type WorkspaceUnavailableReason,
 } from '#/shared/workspace-runtime.ts'
 import { resolveServerRemoteRepoConnection } from '#/server/modules/remote.ts'
+import { parseGitHubRemoteUrl } from '#/system/github/graphql.ts'
 
 export interface LocalWorkspaceProbeDependencies {
   stat(path: string): Promise<{ isDirectory(): boolean }>
@@ -147,11 +148,31 @@ async function probeGitAtWorkspaceRoot(
 async function probeLocalGitRoot(workspacePath: string, signal?: AbortSignal): Promise<LocalGitRootProbe> {
   try {
     const root = await git(workspacePath, ['rev-parse', '--show-toplevel'], { signal })
-    return { status: 'root', path: root, pullRequests: 'github' }
+    return { status: 'root', path: root, pullRequests: await localPullRequestProvider(workspacePath, signal) }
   } catch (error) {
     if (isNotRepositoryError(error)) return { status: 'not-repository' }
     return { status: 'inconclusive', diagnostic: errorMessage(error) }
   }
+}
+
+async function localPullRequestProvider(workspacePath: string, signal?: AbortSignal): Promise<'github' | 'none'> {
+  try {
+    const configured = await git(workspacePath, ['config', '--get-regexp', '^remote\\..*\\.url$'], { signal })
+    return pullRequestProviderFromGitConfig(configured)
+  } catch {
+    signal?.throwIfAborted()
+    // No matching remote config is a conclusive provider result, not a Git
+    // availability failure. Repository capability remains usable without PRs.
+    return 'none'
+  }
+}
+
+export function pullRequestProviderFromGitConfig(configured: string): 'github' | 'none' {
+  const hasGitHubRemote = configured.split('\n').some((line) => {
+    const separator = line.search(/\s/)
+    return separator >= 0 && parseGitHubRemoteUrl(line.slice(separator).trim()) !== null
+  })
+  return hasGitHubRemote ? 'github' : 'none'
 }
 
 function isNotRepositoryError(error: unknown): boolean {

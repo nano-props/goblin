@@ -46,14 +46,14 @@ describe('shared terminal validators', () => {
       isValidTerminalNotifyBellInput({
         title: 'Build finished',
         body: 'done',
-        repoRoot: '/repo',
+        repoRoot: 'goblin+file:///repo',
       }),
     ).toBe(true)
     expect(
       isValidTerminalNotifyBellInput({
         title: '',
         body: 'done',
-        repoRoot: '/repo',
+        repoRoot: 'goblin+file:///repo',
       }),
     ).toBe(false)
 
@@ -140,10 +140,14 @@ describe('shared terminal validators', () => {
         requestId: 'request_runtime_session_id',
         action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
         input: {
-          repoRoot: '/repo',
-          repoRuntimeId: 'repo-runtime-test',
-          branchName: 'main',
-          worktreePath: '/repo',
+          workspaceId: 'goblin+file:///repo',
+          workspaceRuntimeId: 'repo-runtime-test',
+          target: {
+            kind: 'git-worktree',
+            workspaceId: 'goblin+file:///repo',
+            workspaceRuntimeId: 'repo-runtime-test',
+            root: 'goblin+file:///repo',
+          },
           tabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
         },
       }),
@@ -155,10 +159,14 @@ describe('shared terminal validators', () => {
         requestId: 'request_123',
         action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
         input: {
-          repoRoot: '/repo',
-          repoRuntimeId: 'repo-runtime-test',
-          branchName: 'main',
-          worktreePath: '/repo',
+          workspaceId: 'goblin+file:///repo',
+          workspaceRuntimeId: 'repo-runtime-test',
+          target: {
+            kind: 'git-worktree',
+            workspaceId: 'goblin+file:///repo',
+            workspaceRuntimeId: 'repo-runtime-test',
+            root: 'goblin+file:///repo',
+          },
           tabs: [{ type: 'terminal', terminalSessionId: '' }],
         },
       }),
@@ -170,7 +178,7 @@ describe('shared terminal validators', () => {
         requestId: 'request_123',
         action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
         input: {
-          repoRoot: '/repo',
+          repoRoot: 'goblin+file:///repo',
           repoRuntimeId: 'repo-runtime-test',
           branchName: 'main',
           worktreePath: '/repo',
@@ -187,10 +195,14 @@ describe('shared terminal validators', () => {
         requestId: 'request_123',
         action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
         input: {
-          repoRoot: '/repo',
-          repoRuntimeId: 'repo-runtime-test',
-          branchName: 'main',
-          worktreePath: '/repo',
+          workspaceId: 'goblin+file:///repo',
+          workspaceRuntimeId: 'repo-runtime-test',
+          target: {
+            kind: 'git-worktree',
+            workspaceId: 'goblin+file:///repo',
+            workspaceRuntimeId: 'repo-runtime-test',
+            root: 'goblin+file:///repo',
+          },
           operation: { type: 'open-static', tabType: 'history' },
         },
       }),
@@ -202,7 +214,7 @@ describe('shared terminal validators', () => {
         requestId: 'request_legacy_tabs',
         action: 'update-tabs',
         input: {
-          repoRoot: '/repo',
+          repoRoot: 'goblin+file:///repo',
           repoRuntimeId: 'repo-runtime-test',
           branchName: 'main',
           worktreePath: '/repo',
@@ -217,7 +229,7 @@ describe('shared terminal validators', () => {
         requestId: 'request_124',
         action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
         input: {
-          repoRoot: '/repo',
+          repoRoot: 'goblin+file:///repo',
           repoRuntimeId: 'repo-runtime-test',
           branchName: 'main',
           worktreePath: '/repo',
@@ -235,7 +247,7 @@ describe('shared terminal validators', () => {
       input: {
         runtimeType: 'terminal',
         request: {
-          repoRoot: '/repo',
+          repoRoot: 'goblin+file:///repo',
           repoRuntimeId: 'repo-runtime-test',
           branch: 'main',
           worktreePath: '/repo/worktree',
@@ -265,7 +277,7 @@ describe('shared terminal validators', () => {
 
   test('normalizes runtime close application requests and rejects invalid session ids', () => {
     const target = {
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test',
       branchName: 'main',
       worktreePath: '/repo/worktree',
@@ -302,7 +314,7 @@ describe('shared terminal validators', () => {
         requestId: 'request_125',
         action: 'prune',
         input: {
-          repoRoot: '/repo',
+          repoRoot: 'goblin+file:///repo',
         },
       }),
     ).toBeNull()
@@ -313,7 +325,7 @@ describe('shared terminal validators', () => {
         requestId: 'request_126',
         action: 'prune',
         input: {
-          repoRoot: '/repo',
+          repoRoot: 'goblin+file:///repo',
           repoRuntimeId: 'repo-runtime-test',
         },
       }),
@@ -326,7 +338,7 @@ describe('shared terminal validators', () => {
       requestId: 'request_123',
       action: 'create',
       input: {
-        repoRoot: '/repo',
+        repoRoot: 'goblin+file:///repo',
         branch: 'main',
         worktreePath: '/repo',
         kind: 'additional',
@@ -759,7 +771,7 @@ describe('shared terminal validators', () => {
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
-        repoRoot: '/repo',
+        repoRoot: 'goblin+file:///repo',
         worktreePath: '/repo/worktree',
       }),
     ).toEqual({
@@ -767,7 +779,7 @@ describe('shared terminal validators', () => {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       worktreePath: '/repo/worktree',
     })
   })
@@ -776,17 +788,17 @@ describe('shared terminal validators', () => {
     expect(
       normalizeAppRealtimeSocketServerMessage({
         type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
-        repoRoot: '/repo',
+        repoRoot: 'goblin+file:///repo',
       }),
     ).toEqual({
       type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
     })
 
     expect(
       normalizeAppRealtimeSocketServerMessage({
         type: 'workspace-tabs-changed',
-        repoRoot: '/repo',
+        repoRoot: 'goblin+file:///repo',
       }),
     ).toBeNull()
   })
@@ -801,7 +813,7 @@ describe('terminal runtime generation validation', () => {
         terminalRuntimeSessionId: 'pty_generation_validation',
         terminalSessionId: 'term-generation-validation',
         terminalRuntimeGeneration: 0,
-        repoRoot: '/repo',
+        repoRoot: 'goblin+file:///repo',
         repoRuntimeId: 'repo-runtime-validation',
       },
     }

@@ -571,6 +571,16 @@ function restoredRuntimeForWorkspace(
       repoRoot: entry.id,
       repoRuntimeId: `repo-runtime-${entry.id}`,
       name: entry.id.split('/').pop() || entry.id,
+      workspaceProbe: {
+        status: 'ready',
+        name: entry.id.split('/').pop() || entry.id,
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        },
+        diagnostics: [],
+      },
       projection: {
         snapshot: {
           current: 'main',

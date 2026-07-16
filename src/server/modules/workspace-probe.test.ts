@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   probeLocalWorkspace,
+  pullRequestProviderFromGitConfig,
   type LocalGitRootProbe,
   type LocalWorkspaceProbeDependencies,
 } from '#/server/modules/workspace-probe.ts'
@@ -23,6 +24,16 @@ function dependencies(
 }
 
 describe('workspace probe', () => {
+  it('derives pull request capability only from configured GitHub remotes', () => {
+    expect(
+      pullRequestProviderFromGitConfig(
+        'remote.origin.url https://example.test/team/repo.git\nremote.review.url git@github.com:example/repo.git',
+      ),
+    ).toBe('github')
+    expect(pullRequestProviderFromGitConfig('remote.origin.url ssh://git@example.test/team/repo.git')).toBe('none')
+    expect(pullRequestProviderFromGitConfig('')).toBe('none')
+  })
+
   it('opens a readable non-Git directory with files and terminal capabilities', async () => {
     const result = await probeLocalWorkspace('goblin+file:///workspace', 'posix', {
       dependencies: dependencies(gitProbe({ status: 'not-repository' })),

@@ -475,6 +475,7 @@ export function createRepoRoutes(options: {
         diagnostics: probe.diagnostics,
       })
     }
+    assertCanonicalWorkspaceId(input.repoRoot)
     const repoRuntimeId = acquireRepoRuntime(userId, input.repoRoot, input.clientId)
     return c.json({ ok: true as const, repoRuntimeId })
   })
@@ -488,6 +489,7 @@ export function createRepoRoutes(options: {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
     const { clientId, repoRoots } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeReconcile, c)
+    for (const repoRoot of repoRoots) assertCanonicalWorkspaceId(repoRoot)
     const runtimes = replaceRepoRuntimeMembershipsForClient(userId, clientId, repoRoots)
     return c.json({ runtimes })
   })
@@ -516,6 +518,12 @@ function gitBecameUnavailable(before: WorkspaceProbeState, after: WorkspaceSettl
 
 function serverLocatorPlatform(): WorkspaceLocatorPlatform {
   return process.platform === 'win32' ? 'win32' : 'posix'
+}
+
+function assertCanonicalWorkspaceId(value: string): void {
+  if (!parseWorkspaceLocator(value, serverLocatorPlatform())) {
+    throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-locator-malformed' })
+  }
 }
 
 function workspaceLocatorFromCommandInput(input: string, platform: WorkspaceLocatorPlatform): string | null {

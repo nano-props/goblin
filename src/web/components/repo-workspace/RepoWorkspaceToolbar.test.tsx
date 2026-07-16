@@ -45,7 +45,7 @@ import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import {
-  createRepoBranch,
+  createBranchSnapshot,
   installWorkspacePaneTabsTestBridge,
   resetReposStore,
   seedRepoWithReadModelForTest,
@@ -119,7 +119,7 @@ vi.mock('sonner', () => ({
   },
 }))
 
-const REPO_ID = '/tmp/goblin-repo-workspace-toolbar-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-repo-workspace-toolbar-repo'
 const WORKTREE_PATH = '/tmp/goblin-repo-workspace-toolbar-worktree'
 compactUi = false
 
@@ -448,7 +448,7 @@ describe('RepoWorkspaceToolbar', () => {
     const nextWorktreePath = '/tmp/goblin-repo-workspace-toolbar-worktree-next'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
     })
     const branchActions = menuBranchActions()
 
@@ -465,7 +465,7 @@ describe('RepoWorkspaceToolbar', () => {
       >
         <WorkspaceOpenExternallyMenu
           repo={repoWorkspaceRepo(repo)}
-          branch={createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })}
+          branch={createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })}
           branchActions={branchActions}
         />
       </QueryClientProvider>,
@@ -486,7 +486,7 @@ describe('RepoWorkspaceToolbar', () => {
       >
         <WorkspaceOpenExternallyMenu
           repo={repoWorkspaceRepo(repo)}
-          branch={createRepoBranch('feature/worktree', { worktree: { path: nextWorktreePath } })}
+          branch={createBranchSnapshot('feature/worktree', { worktree: { path: nextWorktreePath } })}
           branchActions={branchActions}
         />
       </QueryClientProvider>,
@@ -1272,11 +1272,14 @@ function renderToolbar(options: {
   }
 } {
   const branchName = options.worktree === false ? 'feature/no-worktree' : 'feature/worktree'
-  const branch = createRepoBranch(branchName, options.worktree === false ? {} : { worktree: { path: WORKTREE_PATH } })
+  const branch = createBranchSnapshot(
+    branchName,
+    options.worktree === false ? {} : { worktree: { path: WORKTREE_PATH } },
+  )
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
     repoRuntimeId: options.repoRuntimeId,
-    branches: [branch],
+    branchSnapshots: [branch],
     currentBranchName: branchName,
     preferredWorkspacePaneTab: options.preferredWorkspacePaneTab ?? 'status',
     workspacePaneTabsByBranch:

@@ -14,7 +14,7 @@ import {
   useWorkspacePaneTabDragPreview,
 } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
 
-const REPO_ROOT = '/tmp/workspace-pane-tab-drag-preview-repo'
+const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-tab-drag-preview-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 const NEXT_REPO_RUNTIME_ID = 'repo-runtime-next'
 const BRANCH_NAME = 'feature/worktree'
@@ -96,7 +96,9 @@ describe('useWorkspacePaneTabDragPreview', () => {
       renderResult.rerender(<HookHost input={previewInput({ branchName: null, canonicalTabs: sourceTabs })} />)
     })
     act(() => {
-      expect(currentControls().stageDragPreview([staticEntry('status'), terminalEntry('term-111111111111111111111')])).toBe(false)
+      expect(
+        currentControls().stageDragPreview([staticEntry('status'), terminalEntry('term-111111111111111111111')]),
+      ).toBe(false)
     })
     expect(currentControls().visualTabs).toEqual(sourceTabs)
   })

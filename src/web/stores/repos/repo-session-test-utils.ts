@@ -1,13 +1,14 @@
-import type { WorkspaceSessionEntry, RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { normalizeRemoteRepoId, type WorkspaceSessionEntry, type RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import { resolveServerRemoteRepoConnection, type RemoteRepoConnectionDeps } from '#/server/modules/remote.ts'
 import { createBranchSnapshot, installGoblinTestBridge, resetReposStore } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { flushMicrotasks } from '#/test-utils/index.ts'
 export const REPO_A = 'goblin+file:///tmp/goblin-lifecycle-a'
 export const REPO_B = 'goblin+file:///tmp/goblin-lifecycle-b'
 export const branchSnapshot = createBranchSnapshot
 
 export async function flushIpc(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve()
+  await flushMicrotasks(5)
 }
 
 export function installGoblin(overrides: Record<string, (input: any) => unknown> = {}) {
@@ -36,7 +37,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       calls.resolveTarget.push({ alias, remotePath })
       return {
         target: {
-          id: `goblin+ssh://${encodeURIComponent(alias)}${remotePath}`,
+          id: normalizeRemoteRepoId({ alias, remotePath }),
           alias,
           host: alias === 'example' ? 'example.com' : `${alias}.example.com`,
           user: 'alice',

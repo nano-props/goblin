@@ -16,12 +16,18 @@ const mocks = vi.hoisted(() => ({
   probeRepo: vi.fn(),
   readRepoProjection: vi.fn(),
   runRemoteLifecycleWrite: vi.fn(),
+  workspaceProbes: new Map<string, unknown>(),
 }))
 
 vi.mock('#/server/modules/repo-runtimes.ts', () => ({
   acquireRepoRuntimeLease: mocks.acquireRepoRuntimeLease,
   releaseRepoRuntimeMembershipLease: mocks.releaseRepoRuntimeMembershipLease,
   isCurrentRepoRuntimeMembership: mocks.isCurrentRepoRuntimeMembership,
+  commitWorkspaceProbeState: vi.fn((input) => {
+    mocks.workspaceProbes.set(input.repoRoot, input.probe)
+    return true
+  }),
+  workspaceProbeStateForRuntime: vi.fn((_userId, repoRoot) => mocks.workspaceProbes.get(repoRoot) ?? gitProbe()),
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
@@ -31,8 +37,13 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
-  probeRepo: mocks.probeRepo,
   readRepoProjection: mocks.readRepoProjection,
+}))
+
+vi.mock('#/server/modules/workspace-probe.ts', () => ({
+  probeWorkspace: vi.fn(async (repoRoot: string) =>
+    workspaceProbeFromLegacy(repoRoot, await mocks.probeRepo(repoRoot)),
+  ),
 }))
 
 vi.mock('#/server/modules/remote-lifecycle-write-paths.ts', () => ({
@@ -42,6 +53,7 @@ vi.mock('#/server/modules/remote-lifecycle-write-paths.ts', () => ({
 describe('restoreServerWorkspace', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    mocks.workspaceProbes.clear()
     mocks.acquireRepoRuntimeLease.mockImplementation((_userId: string, repoRoot: string) => ({
       repoRoot,
       repoRuntimeId: 'repo-runtime-test',
@@ -76,12 +88,16 @@ describe('restoreServerWorkspace', () => {
   })
 
   test('restores server-owned workspace tabs only after strict validation succeeds', async () => {
-    const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
+    const targetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: 'goblin+file:///repo',
+      branchName: 'main',
+      worktreePath: null,
+    })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
       workspacePaneTabsByTargetByWorkspace: {
-        '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
+        'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
@@ -105,18 +121,23 @@ describe('restoreServerWorkspace', () => {
 
     expect(result.status).toBe('restored')
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
-      repoRoot: '/repo',
-      repoRuntimeId: 'repo-runtime-test',
-      expectedRepoEntry: { kind: 'local', id: '/repo' },
-      targets: [{ repoRoot: '/repo', branchName: 'main', worktreePath: '/repo' }],
+      workspaceId: 'goblin+file:///repo',
+      workspaceRuntimeId: 'repo-runtime-test',
+      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      targets: [{ kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
     expect(result.runtime).toMatchObject({
-      restoredRepoId: '/repo',
+      restoredRepoId: 'goblin+file:///repo',
       repos: [
-        { entry: { kind: 'local', id: '/repo' }, repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', name: 'repo' },
+        {
+          entry: { kind: 'local', id: 'goblin+file:///repo' },
+          repoRoot: 'goblin+file:///repo',
+          repoRuntimeId: 'repo-runtime-test',
+          name: 'repo',
+        },
       ],
       workspacePaneTabs: [
-        { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', snapshot: { revision: 1, entries: [] } },
+        { repoRoot: 'goblin+file:///repo', repoRuntimeId: 'repo-runtime-test', snapshot: { revision: 1, entries: [] } },
       ],
     })
   })
@@ -124,7 +145,7 @@ describe('restoreServerWorkspace', () => {
   test('repairs instead of migrating non-canonical local workspace entries', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: '/repo/src' }],
+      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo/src' }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.probeRepo.mockResolvedValue({ ok: true, root: '/repo', name: 'repo' })
@@ -146,18 +167,30 @@ describe('restoreServerWorkspace', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.status).toBe('repaired')
-    expect(result.openWorkspaceEntries).toEqual([])
-    expect(result.runtime.repos).toEqual([])
+    expect(result.status).toBe('restored')
+    expect(result.openWorkspaceEntries).toEqual(workspace.openWorkspaceEntries)
+    expect(result.runtime.repos).toEqual([
+      expect.objectContaining({
+        repoRoot: 'goblin+file:///repo/src',
+        projection: null,
+        workspaceProbe: expect.objectContaining({
+          capabilities: expect.objectContaining({ git: { status: 'unavailable' } }),
+        }),
+      }),
+    ])
   })
 
   test('validates and projects workspace tabs into a canonical snapshot', async () => {
-    const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
+    const targetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: 'goblin+file:///repo',
+      branchName: 'main',
+      worktreePath: null,
+    })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
       workspacePaneTabsByTargetByWorkspace: {
-        '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
+        'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
@@ -182,20 +215,20 @@ describe('restoreServerWorkspace', () => {
     expect(result.status).toBe('repaired')
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
-      repoRoot: '/repo',
-      repoRuntimeId: 'repo-runtime-test',
-      expectedRepoEntry: { kind: 'local', id: '/repo' },
-      targets: [{ repoRoot: '/repo', branchName: 'main', worktreePath: '/repo' }],
+      workspaceId: 'goblin+file:///repo',
+      workspaceRuntimeId: 'repo-runtime-test',
+      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      targets: [{ kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
     expect(result.runtime.workspacePaneTabs).toEqual([
-      { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', snapshot: { revision: 3, entries: [] } },
+      { repoRoot: 'goblin+file:///repo', repoRuntimeId: 'repo-runtime-test', snapshot: { revision: 3, entries: [] } },
     ])
   })
 
   test('keeps a canonical active local repo as a stub when projection is temporarily unavailable', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
@@ -220,13 +253,17 @@ describe('restoreServerWorkspace', () => {
     expect(result.status).toBe('restored')
     expect(result.openWorkspaceEntries).toEqual(workspace.openWorkspaceEntries)
     expect(result.runtime.repos).toEqual([
-      expect.objectContaining({ repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', projection: null }),
+      expect.objectContaining({
+        repoRoot: 'goblin+file:///repo',
+        repoRuntimeId: 'repo-runtime-test',
+        projection: null,
+      }),
     ])
     expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 
   test('keeps a local repo declaration as a stub when its path is temporarily unavailable', async () => {
-    const entry = { kind: 'local' as const, id: '/repo' }
+    const entry = { kind: 'local' as const, id: 'goblin+file:///repo' }
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [entry],
@@ -244,7 +281,12 @@ describe('restoreServerWorkspace', () => {
     expect(result.status).toBe('restored')
     expect(result.openWorkspaceEntries).toEqual([entry])
     expect(result.runtime.repos).toEqual([
-      expect.objectContaining({ entry, repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', projection: null }),
+      expect.objectContaining({
+        entry,
+        repoRoot: 'goblin+file:///repo',
+        repoRuntimeId: 'repo-runtime-test',
+        projection: null,
+      }),
     ])
     expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
   })
@@ -295,12 +337,16 @@ describe('restoreServerWorkspace', () => {
   })
 
   test('releases opened runtimes when workspace tab commit fails unexpectedly', async () => {
-    const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
+    const targetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: 'goblin+file:///repo',
+      branchName: 'main',
+      worktreePath: null,
+    })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
       workspacePaneTabsByTargetByWorkspace: {
-        '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
+        'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
@@ -324,19 +370,23 @@ describe('restoreServerWorkspace', () => {
     ).rejects.toBe(commitError)
 
     expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test',
       generation: 1,
     })
   })
 
   test('releases opened runtimes and skips tab commits when aborted after projection restore', async () => {
-    const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
+    const targetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: 'goblin+file:///repo',
+      branchName: 'main',
+      worktreePath: null,
+    })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
       workspacePaneTabsByTargetByWorkspace: {
-        '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
+        'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
     const controller = new AbortController()
@@ -376,7 +426,7 @@ describe('restoreServerWorkspace', () => {
 
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
     expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test',
       generation: 1,
     })
@@ -428,15 +478,15 @@ describe('restoreServerWorkspace', () => {
 
   test('releases opened runtimes when workspace repair persistence fails', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       branchName: 'missing',
       worktreePath: null,
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
       workspacePaneTabsByTargetByWorkspace: {
-        '/repo': { [targetKey]: [workspacePaneStaticTabEntry('files')] },
+        'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('files')] },
       },
     }
     const persistError = new Error('settings write failed')
@@ -460,7 +510,7 @@ describe('restoreServerWorkspace', () => {
     ).rejects.toBe(persistError)
 
     expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test',
       generation: 1,
     })
@@ -468,7 +518,7 @@ describe('restoreServerWorkspace', () => {
 
   test('uses concurrently repaired repo tabs without overwriting them', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       branchName: 'missing',
       worktreePath: null,
     })
@@ -479,15 +529,15 @@ describe('restoreServerWorkspace', () => {
     })
     const invalidWorkspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
       workspacePaneTabsByTargetByWorkspace: {
-        '/repo': { [targetKey]: [workspacePaneStaticTabEntry('files')] },
+        'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('files')] },
         '/other': { [otherTargetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
     const currentWorkspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
     }
     mocks.getServerWorkspaceState.mockResolvedValueOnce(invalidWorkspace).mockResolvedValueOnce(currentWorkspace)
     mocks.compareAndReplaceServerWorkspaceRepos
@@ -515,3 +565,36 @@ describe('restoreServerWorkspace', () => {
     expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 })
+
+function gitProbe() {
+  return {
+    status: 'ready' as const,
+    name: 'repo',
+    capabilities: {
+      files: { read: true as const, write: true },
+      terminal: { available: true },
+      git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+    },
+    diagnostics: [],
+  }
+}
+
+function workspaceProbeFromLegacy(
+  repoRoot: string,
+  result: { ok: boolean; root?: string; name?: string; message?: string },
+) {
+  const reportedRoot = result.root?.startsWith('goblin+')
+    ? result.root
+    : result.root
+      ? `goblin+file://${result.root}`
+      : null
+  return result.ok
+    ? reportedRoot && reportedRoot !== repoRoot
+      ? {
+          ...gitProbe(),
+          name: result.name ?? 'repo',
+          capabilities: { ...gitProbe().capabilities, git: { status: 'unavailable' as const } },
+        }
+      : { ...gitProbe(), name: result.name ?? 'repo' }
+    : { status: 'unavailable' as const, reason: 'error.workspace-transport-unavailable' as const }
+}

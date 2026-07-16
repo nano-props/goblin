@@ -1,4 +1,4 @@
-// Data-binding host for the repository picker. The picker itself owns
+// Data-binding host for the workspace picker. The picker itself owns
 // toolbar/sidebar presentation; this host only supplies repo summaries,
 // labels, and open/switch actions.
 import { useStoreWithEqualityFn } from 'zustand/traditional'

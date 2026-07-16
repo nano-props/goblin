@@ -29,7 +29,7 @@ export const zh: Record<DictKey, string> = {
   'menu.file.clone-repo': '克隆仓库…',
   'menu.file.create-worktree': '新工作树…',
   'menu.file.open-recent': '最近打开',
-  'menu.file.no-recent': '没有最近仓库',
+  'menu.file.no-recent': '没有最近工作区',
   'menu.file.clear-recent': '清除菜单',
   'menu.file.open-in-browser': '在浏览器中打开',
   'menu.file.open-data-folder': '打开数据目录',

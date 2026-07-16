@@ -7,6 +7,7 @@ import { getWorktrees } from '#/system/git/worktrees.ts'
 import { trashRemoteFile } from '#/system/ssh/git.ts'
 import { movePathToTrash } from '#/system/trash.ts'
 import { resolveWorkspaceScopedPath } from '#/server/modules/workspace-path.ts'
+import { parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 export async function trashRepositoryFile(
   cwd: string,
@@ -30,7 +31,9 @@ export async function trashRepositoryFile(
   }
 
   if (!workspacePath) {
-    const worktrees = await getWorktrees(cwd, { includeStatus: false, signal })
+    const locator = parseWorkspaceLocator(cwd, process.platform === 'win32' ? 'win32' : 'posix')
+    if (!locator || locator.transport !== 'file') return { ok: false, message: 'error.workspace-locator-malformed' }
+    const worktrees = await getWorktrees(locator.path, { includeStatus: false, signal })
     if (!matchesKnownWorktree(worktrees, executionPath)) return { ok: false, message: 'error.invalid-worktree-path' }
   }
 

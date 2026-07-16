@@ -4,8 +4,12 @@ import {
   type RepoWorkspaceTabsRestoreResult,
 } from '#/shared/api-types.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
-import { probeRepo, readRepoProjection } from '#/server/modules/repo-read-paths.ts'
-import { isCurrentRepoRuntimeMembership } from '#/server/modules/repo-runtimes.ts'
+import { readRepoProjection } from '#/server/modules/repo-read-paths.ts'
+import {
+  commitWorkspaceProbeState,
+  isCurrentRepoRuntimeMembership,
+  workspaceProbeStateForRuntime,
+} from '#/server/modules/repo-runtimes.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
 import { confirmServerWorkspaceRepoEntry, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
 import {
@@ -14,6 +18,7 @@ import {
 } from '#/server/modules/workspace-pane-tabs-restore.ts'
 import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import { probeWorkspace } from '#/server/modules/workspace-probe.ts'
 
 interface RestoreRepoTabsInput {
   userId: string
@@ -61,6 +66,14 @@ async function projectWorkspaceRepo(
     )
     assertCurrentRepoRuntimeMembership(input)
     if (lifecycle.kind !== 'settled' || lifecycle.lifecycle.kind !== 'ready') return null
+    const workspaceProbe = workspaceProbeStateForRuntime(input.userId, entry.id, input.repoRuntimeId)
+    if (
+      !workspaceProbe ||
+      workspaceProbe.status !== 'ready' ||
+      workspaceProbe.capabilities.git.status !== 'available'
+    ) {
+      return null
+    }
     const projection = await readRepoProjection(entry.id, {
       repoRuntimeId: input.repoRuntimeId,
       signal: input.signal,
@@ -74,13 +87,25 @@ async function projectWorkspaceRepo(
       repoRuntimeId: input.repoRuntimeId,
       name: lifecycle.name,
       target: lifecycle.lifecycle.target,
+      workspaceProbe,
       projection,
     }
   }
-  const probe = await probeRepo(entry.id)
+  const probe = await probeWorkspace(entry.id, process.platform === 'win32' ? 'win32' : 'posix', {
+    signal: input.signal,
+  })
   assertCurrentRepoRuntimeMembership(input)
-  if (!probe.ok || !probe.root || probe.root !== entry.id) return null
-  const projection = await readRepoProjection(probe.root, {
+  if (
+    !commitWorkspaceProbeState({
+      userId: input.userId,
+      repoRoot: entry.id,
+      repoRuntimeId: input.repoRuntimeId,
+      probe,
+    })
+  )
+    return null
+  if (probe.status !== 'ready' || probe.capabilities.git.status !== 'available') return null
+  const projection = await readRepoProjection(entry.id, {
     repoRuntimeId: input.repoRuntimeId,
     signal: input.signal,
     mode: 'full',
@@ -88,10 +113,11 @@ async function projectWorkspaceRepo(
   assertCurrentRepoRuntimeMembership(input)
   if (!projection.snapshot) return null
   return {
-    entry: { kind: 'local', id: probe.root },
-    repoRoot: probe.root,
+    entry,
+    repoRoot: entry.id,
     repoRuntimeId: input.repoRuntimeId,
-    name: probe.name ?? workspaceRepoDisplayName(probe.root),
+    name: probe.name ?? workspaceRepoDisplayName(entry.id),
+    workspaceProbe: probe,
     projection,
   }
 }

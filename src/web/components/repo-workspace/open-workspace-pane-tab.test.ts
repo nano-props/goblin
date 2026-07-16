@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
-  createRepoBranch,
+  createBranchSnapshot,
   installWorkspacePaneTabsTestBridge,
   resetReposStore,
   seedRepoWithReadModelForTest,
@@ -41,7 +41,7 @@ vi.mock('#/web/stores/repos/repo-refresh-actions.ts', async (importOriginal) => 
   return { ...actual, requestVisibleWorkspaceStatusRefresh: vi.fn(() => true) }
 })
 
-const REPO_ID = '/tmp/workspace-pane-tab-repo'
+const REPO_ID = 'goblin+file:///tmp/workspace-pane-tab-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
@@ -127,7 +127,7 @@ describe('openWorkspacePaneTab', () => {
   test('can explicitly append a newly opened static tab while still recording the opener', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -163,7 +163,7 @@ describe('openWorkspacePaneTab', () => {
     const terminalEntry = workspacePaneRuntimeTabEntry('terminal', terminalSessionId)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(branchName, { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [createBranchSnapshot(branchName, { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -209,7 +209,7 @@ describe('openWorkspacePaneTab', () => {
   test('does not select changes when the selected branch has no worktree', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/no-worktree')],
+      branchSnapshots: [createBranchSnapshot('feature/no-worktree')],
       currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -234,7 +234,7 @@ describe('openWorkspacePaneTab', () => {
   test('opens status for a branch without a worktree', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/no-worktree')],
+      branchSnapshots: [createBranchSnapshot('feature/no-worktree')],
       currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'changes',
       workspacePaneTabsByBranch: {
@@ -357,7 +357,7 @@ describe('openWorkspacePaneTab', () => {
   test('records the active tab as the opener when opening a new static tab', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -386,7 +386,7 @@ describe('openWorkspacePaneTab', () => {
   test('does not overwrite the recorded opener when refocusing an already-open static tab', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -424,7 +424,10 @@ describe('openWorkspacePaneTab', () => {
   test('records the opener under the branch the operation targeted, even if the user switches branches while the commit is in flight', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/a', { worktree: { path: WORKTREE_PATH } }), createRepoBranch('feature/b')],
+      branchSnapshots: [
+        createBranchSnapshot('feature/a', { worktree: { path: WORKTREE_PATH } }),
+        createBranchSnapshot('feature/b'),
+      ],
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -475,7 +478,7 @@ describe('openWorkspacePaneTab', () => {
   test('does not record an opener when the server rejects a stale repo runtime commit', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/a', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -518,7 +521,7 @@ describe('openWorkspacePaneTab', () => {
   test('does not select a stale opened tab when the server rejects a stale repo runtime commit', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/a', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -559,7 +562,7 @@ describe('openWorkspacePaneTab', () => {
     await useReposStore.getState().closeRepo(REPO_ID)
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/reopened', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [createBranchSnapshot('feature/reopened', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/reopened',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -577,7 +580,7 @@ describe('openWorkspacePaneTab', () => {
   test('does not select a stale opened tab when the old repo runtime commit succeeds after reopen', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/a', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -619,7 +622,7 @@ describe('openWorkspacePaneTab', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       repoRuntimeId: 'repo-runtime-reopened',
-      branches: [createRepoBranch('feature/reopened', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [createBranchSnapshot('feature/reopened', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/reopened',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -642,13 +645,13 @@ describe('openWorkspacePaneTab', () => {
   })
 
   test('scopes recorded openers per workspace pane target so identical static tab identities do not bleed', async () => {
-    const OTHER_REPO_ID = '/tmp/workspace-pane-tab-other-repo'
+    const OTHER_REPO_ID = 'goblin+file:///tmp/workspace-pane-tab-other-repo'
     const OTHER_WORKTREE_PATH = '/tmp/workspace-pane-tab-other-worktree'
     // seedRepoWithReadModelForTest replaces the whole `repos` map, so seed both repos
     // before merging them back together into one multi-repo store state.
     const repoA = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -657,7 +660,7 @@ describe('openWorkspacePaneTab', () => {
     })
     const repoB = seedRepoWithReadModelForTest({
       id: OTHER_REPO_ID,
-      branches: [createRepoBranch('main', { worktree: { path: OTHER_WORKTREE_PATH } })],
+      branchSnapshots: [createBranchSnapshot('main', { worktree: { path: OTHER_WORKTREE_PATH } })],
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -761,7 +764,7 @@ describe('openWorkspacePaneTab', () => {
 function seedWorktreeRepo(preferredWorkspacePaneTab: WorkspacePaneStaticTabType) {
   seedRepoWithReadModelForTest({
     id: REPO_ID,
-    branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+    branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
     currentBranchName: 'feature/worktree',
     preferredWorkspacePaneTab,
     workspacePaneTabsByBranch: {

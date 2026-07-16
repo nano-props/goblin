@@ -22,6 +22,17 @@ import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
 
+const GIT_WORKSPACE_PROBE = {
+  status: 'ready' as const,
+  name: 'workspace',
+  capabilities: {
+    files: { read: true as const, write: true },
+    terminal: { available: true },
+    git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+  },
+  diagnostics: [],
+}
+
 beforeEach(resetLifecycleTest)
 
 describe('repo session hydration', () => {
@@ -39,6 +50,7 @@ describe('repo session hydration', () => {
             repoRoot: REPO_A,
             repoRuntimeId: 'repo-runtime-server-a',
             name: 'server-a',
+            workspaceProbe: GIT_WORKSPACE_PROBE,
             projection: {
               snapshot: { branches: [branchSnapshot('main')], current: 'main' },
               pullRequests: null,
@@ -102,6 +114,7 @@ describe('repo session hydration', () => {
           repoRoot: REPO_A,
           repoRuntimeId: 'repo-runtime-server-a',
           name: 'server-a',
+          workspaceProbe: GIT_WORKSPACE_PROBE,
           projection: {
             snapshot: { branches: [branchSnapshot('server-main')], current: 'server-main' },
             pullRequests: null,
@@ -175,6 +188,7 @@ describe('repo session hydration', () => {
           repoRoot: REPO_A,
           repoRuntimeId: 'repo-runtime-server-a',
           name: 'server-a',
+          workspaceProbe: GIT_WORKSPACE_PROBE,
           projection: null,
         },
       ],
@@ -198,6 +212,7 @@ describe('repo session hydration', () => {
           repoRoot: REPO_A,
           repoRuntimeId: 'repo-runtime-server-a',
           name: 'server-a',
+          workspaceProbe: GIT_WORKSPACE_PROBE,
           projection: null,
         },
       ],
@@ -219,6 +234,7 @@ describe('repo session hydration', () => {
           repoRoot: REPO_A,
           repoRuntimeId: 'repo-runtime-server-a',
           name: 'server-a',
+          workspaceProbe: GIT_WORKSPACE_PROBE,
           projection,
         },
         snapshot: { revision: 3, entries: [] },
@@ -250,6 +266,7 @@ describe('repo session hydration', () => {
             repoRoot: REPO_A,
             repoRuntimeId: 'repo-runtime-server-a',
             name: 'server-a',
+            workspaceProbe: GIT_WORKSPACE_PROBE,
             projection: null,
           },
         ],
@@ -270,6 +287,7 @@ describe('repo session hydration', () => {
         repoRoot: REPO_A,
         repoRuntimeId: 'repo-runtime-server-a',
         name: 'server-a',
+        workspaceProbe: GIT_WORKSPACE_PROBE,
         projection: {
           snapshot: { branches: [branchSnapshot('main')], current: 'main' },
           pullRequests: null,
@@ -310,6 +328,7 @@ describe('repo session hydration', () => {
           repoRoot: REPO_A,
           repoRuntimeId: 'repo-runtime-old',
           name: 'server-a',
+          workspaceProbe: GIT_WORKSPACE_PROBE,
           projection: null,
         },
       ],
@@ -322,6 +341,7 @@ describe('repo session hydration', () => {
         repoRoot: REPO_A,
         repoRuntimeId: 'repo-runtime-old',
         name: 'server-a',
+        workspaceProbe: GIT_WORKSPACE_PROBE,
         projection: {
           snapshot: { branches: [branchSnapshot('main')], current: 'main' },
           pullRequests: null,
@@ -365,6 +385,7 @@ describe('repo session hydration', () => {
           repoRoot: entry.id,
           repoRuntimeId,
           name: 'repo',
+          workspaceProbe: GIT_WORKSPACE_PROBE,
           projection: null,
         },
       ],
@@ -387,6 +408,7 @@ describe('repo session hydration', () => {
           repoRuntimeId,
           name: 'repo',
           target,
+          workspaceProbe: GIT_WORKSPACE_PROBE,
           projection: {
             snapshot: { branches: [branchSnapshot('main')], current: 'main' },
             pullRequests: null,

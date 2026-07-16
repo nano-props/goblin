@@ -25,7 +25,7 @@ import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspa
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-const REPO_ID = '/tmp/goblin-selection-test-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-selection-test-repo'
 const ipcHandlers: Record<string, (input: any) => unknown> = {}
 
 function seedRepo(options: {
@@ -38,7 +38,7 @@ function seedRepo(options: {
   const currentBranchName = options.currentBranchName === undefined ? 'feature/plain' : options.currentBranchName
   seedRepoWithReadModelForTest({
     id: REPO_ID,
-    branches: options.branches ?? [
+    branchSnapshots: options.branches ?? [
       branch('main', { worktree: { path: '/repo' } }),
       branch('feature/worktree', { worktree: { path: '/tmp/feature-worktree' } }),
       branch('feature/plain'),
@@ -152,7 +152,7 @@ describe('setBranchViewMode', () => {
   test('changes branch view mode without mutating the React Query projection read model', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [],
+      branchSnapshots: [],
       currentBranchName: 'feature/plain',
     })
     seedRepoReadModelQueryData(repo, {
@@ -212,7 +212,7 @@ describe('setWorkspacePaneTab', () => {
   test('uses the React Query projection read model to resolve workspace pane tab targets', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [],
+      branchSnapshots: [],
       currentBranchName: 'feature/query',
       preferredWorkspacePaneTab: 'status',
     })

@@ -212,13 +212,20 @@ export function createRepoSessionActions(set: ReposSet, get: ReposGet) {
 }
 
 function resolvedRepoFromRestoredRuntime(restored: RestoredWorkspaceRepoRuntime) {
+  const workspaceSettledWithoutGit =
+    restored.workspaceProbe.status === 'unavailable' ||
+    (restored.workspaceProbe.status === 'ready' && restored.workspaceProbe.capabilities.git.status === 'unavailable')
   return {
     id: restored.repoRoot,
     name: restored.name,
+    workspaceProbe: restored.workspaceProbe,
     ...(restored.target ? { target: restored.target } : {}),
     session: {
       entry: restored.entry,
-      projectionState: isProjectedRestoredWorkspaceRepo(restored) ? ('projected' as const) : ('stub' as const),
+      projectionState:
+        isProjectedRestoredWorkspaceRepo(restored) || workspaceSettledWithoutGit
+          ? ('projected' as const)
+          : ('stub' as const),
     },
   }
 }
@@ -227,6 +234,7 @@ function resolvedRepoForStubPromotion(restored: RepoWorkspaceTabsRestoreResult['
   return {
     id: restored.repoRoot,
     name: restored.name,
+    workspaceProbe: restored.workspaceProbe,
     session: {
       entry: restored.entry,
       projectionState: 'projected' as const,

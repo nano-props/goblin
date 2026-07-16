@@ -5,6 +5,8 @@ import { clearRepoRuntimesForUser, commitWorkspaceProbeState } from '#/server/mo
 import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 
+const WORKSPACE_ID = 'goblin+file:///tmp/repo'
+
 const mocks = vi.hoisted(() => ({
   probeRepo: vi.fn(),
   probeLocalWorkspace: vi.fn(),
@@ -133,7 +135,7 @@ function createTestRepoRoutes(
 
 async function openTestRepoRuntime(
   app: ReturnType<typeof createTestRepoRoutes>,
-  repoRoot = '/tmp/repo',
+  repoRoot = WORKSPACE_ID,
 ): Promise<string> {
   const response = await app.request(
     new Request('http://localhost/runtime-open', {
@@ -225,7 +227,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/projection', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', mode: 'not-a-mode' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, mode: 'not-a-mode' }),
       }),
     )
     expect(response.status).toBe(400)
@@ -241,12 +243,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/probe', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID }),
       }),
     )
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ ok: true, root: '/tmp/repo', name: 'repo' })
-    expect(mocks.probeRepo).toHaveBeenCalledWith('/tmp/repo')
+    expect(mocks.probeRepo).toHaveBeenCalledWith(WORKSPACE_ID)
   })
 
   test('runtime-open with repoInput preserves the opened directory identity', async () => {
@@ -316,7 +318,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/runtime-open', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoRoot: '/tmp/runtime-list-repo', clientId: 'client-test' }),
+        body: JSON.stringify({ repoRoot: 'goblin+file:///tmp/runtime-list-repo', clientId: 'client-test' }),
       }),
     )
     const opened = (await openResponse.json()) as { ok: true; repoRuntimeId: string }
@@ -332,11 +334,36 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(response.status).toBe(200)
     const json = (await response.json()) as { runtimes: Array<{ repoRoot: string; repoRuntimeId: string }> }
     expect(json.runtimes).toContainEqual({
-      repoRoot: '/tmp/runtime-list-repo',
+      repoRoot: 'goblin+file:///tmp/runtime-list-repo',
       repoRuntimeId: opened.repoRuntimeId,
       remoteLifecycle: null,
       workspaceProbe: { status: 'probing' },
     })
+  })
+
+  test('rejects raw paths at runtime membership admission', async () => {
+    const app = createTestRepoRoutes()
+    const post = async (path: string, body: object) =>
+      await app.request(
+        new Request(`http://localhost${path}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+      )
+
+    const opened = await post('/runtime-open', { repoRoot: '/tmp/raw-path', clientId: 'client-test' })
+    expect(opened.status).toBe(400)
+    await expect(opened.json()).resolves.toMatchObject({ message: 'error.workspace-locator-malformed' })
+
+    const reconciled = await post('/runtime-reconcile', {
+      clientId: 'client-test',
+      repoRoots: ['goblin+file:///tmp/valid', '/tmp/raw-path'],
+    })
+    expect(reconciled.status).toBe(400)
+    await expect(reconciled.json()).resolves.toMatchObject({ message: 'error.workspace-locator-malformed' })
+    const listed = await post('/runtime-list', {})
+    await expect(listed.json()).resolves.toEqual({ runtimes: [] })
   })
 
   test('workspace-refresh commits a conclusive capability result for the current runtime', async () => {
@@ -415,7 +442,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
           new Request('http://localhost/runtime-open', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ repoRoot: '/tmp/shared-runtime', clientId }),
+            body: JSON.stringify({ repoRoot: 'goblin+file:///tmp/shared-runtime', clientId }),
           }),
         )
       ).json()) as { repoRuntimeId: string }
@@ -428,7 +455,11 @@ describe('repo routes — POST body validation (read endpoints)', () => {
           new Request('http://localhost/runtime-close', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ repoRoot: '/tmp/shared-runtime', repoRuntimeId: first.repoRuntimeId, clientId }),
+            body: JSON.stringify({
+              repoRoot: 'goblin+file:///tmp/shared-runtime',
+              repoRuntimeId: first.repoRuntimeId,
+              clientId,
+            }),
           }),
         )
       ).json()
@@ -482,15 +513,15 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       )
     const old = (await (
       await post('/runtime-open', {
-        repoRoot: '/tmp/reconcile-old',
+        repoRoot: 'goblin+file:///tmp/reconcile-old',
         clientId: 'client-a',
       })
     ).json()) as { repoRuntimeId: string }
-    await post('/runtime-open', { repoRoot: '/tmp/reconcile-old', clientId: 'client-b' })
+    await post('/runtime-open', { repoRoot: 'goblin+file:///tmp/reconcile-old', clientId: 'client-b' })
 
     const response = await post('/runtime-reconcile', {
       clientId: 'client-a',
-      repoRoots: ['/tmp/reconcile-new'],
+      repoRoots: ['goblin+file:///tmp/reconcile-new'],
     })
 
     expect(response.status).toBe(200)
@@ -499,7 +530,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     }
     expect(reconciled.runtimes).toContainEqual(
       expect.objectContaining({
-        repoRoot: '/tmp/reconcile-new',
+        repoRoot: 'goblin+file:///tmp/reconcile-new',
         repoRuntimeId: expect.stringMatching(/^repo-runtime-/),
       }),
     )
@@ -508,7 +539,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     }
     expect(listed.runtimes).toContainEqual(
       expect.objectContaining({
-        repoRoot: '/tmp/reconcile-old',
+        repoRoot: 'goblin+file:///tmp/reconcile-old',
         repoRuntimeId: old.repoRuntimeId,
       }),
     )
@@ -534,13 +565,13 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/worktree-bootstrap-preview', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId }),
       }),
     )
 
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ ok: true, preview: { hasOperations: false } })
-    expect(mocks.getRepoWorktreeBootstrapPreview).toHaveBeenCalledWith('/tmp/repo', {
+    expect(mocks.getRepoWorktreeBootstrapPreview).toHaveBeenCalledWith(WORKSPACE_ID, {
       signal: expect.any(AbortSignal),
       repoRuntimeId,
     })
@@ -560,12 +591,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/projection', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, branch: 'feature/a' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, branch: 'feature/a' }),
       }),
     )
 
     expect(response.status).toBe(200)
-    expect(mocks.readRepoProjection).toHaveBeenCalledWith('/tmp/repo', {
+    expect(mocks.readRepoProjection).toHaveBeenCalledWith(WORKSPACE_ID, {
       branch: 'feature/a',
       mode: 'full',
       signal: expect.any(AbortSignal),
@@ -587,12 +618,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/worktree-status', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId }),
       }),
     )
 
     expect(response.status).toBe(200)
-    expect(mocks.readRepoWorktreeStatus).toHaveBeenCalledWith('/tmp/repo', {
+    expect(mocks.readRepoWorktreeStatus).toHaveBeenCalledWith(WORKSPACE_ID, {
       signal: expect.any(AbortSignal),
       repoRuntimeId,
     })
@@ -604,7 +635,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       operations: [
         {
           id: 'repo-op-1',
-          repoId: '/tmp/repo',
+          repoId: WORKSPACE_ID,
           repoRuntimeId: null,
           kind: 'fetch',
           phase: 'running',
@@ -634,12 +665,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/operations', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, includeSettled: true }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, includeSettled: true }),
       }),
     )
 
     expect(response.status).toBe(200)
-    expect(mocks.readRepoOperationsSnapshot).toHaveBeenCalledWith('/tmp/repo', {
+    expect(mocks.readRepoOperationsSnapshot).toHaveBeenCalledWith(WORKSPACE_ID, {
       includeSettled: true,
       repoRuntimeId,
       signal: expect.any(AbortSignal),
@@ -655,11 +686,11 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/patch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
       }),
     )
     expect(response.status).toBe(200)
-    expect(mocks.getRepoPatch).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo/.worktrees/feature', {
+    expect(mocks.getRepoPatch).toHaveBeenCalledWith(WORKSPACE_ID, '/tmp/repo/.worktrees/feature', {
       signal: expect.any(AbortSignal),
       repoRuntimeId,
     })
@@ -673,12 +704,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, branch: 'feature/work', count: 50 }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, branch: 'feature/work', count: 50 }),
       }),
     )
 
     expect(response.status).toBe(500)
-    expect(mocks.getRepoLog).toHaveBeenCalledWith('/tmp/repo', 'feature/work', {
+    expect(mocks.getRepoLog).toHaveBeenCalledWith(WORKSPACE_ID, 'feature/work', {
       count: 50,
       skip: 0,
       signal: expect.any(AbortSignal),
@@ -694,7 +725,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId: 'repo-runtime-stale', branch: 'feature/work' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId: 'repo-runtime-stale', branch: 'feature/work' }),
       }),
     )
 
@@ -901,7 +932,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          cwd: '/tmp/repo',
+          cwd: WORKSPACE_ID,
           repoRuntimeId,
           worktreePath: '/tmp/repo/.worktrees/feature',
           prefix: 'src',
@@ -912,7 +943,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     const json = (await response.json()) as { nodes: Array<{ id: string }>; truncated: boolean }
     expect(json.nodes.map((n) => n.id)).toEqual(['src', 'src/index.ts'])
     expect(json.truncated).toBe(false)
-    expect(mocks.getRepositoryTree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo/.worktrees/feature', {
+    expect(mocks.getRepositoryTree).toHaveBeenCalledWith(WORKSPACE_ID, '/tmp/repo/.worktrees/feature', {
       prefix: 'src',
       repoRuntimeId,
     })
@@ -926,7 +957,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/tree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
       }),
     )
 
@@ -943,7 +974,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/tree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, worktreePath: '/tmp/repo', prefix: '../secret' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, worktreePath: '/tmp/repo', prefix: '../secret' }),
       }),
     )
     expect(response.status).toBe(400)
@@ -958,7 +989,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/tree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, worktreePath: '/tmp/repo' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, worktreePath: '/tmp/repo' }),
       }),
     )
     expect(response.status).toBe(500)
@@ -972,13 +1003,13 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/file-viewer', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
       }),
     )
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ viewer: 'bat', shell: 'posix' })
     expect(mocks.getRepositoryFileViewer).toHaveBeenCalledWith(
-      '/tmp/repo',
+      WORKSPACE_ID,
       '/tmp/repo/.worktrees/feature',
       expect.any(AbortSignal),
       { repoRuntimeId },
@@ -993,7 +1024,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/file-viewer', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
       }),
     )
     expect(response.status).toBe(500)
@@ -1008,7 +1039,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          cwd: '/tmp/repo',
+          cwd: WORKSPACE_ID,
           repoRuntimeId,
           worktreePath: '/tmp/repo/.worktrees/feature',
           path: 'src/index.ts',
@@ -1019,7 +1050,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ ok: true, message: 'ok' })
     expect(mocks.trashRepositoryFile).toHaveBeenCalledWith(
-      '/tmp/repo',
+      WORKSPACE_ID,
       '/tmp/repo/.worktrees/feature',
       'src/index.ts',
       expect.any(AbortSignal),
@@ -1034,7 +1065,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/trash-file', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, worktreePath: '/tmp/repo', path: '../secret.txt' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, worktreePath: '/tmp/repo', path: '../secret.txt' }),
       }),
     )
     expect(response.status).toBe(400)
@@ -1049,7 +1080,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId: 'repo-runtime-test', branch: 'main', count: 0 }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId: 'repo-runtime-test', branch: 'main', count: 0 }),
       }),
     )
     expect(response.status).toBe(400)
@@ -1063,7 +1094,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId: 'repo-runtime-test', branch: 'main', count: 2.5 }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId: 'repo-runtime-test', branch: 'main', count: 2.5 }),
       }),
     )
     expect(response.status).toBe(400)
@@ -1079,7 +1110,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId: 'repo-runtime-test', branch: 'main', count: '50' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId: 'repo-runtime-test', branch: 'main', count: '50' }),
       }),
     )
     expect(response.status).toBe(400)
@@ -1095,7 +1126,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       new Request('http://localhost/fetch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', kind: 'background' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, kind: 'background' }),
       }),
     )
     expect(response.status).toBe(400)
@@ -1136,11 +1167,11 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       new Request('http://localhost/fetch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId }),
       }),
     )
     expect(response.status).toBe(200)
-    expect(mocks.fetchRepo).toHaveBeenCalledWith('/tmp/repo', 'user', expect.any(AbortSignal), repoRuntimeId)
+    expect(mocks.fetchRepo).toHaveBeenCalledWith(WORKSPACE_ID, 'user', expect.any(AbortSignal), repoRuntimeId)
   })
 
   test('clone route forwards url/parentPath/directoryName and the request abort signal', async () => {
@@ -1182,13 +1213,13 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       return prepared.ok ? { ok: true, message: 'removed' } : prepared
     })
     const app = createTestRepoRoutes(worktreeRemovalApplication)
-    const repoRuntimeId = await openTestRepoRuntime(app, '/tmp/repo')
+    const repoRuntimeId = await openTestRepoRuntime(app, WORKSPACE_ID)
     const response = await app.request(
       new Request('http://localhost/remove-worktree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          cwd: '/tmp/repo',
+          cwd: WORKSPACE_ID,
           repoRuntimeId,
           branch: 'feature/remove',
           worktreePath: '/tmp/repo-remove',
@@ -1202,14 +1233,14 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     expect(worktreeRemovalApplication.removeWorktree).toHaveBeenCalledWith(
       'user-test',
       expect.objectContaining({
-        repoRoot: '/tmp/repo',
+        repoRoot: WORKSPACE_ID,
         repoRuntimeId,
         worktreePath: '/tmp/repo-remove',
       }),
     )
     expect(beforeRemove).toHaveBeenCalledOnce()
     expect(mocks.removeCapturedRepoWorktree).toHaveBeenCalledWith(
-      '/tmp/repo',
+      WORKSPACE_ID,
       {
         branch: 'feature/remove',
         worktreePath: '/tmp/repo-remove',
@@ -1241,13 +1272,13 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       new Request('http://localhost/open-url', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, target: { type: 'commit', hash: 'abcdef1' } }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, target: { type: 'commit', hash: 'abcdef1' } }),
       }),
     )
 
     expect(response.status).toBe(200)
     expect(mocks.openRepoUrl).toHaveBeenCalledWith(
-      '/tmp/repo',
+      WORKSPACE_ID,
       { type: 'commit', hash: 'abcdef1' },
       expect.any(AbortSignal),
       { repoRuntimeId },
@@ -1263,12 +1294,12 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     const response = await app.request('/delete-branch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, branch: 'feature/retired' }),
+      body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, branch: 'feature/retired' }),
     })
 
     expect(response.status).toBe(200)
     expect(deleteBranch).toHaveBeenCalledWith('user-test', {
-      repoRoot: '/tmp/repo',
+      repoRoot: WORKSPACE_ID,
       repoRuntimeId,
       branchName: 'feature/retired',
       deleteBranch: expect.any(Function),
@@ -1278,7 +1309,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     await app.request('/delete-branch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, branch: 'feature/kept' }),
+      body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, branch: 'feature/kept' }),
     })
     expect(deleteBranch).toHaveBeenCalledTimes(2)
   })
@@ -1295,7 +1326,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          repoId: '/tmp/repo',
+          repoId: WORKSPACE_ID,
           repoRuntimeId,
           worktreePath: '/tmp/repo',
           app: 'ghostty',
@@ -1307,7 +1338,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          repoId: '/tmp/repo',
+          repoId: WORKSPACE_ID,
           repoRuntimeId,
           worktreePath: '/tmp/repo',
           app: 'vscode',
@@ -1318,17 +1349,17 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       new Request('http://localhost/open-in-finder', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoId: '/tmp/repo', worktreePath: '/tmp/repo' }),
+        body: JSON.stringify({ repoId: WORKSPACE_ID, worktreePath: '/tmp/repo' }),
       }),
     )
 
-    expect(mocks.openRepoTerminal).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo', 'ghostty', expect.any(AbortSignal), {
+    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(WORKSPACE_ID, '/tmp/repo', 'ghostty', expect.any(AbortSignal), {
       repoRuntimeId,
     })
-    expect(mocks.openRepoEditor).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo', 'vscode', expect.any(AbortSignal), {
+    expect(mocks.openRepoEditor).toHaveBeenCalledWith(WORKSPACE_ID, '/tmp/repo', 'vscode', expect.any(AbortSignal), {
       repoRuntimeId,
     })
-    expect(mocks.openRepoInFinder).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo')
+    expect(mocks.openRepoInFinder).toHaveBeenCalledWith(WORKSPACE_ID, '/tmp/repo')
   })
 
   test('marks the current runtime failed when external app open hits a remote runtime failure', async () => {
@@ -1375,7 +1406,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          repoId: '/tmp/repo',
+          repoId: WORKSPACE_ID,
           worktreePath: '/tmp/repo',
           app: 'not-an-editor',
         }),

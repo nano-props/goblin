@@ -34,7 +34,7 @@ import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
 const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
-const REPO_ID = '/tmp/keyboard-repo'
+const REPO_ID = 'goblin+file:///tmp/keyboard-repo'
 const WORKTREE_PATH = '/tmp/keyboard-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 

@@ -164,7 +164,7 @@ afterEach(() => {
 describe('useClientEffectIntentRouter', () => {
   test('terminal bell clicks without a worktree target do not infer a branch route', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
@@ -186,7 +186,7 @@ describe('useClientEffectIntentRouter', () => {
 
   test('terminal bell clicks switch to the emitting worktree branch and selected terminal', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
@@ -221,7 +221,7 @@ describe('useClientEffectIntentRouter', () => {
 
   test('terminal bell clicks combine branch and terminal view navigation in a single route-driven action', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
@@ -266,7 +266,7 @@ describe('useClientEffectIntentRouter', () => {
 
   test('close-repo menu action delegates to navigation close', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
@@ -286,7 +286,7 @@ describe('useClientEffectIntentRouter', () => {
 
   test('close-repo menu action reports shared membership write failures', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
@@ -306,7 +306,7 @@ describe('useClientEffectIntentRouter', () => {
 
   test('zen mode menu action toggles the zen mode state', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
@@ -388,7 +388,7 @@ describe('useClientEffectIntentRouter', () => {
 
   test('workspace view menu actions are suppressed while settings-like routes are active', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
@@ -417,7 +417,7 @@ describe('useClientEffectIntentRouter', () => {
 
   test('native new-terminal and close intents preserve a static route opener', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
@@ -647,8 +647,8 @@ function terminalWorktreeSnapshot(
           terminalSessionId: selectedSession.terminalSessionId,
           terminalWorktreeKey,
           index: selectedSession.index,
-          repoRoot: '/tmp/repo',
-          repoRuntimeId: useReposStore.getState().repos['/tmp/repo']?.repoRuntimeId ?? '',
+          repoRoot: 'goblin+file:///tmp/repo',
+          repoRuntimeId: useReposStore.getState().repos['goblin+file:///tmp/repo']?.repoRuntimeId ?? '',
           branch: 'main',
           worktreePath: '/tmp/repo-worktree',
         }

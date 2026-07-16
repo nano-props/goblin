@@ -30,7 +30,7 @@ export const ko: Record<DictKey, string> = {
   'menu.file.clone-repo': '리포지토리 클론…',
   'menu.file.create-worktree': '새 워크트리…',
   'menu.file.open-recent': '최근 항목 열기',
-  'menu.file.no-recent': '최근 리포지토리 없음',
+  'menu.file.no-recent': '최근 작업 공간 없음',
   'menu.file.clear-recent': '메뉴 지우기',
   'menu.file.open-in-browser': '브라우저에서 열기',
   'menu.file.open-data-folder': '데이터 폴더 열기',
@@ -142,8 +142,7 @@ export const ko: Record<DictKey, string> = {
     'Goblin 은 ~/.ssh/config 에 정의된 별칭으로만 SSH 원격 작업 공간을 엽니다.',
   'repo-picker.open-remote-include-manual-hint':
     'Include 지시어가 감지되어 별칭 목록이 불완전할 수 있습니다. SSH 별칭을 직접 입력하세요. 제안은 현재 파일 기준입니다.',
-  'repo-picker.open-remote-config-required':
-    '~/.ssh/config 에 구체적인 Host 항목을 추가한 뒤 원격 작업 공간을 여세요.',
+  'repo-picker.open-remote-config-required': '~/.ssh/config 에 구체적인 Host 항목을 추가한 뒤 원격 작업 공간을 여세요.',
   'repo-picker.open-remote-config-drift-hint':
     'Goblin 은 매번 ~/.ssh/config 를 다시 읽습니다. 별칭이 삭제되었거나 더 이상 해석되지 않으면 설정 표류로 표시합니다.',
   'repo-picker.open-remote-open-ssh-settings': 'SSH 설정 열기',

@@ -8,7 +8,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { useFiletreeInteractionStore } from '#/web/stores/repos/filetree-interaction-state.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 const writePresentationMock = vi.fn()
 
@@ -26,8 +26,8 @@ beforeEach(() => {
 describe('useClientWorkspacePersistence', () => {
   test('persists client-owned workspace state without canonical tabs', () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
-      branches: [createRepoBranch('feature/a', { worktree: { path: '/tmp/a' } })],
+      id: 'goblin+file:///tmp/repo',
+      branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a' } })],
       currentBranchName: 'feature/a',
     })
     useReposStore.setState({
@@ -53,13 +53,13 @@ describe('useClientWorkspacePersistence', () => {
   test('persists terminal selection, preferred tab, and filetree presentation', () => {
     const worktreePath = '/tmp/repo-worktree'
     const targetKey = workspacePaneTabsTargetIdentityKey({
-      repoRoot: '/tmp/repo',
+      repoRoot: 'goblin+file:///tmp/repo',
       branchName: 'feature/worktree',
       worktreePath,
     })
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: worktreePath } })],
+      id: 'goblin+file:///tmp/repo',
+      branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: worktreePath } })],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/worktree': [workspacePaneStaticTabEntry('history')] },
@@ -69,13 +69,13 @@ describe('useClientWorkspacePersistence', () => {
       order: [repo.id],
       restoredRepoId: repo.id,
       selectedTerminalSessionIdByTerminalWorktree: {
-        [`/tmp/repo\0${worktreePath}`]: 'term-111111111111111111111',
+        [`goblin+file:///tmp/repo\0${worktreePath}`]: 'term-111111111111111111111',
       },
       workspaceMembershipReady: true,
       sessionPersistenceReady: true,
     })
     useFiletreeInteractionStore.getState().restoreViewState({
-      [`/tmp/repo\0${worktreePath}`]: {
+      [`goblin+file:///tmp/repo\0${worktreePath}`]: {
         selectedKeys: ['src/index.ts'],
         expandedKeys: ['src'],
         topVisibleRowIndex: 12,
@@ -87,11 +87,11 @@ describe('useClientWorkspacePersistence', () => {
     expect(writePresentationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         selectedTerminalSessionIdByTerminalWorktree: {
-          [`/tmp/repo\0${worktreePath}`]: 'term-111111111111111111111',
+          [`goblin+file:///tmp/repo\0${worktreePath}`]: 'term-111111111111111111111',
         },
-        preferredWorkspacePaneTabByTargetByRepo: { '/tmp/repo': { [targetKey]: 'history' } },
+        preferredWorkspacePaneTabByTargetByRepo: { 'goblin+file:///tmp/repo': { [targetKey]: 'history' } },
         filetreeViewStateByWorktreeByRepo: {
-          '/tmp/repo': {
+          'goblin+file:///tmp/repo': {
             [worktreePath]: {
               selectedKeys: ['src/index.ts'],
               expandedKeys: ['src'],
@@ -105,8 +105,8 @@ describe('useClientWorkspacePersistence', () => {
 
   test('does not persist before workspace restore converges', () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
-      branches: [createRepoBranch('feature/a', { worktree: { path: '/tmp/a' } })],
+      id: 'goblin+file:///tmp/repo',
+      branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a' } })],
       currentBranchName: 'feature/a',
     })
     useReposStore.setState({
@@ -123,8 +123,8 @@ describe('useClientWorkspacePersistence', () => {
   test('debounces high-frequency presentation changes to the latest state', () => {
     vi.useFakeTimers()
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
-      branches: [createRepoBranch('feature/a', { worktree: { path: '/tmp/a' } })],
+      id: 'goblin+file:///tmp/repo',
+      branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a' } })],
       currentBranchName: 'feature/a',
     })
     useReposStore.setState({
@@ -139,10 +139,14 @@ describe('useClientWorkspacePersistence', () => {
 
     act(() => {
       useReposStore.setState({
-        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/a': 'term-111111111111111111111' },
+        selectedTerminalSessionIdByTerminalWorktree: {
+          'goblin+file:///tmp/repo\0/tmp/a': 'term-111111111111111111111',
+        },
       })
       useReposStore.setState({
-        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/a': 'term-222222222222222222222' },
+        selectedTerminalSessionIdByTerminalWorktree: {
+          'goblin+file:///tmp/repo\0/tmp/a': 'term-222222222222222222222',
+        },
       })
     })
     act(() => {
@@ -152,7 +156,9 @@ describe('useClientWorkspacePersistence', () => {
     expect(writePresentationMock).toHaveBeenCalledOnce()
     expect(writePresentationMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/a': 'term-222222222222222222222' },
+        selectedTerminalSessionIdByTerminalWorktree: {
+          'goblin+file:///tmp/repo\0/tmp/a': 'term-222222222222222222222',
+        },
       }),
     )
   })
@@ -160,8 +166,8 @@ describe('useClientWorkspacePersistence', () => {
   test('flushes a pending local presentation synchronously on pagehide', () => {
     vi.useFakeTimers()
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
-      branches: [createRepoBranch('feature/a', { worktree: { path: '/tmp/a' } })],
+      id: 'goblin+file:///tmp/repo',
+      branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a' } })],
       currentBranchName: 'feature/a',
     })
     useReposStore.setState({
@@ -176,7 +182,9 @@ describe('useClientWorkspacePersistence', () => {
 
     act(() => {
       useReposStore.setState({
-        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/a': 'term-333333333333333333333' },
+        selectedTerminalSessionIdByTerminalWorktree: {
+          'goblin+file:///tmp/repo\0/tmp/a': 'term-333333333333333333333',
+        },
       })
     })
     act(() => {
@@ -186,15 +194,17 @@ describe('useClientWorkspacePersistence', () => {
     expect(writePresentationMock).toHaveBeenCalledOnce()
     expect(writePresentationMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/a': 'term-333333333333333333333' },
+        selectedTerminalSessionIdByTerminalWorktree: {
+          'goblin+file:///tmp/repo\0/tmp/a': 'term-333333333333333333333',
+        },
       }),
     )
   })
 
   test('consumes background persistence failures', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
-      branches: [createRepoBranch('feature/a', { worktree: { path: '/tmp/a' } })],
+      id: 'goblin+file:///tmp/repo',
+      branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a' } })],
       currentBranchName: 'feature/a',
     })
     useReposStore.setState({
@@ -214,8 +224,8 @@ describe('useClientWorkspacePersistence', () => {
 
   test('persists A-B-A transitions while the B write is still pending', async () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
-      branches: [createRepoBranch('feature/a', { worktree: { path: '/tmp/a' } })],
+      id: 'goblin+file:///tmp/repo',
+      branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a' } })],
       currentBranchName: 'feature/a',
     })
     useReposStore.setState({
