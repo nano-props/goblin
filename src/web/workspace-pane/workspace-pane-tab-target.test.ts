@@ -14,6 +14,7 @@ import {
   workspacePanePreferenceTargetOptions,
   workspacePaneTabInteractionBlockedForBranch,
   workspacePaneTabTargetForBranch,
+  workspacePaneTabTargetForCreatedRuntime,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
@@ -92,6 +93,36 @@ describe('workspace pane tab target read model', () => {
     expect(target?.branchName).toBe('feature/query')
     expect(target?.worktreePath).toBe(WORKTREE_PATH)
     expect(target?.renderedTab).toBe('status')
+  })
+
+  test('resolves a created runtime by worktree while its canonical branch rename is not projected locally', () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/old', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/old',
+      preferredWorkspacePaneTab: 'status',
+    })
+    seedRepoReadModelQueryData(repo, {
+      branches: [createRepoBranch('feature/old', { worktree: { path: WORKTREE_PATH } })],
+      currentBranch: 'feature/old',
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: REPO_ID,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: 'feature/renamed',
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+
+    const target = workspacePaneTabTargetForCreatedRuntime(
+      REPO_ID,
+      'feature/renamed',
+      WORKTREE_PATH,
+      workspacePanePreferenceTargetOptions,
+    )
+
+    expect(target?.branchName).toBe('feature/renamed')
+    expect(target?.worktreePath).toBe(WORKTREE_PATH)
   })
 
   test('treats an explicit bare branch route as an empty workspace pane', () => {

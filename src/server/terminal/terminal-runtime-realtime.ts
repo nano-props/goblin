@@ -44,9 +44,6 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalActionHost): 
     takeover(clientId, userId, input) {
       return host.takeover(clientId, userId, { ...input, clientId })
     },
-    close(clientId, userId, input) {
-      return host.close(clientId, userId, input)
-    },
     'recover-sessions'(clientId, userId, input) {
       return host.recoverSessions(clientId, userId, input)
     },
@@ -124,21 +121,13 @@ function sendRealtimeResponse(socket: RealtimeSocket, message: TerminalSocketRes
 // the same socket must not observe the identity event before that
 // response settles.
 export function shouldPauseRealtimeRequest(action: TerminalSocketRequestAction): boolean {
-  return action === 'attach' || action === 'restart' || action === 'takeover' || action === 'recover-sessions'
+  return action === 'attach' || action === 'restart' || action === 'takeover'
 }
 
 function outputFlushBoundaryFromResponse(
   message: TerminalSocketResponseMessage,
 ): AppRealtimeOutputFlushBoundaryContext | null {
   if (!message.ok) return null
-  if (message.action === 'recover-sessions') {
-    return message.payload.snapshots.map((snapshot) => ({
-      terminalRuntimeSessionId: snapshot.terminalRuntimeSessionId,
-      terminalRuntimeGeneration: snapshot.terminalRuntimeGeneration,
-      outputEra: snapshot.outputEra,
-      seq: snapshot.snapshotSeq,
-    }))
-  }
   if (message.action !== 'attach' && message.action !== 'restart') return null
   const payload = message.payload
   if (!payload.ok) return null

@@ -21,7 +21,7 @@ import type {
   TerminalTitleEvent,
   TerminalWriteInput,
   TerminalWriteResult,
-  TerminalSessionsRecoveryResult,
+  TerminalSessionsSnapshot,
 } from '#/shared/terminal-types.ts'
 import type {
   WorkspacePaneTabsListInput,
@@ -43,9 +43,8 @@ export interface ClientTerminal {
   write: (input: TerminalWriteInput) => Promise<TerminalWriteResult>
   resize: (input: TerminalResizeInput) => Promise<TerminalMutationResult>
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
-  close: (input: TerminalSessionInput) => Promise<TerminalMutationResult>
   pruneTerminals: (repoRoot: string, repoRuntimeId: string) => Promise<{ pruned: number; remaining: number }>
-  recoverSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionsRecoveryResult>
+  recoverSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionsSnapshot>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
   sendTestNotification: (input: TerminalTestNotificationInput) => Promise<boolean>
   setBadge: (count: number) => void

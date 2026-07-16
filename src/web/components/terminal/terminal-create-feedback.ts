@@ -8,6 +8,7 @@ const SERVER_ERROR_KEY_PATTERN = /^error\.[a-z0-9.-]+$/
 export function terminalCreateErrorKey(error: unknown): string {
   if (error instanceof ClientRealtimeRequestError) return terminalCreateRealtimeErrorKey(error)
   const message = terminalCreateErrorMessage(error)
+  if (message === 'error.unavailable') return 'error.terminal-create-failed'
   if (SERVER_ERROR_KEY_PATTERN.test(message)) return message
   if (message === 'Terminal socket open timed out' || message === 'App realtime socket open timed out') {
     return 'error.terminal-connection-timeout'

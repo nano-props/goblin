@@ -1,5 +1,4 @@
 import type { TerminalCreateAction } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 
 /**
  * Client admission result for a server-committed terminal runtime open.
@@ -11,8 +10,8 @@ import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
  */
 export interface TerminalCreateAdmissionBase {
   terminalSessionId: string
+  branch: string
   resourceDisposition: TerminalCreateAction
-  workspacePaneTabs: WorkspacePaneTabsSnapshot
   runtimeProjectionApplied: boolean
 }
 

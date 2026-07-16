@@ -4,6 +4,7 @@ import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socke
 
 describe('terminalCreateErrorKey', () => {
   test.each([
+    [new Error('error.unavailable'), 'error.terminal-create-failed'],
     [new Error('error.invalid-arguments'), 'error.invalid-arguments'],
     [new Error('Terminal socket open timed out'), 'error.terminal-connection-timeout'],
     [new Error('App realtime socket open timed out'), 'error.terminal-connection-timeout'],

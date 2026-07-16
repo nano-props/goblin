@@ -81,11 +81,9 @@ The combined symptom list across the root causes:
   atomic-snapshot fix removed that race, but still treated an output checkpoint
   as a visually committed frame. A shell can emit a prompt redraw across
   multiple PTY chunks, so a sequence-consistent snapshot may still be transient.
-- **R1 — Close was fire-and-forget and silent on failure.**
-  `TerminalSession.dispose()` called `terminalClient.close(...)`
-  with a swallowed rejection. A WebSocket mid-request teardown or a
-  race with idle socket shutdown could drop the close before the
-  server saw it. The PTY stayed alive.
+ - **R1 — Close authority was split across view disposal and Workspace commands.**
+  Local xterm disposal could issue a direct server close independently of
+  route/opener settlement and the server-owned retirement boundary.
 - **R2 — The session service reused orphan sessions by terminalSessionId.** The terminal
   session service returned `action: 'restored'` for any existing session with
   a controller. Combined with `forceNew: false`, the new client
@@ -234,80 +232,29 @@ The same invariant applies to local and remote terminals.
 
 ---
 
-## R1: Durable close
+## R1: Server-owned composed close
 
 ### Why
 
-`TerminalSession.dispose()` used to close server-side sessions
-like this:
-
-```ts
-for (const terminalRuntimeSessionId of terminalRuntimeSessionIds) {
-  void terminalClient.close({ terminalRuntimeSessionId }).catch(() => {})
-}
-```
-
-Two problems:
-
-- `.catch(() => {})` swallows rejections. A WebSocket mid-request
-  teardown or a race with idle socket shutdown can drop the close
-  before the server sees it.
-- The dispose path is not awaited. A subsequent create in the same
-  worktree can race ahead, the session service can still see the orphan PTY
-  in its directory, and the session service returns `action: 'restored'`
-  for the same key.
+Local view disposal is not a terminal business command. Letting it close the
+server session split authority from Workspace navigation and made transport
+failure indistinguishable from successful membership removal.
 
 ### Design
 
-Terminal close now shares the same lifecycle-queue boundary as
-pending create. `TerminalSessionLifecycleQueues` owns dedupe and
-promise settlement; `TerminalSessionProjection` decides when to drain
-pending closes before create.
-
-**New projection methods**:
-
-- **Enqueue durable close** — called from `TerminalSession` via
-  an injected callback. Records a pending entry, kicks off
-  `terminalClient.close` in the background, resolves on server ack,
-  rejects on socket error. The entry is removed from the map on
-  either outcome. Concurrent calls for the same `terminalRuntimeSessionId` dedupe
-  to the same promise.
-- **Flush pending closes for the worktree** — awaited inside the
-  create flush for the same worktree so a subsequent create cannot
-  race with a lost close. Drains all entries whose worktree key
-  matches before the create is issued.
-  - If the close succeeds, the orphan is gone and the session service will
-    create fresh.
-  - If the close fails (timeout / disconnect), log loudly and
-    proceed. The user can `pruneTerminals` from the UI to clean up.
-- `destroy()` — reject and clear the pending-close map, mirroring the
-  pending-create rejection at `destroy()`.
-
-**Caller change**:
-
-- Replace the fire-and-forget loop with an injected durable-close
-  callback wired to the projection queue.
-- Provide both a synchronous `dispose()` (for backward-compatible
-  callers) and an async `disposeAndWait()` (for callers that need a
-  resource-release barrier).
-- Local view teardown stays synchronous — the next create rebuilds
-  from a fresh server-side session.
-
-**Logging**:
-
-- Replace `.catch(() => {})` with logging on both success and failure.
-  This is intentionally noisy — the bug is silent today, and any
-  future regression must be visible in logs.
+The public direct terminal-close socket action and client durable-close queue
+are removed. User close goes through the composed Workspace runtime command,
+which preserves `closeOperationByRuntimeBindingKey` until retirement and
+close-back navigation settle. The manager kills and awaits the PTY first; a
+failure preserves Directory membership and the visible tab. Successful
+retirement removes Directory membership exactly once, and canonical tabs
+converge by projection.
 
 ### Why this is the root cause, not a patch
 
-- No timeout / retry logic added.
-- Each piece of state (pending close, flush, destroy) has a single
-  keeper.
-- The create path does not change; it only waits for the close path
-  to settle before issuing. The session service can still return `action:
-'restored'` — that is correct behavior when an orphan exists; the
-  bug is that the orphan exists when it should not.
+- No client retry or fallback membership is added.
+- View teardown owns only DOM/xterm resources.
+- Server retirement single-flight owns PTY safety; Directory owns membership.
 
 ---
 
@@ -603,8 +550,9 @@ any individual implementation:
 2. **Stream only from complete history.** Only the attach request that starts a
    PTY before any output exists may receive `frame: 'stream'`. Any view that may
    have missed history receives `frame: 'snapshot'`.
-3. **Close is durable.** `dispose()` must not be fire-and-forget on
-   the server side. The projection owns pending close state.
+3. **Close is durable and server-owned.** Client view disposal never closes a
+   PTY. Requested retirement keeps Directory membership until kill/wait
+   succeeds; confirmed exit removes membership before post-exit cleanup.
 4. **Close is a broadcast event.** When the server confirms a user
    close, other windows learn about it through `session-closed`, not
    through a full reconcile.

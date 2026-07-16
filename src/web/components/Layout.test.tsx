@@ -87,8 +87,8 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
     createTerminal: vi.fn(async () => ''),
     createTerminalWithAdmission: vi.fn(async () => ({
       terminalSessionId: '',
+      branch: 'main',
       resourceDisposition: 'created',
-      workspacePaneTabs: { revision: 0, entries: [] },
       runtimeProjectionApplied: false,
       requestRole: 'leader',
     })) as TerminalSessionContextValue['createTerminalWithAdmission'],

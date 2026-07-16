@@ -10,7 +10,7 @@ import type {
   TerminalResizeInput,
   TerminalSessionInput,
   TerminalSessionSummary,
-  TerminalSessionsRecoveryResult,
+  TerminalSessionsSnapshot,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalWriteInput,
@@ -22,10 +22,7 @@ import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/
 import { isCurrentRepoRuntime as isCurrentRepoRuntimeOpen } from '#/server/modules/repo-runtimes.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
-
-const MAX_TERMINAL_RECOVERY_PROJECTION_ATTEMPTS = 4
 
 interface TerminalSessionServiceLike {
   prune(
@@ -35,7 +32,6 @@ interface TerminalSessionServiceLike {
     repoRuntimeId: string,
   ): Promise<{ pruned: number; remaining: number }>
   listSessions(userId: string, repoRoot: string, repoRuntimeId: string): Promise<TerminalSessionSummary[]>
-  listWorkspaceTabs(userId: string, repoRoot: string, repoRuntimeId: string): Promise<WorkspacePaneTabsSnapshot>
 }
 
 interface TerminalRuntimeActionDependencies {
@@ -185,25 +181,13 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       clientId: string,
       userId: string,
       input: TerminalListSessionsInput,
-    ): Promise<TerminalSessionsRecoveryResult> {
+    ): Promise<TerminalSessionsSnapshot> {
       if (!isValidTerminalClientId(clientId) || !isValidRepoLocator(input.repoRoot)) {
-        return {
-          terminalSessions: { revision: 0, sessions: [] },
-          snapshots: [],
-          workspacePaneTabs: { revision: 0, entries: [] },
-        }
+        return { revision: 0, sessions: [] }
       }
       assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
       const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
-      for (let attempt = 0; attempt < MAX_TERMINAL_RECOVERY_PROJECTION_ATTEMPTS; attempt += 1) {
-        const recovery = await manager.recoverSessionsForUser(userId, scope)
-        const workspacePaneTabs = await sessionService.listWorkspaceTabs(userId, input.repoRoot, input.repoRuntimeId)
-        const terminalAfter = manager.terminalSessionsSnapshotForUser(userId, scope)
-        if (recovery.terminalSessions.revision === terminalAfter.revision) {
-          return { ...recovery, workspacePaneTabs }
-        }
-      }
-      throw new Error('error.terminal-recovery-unstable')
+      return manager.terminalSessionsSnapshotForUser(userId, scope)
     },
 
     async listSessions(

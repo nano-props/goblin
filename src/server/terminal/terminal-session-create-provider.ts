@@ -1,4 +1,5 @@
 import type { TerminalCreateInput, TerminalCreateResult } from '#/shared/terminal-types.ts'
+import type { ServerTerminalCreateResult } from '#/server/terminal/terminal-session-creator.ts'
 import {
   assertPhysicalWorktreeExecutionCapability,
   type PhysicalWorktreeExecutionCapability,
@@ -19,7 +20,7 @@ export interface ServerTerminalCreateProvider {
     userId: string,
     input: TerminalCreateInput,
     admission: TerminalCreateAdmission,
-  ): Promise<TerminalCreateResult>
+  ): Promise<ServerTerminalCreateResult>
 }
 
 interface TerminalSessionAdmittedCreateService {
@@ -29,7 +30,7 @@ interface TerminalSessionAdmittedCreateService {
     input: TerminalCreateInput,
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     signal: AbortSignal,
-  ): Promise<TerminalCreateResult>
+  ): Promise<ServerTerminalCreateResult>
 }
 
 export function createTerminalSessionCreateProvider(deps: {

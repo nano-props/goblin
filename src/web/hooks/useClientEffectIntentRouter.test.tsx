@@ -436,10 +436,18 @@ describe('useClientEffectIntentRouter', () => {
     useTerminalProjectionHydrationStore.getState().markProjectionReady(repo.id, repo.repoRuntimeId)
     const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-worktree')
     let visibleSessionIds = ['term-111111111111111111111']
+    let workspacePaneTabsTestBridge!: ReturnType<typeof installWorkspacePaneTabsTestBridge>
     useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-111111111111111111111')
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-222222222222222222222'
       visibleSessionIds = [...visibleSessionIds, terminalSessionId]
+      workspacePaneTabsTestBridge.addRuntimeTab({
+        repoRoot: base.repoRoot,
+        repoRuntimeId: base.repoRuntimeId!,
+        branchName: base.branch,
+        worktreePath: base.worktreePath,
+        terminalSessionId,
+      })
       useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, terminalSessionId)
       return terminalSessionId
     })
@@ -453,7 +461,7 @@ describe('useClientEffectIntentRouter', () => {
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
     })
-    installWorkspacePaneTabsTestBridge({
+    workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge({
       onEffectIntent: (cb) => {
         intentListeners.add(cb)
         return () => {

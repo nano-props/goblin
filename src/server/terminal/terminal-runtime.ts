@@ -42,7 +42,6 @@ import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/term
 import {
   TerminalSessionManager,
   type TerminalSessionCloseReason,
-  type TerminalSessionOrderProjection,
 } from '#/server/terminal/terminal-session-manager.ts'
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalActionHost, type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
@@ -109,20 +108,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   })
   const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
   const physicalWorktrees = createPhysicalWorktreeIdentityResolver()
-  const terminalSessionOrder = {
-    terminalSessionIds(input) {
-      const separator = input.scope.lastIndexOf('\0')
-      if (separator < 1) return []
-      return workspacePaneLayout.runtimeSessionIds({
-        userId: input.userId,
-        repoRoot: input.scope.slice(0, separator),
-        repoRuntimeId: input.scope.slice(separator + 1),
-        worktreePath: input.worktreePath,
-        type: 'terminal',
-      })
-    },
-  } satisfies TerminalSessionOrderProjection<string>
-
   // Sink callbacks fan out to every clientId that shares the
   // session's userId. The manager passes `userId` (a string
   // derived from the access token) rather than `clientId`, so a
@@ -159,7 +144,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         broadcastRepoSessionsChanged(userId, repoRoot)
       },
     },
-    terminalSessionOrder,
     (userId, clientId) => broker.isClientOnline(userId, clientId),
   )
   const workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({
@@ -194,8 +178,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     const scope = terminalSessionRuntimeScope(event.repoRoot, event.repoRuntimeId)
     void manager
       .closeSessionsForRepo(event.userId, scope)
-      .then(async (closed) => {
-        if (!closed) throw new Error('terminal session close failed')
+      .then(async (retirement) => {
+        if (retirement.failures.length > 0) throw new Error('terminal session close failed')
         manager.releaseProjectionRevisionForScope(event.userId, scope)
         await workspaceTabsCoordinator.closeInvalidatedScope({ userId: event.userId, scope })
         broadcastRepoSessionsChanged(event.userId, event.repoRoot)
@@ -327,7 +311,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       unsubscribeRepoRuntimeClosed()
       physicalWorktrees.dispose()
       coordinator.shutdown()
-      manager.forceCloseAllForShutdown()
+      manager.forceShutdown()
       ptySupervisor.shutdown()
     },
   })

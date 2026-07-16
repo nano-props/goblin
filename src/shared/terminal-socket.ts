@@ -11,8 +11,7 @@ import type {
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalRestartResult,
-  TerminalSessionInput,
-  TerminalSessionsRecoveryResult,
+  TerminalSessionsSnapshot,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTitleEvent,
@@ -56,7 +55,6 @@ export interface TerminalSocketRequestInputs {
   write: TerminalWriteInput
   resize: TerminalResizeInput
   takeover: TerminalTakeoverInput
-  close: TerminalSessionInput
   'recover-sessions': TerminalListSessionsInput
   prune: TerminalPruneInput
 }
@@ -67,8 +65,7 @@ export interface TerminalSocketResponseOutputs {
   write: TerminalWriteResult
   resize: TerminalMutationResult
   takeover: TerminalTakeoverResult
-  close: TerminalMutationResult
-  'recover-sessions': TerminalSessionsRecoveryResult
+  'recover-sessions': TerminalSessionsSnapshot
   prune: { pruned: number; remaining: number }
 }
 

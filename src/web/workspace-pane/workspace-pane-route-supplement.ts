@@ -2,6 +2,7 @@ import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { workspacePaneCommittedRuntimeTargetIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 export interface WorkspacePaneRouteSupplementTarget {
   repoId: string
@@ -23,6 +24,29 @@ export function commitWorkspacePaneRouteSupplement(
   state.setWorkspacePaneTab(
     target.repoId,
     target.branchName,
+    route === null ? null : route.kind === 'static' ? route.tab : 'terminal',
+  )
+  if (route?.kind === 'terminal' && target.worktreePath) {
+    state.setSelectedTerminal(
+      formatTerminalWorktreeKey(target.repoId, target.worktreePath),
+      route.terminalSessionId,
+    )
+  }
+  return true
+}
+
+export function commitWorkspacePaneCommittedRuntimeRouteSupplement(
+  target: WorkspacePaneRouteSupplementTarget,
+  route: RepoBranchWorkspacePaneRouteTarget,
+): boolean {
+  if (!workspacePaneCommittedRuntimeTargetIsCurrent(target)) return false
+  const state = useReposStore.getState()
+  state.setWorkspacePaneTabForTarget(
+    {
+      repoRoot: target.repoId,
+      branchName: target.branchName,
+      worktreePath: target.worktreePath,
+    },
     route === null ? null : route.kind === 'static' ? route.tab : 'terminal',
   )
   if (route?.kind === 'terminal' && target.worktreePath) {

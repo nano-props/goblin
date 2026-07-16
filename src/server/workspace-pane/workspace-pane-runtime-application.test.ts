@@ -1,8 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { createWorkspacePaneRuntimeApplication } from '#/server/workspace-pane/workspace-pane-runtime-application.ts'
+import type { ServerTerminalCreateResult } from '#/server/terminal/terminal-session-creator.ts'
 import type { TerminalCreateResult } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import {
   createPhysicalWorktreeOperationCoordinator,
   type PhysicalWorktreeOperationPermit,
@@ -33,26 +32,22 @@ const request = {
 }
 
 describe('WorkspacePaneRuntimeApplication', () => {
-  test('returns the provider result and canonical tabs as one application outcome', async () => {
+  test('returns the provider result and broadcasts workspace invalidation', async () => {
     const runtime = terminalCreateSuccess()
     const create = vi.fn(async () => runtime)
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(request.worktreePath)
     const capture = vi.fn(async () => physicalWorktreeCapability)
-    const workspacePaneTabs = snapshot([
-      { type: 'status', tabId: 'workspace-pane:status' },
-      { type: 'terminal', runtimeSessionId: runtime.terminalSessionId },
-    ])
-    const ensureRuntimeTabForSession = vi.fn(async () => ({ kind: 'committed' as const, snapshot: workspacePaneTabs }))
+    const ensureRuntimeTabForSession = vi.fn(async (input: { commitAdmission: (canonicalBranch: string) => void }) => {
+      input.commitAdmission(request.branch)
+      return { kind: 'committed' as const }
+    })
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture },
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close: () => false },
-      workspaceTabsCoordinator: { ensureRuntimeTabForSession, reconcileWorktreeAdmitted: vi.fn() } as unknown as Pick<
-        WorkspacePaneTabsCoordinator,
-        'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'
-      >,
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession },
       isCurrentRepoRuntime: () => true,
       broadcastWorkspaceTabsChanged,
     })
@@ -82,8 +77,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(result).toEqual({
       ok: true,
       runtimeType: 'terminal',
-      runtime,
-      workspacePaneTabs,
+      runtime: publishedTerminalResult(runtime),
     })
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', '/repo')
   })
@@ -99,10 +93,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
         createAdmitted: async () => ({ ok: false, message: 'error.terminal-create-failed' }),
         close: () => false,
       },
-      workspaceTabsCoordinator: { ensureRuntimeTabForSession, reconcileWorktreeAdmitted: vi.fn() } as unknown as Pick<
-        WorkspacePaneTabsCoordinator,
-        'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'
-      >,
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession },
       isCurrentRepoRuntime: () => true,
       broadcastWorkspaceTabsChanged,
     })
@@ -134,10 +125,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       },
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close: () => false },
-      workspaceTabsCoordinator: { ensureRuntimeTabForSession, reconcileWorktreeAdmitted: vi.fn() } as unknown as Pick<
-        WorkspacePaneTabsCoordinator,
-        'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'
-      >,
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession },
       isCurrentRepoRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
@@ -173,10 +161,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       physicalWorktrees: { capture: async () => capability },
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close: () => false },
-      workspaceTabsCoordinator: { ensureRuntimeTabForSession, reconcileWorktreeAdmitted: vi.fn() } as unknown as Pick<
-        WorkspacePaneTabsCoordinator,
-        'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'
-      >,
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession },
       isCurrentRepoRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
@@ -194,18 +179,19 @@ describe('WorkspacePaneRuntimeApplication', () => {
   test.each(['created', 'reused', 'restored'] as const)(
     'rechecks repo runtime authority at the tab commit boundary for a %s terminal',
     async (action) => {
-      const runtime = terminalCreateSuccess()
-      runtime.action = action
+      const runtime = terminalCreateSuccess(action)
+      const retire = vi.fn()
+      runtime.admission =
+        action === 'created'
+          ? { ...runtime.admission, kind: 'prepared', abort: retire }
+          : { ...runtime.admission, kind: 'existing', abort: vi.fn() }
       const close = vi.fn(() => true)
-      const reconcileWorktree = vi.fn(async () => snapshot([]))
       const stale = { ok: false as const, runtimeType: 'terminal' as const, message: 'error.repo-runtime-stale' }
       const ensureRuntimeTabForSession = vi.fn(async (input: { isRuntimeCurrent: () => boolean }) =>
-        input.isRuntimeCurrent()
-          ? { kind: 'committed' as const, snapshot: snapshot([]) }
-          : { kind: 'runtime-stale' as const },
+        input.isRuntimeCurrent() ? { kind: 'committed' as const } : { kind: 'runtime-stale' as const },
       )
       const broadcastWorkspaceTabsChanged = vi.fn()
-      const providerResult = deferred<Extract<TerminalCreateResult, { ok: true }>>()
+      const providerResult = deferred<Extract<ServerTerminalCreateResult, { ok: true }>>()
       let current = true
       const create = vi.fn(async () => {
         const result = await providerResult.promise
@@ -218,10 +204,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
         physicalWorktrees: testPhysicalWorktrees,
         terminalWorktree: { listSessionsForUser: async () => [] },
         terminal: { createAdmitted: create, close },
-        workspaceTabsCoordinator: {
-          ensureRuntimeTabForSession,
-          reconcileWorktreeAdmitted: reconcileWorktree,
-        } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,
+        workspaceTabsCoordinator: { ensureRuntimeTabForSession },
         isCurrentRepoRuntime,
         broadcastWorkspaceTabsChanged,
       })
@@ -234,64 +217,15 @@ describe('WorkspacePaneRuntimeApplication', () => {
       expect(current).toBe(false)
       expect(isCurrentRepoRuntime).toHaveBeenCalledTimes(2)
       expect(ensureRuntimeTabForSession).toHaveBeenCalledOnce()
-      if (action === 'created') {
-        expect(close).toHaveBeenCalledOnce()
-        expect(close).toHaveBeenCalledWith('client-test', 'user-test', {
-          terminalRuntimeSessionId: runtime.terminalRuntimeSessionId,
-        })
-      } else {
-        expect(close).not.toHaveBeenCalled()
-      }
-      expect(reconcileWorktree).toHaveBeenCalledOnce()
-      expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', request.repoRoot)
+      expect(retire).toHaveBeenCalledTimes(action === 'created' ? 1 : 0)
+      expect(close).not.toHaveBeenCalled()
+      expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
     },
   )
 
-  test('reconciles provider truth when stale-open compensation is not acknowledged', async () => {
-    const runtime = terminalCreateSuccess()
-    const close = vi.fn(async () => false)
-    const stale = { ok: false as const, runtimeType: 'terminal' as const, message: 'error.repo-runtime-stale' }
-    const reconcileWorktree = vi.fn(async () =>
-      snapshot([{ type: 'terminal', runtimeSessionId: runtime.terminalSessionId }]),
-    )
-    const broadcastWorkspaceTabsChanged = vi.fn()
-    const providerResult = deferred<Extract<TerminalCreateResult, { ok: true }>>()
-    let current = true
-    const create = vi.fn(async () => {
-      const result = await providerResult.promise
-      current = false
-      return result
-    })
-    const application = createWorkspacePaneRuntimeApplication({
-      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
-      physicalWorktrees: testPhysicalWorktrees,
-      terminalWorktree: { listSessionsForUser: async () => [] },
-      terminal: { createAdmitted: create, close },
-      workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: async (input: { isRuntimeCurrent: () => boolean }) =>
-          input.isRuntimeCurrent()
-            ? { kind: 'committed' as const, snapshot: snapshot([]) }
-            : { kind: 'runtime-stale' as const },
-        reconcileWorktreeAdmitted: reconcileWorktree,
-      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,
-      isCurrentRepoRuntime: () => current,
-      broadcastWorkspaceTabsChanged,
-    })
-
-    const open = application.open('client-test', 'user-test', { runtimeType: 'terminal', request })
-    await vi.waitFor(() => expect(create).toHaveBeenCalledOnce())
-    providerResult.resolve(runtime)
-    await expect(open).resolves.toEqual(stale)
-    expect(close).toHaveBeenCalledOnce()
-    expect(reconcileWorktree).toHaveBeenCalledOnce()
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', request.repoRoot)
-  })
-
-  test('closes a terminal by durable session id and returns the canonical scope snapshot', async () => {
+  test('closes a terminal by durable session id and leaves projection cleanup to the close event', async () => {
     const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
     const close = vi.fn(() => true)
-    const workspacePaneTabs = snapshot([{ type: 'status', tabId: 'workspace-pane:status' }])
-    const reconcileWorktree = vi.fn(async () => workspacePaneTabs)
     const broadcastWorkspaceTabsChanged = vi.fn()
     const listSessions = vi.fn().mockResolvedValueOnce([session])
     const application = createWorkspacePaneRuntimeApplication({
@@ -299,10 +233,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       physicalWorktrees: testPhysicalWorktrees,
       terminalWorktree: { listSessionsForUser: listSessions },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
-      workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: vi.fn(),
-        reconcileWorktreeAdmitted: reconcileWorktree,
-      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentRepoRuntime: () => true,
       broadcastWorkspaceTabsChanged,
     })
@@ -327,37 +258,21 @@ describe('WorkspacePaneRuntimeApplication', () => {
         terminalRuntimeSessionId: session.terminalRuntimeSessionId,
         terminalRuntimeGeneration: session.terminalRuntimeGeneration,
       },
-      workspacePaneTabs,
     })
     expect(close).toHaveBeenCalledWith('client-test', 'user-test', {
       terminalRuntimeSessionId: session.terminalRuntimeSessionId,
     })
-    expect(reconcileWorktree).toHaveBeenCalledWith({
-      userId: 'user-test',
-      repoRoot: request.repoRoot,
-      scope: '/repo\0repo-runtime-test',
-      worktreePath: request.worktreePath,
-      physicalWorktreeCapability: expect.objectContaining({
-        identity: testPhysicalWorktreeIdentity(request.worktreePath),
-      }),
-      permit: expect.objectContaining({ operationId: expect.any(Number) }),
-    })
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', request.repoRoot)
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
 
-  test('reports an already-closed durable identity and still reconciles tabs', async () => {
+  test('reports an already-closed durable identity without redundant projection reconciliation', async () => {
     const close = vi.fn()
-    const workspacePaneTabs = snapshot([{ type: 'status', tabId: 'workspace-pane:status' }])
-    const reconcileWorktree = vi.fn(async () => workspacePaneTabs)
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
-      workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: vi.fn(),
-        reconcileWorktreeAdmitted: reconcileWorktree,
-      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentRepoRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
@@ -382,24 +297,18 @@ describe('WorkspacePaneRuntimeApplication', () => {
         terminalRuntimeSessionId: null,
         terminalRuntimeGeneration: null,
       },
-      workspacePaneTabs,
     })
     expect(close).not.toHaveBeenCalled()
-    expect(reconcileWorktree).toHaveBeenCalledOnce()
   })
 
   test('does not claim runtime close success or mutate tabs when provider close is unconfirmed', async () => {
     const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
-    const reconcileWorktree = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
       terminalWorktree: { listSessionsForUser: async () => [session] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close: async () => false },
-      workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: vi.fn(),
-        reconcileWorktreeAdmitted: reconcileWorktree,
-      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentRepoRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
@@ -416,11 +325,10 @@ describe('WorkspacePaneRuntimeApplication', () => {
         },
       }),
     ).resolves.toEqual({ ok: false, runtimeType: 'terminal', message: 'error.unavailable' })
-    expect(reconcileWorktree).not.toHaveBeenCalled()
   })
 
   test('serializes open and close through the shared user/runtime/worktree queue', async () => {
-    const createResult = deferred<Extract<TerminalCreateResult, { ok: true }>>()
+    const createResult = deferred<Extract<ServerTerminalCreateResult, { ok: true }>>()
     const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
     const listSessions = vi.fn().mockResolvedValueOnce([session]).mockResolvedValueOnce([])
     const application = createWorkspacePaneRuntimeApplication({
@@ -432,12 +340,11 @@ describe('WorkspacePaneRuntimeApplication', () => {
         close: () => true,
       },
       workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: async () => ({
-          kind: 'committed' as const,
-          snapshot: snapshot([{ type: 'terminal', runtimeSessionId: session.terminalSessionId }]),
-        }),
-        reconcileWorktreeAdmitted: async () => snapshot([]),
-      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,
+        ensureRuntimeTabForSession: async (input: { commitAdmission: (canonicalBranch: string) => void }) => {
+          input.commitAdmission(request.branch)
+          return { kind: 'committed' as const }
+        },
+      },
       isCurrentRepoRuntime: () => true,
       broadcastWorkspaceTabsChanged: () => {},
     })
@@ -464,7 +371,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
 
   test('lets an earlier admitted open finish before a later removal that fails validation', async () => {
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
-    const createResult = deferred<Extract<TerminalCreateResult, { ok: true }>>()
+    const createResult = deferred<Extract<ServerTerminalCreateResult, { ok: true }>>()
     const create = vi.fn(async () => await createResult.promise)
     const close = vi.fn(async () => true)
     const application = createWorkspacePaneRuntimeApplication({
@@ -476,15 +383,13 @@ describe('WorkspacePaneRuntimeApplication', () => {
         ensureRuntimeTabForSession: async (input: {
           physicalWorktreeCapability: ReturnType<typeof testPhysicalWorktreeExecutionCapability>
           permit: PhysicalWorktreeOperationPermit
+          commitAdmission: (canonicalBranch: string) => void
         }) => {
           worktreeOperations.assertPermit(input.physicalWorktreeCapability, input.permit)
-          return {
-            kind: 'committed' as const,
-            snapshot: snapshot([{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }]),
-          }
+          input.commitAdmission(request.branch)
+          return { kind: 'committed' as const }
         },
-        reconcileWorktreeAdmitted: vi.fn(),
-      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,
+      },
       isCurrentRepoRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
@@ -518,10 +423,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       physicalWorktrees: { capture: async () => physicalWorktreeCapability },
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => false },
-      workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: vi.fn(),
-        reconcileWorktreeAdmitted: vi.fn(),
-      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentRepoRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
@@ -536,10 +438,11 @@ describe('WorkspacePaneRuntimeApplication', () => {
     await removal
   })
 
-  test('closes a newly created terminal and reconciles if projection unexpectedly throws', async () => {
+  test('retires an unpublished terminal if placement preparation throws', async () => {
     const runtime = terminalCreateSuccess()
+    const retire = vi.fn()
+    runtime.admission = { ...runtime.admission, kind: 'prepared', abort: retire }
     const close = vi.fn(async () => true)
-    const reconcileWorktree = vi.fn(async () => snapshot([]))
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
@@ -550,8 +453,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
         ensureRuntimeTabForSession: async () => {
           throw new Error('projection failed')
         },
-        reconcileWorktreeAdmitted: reconcileWorktree,
-      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,
+      },
       isCurrentRepoRuntime: () => true,
       broadcastWorkspaceTabsChanged,
     })
@@ -561,45 +463,87 @@ describe('WorkspacePaneRuntimeApplication', () => {
       runtimeType: 'terminal',
       message: 'error.unavailable',
     })
-    expect(close).toHaveBeenCalledWith('client-test', 'user-test', {
-      terminalRuntimeSessionId: runtime.terminalRuntimeSessionId,
+    expect(retire).toHaveBeenCalledOnce()
+    expect(close).not.toHaveBeenCalled()
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
+  })
+
+  test('does not compensate an invariant failure after admission', async () => {
+    const runtime = terminalCreateSuccess()
+    const publish = vi.fn(() => committedTerminalResult('created'))
+    const retire = vi.fn()
+    const publishCommittedEffects = vi.fn()
+    runtime.admission = { kind: 'prepared', commit: publish, publishCommittedEffects, abort: retire }
+    const close = vi.fn(async () => true)
+    const broadcastWorkspaceTabsChanged = vi.fn()
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
+      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminal: { createAdmitted: async () => runtime, close },
+      workspaceTabsCoordinator: {
+        ensureRuntimeTabForSession: async (input: { commitAdmission: (canonicalBranch: string) => void }) => {
+          input.commitAdmission(request.branch)
+          throw new Error('invariant failure after admission')
+        },
+      },
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged,
     })
-    expect(reconcileWorktree).toHaveBeenCalledOnce()
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', request.repoRoot)
+
+    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual({
+      ok: false,
+      runtimeType: 'terminal',
+      message: 'error.unavailable',
+    })
+    expect(publish).toHaveBeenCalledOnce()
+    expect(retire).not.toHaveBeenCalled()
+    expect(close).not.toHaveBeenCalled()
+    expect(publishCommittedEffects).not.toHaveBeenCalled()
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
 })
 
-function snapshot(tabs: WorkspacePaneTabsSnapshot['entries'][number]['tabs']): WorkspacePaneTabsSnapshot {
-  return {
-    revision: 1,
-    entries: [
-      {
-        repoRoot: request.repoRoot,
-        branchName: request.branch,
-        worktreePath: request.worktreePath,
-        tabs,
-      },
-    ],
-  }
-}
-
-function terminalCreateSuccess(): Extract<TerminalCreateResult, { ok: true }> {
+function terminalCreateSuccess(action: 'created' | 'restored' | 'reused' = 'created'): Extract<ServerTerminalCreateResult, { ok: true }> {
   const terminalRuntimeSessionId = 'pty_session_1_aaaaaaaaa'
   const terminalSessionId = 'term-111111111111111111111'
   return {
     ok: true,
-    action: 'created',
     terminalSessionId,
-    terminalSessionsRevision: 1,
+    admission: {
+      kind: 'existing',
+      commit: () => committedTerminalResult(action),
+      publishCommittedEffects: vi.fn(),
+      abort: vi.fn(),
+    },
     terminalRuntimeSessionId,
+  }
+}
+
+function committedTerminalResult(action: 'created' | 'restored' | 'reused') {
+  return {
+    action,
+    branch: request.branch,
+    terminalSessionsRevision: 1,
+    terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
     terminalRuntimeGeneration: 1,
     processName: 'zsh',
     canonicalTitle: null,
-    phase: 'open',
+    phase: 'open' as const,
     message: null,
-    controller: { clientId: 'client-test', status: 'connected' },
+    controller: { clientId: 'client-test', status: 'connected' as const },
     canonicalCols: 100,
     canonicalRows: 30,
+  }
+}
+
+function publishedTerminalResult(
+  runtime: Extract<ServerTerminalCreateResult, { ok: true }>,
+): Extract<TerminalCreateResult, { ok: true }> {
+  return {
+    ok: true,
+    terminalSessionId: runtime.terminalSessionId,
+    ...runtime.admission.commit({ canonicalBranch: request.branch }),
   }
 }
 

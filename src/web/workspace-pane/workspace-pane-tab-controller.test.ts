@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   beginWorkspacePaneCloseActiveTabPresentationLease,
+  commitWorkspacePaneCommittedRuntimeTargetRoute,
   commitWorkspacePaneControllerCloseBackTarget,
   commitWorkspacePaneExactTargetRoute,
   selectWorkspacePaneControllerTab,
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RepoWorkspaceStaticTab, RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -74,6 +76,36 @@ describe('workspace pane tab controller transactions', () => {
       TARGET_ROUTE,
       expect.objectContaining({ routePrecondition: { kind: 'current-workspace-target' } }),
     )
+  })
+
+  test('commits a server-created runtime route while the local branch label is stale', async () => {
+    const navigation = committingNavigation()
+
+    await expect(
+      commitWorkspacePaneCommittedRuntimeTargetRoute(
+        {
+          repoId: '/repo',
+          repoRuntimeId: 'repo-runtime-1',
+          branchName: 'feature/renamed',
+          worktreePath: '/worktree-a',
+        },
+        { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+        navigation,
+      ),
+    ).resolves.toBe(true)
+
+    expect(navigation.commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
+      '/repo',
+      'feature/renamed',
+      { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+      expect.any(Object),
+    )
+    const targetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: '/repo',
+      branchName: 'feature/renamed',
+      worktreePath: '/worktree-a',
+    })
+    expect(useReposStore.getState().repos['/repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe('terminal')
   })
 
   test('rejects exact target completion after its runtime is replaced', async () => {

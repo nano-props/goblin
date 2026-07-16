@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { act, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -55,7 +55,6 @@ import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
 import {
   workspacePaneStaticTabEntry,
   workspacePaneRuntimeTabEntry,
-  workspacePaneTabsWithRuntimeTab,
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -472,6 +471,7 @@ beforeEach(() => {
       return {
         ok: true,
         action: 'reused',
+        branch: input.branch,
         terminalSessionsRevision: 1,
         terminalSessionId,
         terminalRuntimeSessionId: reused?.terminalRuntimeSessionId ?? 'term-111111111111111111111',
@@ -515,6 +515,7 @@ beforeEach(() => {
     return {
       ok: true,
       action: 'created',
+      branch: input.branch,
       terminalSessionsRevision: 1,
       terminalSessionId,
       terminalRuntimeSessionId: terminalSessionId,
@@ -601,9 +602,8 @@ beforeEach(() => {
         setBadge: vi.fn(async () => {}),
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         recoverSessions: async (input: { repoRoot: string }) => ({
-          terminalSessions: { revision: 1, sessions: completeServerSessions(await listSessionsMock(input)) },
-          snapshots: [],
-          workspacePaneTabs: { revision: 0, entries: [] },
+          revision: 1,
+          sessions: completeServerSessions(await listSessionsMock(input)),
         }),
         onOutput: vi.fn((cb: (event: TerminalOutputEvent) => void) => {
           outputHandler = cb
@@ -712,9 +712,8 @@ beforeEach(() => {
       close: closeMock,
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       recoverSessions: async (input) => ({
-        terminalSessions: { revision: 1, sessions: completeServerSessions(await listSessionsMock(input)) },
-        snapshots: [],
-        workspacePaneTabs: { revision: 0, entries: [] },
+        revision: 1,
+        sessions: completeServerSessions(await listSessionsMock(input)),
       }),
       notifyBell: window.goblinNative.terminal.notifyBell ?? vi.fn(async () => true),
       sendTestNotification: vi.fn(async () => true),
@@ -781,32 +780,10 @@ beforeEach(() => {
       open: vi.fn(async (input) => {
         const runtime = await createTerminalMock(input.request)
         if (!runtime.ok) return { ok: false as const, runtimeType: 'terminal' as const, message: runtime.message }
-        const tabs = workspacePaneTabsWithRuntimeTab(
-          readWorkspacePaneTabsForTarget({
-            repoRoot: input.request.repoRoot,
-            repoRuntimeId: input.request.repoRuntimeId,
-            branchName: input.request.branch,
-            worktreePath: input.request.worktreePath,
-          }),
-          'terminal',
-          runtime.terminalSessionId,
-          { insertAfterIdentity: input.insertAfterIdentity },
-        )
         return {
           ok: true as const,
           runtimeType: 'terminal' as const,
           runtime,
-          workspacePaneTabs: {
-            revision: 1,
-            entries: [
-              {
-                repoRoot: input.request.repoRoot,
-                branchName: input.request.branch,
-                worktreePath: input.request.worktreePath,
-                tabs,
-              },
-            ],
-          },
         }
       }),
       close: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
@@ -1159,7 +1136,7 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('updates reused terminal descriptors when the branch changes on the same worktree', async () => {
+  test('uses the authoritative repo-index branch when the client repo branch changes', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1204,7 +1181,7 @@ describe('TerminalSessionProvider', () => {
         await Promise.resolve()
       })
 
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(
           readTerminalSessionCommandBridge()?.terminalWorktreeSnapshot(terminalWorktreeKey).selectedDescriptor?.branch,
         ).toBe('feature/renamed')
@@ -1711,6 +1688,7 @@ describe('TerminalSessionProvider', () => {
     createTerminalMock.mockResolvedValueOnce({
       ok: true as const,
       action: 'created' as const,
+      branch: 'feature/worktree',
       terminalSessionId: 'term-111111111111111111111',
       terminalSessionsRevision: 1,
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',

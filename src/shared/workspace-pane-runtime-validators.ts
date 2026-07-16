@@ -11,7 +11,6 @@ import type {
 import {
   RepoRuntimeIdSchema,
   WorkspacePaneOptionalTabIdentitySchema,
-  WorkspacePaneTabsSnapshotSchema,
 } from '#/shared/workspace-pane-tabs-validators.ts'
 import { WORKSPACE_PANE_RUNTIME_TAB_TYPES } from '#/shared/workspace-pane.ts'
 
@@ -42,7 +41,6 @@ const WorkspacePaneRuntimeOpenResultEnvelopeSchema = v.variant('runtimeType', [
       ok: v.literal(true),
       runtimeType: v.literal('terminal'),
       runtime: v.unknown(),
-      workspacePaneTabs: WorkspacePaneTabsSnapshotSchema,
     }),
     v.object({
       ok: v.literal(false),
@@ -64,7 +62,6 @@ const WorkspacePaneRuntimeCloseResultSchema = v.variant('ok', [
         v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(Number.MAX_SAFE_INTEGER)),
       ),
     }),
-    workspacePaneTabs: WorkspacePaneTabsSnapshotSchema,
   }),
   v.object({
     ok: v.literal(false),

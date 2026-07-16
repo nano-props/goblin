@@ -86,7 +86,7 @@ export interface TerminalPtyBindingEvents<TSession extends TerminalPtySessionSta
   ): void
   emitTitle(session: TSession, event: Omit<TerminalTitleEvent, 'terminalSessionId' | 'repoRoot' | 'worktreePath'>): void
   emitExit(session: TSession, event: Omit<TerminalExitEvent, 'terminalSessionId' | 'repoRoot' | 'repoRuntimeId'>): void
-  closeSession(terminalRuntimeSessionId: string): void
+  confirmedExit(session: TSession, terminalRuntimeGeneration: number): void
 }
 
 export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
@@ -254,6 +254,11 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     disposeRender(session.render)
   }
 
+  disposeAfterConfirmedExit(session: TSession): void {
+    this.beginRetirement(session)
+    disposeRender(session.render)
+  }
+
   resize(session: TSession, cols: number, rows: number): boolean {
     if (!this.handle) return false
     if (session.cols === cols && session.rows === rows) return true
@@ -283,7 +288,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     signal?: AbortSignal,
   ): Promise<TerminalPtySpawnResult> {
     // Failure handling stays with the caller:
-    // - create failures remove the just-created session from manager maps;
+    // - create failures retire operation-owned resources without Directory publication;
     // - restart failures keep the session addressable for a later retry.
     let spawn: AbortablePtySpawn
     try {
@@ -411,7 +416,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
         if (!this.isCurrentBinding(session, generation, handle)) return
         this.handle = null
         this.events.emitExit(session, { terminalRuntimeSessionId: session.id, terminalRuntimeGeneration: generation })
-        this.events.closeSession(session.id)
+        this.events.confirmedExit(session, generation)
       }),
     )
     // `open` is the process-ready boundary: the supervisor returned a live

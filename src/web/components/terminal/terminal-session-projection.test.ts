@@ -44,13 +44,6 @@ describe('terminal session projection helpers', () => {
         cols: 120,
         rows: 40,
       },
-      serverSnapshot: {
-        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
-        snapshot: 'server-snap',
-        snapshotSeq: 9,
-        outputEra: 0,
-      },
     })
 
     expect(projected).toEqual({
@@ -75,8 +68,8 @@ describe('terminal session projection helpers', () => {
         controllerStatus: 'connected',
         canonicalCols: 120,
         canonicalRows: 40,
-        snapshot: 'server-snap',
-        snapshotSeq: 9,
+        snapshot: null,
+        snapshotSeq: 0,
         outputEra: 0,
       },
       controlsTerminal: true,
@@ -179,6 +172,40 @@ describe('terminal session projection helpers', () => {
     expect(projected?.descriptor.branch).toBe('feature/restored')
   })
 
+  test('keeps the current repo-index branch when catalog metadata is stale', () => {
+    const projected = projectServerTerminalSession({
+      repoIndex: {
+        [REPO_ROOT]: {
+          repoRuntimeId: REPO_RUNTIME_ID,
+          branchByWorktreePath: { [WORKTREE_PATH]: 'feature/current' },
+        },
+      },
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+      clientId: 'client_b',
+      index: 1,
+      serverSession: {
+        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-111111111111111111111',
+        repoRuntimeId: REPO_RUNTIME_ID,
+        repoRoot: REPO_ROOT,
+        branch: 'feature/stale',
+        worktreePath: WORKTREE_PATH,
+        cwd: WORKTREE_PATH,
+        controller: null,
+        processName: 'bash',
+        canonicalTitle: null,
+        phase: 'open',
+        message: null,
+        cols: 80,
+        rows: 24,
+      },
+    })
+
+    expect(projected?.descriptor.branch).toBe('feature/current')
+  })
+
   test('projects attach results into local controller state for the active attachment', () => {
     const projected = projectTerminalAttachResultForClient(
       {
@@ -204,12 +231,13 @@ describe('terminal session projection helpers', () => {
     expect(projected.controllerStatus).toBe('connected')
   })
 
-  test('materializes a prepared create projection from metadata only', () => {
+  test('materializes a prepared create projection with the committed canonical branch', () => {
     const projected = projectCreateResultForClient(
-      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'main', worktreePath: WORKTREE_PATH },
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'feature/stale', worktreePath: WORKTREE_PATH },
       {
         ok: true,
         action: 'created',
+        branch: 'feature/renamed',
         terminalSessionId: 'term-111111111111111111111',
         terminalSessionsRevision: 1,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
@@ -230,7 +258,7 @@ describe('terminal session projection helpers', () => {
       terminalSessionId: 'term-111111111111111111111',
       repoRuntimeId: REPO_RUNTIME_ID,
       repoRoot: REPO_ROOT,
-      branch: 'main',
+      branch: 'feature/renamed',
       worktreePath: WORKTREE_PATH,
       cwd: WORKTREE_PATH,
       controller: { clientId: 'client_a', status: 'connected' },
@@ -249,6 +277,7 @@ describe('terminal session projection helpers', () => {
       {
         ok: true,
         action: 'created',
+        branch: 'main',
         terminalSessionId: 'term-111111111111111111111',
         terminalSessionsRevision: 1,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
@@ -287,6 +316,7 @@ describe('terminal session projection helpers', () => {
       {
         ok: true,
         action: 'restored',
+        branch: 'main',
         terminalSessionId: 'term-111111111111111111111',
         terminalSessionsRevision: 1,
         terminalRuntimeSessionId: 'pty_session_new_aaaaaaaaa',

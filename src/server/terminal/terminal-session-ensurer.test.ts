@@ -101,10 +101,8 @@ describe('terminal session ensurer', () => {
 
   test('ensures local terminal sessions with resolved worktree metadata', async () => {
     const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId, input.cols, input.rows))
-    const broadcastSessionsChanged = vi.fn()
     const ensurer = createTerminalSessionEnsurer({
       manager: { prepareSession },
-      broadcastSessionsChanged,
     })
 
     const context = ensureContext({
@@ -113,7 +111,6 @@ describe('terminal session ensurer', () => {
       rows: 40,
       scopedWorktreePath: path.resolve(WORKTREE_PATH),
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
-      action: 'created',
     })
     const result = await ensurer.ensure(
       USER_ID,
@@ -130,11 +127,8 @@ describe('terminal session ensurer', () => {
 
     expect(result).toMatchObject({
       ok: true,
-      terminalSessionsRevision: 7,
-      action: 'created',
+      admission: { kind: 'existing' },
       terminalSessionId: 'term-locallocallocallocal1',
-      canonicalCols: 100,
-      canonicalRows: 40,
     })
     expect(getWorktrees).not.toHaveBeenCalled()
     expect(resolveKnownWorktree).not.toHaveBeenCalled()
@@ -155,15 +149,12 @@ describe('terminal session ensurer', () => {
       env: undefined,
       signal: context.signal,
     })
-    expect(broadcastSessionsChanged).toHaveBeenCalledWith(USER_ID, REPO_ROOT)
   })
 
   test('ensures remote terminal sessions through an SSH invocation', async () => {
     const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId, input.cols, input.rows))
-    const broadcastSessionsChanged = vi.fn()
     const ensurer = createTerminalSessionEnsurer({
       manager: { prepareSession },
-      broadcastSessionsChanged,
     })
 
     const result = await ensurer.ensure(
@@ -181,16 +172,12 @@ describe('terminal session ensurer', () => {
         rows: 32,
         scopedWorktreePath: REMOTE_WORKTREE_PATH,
         physicalWorktreeCapability: remotePhysicalWorktreeExecutionCapability(),
-        action: 'reused',
       }),
     )
 
     expect(result).toMatchObject({
       ok: true,
-      action: 'reused',
       terminalSessionId: 'term-remoteremoteremote001',
-      canonicalCols: 120,
-      canonicalRows: 32,
     })
     expect(resolveRemoteTarget).not.toHaveBeenCalled()
     expect(prepareSession).toHaveBeenCalledTimes(1)
@@ -216,16 +203,13 @@ describe('terminal session ensurer', () => {
     expect(input?.args?.at(-1)).toContain(REMOTE_WORKTREE_PATH)
     expect(input?.args?.at(-1)).toContain('pwd')
     expect(input?.startupShellCommand).toBeUndefined()
-    expect(broadcastSessionsChanged).toHaveBeenCalledWith(USER_ID, REMOTE_REPO_ROOT)
   })
 
   test('uses the captured remote target after SSH config changes', async () => {
     vi.mocked(resolveRemoteTarget).mockRejectedValueOnce(new Error('error.ssh-config-changed'))
     const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId, input.cols, input.rows))
-    const broadcastSessionsChanged = vi.fn()
     const ensurer = createTerminalSessionEnsurer({
       manager: { prepareSession },
-      broadcastSessionsChanged,
     })
 
     await expect(
@@ -243,7 +227,6 @@ describe('terminal session ensurer', () => {
           rows: 24,
           scopedWorktreePath: REMOTE_WORKTREE_PATH,
           physicalWorktreeCapability: remotePhysicalWorktreeExecutionCapability(),
-          action: 'created',
         }),
       ),
     ).resolves.toMatchObject({ ok: true })
@@ -259,15 +242,25 @@ function preparedResult(
 ): Extract<TerminalSessionPrepareManagerResult, { ok: true }> {
   return {
     ok: true,
-    terminalSessionsRevision: 7,
+    admission: {
+      kind: 'existing',
+      commit: () => ({
+        action: 'created',
+        branch: BRANCH_NAME,
+        terminalSessionsRevision: 7,
+        terminalRuntimeSessionId: `pty_${terminalSessionId}`,
+        terminalRuntimeGeneration: 1,
+        processName: 'zsh',
+        canonicalTitle: null,
+        phase: 'open',
+        message: null,
+        controller: null,
+        canonicalCols: cols,
+        canonicalRows: rows,
+      }),
+      publishCommittedEffects: () => {},
+      abort: () => {},
+    },
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
-    terminalRuntimeGeneration: 1,
-    processName: 'zsh',
-    canonicalTitle: null,
-    phase: 'open',
-    message: null,
-    controller: null,
-    canonicalCols: cols,
-    canonicalRows: rows,
   }
 }

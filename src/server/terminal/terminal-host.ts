@@ -9,7 +9,7 @@ import type {
   TerminalRestartResult,
   TerminalSessionInput,
   TerminalSessionSummary,
-  TerminalSessionsRecoveryResult,
+  TerminalSessionsSnapshot,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalWriteInput,
@@ -94,7 +94,7 @@ export interface ServerTerminalActionHost {
     clientId: string,
     userId: string,
     input: TerminalListSessionsInput,
-  ): MaybePromise<TerminalSessionsRecoveryResult>
+  ): MaybePromise<TerminalSessionsSnapshot>
   prune(
     clientId: string,
     userId: string,

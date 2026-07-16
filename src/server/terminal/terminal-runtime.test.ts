@@ -440,7 +440,6 @@ describe('server terminal runtime', () => {
     ).resolves.toMatchObject({ ok: true, frame: 'stream', terminalRuntimeGeneration: 1 })
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toEqual([
       { type: 'sessions-changed', repoRoot: REPO_ROOT },
-      { type: 'sessions-changed', repoRoot: REPO_ROOT },
     ])
 
     host.unregisterSocket('client_a', USER_1, socket)
@@ -1386,7 +1385,7 @@ describe('server terminal runtime', () => {
         message: 'pty spawn failed',
       }),
     ])
-    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(2)
+    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
 
     // A never-spawned session has no exit event — lock in that
     // semantic so we don't regress to broadcasting a phantom exit.
@@ -1601,17 +1600,6 @@ describe('server terminal runtime', () => {
           action: 'created',
           controller: { clientId: 'client_a', status: 'connected' },
         },
-        workspacePaneTabs: {
-          revision: expect.any(Number),
-          entries: [
-            {
-              tabs: [
-                { type: 'status', tabId: 'workspace-pane:status' },
-                { type: 'terminal', runtimeSessionId: expect.any(String) },
-              ],
-            },
-          ],
-        },
       },
     })
     expect(mockPtys).toHaveLength(0)
@@ -1673,10 +1661,6 @@ describe('server terminal runtime', () => {
         action: 'closed',
         terminalSessionId: opened.runtime.terminalSessionId,
         terminalRuntimeSessionId: opened.runtime.terminalRuntimeSessionId,
-      },
-      workspacePaneTabs: {
-        revision: expect.any(Number),
-        entries: [],
       },
     })
     await expect(

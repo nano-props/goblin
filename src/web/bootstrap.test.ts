@@ -172,11 +172,7 @@ describe('client bootstrap', () => {
         takeover: async () => ({ ok: false as const, message: 'error.invalid-arguments' }),
         close: async () => false,
         pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
-        recoverSessions: async () => ({
-          terminalSessions: { revision: 0, sessions: [] },
-          snapshots: [],
-          workspacePaneTabs: { revision: 0, entries: [] },
-        }),
+        recoverSessions: async () => ({ revision: 0, sessions: [] }),
         notifyBell: async () => false,
         sendTestNotification: async () => false,
         setBadge: () => {},

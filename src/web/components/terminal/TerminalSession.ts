@@ -71,7 +71,6 @@ interface PendingOutputWrite {
 export class TerminalSession {
   descriptor: TerminalDescriptor
   private readonly notify: (reason: TerminalNotifyReason) => void
-  private readonly requestDurableClose: (terminalRuntimeSessionId: string) => Promise<void>
   private readonly writeFailureReporter: TerminalWriteFailureReporter
   private readonly runtime = new TerminalSessionRuntime()
   private readonly view: TerminalSessionView
@@ -109,19 +108,10 @@ export class TerminalSession {
   constructor(
     descriptor: TerminalDescriptor,
     notify: (reason: TerminalNotifyReason) => void,
-    // Durable close hook. The projection passes this in so dispose() can
-    // hand the close to a queue (drained on the next create for the
-    // same worktree) instead of firing `terminalClient.close` as a
-    // fire-and-forget. The old `void … .catch(() => {})` path could
-    // drop the request if the WebSocket was already closing, leaving
-    // the server PTY alive and the next create reattaching to the
-    // orphan. See `TerminalSessionLifecycleQueues`.
-    requestDurableClose: (terminalRuntimeSessionId: string) => Promise<void> = () => Promise.resolve(),
     writeFailureReporter: TerminalWriteFailureReporter = createTerminalWriteFailureReporter(),
   ) {
     this.descriptor = descriptor
     this.notify = notify
-    this.requestDurableClose = requestDurableClose
     this.writeFailureReporter = writeFailureReporter
     this.view = new TerminalSessionView({
       onInput: (data) => this.writeInput(data),
@@ -164,6 +154,13 @@ export class TerminalSession {
     return (phase === 'opening' || phase === 'open') && this.runtime.clientRole() === 'unowned'
   }
 
+  resynchronizeConnectedView(): void {
+    if (this.disposed || !this.view.isConnected()) return
+    if (!this.shouldStartAttachedSession()) return
+    if (this.view.currentTerminal()) this.destroyActiveView()
+    this.start()
+  }
+
   detach(host: HTMLElement): void {
     this.clearTerminalFocusIfOwned()
     if (this.view.detach(host) && this.destroyActiveView()) this.notify('metadata')
@@ -177,43 +174,20 @@ export class TerminalSession {
     this.start()
   }
 
-  dispose(options: { closeSession?: boolean } = {}): void {
-    void this.disposeAndWait(options).catch(() => {
-      // Durable close failures are logged at the projection queue. The
-      // synchronous dispose surface intentionally preserves the old
-      // fire-and-forget behaviour for callers that are not resource gates.
-    })
-  }
-
-  async disposeAndWait(options: { closeSession?: boolean } = {}): Promise<void> {
+  dispose(): void {
     if (this.disposed) return
     this.disposed = true
     this.geometryAbortController?.abort()
     this.geometryAbortController = null
     this.clearTerminalFocusIfOwned()
     this.view.blurIfFocused()
-    const terminalRuntimeSessionIds = this.runtime.disposeTerminalRuntimeSessionIds()
-    const closePromises: Promise<void>[] = []
-    if (options.closeSession !== false) {
-      // Hand the close to the projection's durable queue instead of
-      // firing `terminalClient.close` directly. The queue resolves
-      // only after the server close settles, so async close callers
-      // can use this method as a resource-release barrier.
-      for (const terminalRuntimeSessionId of terminalRuntimeSessionIds) {
-        closePromises.push(this.requestDurableClose(terminalRuntimeSessionId))
-      }
-    }
+    this.runtime.disposeTerminalRuntimeSessionIds()
     this.destroyActiveView()
     this.view.disposeFrame()
-    await Promise.all(closePromises)
   }
 
-  async closeServerResourcesAndWait(): Promise<void> {
-    if (this.disposed) return
-    const terminalRuntimeSessionIds = this.runtime.terminalRuntimeSessionIdsForClose()
-    await Promise.all(
-      terminalRuntimeSessionIds.map((terminalRuntimeSessionId) => this.requestDurableClose(terminalRuntimeSessionId)),
-    )
+  async disposeAndWait(): Promise<void> {
+    this.dispose()
   }
 
   snapshot() {
@@ -826,10 +800,7 @@ export class TerminalSession {
       ? await terminalClient.restart(this.terminalRestartInput(terminalRuntimeSessionId, term))
       : await terminalClient.attach(this.terminalAttachInput(terminalRuntimeSessionId, term))
     if (this.disposed || this.startEpoch !== epoch || this.view.currentTerminal() !== term) {
-      if (this.disposed) {
-        if (result.ok) void this.requestDurableClose(result.terminalRuntimeSessionId).catch(() => {})
-        else this.closeRestartBaseSession()
-      }
+      if (this.disposed && !result.ok) this.runtime.takePendingRestartTerminalRuntimeSessionIdForClose()
       throw new StartCancelledError()
     }
     if (!result.ok) {
@@ -1296,10 +1267,6 @@ export class TerminalSession {
     if (this.isTerminalFocusTarget(document.activeElement)) setTerminalFocused(false)
   }
 
-  private closeRestartBaseSession(): void {
-    const terminalRuntimeSessionId = this.runtime.takePendingRestartTerminalRuntimeSessionIdForClose()
-    if (terminalRuntimeSessionId) void this.requestDurableClose(terminalRuntimeSessionId).catch(() => {})
-  }
 }
 
 function waitForTerminalLayout(): Promise<void> {

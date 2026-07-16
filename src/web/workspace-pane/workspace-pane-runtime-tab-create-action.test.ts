@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalCreateLeaderAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -27,24 +26,17 @@ const BASE: TerminalSessionBase = {
 const terminalCreateCommandMocks = vi.hoisted(() => ({
   runCreateTerminalTabCommand: vi.fn(),
 }))
-const workspacePaneTabsCommitMocks = vi.hoisted(() => ({
-  writeCanonicalWorkspacePaneTabsSnapshot: vi.fn(),
-}))
 const workspacePaneTabsQueryMocks = vi.hoisted(() => ({
-  refreshWorkspacePaneTabs: vi.fn(),
+  refreshWorkspacePaneTabsQueryData: vi.fn(),
 }))
 
 vi.mock('#/web/commands/terminal-create-command.ts', () => ({
   runCreateTerminalTabCommand: terminalCreateCommandMocks.runCreateTerminalTabCommand,
 }))
 
-vi.mock('#/web/workspace-pane/workspace-pane-tabs-commit.ts', () => ({
-  writeCanonicalWorkspacePaneTabsSnapshot: workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsSnapshot,
-}))
-
 vi.mock('#/web/workspace-pane/workspace-pane-tabs-query.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('#/web/workspace-pane/workspace-pane-tabs-query.ts')>()),
-  refreshWorkspacePaneTabs: workspacePaneTabsQueryMocks.refreshWorkspacePaneTabs,
+  refreshWorkspacePaneTabsQueryData: workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData,
 }))
 
 beforeEach(() => {
@@ -56,9 +48,8 @@ beforeEach(() => {
     terminalSessionId: TERMINAL_SESSION_ID,
     presentationStatus: 'committed',
   })
-  workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsSnapshot.mockReset()
-  workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsSnapshot.mockResolvedValue(true)
-  workspacePaneTabsQueryMocks.refreshWorkspacePaneTabs.mockReset()
+  workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mockReset()
+  workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -112,7 +103,7 @@ describe('workspace pane runtime tab create action', () => {
       commitCreatedTerminalTab: (admission: TerminalCreateLeaderAdmissionResult) => Promise<unknown>
     }
     await commandInput.commitCreatedTerminalTab(createAdmission())
-    expect(showCreatedRuntimeTab).toHaveBeenCalledWith('terminal', TERMINAL_SESSION_ID)
+    expect(showCreatedRuntimeTab).toHaveBeenCalledWith('terminal', TERMINAL_SESSION_ID, BRANCH_NAME)
   })
 
   test('dispatches immediately without holding the client workspace-pane operation queue', async () => {
@@ -131,13 +122,8 @@ describe('workspace pane runtime tab create action', () => {
     )
   })
 
-  test('applies the server snapshot, records the opener, then commits the exact route', async () => {
-    const admission = createAdmission({
-      tabs: [
-        { type: 'status', tabId: 'workspace-pane:status' },
-        { type: 'terminal', runtimeSessionId: TERMINAL_SESSION_ID },
-      ],
-    })
+  test('refreshes the canonical projection, records the opener, then commits the exact route', async () => {
+    const admission = createAdmission()
     const showCreatedTerminalTab = vi.fn(() => {
       expect(workspacePaneTabOpener(REPO_ROOT, REPO_RUNTIME_ID, BRANCH_NAME, `terminal:${TERMINAL_SESSION_ID}`)).toBe(
         'workspace-pane:status',
@@ -154,19 +140,17 @@ describe('workspace pane runtime tab create action', () => {
       }),
     ).resolves.toEqual({ status: 'committed' })
 
-    expect(workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsSnapshot).toHaveBeenCalledWith(
-      REPO_ROOT,
-      REPO_RUNTIME_ID,
-      admission.workspacePaneTabs,
-    )
-    expect(showCreatedTerminalTab).toHaveBeenCalledWith(TERMINAL_SESSION_ID)
+    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).toHaveBeenCalledWith(REPO_ROOT, REPO_RUNTIME_ID)
+    expect(showCreatedTerminalTab).toHaveBeenCalledWith(TERMINAL_SESSION_ID, BRANCH_NAME)
     expect(
-      workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsSnapshot.mock.invocationCallOrder[0],
+      workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mock.invocationCallOrder[0],
     ).toBeLessThan(showCreatedTerminalTab.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY)
   })
 
   test('does not navigate when a newer server snapshot supersedes create presentation', async () => {
-    workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsSnapshot.mockResolvedValueOnce(false)
+    workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mockImplementationOnce(async () => {
+      seedCurrentRepoRuntime('repo-runtime-replacement')
+    })
     const showCreatedTerminalTab = vi.fn(() => true)
 
     await expect(
@@ -202,7 +186,7 @@ describe('workspace pane runtime tab create action', () => {
   })
 
   test('refreshes after projection failure without routing an unprojected session', async () => {
-    workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsSnapshot.mockRejectedValueOnce(
+    workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mockRejectedValueOnce(
       new Error('query projection failed'),
     )
     const showCreatedTerminalTab = vi.fn(() => true)
@@ -216,7 +200,7 @@ describe('workspace pane runtime tab create action', () => {
       }),
     ).resolves.toEqual({ status: 'projection-failed' })
 
-    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabs).toHaveBeenCalledWith(REPO_ROOT, REPO_RUNTIME_ID)
+    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).toHaveBeenCalledWith(REPO_ROOT, REPO_RUNTIME_ID)
     expect(showCreatedTerminalTab).not.toHaveBeenCalled()
   })
 
@@ -259,22 +243,12 @@ function translate(key: string): string {
   return key
 }
 
-function createAdmission(input: { tabs?: WorkspacePaneTabEntry[] } = {}): TerminalCreateLeaderAdmissionResult {
+function createAdmission(): TerminalCreateLeaderAdmissionResult {
   return {
     terminalSessionId: TERMINAL_SESSION_ID,
+    branch: BRANCH_NAME,
     requestRole: 'leader',
     resourceDisposition: 'created',
-    workspacePaneTabs: {
-      revision: 1,
-      entries: [
-        {
-          repoRoot: REPO_ROOT,
-          branchName: BRANCH_NAME,
-          worktreePath: WORKTREE_PATH,
-          tabs: input.tabs ?? [{ type: 'terminal', runtimeSessionId: TERMINAL_SESSION_ID }],
-        },
-      ],
-    },
     runtimeProjectionApplied: true,
   }
 }

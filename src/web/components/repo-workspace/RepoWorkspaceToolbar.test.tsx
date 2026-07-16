@@ -39,6 +39,7 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import {
   createRepoBranch,
@@ -64,6 +65,7 @@ import {
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 
 let compactUi = false
+let workspacePaneTabsTestBridge: ReturnType<typeof installWorkspacePaneTabsTestBridge>
 const runtimeExternalAppSettings = vi.hoisted(() => ({
   value: {
     terminalAvailable: true,
@@ -161,7 +163,7 @@ beforeEach(() => {
     hydrated: true,
   })
   resetReposStore()
-  installWorkspacePaneTabsTestBridge()
+  workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
   // T6.1: the toolbar reads `isInitialSyncInFlight` from
   // useTerminalProjectionHydrationStore; existing tests assume the repo has been
   // synced. Mark ready by default so the "+ New" button renders; the
@@ -1345,7 +1347,17 @@ function renderToolbar(options: {
     snapshot: () => terminalSnapshot,
     subscribeSnapshot: () => () => {},
   }
-  const createTerminal = vi.fn(async () => 'term-111111111111111111111')
+  const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
+    const terminalSessionId = 'term-111111111111111111111'
+    workspacePaneTabsTestBridge.addRuntimeTab({
+      repoRoot: base.repoRoot,
+      repoRuntimeId: base.repoRuntimeId!,
+      branchName: base.branch,
+      worktreePath: base.worktreePath,
+      terminalSessionId,
+    })
+    return terminalSessionId
+  })
   const selectTerminal = vi.fn()
   const scrollToBottom = vi.fn()
   const closeTerminalByDescriptor = vi.fn(async () => true)

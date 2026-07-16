@@ -595,11 +595,7 @@ beforeEach(() => {
       takeover: terminalCalls.takeover.mockResolvedValue(takeoverResult('pty_session_1_aaaaaaaaa')),
       close: terminalCalls.close.mockResolvedValue(true),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-      recoverSessions: vi.fn(async () => ({
-        terminalSessions: { revision: 0, sessions: [] },
-        snapshots: [],
-        workspacePaneTabs: { revision: 0, entries: [] },
-      })),
+      recoverSessions: vi.fn(async () => ({ revision: 0, sessions: [] })),
       notifyBell: terminalCalls.notifyBell.mockResolvedValue(true),
       sendTestNotification: vi.fn(async () => true),
       setBadge: terminalCalls.setBadge,
@@ -1125,8 +1121,7 @@ describe('TerminalSession', () => {
     terminalCalls.restart.mockResolvedValueOnce({ ok: false, message: 'error.spawn-failed' })
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const durableClose = vi.fn(async () => {})
-    const session = new TerminalSession(descriptor, vi.fn(), durableClose)
+    const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -1145,7 +1140,6 @@ describe('TerminalSession', () => {
       processName: 'zsh',
       canonicalTitle: null,
     })
-    expect(durableClose).not.toHaveBeenCalled()
     expect(terminalCalls.close).not.toHaveBeenCalled()
   })
 
@@ -1192,7 +1186,7 @@ describe('TerminalSession', () => {
     const report = vi.fn()
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn(), undefined, { report })
+    const session = new TerminalSession(descriptor, vi.fn(), { report })
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -2520,20 +2514,10 @@ describe('TerminalSession', () => {
     })
   })
 
-  test('closes pending replacement session when disposed before restart reaches main', async () => {
+  test('does not issue a direct close when disposed before restart reaches main', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    // The new `requestDurableClose` callback is the seam TerminalSession
-    // uses to hand a close off to the projection's durable queue. In production
-    // the queue dedupes and the projection awaits it on the next create; in
-    // this test we wire it straight to `terminalCalls.close` so the same
-    // assertions the old test made still hold.
-    const pendingCloses: Array<Promise<unknown>> = []
-    const session = new TerminalSession(descriptor, vi.fn(), async (terminalRuntimeSessionId) => {
-      const promise = terminalCalls.close({ terminalRuntimeSessionId })
-      pendingCloses.push(promise)
-      await promise
-    })
+    const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -2541,22 +2525,16 @@ describe('TerminalSession', () => {
     session.restart()
     session.dispose()
     await flushTerminalStart()
-    // The close is now routed through the durable callback, not the
-    // bridge directly. Awaiting the queue's pending promise is the
-    // equivalent of "the projection's queue settled".
-    await Promise.allSettled(pendingCloses)
-
     expect(terminalCalls.restart).not.toHaveBeenCalled()
-    expect(terminalCalls.close).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa' })
+    expect(terminalCalls.close).not.toHaveBeenCalled()
   })
 
-  test('closes stale restart result when disposed while restart is in flight', async () => {
+  test('does not issue a direct close for a stale restart response after disposal', async () => {
     const restart = deferred<TerminalRestartResult>()
     terminalCalls.restart.mockReturnValueOnce(restart.promise)
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const durableClose = vi.fn(async () => {})
-    const session = new TerminalSession(descriptor, vi.fn(), durableClose)
+    const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)
     session.attach(host)
     await flushTerminalStart()
@@ -2567,8 +2545,6 @@ describe('TerminalSession', () => {
     restart.resolve(attachResult('pty_session_2_aaaaaaaaa'))
     await flushTerminalStart()
 
-    expect(durableClose).toHaveBeenCalledWith('pty_session_1_aaaaaaaaa')
-    expect(durableClose).toHaveBeenCalledWith('pty_session_2_aaaaaaaaa')
     expect(terminalCalls.close).not.toHaveBeenCalled()
   })
 

@@ -58,6 +58,8 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
+
+let workspacePaneTabsTestBridge: ReturnType<typeof installWorkspacePaneTabsTestBridge>
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
@@ -154,7 +156,7 @@ function preferenceBackedWorkspacePaneTabModel(repoId: string, branchName: strin
 beforeEach(() => {
   primaryWindowQueryClient.clear()
   resetReposStore()
-  installWorkspacePaneTabsTestBridge()
+  workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
   useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
   repoClientMocks.getRepoLog.mockResolvedValue([])
   repoClientMocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
@@ -1027,21 +1029,19 @@ describe('RepoWorkspaceContent', () => {
     const createTerminalWithAdmission: TerminalSessionContextValue['createTerminalWithAdmission'] = vi.fn(
       async (_base, options) => {
         resolvedStartupShellCommand = (await options?.resolveStartupShellCommand?.()) ?? null
+        workspacePaneTabsTestBridge.addRuntimeTab({
+          repoRoot: REPO_ID,
+          repoRuntimeId: repo.repoRuntimeId,
+          branchName,
+          worktreePath,
+          terminalSessionId: 'term-111111111111111111111',
+          insertAfterIdentity: 'workspace-pane:files',
+        })
         return {
           terminalSessionId: 'term-111111111111111111111',
+          branch: branchName,
           requestRole: 'leader' as const,
           resourceDisposition: 'created' as const,
-          workspacePaneTabs: {
-            revision: 1,
-            entries: [
-              {
-                repoRoot: REPO_ID,
-                branchName,
-                worktreePath,
-                tabs: [staticEntry('files'), terminalEntry('term-111111111111111111111'), staticEntry('status')],
-              },
-            ],
-          },
           runtimeProjectionApplied: true,
         }
       },
@@ -1221,7 +1221,7 @@ describe('RepoWorkspaceContent', () => {
       REPO_ID,
       repo.repoRuntimeId,
       'feature/history',
-      expect.objectContaining({ count: 50 }),
+      expect.objectContaining({ count: 100 }),
     )
     await waitFor(() => {
       expect(container.querySelector('[data-history-commit-graph=""]')).not.toBeNull()

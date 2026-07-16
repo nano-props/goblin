@@ -89,18 +89,17 @@ export function RepoWorkspaceToolbar({
   const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
   const showCreatedWorkspacePaneRuntimeTab = useCallback(
-    (type: WorkspacePaneRuntimeTabType, sessionId: string) => {
-      if (!branchName) return false
+    (type: WorkspacePaneRuntimeTabType, sessionId: string, canonicalBranch: string) => {
       if (type === 'terminal' && worktreePath) {
         return showCreatedTerminalWorkspacePaneRuntimeTab(
-          { repoRoot: repo.id, repoRuntimeId: repo.repoRuntimeId, branch: branchName, worktreePath },
+          { repoRoot: repo.id, repoRuntimeId: repo.repoRuntimeId, branch: canonicalBranch, worktreePath },
           sessionId,
           navigation,
         )
       }
       return false
     },
-    [branchName, navigation, repo.id, repo.repoRuntimeId, worktreePath],
+    [navigation, repo.id, repo.repoRuntimeId, worktreePath],
   )
   const showWorkspacePaneRuntimeTab = useCallback(
     (type: WorkspacePaneRuntimeTabType, sessionId: string) => {

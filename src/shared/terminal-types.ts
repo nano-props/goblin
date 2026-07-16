@@ -167,6 +167,8 @@ export type TerminalCreateResult =
   | ({
       ok: true
       action: TerminalCreateAction
+      /** Canonical branch label resolved at the admission commit boundary. */
+      branch: string
       terminalSessionId: string
       /** Exact terminal projection revision sampled with this metadata. */
       terminalSessionsRevision: number
@@ -233,14 +235,6 @@ export interface TerminalSessionSummary {
   rows: number
 }
 
-export interface TerminalHydrationSnapshot {
-  terminalRuntimeSessionId: string
-  terminalRuntimeGeneration: TerminalRuntimeGeneration
-  snapshot: string
-  snapshotSeq: number
-  outputEra: number
-}
-
 /**
  * Versioned full terminal projection for one user/repo-runtime scope.
  *
@@ -251,12 +245,6 @@ export interface TerminalHydrationSnapshot {
 export interface TerminalSessionsSnapshot {
   revision: number
   sessions: TerminalSessionSummary[]
-}
-
-export interface TerminalSessionsRecoveryResult {
-  terminalSessions: TerminalSessionsSnapshot
-  snapshots: TerminalHydrationSnapshot[]
-  workspacePaneTabs: WorkspacePaneTabsSnapshot
 }
 
 export type TerminalMutationResult = boolean

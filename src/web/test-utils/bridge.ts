@@ -44,7 +44,7 @@ import type {
   TerminalRestartResult,
   TerminalMutationResult,
   TerminalWriteResult,
-  TerminalSessionsRecoveryResult,
+  TerminalSessionsSnapshot,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
@@ -137,7 +137,7 @@ interface TerminalClientTestOutputs {
   'terminal.takeover': TerminalTakeoverResult
   'terminal.close': TerminalMutationResult
   'terminal.prune': { pruned: number; remaining: number }
-  'terminal.recoverSessions': TerminalSessionsRecoveryResult
+  'terminal.recoverSessions': TerminalSessionsSnapshot
   'terminal.notifyBell': TerminalMutationResult
   'workspacePaneTabs.replace': WorkspacePaneTabsSnapshot
   'workspacePaneTabs.update': WorkspacePaneTabsSnapshot
@@ -221,7 +221,23 @@ export function installWorkspacePaneTabsTestBridge(
     ) => WorkspacePaneTabsEntry[] | Promise<WorkspacePaneTabsEntry[]>
     onEffectIntent?: ClientBridge['onEffectIntent']
   } = {},
-): void {
+): {
+  addRuntimeTab: (input: {
+    repoRoot: string
+    repoRuntimeId: string
+    branchName: string
+    worktreePath: string | null
+    terminalSessionId: string
+    insertAfterIdentity?: string | null
+  }) => void
+  removeRuntimeTab: (input: {
+    repoRoot: string
+    repoRuntimeId: string
+    branchName: string
+    worktreePath: string | null
+    terminalSessionId: string
+  }) => void
+} {
   let serverEntries: WorkspacePaneTabsEntry[] = []
   let serverRevision = 0
   const targetKey = (input: { repoRoot: string; branchName: string; worktreePath: string | null }) =>
@@ -324,11 +340,7 @@ export function installWorkspacePaneTabsTestBridge(
         canonicalRows: 24,
       }),
       pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
-      recoverSessions: async () => ({
-        terminalSessions: { revision: 0, sessions: [] },
-        snapshots: [],
-        workspacePaneTabs: { revision: 0, entries: [] },
-      }),
+      recoverSessions: async () => ({ revision: 0, sessions: [] }),
       notifyBell: async () => true,
       sendTestNotification: async () => true,
       setBadge: () => {},
@@ -391,13 +403,11 @@ export function installWorkspacePaneTabsTestBridge(
           runtime: {
             ok: true,
             action: 'created',
+            branch: input.request.branch,
             terminalSessionId,
             terminalSessionsRevision: 1,
             terminalRuntimeSessionId,
             terminalRuntimeGeneration: 1,
-            snapshot: '',
-            snapshotSeq: 0,
-            outputEra: 0,
             processName: 'zsh',
             canonicalTitle: null,
             phase: 'open',
@@ -406,7 +416,6 @@ export function installWorkspacePaneTabsTestBridge(
             canonicalCols: input.request.cols ?? 80,
             canonicalRows: input.request.rows ?? 24,
           },
-          workspacePaneTabs: commitServerSnapshot(),
         } as const
       },
       close: async (input) => {
@@ -427,11 +436,30 @@ export function installWorkspacePaneTabsTestBridge(
             terminalRuntimeSessionId: wasOpen ? 'pty_test_aaaaaaaaa' : null,
             terminalRuntimeGeneration: wasOpen ? 1 : null,
           },
-          workspacePaneTabs: commitServerSnapshot(),
         }
       },
     }),
   } satisfies ClientBridge)
+  return {
+    addRuntimeTab: (input) => {
+      replaceServerTarget(
+        input,
+        workspacePaneTabsWithRuntimeTab(serverTabsForTarget(input), 'terminal', input.terminalSessionId, {
+          insertAfterIdentity: input.insertAfterIdentity,
+        }),
+      )
+      commitServerSnapshot()
+    },
+    removeRuntimeTab: (input) => {
+      replaceServerTarget(
+        input,
+        serverTabsForTarget(input).filter(
+          (tab) => tab.type !== 'terminal' || tab.runtimeSessionId !== input.terminalSessionId,
+        ),
+      )
+      commitServerSnapshot()
+    },
+  }
 }
 
 function defaultWorkspacePaneTabsOperationResult(
@@ -588,12 +616,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             }),
           close: () => Promise.resolve(true),
           pruneTerminals: () => Promise.resolve({ pruned: 0, remaining: 0 }),
-          recoverSessions: () =>
-            Promise.resolve({
-              terminalSessions: { revision: 0, sessions: [] },
-              snapshots: [],
-              workspacePaneTabs: { revision: 0, entries: [] },
-            }),
+          recoverSessions: () => Promise.resolve({ revision: 0, sessions: [] }),
           notifyBell: () => Promise.resolve(true),
           sendTestNotification: () => Promise.resolve(true),
           setBadge: () => {},
@@ -740,15 +763,10 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
               terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
               terminalRuntimeGeneration: 1,
             },
-            workspacePaneTabs: { revision: 1, entries: [] },
           }
         }
         case 'terminal.recoverSessions':
-          return {
-            terminalSessions: { revision: 0, sessions: [] },
-            snapshots: [],
-            workspacePaneTabs: { revision: 0, entries: [] },
-          }
+          return { revision: 0, sessions: [] }
       }
     }
     return handler(payload) as TerminalClientTestOutputs[keyof TerminalClientTestOutputs]
@@ -835,7 +853,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       write: async (input) => callTerminalHandler('terminal.write', input),
       resize: async (input) => callTerminalHandler('terminal.resize', input),
       takeover: async (input) => callTerminalHandler('terminal.takeover', input),
-      close: async (input) => callTerminalHandler('terminal.close', input),
       pruneTerminals: async (repoRoot) => callTerminalHandler('terminal.prune', { repoRoot }),
       recoverSessions: async (input) => callTerminalHandler('terminal.recoverSessions', input),
       notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),

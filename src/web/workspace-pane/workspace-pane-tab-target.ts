@@ -80,6 +80,17 @@ export function workspacePaneTargetLeaseIsCurrent(lease: WorkspacePaneTargetLeas
   )
 }
 
+export function workspacePaneCommittedRuntimeTargetIsCurrent(target: WorkspacePaneActionTarget): boolean {
+  if (!target.worktreePath) return false
+  const repo = useReposStore.getState().repos[target.repoId]
+  if (!repo || repo.repoRuntimeId !== target.repoRuntimeId) return false
+  return (
+    readRepoBranchQueryProjection(repo)?.branches.some(
+      (branch) => branch.worktree?.path === target.worktreePath,
+    ) ?? false
+  )
+}
+
 export function workspacePaneTabTargetForBranch(
   repoId: string,
   branchName: string,
@@ -87,6 +98,66 @@ export function workspacePaneTabTargetForBranch(
 ): RepoWorkspaceTabModel | null {
   const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName, options)
   return resolution.kind === 'ready' ? resolution.target : null
+}
+
+export function workspacePaneTabTargetForCreatedRuntime(
+  repoId: string,
+  canonicalBranch: string,
+  worktreePath: string,
+  options: WorkspacePaneTabTargetOptions,
+): RepoWorkspaceTabModel | null {
+  const resolution = resolveWorkspacePaneTabTarget(repoId, canonicalBranch, worktreePath, options)
+  return resolution.kind === 'ready' ? resolution.target : null
+}
+
+function resolveWorkspacePaneTabTarget(
+  repoId: string,
+  branchName: string,
+  worktreePath: string | null,
+  options: WorkspacePaneTabTargetOptions,
+): WorkspacePaneTabTargetResolution {
+  const repo = useReposStore.getState().repos[repoId]
+  if (!repo) return { kind: 'missing' }
+  const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
+    repoRoot: repoId,
+    repoRuntimeId: repo.repoRuntimeId,
+    worktreePath,
+  })
+  const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget({
+    repoRoot: repoId,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName,
+    worktreePath,
+  })
+  if (tabEntriesProjection.phase !== 'ready') {
+    return {
+      kind: 'unavailable',
+      reason: tabEntriesProjection.phase === 'failed' ? 'workspace-pane-tabs-failed' : 'workspace-pane-tabs-pending',
+    }
+  }
+  return {
+    kind: 'ready',
+    target: createRepoWorkspaceTabModel({
+      repoId,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName,
+      worktreePath,
+      preferredTab: preferredWorkspacePaneTabForRoute(
+        repo.ui,
+        { repoRoot: repoId, branchName, worktreePath },
+        options,
+      ),
+      allowPreferredTabFallback: options.workspacePaneRoute === undefined,
+      tabEntries: tabEntriesProjection.tabs,
+      tabEntriesProjectionPhase: tabEntriesProjection.phase,
+      runtimeTabViews: runtimeProjection.runtimeTabViews,
+      runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
+      requestedSessionIdByRuntimeType:
+        options.workspacePaneRoute?.kind === 'terminal'
+          ? { terminal: options.workspacePaneRoute.terminalSessionId }
+          : undefined,
+    }),
+  }
 }
 
 export function workspacePaneTabInteractionBlockedForBranch(
@@ -136,42 +207,7 @@ export function resolveWorkspacePaneTabTargetForBranch(
   const branch = branchModel.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return { kind: 'missing' }
   const worktreePath = branch.worktree?.path ?? null
-  const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
-    repoRoot: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
-    worktreePath,
-  })
-  const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget({
-    repoRoot: repoId,
-    repoRuntimeId: repo.repoRuntimeId,
-    branchName,
-    worktreePath,
-  })
-  if (tabEntriesProjection.phase !== 'ready') {
-    return {
-      kind: 'unavailable',
-      reason: tabEntriesProjection.phase === 'failed' ? 'workspace-pane-tabs-failed' : 'workspace-pane-tabs-pending',
-    }
-  }
-  return {
-    kind: 'ready',
-    target: createRepoWorkspaceTabModel({
-      repoId,
-      repoRuntimeId: repo.repoRuntimeId,
-      branchName,
-      worktreePath,
-      preferredTab: preferredWorkspacePaneTabForRoute(repo.ui, { repoRoot: repoId, branchName, worktreePath }, options),
-      allowPreferredTabFallback: options.workspacePaneRoute === undefined,
-      tabEntries: tabEntriesProjection.tabs,
-      tabEntriesProjectionPhase: tabEntriesProjection.phase,
-      runtimeTabViews: runtimeProjection.runtimeTabViews,
-      runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
-      requestedSessionIdByRuntimeType:
-        options.workspacePaneRoute?.kind === 'terminal'
-          ? { terminal: options.workspacePaneRoute.terminalSessionId }
-          : undefined,
-    }),
-  }
+  return resolveWorkspacePaneTabTarget(repoId, branchName, worktreePath, options)
 }
 
 function preferredWorkspacePaneTabForRoute(

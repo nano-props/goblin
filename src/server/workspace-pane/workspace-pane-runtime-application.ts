@@ -12,8 +12,7 @@ import type {
   WorkspacePaneRuntimeOpenInput,
   WorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime.ts'
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
-import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import type { WorkspaceRuntimeTabPlacement } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
   PhysicalWorktreeOperationPermit,
@@ -31,10 +30,7 @@ type MaybePromise<T> = T | Promise<T>
 const workspacePaneRuntimeApplicationLogger = serverLogger.child({ module: 'workspace-pane-runtime-application' })
 
 interface WorkspacePaneRuntimeApplicationDependencies {
-  workspaceTabsCoordinator: Pick<
-    WorkspacePaneTabsCoordinator,
-    'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'
-  >
+  workspaceTabsCoordinator: WorkspaceRuntimeTabPlacement
   worktreeOperations: PhysicalWorktreeOperationCoordinator
   physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
   terminal: ServerTerminalCreateProvider & {
@@ -113,7 +109,7 @@ export class WorkspacePaneRuntimeApplication {
         if (!this.isCurrentTarget(userId, target)) return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
         switch (input.runtimeType) {
           case 'terminal':
-            return await this.closeTerminal(clientId, userId, target, input.sessionId, scope, physicalCapability, permit)
+            return await this.closeTerminal(clientId, userId, target, input.sessionId, scope)
         }
       })
     } catch (error) {
@@ -139,12 +135,14 @@ export class WorkspacePaneRuntimeApplication {
     if (!runtime.ok) return { ok: false, runtimeType: 'terminal', message: runtime.message }
 
     const worktreePath = requestedWorktreePath
+    let committedRuntime: Extract<TerminalCreateResult, { ok: true }> | null = null
     let paneCommit
     try {
       paneCommit = await this.deps.workspaceTabsCoordinator.ensureRuntimeTabForSession({
         userId,
         repoRoot: input.request.repoRoot,
         scope,
+        branchName: input.request.branch,
         worktreePath,
         runtimeType: 'terminal',
         sessionId: runtime.terminalSessionId,
@@ -153,90 +151,35 @@ export class WorkspacePaneRuntimeApplication {
         physicalWorktreeCapability,
         isRuntimeCurrent: () =>
           this.deps.isCurrentRepoRuntime(userId, input.request.repoRoot, input.request.repoRuntimeId),
+        commitAdmission: (canonicalBranch) => {
+          committedRuntime = {
+            ok: true,
+            terminalSessionId: runtime.terminalSessionId,
+            ...runtime.admission.commit({ canonicalBranch }),
+          }
+        },
       })
     } catch (error) {
-      const recovery = await this.recoverIncompleteTerminalOpen(
-        clientId,
-        userId,
-        input,
-        runtime,
-        scope,
-        worktreePath,
-        physicalWorktreeCapability,
-        permit,
-      )
+      if (committedRuntime === null) runtime.admission.abort()
       workspacePaneRuntimeApplicationLogger.error(
-        { error, ...recovery, userId, repoRoot: input.request.repoRoot, worktreePath },
+        { error, userId, repoRoot: input.request.repoRoot, worktreePath },
         'terminal open application command failed',
       )
       return runtimeFailure('terminal', 'error.unavailable')
     }
     if (paneCommit.kind === 'runtime-stale') {
-      const recovery = await this.recoverIncompleteTerminalOpen(
-        clientId,
-        userId,
-        input,
-        runtime,
-        scope,
-        worktreePath,
-        physicalWorktreeCapability,
-        permit,
-      )
-      if (recovery.closeError || recovery.reconcileError) {
-        workspacePaneRuntimeApplicationLogger.error(
-          { ...recovery, userId, repoRoot: input.request.repoRoot, worktreePath },
-          'failed to recover rejected terminal open application command',
-        )
-      }
+      runtime.admission.abort()
       return runtimeFailure('terminal', 'error.repo-runtime-stale')
     }
 
-    const workspacePaneTabs = paneCommit.snapshot
+    if (committedRuntime === null) throw new Error('terminal admission did not produce a committed result')
+    runtime.admission.publishCommittedEffects()
     this.deps.broadcastWorkspaceTabsChanged(userId, input.request.repoRoot)
     return {
       ok: true,
       runtimeType: 'terminal',
-      runtime,
-      workspacePaneTabs,
+      runtime: committedRuntime,
     }
-  }
-
-  private async recoverIncompleteTerminalOpen(
-    clientId: string,
-    userId: string,
-    input: TerminalWorkspacePaneRuntimeOpenInput,
-    runtime: Extract<TerminalCreateResult, { ok: true }>,
-    scope: string,
-    worktreePath: string,
-    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
-    permit: PhysicalWorktreeOperationPermit,
-  ): Promise<{ closeError: unknown; reconcileError: unknown }> {
-    let closeError: unknown = null
-    if (runtime.action === 'created') {
-      try {
-        const closed = await this.deps.terminal.close(clientId, userId, {
-          terminalRuntimeSessionId: runtime.terminalRuntimeSessionId,
-        })
-        if (!closed) closeError = new Error('error.unavailable')
-      } catch (caught) {
-        closeError = caught
-      }
-    }
-    let reconcileError: unknown = null
-    try {
-      await this.deps.workspaceTabsCoordinator.reconcileWorktreeAdmitted({
-        userId,
-        repoRoot: input.request.repoRoot,
-        scope,
-        worktreePath,
-        physicalWorktreeCapability,
-        permit,
-      })
-    } catch (caught) {
-      reconcileError = caught
-    }
-    this.deps.broadcastWorkspaceTabsChanged(userId, input.request.repoRoot)
-    return { closeError, reconcileError }
   }
 
   private async closeTerminal(
@@ -245,8 +188,6 @@ export class WorkspacePaneRuntimeApplication {
     target: NormalizedRuntimeTarget,
     terminalSessionId: string,
     scope: string,
-    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
-    permit: PhysicalWorktreeOperationPermit,
   ): Promise<WorkspacePaneRuntimeCloseResult> {
     const sessions = await this.listTerminalSessions(userId, scope)
     const session = sessions.find(
@@ -259,7 +200,6 @@ export class WorkspacePaneRuntimeApplication {
       })
       if (!closed) return runtimeFailure('terminal', 'error.unavailable')
     }
-    const workspacePaneTabs = await this.reconcileTarget(userId, target, scope, physicalWorktreeCapability, permit)
     return {
       ok: true,
       runtimeType: 'terminal',
@@ -269,31 +209,11 @@ export class WorkspacePaneRuntimeApplication {
         terminalRuntimeSessionId: session?.terminalRuntimeSessionId ?? null,
         terminalRuntimeGeneration: session?.terminalRuntimeGeneration ?? null,
       },
-      workspacePaneTabs,
     }
   }
 
   private async listTerminalSessions(userId: string, scope: string): Promise<TerminalSessionSummary[]> {
     return await this.deps.terminalWorktree.listSessionsForUser(userId, scope)
-  }
-
-  private async reconcileTarget(
-    userId: string,
-    target: NormalizedRuntimeTarget,
-    scope: string,
-    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
-    permit: PhysicalWorktreeOperationPermit,
-  ): Promise<WorkspacePaneTabsSnapshot> {
-    const snapshot = await this.deps.workspaceTabsCoordinator.reconcileWorktreeAdmitted({
-      userId,
-      repoRoot: target.repoRoot,
-      scope,
-      worktreePath: target.worktreePath,
-      physicalWorktreeCapability,
-      permit,
-    })
-    this.deps.broadcastWorkspaceTabsChanged(userId, target.repoRoot)
-    return snapshot
   }
 
   private isCurrentTarget(userId: string, target: WorkspacePaneRuntimeCommandTarget): boolean {

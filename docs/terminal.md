@@ -124,15 +124,17 @@ At a high level, the lifecycle is:
 1. A client requests create or restore for a worktree terminal.
 2. The server session service validates the request and delegates create orchestration.
 3. The create path resolves whether the request means create, reuse, or restore.
-4. The session manager prepares an addressable logical session without starting a
-   new PTY.
-5. The client mounts and fits its single local xterm, then attaches with the
+4. The session manager reserves a logical session identity without publishing
+   catalog membership or starting a PTY.
+5. The Workspace application records placement and commits Directory admission;
+   only then is the session addressable through catalog and attach.
+6. The client mounts and fits its single local xterm, then attaches with the
    measured geometry.
-6. Attach starts a fresh PTY and streams from output sequence 1, or snapshots an
+7. Attach starts a fresh PTY and streams from output sequence 1, or snapshots an
    already-running PTY when the view has missed history.
-7. Realtime output, title, exit, and identity events keep clients up to date.
-8. Detach removes a local view without necessarily killing the session.
-9. Close or TTL cleanup ends the session and frees PTY resources.
+8. Realtime output, title, exit, and identity events keep clients up to date.
+9. Detach removes a local view without necessarily killing the session.
+10. Close or TTL cleanup ends the session and frees PTY resources.
 
 The important design rule is that **session lifecycle is independent from view lifecycle**.
 
@@ -296,9 +298,10 @@ The clean flow is:
 1. The user invokes create through a command/open-tab entry point.
 2. The terminal projection admits the create request and publishes
    `createPending` before async startup command resolution begins.
-3. The server application command invokes terminal creation, commits the
-   corresponding runtime tab in server order, and returns the server-allocated
-   `terminalSessionId` plus a revisioned full-scope snapshot.
+3. The server application command prepares terminal creation, records the
+   ordered placement hint, synchronously publishes Directory membership, and
+   returns the server-allocated `terminalSessionId` plus independently
+   revisioned terminal and Workspace effects.
 4. The owning workspace-pane command applies that snapshot through the single
    revision acceptance boundary, verifies the captured `repoRuntimeId`,
    records opener facts, and navigates directly to the canonical terminal

@@ -139,15 +139,6 @@ export class WorkspacePaneEpochOverlay {
     )
   }
 
-  runtimeSessionIds(input: WorkspacePaneEpochScope & { worktreePath: string; type: WorkspacePaneRuntimeTabType }): string[] {
-    const target = { kind: 'worktree' as const, repoRoot: input.repoRoot, worktreePath: input.worktreePath }
-    const prefix = `${input.type}:`
-    return this.placementHints({ ...input, target })
-      .map((hint) => hint.identity)
-      .filter((identity) => identity.startsWith(prefix))
-      .map((identity) => identity.slice(prefix.length))
-  }
-
   revision(scope: WorkspacePaneEpochScope): number {
     return this.epochs.get(epochKey(scope))?.overlayRevision ?? 0
   }

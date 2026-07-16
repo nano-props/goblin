@@ -3,12 +3,16 @@ import type {
   WorkspacePaneTabEntry,
 } from '#/shared/workspace-pane.ts'
 import { isWorkspacePaneStaticTabType, workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type {
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateOperation,
 } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  workspacePaneTabsTargetIdentityKey,
+  type WorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
@@ -67,8 +71,27 @@ export interface WorkspacePaneTabsCommandResult extends WorkspacePaneLayoutCommi
 }
 
 export type WorkspacePaneRuntimeTabCommitResult =
-  | { kind: 'committed'; snapshot: WorkspacePaneTabsSnapshot }
+  | { kind: 'committed' }
   | { kind: 'runtime-stale' }
+
+export interface WorkspaceRuntimeTabPlacementInput {
+  userId: string
+  repoRoot: string
+  scope: string
+  branchName: string
+  worktreePath: string
+  runtimeType: WorkspacePaneRuntimeTabType
+  sessionId: string
+  insertAfterIdentity?: string | null
+  permit: PhysicalWorktreeOperationPermit
+  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
+  isRuntimeCurrent: () => boolean
+  commitAdmission: (canonicalBranchName: string) => void
+}
+
+export interface WorkspaceRuntimeTabPlacement {
+  ensureRuntimeTabForSession(input: WorkspaceRuntimeTabPlacementInput): Promise<WorkspacePaneRuntimeTabCommitResult>
+}
 
 export interface WorkspacePaneTabsCoordinatorOptions {
   runtimeProviders: readonly WorkspacePaneRuntimeTabsProvider[]
@@ -78,7 +101,7 @@ export interface WorkspacePaneTabsCoordinatorOptions {
   targetProjection: WorkspacePaneTargetProjectionProvider
 }
 
-export class WorkspacePaneTabsCoordinator {
+export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacement {
   private readonly runtimeProviders: readonly WorkspacePaneRuntimeTabsProvider[]
   private readonly worktreeOperations: PhysicalWorktreeOperationCoordinator
   private readonly physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
@@ -94,30 +117,38 @@ export class WorkspacePaneTabsCoordinator {
     assertUniqueRuntimeProviderTypes(this.runtimeProviders)
   }
 
-  async ensureRuntimeTabForSession(input: {
-    userId: string
-    repoRoot: string
-    scope: string
-    worktreePath: string
-    runtimeType: WorkspacePaneRuntimeTabType
-    sessionId: string
-    insertAfterIdentity?: string | null
-    permit: PhysicalWorktreeOperationPermit
-    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
-    isRuntimeCurrent: () => boolean
-  }): Promise<WorkspacePaneRuntimeTabCommitResult> {
+  async ensureRuntimeTabForSession(input: WorkspaceRuntimeTabPlacementInput): Promise<WorkspacePaneRuntimeTabCommitResult> {
     const physicalCapability = input.physicalWorktreeCapability
     return await this.runWorkspaceTabsRepoOperation(input.repoRoot, async (layout) => {
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
-      const validTargets = await this.targetProjection.captureTargets(input.userId, input.repoRoot, input.scope)
+      const capturedTargets = await this.targetProjection.captureTargets(input.userId, input.repoRoot, input.scope)
+      const requestedTarget = {
+        repoRoot: input.repoRoot,
+        branchName: input.branchName,
+        worktreePath: input.worktreePath,
+      }
+      const requestedTargetKey = workspacePaneTabsTargetIdentityKey(requestedTarget)
+      const capturedTarget = capturedTargets.find(
+        (target) => workspacePaneTabsTargetIdentityKey(target) === requestedTargetKey,
+      )
+      if (!capturedTarget) return { kind: 'runtime-stale' }
       const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
       const scope = aggregateScope(input.userId, input.repoRoot, input.scope)
-      const current = await layout.snapshot({ scope, validTargets, providerSnapshots })
+      const current = await layout.snapshot({ scope, validTargets: capturedTargets, providerSnapshots })
+      if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
+      this.worktreeOperations.assertPermit(physicalCapability, input.permit)
+      const commitTargets = await this.targetProjection.captureTargets(input.userId, input.repoRoot, input.scope)
+      if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
+      this.worktreeOperations.assertPermit(physicalCapability, input.permit)
+      const commitTarget = commitTargets.find(
+        (target) => workspacePaneTabsTargetIdentityKey(target) === requestedTargetKey,
+      )
+      if (!commitTarget) return { kind: 'runtime-stale' }
       const entry = current.entries.find((candidate) => candidate.worktreePath === input.worktreePath)
       const tabs = workspacePaneTabsWithRuntimeTab(
-        entry?.tabs ?? [],
+        entry?.tabs ?? [workspacePaneStaticTabEntry('status')],
         input.runtimeType,
         input.sessionId,
         { insertAfterIdentity: input.insertAfterIdentity ?? null },
@@ -129,15 +160,8 @@ export class WorkspacePaneTabsCoordinator {
         lease: physicalWorktreeAdmissionLease(physicalCapability),
         tabs,
       })
-      const resampled = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
-      const resampledTargets = await this.targetProjection.captureTargets(input.userId, input.repoRoot, input.scope)
-      if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
-      const snapshot = await layout.snapshot({ scope, validTargets: resampledTargets, providerSnapshots: resampled })
-      if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
-      return {
-        kind: 'committed',
-        snapshot,
-      }
+      input.commitAdmission(commitTarget.branchName)
+      return { kind: 'committed' }
     })
   }
 
@@ -310,7 +334,6 @@ export class WorkspacePaneTabsCoordinator {
     return await this.runWorkspaceTabsRepoOperation(input.repoRoot, async (layout) => {
       const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       const validTargets = await this.targetProjection.captureTargets(input.userId, input.repoRoot, input.scope)
-      input.assertCurrent?.()
       this.worktreeOperations.assertPermit(input.physicalWorktreeCapability, input.permit)
       input.assertCurrent?.()
       return await layout.snapshot({

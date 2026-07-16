@@ -109,7 +109,7 @@ export interface LogEntry {
   date: string
 }
 
-export const DEFAULT_REPOSITORY_LOG_COUNT = 50
+export const DEFAULT_REPOSITORY_LOG_COUNT = 100
 
 export interface GitRemoteInfo {
   name: string

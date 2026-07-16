@@ -14,8 +14,7 @@ import {
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import { refreshWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { refreshWorkspacePaneTabsQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { goblinLog } from '#/web/logger.ts'
 import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -33,7 +32,11 @@ export interface WorkspacePaneRuntimeTabCreateActionContext {
   repoRoot: string
   runtimeTabStateByType: WorkspacePaneRuntimeTabCreateStateByType
   initialRuntimeProjectionHydrating: boolean
-  showCreatedRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean | Promise<boolean>
+  showCreatedRuntimeTab: (
+    type: WorkspacePaneRuntimeTabType,
+    sessionId: string,
+    canonicalBranch: string,
+  ) => boolean | Promise<boolean>
   t: TerminalCreateTranslator
   terminal?: WorkspacePaneTerminalCreateActionContext
 }
@@ -58,7 +61,7 @@ export interface CreateTerminalWorkspacePaneRuntimeTabActionOptions {
     placement?: import('#/shared/workspace-pane-runtime.ts').WorkspacePaneRuntimeTabPlacement,
   ) => Promise<TerminalCreateCommandAdmission>
   openerIdentity: string | null
-  showCreatedTerminalTab: (terminalSessionId: string) => boolean | Promise<boolean>
+  showCreatedTerminalTab: (terminalSessionId: string, canonicalBranch: string) => boolean | Promise<boolean>
   insertAfterIdentity?: string | null
   options?: TerminalCreateOptions
   t?: TerminalCreateTranslator
@@ -69,7 +72,7 @@ export interface CommitCreatedTerminalWorkspacePaneRuntimeTabOptions {
   base: TerminalSessionBase
   admission: TerminalCreateLeaderAdmissionResult
   openerIdentity: string | null
-  showCreatedTerminalTab: (terminalSessionId: string) => boolean | Promise<boolean>
+  showCreatedTerminalTab: (terminalSessionId: string, canonicalBranch: string) => boolean | Promise<boolean>
 }
 
 interface WorkspacePaneRuntimeTabCreateActionResolver {
@@ -136,11 +139,18 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
 export async function commitCreatedTerminalWorkspacePaneRuntimeTab(
   options: CommitCreatedTerminalWorkspacePaneRuntimeTabOptions,
 ): Promise<TerminalCreatedTabCommitResult> {
-  const projectionStatus = await applyCreatedTerminalWorkspacePaneRuntimeTabs(options)
+  const canonicalOptions = {
+    ...options,
+    base: { ...options.base, branch: options.admission.branch },
+  }
+  const projectionStatus = await applyCreatedTerminalWorkspacePaneRuntimeTabs(canonicalOptions)
   if (projectionStatus !== 'accepted') return { status: projectionStatus }
-  if (!terminalCreateTargetRuntimeIsCurrent(options.base)) return { status: 'superseded' }
-  recordCreatedTerminalWorkspacePaneRuntimeTabOpener(options)
-  const navigationCommitted = await options.showCreatedTerminalTab(options.admission.terminalSessionId)
+  if (!terminalCreateTargetRuntimeIsCurrent(canonicalOptions.base)) return { status: 'superseded' }
+  recordCreatedTerminalWorkspacePaneRuntimeTabOpener(canonicalOptions)
+  const navigationCommitted = await options.showCreatedTerminalTab(
+    options.admission.terminalSessionId,
+    options.admission.branch,
+  )
   return navigationCommitted ? { status: 'committed' } : { status: 'navigation-rejected' }
 }
 
@@ -181,21 +191,16 @@ async function applyCreatedTerminalWorkspacePaneRuntimeTabs(
   const repoRuntimeId = options.base.repoRuntimeId
   if (!repoRuntimeId) return 'superseded'
   try {
-    const accepted = await writeCanonicalWorkspacePaneTabsSnapshot(
-      options.base.repoRoot,
-      repoRuntimeId,
-      options.admission.workspacePaneTabs,
-    )
-    return accepted ? 'accepted' : 'superseded'
+    await refreshWorkspacePaneTabsQueryData(options.base.repoRoot, repoRuntimeId)
+    return terminalCreateTargetRuntimeIsCurrent(options.base) ? 'accepted' : 'superseded'
   } catch (err) {
-    goblinLog.warn('failed to apply application-returned workspace pane tabs', {
+    goblinLog.warn('failed to refresh workspace pane tabs after runtime creation', {
       repoRoot: options.base.repoRoot,
       repoRuntimeId,
       branchName: options.base.branch,
       worktreePath: options.base.worktreePath,
       err,
     })
-    refreshWorkspacePaneTabs(options.base.repoRoot, repoRuntimeId)
     return 'projection-failed'
   }
 }
@@ -225,7 +230,8 @@ function terminalRuntimeTabCreateAction(
         base,
         createTerminal: terminal.createTerminal,
         openerIdentity,
-        showCreatedTerminalTab: (terminalSessionId) => context.showCreatedRuntimeTab('terminal', terminalSessionId),
+        showCreatedTerminalTab: (terminalSessionId, canonicalBranch) =>
+          context.showCreatedRuntimeTab('terminal', terminalSessionId, canonicalBranch),
         t: context.t,
       })
     },

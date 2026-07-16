@@ -213,8 +213,8 @@ export interface TerminalSessionLike {
   detach: (host: HTMLElement) => void
   restart: () => void
   focus: () => void
-  dispose: (options?: { closeSession?: boolean }) => void
-  disposeAndWait: (options?: { closeSession?: boolean }) => Promise<void>
+  dispose: () => void
+  disposeAndWait: () => Promise<void>
   snapshot: () => TerminalSnapshot
   isTerminalFocusTarget: (target: EventTarget | null) => boolean
   findNext: (term: string, incremental?: boolean) => TerminalSearchResult

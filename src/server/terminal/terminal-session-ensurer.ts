@@ -24,16 +24,30 @@ export interface TerminalSessionEnsureInput {
 }
 
 export type TerminalSessionEnsureResult =
-  | ({
+  | {
       ok: true
-      terminalSessionsRevision: number
       terminalSessionId: string
-      action: TerminalCreateAction
-    } & TerminalRuntimeMetadata)
+      terminalRuntimeSessionId: string
+      admission: TerminalSessionAdmission
+    }
   | { ok: false; message: string }
 
 export type TerminalSessionPrepareManagerResult =
-  ({ ok: true; terminalSessionsRevision: number } & TerminalRuntimeMetadata) | { ok: false; message: string }
+  | { ok: true; terminalRuntimeSessionId: string; admission: TerminalSessionAdmission }
+  | { ok: false; message: string }
+
+export type TerminalSessionAdmissionCommitResult = {
+  action: TerminalCreateAction
+  branch: string
+  terminalSessionsRevision: number
+} & TerminalRuntimeMetadata
+
+export interface TerminalSessionAdmission {
+  kind: 'existing' | 'prepared'
+  commit(input: { canonicalBranch: string }): TerminalSessionAdmissionCommitResult
+  publishCommittedEffects(): void
+  abort(): void
+}
 
 export interface TerminalSessionEnsureManagerInput {
   userId: string
@@ -63,7 +77,6 @@ export interface TerminalSessionEnsureManager {
 
 export interface TerminalSessionEnsurerOptions {
   manager: TerminalSessionEnsureManager
-  broadcastSessionsChanged(userId: string, repoRoot: string): void
   gCommand?: GoblinTerminalCommandRuntime
 }
 
@@ -73,7 +86,6 @@ export interface TerminalSessionEnsureContext {
   rows: number
   scopedWorktreePath: string
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
-  action: TerminalCreateAction
   signal: AbortSignal
 }
 
@@ -127,8 +139,7 @@ class TerminalSessionEnsurer {
       signal: context.signal,
     })
     if (!result.ok) return { ok: false, message: result.message }
-    this.options.broadcastSessionsChanged(userId, input.repoRoot)
-    return toEnsureResult(context.terminalSessionId, context.action, result)
+    return toEnsureResult(context.terminalSessionId, result)
   }
 
   private async ensureLocal(
@@ -165,8 +176,7 @@ class TerminalSessionEnsurer {
       signal: context.signal,
     })
     if (!result.ok) return { ok: false, message: result.message }
-    this.options.broadcastSessionsChanged(userId, input.repoRoot)
-    return toEnsureResult(context.terminalSessionId, context.action, result)
+    return toEnsureResult(context.terminalSessionId, result)
   }
 }
 
@@ -176,22 +186,12 @@ export function createTerminalSessionEnsurer(options: TerminalSessionEnsurerOpti
 
 function toEnsureResult(
   terminalSessionId: string,
-  action: TerminalCreateAction,
   prepared: Extract<TerminalSessionPrepareManagerResult, { ok: true }>,
 ): TerminalSessionEnsureResult {
   return {
     ok: true,
-    terminalSessionsRevision: prepared.terminalSessionsRevision,
     terminalRuntimeSessionId: prepared.terminalRuntimeSessionId,
-    terminalRuntimeGeneration: prepared.terminalRuntimeGeneration,
     terminalSessionId,
-    action,
-    processName: prepared.processName,
-    canonicalTitle: prepared.canonicalTitle,
-    phase: prepared.phase,
-    message: prepared.message,
-    controller: prepared.controller,
-    canonicalCols: prepared.canonicalCols,
-    canonicalRows: prepared.canonicalRows,
+    admission: prepared.admission,
   }
 }

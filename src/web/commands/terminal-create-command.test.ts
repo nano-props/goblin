@@ -36,19 +36,7 @@ describe('terminal create command', () => {
   })
 
   test('passes the captured insertion anchor to the server application operation', async () => {
-    const admission = createAdmission({
-      workspacePaneTabs: {
-        revision: 1,
-        entries: [
-          {
-            repoRoot: REPO_ID,
-            branchName: 'main',
-            worktreePath: WORKTREE_PATH,
-            tabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
-          },
-        ],
-      },
-    })
+    const admission = createAdmission()
     const createTerminal = vi.fn(async () => admission)
     const commitCreatedTerminalTab = vi.fn(() => ({ status: 'committed' as const }))
 
@@ -169,9 +157,9 @@ describe('terminal create command', () => {
 function createAdmission(overrides: Partial<TerminalCreateAdmissionResult> = {}): TerminalCreateAdmissionResult {
   return {
     terminalSessionId: 'term-111111111111111111111',
+    branch: 'main',
     requestRole: 'leader',
     resourceDisposition: 'created',
-    workspacePaneTabs: { revision: 1, entries: [] },
     runtimeProjectionApplied: true,
     ...overrides,
   }

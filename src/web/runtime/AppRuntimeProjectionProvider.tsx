@@ -7,7 +7,6 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { useTerminalSessionProjection } from '#/web/components/terminal/use-terminal-session-projection.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
-import type { TerminalHydrationSnapshot } from '#/shared/terminal-types.ts'
 import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import {
   createRuntimeProjectionScopeRegistry,
@@ -57,31 +56,23 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
   }, [])
 
   const recoverTerminalSessionsFromServer = useCallback(
-    (scope: RuntimeProjectionScope): void => {
+    (scope: RuntimeProjectionScope, options: { resynchronizeConnectedViews?: boolean } = {}): void => {
       scope.runLatest(
         TERMINAL_RECOVERY_LANE,
         async () => ({
           clientId: readOrCreateWebTerminalClientId(),
-          recovery: await terminalClient.recoverSessions(scope.target),
+          catalog: await terminalClient.recoverSessions(scope.target),
         }),
-        ({ clientId, recovery }) => {
-          try {
-            writeCanonicalWorkspacePaneTabsSnapshot(
-              scope.target.repoRoot,
-              scope.target.repoRuntimeId,
-              recovery.workspacePaneTabs,
-            )
-          } catch (error) {
-            appRuntimeProjectionLog.debug('failed to apply workspace pane tabs from terminal recovery', { error })
-            refreshWorkspacePaneTabsForScope(scope)
-          }
+        ({ clientId, catalog }) => {
           const reconciled = terminalProjection.reconcileServerSessionsSnapshot(
             scope.target,
-            recovery.terminalSessions,
+            catalog,
             clientId,
-            terminalHydrationSnapshotMap(recovery.snapshots),
           )
           if (!reconciled) return
+          if (options.resynchronizeConnectedViews) {
+            terminalProjection.resynchronizeConnectedViews(scope.target.repoRoot, scope.target.repoRuntimeId)
+          }
           useTerminalProjectionHydrationStore
             .getState()
             .markProjectionReady(scope.target.repoRoot, scope.target.repoRuntimeId)
@@ -100,7 +91,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
         },
       )
     },
-    [refreshWorkspacePaneTabsForScope, terminalProjection],
+    [terminalProjection],
   )
 
   useEffect(() => () => scopeRegistry.disposeScopes(), [scopeRegistry])
@@ -176,7 +167,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
                   .getState()
                   .beginProjectionHydration(target.repoRoot, target.repoRuntimeId)
               })
-              recoverTerminalSessionsFromServer(scope)
+              recoverTerminalSessionsFromServer(scope, { resynchronizeConnectedViews: true })
               refreshWorkspacePaneTabsForScope(scope)
             }
           })
@@ -215,12 +206,6 @@ function currentScopeForRepo(
 
 function repoRuntimeIdForRoot(repoRoot: string): string | null {
   return useReposStore.getState().repos[repoRoot]?.repoRuntimeId ?? null
-}
-
-function terminalHydrationSnapshotMap(
-  snapshots: readonly TerminalHydrationSnapshot[],
-): Map<string, TerminalHydrationSnapshot> {
-  return new Map(snapshots.map((snapshot) => [snapshot.terminalRuntimeSessionId, snapshot]))
 }
 
 function projectionHydrationFailureMessage(error: unknown): string {

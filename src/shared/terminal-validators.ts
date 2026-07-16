@@ -12,7 +12,6 @@ import type {
   TerminalSessionPhase,
   TerminalSessionSummary,
   TerminalSessionsSnapshot,
-  TerminalSessionsRecoveryResult,
   TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
@@ -34,7 +33,6 @@ const TERMINAL_SOCKET_ACTIONS = [
   'write',
   'resize',
   'takeover',
-  'close',
   'recover-sessions',
   'prune',
 ] as const satisfies TerminalSocketRequestAction[]
@@ -120,21 +118,9 @@ export const TerminalSessionSummarySchema = v.object({
   cols: v.number(),
   rows: v.number(),
 })
-const TerminalHydrationSnapshotSchema = v.object({
-  terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
-  terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
-  snapshot: v.string(),
-  snapshotSeq: v.number(),
-  outputEra: v.number(),
-})
 export const TerminalSessionsSnapshotSchema = v.object({
   revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
   sessions: v.array(TerminalSessionSummarySchema),
-})
-const TerminalSessionsRecoveryResultSchema = v.object({
-  terminalSessions: TerminalSessionsSnapshotSchema,
-  snapshots: v.array(TerminalHydrationSnapshotSchema),
-  workspacePaneTabs: WorkspacePaneTabsSnapshotSchema,
 })
 const TerminalRuntimeMetadataSchemaEntries = {
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
@@ -151,6 +137,7 @@ const TerminalCreateResultSchema = v.variant('ok', [
   v.object({
     ok: v.literal(true),
     action: v.picklist(['created', 'restored', 'reused']),
+    branch: v.string(),
     terminalSessionId: v.string(),
     terminalSessionsRevision: v.pipe(v.number(), v.integer(), v.minValue(0)),
     ...TerminalRuntimeMetadataSchemaEntries,
@@ -346,12 +333,6 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal('close'),
-    input: TerminalSessionInputSchema,
-  }),
-  v.object({
-    type: v.literal('request'),
-    requestId: TerminalRequestIdSchema,
     action: v.literal('recover-sessions'),
     input: TerminalListSessionsInputSchema,
   }),
@@ -448,11 +429,6 @@ export function isValidTerminalTestNotificationInput(value: unknown): value is T
   )
 }
 
-export function normalizeTerminalSessionsRecoveryResult(value: unknown): TerminalSessionsRecoveryResult | null {
-  const parsed = v.safeParse(TerminalSessionsRecoveryResultSchema, value)
-  return parsed.success ? parsed.output : null
-}
-
 export function normalizeTerminalSessionsSnapshot(value: unknown): TerminalSessionsSnapshot | null {
   const parsed = v.safeParse(TerminalSessionsSnapshotSchema, value)
   return parsed.success ? parsed.output : null
@@ -495,12 +471,11 @@ function normalizeTerminalSocketResponsePayload(action: TerminalSocketRequestAct
     case 'write':
       return normalizeWithSchema(TerminalWriteResultSchema, payload)
     case 'resize':
-    case 'close':
       return normalizeWithSchema(TerminalMutationResultSchema, payload)
     case 'takeover':
       return normalizeWithSchema(TerminalTakeoverResultSchema, payload)
     case 'recover-sessions':
-      return normalizeWithSchema(TerminalSessionsRecoveryResultSchema, payload)
+      return normalizeWithSchema(TerminalSessionsSnapshotSchema, payload)
     case 'prune':
       return normalizeWithSchema(TerminalPruneResultSchema, payload)
   }

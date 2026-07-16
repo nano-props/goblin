@@ -74,12 +74,13 @@ const REPO_ID = '/tmp/goblin-workspace-command-repo'
 const OTHER_REPO_ID = '/tmp/goblin-workspace-command-other-repo'
 const WORKTREE_PATH = '/tmp/goblin-workspace-command-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
+let workspacePaneTabsTestBridge: ReturnType<typeof installWorkspacePaneTabsTestBridge>
 
 beforeEach(() => {
   resetWorkspacePaneActionQueueForTest()
   primaryWindowQueryClient.clear()
   resetReposStore()
-  installWorkspacePaneTabsTestBridge()
+  workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
   resetTerminalActionDialogsStore()
   useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
 })
@@ -355,7 +356,11 @@ describe('workspace commands', () => {
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: { 'feature/worktree': [staticEntry('status')] },
     })
-    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
+    const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
+      const terminalSessionId = 'term-111111111111111111111'
+      recordCreatedTerminalSelection(base, terminalSessionId)
+      return terminalSessionId
+    })
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => ({
         terminalWorktreeKey: WORKTREE_KEY,
@@ -479,6 +484,7 @@ describe('workspace commands', () => {
     })
     const closeTerminalByDescriptor = vi.fn((terminalSessionId: string) => {
       visibleSessionIds = visibleSessionIds.filter((id) => id !== terminalSessionId)
+      removeTerminalFromWorkspacePaneTabsServer(BASE_FOR_WORKTREE, terminalSessionId)
       return Promise.resolve(true)
     })
     const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
@@ -589,6 +595,7 @@ describe('workspace commands', () => {
     })
     const closeTerminalByDescriptor = vi.fn((terminalSessionId: string) => {
       visibleSessionIds = visibleSessionIds.filter((id) => id !== terminalSessionId)
+      removeTerminalFromWorkspacePaneTabsServer(BASE_FOR_WORKTREE, terminalSessionId)
       return Promise.resolve(true)
     })
     setTerminalSessionCommandBridge({
@@ -808,6 +815,13 @@ describe('workspace commands', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [terminalEntry('term-111111111111111111111'), staticEntry('status')],
       },
+    })
+    workspacePaneTabsTestBridge.addRuntimeTab({
+      repoRoot: REPO_ID,
+      repoRuntimeId: repoRuntimeIdForTest(),
+      branchName: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+      terminalSessionId: 'term-111111111111111111111',
     })
     const createTerminal = vi.fn(async () => 'term-111111111111111111111')
     setTerminalSessionCommandBridge({
@@ -1031,9 +1045,9 @@ describe('workspace commands', () => {
       firstCreatePending = false
       return {
         terminalSessionId,
+        branch: base.branch,
         requestRole: 'leader' as const,
         resourceDisposition: 'created' as const,
-        workspacePaneTabs: workspacePaneTabsSnapshot(base, [staticEntry('status'), terminalEntry(terminalSessionId)]),
         runtimeProjectionApplied: true,
       }
     })
@@ -1070,12 +1084,9 @@ describe('workspace commands', () => {
         const terminalSessionId = await createTerminal(createBase)
         return {
           terminalSessionId,
+          branch: createBase.branch,
           requestRole: 'leader' as const,
           resourceDisposition: 'created' as const,
-          workspacePaneTabs: workspacePaneTabsSnapshot(createBase, [
-            staticEntry('status'),
-            terminalEntry(terminalSessionId),
-          ]),
           runtimeProjectionApplied: true,
         }
       },
@@ -2825,8 +2836,8 @@ function createSingleFlightTerminalWithProjection(resolveSessionId: () => string
       const terminalSessionId = await createTerminal(base)
       const admission = {
         terminalSessionId,
+        branch: base.branch,
         resourceDisposition: 'created' as const,
-        workspacePaneTabs: workspacePaneTabsSnapshot(base, [staticEntry('status'), terminalEntry(terminalSessionId)]),
         runtimeProjectionApplied: true,
       }
       return requestRole === 'leader'
@@ -2846,6 +2857,32 @@ function recordCreatedTerminalSelection(base: TerminalSessionBase, terminalSessi
   useReposStore
     .getState()
     .setSelectedTerminal(formatTerminalWorktreeKey(base.repoRoot, base.worktreePath), terminalSessionId)
+  const repoRuntimeId = base.repoRuntimeId
+  if (!repoRuntimeId) return
+  workspacePaneTabsTestBridge.addRuntimeTab({
+    repoRoot: base.repoRoot,
+    repoRuntimeId,
+    branchName: base.branch,
+    worktreePath: base.worktreePath,
+    terminalSessionId,
+  })
+}
+
+const BASE_FOR_WORKTREE: TerminalSessionBase = {
+  repoRoot: REPO_ID,
+  branch: 'feature/worktree',
+  worktreePath: WORKTREE_PATH,
+}
+
+function removeTerminalFromWorkspacePaneTabsServer(base: TerminalSessionBase, terminalSessionId: string): void {
+  const repoRuntimeId = base.repoRuntimeId ?? repoRuntimeIdForTest(base.repoRoot)
+  workspacePaneTabsTestBridge.removeRuntimeTab({
+    repoRoot: base.repoRoot,
+    repoRuntimeId,
+    branchName: base.branch,
+    worktreePath: base.worktreePath,
+    terminalSessionId,
+  })
 }
 
 function staticEntry(type: WorkspacePaneStaticTabType) {
@@ -2854,20 +2891,6 @@ function staticEntry(type: WorkspacePaneStaticTabType) {
 
 function terminalEntry(id: string) {
   return workspacePaneRuntimeTabEntry('terminal', id)
-}
-
-function workspacePaneTabsSnapshot(base: TerminalSessionBase, tabs: WorkspacePaneTabEntry[]) {
-  return {
-    revision: 1,
-    entries: [
-      {
-        repoRoot: base.repoRoot,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-        tabs,
-      },
-    ],
-  }
 }
 
 test('rebases the latest queued absolute selection after an earlier route commit', async () => {

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
   runWorkspacePaneRuntimeNewAction,
@@ -8,6 +9,8 @@ import {
 import { createTerminalWithAdmissionForTest } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 const terminalBase: TerminalSessionBase & { repoRuntimeId: string } = {
   repoRoot: '/repo',
@@ -19,6 +22,34 @@ const terminalBase: TerminalSessionBase & { repoRuntimeId: string } = {
 describe('workspace pane runtime tab command actions', () => {
   beforeEach(() => {
     resetWorkspacePaneActionQueueForTest()
+    resetReposStore()
+  })
+
+  test('routes a committed create with its canonical admission branch', async () => {
+    seedRepoWithReadModelForTest({
+      id: terminalBase.repoRoot,
+      repoRuntimeId: terminalBase.repoRuntimeId,
+      branches: [createRepoBranch(terminalBase.branch, { worktree: { path: terminalBase.worktreePath } })],
+      currentBranchName: terminalBase.branch,
+      workspacePaneTabsByBranch: { [terminalBase.branch]: [workspacePaneStaticTabEntry('status')] },
+    })
+    const showCreatedRuntimeTab = vi.fn(() => true)
+    const context = workspacePaneRuntimeTabCommandContext({
+      repoId: terminalBase.repoRoot,
+      branchName: terminalBase.branch,
+      workspacePaneRoute: null,
+      showRuntimeTab: vi.fn(() => true),
+      showCreatedRuntimeTab,
+    })
+
+    await context.terminal?.showCreatedTerminalSession('term-111111111111111111111', 'feature/renamed')
+
+    expect(showCreatedRuntimeTab).toHaveBeenCalledWith(
+      'terminal',
+      'term-111111111111111111111',
+      'feature/renamed',
+      terminalBase.worktreePath,
+    )
   })
 
   test('primary terminal action focuses the first existing runtime session', async () => {
@@ -50,6 +81,7 @@ describe('workspace pane runtime tab command actions', () => {
           bridge,
           openerIdentity: null,
           showTerminalSession,
+          showCreatedTerminalSession: showTerminalSession,
         },
       }),
     ).resolves.toBe(true)
@@ -106,6 +138,7 @@ describe('workspace pane runtime tab command actions', () => {
         bridge,
         openerIdentity: null,
         showTerminalSession,
+        showCreatedTerminalSession: showTerminalSession,
       },
     })
     await Promise.resolve()
@@ -147,6 +180,7 @@ describe('workspace pane runtime tab command actions', () => {
           bridge,
           openerIdentity: null,
           showTerminalSession,
+          showCreatedTerminalSession: showTerminalSession,
         },
       }),
     ).resolves.toBe(true)
@@ -159,9 +193,9 @@ describe('workspace pane runtime tab command actions', () => {
     const createTerminal = vi.fn(async () => 'created-session')
     const createTerminalWithAdmission = vi.fn(async () => ({
       terminalSessionId: 'created-session',
+      branch: terminalBase.branch,
       requestRole: 'observer' as const,
       resourceDisposition: 'created' as const,
-      workspacePaneTabs: { revision: 1, entries: [] },
       runtimeProjectionApplied: true,
     }))
     const showTerminalSession = vi.fn(() => true)
@@ -187,6 +221,7 @@ describe('workspace pane runtime tab command actions', () => {
           bridge,
           openerIdentity: null,
           showTerminalSession,
+          showCreatedTerminalSession: showTerminalSession,
         },
       }),
     ).resolves.toBe(true)
@@ -206,6 +241,7 @@ describe('workspace pane runtime tab command actions', () => {
           bridge: null,
           openerIdentity: null,
           showTerminalSession,
+          showCreatedTerminalSession: showTerminalSession,
         },
       }),
     ).resolves.toBe(false)
@@ -221,6 +257,7 @@ describe('workspace pane runtime tab command actions', () => {
           bridge: null,
           openerIdentity: null,
           showTerminalSession: vi.fn(),
+          showCreatedTerminalSession: vi.fn(),
         },
       }),
     ).resolves.toBe(false)
