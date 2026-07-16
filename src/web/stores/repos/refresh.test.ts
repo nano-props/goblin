@@ -612,8 +612,8 @@ describe('projection refresh request ordering', () => {
       })
     }
 
-    const first = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId, 'feature/a')
-    const second = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId, 'feature/a')
+    const first = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
+    const second = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
     const fresh = [{ path: '/repo', isMain: true, entries: [{ x: 'M', y: ' ', path: 'fresh.ts' }] }]
 
     await vi.waitFor(() => {
@@ -704,7 +704,7 @@ describe('projection refresh request ordering', () => {
       loadedAt: Date.now(),
     })
 
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId, 'feature/dirty')
+    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
     const repo = useReposStore.getState().repos[REPO_ID]!
     const worktreesByPath = readRepoBranchQueryProjection(repo)?.worktreesByPath
@@ -731,7 +731,7 @@ describe('projection refresh request ordering', () => {
       repoProjection({ branches: [branch('feature/a')], current: 'feature/a' })
     ipcHandlers['repo.worktreeStatus'] = () => ({ repoRuntimeId, status, loadedAt: Date.now() })
 
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId, 'feature/a')
+    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
     expect(cachedRepoStatus(repoRuntimeId)).toEqual(status)
   })
@@ -773,7 +773,7 @@ describe('projection refresh request ordering', () => {
     }
     ipcHandlers['repo.worktreeStatus'] = () => ({ repoRuntimeId, status: freshStatus, loadedAt: Date.now() })
 
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId, 'feature/a')
+    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
     expect(cachedRepoStatus(repoRuntimeId)).toEqual(freshStatus)
   })
@@ -803,7 +803,7 @@ describe('projection refresh request ordering', () => {
     )
     ipcHandlers['repo.worktreeStatus'] = () => ({ repoRuntimeId, status: freshStatus, loadedAt: Date.now() })
 
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId, 'feature/a')
+    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
     expect(invalidateSpy).toHaveBeenCalledWith(
       { queryKey: repoWorktreeStatusQueryKey(REPO_ID, repoRuntimeId), exact: true, refetchType: 'none' },
@@ -830,7 +830,7 @@ describe('projection refresh request ordering', () => {
       })
     }
 
-    const refresh = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId, 'feature/a')
+    const refresh = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
     await vi.waitFor(() => {
       expect(statusCalls).toBe(1)
     })
@@ -854,7 +854,7 @@ describe('projection refresh request ordering', () => {
       })
     }
 
-    const refresh = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId, 'feature/a')
+    const refresh = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
     await vi.waitFor(() => {
       expect(statusCalls).toBe(1)
     })
@@ -876,16 +876,16 @@ describe('projection refresh request ordering', () => {
       return repoProjection({ branches: [branch('feature/a')], current: 'feature/a' })
     }
 
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, 'repo-runtime-stale', 'feature/a')
+    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, 'repo-runtime-stale')
     updateRepoForTest((repo) => {
       repo.dataLoads.visibleStatus.phase = 'loading'
     })
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId, 'feature/a')
+    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
     updateRepoForTest((repo) => {
       repo.dataLoads.visibleStatus.phase = 'idle'
       repo.availability = { phase: 'unavailable', reason: 'error.path-not-found', checkedAt: 1 }
     })
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId, 'feature/a')
+    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
     expect(projectionCalls).toBe(0)
   })
@@ -911,7 +911,7 @@ describe('projection refresh request ordering', () => {
       expect(statusCalls).toBe(1)
     })
 
-    const visibleRefresh = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId, 'feature/a')
+    const visibleRefresh = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
     expect(statusCalls).toBe(1)
     expect(invalidateSpy).toHaveBeenCalledWith(
@@ -1027,7 +1027,7 @@ describe('projection refresh request ordering', () => {
         resolveStatus = (status) => resolve({ repoRuntimeId, status, loadedAt: Date.now() })
       })
 
-    const work = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId, 'feature/a')
+    const work = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
       phase: 'refreshing',
@@ -1054,7 +1054,7 @@ describe('projection refresh request ordering', () => {
       throw new Error('status failed')
     }
 
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId, 'feature/a')
+    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
       phase: 'idle',

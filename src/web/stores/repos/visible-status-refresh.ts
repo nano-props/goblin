@@ -36,7 +36,6 @@ export async function refreshVisibleStatusCache(
   store: RepoRefreshStoreAccess,
   repoRoot: string,
   repoRuntimeId: string,
-  _branchName: string,
 ): Promise<void> {
   if (!visibleStatusRefreshable(store, repoRoot, repoRuntimeId)) return
   const key = visibleStatusRefreshKey(repoRoot, repoRuntimeId)

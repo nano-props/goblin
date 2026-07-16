@@ -145,18 +145,17 @@ function RepoWorkspaceLoaded({
   )
   const projection = projectionReadModel.data
   const statusReadModel = useRepoWorktreeStatusReadModel(repoShell.id, repoShell.repoRuntimeId, true)
+  const statusSnapshot = statusReadModel.data
   const branchReadModel =
-    projection?.snapshot && statusReadModel.data
-      ? repoBranchReadModelFromSnapshot(projection.snapshot, statusReadModel.data.status)
+    projection?.snapshot && statusSnapshot
+      ? repoBranchReadModelFromSnapshot(projection.snapshot, statusSnapshot.status)
       : null
   if (!branchReadModel || !projection) {
     return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }
-  const statusSnapshot = statusReadModel.data
-  if (!statusSnapshot) return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   let presentationBranchModel: RepoWorkspaceRepo['branchModel'] = {
     ...branchReadModel,
-    status: statusSnapshot.status,
+    status: branchReadModel.status,
     statusReady: true,
   }
   if (currentBranchName && Array.isArray(projection.pullRequests)) {

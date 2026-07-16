@@ -73,7 +73,7 @@ describe('repo refresh actions', () => {
     ).toBe(false)
 
     expect(refreshVisibleStatusCache).toHaveBeenCalledOnce()
-    expect(refreshVisibleStatusCache).toHaveBeenCalledWith(store, '/repo', 'repo-runtime-test-9', 'feature/query')
+    expect(refreshVisibleStatusCache).toHaveBeenCalledWith(store, '/repo', 'repo-runtime-test-9')
   })
 
   test('routes repo snapshot invalidation through query invalidation only', async () => {

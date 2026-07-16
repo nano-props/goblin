@@ -15,7 +15,7 @@ export function requestVisibleWorkspaceStatusRefresh(
   const repo = store.get().repos[id]
   if (!repo || repo.repoRuntimeId !== repoRuntimeId || !branchName) return false
   if (isRepoUnavailable(repo) || repo.dataLoads.visibleStatus.phase !== 'idle') return false
-  void refreshVisibleStatusCache(store, id, repoRuntimeId, branchName)
+  void refreshVisibleStatusCache(store, id, repoRuntimeId)
   return true
 }
 
