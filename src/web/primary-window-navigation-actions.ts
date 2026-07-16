@@ -11,7 +11,7 @@ import { workspacePaneRouteNavigationBlockedForBranch } from '#/web/workspace-pa
 import { openRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
 import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import {
   beginPrimaryWindowPresentation,
@@ -193,7 +193,7 @@ function rememberWorkspacePaneRouteSelection(
 ): void {
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
-  const branchModel = repo ? readRepoBranchQueryProjection(repo) : null
+  const branchModel = repo ? readRepoBranchSnapshotQueryProjection(repo) : null
   const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
   if (!repo || !branchModel || !branch) return
   state.setWorkspacePaneTab(

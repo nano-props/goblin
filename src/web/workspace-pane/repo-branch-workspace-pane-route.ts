@@ -2,9 +2,15 @@ import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
 import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
-import { createRepoWorkspaceTabModel, isRepoWorkspaceRuntimeTab } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { preferredWorkspacePaneTabForTarget, workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import {
+  createRepoWorkspaceTabModel,
+  isRepoWorkspaceRuntimeTab,
+} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import {
+  preferredWorkspacePaneTabForTarget,
+  workspacePaneTabsTargetForRepoBranch,
+} from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -24,12 +30,9 @@ export function resolveRepoBranchWorkspacePaneRoute(
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
   if (!repo) return { kind: 'missing' }
-  const branchModel = readRepoBranchQueryProjection(repo)
+  const branchModel = readRepoBranchSnapshotQueryProjection(repo)
   if (!branchModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
-  const target = workspacePaneTabsTargetForRepoBranch(
-    { repoRoot: repo.id, branches: branchModel.branches },
-    branchName,
-  )
+  const target = workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
   if (!target) return { kind: 'missing' }
   const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget({
     ...target,
@@ -38,8 +41,7 @@ export function resolveRepoBranchWorkspacePaneRoute(
   if (tabEntriesProjection.phase !== 'ready') {
     return {
       kind: 'unavailable',
-      reason:
-        tabEntriesProjection.phase === 'failed' ? 'workspace-pane-tabs-failed' : 'workspace-pane-tabs-pending',
+      reason: tabEntriesProjection.phase === 'failed' ? 'workspace-pane-tabs-failed' : 'workspace-pane-tabs-pending',
     }
   }
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({

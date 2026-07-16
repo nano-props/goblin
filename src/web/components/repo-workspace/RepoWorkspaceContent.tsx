@@ -57,7 +57,11 @@ export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspaceP
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {(renderedTab === 'status' || renderedTab === 'changes') && detail.stale.status && detail.errors.status && (
-        <RepoStatusStaleNotice message={detail.errors.status} onRetry={onRetryStatus} />
+        <RepoStatusStaleNotice
+          messageKey={detail.errors.status}
+          retrying={detail.loading.status}
+          onRetry={onRetryStatus}
+        />
       )}
       {renderedTab
         ? renderRepoWorkspacePanePanel({

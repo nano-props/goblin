@@ -145,12 +145,12 @@ function RepoWorkspaceLoaded({
   const statusReadModel = useRepoWorktreeStatusReadModel(repoShell.id, repoShell.repoRuntimeId, true)
   const statusSnapshot = statusReadModel.data
   if (projection?.snapshot && !statusSnapshot && statusReadModel.isError) {
-    const message =
+    const statusErrorKey =
       statusReadModel.error instanceof Error ? statusReadModel.error.message : String(statusReadModel.error)
     return (
       <section className="flex min-h-0 flex-1 flex-col bg-background">
         <RepoStatusFailureView
-          message={message}
+          messageKey={statusErrorKey}
           retrying={statusReadModel.isFetching}
           onRetry={() => {
             void refreshRepoWorktreeStatus(
@@ -188,11 +188,10 @@ function RepoWorkspaceLoaded({
     branchModel: presentationBranchModel,
   }
   const statusError = statusReadModel.error
-  const statusErrorMessage =
-    statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
+  const statusErrorKey = statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
   const detailBase = getCurrentRepoWorkspacePresentation(presentationRepo, {
     loading: statusReadModel.isFetching,
-    error: statusErrorMessage,
+    error: statusErrorKey,
     stale: !!statusSnapshot && statusReadModel.isError,
   })
   const detail: CurrentRepoWorkspacePresentation = {

@@ -27,7 +27,7 @@ import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
@@ -67,7 +67,7 @@ export function handleTerminalBellClickIntent(
   deps: TerminalBellIntentDeps,
 ): void {
   const repo = useReposStore.getState().repos[event.repoRoot]
-  const branchModel = repo && event.terminalWorktreeKey ? readRepoBranchQueryProjection(repo) : null
+  const branchModel = repo && event.terminalWorktreeKey ? readRepoBranchSnapshotQueryProjection(repo) : null
   const plan = createTerminalBellIntentPlan(repo, branchModel, event)
   if (plan.kind === 'noop' || plan.kind === 'unavailable') return
   deps.closeAllOverlays()

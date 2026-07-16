@@ -17,7 +17,7 @@ import {
   workspacePaneTabsQueryKey,
   type WorkspacePaneTabsQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { readRepoBranchQueryProjection, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchSnapshotQueryProjection, type RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
 import {
   defaultWorkspacePaneTabs,
   workspacePaneStaticTabsFromEntries,
@@ -27,7 +27,7 @@ interface ClientWorkspaceRepoProjection {
   id: string
   remote: ReposStore['repos'][string]['remote']
   ui: Pick<ReposStore['repos'][string]['ui'], 'preferredWorkspacePaneTabByTarget'>
-  branches: RepoBranchReadModelData['branches']
+  branches: RepoBranchSnapshotData['branches']
 }
 
 interface ClientWorkspaceBranchProjection {
@@ -96,7 +96,7 @@ function clientWorkspaceRepoProjections(
     const repo = repos[id]
     if (!repo) continue
     if (repo.session.projectionState === 'stub') continue
-    const branchModel = readRepoBranchQueryProjection(repo)
+    const branchModel = readRepoBranchSnapshotQueryProjection(repo)
     if (!branchModel) continue
     projectedRepos[id] = {
       id: repo.id,

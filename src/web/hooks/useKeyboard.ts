@@ -33,7 +33,7 @@ import {
 import { getClientBridge } from '#/web/client-bridge.ts'
 import { translate } from '#/web/stores/i18n.ts'
 import { toast } from 'sonner'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
@@ -104,7 +104,7 @@ function moveBranchSelection(
   direction: MoveDirection,
   navigation: PrimaryWindowNavigationActions,
 ): boolean {
-  const branchModel = readRepoBranchQueryProjection(input.repo)
+  const branchModel = readRepoBranchSnapshotQueryProjection(input.repo)
   if (!branchModel) return false
   const branches = visibleBranches({
     branches: branchModel.branches,

@@ -5,7 +5,7 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/repos/types.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { isWorkspacePaneStaticTabType, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/repos/navigation-history-entry.ts'
@@ -158,7 +158,7 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
       return { repoId, kind: 'newWorktree', returnTo: routeContext.returnTo }
     case 'branch': {
       const repo = useReposStore.getState().repos[repoId]
-      const branchModel = repo ? readRepoBranchQueryProjection(repo) : null
+      const branchModel = repo ? readRepoBranchSnapshotQueryProjection(repo) : null
       const branch = branchModel?.branches.find((candidate) => candidate.name === routeContext.branchName)
       const worktreePath = routeContext.worktreePath ?? branch?.worktree?.path ?? null
       const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKey(repoId, worktreePath) : null
@@ -262,10 +262,7 @@ export function restoreWorkspaceNavigationEntry(
   }
 }
 
-export type WorkspaceNavigationRestoreResult =
-  | { kind: 'accepted' }
-  | { kind: 'blocked' }
-  | { kind: 'unavailable' }
+export type WorkspaceNavigationRestoreResult = { kind: 'accepted' } | { kind: 'blocked' } | { kind: 'unavailable' }
 
 export function workspaceNavigationHistoryRestoreBlocked(repoId: string, direction: 'back' | 'forward'): boolean {
   const history = useReposStore.getState().navigationHistoryByRepo[repoId]

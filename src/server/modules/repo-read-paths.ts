@@ -199,9 +199,9 @@ function composeSectionSignal(
 }
 
 /**
- * Fetch several repo read results in parallel. Each field is independent:
- * requested section fails the whole composite read fails; callers must not
- * mistake a missing section for authoritative empty repo data. The composite
+ * Fetch the requested projection sections in parallel. If any requested
+ * section fails, the projection read fails; callers must not mistake a missing
+ * section for authoritative empty repo data. The shared
  * request is aborted when the caller's signal fires, and each section
  * additionally gets a hard `timeoutMs` deadline so a slow git / network
  * operation cannot pin the request worker.

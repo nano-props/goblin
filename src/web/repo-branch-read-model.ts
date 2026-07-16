@@ -76,11 +76,11 @@ export function readRepoBranchSnapshotQueryProjection(
   return projection?.snapshot ? repoBranchSnapshotDataFromSnapshot(projection.snapshot) : null
 }
 
-export function requireRepoBranchQueryProjection(
+export function requireRepoBranchSnapshotQueryProjection(
   repo: Pick<RepoState, 'id' | 'repoRuntimeId'>,
   queryClient?: QueryClient,
-): RepoBranchReadModelData {
-  const projection = readRepoBranchQueryProjection(repo, queryClient)
-  if (!projection) throw new Error(`repo branch read model query data unavailable for repo: ${repo.id}`)
+): RepoBranchSnapshotData {
+  const projection = readRepoBranchSnapshotQueryProjection(repo, queryClient)
+  if (!projection) throw new Error(`repo branch snapshot query data unavailable for repo: ${repo.id}`)
   return projection
 }

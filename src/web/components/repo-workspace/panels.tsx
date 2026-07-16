@@ -96,7 +96,11 @@ function selectedRuntimeSessionId(selection: RepoWorkspaceSelection, type: Works
 
 function StatusWorkspacePanePanel({ repo, workspacePaneId, panelLabel, detail }: WorkspacePanePanelProps) {
   return (
-    <WorkspacePanePanelFrame id={`${workspacePaneId}-status-panel`} {...panelLabel} busy={detail.loading.pullRequests}>
+    <WorkspacePanePanelFrame
+      id={`${workspacePaneId}-status-panel`}
+      {...panelLabel}
+      busy={detail.loading.pullRequests || detail.loading.status}
+    >
       <ScrollPane>
         <BranchStatus detail={detail} repoRuntimeId={repo.repoRuntimeId} />
       </ScrollPane>

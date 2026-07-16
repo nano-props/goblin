@@ -97,7 +97,7 @@ export function RepoDashboardPane({
   )
   const hasAttentionBranches = !!summary?.attentionBranches.length
   const statusError = statusReadModel.error
-  const statusErrorMessage = statusError instanceof Error ? statusError.message : String(statusError)
+  const statusErrorKey = statusError instanceof Error ? statusError.message : String(statusError)
   const statusStale = !!statusReadModel.data && statusReadModel.isError
   const retryStatus = () => {
     if (!repo) return
@@ -120,7 +120,7 @@ export function RepoDashboardPane({
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-5">
           {repo && projection?.snapshot && !statusReadModel.data && statusReadModel.isError ? (
             <RepoStatusFailureView
-              message={statusErrorMessage}
+              messageKey={statusErrorKey}
               retrying={statusReadModel.isFetching}
               onRetry={retryStatus}
             />
@@ -128,7 +128,7 @@ export function RepoDashboardPane({
             <>
               {statusStale && (
                 <RepoStatusStaleNotice
-                  message={statusErrorMessage}
+                  messageKey={statusErrorKey}
                   retrying={statusReadModel.isFetching}
                   onRetry={retryStatus}
                 />

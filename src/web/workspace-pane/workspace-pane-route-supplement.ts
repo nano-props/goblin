@@ -1,6 +1,6 @@
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneCommittedRuntimeTargetIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
@@ -18,7 +18,7 @@ export function commitWorkspacePaneRouteSupplement(
   const state = useReposStore.getState()
   const repo = state.repos[target.repoId]
   if (!repo || repo.repoRuntimeId !== target.repoRuntimeId) return false
-  const branchModel = readRepoBranchQueryProjection(repo)
+  const branchModel = readRepoBranchSnapshotQueryProjection(repo)
   const branch = branchModel?.branches.find((candidate) => candidate.name === target.branchName)
   if (!branch || (branch.worktree?.path ?? null) !== target.worktreePath) return false
   state.setWorkspacePaneTab(
@@ -27,10 +27,7 @@ export function commitWorkspacePaneRouteSupplement(
     route === null ? null : route.kind === 'static' ? route.tab : 'terminal',
   )
   if (route?.kind === 'terminal' && target.worktreePath) {
-    state.setSelectedTerminal(
-      formatTerminalWorktreeKey(target.repoId, target.worktreePath),
-      route.terminalSessionId,
-    )
+    state.setSelectedTerminal(formatTerminalWorktreeKey(target.repoId, target.worktreePath), route.terminalSessionId)
   }
   return true
 }
@@ -50,10 +47,7 @@ export function commitWorkspacePaneCommittedRuntimeRouteSupplement(
     route === null ? null : route.kind === 'static' ? route.tab : 'terminal',
   )
   if (route?.kind === 'terminal' && target.worktreePath) {
-    state.setSelectedTerminal(
-      formatTerminalWorktreeKey(target.repoId, target.worktreePath),
-      route.terminalSessionId,
-    )
+    state.setSelectedTerminal(formatTerminalWorktreeKey(target.repoId, target.worktreePath), route.terminalSessionId)
   }
   return true
 }

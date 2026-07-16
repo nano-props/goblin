@@ -232,7 +232,11 @@ describe('RepoWorkspaceContent', () => {
       ],
     })
     const presentationRepo = repoWorkspaceRepo(repo)
-    const detail = getTestRepoWorkspacePresentation(presentationRepo)
+    const detail = buildRepoWorkspacePresentation(presentationRepo, {
+      loading: true,
+      error: null,
+      stale: false,
+    })
     const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/changes')
 
     const { container } = renderInJsdom(
@@ -256,7 +260,7 @@ describe('RepoWorkspaceContent', () => {
       </TerminalSessionReadContext>,
     )
 
-    expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
+    expect(container.querySelector('#workspace-status-panel')?.getAttribute('aria-busy')).toBe('true')
     expect(container.textContent).toContain('branch-status.changes-count')
     expect(container.textContent).toContain('branch-status.signal.changes')
 

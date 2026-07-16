@@ -8,6 +8,8 @@ import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from 
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { repoWorktreeStatusQueryKey } from '#/web/repo-data-query.ts'
 
 describe('restorable-workspace-state', () => {
   beforeEach(() => {
@@ -25,6 +27,7 @@ describe('restorable-workspace-state', () => {
         'feature/worktree': [workspacePaneStaticTabEntry('status')],
       },
     })
+    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(repo.id, repo.repoRuntimeId) })
 
     expect(
       clientWorkspaceStateFromRestorableWorkspaceState({

@@ -4,11 +4,11 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 
 export function RepoStatusFailureView({
-  message,
+  messageKey,
   retrying,
   onRetry,
 }: {
-  message: string
+  messageKey: string
   retrying: boolean
   onRetry: () => void
 }) {
@@ -19,7 +19,7 @@ export function RepoStatusFailureView({
       title={t('error.failed-read-repo')}
       body={
         <div className="space-y-3">
-          <div className="break-words">{t(message)}</div>
+          <div className="break-words">{t(messageKey)}</div>
           <Button type="button" variant="default" disabled={retrying} onClick={onRetry}>
             <RefreshCw className={retrying ? 'animate-spin' : undefined} />
             {t('error.try-again')}
@@ -31,11 +31,11 @@ export function RepoStatusFailureView({
 }
 
 export function RepoStatusStaleNotice({
-  message,
+  messageKey,
   retrying = false,
   onRetry,
 }: {
-  message: string
+  messageKey: string
   retrying?: boolean
   onRetry?: () => void
 }) {
@@ -49,7 +49,7 @@ export function RepoStatusStaleNotice({
         <span className="font-medium">{t('status.stale-title')}</span>
         <span className="break-words text-muted-foreground">
           {' \u2014 '}
-          {t(message)}
+          {t(messageKey)}
         </span>
       </div>
       {onRetry && (
