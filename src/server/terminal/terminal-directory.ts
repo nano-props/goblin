@@ -54,8 +54,9 @@ export class TerminalDirectory<
       abort: () => {
         if (settled) return
         settled = true
-        this.reservationsByRuntimeId.delete(identity.id)
-        this.reservedRuntimeIdByUserSession.delete(durableKey)
+        if (this.reservationsByRuntimeId.get(identity.id) === identity) this.reservationsByRuntimeId.delete(identity.id)
+        if (this.reservedRuntimeIdByUserSession.get(durableKey) === identity.id)
+          this.reservedRuntimeIdByUserSession.delete(durableKey)
       },
     }
   }
