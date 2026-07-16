@@ -80,6 +80,17 @@ export function workspacePaneTargetLeaseIsCurrent(lease: WorkspacePaneTargetLeas
   )
 }
 
+export function workspacePaneCommittedRuntimeTargetIsCurrent(target: WorkspacePaneActionTarget): boolean {
+  if (!target.worktreePath) return false
+  const repo = useReposStore.getState().repos[target.repoId]
+  if (!repo || repo.repoRuntimeId !== target.repoRuntimeId) return false
+  return (
+    readRepoBranchQueryProjection(repo)?.branches.some(
+      (branch) => branch.worktree?.path === target.worktreePath,
+    ) ?? false
+  )
+}
+
 export function workspacePaneTabTargetForBranch(
   repoId: string,
   branchName: string,

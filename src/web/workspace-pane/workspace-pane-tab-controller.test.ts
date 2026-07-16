@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   beginWorkspacePaneCloseActiveTabPresentationLease,
+  commitWorkspacePaneCommittedRuntimeTargetRoute,
   commitWorkspacePaneControllerCloseBackTarget,
   commitWorkspacePaneExactTargetRoute,
   selectWorkspacePaneControllerTab,
@@ -73,6 +74,30 @@ describe('workspace pane tab controller transactions', () => {
       'feature/a',
       TARGET_ROUTE,
       expect.objectContaining({ routePrecondition: { kind: 'current-workspace-target' } }),
+    )
+  })
+
+  test('commits a server-created runtime route while the local branch label is stale', async () => {
+    const navigation = committingNavigation()
+
+    await expect(
+      commitWorkspacePaneCommittedRuntimeTargetRoute(
+        {
+          repoId: '/repo',
+          repoRuntimeId: 'repo-runtime-1',
+          branchName: 'feature/renamed',
+          worktreePath: '/worktree-a',
+        },
+        { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+        navigation,
+      ),
+    ).resolves.toBe(true)
+
+    expect(navigation.commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
+      '/repo',
+      'feature/renamed',
+      { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+      expect.any(Object),
     )
   })
 
