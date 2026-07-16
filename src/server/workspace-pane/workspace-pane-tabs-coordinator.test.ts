@@ -17,6 +17,58 @@ import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 describe('workspace pane tabs coordinator queues', () => {
+  test('records an invisible placement hint before synchronously publishing membership', async () => {
+    const operations = createPhysicalWorktreeOperationCoordinator()
+    const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
+      userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a',
+    })
+    const events: string[] = []
+    let published = false
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      layoutAggregate: aggregateFor(memoryRepository()),
+      runtimeProviders: [{
+        type: 'terminal',
+        async captureSnapshotForUser() {
+          events.push(`sample:${String(published)}`)
+          return {
+            revision: published ? 1 : 0,
+            liveSessions: published
+              ? [{ sessionId: 'term-preparedprepared001', branch: 'main', worktreePath: '/repo/worktree' }]
+              : [],
+          }
+        },
+      }],
+      worktreeOperations: operations,
+      physicalWorktrees: { capture: async () => capability },
+      targetProjection: testTargetProjection([]),
+    })
+
+    const admitted = await operations.runOperation(capability, async (permit) =>
+      await coordinator.ensureRuntimeTabForSession({
+        userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a', branchName: 'main',
+        worktreePath: '/repo/worktree', runtimeType: 'terminal', sessionId: 'term-preparedprepared001',
+        insertAfterIdentity: 'workspace-pane:status', permit, physicalWorktreeCapability: capability,
+        isRuntimeCurrent: () => true,
+        publishRuntime: () => {
+          events.push('publish')
+          published = true
+          return 1
+        },
+      }))
+
+    expect(admitted.admitted).toBe(true)
+    if (!admitted.admitted) return
+    expect(events).toEqual(['sample:false', 'publish', 'sample:true'])
+    expect(admitted.value).toMatchObject({
+      kind: 'committed',
+      terminalSessionsRevision: 1,
+      snapshot: { entries: [{ tabs: [
+        workspacePaneStaticTabEntry('status'),
+        { type: 'terminal', runtimeSessionId: 'term-preparedprepared001' },
+      ] }] },
+    })
+  })
+
   test('serializes repository reads with a later durable command', async () => {
     let layout: WorkspacePaneDurableLayout = { entries: [{
       repoRoot: '/repo', branchName: 'main', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')],

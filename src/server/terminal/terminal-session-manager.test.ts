@@ -213,7 +213,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(onSessionsProjectionChanged).toHaveBeenCalledOnce()
     expect(onSessionsProjectionChanged).toHaveBeenCalledWith(USER_ID, SCOPE)
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)).toMatchObject({
-      revision: prepared.terminalSessionsRevision + 2,
+      revision: prepared.publication.kind === 'existing' ? prepared.publication.terminalSessionsRevision : 0,
       sessions: [{ terminalRuntimeGeneration: 1, phase: 'open' }],
     })
 
@@ -911,7 +911,6 @@ describe('TerminalSessionManager membership catalog', () => {
     const afterBinding = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
 
     expect(afterBinding.revision).toBe(beforeBinding.revision)
-    expect(created.terminalSessionsRevision).toBe(afterBinding.revision)
     expect(afterBinding.sessions[0]).toMatchObject({ terminalRuntimeGeneration: 1, processName: 'terminal' })
   })
 

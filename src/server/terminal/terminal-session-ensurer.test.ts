@@ -113,7 +113,6 @@ describe('terminal session ensurer', () => {
       rows: 40,
       scopedWorktreePath: path.resolve(WORKTREE_PATH),
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
-      action: 'created',
     })
     const result = await ensurer.ensure(
       USER_ID,
@@ -130,8 +129,7 @@ describe('terminal session ensurer', () => {
 
     expect(result).toMatchObject({
       ok: true,
-      terminalSessionsRevision: 7,
-      action: 'created',
+      publication: { kind: 'existing', terminalSessionsRevision: 7 },
       terminalSessionId: 'term-locallocallocallocal1',
       canonicalCols: 100,
       canonicalRows: 40,
@@ -181,7 +179,6 @@ describe('terminal session ensurer', () => {
         rows: 32,
         scopedWorktreePath: REMOTE_WORKTREE_PATH,
         physicalWorktreeCapability: remotePhysicalWorktreeExecutionCapability(),
-        action: 'reused',
       }),
     )
 
@@ -243,7 +240,6 @@ describe('terminal session ensurer', () => {
           rows: 24,
           scopedWorktreePath: REMOTE_WORKTREE_PATH,
           physicalWorktreeCapability: remotePhysicalWorktreeExecutionCapability(),
-          action: 'created',
         }),
       ),
     ).resolves.toMatchObject({ ok: true })
@@ -260,7 +256,7 @@ function preparedResult(
   return {
     ok: true,
     action: 'created',
-    terminalSessionsRevision: 7,
+    publication: { kind: 'existing', terminalSessionsRevision: 7 },
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalRuntimeGeneration: 1,
     processName: 'zsh',

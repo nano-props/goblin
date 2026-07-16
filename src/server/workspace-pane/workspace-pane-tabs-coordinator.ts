@@ -3,12 +3,16 @@ import type {
   WorkspacePaneTabEntry,
 } from '#/shared/workspace-pane.ts'
 import { isWorkspacePaneStaticTabType, workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type {
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateOperation,
 } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  workspacePaneTabsTargetIdentityKey,
+  type WorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
@@ -67,7 +71,7 @@ export interface WorkspacePaneTabsCommandResult extends WorkspacePaneLayoutCommi
 }
 
 export type WorkspacePaneRuntimeTabCommitResult =
-  | { kind: 'committed'; snapshot: WorkspacePaneTabsSnapshot }
+  | { kind: 'committed'; snapshot: WorkspacePaneTabsSnapshot; terminalSessionsRevision: number | null }
   | { kind: 'runtime-stale' }
 
 export interface WorkspacePaneTabsCoordinatorOptions {
@@ -98,6 +102,7 @@ export class WorkspacePaneTabsCoordinator {
     userId: string
     repoRoot: string
     scope: string
+    branchName: string
     worktreePath: string
     runtimeType: WorkspacePaneRuntimeTabType
     sessionId: string
@@ -105,11 +110,23 @@ export class WorkspacePaneTabsCoordinator {
     permit: PhysicalWorktreeOperationPermit
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
     isRuntimeCurrent: () => boolean
+    publishRuntime?: () => number
   }): Promise<WorkspacePaneRuntimeTabCommitResult> {
     const physicalCapability = input.physicalWorktreeCapability
     return await this.runWorkspaceTabsRepoOperation(input.repoRoot, async (layout) => {
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
-      const validTargets = await this.targetProjection.captureTargets(input.userId, input.repoRoot, input.scope)
+      const capturedTargets = await this.targetProjection.captureTargets(input.userId, input.repoRoot, input.scope)
+      const requestedTarget = {
+        repoRoot: input.repoRoot,
+        branchName: input.branchName,
+        worktreePath: input.worktreePath,
+      }
+      const requestedTargetKey = workspacePaneTabsTargetIdentityKey(requestedTarget)
+      const validTargets = capturedTargets.some(
+        (target) => workspacePaneTabsTargetIdentityKey(target) === requestedTargetKey,
+      )
+        ? capturedTargets
+        : [...capturedTargets, requestedTarget]
       const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
@@ -117,7 +134,7 @@ export class WorkspacePaneTabsCoordinator {
       const current = await layout.snapshot({ scope, validTargets, providerSnapshots })
       const entry = current.entries.find((candidate) => candidate.worktreePath === input.worktreePath)
       const tabs = workspacePaneTabsWithRuntimeTab(
-        entry?.tabs ?? [],
+        entry?.tabs ?? [workspacePaneStaticTabEntry('status')],
         input.runtimeType,
         input.sessionId,
         { insertAfterIdentity: input.insertAfterIdentity ?? null },
@@ -129,14 +146,14 @@ export class WorkspacePaneTabsCoordinator {
         lease: physicalWorktreeAdmissionLease(physicalCapability),
         tabs,
       })
+      const terminalSessionsRevision = input.publishRuntime?.() ?? null
       const resampled = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       const resampledTargets = await this.targetProjection.captureTargets(input.userId, input.repoRoot, input.scope)
-      if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
       const snapshot = await layout.snapshot({ scope, validTargets: resampledTargets, providerSnapshots: resampled })
-      if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
       return {
         kind: 'committed',
         snapshot,
+        terminalSessionsRevision,
       }
     })
   }

@@ -19,7 +19,6 @@ const BRANCH_NAME = 'feature/worktree'
 describe('terminal session creator', () => {
   test('keeps the manager metadata revision when takeover advances current revision during stale validation', async () => {
     const sessions: TerminalSessionSummary[] = []
-    let currentRevision = 7
     const manager = {
       listSessionsForUser: vi.fn(async () => sessions),
     }
@@ -34,10 +33,6 @@ describe('terminal session creator', () => {
       }),
       ensureOrRestore,
       isCurrentRepoRuntime: vi.fn(() => true),
-      rejectStaleCreateIfNeeded: vi.fn(async () => {
-        currentRevision = 8
-        return null
-      }),
     })
 
     const result = await creator.create({
@@ -63,11 +58,10 @@ describe('terminal session creator', () => {
     )
     expect(result).toMatchObject({
       terminalSessionId: 'term-createdcreatedcreated',
-      terminalSessionsRevision: 7,
+      publication: { kind: 'existing', terminalSessionsRevision: 7 },
       terminalRuntimeSessionId: 'pty_term-createdcreatedcreated',
       terminalRuntimeGeneration: 1,
     })
-    expect(currentRevision).toBe(8)
     expect(result).not.toHaveProperty('sessions')
   })
 
@@ -83,7 +77,6 @@ describe('terminal session creator', () => {
       }),
       ensureOrRestore,
       isCurrentRepoRuntime: vi.fn(() => false),
-      rejectStaleCreateIfNeeded: vi.fn(async () => null),
     })
 
     await expect(
@@ -108,7 +101,6 @@ describe('terminal session creator', () => {
       sessions.push(terminalSession(input.terminalSessionId ?? 'term-createdcreatedcreated'))
       return ensureResult(input.terminalSessionId ?? 'term-createdcreatedcreated')
     })
-    const rejectStaleCreateIfNeeded = vi.fn(async () => ({ ok: false as const, message: 'error.repo-runtime-stale' }))
     const creator = createTerminalSessionCreator({
       createCoordinator: createTerminalSessionCreateCoordinator({
         manager,
@@ -116,7 +108,6 @@ describe('terminal session creator', () => {
       }),
       ensureOrRestore,
       isCurrentRepoRuntime: vi.fn(() => true),
-      rejectStaleCreateIfNeeded,
     })
 
     await expect(
@@ -129,7 +120,6 @@ describe('terminal session creator', () => {
         signal: new AbortController().signal,
       }),
     ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
-    expect(rejectStaleCreateIfNeeded).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -169,7 +159,7 @@ function terminalSession(terminalSessionId: string): TerminalSessionSummary {
 function ensureResult(terminalSessionId: string): Extract<TerminalSessionEnsureResult, { ok: true }> {
   return {
     ok: true,
-    terminalSessionsRevision: 7,
+    publication: { kind: 'existing', terminalSessionsRevision: 7 },
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalRuntimeGeneration: 1,
     terminalSessionId,

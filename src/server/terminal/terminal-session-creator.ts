@@ -9,6 +9,11 @@ import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-remo
 
 type TerminalSessionCreateCoordinator = ReturnType<typeof createTerminalSessionCreateCoordinator>
 type TerminalCreateFailure = Extract<TerminalCreateResult, { ok: false }>
+export type ServerTerminalCreateResult =
+  | (Omit<Extract<TerminalCreateResult, { ok: true }>, 'terminalSessionsRevision'> & {
+      publication: Extract<TerminalSessionEnsureResult, { ok: true }>['publication']
+    })
+  | TerminalCreateFailure
 
 interface TerminalSessionCreatorOptions {
   createCoordinator: TerminalSessionCreateCoordinator
@@ -20,11 +25,6 @@ interface TerminalSessionCreatorOptions {
     signal: AbortSignal,
   ): Promise<TerminalSessionEnsureResult>
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
-  rejectStaleCreateIfNeeded(
-    userId: string,
-    input: Pick<TerminalCreateInput, 'repoRoot' | 'repoRuntimeId'>,
-    terminalRuntimeSessionId: string,
-  ): Promise<TerminalCreateFailure | null>
 }
 
 class TerminalSessionCreator {
@@ -41,7 +41,7 @@ class TerminalSessionCreator {
     request: TerminalCreateInput
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
     signal: AbortSignal
-  }): Promise<TerminalCreateResult> {
+  }): Promise<ServerTerminalCreateResult> {
     const signal = input.signal
     const sessionScope = terminalSessionRuntimeScope(input.request.repoRoot, input.request.repoRuntimeId)
     const scopedWorktreePath = terminalSessionWorktreePath(input.request.repoRoot, input.request.worktreePath)
@@ -68,17 +68,15 @@ class TerminalSessionCreator {
             ),
         )
         if (!createResult.ok) return { ok: false, message: createResult.message }
-        const staleAfterEnsure = await this.options.rejectStaleCreateIfNeeded(
-          input.userId,
-          input.request,
-          createResult.terminalRuntimeSessionId,
-        )
-        if (staleAfterEnsure) return staleAfterEnsure
+        if (!this.options.isCurrentRepoRuntime(input.userId, input.request.repoRoot, input.request.repoRuntimeId)) {
+          if (createResult.publication.kind === 'prepared') createResult.publication.retire()
+          return { ok: false, message: 'error.repo-runtime-stale' }
+        }
         return {
           ok: true,
           action: createResult.action,
           terminalSessionId: createResult.terminalSessionId,
-          terminalSessionsRevision: createResult.terminalSessionsRevision,
+          publication: createResult.publication,
           terminalRuntimeSessionId: createResult.terminalRuntimeSessionId,
           terminalRuntimeGeneration: createResult.terminalRuntimeGeneration,
           processName: createResult.processName,

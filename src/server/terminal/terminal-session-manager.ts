@@ -52,7 +52,11 @@ interface TerminalPtyRestartResult {
 }
 
 export type TerminalSessionPrepareResult =
-  | ({ ok: true; terminalSessionsRevision: number; action: TerminalCreateAction } & TerminalRuntimeMetadata)
+  | ({
+      ok: true
+      action: TerminalCreateAction
+      publication: { kind: 'existing'; terminalSessionsRevision: number }
+    } & TerminalRuntimeMetadata)
   | { ok: false; message: string }
 
 export interface TerminalEnsureSessionInput<TUser extends string | number> {
@@ -136,6 +140,7 @@ export interface TerminalBatchRetirementResult {
 
 export class TerminalSessionManager<TUser extends string | number> {
   private readonly directory = new TerminalDirectory<TUser, TerminalSessionView<TUser>>()
+  private readonly projectedProcessNameByTerminalRuntimeSessionId = new Map<string, string>()
   private readonly closeOperationsByTerminalRuntimeSessionId = new Map<string, Promise<boolean>>()
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
@@ -178,7 +183,11 @@ export class TerminalSessionManager<TUser extends string | number> {
         )
       }
       const action = this.effectiveController(existing) ? 'restored' : 'reused'
-      return { ...this.prepareResult(existing), action }
+      return {
+        ...this.prepareResult(existing),
+        action,
+        publication: { kind: 'existing', terminalSessionsRevision: this.projectionRevision(userId, input.scope) },
+      }
     }
 
     const worktreePath = input.worktreePath
@@ -222,7 +231,11 @@ export class TerminalSessionManager<TUser extends string | number> {
     // single xterm before `attachSession` starts the PTY with exact geometry.
     // Until then this server-owned session is intentionally addressable but
     // has no process and no output history.
-    return { ...this.prepareResult(session), action: 'created' }
+    return {
+      ...this.prepareResult(session),
+      action: 'created',
+      publication: { kind: 'existing', terminalSessionsRevision: this.projectionRevision(userId, input.scope) },
+    }
   }
 
   async writeSession(
@@ -637,7 +650,9 @@ export class TerminalSessionManager<TUser extends string | number> {
     }
   }
 
-  private prepareResult(session: TerminalSessionView<TUser>): TerminalSessionPrepareResult {
+  private prepareResult(
+    session: TerminalSessionView<TUser>,
+  ): { ok: true; terminalSessionsRevision: number } & TerminalRuntimeMetadata {
     return {
       ok: true,
       terminalSessionsRevision: this.projectionRevision(session.userId, session.scope),

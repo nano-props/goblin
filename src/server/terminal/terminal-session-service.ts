@@ -31,7 +31,10 @@ import {
   type TerminalSessionEnsurerOptions,
 } from '#/server/terminal/terminal-session-ensurer.ts'
 import { createTerminalSessionPruner } from '#/server/terminal/terminal-session-pruner.ts'
-import { createTerminalSessionCreator } from '#/server/terminal/terminal-session-creator.ts'
+import {
+  createTerminalSessionCreator,
+  type ServerTerminalCreateResult,
+} from '#/server/terminal/terminal-session-creator.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 interface TerminalSessionServiceManager extends TerminalSessionEnsureManager {
@@ -79,8 +82,6 @@ class TerminalSessionService {
         await this.ensureOrRestore(clientId, userId, input, physicalWorktreeCapability, signal),
       isCurrentRepoRuntime: (userId, repoRoot, repoRuntimeId) =>
         this.isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId),
-      rejectStaleCreateIfNeeded: async (userId, input, terminalRuntimeSessionId) =>
-        await this.rejectStaleCreateIfNeeded(userId, input, terminalRuntimeSessionId),
     })
   }
 
@@ -121,7 +122,7 @@ class TerminalSessionService {
     input: TerminalCreateInput,
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     signal: AbortSignal,
-  ): Promise<TerminalCreateResult> {
+  ): Promise<ServerTerminalCreateResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidRepoLocator(input.repoRoot)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidBranch(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
@@ -278,15 +279,6 @@ class TerminalSessionService {
     }
   }
 
-  private async rejectStaleCreateIfNeeded(
-    userId: string,
-    input: Pick<TerminalCreateInput, 'repoRoot' | 'repoRuntimeId'>,
-    terminalRuntimeSessionId: string,
-  ): Promise<Extract<TerminalCreateResult, { ok: false }> | null> {
-    if (this.isCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)) return null
-    await this.options.manager.closeSession(terminalRuntimeSessionId)
-    return { ok: false, message: 'error.repo-runtime-stale' }
-  }
 }
 
 export function createTerminalSessionService(options: TerminalSessionServiceOptions): TerminalSessionService {

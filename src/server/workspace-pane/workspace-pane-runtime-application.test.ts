@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { createWorkspacePaneRuntimeApplication } from '#/server/workspace-pane/workspace-pane-runtime-application.ts'
+import type { ServerTerminalCreateResult } from '#/server/terminal/terminal-session-creator.ts'
 import type { TerminalCreateResult } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
@@ -82,7 +83,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(result).toEqual({
       ok: true,
       runtimeType: 'terminal',
-      runtime,
+      runtime: publishedTerminalResult(runtime),
       workspacePaneTabs,
     })
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', '/repo')
@@ -196,6 +197,11 @@ describe('WorkspacePaneRuntimeApplication', () => {
     async (action) => {
       const runtime = terminalCreateSuccess()
       runtime.action = action
+      const retire = vi.fn()
+      runtime.publication =
+        action === 'created'
+          ? { kind: 'prepared', publish: () => 1, retire }
+          : { kind: 'existing', terminalSessionsRevision: 1 }
       const close = vi.fn(() => true)
       const reconcileWorktree = vi.fn(async () => snapshot([]))
       const stale = { ok: false as const, runtimeType: 'terminal' as const, message: 'error.repo-runtime-stale' }
@@ -205,7 +211,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
           : { kind: 'runtime-stale' as const },
       )
       const broadcastWorkspaceTabsChanged = vi.fn()
-      const providerResult = deferred<Extract<TerminalCreateResult, { ok: true }>>()
+      const providerResult = deferred<Extract<ServerTerminalCreateResult, { ok: true }>>()
       let current = true
       const create = vi.fn(async () => {
         const result = await providerResult.promise
@@ -234,58 +240,12 @@ describe('WorkspacePaneRuntimeApplication', () => {
       expect(current).toBe(false)
       expect(isCurrentRepoRuntime).toHaveBeenCalledTimes(2)
       expect(ensureRuntimeTabForSession).toHaveBeenCalledOnce()
-      if (action === 'created') {
-        expect(close).toHaveBeenCalledOnce()
-        expect(close).toHaveBeenCalledWith('client-test', 'user-test', {
-          terminalRuntimeSessionId: runtime.terminalRuntimeSessionId,
-        })
-      } else {
-        expect(close).not.toHaveBeenCalled()
-      }
-      expect(reconcileWorktree).toHaveBeenCalledOnce()
-      expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', request.repoRoot)
+      expect(retire).toHaveBeenCalledTimes(action === 'created' ? 1 : 0)
+      expect(close).not.toHaveBeenCalled()
+      expect(reconcileWorktree).not.toHaveBeenCalled()
+      expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
     },
   )
-
-  test('reconciles provider truth when stale-open compensation is not acknowledged', async () => {
-    const runtime = terminalCreateSuccess()
-    const close = vi.fn(async () => false)
-    const stale = { ok: false as const, runtimeType: 'terminal' as const, message: 'error.repo-runtime-stale' }
-    const reconcileWorktree = vi.fn(async () =>
-      snapshot([{ type: 'terminal', runtimeSessionId: runtime.terminalSessionId }]),
-    )
-    const broadcastWorkspaceTabsChanged = vi.fn()
-    const providerResult = deferred<Extract<TerminalCreateResult, { ok: true }>>()
-    let current = true
-    const create = vi.fn(async () => {
-      const result = await providerResult.promise
-      current = false
-      return result
-    })
-    const application = createWorkspacePaneRuntimeApplication({
-      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
-      physicalWorktrees: testPhysicalWorktrees,
-      terminalWorktree: { listSessionsForUser: async () => [] },
-      terminal: { createAdmitted: create, close },
-      workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: async (input: { isRuntimeCurrent: () => boolean }) =>
-          input.isRuntimeCurrent()
-            ? { kind: 'committed' as const, snapshot: snapshot([]) }
-            : { kind: 'runtime-stale' as const },
-        reconcileWorktreeAdmitted: reconcileWorktree,
-      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,
-      isCurrentRepoRuntime: () => current,
-      broadcastWorkspaceTabsChanged,
-    })
-
-    const open = application.open('client-test', 'user-test', { runtimeType: 'terminal', request })
-    await vi.waitFor(() => expect(create).toHaveBeenCalledOnce())
-    providerResult.resolve(runtime)
-    await expect(open).resolves.toEqual(stale)
-    expect(close).toHaveBeenCalledOnce()
-    expect(reconcileWorktree).toHaveBeenCalledOnce()
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', request.repoRoot)
-  })
 
   test('closes a terminal by durable session id and returns the canonical scope snapshot', async () => {
     const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
@@ -420,7 +380,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
   })
 
   test('serializes open and close through the shared user/runtime/worktree queue', async () => {
-    const createResult = deferred<Extract<TerminalCreateResult, { ok: true }>>()
+    const createResult = deferred<Extract<ServerTerminalCreateResult, { ok: true }>>()
     const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
     const listSessions = vi.fn().mockResolvedValueOnce([session]).mockResolvedValueOnce([])
     const application = createWorkspacePaneRuntimeApplication({
@@ -464,7 +424,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
 
   test('lets an earlier admitted open finish before a later removal that fails validation', async () => {
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
-    const createResult = deferred<Extract<TerminalCreateResult, { ok: true }>>()
+    const createResult = deferred<Extract<ServerTerminalCreateResult, { ok: true }>>()
     const create = vi.fn(async () => await createResult.promise)
     const close = vi.fn(async () => true)
     const application = createWorkspacePaneRuntimeApplication({
@@ -536,8 +496,10 @@ describe('WorkspacePaneRuntimeApplication', () => {
     await removal
   })
 
-  test('closes a newly created terminal and reconciles if projection unexpectedly throws', async () => {
+  test('retires an unpublished terminal if placement preparation throws', async () => {
     const runtime = terminalCreateSuccess()
+    const retire = vi.fn()
+    runtime.publication = { kind: 'prepared', publish: () => 1, retire }
     const close = vi.fn(async () => true)
     const reconcileWorktree = vi.fn(async () => snapshot([]))
     const broadcastWorkspaceTabsChanged = vi.fn()
@@ -561,11 +523,42 @@ describe('WorkspacePaneRuntimeApplication', () => {
       runtimeType: 'terminal',
       message: 'error.unavailable',
     })
-    expect(close).toHaveBeenCalledWith('client-test', 'user-test', {
-      terminalRuntimeSessionId: runtime.terminalRuntimeSessionId,
+    expect(retire).toHaveBeenCalledOnce()
+    expect(close).not.toHaveBeenCalled()
+    expect(reconcileWorktree).not.toHaveBeenCalled()
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
+  })
+
+  test('does not roll back membership when projection fails after publication', async () => {
+    const runtime = terminalCreateSuccess()
+    const publish = vi.fn(() => 1)
+    const retire = vi.fn()
+    runtime.publication = { kind: 'prepared', publish, retire }
+    const close = vi.fn(async () => true)
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
+      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminal: { createAdmitted: async () => runtime, close },
+      workspaceTabsCoordinator: {
+        ensureRuntimeTabForSession: async (input: { publishRuntime?: () => number }) => {
+          input.publishRuntime?.()
+          throw new Error('projection failed after publication')
+        },
+        reconcileWorktreeAdmitted: vi.fn(),
+      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged: vi.fn(),
     })
-    expect(reconcileWorktree).toHaveBeenCalledOnce()
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', request.repoRoot)
+
+    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual({
+      ok: false,
+      runtimeType: 'terminal',
+      message: 'error.unavailable',
+    })
+    expect(publish).toHaveBeenCalledOnce()
+    expect(retire).not.toHaveBeenCalled()
+    expect(close).not.toHaveBeenCalled()
   })
 })
 
@@ -583,14 +576,14 @@ function snapshot(tabs: WorkspacePaneTabsSnapshot['entries'][number]['tabs']): W
   }
 }
 
-function terminalCreateSuccess(): Extract<TerminalCreateResult, { ok: true }> {
+function terminalCreateSuccess(): Extract<ServerTerminalCreateResult, { ok: true }> {
   const terminalRuntimeSessionId = 'pty_session_1_aaaaaaaaa'
   const terminalSessionId = 'term-111111111111111111111'
   return {
     ok: true,
     action: 'created',
     terminalSessionId,
-    terminalSessionsRevision: 1,
+    publication: { kind: 'existing', terminalSessionsRevision: 1 },
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 1,
     processName: 'zsh',
@@ -600,6 +593,17 @@ function terminalCreateSuccess(): Extract<TerminalCreateResult, { ok: true }> {
     controller: { clientId: 'client-test', status: 'connected' },
     canonicalCols: 100,
     canonicalRows: 30,
+  }
+}
+
+function publishedTerminalResult(
+  runtime: Extract<ServerTerminalCreateResult, { ok: true }>,
+): Extract<TerminalCreateResult, { ok: true }> {
+  const { publication, ...result } = runtime
+  return {
+    ...result,
+    terminalSessionsRevision:
+      publication.kind === 'existing' ? publication.terminalSessionsRevision : publication.publish(),
   }
 }
 

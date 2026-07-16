@@ -139,12 +139,15 @@ export class WorkspacePaneRuntimeApplication {
     if (!runtime.ok) return { ok: false, runtimeType: 'terminal', message: runtime.message }
 
     const worktreePath = requestedWorktreePath
+    let publishedRevision =
+      runtime.publication.kind === 'existing' ? runtime.publication.terminalSessionsRevision : null
     let paneCommit
     try {
       paneCommit = await this.deps.workspaceTabsCoordinator.ensureRuntimeTabForSession({
         userId,
         repoRoot: input.request.repoRoot,
         scope,
+        branchName: input.request.branch,
         worktreePath,
         runtimeType: 'terminal',
         sessionId: runtime.terminalSessionId,
@@ -153,90 +156,39 @@ export class WorkspacePaneRuntimeApplication {
         physicalWorktreeCapability,
         isRuntimeCurrent: () =>
           this.deps.isCurrentRepoRuntime(userId, input.request.repoRoot, input.request.repoRuntimeId),
+        publishRuntime:
+          runtime.publication.kind === 'prepared'
+            ? () => {
+                publishedRevision = runtime.publication.kind === 'prepared' ? runtime.publication.publish() : null
+                if (publishedRevision === null) throw new Error('error.unavailable')
+                return publishedRevision
+              }
+            : undefined,
       })
     } catch (error) {
-      const recovery = await this.recoverIncompleteTerminalOpen(
-        clientId,
-        userId,
-        input,
-        runtime,
-        scope,
-        worktreePath,
-        physicalWorktreeCapability,
-        permit,
-      )
+      if (runtime.publication.kind === 'prepared' && publishedRevision === null) runtime.publication.retire()
       workspacePaneRuntimeApplicationLogger.error(
-        { error, ...recovery, userId, repoRoot: input.request.repoRoot, worktreePath },
+        { error, userId, repoRoot: input.request.repoRoot, worktreePath },
         'terminal open application command failed',
       )
       return runtimeFailure('terminal', 'error.unavailable')
     }
     if (paneCommit.kind === 'runtime-stale') {
-      const recovery = await this.recoverIncompleteTerminalOpen(
-        clientId,
-        userId,
-        input,
-        runtime,
-        scope,
-        worktreePath,
-        physicalWorktreeCapability,
-        permit,
-      )
-      if (recovery.closeError || recovery.reconcileError) {
-        workspacePaneRuntimeApplicationLogger.error(
-          { ...recovery, userId, repoRoot: input.request.repoRoot, worktreePath },
-          'failed to recover rejected terminal open application command',
-        )
-      }
+      if (runtime.publication.kind === 'prepared') runtime.publication.retire()
       return runtimeFailure('terminal', 'error.repo-runtime-stale')
     }
 
+    publishedRevision ??= paneCommit.terminalSessionsRevision
+    if (publishedRevision === null) throw new Error('terminal publication did not produce a catalog revision')
+    const { publication: _publication, ...runtimeResult } = runtime
     const workspacePaneTabs = paneCommit.snapshot
     this.deps.broadcastWorkspaceTabsChanged(userId, input.request.repoRoot)
     return {
       ok: true,
       runtimeType: 'terminal',
-      runtime,
+      runtime: { ...runtimeResult, terminalSessionsRevision: publishedRevision },
       workspacePaneTabs,
     }
-  }
-
-  private async recoverIncompleteTerminalOpen(
-    clientId: string,
-    userId: string,
-    input: TerminalWorkspacePaneRuntimeOpenInput,
-    runtime: Extract<TerminalCreateResult, { ok: true }>,
-    scope: string,
-    worktreePath: string,
-    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
-    permit: PhysicalWorktreeOperationPermit,
-  ): Promise<{ closeError: unknown; reconcileError: unknown }> {
-    let closeError: unknown = null
-    if (runtime.action === 'created') {
-      try {
-        const closed = await this.deps.terminal.close(clientId, userId, {
-          terminalRuntimeSessionId: runtime.terminalRuntimeSessionId,
-        })
-        if (!closed) closeError = new Error('error.unavailable')
-      } catch (caught) {
-        closeError = caught
-      }
-    }
-    let reconcileError: unknown = null
-    try {
-      await this.deps.workspaceTabsCoordinator.reconcileWorktreeAdmitted({
-        userId,
-        repoRoot: input.request.repoRoot,
-        scope,
-        worktreePath,
-        physicalWorktreeCapability,
-        permit,
-      })
-    } catch (caught) {
-      reconcileError = caught
-    }
-    this.deps.broadcastWorkspaceTabsChanged(userId, input.request.repoRoot)
-    return { closeError, reconcileError }
   }
 
   private async closeTerminal(
