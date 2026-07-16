@@ -41,8 +41,10 @@ import { physicalWorktreeIdentityKey } from '#/server/worktree-removal/physical-
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { TerminalDirectory } from '#/server/terminal/terminal-directory.ts'
 import type { TerminalSessionAdmission } from '#/server/terminal/terminal-session-ensurer.ts'
+import { serverLogger } from '#/server/logger.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
+const terminalSessionManagerLogger = serverLogger.child({ module: 'terminal-session-manager' })
 
 export type TerminalSessionCloseReason = 'session' | 'scope' | 'detached-user' | 'shutdown'
 
@@ -244,11 +246,16 @@ export class TerminalSessionManager<TUser extends string | number> {
         if (settled) throw new Error('error.unavailable')
         reservation.commit(session)
         settled = true
-        if (input.clientId) {
-          this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId, this.sessionPresence(session)))
+        const revision = this.projectionRevision(userId, input.scope)
+        try {
+          if (input.clientId) {
+            this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId, this.sessionPresence(session)))
+          }
+          this.sink.onSessionsProjectionChanged?.(session.userId, session.repoRoot)
+        } catch (error) {
+          terminalSessionManagerLogger.warn({ error, terminalRuntimeSessionId: session.id }, 'admission notification failed')
         }
-        this.sink.onSessionsProjectionChanged?.(session.userId, session.repoRoot)
-        return this.projectionRevision(userId, input.scope)
+        return revision
       },
       abort: () => {
         if (settled) return
