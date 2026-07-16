@@ -11,7 +11,7 @@ import type {
   WorkspacePaneRuntimeOpenInput,
   WorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime.ts'
-import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import type { WorkspaceRuntimeTabPlacement } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
   PhysicalWorktreeOperationPermit,
@@ -29,10 +29,7 @@ type MaybePromise<T> = T | Promise<T>
 const workspacePaneRuntimeApplicationLogger = serverLogger.child({ module: 'workspace-pane-runtime-application' })
 
 interface WorkspacePaneRuntimeApplicationDependencies {
-  workspaceTabsCoordinator: Pick<
-    WorkspacePaneTabsCoordinator,
-    'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'
-  >
+  workspaceTabsCoordinator: WorkspaceRuntimeTabPlacement
   worktreeOperations: PhysicalWorktreeOperationCoordinator
   physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
   terminal: ServerTerminalCreateProvider & {

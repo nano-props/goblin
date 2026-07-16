@@ -74,6 +74,25 @@ export type WorkspacePaneRuntimeTabCommitResult =
   | { kind: 'committed'; snapshot: WorkspacePaneTabsSnapshot }
   | { kind: 'runtime-stale' }
 
+export interface WorkspaceRuntimeTabPlacementInput {
+  userId: string
+  repoRoot: string
+  scope: string
+  branchName: string
+  worktreePath: string
+  runtimeType: WorkspacePaneRuntimeTabType
+  sessionId: string
+  insertAfterIdentity?: string | null
+  permit: PhysicalWorktreeOperationPermit
+  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
+  isRuntimeCurrent: () => boolean
+  onPlacementCommitted?: () => void
+}
+
+export interface WorkspaceRuntimeTabPlacement {
+  ensureRuntimeTabForSession(input: WorkspaceRuntimeTabPlacementInput): Promise<WorkspacePaneRuntimeTabCommitResult>
+}
+
 export interface WorkspacePaneTabsCoordinatorOptions {
   runtimeProviders: readonly WorkspacePaneRuntimeTabsProvider[]
   worktreeOperations: PhysicalWorktreeOperationCoordinator
@@ -82,7 +101,7 @@ export interface WorkspacePaneTabsCoordinatorOptions {
   targetProjection: WorkspacePaneTargetProjectionProvider
 }
 
-export class WorkspacePaneTabsCoordinator {
+export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacement {
   private readonly runtimeProviders: readonly WorkspacePaneRuntimeTabsProvider[]
   private readonly worktreeOperations: PhysicalWorktreeOperationCoordinator
   private readonly physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
@@ -98,20 +117,7 @@ export class WorkspacePaneTabsCoordinator {
     assertUniqueRuntimeProviderTypes(this.runtimeProviders)
   }
 
-  async ensureRuntimeTabForSession(input: {
-    userId: string
-    repoRoot: string
-    scope: string
-    branchName: string
-    worktreePath: string
-    runtimeType: WorkspacePaneRuntimeTabType
-    sessionId: string
-    insertAfterIdentity?: string | null
-    permit: PhysicalWorktreeOperationPermit
-    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
-    isRuntimeCurrent: () => boolean
-    onPlacementCommitted?: () => void
-  }): Promise<WorkspacePaneRuntimeTabCommitResult> {
+  async ensureRuntimeTabForSession(input: WorkspaceRuntimeTabPlacementInput): Promise<WorkspacePaneRuntimeTabCommitResult> {
     const physicalCapability = input.physicalWorktreeCapability
     return await this.runWorkspaceTabsRepoOperation(input.repoRoot, async (layout) => {
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)

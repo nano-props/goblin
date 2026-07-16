@@ -449,7 +449,7 @@ describe('shared terminal validators', () => {
     })
   })
 
-  test('normalizes runtime-open application responses as one provider-and-tabs outcome', () => {
+  test('normalizes runtime-open command responses', () => {
     const payload = {
       ok: true,
       runtimeType: 'terminal',
@@ -467,17 +467,6 @@ describe('shared terminal validators', () => {
         controller: { clientId: 'client_a', status: 'connected' },
         canonicalCols: 120,
         canonicalRows: 40,
-      },
-      workspacePaneTabs: {
-        revision: 4,
-        entries: [
-          {
-            repoRoot: '/repo',
-            branchName: 'main',
-            worktreePath: '/repo/worktree',
-            tabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
-          },
-        ],
       },
     }
 
@@ -510,19 +499,7 @@ describe('shared terminal validators', () => {
     })
   })
 
-  test('normalizes runtime close application responses with canonical snapshots', () => {
-    const workspacePaneTabs = {
-      revision: 5,
-      entries: [
-        {
-          repoRoot: '/repo',
-          branchName: 'main',
-          worktreePath: '/repo/worktree',
-          tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
-        },
-      ],
-    }
-
+  test('normalizes runtime close command responses', () => {
     const effects = [
       {
         action: 'closed' as const,
@@ -544,13 +521,13 @@ describe('shared terminal validators', () => {
           requestId: `request_runtime_close_${index}`,
           ok: true,
           action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
-          payload: { ok: true, runtimeType: 'terminal', runtime, workspacePaneTabs },
+          payload: { ok: true, runtimeType: 'terminal', runtime },
         }),
       ).toMatchObject({
         type: 'response',
         ok: true,
         action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
-        payload: { ok: true, runtimeType: 'terminal', runtime, workspacePaneTabs },
+        payload: { ok: true, runtimeType: 'terminal', runtime },
       })
       expect(
         normalizeAppRealtimeSocketServerMessage({
@@ -561,8 +538,7 @@ describe('shared terminal validators', () => {
           payload: {
             ok: true,
             runtimeType: 'terminal',
-            runtime,
-            workspacePaneTabs: { revision: 5, entries: null },
+            runtime: { ...runtime, action: 'invalid' },
           },
         }),
       ).toMatchObject({

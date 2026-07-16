@@ -22,7 +22,6 @@ import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/
 import { isCurrentRepoRuntime as isCurrentRepoRuntimeOpen } from '#/server/modules/repo-runtimes.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 
 interface TerminalSessionServiceLike {
@@ -33,7 +32,6 @@ interface TerminalSessionServiceLike {
     repoRuntimeId: string,
   ): Promise<{ pruned: number; remaining: number }>
   listSessions(userId: string, repoRoot: string, repoRuntimeId: string): Promise<TerminalSessionSummary[]>
-  listWorkspaceTabs(userId: string, repoRoot: string, repoRuntimeId: string): Promise<WorkspacePaneTabsSnapshot>
 }
 
 interface TerminalRuntimeActionDependencies {

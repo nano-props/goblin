@@ -11,7 +11,6 @@ import type {
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalRestartResult,
-  TerminalSessionInput,
   TerminalSessionsSnapshot,
   TerminalTakeoverInput,
   TerminalTakeoverResult,

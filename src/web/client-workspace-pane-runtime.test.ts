@@ -21,7 +21,6 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
         terminalRuntimeSessionId: 'pty_1234567890abcdef',
         terminalRuntimeGeneration: 1,
       },
-      workspacePaneTabs: { revision: 2, entries: [] },
     }))
     const client = createServerWorkspacePaneRuntimeClient(realtimeWithRequest(request))
     const closeInput = {
@@ -38,12 +37,11 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
         terminalRuntimeSessionId: 'pty_1234567890abcdef',
         terminalRuntimeGeneration: 1,
       },
-      workspacePaneTabs: { revision: 2, entries: [] },
     })
     expect(request).toHaveBeenNthCalledWith(1, WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close, closeInput)
   })
 
-  test('rejects malformed canonical snapshots returned by runtime close', async () => {
+  test('rejects malformed runtime effects returned by runtime close', async () => {
     const client = createServerWorkspacePaneRuntimeClient(
       realtimeWithRequest(
         vi.fn(async () => ({
@@ -53,9 +51,8 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
             action: 'closed',
             terminalSessionId: 'term-111111111111111111111',
             terminalRuntimeSessionId: 'pty_1234567890abcdef',
-            terminalRuntimeGeneration: 1,
+            terminalRuntimeGeneration: -1,
           },
-          workspacePaneTabs: { revision: -1, entries: [] },
         })),
       ),
     )
