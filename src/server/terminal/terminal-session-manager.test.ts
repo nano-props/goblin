@@ -216,9 +216,13 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(onSessionsProjectionChanged).toHaveBeenCalledOnce()
     expect(onSessionsProjectionChanged).toHaveBeenCalledWith(USER_ID, SCOPE)
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)).toMatchObject({
-      revision: prepared.terminalSessionsRevision + 1,
-      sessions: [{ terminalRuntimeGeneration: 1 }],
+      revision: prepared.terminalSessionsRevision + 2,
+      sessions: [{ terminalRuntimeGeneration: 1, phase: 'open' }],
     })
+
+    await expect(
+      manager.writeSession(USER_ID, prepared.terminalRuntimeSessionId, 'input before output', CLIENT_ID),
+    ).resolves.toEqual({ status: 'accepted' })
 
     supervisor.emitData('pty_fresh_stream_123456', 'prompt')
     expect(onOutput).toHaveBeenCalledWith(USER_ID, expect.objectContaining({ data: 'prompt', seq: 1, outputEra: 0 }))
@@ -936,7 +940,7 @@ describe('TerminalSessionManager versioned recovery projection', () => {
       expect.objectContaining({
         terminalSessionId: TERMINAL_SESSION_ID,
         processName: 'zsh',
-        phase: 'opening',
+        phase: 'open',
         cols: 80,
         rows: 24,
       }),
@@ -944,7 +948,7 @@ describe('TerminalSessionManager versioned recovery projection', () => {
 
     supervisor.emitData('pty_revision_123456', 'first output')
     const openedSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
-    expect(openedSnapshot.revision).toBeGreaterThan(createdSnapshot.revision)
+    expect(openedSnapshot.revision).toBe(createdSnapshot.revision)
     expect(openedSnapshot.sessions[0]).toMatchObject({ phase: 'open' })
 
     supervisor.emitData('pty_revision_123456', 'ordinary output')

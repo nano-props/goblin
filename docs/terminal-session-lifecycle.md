@@ -126,6 +126,11 @@ The protocol now has three explicit outcomes:
    returns a snapshot frame. Those responses carry `snapshot`, `snapshotSeq`,
    and `outputEra`, and the client uses them as a recovery boundary.
 
+`open` means the spawned PTY handle is bound to its data and exit listeners. It
+does not mean that a first output chunk has arrived. Quiet processes that wait
+for stdin are therefore writable immediately; output acceptance is tracked
+separately by the server render sequence and snapshot checkpoint.
+
 The server, not the client, chooses the attach frame from PTY state. A second
 attach waiting on an in-flight fresh spawn is a recovery attach and receives a
 snapshot after the spawn completes; it cannot share the first request's stream

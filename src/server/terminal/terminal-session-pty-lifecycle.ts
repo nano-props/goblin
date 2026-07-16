@@ -345,11 +345,6 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
         const processNameBeforeData = lastProcessName
 
         const output = appendOutput(session.render, data)
-        // `open` means the authoritative output ingress has accepted at
-        // least one PTY chunk. Publish lifecycle only after that boundary;
-        // consumers can never observe an open session whose headless state
-        // has not yet received the output that made it open.
-        if (markTerminalSessionOpen(session)) this.events.emitLifecycle(session)
 
         const processNameAfterData = this.supervisor.processName(handle)
         lastProcessName = processNameAfterData
@@ -419,6 +414,12 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
         this.events.closeSession(session.id)
       }),
     )
+    // `open` is the process-ready boundary: the supervisor returned a live
+    // handle and both data and exit listeners now own it. Output acceptance
+    // remains represented by render sequence/checkpoints, not lifecycle.
+    // A quiet process that waits for stdin must be writable before producing
+    // its first byte.
+    if (markTerminalSessionOpen(session)) this.events.emitLifecycle(session)
   }
 
   private beginSpawn(): number {

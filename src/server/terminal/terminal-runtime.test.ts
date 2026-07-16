@@ -647,7 +647,7 @@ describe('server terminal runtime', () => {
         ok: true,
         frame: 'stream',
         terminalRuntimeSessionId,
-        phase: 'opening',
+        phase: 'open',
         message: null,
         canonicalCols: 101,
         canonicalRows: 31,
@@ -1750,7 +1750,7 @@ describe('server terminal runtime', () => {
       controller: { clientId: 'client_b', status: 'connected' },
       canonicalCols: 120,
       canonicalRows: 40,
-      phase: 'opening',
+      phase: 'open',
     })
     expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(120, 40)
 
