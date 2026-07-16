@@ -146,9 +146,7 @@ function terminalRepoEpochKey(repoRoot: string, repoRuntimeId: string): string {
 
 function retiredTerminalRepoEpochKeys(previous: TerminalRepoIndex, next: TerminalRepoIndex): string[] {
   return Object.entries(previous).flatMap(([repoRoot, repo]) =>
-    next[repoRoot]?.repoRuntimeId === repo.repoRuntimeId
-      ? []
-      : [terminalRepoEpochKey(repoRoot, repo.repoRuntimeId)],
+    next[repoRoot]?.repoRuntimeId === repo.repoRuntimeId ? [] : [terminalRepoEpochKey(repoRoot, repo.repoRuntimeId)],
   )
 }
 
@@ -499,7 +497,8 @@ export class TerminalSessionProjection {
   ): boolean {
     const current = this.terminalSessionsProjectionRevisionByRepoRoot.get(scope.repoRoot)
     if (current?.repoRuntimeId === scope.repoRuntimeId && snapshot.revision < current.revision) return false
-    if (!this.reconcileServerSessions(scope, snapshot.sessions, clientId, snapshotsByTerminalRuntimeSessionId)) return false
+    if (!this.reconcileServerSessions(scope, snapshot.sessions, clientId, snapshotsByTerminalRuntimeSessionId))
+      return false
     this.terminalSessionsProjectionRevisionByRepoRoot.set(scope.repoRoot, {
       repoRuntimeId: scope.repoRuntimeId,
       revision: snapshot.revision,
@@ -752,14 +751,7 @@ export class TerminalSessionProjection {
     })
     if (!openResult.ok) throw new Error(openResult.message)
     const result = openResult.runtime
-    const snapshotTerminalRuntimeSessionId = result.terminalRuntimeSessionId
-    if (
-      !snapshotTerminalRuntimeSessionId ||
-      typeof result.snapshot !== 'string' ||
-      typeof result.snapshotSeq !== 'number'
-    ) {
-      throw new Error('error.terminal-create-failed')
-    }
+    if (!result.terminalRuntimeSessionId) throw new Error('error.terminal-create-failed')
     let runtimeProjectionApplied = false
     if (this.lifecycleQueues.getCreate(terminalWorktreeKey) === pending) {
       const projectedCreate = projectCreateResultForClient(base, result)
@@ -769,7 +761,7 @@ export class TerminalSessionProjection {
           result.terminalSessionsRevision,
           projectedCreate.serverSession,
           clientId,
-          projectedCreate.snapshotByTerminalRuntimeSessionId,
+          EMPTY_SERVER_SNAPSHOTS,
         )
         if (runtimeProjectionApplied) {
           this.setPreferredSelectedTerminalSessionId(terminalWorktreeKey, result.terminalSessionId)
@@ -1179,7 +1171,7 @@ export class TerminalSessionProjection {
   }
 
   /**
-   * Single commit barrier for bindings activated by either a direct first-frame
+   * Single commit barrier for bindings activated by either a direct response
    * response or full reconciliation. No binding is published before a queued
    * future exit is checked and its exact pending bell is consumed.
    */
@@ -1224,10 +1216,7 @@ export class TerminalSessionProjection {
       })
       return false
     }
-    this.syncTerminalRuntimeSessionIdIndex(
-      session.descriptor.terminalSessionId,
-      binding,
-    )
+    this.syncTerminalRuntimeSessionIdIndex(session.descriptor.terminalSessionId, binding)
     const pendingBell = this.pendingServerBellByRuntimeBindingKey.get(bindingKey)
     if (pendingBell) this.applyServerBell(session, pendingBell)
     return true
@@ -1366,10 +1355,7 @@ export class TerminalSessionProjection {
     this.removeSession(effect.terminalSessionId, { dispose: true, closeSession: false })
   }
 
-  private runtimeBindingForClose(
-    terminalSessionId: string,
-    base: TerminalSessionBase,
-  ): TerminalRuntimeBindingIdentity {
+  private runtimeBindingForClose(terminalSessionId: string, base: TerminalSessionBase): TerminalRuntimeBindingIdentity {
     const session = this.sessions.get(terminalSessionId)
     const repoRuntimeId = requireRepoRuntimeId(base)
     const addressableBinding =
@@ -1406,10 +1392,7 @@ export class TerminalSessionProjection {
     }
   }
 
-  private sessionMatchesRuntimeBinding(
-    session: TerminalSession,
-    binding: TerminalRuntimeBindingIdentity,
-  ): boolean {
+  private sessionMatchesRuntimeBinding(session: TerminalSession, binding: TerminalRuntimeBindingIdentity): boolean {
     return (
       session.descriptor.repoRoot === binding.repoRoot &&
       session.descriptor.repoRuntimeId === binding.repoRuntimeId &&

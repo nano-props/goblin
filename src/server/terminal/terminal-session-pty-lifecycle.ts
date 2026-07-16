@@ -122,10 +122,21 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     return this.spawnGeneration
   }
 
-  async spawn(session: TSession, signal?: AbortSignal): Promise<TerminalPtySpawnResult> {
-    // This pending promise covers only PTY spawn/bind ownership. The
-    // manager builds attach first-frame results after a successful bind.
+  hasPendingSpawn(): boolean {
+    return this.pendingSpawn !== null
+  }
+
+  async spawn(session: TSession, cols: number, rows: number, signal?: AbortSignal): Promise<TerminalPtySpawnResult> {
+    // The first real xterm fit owns initial PTY geometry. The logical
+    // session may have been prepared earlier with a best-effort hint, but no
+    // process output exists yet, so resizing the empty headless screen here
+    // preserves a single geometry boundary for both PTY and recovery state.
     const generation = this.beginSpawn()
+    session.terminalRuntimeGeneration = generation
+    session.cols = cols
+    session.rows = rows
+    resizeRender(session.render, cols, rows)
+    if (markTerminalSessionOpening(session)) this.events.emitLifecycle(session)
     const spawn = this.resolveSpawn(session, generation, signal)
     return await this.trackPendingSpawn(spawn)
   }
@@ -330,7 +341,6 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     this.disposables.push(
       this.supervisor.onData(handle, (data) => {
         if (!this.isCurrentBinding(session, generation, handle)) return
-        if (markTerminalSessionOpen(session)) this.events.emitLifecycle(session)
         const titleBeforeData = session.render.title
         const processNameBeforeData = lastProcessName
 
@@ -404,6 +414,12 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
         this.events.closeSession(session.id)
       }),
     )
+    // `open` is the process-ready boundary: the supervisor returned a live
+    // handle and both data and exit listeners now own it. Output acceptance
+    // remains represented by render sequence/checkpoints, not lifecycle.
+    // A quiet process that waits for stdin must be writable before producing
+    // its first byte.
+    if (markTerminalSessionOpen(session)) this.events.emitLifecycle(session)
   }
 
   private beginSpawn(): number {

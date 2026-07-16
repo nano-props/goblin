@@ -115,8 +115,10 @@ function sendRealtimeResponse(socket: RealtimeSocket, message: TerminalSocketRes
 // during the request can race ahead of the authoritative response and
 // split the client's transition across two sources.
 //
-// `attach` and `restart` both return snapshot hydration
-// data that the client applies as one boundary.
+// Existing-session `attach` and every `restart` return snapshot hydration
+// data that the client applies as one boundary. Fresh attach returns a
+// stream handshake instead: pausing still orders the response before output,
+// but resume deliberately drops nothing so sequence 1 reaches the xterm.
 // `takeover` does not return a fresh snapshot, but its response is still
 // the authoritative identity/geometry handshake for the new controller;
 // the same socket must not observe the identity event before that
@@ -140,6 +142,7 @@ function outputFlushBoundaryFromResponse(
   if (message.action !== 'attach' && message.action !== 'restart') return null
   const payload = message.payload
   if (!payload.ok) return null
+  if (payload.frame === 'stream') return null
   return {
     terminalRuntimeSessionId: payload.terminalRuntimeSessionId,
     terminalRuntimeGeneration: payload.terminalRuntimeGeneration,

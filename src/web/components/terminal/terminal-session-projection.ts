@@ -30,7 +30,6 @@ export interface ProjectedServerTerminalSession {
 
 export interface ProjectedCreateTerminalSession {
   serverSession: ServerTerminalSessionSummary
-  snapshotByTerminalRuntimeSessionId: Map<string, TerminalHydrationSnapshot>
 }
 
 export function projectTerminalAttachResultForClient(
@@ -49,18 +48,6 @@ export function projectCreateResultForClient(
 ): ProjectedCreateTerminalSession {
   return {
     serverSession: createSessionSummaryFromCreate(base, result),
-    snapshotByTerminalRuntimeSessionId: new Map<string, TerminalHydrationSnapshot>([
-      [
-        result.terminalRuntimeSessionId,
-        {
-          terminalRuntimeSessionId: result.terminalRuntimeSessionId,
-          terminalRuntimeGeneration: result.terminalRuntimeGeneration,
-          snapshot: result.snapshot,
-          snapshotSeq: result.snapshotSeq,
-          outputEra: result.outputEra,
-        },
-      ],
-    ]),
   }
 }
 
@@ -105,7 +92,7 @@ export function projectServerTerminalSession(input: {
       controllerStatus: controller.controllerStatus,
       canonicalCols: input.serverSession.cols,
       canonicalRows: input.serverSession.rows,
-      snapshot: input.serverSnapshot?.snapshot ?? '',
+      snapshot: input.serverSnapshot?.snapshot ?? null,
       snapshotSeq: input.serverSnapshot?.snapshotSeq ?? 0,
       outputEra: input.serverSnapshot?.outputEra ?? 0,
     },

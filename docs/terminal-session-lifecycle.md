@@ -7,14 +7,14 @@
 ## Why this document exists
 
 The terminal feature surfaced several bugs that looked unrelated but shared
-one underlying weakness: the `create` path did not own the created session's
-lifecycle end to end.
+one underlying weakness: terminal creation, runtime recovery, and local view
+startup did not have distinct ownership boundaries.
 
-- The first frame depended on a race between `create`, realtime output,
-  a follow-up snapshot, and session-list reconciliation. Result: blank
-  panels, torn prompts, isolated `%` inverse-video glyphs, and
-  "failed to create terminal" toasts on top of a successfully created
-  terminal.
+- The first frame first depended on a race between `create`, realtime output,
+  a follow-up snapshot, and session-list reconciliation. A later fix made the
+  create snapshot atomic by sequence number, but still exposed transient shell
+  redraw state as a visible frame. Result: blank panels, torn prompts, isolated
+  `%` inverse-video glyphs, and false create failures.
 - `dispose()` closed the local view state but only fire-and-forget the
   server-side close. The PTY could stay alive. The next create in the
   same window then re-attached to the orphan PTY and the session service
@@ -28,9 +28,9 @@ lifecycle end to end.
 None of these are one-off workarounds. They are three faces of the
 same gap:
 
-> **`create` returns the handshake, but the client's view of the
-> session's lifecycle — including close, broadcast, and rendering the
-> empty session — was treated as a series of unrelated follow-ups.**
+> **Logical session creation, fresh PTY startup, recovery replay, close,
+> broadcast, and empty-session rendering need explicit boundaries instead of
+> being inferred from one snapshot-shaped create result.**
 
 This document defines the contract that closes that gap.
 
@@ -38,7 +38,7 @@ This document defines the contract that closes that gap.
 
 In scope:
 
-- `create` first-frame protocol.
+- fresh-stream versus recovery-frame protocol.
 - Workspace-pane terminal tab materialization from live sessions.
 - Durable close on the client — every close must be tracked to server
   ack before a subsequent create in the same repo is allowed to race.
@@ -76,10 +76,11 @@ The combined symptom list across the root causes:
 
 ## Root causes, briefly
 
-- **R0 — `create` had no atomic first-frame protocol.** The server
-  knew the snapshot during `create`, but the public response did not
-  treat it as the authoritative handshake. The client reconstructed
-  the first frame from multiple asynchronous sources.
+- **R0 — fresh startup and recovery replay were conflated.** The first
+  implementation reconstructed startup from several asynchronous sources. The
+  atomic-snapshot fix removed that race, but still treated an output checkpoint
+  as a visually committed frame. A shell can emit a prompt redraw across
+  multiple PTY chunks, so a sequence-consistent snapshot may still be transient.
 - **R1 — Close was fire-and-forget and silent on failure.**
   `TerminalSession.dispose()` called `terminalClient.close(...)`
   with a swallowed rejection. A WebSocket mid-request teardown or a
@@ -102,89 +103,94 @@ The combined symptom list across the root causes:
 
 ---
 
-## R0: First-frame atomicity (`create`)
+## R0: Fresh startup versus recovery replay
 
-### Protocol changes
+### Authoritative boundary
 
-1. `create` returns the created session's first-frame hydration
-   data directly. The success payload carries the same class of
-   information the client already relied on for `attach` / `restart`:
-   - `terminalRuntimeSessionId`
-   - `processName`
-   - `canonicalTitle`
-   - `phase`
-   - `message`
-   - `snapshot`
-   - `snapshotSeq`
-   - `outputEra`
-   - `controller`
-   - `canonicalCols`
-   - `canonicalRows`
+The server remains authoritative for the session, PTY, controller, canonical
+geometry, output sequence, and headless render state. The client owns only its
+mounted xterm rendering and fitted view geometry. Keeping Server First does not
+require making every view start Snapshot First.
 
-   This makes `create` self-sufficient for the first visible frame.
+The protocol now has three explicit outcomes:
 
-2. `create` participates in the realtime pause boundary. The
-   server treats `create` like `attach` / `restart` for the purpose
-   of buffering per-socket output while the snapshot-bearing
-   response is being prepared. The snapshot-bearing response is
-   the authoritative boundary; live output around it follows the
-   same discipline as `attach` / `restart`.
+1. `create` prepares or finds the logical session and returns runtime metadata
+   (`terminalRuntimeSessionId`, generation, process/lifecycle/controller data,
+   and canonical geometry). It does not start a newly created PTY and carries no
+   `snapshot` fields.
+2. `attach` returns `frame: 'stream'` only when that request starts a prepared
+   PTY with no missed history. The client has already mounted and fitted its one
+   xterm, so the PTY starts at that geometry and realtime output begins at
+   sequence 1 without reset/replay.
+3. `attach` returns `frame: 'snapshot'` for an existing PTY. Restart also always
+   returns a snapshot frame. Those responses carry `snapshot`, `snapshotSeq`,
+   and `outputEra`, and the client uses them as a recovery boundary.
 
-3. The client hydrates directly from the `create` response. There
-   is no follow-up snapshot fetch to paint the first frame.
+`open` means the spawned PTY handle is bound to its data and exit listeners. It
+does not mean that a first output chunk has arrived. Quiet processes that wait
+for stdin are therefore writable immediately; output acceptance is tracked
+separately by the server render sequence and snapshot checkpoint.
 
-### `create.sessions` is projection data, not the success oracle
+The server, not the client, chooses the attach frame from PTY state. A second
+attach waiting on an in-flight fresh spawn is a recovery attach and receives a
+snapshot after the spawn completes; it cannot share the first request's stream
+claim because it may have missed earlier output.
 
-- `create.terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` +
-  `outputEra` are the **authoritative first-frame handshake**.
-- `create.sessions` is **projection / directory data**.
+Fresh binding activation also advances the authoritative sessions projection
+and broadcasts `sessions-changed`. Other clients may still hold the prepared
+generation 0 binding; generation 1 identity, lifecycle, and output events are
+intentionally insufficient to activate them because they may have missed
+history. They reconcile the complete projection and recover through a snapshot.
+The invalidation applies equally when fresh spawn fails: generation 1 plus its
+error lifecycle is still a new authoritative projection that generation 0
+siblings cannot reconstruct from incremental events.
 
-`create.sessions` is useful for tab-strip updates, terminal count,
-session metadata projection, and reducing an immediate recovery refresh.
-It is **not** a success criterion for first paint, and
-treating it as one introduced the false-failure toast described
-below.
+Snapshot presence is explicit in the client projection. `null` means recovery
+did not supply a snapshot; an empty string is a supplied authoritative blank
+screen and must reset any previous binding's xterm. String length is never used
+to decide whether a recovery frame exists.
 
-### False failure after a successful create
 
-After R0 landed, a client-side bug surfaced more clearly: the
-terminal could appear successfully but the create promise rejected
-with "failed to create terminal", triggering an empty-state CTA
-toast.
+### Transport ordering
 
-The client was doing an overly strict validation step:
+Attach pauses that socket's realtime fanout while the response is built. The
+response is sent before buffered events are resumed:
 
-- required `terminalRuntimeSessionId`, `snapshot`, `snapshotSeq`, `outputEra`
-  from `create`, **and**
-- required the returned `sessions` list to already include the
-  created session.
+- stream frame: drop nothing, so sequence 1 and every later event reach the
+  mounted xterm after its binding metadata is committed;
+- snapshot frame: drop buffered output represented by the snapshot checkpoint,
+  then flush only later output.
 
-That extra requirement was removed. The client now trusts the
-authoritative `create` payload for first paint. `create.sessions`
-remains useful for tab-strip and count updates, but a lagging list
-no longer triggers the false-failure toast. If the response has the
-required first-frame fields but `sessions[]` does not echo the target
-yet, the client materializes a minimal local projection from the create
-payload and lets the next server sync reconcile the directory data.
+Workspace runtime open still uses the same response-before-realtime ordering,
+but it has no render checkpoint and therefore drops no output. Fresh sessions
+cannot emit PTY output during create because their process does not exist yet.
 
-### Type-level atomicity
+### Why an atomic snapshot was insufficient
 
-The shared protocol types require the first-frame fields at the type
-level, so a forgotten field surfaces as a compile error rather than a
-runtime crash.
+`snapshotSeq` proves which PTY chunks the server headless xterm has parsed. It
+does not prove the shell has completed a prompt redraw. In the recorded failure,
+zsh's inverse-video `PROMPT_EOL_MARK` was present in one serialized screen and
+cleared by the next output chunk. Both states were sequence-consistent; only the
+first was an undesirable visible startup frame. Fixed waits and prompt-specific
+detection would create a second readiness protocol with no general terminal
+meaning.
 
-1. A `TerminalFirstFrame` interface is the single source of truth for
-   the first-frame handshake. It lifts every field that R0 made
-   required (`terminalRuntimeSessionId`, `processName`, `canonicalTitle`, `phase`,
-   `message`, `snapshot`, `snapshotSeq`, `outputEra`, `controller`,
-   `canonicalCols`, `canonicalRows`).
-2. `TerminalAttachResult` no longer accepts optional `canonicalCols` /
-   `canonicalRows` — both are required.
-3. `TerminalCreateResult` intersects with `TerminalFirstFrame`
-   instead of a partial attach result, so every `create` success carries
-   the full first-frame payload at the type level. The client's runtime
-   "missing terminalRuntimeSessionId" check stays as a belt-and-suspenders guard
-   against `unknown`/JSON-blob shapes arriving from the client layer.
+The current design follows the VS Code boundary instead: create and size xterm
+before a fresh process, stream fresh data directly, and reserve serializer
+replay for persistent/revived processes. Our server-side headless xterm remains
+active from sequence 1 so later reconnect, switch, and recovery behavior stays
+Server First.
+
+### Type-level separation
+
+The shared protocol prevents the paths from collapsing again:
+
+1. `TerminalCreateResult` contains `TerminalRuntimeMetadata` but no render
+   snapshot.
+2. `TerminalAttachResult` is discriminated by `frame: 'stream' | 'snapshot'`;
+   snapshot fields exist only on the snapshot branch.
+3. `TerminalRestartResult` permits only `frame: 'snapshot'`.
+4. Geometry and controller metadata remain required on every successful frame.
 
 ### `terminalRuntimeSessionId` is an addressable runtime id, not a live-handle proof
 
@@ -516,10 +522,8 @@ arrive at the same final state.
 
 ### Out of scope
 
-- No restructuring of who-emits-when for the realtime event.
-- `TerminalFirstFrame` is unchanged — takeover deliberately does not extend it,
-  because snapshot paint remains owned by the attach/restart/create first-frame
-  paths.
+- Takeover remains a metadata/control handshake. If it causes a local view to
+  be recreated, the ordinary attach path decides whether a snapshot is needed.
 
 ---
 
@@ -547,10 +551,11 @@ order would have been:
 
 ### Per fix — existing coverage
 
-- **R0**: provider tests supply the new first-frame hydration fields
-  on both `created` and `reused` paths; projection tests cover the
-  `create.terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` + `outputEra`
-  rule.
+- **R0**: manager tests prove create preparation does not spawn, the fitted
+  attach starts one PTY and returns a stream frame, concurrent/later attaches
+  receive snapshots, and headless recovery includes fresh output. Realtime
+  tests prove the attach response precedes sequence 1 without dropping it.
+  Client tests prove a stream frame performs no xterm reset or snapshot write.
 - **R1**: projection durable-close tests cover awaiting an in-flight
   close before creating, in-flight close failures allowing the queued
   create to proceed afterward, deduplicating concurrent enqueues,
@@ -592,13 +597,12 @@ order would have been:
 These rules are derived from the symptom family and should outlive
 any individual implementation:
 
-1. **Do not return a full terminal collection from `create`.**
-   `create.terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` +
-   `outputEra` are the authoritative target-session handshake. Full terminal
-   collections are returned only by revisioned recovery/query snapshots.
-2. **Keep `create`, `attach`, and `restart` aligned in first-frame
-   semantics.** All three produce a terminal frame the user can
-   immediately see; they all owe the same atomic handshake.
+1. **Create metadata is not a render frame.** It prepares or identifies the
+   server session and commits workspace membership; it does not carry a
+   snapshot or prove that a PTY has started.
+2. **Stream only from complete history.** Only the attach request that starts a
+   PTY before any output exists may receive `frame: 'stream'`. Any view that may
+   have missed history receives `frame: 'snapshot'`.
 3. **Close is durable.** `dispose()` must not be fire-and-forget on
    the server side. The projection owns pending close state.
 4. **Close is a broadcast event.** When the server confirms a user
@@ -611,7 +615,7 @@ any individual implementation:
 6. **Empty-state UI is part of the contract.** A terminal session with
    zero sessions must show the affordance to open one.
 7. **Treat React/provider lifetime concerns separately from terminal
-   protocol correctness.** The first-frame fix and the singleton
+   protocol correctness.** The frame-protocol fix and the singleton
    projection lifetime cleanup are related but separate.
 8. **Takeover is authoritative in its response.** The takeover
    response carries the new controller's full identity/lifecycle
@@ -623,8 +627,8 @@ any individual implementation:
 
 ## Suggested follow-ups
 
-1. **Done** — tighten the shared `TerminalCreateResult`
-   type so the first-frame fields are required at the type level.
+1. **Done** — split `TerminalCreateResult`, stream attach, snapshot attach, and
+   snapshot-only restart at the type and validator boundaries.
 2. **Done** — decide explicitly that same-session snapshot reapply is
    not a supported repair path. The long-term rule now lives in
    `docs/terminal.md`: replay side effects are local rendering

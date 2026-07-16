@@ -136,16 +136,13 @@ const TerminalSessionsRecoveryResultSchema = v.object({
   snapshots: v.array(TerminalHydrationSnapshotSchema),
   workspacePaneTabs: WorkspacePaneTabsSnapshotSchema,
 })
-const TerminalFirstFrameSchemaEntries = {
+const TerminalRuntimeMetadataSchemaEntries = {
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   processName: v.string(),
   canonicalTitle: v.nullable(v.string()),
   phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
   message: v.nullable(v.string()),
-  snapshot: v.string(),
-  snapshotSeq: v.number(),
-  outputEra: v.number(),
   controller: v.nullable(TerminalControllerSchema),
   canonicalCols: TerminalColsSchema,
   canonicalRows: TerminalRowsSchema,
@@ -156,7 +153,7 @@ const TerminalCreateResultSchema = v.variant('ok', [
     action: v.picklist(['created', 'restored', 'reused']),
     terminalSessionId: v.string(),
     terminalSessionsRevision: v.pipe(v.number(), v.integer(), v.minValue(0)),
-    ...TerminalFirstFrameSchemaEntries,
+    ...TerminalRuntimeMetadataSchemaEntries,
   }),
   v.object({
     ok: v.literal(false),
@@ -164,9 +161,35 @@ const TerminalCreateResultSchema = v.variant('ok', [
   }),
 ])
 const TerminalAttachResultSchema = v.variant('ok', [
+  v.variant('frame', [
+    v.object({
+      ok: v.literal(true),
+      frame: v.literal('stream'),
+      ...TerminalRuntimeMetadataSchemaEntries,
+      phase: v.literal('open'),
+    }),
+    v.object({
+      ok: v.literal(true),
+      frame: v.literal('snapshot'),
+      snapshot: v.string(),
+      snapshotSeq: v.number(),
+      outputEra: v.number(),
+      ...TerminalRuntimeMetadataSchemaEntries,
+    }),
+  ]),
+  v.object({
+    ok: v.literal(false),
+    message: v.string(),
+  }),
+])
+const TerminalRestartResultSchema = v.variant('ok', [
   v.object({
     ok: v.literal(true),
-    ...TerminalFirstFrameSchemaEntries,
+    frame: v.literal('snapshot'),
+    snapshot: v.string(),
+    snapshotSeq: v.number(),
+    outputEra: v.number(),
+    ...TerminalRuntimeMetadataSchemaEntries,
   }),
   v.object({
     ok: v.literal(false),
@@ -466,8 +489,9 @@ export function normalizeTerminalSocketServerMessage(value: unknown): TerminalSo
 function normalizeTerminalSocketResponsePayload(action: TerminalSocketRequestAction, payload: unknown): unknown | null {
   switch (action) {
     case 'attach':
-    case 'restart':
       return normalizeWithSchema(TerminalAttachResultSchema, payload)
+    case 'restart':
+      return normalizeWithSchema(TerminalRestartResultSchema, payload)
     case 'write':
       return normalizeWithSchema(TerminalWriteResultSchema, payload)
     case 'resize':

@@ -10,6 +10,7 @@ import type {
   TerminalOutputEvent,
   TerminalResizeInput,
   TerminalRestartInput,
+  TerminalRestartResult,
   TerminalSessionInput,
   TerminalSessionsRecoveryResult,
   TerminalTakeoverInput,
@@ -62,7 +63,7 @@ export interface TerminalSocketRequestInputs {
 
 export interface TerminalSocketResponseOutputs {
   attach: TerminalAttachResult
-  restart: TerminalAttachResult
+  restart: TerminalRestartResult
   write: TerminalWriteResult
   resize: TerminalMutationResult
   takeover: TerminalTakeoverResult

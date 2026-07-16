@@ -17,7 +17,7 @@ const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'
 
 describe('terminal session creator', () => {
-  test('keeps the manager first-frame revision when takeover advances current revision during stale validation', async () => {
+  test('keeps the manager metadata revision when takeover advances current revision during stale validation', async () => {
     const sessions: TerminalSessionSummary[] = []
     let currentRevision = 7
     const manager = {
@@ -65,9 +65,7 @@ describe('terminal session creator', () => {
       terminalSessionId: 'term-createdcreatedcreated',
       terminalSessionsRevision: 7,
       terminalRuntimeSessionId: 'pty_term-createdcreatedcreated',
-        terminalRuntimeGeneration: 1,
-      snapshotSeq: 0,
-      outputEra: 0,
+      terminalRuntimeGeneration: 1,
     })
     expect(currentRevision).toBe(8)
     expect(result).not.toHaveProperty('sessions')
@@ -151,7 +149,7 @@ function createRequest(overrides: Partial<TerminalCreateInput> = {}): TerminalCr
 function terminalSession(terminalSessionId: string): TerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
-        terminalRuntimeGeneration: 1,
+    terminalRuntimeGeneration: 1,
     terminalSessionId,
     repoRuntimeId: REPO_RUNTIME_ID,
     repoRoot: path.resolve(REPO_ROOT),
@@ -173,17 +171,13 @@ function ensureResult(terminalSessionId: string): Extract<TerminalSessionEnsureR
     ok: true,
     terminalSessionsRevision: 7,
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
-        terminalRuntimeGeneration: 1,
+    terminalRuntimeGeneration: 1,
     terminalSessionId,
     action: 'created',
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open',
     message: null,
-    snapshot: '',
-    snapshotSeq: 0,
-    outputEra: 0,
-
     controller: null,
     canonicalCols: 80,
     canonicalRows: 24,

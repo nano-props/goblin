@@ -41,6 +41,7 @@ import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bo
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type {
   TerminalAttachResult,
+  TerminalRestartResult,
   TerminalMutationResult,
   TerminalWriteResult,
   TerminalSessionsRecoveryResult,
@@ -130,7 +131,7 @@ export function seedRepoShellForTest(options: {
 
 interface TerminalClientTestOutputs {
   'terminal.attach': TerminalAttachResult
-  'terminal.restart': TerminalAttachResult
+  'terminal.restart': TerminalRestartResult
   'terminal.write': TerminalWriteResult
   'terminal.resize': TerminalMutationResult
   'terminal.takeover': TerminalTakeoverResult

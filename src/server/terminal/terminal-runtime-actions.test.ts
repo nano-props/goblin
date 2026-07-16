@@ -36,7 +36,7 @@ function makeActions(
   const manager = {
     getSessionSummaryForUser: vi.fn((userId: string, terminalRuntimeSessionId: string) =>
       options.getSlotScope?.(userId, terminalRuntimeSessionId)
-          ? ({
+        ? ({
             terminalRuntimeSessionId,
             terminalRuntimeGeneration: 1,
             terminalSessionId: 'term-111111111111111111111',
@@ -115,14 +115,11 @@ describe('terminal-runtime-actions close broadcast', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalSessionsRevision: 1,
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open',
       message: null,
-      snapshot: '',
-      snapshotSeq: 0,
-      outputEra: 0,
       controller: null,
       canonicalCols: 80,
       canonicalRows: 24,
@@ -136,14 +133,21 @@ describe('terminal-runtime-actions close broadcast', () => {
       repoRuntimeId: REPO_RUNTIME_ID,
     })
     await expect(
-      worktreeOperations.runOperation(physicalWorktreeCapability, async (permit) =>
-        await provider.createAdmitted(CLIENT_ID, USER_ID, {
-        repoRoot: '/repo',
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branch: 'feature/worktree',
-        worktreePath: '/repo',
-        kind: 'additional',
-        }, { physicalWorktreeCapability, permit }),
+      worktreeOperations.runOperation(
+        physicalWorktreeCapability,
+        async (permit) =>
+          await provider.createAdmitted(
+            CLIENT_ID,
+            USER_ID,
+            {
+              repoRoot: '/repo',
+              repoRuntimeId: REPO_RUNTIME_ID,
+              branch: 'feature/worktree',
+              worktreePath: '/repo',
+              kind: 'additional',
+            },
+            { physicalWorktreeCapability, permit },
+          ),
       ),
     ).resolves.toMatchObject({ admitted: true, value: { ok: true } })
 
@@ -164,14 +168,21 @@ describe('terminal-runtime-actions close broadcast', () => {
       repoRuntimeId: REPO_RUNTIME_ID,
     })
     await expect(
-      worktreeOperations.runOperation(physicalWorktreeCapability, async (permit) =>
-        await provider.createAdmitted(CLIENT_ID, USER_ID, {
-        repoRoot: '/repo',
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branch: 'feature/worktree',
-        worktreePath: '/repo',
-        kind: 'additional',
-        }, { physicalWorktreeCapability, permit }),
+      worktreeOperations.runOperation(
+        physicalWorktreeCapability,
+        async (permit) =>
+          await provider.createAdmitted(
+            CLIENT_ID,
+            USER_ID,
+            {
+              repoRoot: '/repo',
+              repoRuntimeId: REPO_RUNTIME_ID,
+              branch: 'feature/worktree',
+              worktreePath: '/repo',
+              kind: 'additional',
+            },
+            { physicalWorktreeCapability, permit },
+          ),
       ),
     ).resolves.toEqual({
       admitted: true,
@@ -194,14 +205,21 @@ describe('terminal-runtime-actions close broadcast', () => {
       repoRuntimeId: 'repo-runtime-stale',
     })
     await expect(
-      worktreeOperations.runOperation(physicalWorktreeCapability, async (permit) =>
-        await provider.createAdmitted(CLIENT_ID, USER_ID, {
-        repoRoot: '',
-        repoRuntimeId: 'repo-runtime-stale',
-        branch: 'feature/worktree',
-        worktreePath: '/repo',
-        kind: 'additional',
-        }, { physicalWorktreeCapability, permit }),
+      worktreeOperations.runOperation(
+        physicalWorktreeCapability,
+        async (permit) =>
+          await provider.createAdmitted(
+            CLIENT_ID,
+            USER_ID,
+            {
+              repoRoot: '',
+              repoRuntimeId: 'repo-runtime-stale',
+              branch: 'feature/worktree',
+              worktreePath: '/repo',
+              kind: 'additional',
+            },
+            { physicalWorktreeCapability, permit },
+          ),
       ),
     ).resolves.toEqual({
       admitted: true,
@@ -230,7 +248,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     expect(broadcasts).toHaveBeenCalledWith(USER_ID, {
       type: 'session-closed',
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       repoRoot: '/repo',
       worktreePath: '/repo',

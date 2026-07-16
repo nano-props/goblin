@@ -124,11 +124,15 @@ At a high level, the lifecycle is:
 1. A client requests create or restore for a worktree terminal.
 2. The server session service validates the request and delegates create orchestration.
 3. The create path resolves whether the request means create, reuse, or restore.
-4. The session manager ensures a session exists and that a PTY is running for it.
-5. The client attaches a local view to the session.
-6. Realtime output, title, exit, and identity events keep clients up to date.
-7. Detach removes a local view without necessarily killing the session.
-8. Close or TTL cleanup ends the session and frees PTY resources.
+4. The session manager prepares an addressable logical session without starting a
+   new PTY.
+5. The client mounts and fits its single local xterm, then attaches with the
+   measured geometry.
+6. Attach starts a fresh PTY and streams from output sequence 1, or snapshots an
+   already-running PTY when the view has missed history.
+7. Realtime output, title, exit, and identity events keep clients up to date.
+8. Detach removes a local view without necessarily killing the session.
+9. Close or TTL cleanup ends the session and frees PTY resources.
 
 The important design rule is that **session lifecycle is independent from view lifecycle**.
 
@@ -217,7 +221,7 @@ returned as a full-scope tabs snapshot.
 Terminal creation has three architecture layers:
 
 - `TerminalSessionService` and its focused domain collaborators own terminal
-  create/reuse/restore, PTY/session lifecycle, and terminal first-frame data.
+  create/reuse/restore and PTY/session lifecycle.
 - `WorkspacePaneRuntimeApplication` owns composed runtime open/close commands;
   `WorktreeRemovalApplication` owns physical removal, provider quiescence, Git
   commit, and canonical-tab finalization.
@@ -238,10 +242,11 @@ must not be rejected just because another terminal create is pending.
 Workspace-pane terminal create commands enter the terminal projection first so
 terminal lifecycle can see duplicate or distinct requests immediately and keep
 `createPending` projection-owned. The projection sends the accepted request to
-`workspace-pane-runtime.open`; the server application operation creates or
+`workspace-pane-runtime.open`; the server application operation prepares or
 restores the terminal and then commits tab membership through the generic
-workspace-pane coordinator. The response contains the terminal first frame,
-session projection, and `WorkspacePaneTabsSnapshot { revision, entries }`.
+workspace-pane coordinator. The response contains addressable terminal runtime
+metadata and `WorkspacePaneTabsSnapshot { revision, entries }`; it deliberately
+does not contain a render snapshot. The selected view owns the later attach.
 
 The admission-leading client command writes those returned tabs into the local
 query projection, records opener facts, and commits the exact terminal route.
@@ -438,7 +443,7 @@ The system supports replay and snapshot hydration so users can reattach to runni
 ### Purpose
 
 - restore visible content after reconnect
-- minimize blank time during attach using server-authored first-frame hydration
+- restore an existing view from a server-authored snapshot before continuing live output
 - preserve continuity across client lifecycle changes
 
 ### Rules
@@ -460,22 +465,46 @@ The client input pipeline therefore uses an internal envelope:
 
 Replay boundaries suppress terminal-emulator input while replay is in progress, but still allow attributed user intent. This keeps replay a rendering operation instead of a hidden stdin writer.
 
-### First-frame mutation contract
+### Fresh stream and recovery frame contract
 
-`create`, `attach`, and `restart` all produce a terminal frame the user may immediately see.
-They should therefore share the same high-level rule:
+An output sequence checkpoint is not a visual-frame commit. A server headless
+xterm can serialize a sequence-consistent screen while a shell is between two
+prompt redraw chunks. Replaying that snapshot into a newly created client xterm
+turns a transient internal screen into a visible first paint.
 
-- the mutation response itself should carry the authoritative first-frame hydration payload
-- the client should hydrate from that response instead of reconstructing first paint from a race between live output, list updates, and later snapshot fetches
-- projection data returned alongside the mutation should not be used as the success criterion for first paint
+The protocol therefore distinguishes startup from recovery:
 
-For `create` specifically:
+- `create` prepares an addressable server session and returns runtime metadata
+  only. It does not start a fresh PTY and does not return a snapshot.
+- The client mounts its one real xterm, waits for a measurable host, fits it,
+  and sends `attach` with the exact `cols`/`rows`.
+- If the session has no PTY history, attach starts the PTY and returns
+  `frame: 'stream'`. The client does not reset or replay xterm; raw output begins
+  at sequence 1 through realtime.
+- If the PTY already exists, attach returns `frame: 'snapshot'` with
+  `snapshot`, `snapshotSeq`, and `outputEra`. The client replays that recovery
+  frame and then applies later realtime output.
+- Restart always returns a snapshot frame because it replaces an existing
+  binding and establishes an explicit reset boundary.
 
-- `terminalRuntimeSessionId` plus `snapshot` / `snapshotSeq` / `outputEra`
-  are the authoritative created-session handshake
-- any returned `sessions` list is useful for tab-strip and projection updates, but is not the created session's primary truth source
+The realtime socket is paused while attach is processed. For a stream frame the
+response is sent first and the buffer is resumed without dropping output, so
+sequence 1 cannot race ahead of the binding metadata. For a snapshot frame,
+buffered output at or before the snapshot checkpoint is dropped and only later
+output is flushed. A concurrent attach that did not initiate the fresh spawn is
+treated as recovery and receives a snapshot.
 
-This keeps `create`, `attach`, and `restart` aligned and prevents prompt tearing and false create failures caused by projection lag. A selected view may still be blank while the fresh xterm is created and the server-authored snapshot is replayed.
+This is the same lifecycle split used by VS Code: create the client terminal and
+know its dimensions before starting a fresh process, stream fresh process data
+directly, and reserve serializer replay for persistent or revived processes.
+The server-side headless xterm remains authoritative for recovery; Server First
+does not imply Snapshot First.
+
+VS Code also batches process data briefly to reduce renderer messages. That is a
+transport optimization, not a prompt-readiness contract. This implementation
+keeps the existing animation-frame client batching and does not introduce a
+fixed startup delay; server-side chunk coalescing can be added later without
+changing the frame protocol.
 
 ## Realtime model
 
@@ -492,16 +521,17 @@ The terminal feature uses realtime transport for continuous, UX-critical flows.
 ### Non-streaming flows
 
 - session service reads
-- first-frame mutation responses that carry snapshots
-- explicit mutations such as create, attach, restart, resize, takeover, close, and reorder
+- metadata/frame handshakes for create, attach, and restart
+- explicit mutations such as resize, takeover, close, and reorder
 
 ### Design rule
 
 Use realtime streaming where the user experience requires continuity.
-Use targeted request/response flows for mutations; when a snapshot-carrying
-mutation opens or replaces a visible frame, its response carries the
-server-authored snapshot. Control-only mutations such as takeover apply
-role/lifecycle state first, then paint xterm through the server snapshot path.
+Use targeted request/response flows for mutations. A fresh attach orders its
+metadata response before undropped realtime output; a recovery or restart
+response carries the server snapshot and its output checkpoint. Control-only
+mutations such as takeover apply role/lifecycle state synchronously, while any
+later view recreation goes through the ordinary attach frame decision.
 
 ## State model
 

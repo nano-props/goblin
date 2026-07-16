@@ -12,7 +12,7 @@ import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { resolveKnownWorktree } from '#/shared/worktree-guards.ts'
-import type { TerminalAttachResult } from '#/shared/terminal-types.ts'
+import type { TerminalSessionPrepareManagerResult } from '#/server/terminal/terminal-session-ensurer.ts'
 
 vi.mock('#/system/git/worktrees.ts', () => ({
   getWorktrees: vi.fn(async () => [
@@ -100,10 +100,10 @@ describe('terminal session ensurer', () => {
   })
 
   test('ensures local terminal sessions with resolved worktree metadata', async () => {
-    const ensureSession = vi.fn(async (input) => attachResult(input.terminalSessionId, input.cols, input.rows))
+    const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId, input.cols, input.rows))
     const broadcastSessionsChanged = vi.fn()
     const ensurer = createTerminalSessionEnsurer({
-      manager: { ensureSession },
+      manager: { prepareSession },
       broadcastSessionsChanged,
     })
 
@@ -138,7 +138,7 @@ describe('terminal session ensurer', () => {
     })
     expect(getWorktrees).not.toHaveBeenCalled()
     expect(resolveKnownWorktree).not.toHaveBeenCalled()
-    expect(ensureSession).toHaveBeenCalledWith({
+    expect(prepareSession).toHaveBeenCalledWith({
       userId: USER_ID,
       scope: terminalSessionRuntimeScope(REPO_ROOT, REPO_RUNTIME_ID),
       repoRoot: path.resolve(REPO_ROOT),
@@ -159,10 +159,10 @@ describe('terminal session ensurer', () => {
   })
 
   test('ensures remote terminal sessions through an SSH invocation', async () => {
-    const ensureSession = vi.fn(async (input) => attachResult(input.terminalSessionId, input.cols, input.rows))
+    const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId, input.cols, input.rows))
     const broadcastSessionsChanged = vi.fn()
     const ensurer = createTerminalSessionEnsurer({
-      manager: { ensureSession },
+      manager: { prepareSession },
       broadcastSessionsChanged,
     })
 
@@ -193,8 +193,8 @@ describe('terminal session ensurer', () => {
       canonicalRows: 32,
     })
     expect(resolveRemoteTarget).not.toHaveBeenCalled()
-    expect(ensureSession).toHaveBeenCalledTimes(1)
-    const input = ensureSession.mock.calls[0]?.[0]
+    expect(prepareSession).toHaveBeenCalledTimes(1)
+    const input = prepareSession.mock.calls[0]?.[0]
     expect(input).toEqual(
       expect.objectContaining({
         userId: USER_ID,
@@ -221,10 +221,10 @@ describe('terminal session ensurer', () => {
 
   test('uses the captured remote target after SSH config changes', async () => {
     vi.mocked(resolveRemoteTarget).mockRejectedValueOnce(new Error('error.ssh-config-changed'))
-    const ensureSession = vi.fn(async (input) => attachResult(input.terminalSessionId, input.cols, input.rows))
+    const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId, input.cols, input.rows))
     const broadcastSessionsChanged = vi.fn()
     const ensurer = createTerminalSessionEnsurer({
-      manager: { ensureSession },
+      manager: { prepareSession },
       broadcastSessionsChanged,
     })
 
@@ -248,24 +248,20 @@ describe('terminal session ensurer', () => {
       ),
     ).resolves.toMatchObject({ ok: true })
     expect(resolveRemoteTarget).not.toHaveBeenCalled()
-    expect(ensureSession).toHaveBeenCalledOnce()
+    expect(prepareSession).toHaveBeenCalledOnce()
   })
 })
 
-function attachResult(
+function preparedResult(
   terminalSessionId: string,
   cols: number,
   rows: number,
-): Extract<TerminalAttachResult, { ok: true }> & { terminalSessionsRevision: number } {
+): Extract<TerminalSessionPrepareManagerResult, { ok: true }> {
   return {
     ok: true,
     terminalSessionsRevision: 7,
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
-        terminalRuntimeGeneration: 1,
-    snapshot: '',
-    snapshotSeq: 0,
-   outputEra: 0,
-
+    terminalRuntimeGeneration: 1,
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open',

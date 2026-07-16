@@ -15,6 +15,7 @@ import type {
   TerminalAttachResult,
   TerminalResizeInput,
   TerminalRestartInput,
+  TerminalRestartResult,
   TerminalSessionInput,
   TerminalTakeoverResult,
   TerminalTakeoverInput,
@@ -436,7 +437,7 @@ class MockFontFaceSet {
 
 const terminalCalls = {
   attach: vi.fn<(input: TerminalAttachInput) => Promise<TerminalAttachResult>>(),
-  restart: vi.fn<(input: TerminalRestartInput) => Promise<TerminalAttachResult>>(),
+  restart: vi.fn<(input: TerminalRestartInput) => Promise<TerminalRestartResult>>(),
   write: vi.fn<(input: TerminalWriteInput) => Promise<TerminalWriteResult>>(),
   resize: vi.fn<(input: TerminalResizeInput) => Promise<TerminalMutationResult>>(),
   takeover: vi.fn<(input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>>(),
@@ -649,6 +650,34 @@ describe('TerminalSession', () => {
     expect(xtermMocks.terminals[0]!.options.rescaleOverlappingGlyphs).toBe(true)
     expect(terminalCalls.restart).not.toHaveBeenCalled()
     expect(session.snapshot().phase).toBe('open')
+  })
+
+  test('keeps the fresh xterm intact and renders realtime output from sequence 1', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
+
+    session.attach(host)
+    await flushTerminalStart()
+    const term = xtermMocks.terminals[0]!
+    expect(term.reset).not.toHaveBeenCalled()
+    expect(term.write).not.toHaveBeenCalled()
+
+    session.handleOutput({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      terminalSessionId: descriptor.terminalSessionId,
+      data: 'prompt',
+      outputEra: 0,
+      seq: 1,
+      processName: 'zsh',
+    })
+    await flushTerminalStart()
+
+    expect(term.reset).not.toHaveBeenCalled()
+    expect(term.write).toHaveBeenCalledWith('prompt', expect.any(Function))
   })
 
   test('marks an already-open server session as opening while the local xterm attach is pending', async () => {
@@ -1327,7 +1356,7 @@ describe('TerminalSession', () => {
 
     session.hydrate({
       terminalRuntimeSessionId: 'term-remoteremoteremote001',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1357,7 +1386,7 @@ describe('TerminalSession', () => {
 
     session.hydrate({
       terminalRuntimeSessionId: 'term-remoteremoteremote001',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1371,7 +1400,7 @@ describe('TerminalSession', () => {
     })
     // Sanity-check the leak precondition: hydrate() populated the field.
     expect(
-      (session as unknown as { hydratedSnapshot: { snapshot: string; snapshotSeq: number; outputEra: number } })
+      (session as unknown as { hydratedSnapshot: { snapshot: string | null; snapshotSeq: number; outputEra: number } })
         .hydratedSnapshot,
     ).toEqual({ snapshot: 'hydrated-screen', snapshotSeq: 5, outputEra: 0 })
 
@@ -1380,9 +1409,9 @@ describe('TerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
 
     // After the write resolves, the field should be reset
-    // to the empty sentinel so we don't keep a stale up-to-16 MiB copy
+    // to the absent sentinel so we don't keep a stale up-to-16 MiB copy
     // around until the next hydrate().
-    expect(hydratedSnapshot(session)).toEqual({ snapshot: '', snapshotSeq: 0, outputEra: 0 })
+    expect(hydratedSnapshot(session)).toEqual({ snapshot: null, snapshotSeq: 0, outputEra: 0 })
   })
 
   test('clears hydratedSnapshot after applyHydratedSnapshotToActiveView writes the snapshot to the term', async () => {
@@ -1402,7 +1431,7 @@ describe('TerminalSession', () => {
     // applyHydratedSnapshotToActiveView on the existing term (line 204).
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1421,8 +1450,8 @@ describe('TerminalSession', () => {
     // field is cleared. The queue adds one promise boundary on top of
     // xterm's callback, so wait for the observable state instead of a
     // fixed microtask count.
-    await flushUntil(() => hydratedSnapshot(session).snapshot.length === 0)
-    expect(hydratedSnapshot(session)).toEqual({ snapshot: '', snapshotSeq: 0, outputEra: 0 })
+    await flushUntil(() => hydratedSnapshot(session).snapshot === null)
+    expect(hydratedSnapshot(session)).toEqual({ snapshot: null, snapshotSeq: 0, outputEra: 0 })
   })
 
   test('resets an existing terminal view when hydrate switches to a different session id', async () => {
@@ -1440,7 +1469,7 @@ describe('TerminalSession', () => {
 
     session.hydrate({
       terminalRuntimeSessionId: 'term-remoteremoteremote001',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1461,6 +1490,40 @@ describe('TerminalSession', () => {
     expect(session.currentTerminalRuntimeSessionId()).toBe('term-remoteremoteremote001')
   })
 
+  test('resets an existing terminal view for an authoritative empty snapshot', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    const term = xtermMocks.terminals[0]!
+    term.reset.mockClear()
+    term.write.mockClear()
+
+    session.hydrate({
+      terminalRuntimeSessionId: 'term-authoritative-empty01',
+      terminalRuntimeGeneration: 2,
+      phase: 'open',
+      message: null,
+      processName: 'node',
+      role: 'viewer',
+      controllerStatus: 'connected',
+      canonicalCols: 120,
+      canonicalRows: 40,
+      snapshot: '',
+      snapshotSeq: 0,
+      outputEra: 1,
+    })
+    await flushTerminalStart()
+
+    expect(term.reset).toHaveBeenCalledOnce()
+    expect(term.write).not.toHaveBeenCalled()
+    expect(session.currentTerminalRuntimeSessionId()).toBe('term-authoritative-empty01')
+  })
+
   test('drops pending live output when hydrate switches to a different session id', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -1475,7 +1538,7 @@ describe('TerminalSession', () => {
 
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'old-pending-output',
       seq: 1,
@@ -1486,7 +1549,7 @@ describe('TerminalSession', () => {
 
     session.hydrate({
       terminalRuntimeSessionId: 'term-remoteremoteremote001',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1518,7 +1581,7 @@ describe('TerminalSession', () => {
 
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1554,7 +1617,7 @@ describe('TerminalSession', () => {
 
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1568,7 +1631,7 @@ describe('TerminalSession', () => {
     })
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_3_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1624,7 +1687,7 @@ describe('TerminalSession', () => {
 
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'prompt',
       seq: 1,
@@ -1778,7 +1841,7 @@ describe('TerminalSession', () => {
     // every field already matches.
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       role: 'controller',
       controllerStatus: 'connected',
       canonicalCols: 101,
@@ -1908,7 +1971,7 @@ describe('TerminalSession', () => {
 
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -2057,7 +2120,7 @@ describe('TerminalSession', () => {
 
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       role: 'unowned',
       controllerStatus: 'none',
       canonicalCols: 120,
@@ -2103,7 +2166,7 @@ describe('TerminalSession', () => {
 
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       role: 'unowned',
       controllerStatus: 'none',
       canonicalCols: 120,
@@ -2153,7 +2216,7 @@ describe('TerminalSession', () => {
 
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       role: 'controller',
       controllerStatus: 'connected',
       canonicalCols: 101,
@@ -2269,7 +2332,7 @@ describe('TerminalSession', () => {
 
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'prompt',
       seq: 1,
@@ -2278,7 +2341,7 @@ describe('TerminalSession', () => {
     })
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'next',
       seq: 2,
@@ -2305,7 +2368,7 @@ describe('TerminalSession', () => {
     xtermMocks.deferWriteCallbacks(true)
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'live-2',
       seq: 2,
@@ -2326,7 +2389,7 @@ describe('TerminalSession', () => {
     xtermMocks.deferWriteCallbacks(false)
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'live-2-again',
       seq: 2,
@@ -2351,7 +2414,7 @@ describe('TerminalSession', () => {
 
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_otheraaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-999999999999999999999',
       data: 'ignored',
       seq: 1,
@@ -2360,7 +2423,7 @@ describe('TerminalSession', () => {
     })
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'first',
       seq: 1,
@@ -2369,7 +2432,7 @@ describe('TerminalSession', () => {
     })
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'second',
       seq: 2,
@@ -2397,7 +2460,7 @@ describe('TerminalSession', () => {
 
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'before exit',
       seq: 1,
@@ -2440,7 +2503,7 @@ describe('TerminalSession', () => {
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session, {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       processName: 'zsh',
       canonicalTitle: '~/Developer/goblin — npm run dev',
       role: 'viewer',
@@ -2488,7 +2551,7 @@ describe('TerminalSession', () => {
   })
 
   test('closes stale restart result when disposed while restart is in flight', async () => {
-    const restart = deferred<TerminalAttachResult>()
+    const restart = deferred<TerminalRestartResult>()
     terminalCalls.restart.mockReturnValueOnce(restart.promise)
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -2510,7 +2573,7 @@ describe('TerminalSession', () => {
   })
 
   test('does not close restart result when deselected while restart is in flight', async () => {
-    const restart = deferred<TerminalAttachResult>()
+    const restart = deferred<TerminalRestartResult>()
     terminalCalls.restart.mockReturnValueOnce(restart.promise)
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -2871,9 +2934,10 @@ describe('TerminalSession', () => {
 
 function createFirstFrame(
   terminalRuntimeSessionId: string,
-  overrides: Partial<Omit<Extract<TerminalAttachResult, { ok: true }>, 'ok'>> = {},
-): Extract<TerminalAttachResult, { ok: true }> {
+  overrides: Partial<Omit<Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }>, 'ok' | 'frame'>> = {},
+): Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }> {
   return {
+    frame: 'snapshot',
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 1,
     snapshot: '',
@@ -2893,9 +2957,10 @@ function createFirstFrame(
 
 function attachResult(
   terminalRuntimeSessionId: string,
-  overrides: Partial<Omit<Extract<TerminalAttachResult, { ok: true }>, 'ok'>> = {},
-): TerminalAttachResult {
-  const result: Extract<TerminalAttachResult, { ok: true }> = {
+  overrides: Partial<Omit<Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }>, 'ok' | 'frame'>> = {},
+): Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }> {
+  const result: Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }> = {
+    frame: 'snapshot',
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 1,
     snapshot: '',
@@ -2912,6 +2977,24 @@ function attachResult(
     ok: true as const,
   }
   return result
+}
+
+function streamAttachResult(
+  terminalRuntimeSessionId: string,
+): Extract<TerminalAttachResult, { ok: true; frame: 'stream' }> {
+  return {
+    ok: true,
+    frame: 'stream',
+    terminalRuntimeSessionId,
+    terminalRuntimeGeneration: 1,
+    processName: 'zsh',
+    canonicalTitle: null,
+    phase: 'open',
+    message: null,
+    controller: { clientId: 'client_local', status: 'connected' },
+    canonicalCols: 100,
+    canonicalRows: 30,
+  }
 }
 
 function takeoverResult(
@@ -2945,13 +3028,13 @@ function hydrateManagedSession(
     controllerStatus: 'connected' | 'none'
     canonicalCols: number
     canonicalRows: number
-    snapshot: string
+    snapshot: string | null
     snapshotSeq: number
   }> = {},
 ): void {
   session.hydrate({
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+    terminalRuntimeGeneration: 1,
     phase: 'open',
     message: null,
     processName: 'zsh',
@@ -2960,16 +3043,17 @@ function hydrateManagedSession(
     controllerStatus: 'connected',
     canonicalCols: 100,
     canonicalRows: 30,
-    snapshot: '',
+    snapshot: null,
     snapshotSeq: 0,
     outputEra: 0,
     ...overrides,
   })
 }
 
-function hydratedSnapshot(session: TerminalSession): { snapshot: string; snapshotSeq: number; outputEra: number } {
-  return (session as unknown as { hydratedSnapshot: { snapshot: string; snapshotSeq: number; outputEra: number } })
-    .hydratedSnapshot
+function hydratedSnapshot(session: TerminalSession): { snapshot: string | null; snapshotSeq: number; outputEra: number } {
+  return (
+    session as unknown as { hydratedSnapshot: { snapshot: string | null; snapshotSeq: number; outputEra: number } }
+  ).hydratedSnapshot
 }
 
 function deferred<T>() {

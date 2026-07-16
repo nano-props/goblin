@@ -155,6 +155,9 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       onLifecycle(userId, event) {
         broker.broadcastToUser(userId, { type: 'lifecycle', event })
       },
+      onSessionsProjectionChanged(userId, repoRoot) {
+        broadcastRepoSessionsChanged(userId, repoRoot)
+      },
     },
     terminalSessionOrder,
     (userId, clientId) => broker.isClientOnline(userId, clientId),

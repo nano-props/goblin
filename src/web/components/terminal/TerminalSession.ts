@@ -43,10 +43,7 @@ import {
   type AuthorizationDenialReason,
   type TerminalAuthorityGate,
 } from '#/web/components/terminal/authority-gate.ts'
-import {
-  TerminalRenderQueue,
-  type RenderedOutputCheckpoint,
-} from '#/web/components/terminal/terminal-render-queue.ts'
+import { TerminalRenderQueue, type RenderedOutputCheckpoint } from '#/web/components/terminal/terminal-render-queue.ts'
 import { WRITE_BLOCKED_KEY_BY_REASON } from '#/web/components/terminal/authority-denial-feedback.ts'
 import { terminalLog } from '#/web/logger.ts'
 import {
@@ -97,11 +94,11 @@ export class TerminalSession {
   private externalCommandGateTerminalRuntimeSessionId: string | null = null
   private hasObservedOutputForExternalCommandGate = false
   private queuedExternalCommandInput = ''
-  // An empty snapshot string is the "no preload" sentinel — the hydration
-  // input always carries the field, so the runtime type can stay
-  // non-nullable and consumers branch on `.snapshot.length`.
-  private hydratedSnapshot: { snapshot: string; snapshotSeq: number; outputEra: number } = {
-    snapshot: '',
+  // Snapshot presence is explicit: null means no recovery frame was supplied,
+  // while an empty string is an authoritative blank screen that must reset a
+  // previous generation's xterm.
+  private hydratedSnapshot: { snapshot: string | null; snapshotSeq: number; outputEra: number } = {
+    snapshot: null,
     snapshotSeq: 0,
     outputEra: 0,
   }
@@ -163,7 +160,8 @@ export class TerminalSession {
 
   private shouldStartAttachedSession(): boolean {
     if (this.runtime.isController()) return true
-    return this.runtime.phase() === 'open' && this.runtime.clientRole() === 'unowned'
+    const phase = this.runtime.phase()
+    return (phase === 'opening' || phase === 'open') && this.runtime.clientRole() === 'unowned'
   }
 
   detach(host: HTMLElement): void {
@@ -430,23 +428,23 @@ export class TerminalSession {
     return this.authorityGate
   }
 
-  hydrate(
-    input: TerminalSessionHydrationInput,
-    source: TerminalAuthoritativeHydrationSource = 'snapshot',
-  ): void {
+  hydrate(input: TerminalSessionHydrationInput, source: TerminalAuthoritativeHydrationSource = 'snapshot'): void {
     const previousTerminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
-    const hydration = this.runtime.hydrateRepoSession({
-      terminalRuntimeSessionId: input.terminalRuntimeSessionId,
-      terminalRuntimeGeneration: input.terminalRuntimeGeneration,
-      phase: input.phase,
-      message: input.message,
-      processName: input.processName,
-      canonicalTitle: input.canonicalTitle ?? null,
-      role: input.role,
-      controllerStatus: input.controllerStatus,
-      canonicalCols: input.canonicalCols,
-      canonicalRows: input.canonicalRows,
-    }, source)
+    const hydration = this.runtime.hydrateRepoSession(
+      {
+        terminalRuntimeSessionId: input.terminalRuntimeSessionId,
+        terminalRuntimeGeneration: input.terminalRuntimeGeneration,
+        phase: input.phase,
+        message: input.message,
+        processName: input.processName,
+        canonicalTitle: input.canonicalTitle ?? null,
+        role: input.role,
+        controllerStatus: input.controllerStatus,
+        canonicalCols: input.canonicalCols,
+        canonicalRows: input.canonicalRows,
+      },
+      source,
+    )
     if (hydration.disposition === 'staged') {
       if (hydration.candidateAccepted) this.stagedHydrationInput = input
       if (hydration.activationPending) this.notify('metadata')
@@ -480,7 +478,7 @@ export class TerminalSession {
     }
     if (
       forceSnapshot
-        ? this.view.currentTerminal() !== null && input.snapshot.length > 0
+        ? this.view.currentTerminal() !== null && input.snapshot !== null
         : this.shouldApplyHydratedSnapshotToActiveView(previousTerminalRuntimeSessionId)
     )
       this.applyHydratedSnapshotToActiveView()
@@ -696,7 +694,7 @@ export class TerminalSession {
         }
         this.stagedHydrationInput = null
         // Sync the gate so writes/resizes that race the next identity
-        // event use the correct role. The first-frame payload is
+        // event use the correct role. The attach response is
         // authoritative for the new terminalRuntimeSessionId, so a successful
         // attach always lands here before any keystroke.
         this.authority().setRole(result.role)
@@ -704,7 +702,18 @@ export class TerminalSession {
         if (committed.changed) this.notify('metadata')
         return
       }
-      const metadataChanged = await this.replayPhase(epoch, attempt, term, result)
+      if (result.frame === 'stream' && preloadReplayGeneration !== null) {
+        // This is a protocol invariant failure, not a state to reconcile:
+        // stream means no history existed, while a non-empty preload means
+        // this view was given recovery history for the same binding.
+        this.runtime.drainReplay(preloadReplayGeneration)
+        preloadReplayGeneration = null
+        throw new Error('terminal stream frame conflicts with recovery preload')
+      }
+      const metadataChanged =
+        result.frame === 'snapshot'
+          ? await this.replayPhase(epoch, attempt, term, result)
+          : this.streamPhase(epoch, attempt, term, result)
       this.finalizePhase(epoch, term, metadataChanged)
     } catch (err) {
       if (err instanceof StartCancelledError) {
@@ -785,7 +794,7 @@ export class TerminalSession {
       // and the attach IPC reads them synchronously when ipcPhase runs.
       // The rAF settles the *layout paint* for measurement accuracy in
       // later operations, but the attach roundtrip doesn't need that
-      // paint to have completed. A future local first-frame optimization
+      // paint to have completed. A future local geometry optimization
       // MUST restore the blocking wait before trusting local geometry.
       void waitForTerminalLayout()
       this.assertCurrentStart(epoch, term)
@@ -839,8 +848,34 @@ export class TerminalSession {
     epoch: number,
     attempt: TerminalRuntimeAttemptToken,
     term: XTermTerminal,
-    result: TerminalAttachResultWithController,
+    result: Extract<TerminalAttachResultWithController, { frame: 'snapshot' }>,
   ): Promise<boolean> {
+    const metadataChanged = this.commitAttachFrame(attempt, term, result)
+    await this.replayActiveView(epoch, term, result.snapshot, {
+      terminalRuntimeSessionId: result.terminalRuntimeSessionId,
+      outputEra: result.outputEra,
+      seq: result.snapshotSeq,
+    })
+    this.assertCurrentStart(epoch, term)
+    return metadataChanged
+  }
+
+  private streamPhase(
+    epoch: number,
+    attempt: TerminalRuntimeAttemptToken,
+    term: XTermTerminal,
+    result: Extract<TerminalAttachResultWithController, { frame: 'stream' }>,
+  ): boolean {
+    const metadataChanged = this.commitAttachFrame(attempt, term, result)
+    this.assertCurrentStart(epoch, term)
+    return metadataChanged
+  }
+
+  private commitAttachFrame(
+    attempt: TerminalRuntimeAttemptToken,
+    term: XTermTerminal,
+    result: TerminalAttachResultWithController,
+  ): boolean {
     const committed = this.runtime.commitAttachResult(attempt, result, { cols: term.cols, rows: term.rows })
     if (!committed.accepted) throw new StartCancelledError()
     if (committed.resolution === 'staged') {
@@ -850,7 +885,7 @@ export class TerminalSession {
     this.stagedHydrationInput = null
     this.syncExternalCommandGate(
       result.terminalRuntimeSessionId,
-      terminalSnapshotHasOutput(result.snapshot, result.snapshotSeq),
+      result.frame === 'snapshot' && terminalSnapshotHasOutput(result.snapshot, result.snapshotSeq),
     )
     // Sync the gate. Without this, a controller→unowned→recreate
     // cycle leaves the gate at 'viewer' even though the runtime
@@ -866,12 +901,6 @@ export class TerminalSession {
         this.queueResize(term.cols, term.rows)
       }
     }
-    await this.replayActiveView(epoch, term, result.snapshot, {
-      terminalRuntimeSessionId: result.terminalRuntimeSessionId,
-      outputEra: result.outputEra,
-      seq: result.snapshotSeq,
-    })
-    this.assertCurrentStart(epoch, term)
     return committed.changed
   }
 
@@ -930,11 +959,7 @@ export class TerminalSession {
 
   private async preloadHydratedSnapshot(epoch: number, term: XTermTerminal): Promise<number | null> {
     const hydratedSnapshot = this.hydratedSnapshot
-    // An empty snapshot is the "no preload" sentinel — the hydration
-    // input always carries the field, but producers use '' when they
-    // have no buffer to seed. Resetting/writing on empty would clobber
-    // the term for nothing.
-    if (hydratedSnapshot.snapshot.length === 0 || !this.isCurrentStart(epoch, term)) return null
+    if (hydratedSnapshot.snapshot === null || !this.isCurrentStart(epoch, term)) return null
     // Open the replay window — see state.beginReplay for the preload+post-attach contract.
     const replayCheckpoint = this.checkpointFromHydratedSnapshot(hydratedSnapshot)
     const replayGeneration = this.runtime.beginReplay(replayCheckpoint)
@@ -960,7 +985,7 @@ export class TerminalSession {
       // with a fresher value. Clearing in that case would discard it;
       // we leave the new value for its own write path to clear.
       if (stillCurrent && this.hydratedSnapshot === hydratedSnapshot) {
-        this.hydratedSnapshot = { snapshot: '', snapshotSeq: 0, outputEra: 0 }
+        this.hydratedSnapshot = { snapshot: null, snapshotSeq: 0, outputEra: 0 }
       }
       if (!stillCurrent) {
         this.runtime.drainReplay(replayGeneration)
@@ -978,7 +1003,7 @@ export class TerminalSession {
   private applyHydratedSnapshotToActiveView(): void {
     const term = this.view.currentTerminal()
     const hydratedSnapshot = this.hydratedSnapshot
-    if (!term) return
+    if (!term || hydratedSnapshot.snapshot === null) return
     this.clearPendingOutput()
     const replayCheckpoint = this.checkpointFromHydratedSnapshot(hydratedSnapshot)
     const replayGeneration = this.runtime.beginReplay(replayCheckpoint)
@@ -1012,7 +1037,7 @@ export class TerminalSession {
   private shouldApplyHydratedSnapshotToActiveView(previousTerminalRuntimeSessionId: string | null): boolean {
     const term = this.view.currentTerminal()
     if (!term) return false
-    if (this.hydratedSnapshot.snapshot.length === 0) return false
+    if (this.hydratedSnapshot.snapshot === null) return false
     const currentTerminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
     if (!currentTerminalRuntimeSessionId) return false
     if (previousTerminalRuntimeSessionId && previousTerminalRuntimeSessionId !== currentTerminalRuntimeSessionId) {
@@ -1023,7 +1048,7 @@ export class TerminalSession {
 
   private finishActiveHydratedSnapshotReplay(
     term: XTermTerminal,
-    hydratedSnapshot: { snapshot: string; snapshotSeq: number; outputEra: number },
+    hydratedSnapshot: { snapshot: string | null; snapshotSeq: number; outputEra: number },
     replayCheckpoint: RenderedOutputCheckpoint,
     replayGeneration: number,
   ): void {
@@ -1040,7 +1065,7 @@ export class TerminalSession {
     // captured the local reference; only clear if it still points
     // at the snapshot we just wrote.
     if (this.hydratedSnapshot === hydratedSnapshot) {
-      this.hydratedSnapshot = { snapshot: '', snapshotSeq: 0, outputEra: 0 }
+      this.hydratedSnapshot = { snapshot: null, snapshotSeq: 0, outputEra: 0 }
     }
   }
 
@@ -1292,8 +1317,8 @@ function cancelScheduledAnimationFrame(frame: number): void {
   else clearTimeout(frame)
 }
 
-function terminalSnapshotHasOutput(snapshot: string, snapshotSeq: number): boolean {
-  return snapshot.length > 0 || snapshotSeq > 0
+function terminalSnapshotHasOutput(snapshot: string | null, snapshotSeq: number): boolean {
+  return (snapshot !== null && snapshot.length > 0) || snapshotSeq > 0
 }
 
 function latestCheckpoint(checkpoints: RenderedOutputCheckpoint[]): RenderedOutputCheckpoint | null {

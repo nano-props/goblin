@@ -151,12 +151,7 @@ export function buildCanonicalSshConnectionSnapshot(
     // Keep the original argv host so OpenSSH's %n token retains alias semantics.
     // HostName below still fixes %h and the actual network destination.
     destination: target.alias,
-    options: Object.freeze([
-      `hostname=${target.host}`,
-      `user=${target.user}`,
-      `port=${target.port}`,
-      ...options,
-    ]),
+    options: Object.freeze([`hostname=${target.host}`, `user=${target.user}`, `port=${target.port}`, ...options]),
   })
 }
 
@@ -187,9 +182,8 @@ export function buildRemoteTerminalInvocation(
   options: { startupShellCommand?: string } = {},
 ): RemoteCommandInvocation {
   const startupShellCommand = normalizeTerminalStartupShellCommand(options.startupShellCommand)
-  // Startup commands run as part of the initial SSH login shell. The attached browser xterm
-  // may not have delivered its first authoritative fit/resize yet, so first-frame output
-  // from width-sensitive commands can be formatted with the create-time size hint.
+  // This invocation is prepared with the logical session, but it is not executed until
+  // attach starts the remote PTY with the mounted xterm's fitted geometry.
   const script = startupShellCommand
     ? `cd ${shellQuote(remotePath)} && exec "\${SHELL:-/bin/sh}" -ilc ${shellQuote(`${startupShellCommand}\nexec "\${SHELL:-/bin/sh}" -l`)}`
     : `cd ${shellQuote(remotePath)} && exec "\${SHELL:-/bin/sh}" -l`
@@ -231,11 +225,11 @@ export async function runRemoteCommand(
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ): Promise<RemoteCommandResult> {
   if (options?.signal?.aborted) return { ok: false, stdout: '', stderr: '', message: 'cancelled' }
-  const invocation = buildCanonicalSshInvocation(
-    target,
-    commandStartedMarkerScript(scriptForCommand(command)),
-    ['-T', '-o', 'RequestTTY=no'],
-  )
+  const invocation = buildCanonicalSshInvocation(target, commandStartedMarkerScript(scriptForCommand(command)), [
+    '-T',
+    '-o',
+    'RequestTTY=no',
+  ])
   // Ensure the ControlMaster socket directory exists. ssh will refuse to
   // create a control socket in a missing directory, which on a fresh
   // install manifests as every probe failing before the handshake.
@@ -346,9 +340,15 @@ function splitRemoteCommandStderr(stderr: string): { stderr: string; transportSt
   const beginIndex = lines.findIndex((line, index) => index < endIndex && line === REMOTE_COMMAND_STDERR_BEGIN_MARKER)
   if (beginIndex === -1) return { stderr, transportStderr: '' }
 
-  const remoteStderr = lines.slice(beginIndex + 1, endIndex).join('\n').trimEnd()
+  const remoteStderr = lines
+    .slice(beginIndex + 1, endIndex)
+    .join('\n')
+    .trimEnd()
   const before = lines.slice(0, beginIndex).join('\n').trimEnd()
-  const after = lines.slice(endIndex + 1).join('\n').trimEnd()
+  const after = lines
+    .slice(endIndex + 1)
+    .join('\n')
+    .trimEnd()
   const transportStderr = [before, after].filter(Boolean).join('\n').trimEnd()
   return { stderr: remoteStderr, transportStderr }
 }
@@ -705,7 +705,7 @@ function remotePhysicalWorktreeIdentityScript(worktreePath: string): string {
     'set -- $endpoint_stat',
     '[ "$#" -eq 2 ] || exit 1',
     'case "$1:$2" in (*[!0-9:]*) exit 1;; esac',
-    "printf '%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0' \"$runtime_token\" \"$machine_fact\" \"$root_namespace_fact\" \"$canonical\" \"$1\" \"$2\"",
+    'printf \'%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0\' "$runtime_token" "$machine_fact" "$root_namespace_fact" "$canonical" "$1" "$2"',
   ].join('\n')
 }
 

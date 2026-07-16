@@ -163,16 +163,16 @@ export class TerminalSessionState {
     canonicalCols: number
     canonicalRows: number
   }): boolean {
-    // The first-frame payload carries both identity and lifecycle
+    // Attach/restart metadata carries both identity and lifecycle
     // in one shape. Apply them through their respective boundaries
     // so the `applyIdentity` / `applyLifecycle` separation is
-    // preserved even on the synchronous create/attach/takeover
+    // preserved even on synchronous create/attach/takeover
     // path. Identity first, then lifecycle — order is irrelevant
     // because they touch disjoint state.
     let changed = false
     changed =
       this.applyIdentity({
-        terminalRuntimeSessionId: '', // The runtime stamps the actual terminalRuntimeSessionId itself; the first-frame path carries it via `currentTerminalRuntimeSessionId` set by the caller.
+        terminalRuntimeSessionId: '', // The runtime stamps the actual terminalRuntimeSessionId itself; the response path carries it via `currentTerminalRuntimeSessionId` set by the caller.
         terminalRuntimeGeneration: 0,
         role: input.role,
         controllerStatus: input.controllerStatus,
@@ -266,8 +266,7 @@ export class TerminalSessionState {
 
   resetTransientState(): boolean {
     const hadReplay =
-      this.outputSequencingState.replayBoundary !== null ||
-      this.outputSequencingState.replayPendingOutput.length > 0
+      this.outputSequencingState.replayBoundary !== null || this.outputSequencingState.replayPendingOutput.length > 0
     const hadSearch = this.transientViewState.searchResult !== null
     const hadProgress = this.transientViewState.progressState !== null
     const changed = hadReplay || hadSearch || hadProgress

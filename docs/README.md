@@ -16,7 +16,7 @@ Use these docs for app-level product and architecture decisions:
 - `terminology.md`: canonical naming reference for subsystems, components, and state classes
 - `transient-surfaces.md`: transient hover/proximity surfaces and descendant floating-surface pinning
 - `terminal.md`: terminal system design
-- `terminal-session-lifecycle.md`: terminal session lifecycle correctness (first-frame protocol, durable close, `session-closed` broadcast, empty-state CTA)
+- `terminal-session-lifecycle.md`: terminal session lifecycle correctness (fresh-stream/recovery-frame protocol, durable close, `session-closed` broadcast, empty-state CTA)
 - `terminal-roadmap.md`: terminal refactor roadmap
 - `terminal-target-model.md`: terminal target lifecycle and control model
 - `terminal-ephemeral-xterm.md`: current inactive-terminal xterm lifetime model
