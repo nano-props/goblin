@@ -38,6 +38,7 @@ export type TerminalSessionPrepareManagerResult =
 
 export type TerminalSessionAdmissionCommitResult = {
   action: TerminalCreateAction
+  branch: string
   terminalSessionsRevision: number
 } & TerminalRuntimeMetadata
 

@@ -159,6 +159,7 @@ describe('workspace pane runtime tab command actions', () => {
     const createTerminal = vi.fn(async () => 'created-session')
     const createTerminalWithAdmission = vi.fn(async () => ({
       terminalSessionId: 'created-session',
+      branch: terminalBase.branch,
       requestRole: 'observer' as const,
       resourceDisposition: 'created' as const,
       runtimeProjectionApplied: true,

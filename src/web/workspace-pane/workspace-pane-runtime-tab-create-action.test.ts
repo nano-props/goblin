@@ -141,7 +141,7 @@ describe('workspace pane runtime tab create action', () => {
     ).resolves.toEqual({ status: 'committed' })
 
     expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).toHaveBeenCalledWith(REPO_ROOT, REPO_RUNTIME_ID)
-    expect(showCreatedTerminalTab).toHaveBeenCalledWith(TERMINAL_SESSION_ID)
+    expect(showCreatedTerminalTab).toHaveBeenCalledWith(TERMINAL_SESSION_ID, BRANCH_NAME)
     expect(
       workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mock.invocationCallOrder[0],
     ).toBeLessThan(showCreatedTerminalTab.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY)
@@ -246,6 +246,7 @@ function translate(key: string): string {
 function createAdmission(): TerminalCreateLeaderAdmissionResult {
   return {
     terminalSessionId: TERMINAL_SESSION_ID,
+    branch: BRANCH_NAME,
     requestRole: 'leader',
     resourceDisposition: 'created',
     runtimeProjectionApplied: true,

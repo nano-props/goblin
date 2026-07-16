@@ -130,15 +130,13 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
       const requestedTargetKey = workspacePaneTabsTargetIdentityKey(requestedTarget)
       const canonicalTarget = capturedTargets.find(
         (target) => workspacePaneTabsTargetIdentityKey(target) === requestedTargetKey,
-      ) ?? requestedTarget
-      const validTargets = canonicalTarget === requestedTarget
-        ? [...capturedTargets, requestedTarget]
-        : capturedTargets
+      )
+      if (!canonicalTarget) return { kind: 'runtime-stale' }
       const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
       const scope = aggregateScope(input.userId, input.repoRoot, input.scope)
-      const current = await layout.snapshot({ scope, validTargets, providerSnapshots })
+      const current = await layout.snapshot({ scope, validTargets: capturedTargets, providerSnapshots })
       if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
       const entry = current.entries.find((candidate) => candidate.worktreePath === input.worktreePath)

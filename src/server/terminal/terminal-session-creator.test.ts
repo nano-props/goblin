@@ -172,6 +172,7 @@ function ensureResult(terminalSessionId: string): Extract<TerminalSessionEnsureR
 function committedResult(terminalRuntimeSessionId: string) {
   return {
     action: 'created' as const,
+    branch: BRANCH_NAME,
     terminalSessionsRevision: 7,
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 1,

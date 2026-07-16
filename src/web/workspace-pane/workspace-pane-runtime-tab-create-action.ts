@@ -57,7 +57,7 @@ export interface CreateTerminalWorkspacePaneRuntimeTabActionOptions {
     placement?: import('#/shared/workspace-pane-runtime.ts').WorkspacePaneRuntimeTabPlacement,
   ) => Promise<TerminalCreateCommandAdmission>
   openerIdentity: string | null
-  showCreatedTerminalTab: (terminalSessionId: string) => boolean | Promise<boolean>
+  showCreatedTerminalTab: (terminalSessionId: string, canonicalBranch: string) => boolean | Promise<boolean>
   insertAfterIdentity?: string | null
   options?: TerminalCreateOptions
   t?: TerminalCreateTranslator
@@ -68,7 +68,7 @@ export interface CommitCreatedTerminalWorkspacePaneRuntimeTabOptions {
   base: TerminalSessionBase
   admission: TerminalCreateLeaderAdmissionResult
   openerIdentity: string | null
-  showCreatedTerminalTab: (terminalSessionId: string) => boolean | Promise<boolean>
+  showCreatedTerminalTab: (terminalSessionId: string, canonicalBranch: string) => boolean | Promise<boolean>
 }
 
 interface WorkspacePaneRuntimeTabCreateActionResolver {
@@ -135,11 +135,18 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
 export async function commitCreatedTerminalWorkspacePaneRuntimeTab(
   options: CommitCreatedTerminalWorkspacePaneRuntimeTabOptions,
 ): Promise<TerminalCreatedTabCommitResult> {
-  const projectionStatus = await applyCreatedTerminalWorkspacePaneRuntimeTabs(options)
+  const canonicalOptions = {
+    ...options,
+    base: { ...options.base, branch: options.admission.branch },
+  }
+  const projectionStatus = await applyCreatedTerminalWorkspacePaneRuntimeTabs(canonicalOptions)
   if (projectionStatus !== 'accepted') return { status: projectionStatus }
-  if (!terminalCreateTargetRuntimeIsCurrent(options.base)) return { status: 'superseded' }
-  recordCreatedTerminalWorkspacePaneRuntimeTabOpener(options)
-  const navigationCommitted = await options.showCreatedTerminalTab(options.admission.terminalSessionId)
+  if (!terminalCreateTargetRuntimeIsCurrent(canonicalOptions.base)) return { status: 'superseded' }
+  recordCreatedTerminalWorkspacePaneRuntimeTabOpener(canonicalOptions)
+  const navigationCommitted = await options.showCreatedTerminalTab(
+    options.admission.terminalSessionId,
+    options.admission.branch,
+  )
   return navigationCommitted ? { status: 'committed' } : { status: 'navigation-rejected' }
 }
 

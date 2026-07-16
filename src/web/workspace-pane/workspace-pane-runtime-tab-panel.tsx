@@ -77,8 +77,12 @@ function TerminalWorkspacePaneRuntimeTabPanel({
         base,
         createTerminal: createTerminalWithAdmission,
         openerIdentity: null,
-        showCreatedTerminalTab: (terminalSessionId) =>
-          showCreatedTerminalWorkspacePaneRuntimeTab(base, terminalSessionId, navigation),
+        showCreatedTerminalTab: (terminalSessionId, canonicalBranch) =>
+          showCreatedTerminalWorkspacePaneRuntimeTab(
+            { ...base, branch: canonicalBranch },
+            terminalSessionId,
+            navigation,
+          ),
         t,
         logMessage: 'workspace pane terminal create failed',
       })

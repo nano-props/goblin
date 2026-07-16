@@ -523,6 +523,7 @@ function terminalCreateSuccess(action: 'created' | 'restored' | 'reused' = 'crea
 function committedTerminalResult(action: 'created' | 'restored' | 'reused') {
   return {
     action,
+    branch: request.branch,
     terminalSessionsRevision: 1,
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
     terminalRuntimeGeneration: 1,

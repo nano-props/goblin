@@ -108,7 +108,7 @@ function createSessionSummaryFromCreate(
     terminalSessionId: result.terminalSessionId,
     repoRuntimeId: requireBaseRepoRuntimeId(base),
     repoRoot: base.repoRoot,
-    branch: base.branch,
+    branch: result.branch,
     worktreePath: base.worktreePath,
     cwd: base.worktreePath,
     controller: result.controller,

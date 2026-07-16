@@ -233,6 +233,58 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions[0]?.branch).toBe('renamed-branch')
   })
 
+  test('publishes committed controller identity when its PTY resize fails', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onIdentity = vi.fn()
+    const onlineClients = new Set([CLIENT_ID])
+    const manager = new TerminalSessionManager<string>(
+      supervisor,
+      { onOutput: vi.fn(), onExit: vi.fn(), onIdentity },
+      (_userId, clientId) => onlineClients.has(clientId),
+    )
+    const created = await createSession(manager, supervisor)
+    onlineClients.delete(CLIENT_ID)
+    manager.handleClientPresenceChanged(USER_ID, CLIENT_ID, true)
+    onIdentity.mockClear()
+    vi.mocked(supervisor.resize).mockImplementationOnce(() => {
+      throw new Error('resize failed')
+    })
+
+    const admission = manager.prepareSession({
+      userId: USER_ID,
+      scope: SCOPE,
+      repoRoot: SCOPE,
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+      cwd: '/tmp',
+      cols: 100,
+      rows: 30,
+      clientId: 'client-replacement',
+    })
+    onlineClients.add('client-replacement')
+    if (!admission.ok) throw new Error(admission.message)
+
+    expect(admission.admission.commit({ canonicalBranch: BRANCH_NAME })).toMatchObject({
+      action: 'reused',
+      terminalRuntimeSessionId: created.terminalRuntimeSessionId,
+      controller: { clientId: 'client-replacement', status: 'connected' },
+      canonicalCols: 80,
+      canonicalRows: 24,
+    })
+    admission.admission.publishCommittedEffects()
+
+    expect(onIdentity).toHaveBeenCalledOnce()
+    expect(onIdentity).toHaveBeenCalledWith(USER_ID, expect.objectContaining({
+      terminalRuntimeSessionId: created.terminalRuntimeSessionId,
+      controller: { clientId: 'client-replacement', status: 'connected' },
+      canonicalCols: 80,
+      canonicalRows: 24,
+    }))
+  })
+
   test('rejects an existing admission after the PTY exits during placement preparation', async () => {
     const supervisor = createDeferredPtySupervisor()
     const onIdentity = vi.fn()

@@ -17,26 +17,18 @@ import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 describe('workspace pane tabs coordinator queues', () => {
-  test('records an invisible placement hint before synchronously publishing membership', async () => {
+  test('does not commit admission when the target projection no longer contains the worktree', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a',
     })
-    const events: string[] = []
-    let published = false
+    const commitAdmission = vi.fn()
+    const captureSnapshotForUser = vi.fn(async () => ({ revision: 0, liveSessions: [] }))
     const coordinator = createWorkspacePaneTabsCoordinator({
       layoutAggregate: aggregateFor(memoryRepository()),
       runtimeProviders: [{
         type: 'terminal',
-        async captureSnapshotForUser() {
-          events.push(`sample:${String(published)}`)
-          return {
-            revision: published ? 1 : 0,
-            liveSessions: published
-              ? [{ sessionId: 'term-preparedprepared001', branch: 'main', worktreePath: '/repo/worktree' }]
-              : [],
-          }
-        },
+        captureSnapshotForUser,
       }],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
@@ -49,17 +41,14 @@ describe('workspace pane tabs coordinator queues', () => {
         worktreePath: '/repo/worktree', runtimeType: 'terminal', sessionId: 'term-preparedprepared001',
         insertAfterIdentity: 'workspace-pane:status', permit, physicalWorktreeCapability: capability,
         isRuntimeCurrent: () => true,
-        commitAdmission: () => {
-          events.push('publish')
-          published = true
-          return 1
-        },
+        commitAdmission,
       }))
 
     expect(admitted.admitted).toBe(true)
     if (!admitted.admitted) return
-    expect(events).toEqual(['sample:false', 'publish'])
-    expect(admitted.value).toEqual({ kind: 'committed' })
+    expect(admitted.value).toEqual({ kind: 'runtime-stale' })
+    expect(captureSnapshotForUser).not.toHaveBeenCalled()
+    expect(commitAdmission).not.toHaveBeenCalled()
   })
 
   test('commits admission with the canonical branch for an existing worktree target', async () => {

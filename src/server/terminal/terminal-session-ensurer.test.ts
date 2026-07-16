@@ -246,6 +246,7 @@ function preparedResult(
       kind: 'existing',
       commit: () => ({
         action: 'created',
+        branch: BRANCH_NAME,
         terminalSessionsRevision: 7,
         terminalRuntimeSessionId: `pty_${terminalSessionId}`,
         terminalRuntimeGeneration: 1,

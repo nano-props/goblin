@@ -341,6 +341,7 @@ describe('shared terminal validators', () => {
     const normalizedCreateResult = normalizeTerminalCreateResult({
       ok: true,
       action: 'created',
+      branch: 'main',
       terminalSessionId: 'term-111111111111111111111',
       terminalSessionsRevision: 11,
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -367,6 +368,7 @@ describe('shared terminal validators', () => {
       normalizeTerminalCreateResult({
         ok: true,
         action: 'created',
+        branch: 'main',
         terminalSessionId: 'term-111111111111111111111',
         terminalSessionsRevision: 11,
       }),
@@ -456,6 +458,7 @@ describe('shared terminal validators', () => {
       runtime: {
         ok: true,
         action: 'created',
+        branch: 'main',
         terminalSessionId: 'term-111111111111111111111',
         terminalSessionsRevision: 11,
         terminalRuntimeSessionId: 'pty_1234567890abcdef',

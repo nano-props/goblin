@@ -199,6 +199,7 @@ export class TerminalSessionManager<TUser extends string | number> {
             admissionState = 'committed'
             return {
               action,
+              branch: existing.branch,
               terminalSessionsRevision: this.projectionRevision(userId, input.scope),
               ...this.runtimeMetadata(existing),
             }
@@ -272,6 +273,7 @@ export class TerminalSessionManager<TUser extends string | number> {
         admissionState = 'committed'
         return {
           action: 'created',
+          branch: session.branch,
           terminalSessionsRevision: this.projectionRevision(userId, input.scope),
           ...this.runtimeMetadata(session),
         }
@@ -798,8 +800,12 @@ export class TerminalSessionManager<TUser extends string | number> {
     effect: ReturnType<typeof attachTerminalClient>,
   ): ReturnType<typeof attachTerminalClient> {
     if (!effect.resizeTo) return effect
-    const resized = session.ptyBinding.resize(session, effect.resizeTo.cols, effect.resizeTo.rows)
-    return { emitIdentity: effect.emitIdentity || resized }
+    session.ptyBinding.resize(session, effect.resizeTo.cols, effect.resizeTo.rows)
+    // A resize request suppresses the controller helper's immediate identity
+    // effect so geometry and authority travel in one canonical event. Publish
+    // that event even when the PTY rejects the resize: the controller mutation
+    // still committed and the unchanged geometry is now the authoritative fact.
+    return { emitIdentity: true }
   }
 
   private async restartAndAttachSession(

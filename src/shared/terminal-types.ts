@@ -167,6 +167,8 @@ export type TerminalCreateResult =
   | ({
       ok: true
       action: TerminalCreateAction
+      /** Canonical branch label resolved at the admission commit boundary. */
+      branch: string
       terminalSessionId: string
       /** Exact terminal projection revision sampled with this metadata. */
       terminalSessionsRevision: number

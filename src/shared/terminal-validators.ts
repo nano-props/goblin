@@ -137,6 +137,7 @@ const TerminalCreateResultSchema = v.variant('ok', [
   v.object({
     ok: v.literal(true),
     action: v.picklist(['created', 'restored', 'reused']),
+    branch: v.string(),
     terminalSessionId: v.string(),
     terminalSessionsRevision: v.pipe(v.number(), v.integer(), v.minValue(0)),
     ...TerminalRuntimeMetadataSchemaEntries,

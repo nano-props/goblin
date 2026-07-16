@@ -471,6 +471,7 @@ beforeEach(() => {
       return {
         ok: true,
         action: 'reused',
+        branch: input.branch,
         terminalSessionsRevision: 1,
         terminalSessionId,
         terminalRuntimeSessionId: reused?.terminalRuntimeSessionId ?? 'term-111111111111111111111',
@@ -514,6 +515,7 @@ beforeEach(() => {
     return {
       ok: true,
       action: 'created',
+      branch: input.branch,
       terminalSessionsRevision: 1,
       terminalSessionId,
       terminalRuntimeSessionId: terminalSessionId,
@@ -1686,6 +1688,7 @@ describe('TerminalSessionProvider', () => {
     createTerminalMock.mockResolvedValueOnce({
       ok: true as const,
       action: 'created' as const,
+      branch: 'feature/worktree',
       terminalSessionId: 'term-111111111111111111111',
       terminalSessionsRevision: 1,
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',

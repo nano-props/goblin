@@ -157,6 +157,7 @@ describe('terminal create command', () => {
 function createAdmission(overrides: Partial<TerminalCreateAdmissionResult> = {}): TerminalCreateAdmissionResult {
   return {
     terminalSessionId: 'term-111111111111111111111',
+    branch: 'main',
     requestRole: 'leader',
     resourceDisposition: 'created',
     runtimeProjectionApplied: true,

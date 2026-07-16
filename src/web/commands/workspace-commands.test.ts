@@ -1045,6 +1045,7 @@ describe('workspace commands', () => {
       firstCreatePending = false
       return {
         terminalSessionId,
+        branch: base.branch,
         requestRole: 'leader' as const,
         resourceDisposition: 'created' as const,
         runtimeProjectionApplied: true,
@@ -1083,6 +1084,7 @@ describe('workspace commands', () => {
         const terminalSessionId = await createTerminal(createBase)
         return {
           terminalSessionId,
+          branch: createBase.branch,
           requestRole: 'leader' as const,
           resourceDisposition: 'created' as const,
           runtimeProjectionApplied: true,
@@ -2834,6 +2836,7 @@ function createSingleFlightTerminalWithProjection(resolveSessionId: () => string
       const terminalSessionId = await createTerminal(base)
       const admission = {
         terminalSessionId,
+        branch: base.branch,
         resourceDisposition: 'created' as const,
         runtimeProjectionApplied: true,
       }

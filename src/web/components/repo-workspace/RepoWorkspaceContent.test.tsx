@@ -1039,6 +1039,7 @@ describe('RepoWorkspaceContent', () => {
         })
         return {
           terminalSessionId: 'term-111111111111111111111',
+          branch: branchName,
           requestRole: 'leader' as const,
           resourceDisposition: 'created' as const,
           runtimeProjectionApplied: true,

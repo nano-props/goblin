@@ -737,6 +737,7 @@ export class TerminalSessionProjection {
     }
     return {
       terminalSessionId: result.terminalSessionId,
+      branch: result.branch,
       resourceDisposition: result.action,
       runtimeProjectionApplied,
     }

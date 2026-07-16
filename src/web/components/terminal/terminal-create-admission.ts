@@ -10,6 +10,7 @@ import type { TerminalCreateAction } from '#/shared/terminal-types.ts'
  */
 export interface TerminalCreateAdmissionBase {
   terminalSessionId: string
+  branch: string
   resourceDisposition: TerminalCreateAction
   runtimeProjectionApplied: boolean
 }

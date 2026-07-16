@@ -231,12 +231,13 @@ describe('terminal session projection helpers', () => {
     expect(projected.controllerStatus).toBe('connected')
   })
 
-  test('materializes a prepared create projection from metadata only', () => {
+  test('materializes a prepared create projection with the committed canonical branch', () => {
     const projected = projectCreateResultForClient(
-      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'main', worktreePath: WORKTREE_PATH },
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'feature/stale', worktreePath: WORKTREE_PATH },
       {
         ok: true,
         action: 'created',
+        branch: 'feature/renamed',
         terminalSessionId: 'term-111111111111111111111',
         terminalSessionsRevision: 1,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
@@ -257,7 +258,7 @@ describe('terminal session projection helpers', () => {
       terminalSessionId: 'term-111111111111111111111',
       repoRuntimeId: REPO_RUNTIME_ID,
       repoRoot: REPO_ROOT,
-      branch: 'main',
+      branch: 'feature/renamed',
       worktreePath: WORKTREE_PATH,
       cwd: WORKTREE_PATH,
       controller: { clientId: 'client_a', status: 'connected' },
@@ -276,6 +277,7 @@ describe('terminal session projection helpers', () => {
       {
         ok: true,
         action: 'created',
+        branch: 'main',
         terminalSessionId: 'term-111111111111111111111',
         terminalSessionsRevision: 1,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
@@ -314,6 +316,7 @@ describe('terminal session projection helpers', () => {
       {
         ok: true,
         action: 'restored',
+        branch: 'main',
         terminalSessionId: 'term-111111111111111111111',
         terminalSessionsRevision: 1,
         terminalRuntimeSessionId: 'pty_session_new_aaaaaaaaa',

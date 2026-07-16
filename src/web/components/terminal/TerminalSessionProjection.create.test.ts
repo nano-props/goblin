@@ -214,6 +214,7 @@ function makeCreateResult(overrides: Partial<TerminalCreateSuccess> = {}): Termi
   return {
     ok: true as const,
     action: 'created' as const,
+    branch: BRANCH,
     terminalSessionId: 'term-111111111111111111111',
     terminalSessionsRevision: 11,
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -473,12 +474,14 @@ describe('TerminalSessionProjection create flow', () => {
     const firstResult = await firstCreate
     expect(firstResult).toEqual({
       terminalSessionId: 'term-111111111111111111111',
+      branch: BRANCH,
       requestRole: 'leader',
       resourceDisposition: 'created',
       runtimeProjectionApplied: true,
     })
     await expect(secondCreate).resolves.toEqual({
       terminalSessionId: 'term-111111111111111111111',
+      branch: BRANCH,
       requestRole: 'observer',
       resourceDisposition: 'created',
       runtimeProjectionApplied: true,
@@ -494,6 +497,7 @@ describe('TerminalSessionProjection create flow', () => {
 
       expect(admission).toEqual({
         terminalSessionId: 'term-111111111111111111111',
+        branch: BRANCH,
         requestRole: 'leader',
         resourceDisposition,
         runtimeProjectionApplied: true,

@@ -250,8 +250,12 @@ function FiletreeTab({
           base,
           createTerminal: createTerminalWithAdmission,
           openerIdentity,
-          showCreatedTerminalTab: (terminalSessionId) =>
-            showCreatedTerminalWorkspacePaneRuntimeTab(base, terminalSessionId, navigation),
+          showCreatedTerminalTab: (terminalSessionId, canonicalBranch) =>
+            showCreatedTerminalWorkspacePaneRuntimeTab(
+              { ...base, branch: canonicalBranch },
+              terminalSessionId,
+              navigation,
+            ),
           insertAfterIdentity: openerIdentity,
           options: {
             resolveStartupShellCommand: async () => {
