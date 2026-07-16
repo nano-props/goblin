@@ -41,6 +41,7 @@ import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { physicalWorktreeIdentityKey } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { TerminalDirectory } from '#/server/terminal/terminal-directory.ts'
+import type { TerminalSessionPublication } from '#/server/terminal/terminal-session-ensurer.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 
@@ -55,7 +56,7 @@ export type TerminalSessionPrepareResult =
   | ({
       ok: true
       action: TerminalCreateAction
-      publication: { kind: 'existing'; terminalSessionsRevision: number }
+      publication: TerminalSessionPublication
     } & TerminalRuntimeMetadata)
   | { ok: false; message: string }
 
@@ -140,7 +141,6 @@ export interface TerminalBatchRetirementResult {
 
 export class TerminalSessionManager<TUser extends string | number> {
   private readonly directory = new TerminalDirectory<TUser, TerminalSessionView<TUser>>()
-  private readonly projectedProcessNameByTerminalRuntimeSessionId = new Map<string, string>()
   private readonly closeOperationsByTerminalRuntimeSessionId = new Map<string, Promise<boolean>>()
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
@@ -166,6 +166,13 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (!this.isValidUserId(userId)) return { ok: false, message: 'error.invalid-arguments' }
     const existing = this.directory.getByDurableId(userId, input.terminalSessionId)
     if (existing) {
+      if (
+        existing.scope !== input.scope ||
+        existing.repoRuntimeId !== input.repoRuntimeId ||
+        existing.repoRoot !== input.repoRoot
+      ) {
+        return { ok: false, message: 'error.invalid-arguments' }
+      }
       if (
         physicalWorktreeIdentityKey(existing.physicalWorktreeCapability.identity) !==
         physicalWorktreeIdentityKey(input.physicalWorktreeCapability.identity)
@@ -231,10 +238,27 @@ export class TerminalSessionManager<TUser extends string | number> {
     // single xterm before `attachSession` starts the PTY with exact geometry.
     // Until then this server-owned session is intentionally addressable but
     // has no process and no output history.
+    let settled = false
+    const publication: TerminalSessionPublication = {
+      kind: 'prepared',
+      publish: () => {
+        if (settled || this.directory.get(session.id) !== session) throw new Error('error.unavailable')
+        settled = true
+        return this.projectionRevision(userId, input.scope)
+      },
+      retire: () => {
+        if (settled) return
+        settled = true
+        if (this.directory.get(session.id) === session) {
+          const closedSession = this.detachSession(session)
+          this.sink.onSessionClosed?.(session.userId, closedSession, 'session')
+        }
+      },
+    }
     return {
       ...this.prepareResult(session),
       action: 'created',
-      publication: { kind: 'existing', terminalSessionsRevision: this.projectionRevision(userId, input.scope) },
+      publication,
     }
   }
 
@@ -786,7 +810,6 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (!spawn.result.ok) {
       if (markTerminalSessionError(session, spawn.result.message)) this.emitLifecycle(session)
     } else {
-      this.projectedProcessNameByTerminalRuntimeSessionId.set(session.id, session.ptyBinding.processName())
       this.emitIdentity(session)
     }
     // Prepared sessions are published at generation 0. Incremental generation
@@ -803,7 +826,6 @@ export class TerminalSessionManager<TUser extends string | number> {
     spawn: TerminalPtySpawnResult,
   ): Promise<TerminalPtyRestartResult> {
     if (!spawn.result.ok) return { generation: spawn.generation, result: spawn.result }
-    this.projectedProcessNameByTerminalRuntimeSessionId.set(session.id, session.ptyBinding.processName())
     const attach = await this.snapshotAttachResult(session)
     if (!session.ptyBinding.isCurrentSpawn(session, spawn.generation)) {
       return { generation: spawn.generation, result: { ok: false, message: 'error.unavailable' } }

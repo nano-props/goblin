@@ -163,6 +163,28 @@ function ensureSession(
 }
 
 describe('TerminalSessionManager fresh stream boundary', () => {
+  test('retires a prepared opening session before attach without leaving catalog membership', () => {
+    const manager = createManager(createDeferredPtySupervisor())
+    const prepared = manager.prepareSession({
+      userId: USER_ID,
+      scope: SCOPE,
+      repoRoot: SCOPE,
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+      cwd: '/tmp',
+      cols: 80,
+      rows: 24,
+    })
+    if (!prepared.ok) throw new Error(prepared.message)
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toHaveLength(1)
+    expect(prepared.publication.kind).toBe('prepared')
+    if (prepared.publication.kind === 'prepared') prepared.publication.retire()
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
+  })
+
   test('prepares without spawning, then starts at fitted geometry and snapshots only later attaches', async () => {
     const supervisor = createDeferredPtySupervisor()
     const onOutput = vi.fn()
@@ -213,7 +235,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(onSessionsProjectionChanged).toHaveBeenCalledOnce()
     expect(onSessionsProjectionChanged).toHaveBeenCalledWith(USER_ID, SCOPE)
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)).toMatchObject({
-      revision: prepared.publication.kind === 'existing' ? prepared.publication.terminalSessionsRevision : 0,
+      revision: prepared.publication.kind === 'existing' ? prepared.publication.terminalSessionsRevision : 1,
       sessions: [{ terminalRuntimeGeneration: 1, phase: 'open' }],
     })
 
