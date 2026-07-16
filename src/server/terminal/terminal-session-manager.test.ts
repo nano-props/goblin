@@ -152,7 +152,8 @@ function ensureSession(
     physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(input.worktreePath),
   })
   if (!prepared.ok) return Promise.resolve(prepared)
-  if (prepared.admission.kind === 'prepared') prepared.admission.commit()
+  prepared.admission.commit()
+  prepared.admission.publishCommittedEffects()
   return manager.attachSession(
     input.userId,
     prepared.terminalRuntimeSessionId,
@@ -186,6 +187,45 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
   })
 
+  test('defers an existing session attachment until placement admission commits', () => {
+    const onIdentity = vi.fn()
+    const manager = createManager(createDeferredPtySupervisor(), { onIdentity })
+    const input = {
+      userId: USER_ID,
+      scope: SCOPE,
+      repoRoot: SCOPE,
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+      cwd: '/tmp',
+      cols: 80,
+      rows: 24,
+    }
+    const created = manager.prepareSession(input)
+    if (!created.ok) throw new Error(created.message)
+    created.admission.commit()
+    created.admission.publishCommittedEffects()
+
+    const aborted = manager.prepareSession({ ...input, clientId: 'client-aborted' })
+    if (!aborted.ok) throw new Error(aborted.message)
+    expect(aborted).toMatchObject({ action: 'reused', controller: { clientId: 'client-aborted' } })
+    aborted.admission.abort()
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions[0]?.controller).toBeNull()
+
+    const admitted = manager.prepareSession({ ...input, clientId: CLIENT_ID })
+    if (!admitted.ok) throw new Error(admitted.message)
+    admitted.admission.commit()
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions[0]?.controller).toEqual({
+      clientId: CLIENT_ID,
+      status: 'connected',
+    })
+    expect(onIdentity).not.toHaveBeenCalled()
+    admitted.admission.publishCommittedEffects()
+    expect(onIdentity).toHaveBeenCalledOnce()
+  })
+
   test('prepares without spawning, then starts at fitted geometry and snapshots only later attaches', async () => {
     const supervisor = createDeferredPtySupervisor()
     const onOutput = vi.fn()
@@ -213,7 +253,10 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(supervisor.spawn).not.toHaveBeenCalled()
     if (!prepared.ok) return
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
-    if (prepared.admission.kind === 'prepared') prepared.admission.commit()
+    prepared.admission.commit()
+    expect(onSessionsProjectionChanged).not.toHaveBeenCalled()
+    prepared.admission.publishCommittedEffects()
+    expect(onSessionsProjectionChanged).toHaveBeenCalledOnce()
 
     const freshAttach = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 123, 41, CLIENT_ID)
     expect(supervisor.spawn).toHaveBeenCalledWith(
@@ -238,7 +281,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(onSessionsProjectionChanged).toHaveBeenCalledOnce()
     expect(onSessionsProjectionChanged).toHaveBeenCalledWith(USER_ID, SCOPE)
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)).toMatchObject({
-      revision: prepared.admission.kind === 'existing' ? prepared.admission.terminalSessionsRevision : 1,
+      revision: 1,
       sessions: [{ terminalRuntimeGeneration: 1, phase: 'open' }],
     })
 
@@ -276,7 +319,8 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       clientId: CLIENT_ID,
     })
     if (!prepared.ok) throw new Error(prepared.message)
-    if (prepared.admission.kind === 'prepared') prepared.admission.commit()
+    prepared.admission.commit()
+    prepared.admission.publishCommittedEffects()
 
     const first = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
     const second = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 120, 40, 'client-test-2')

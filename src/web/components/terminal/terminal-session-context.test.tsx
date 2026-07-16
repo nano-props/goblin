@@ -36,7 +36,6 @@ function makeCommandContext(
     createTerminalWithAdmission: vi.fn(async () => ({
       terminalSessionId: 'term-111111111111111111111',
       resourceDisposition: 'created',
-      workspacePaneTabs: { revision: 0, entries: [] },
       runtimeProjectionApplied: false,
       requestRole: 'leader',
     })) as TerminalSessionContextValue['createTerminalWithAdmission'],

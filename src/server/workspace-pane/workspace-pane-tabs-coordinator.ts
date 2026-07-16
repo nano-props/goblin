@@ -71,7 +71,7 @@ export interface WorkspacePaneTabsCommandResult extends WorkspacePaneLayoutCommi
 }
 
 export type WorkspacePaneRuntimeTabCommitResult =
-  | { kind: 'committed'; snapshot: WorkspacePaneTabsSnapshot }
+  | { kind: 'committed' }
   | { kind: 'runtime-stale' }
 
 export interface WorkspaceRuntimeTabPlacementInput {
@@ -86,7 +86,7 @@ export interface WorkspaceRuntimeTabPlacementInput {
   permit: PhysicalWorktreeOperationPermit
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   isRuntimeCurrent: () => boolean
-  onPlacementCommitted?: () => void
+  commitAdmission?: () => void
 }
 
 export interface WorkspaceRuntimeTabPlacement {
@@ -154,23 +154,8 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
         lease: physicalWorktreeAdmissionLease(physicalCapability),
         tabs,
       })
-      input.onPlacementCommitted?.()
-      const hasEntry = current.entries.some((candidate) => candidate.worktreePath === input.worktreePath)
-      const snapshot = {
-        ...current,
-        entries: hasEntry
-          ? current.entries.map((candidate) =>
-              candidate.worktreePath === input.worktreePath ? { ...candidate, tabs } : candidate,
-            )
-          : [
-              ...current.entries,
-              { repoRoot: input.repoRoot, branchName: input.branchName, worktreePath: input.worktreePath, tabs },
-            ],
-      }
-      return {
-        kind: 'committed',
-        snapshot,
-      }
+      input.commitAdmission?.()
+      return { kind: 'committed' }
     })
   }
 

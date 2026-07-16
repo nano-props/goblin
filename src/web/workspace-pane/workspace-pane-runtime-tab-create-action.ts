@@ -183,7 +183,7 @@ async function applyCreatedTerminalWorkspacePaneRuntimeTabs(
     await refreshWorkspacePaneTabsQueryData(options.base.repoRoot, repoRuntimeId)
     return terminalCreateTargetRuntimeIsCurrent(options.base) ? 'accepted' : 'superseded'
   } catch (err) {
-    goblinLog.warn('failed to apply application-returned workspace pane tabs', {
+    goblinLog.warn('failed to refresh workspace pane tabs after runtime creation', {
       repoRoot: options.base.repoRoot,
       repoRuntimeId,
       branchName: options.base.branch,

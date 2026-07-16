@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { act, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -55,7 +55,6 @@ import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
 import {
   workspacePaneStaticTabEntry,
   workspacePaneRuntimeTabEntry,
-  workspacePaneTabsWithRuntimeTab,
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -779,32 +778,10 @@ beforeEach(() => {
       open: vi.fn(async (input) => {
         const runtime = await createTerminalMock(input.request)
         if (!runtime.ok) return { ok: false as const, runtimeType: 'terminal' as const, message: runtime.message }
-        const tabs = workspacePaneTabsWithRuntimeTab(
-          readWorkspacePaneTabsForTarget({
-            repoRoot: input.request.repoRoot,
-            repoRuntimeId: input.request.repoRuntimeId,
-            branchName: input.request.branch,
-            worktreePath: input.request.worktreePath,
-          }),
-          'terminal',
-          runtime.terminalSessionId,
-          { insertAfterIdentity: input.insertAfterIdentity },
-        )
         return {
           ok: true as const,
           runtimeType: 'terminal' as const,
           runtime,
-          workspacePaneTabs: {
-            revision: 1,
-            entries: [
-              {
-                repoRoot: input.request.repoRoot,
-                branchName: input.request.branch,
-                worktreePath: input.request.worktreePath,
-                tabs,
-              },
-            ],
-          },
         }
       }),
       close: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
@@ -1157,7 +1134,7 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('keeps server catalog target facts when the client repo branch changes', async () => {
+  test('uses the authoritative repo-index branch when the client repo branch changes', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1202,9 +1179,11 @@ describe('TerminalSessionProvider', () => {
         await Promise.resolve()
       })
 
-      expect(
-        readTerminalSessionCommandBridge()?.terminalWorktreeSnapshot(terminalWorktreeKey).selectedDescriptor?.branch,
-      ).toBe('feature/worktree')
+      await waitFor(() => {
+        expect(
+          readTerminalSessionCommandBridge()?.terminalWorktreeSnapshot(terminalWorktreeKey).selectedDescriptor?.branch,
+        ).toBe('feature/renamed')
+      })
 
       await act(async () => {
         notifyBell.mockClear()
@@ -1221,7 +1200,7 @@ describe('TerminalSessionProvider', () => {
 
       expect(notifyBell).toHaveBeenLastCalledWith({
         title: 'goblin-terminal-provider-repo',
-        body: 'feature/worktree\n~/Developer/goblin — npm run dev',
+        body: 'feature/renamed\n~/Developer/goblin — npm run dev',
         terminalSessionId: 'term-111111111111111111111',
         terminalWorktreeKey,
         repoRoot: REPO_ID,

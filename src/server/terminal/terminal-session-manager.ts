@@ -178,17 +178,36 @@ export class TerminalSessionManager<TUser extends string | number> {
         return { ok: false, message: 'error.unavailable' }
       }
       const action = this.effectiveController(existing) ? 'restored' : 'reused'
-      if (input.clientId) {
-        registerTerminalClient(existing, input.clientId, size.cols, size.rows)
-        this.applyIdentityEffect(
-          existing,
-          attachTerminalClient(existing, input.clientId, this.sessionPresence(existing)),
-        )
-      }
+      const projected = input.clientId
+        ? this.projectAttachment(existing, input.clientId, size.cols, size.rows)
+        : existing
+      let admissionState: 'pending' | 'committed' | 'aborted' = 'pending'
+      let committedEffect: ReturnType<typeof attachTerminalClient> | null = null
+      let effectsPublished = false
       return {
-        ...this.prepareResult(existing),
+        ...this.prepareResult(projected),
         action,
-        admission: { kind: 'existing', terminalSessionsRevision: this.projectionRevision(userId, input.scope) },
+        admission: {
+          kind: 'existing',
+          commit: () => {
+            if (admissionState !== 'pending') throw new Error('error.unavailable')
+            if (input.clientId) {
+              registerTerminalClient(existing, input.clientId, size.cols, size.rows)
+              committedEffect = attachTerminalClient(existing, input.clientId, this.sessionPresence(existing))
+            }
+            admissionState = 'committed'
+            return this.projectionRevision(userId, input.scope)
+          },
+          publishCommittedEffects: () => {
+            if (admissionState !== 'committed' || effectsPublished) return
+            effectsPublished = true
+            if (committedEffect) this.applyIdentityEffect(existing, committedEffect)
+          },
+          abort: () => {
+            if (admissionState !== 'pending') return
+            admissionState = 'aborted'
+          },
+        },
       }
     }
 
@@ -226,34 +245,37 @@ export class TerminalSessionManager<TUser extends string | number> {
     }
     const reservation = this.directory.reserve({ id, userId, scope: input.scope, terminalSessionId: input.terminalSessionId })
     if (!reservation) return { ok: false, message: 'error.unavailable' }
+    let committedEffect: ReturnType<typeof attachTerminalClient> | null = null
     if (input.clientId) {
       registerTerminalClient(session, input.clientId, size.cols, size.rows)
       // Update the local authoritative controller projection now so the
       // admission response is complete, but defer realtime emission until
       // Directory commit makes the session visible.
-      attachTerminalClient(session, input.clientId, this.sessionPresence(session))
+      committedEffect = attachTerminalClient(session, input.clientId, this.sessionPresence(session))
     }
     // Logical creation stops here. The selected client mounts and fits its
     // single xterm before `attachSession` starts the PTY with exact geometry.
     // Until admission commit, this operation-owned session is not addressable
     // and has no process or output history.
-    let settled = false
+    let admissionState: 'pending' | 'committed' | 'aborted' = 'pending'
+    let effectsPublished = false
     const admission: TerminalSessionAdmission = {
       kind: 'prepared',
       commit: () => {
-        if (settled) throw new Error('error.unavailable')
+        if (admissionState !== 'pending') throw new Error('error.unavailable')
         reservation.commit(session)
-        settled = true
-        const revision = this.projectionRevision(userId, input.scope)
-        if (input.clientId) {
-          this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId, this.sessionPresence(session)))
-        }
+        admissionState = 'committed'
+        return this.projectionRevision(userId, input.scope)
+      },
+      publishCommittedEffects: () => {
+        if (admissionState !== 'committed' || effectsPublished) return
+        effectsPublished = true
+        if (committedEffect) this.applyIdentityEffect(session, committedEffect)
         this.sink.onSessionsProjectionChanged?.(session.userId, session.repoRoot)
-        return revision
       },
       abort: () => {
-        if (settled) return
-        settled = true
+        if (admissionState !== 'pending') return
+        admissionState = 'aborted'
         reservation.abort()
         session.ptyBinding.invalidateOwnership()
         session.ptyBinding.dispose(session)
@@ -698,6 +720,18 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   private effectiveController(session: TerminalSessionView<TUser>): TerminalController | null {
     return effectiveTerminalController(session, this.sessionPresence(session))
+  }
+
+  private projectAttachment(
+    session: TerminalSessionView<TUser>,
+    clientId: string,
+    cols: number,
+    rows: number,
+  ): TerminalSessionView<TUser> {
+    const projected = { ...session, attachments: new Map(session.attachments) }
+    registerTerminalClient(projected, clientId, cols, rows)
+    attachTerminalClient(projected, clientId, this.sessionPresence(projected))
+    return projected
   }
 
   private effectiveControllerWithOverride(

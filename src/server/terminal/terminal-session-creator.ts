@@ -69,7 +69,7 @@ class TerminalSessionCreator {
         )
         if (!createResult.ok) return { ok: false, message: createResult.message }
         if (!this.options.isCurrentRepoRuntime(input.userId, input.request.repoRoot, input.request.repoRuntimeId)) {
-          if (createResult.admission.kind === 'prepared') createResult.admission.abort()
+          createResult.admission.abort()
           return { ok: false, message: 'error.repo-runtime-stale' }
         }
         return {

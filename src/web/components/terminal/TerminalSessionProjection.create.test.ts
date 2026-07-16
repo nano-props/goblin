@@ -257,17 +257,6 @@ describe('TerminalSessionProjection create flow', () => {
             ok: true as const,
             runtimeType: 'terminal' as const,
             runtime,
-            workspacePaneTabs: {
-              revision: 1,
-              entries: [
-                {
-                  repoRoot: REPO_ROOT,
-                  branchName: BRANCH,
-                  worktreePath: WORKTREE_PATH,
-                  tabs: [{ type: 'terminal' as const, runtimeSessionId: runtime.terminalSessionId }],
-                },
-              ],
-            },
           }
         : { ok: false as const, runtimeType: 'terminal' as const, message: runtime.message }
     })
@@ -278,7 +267,6 @@ describe('TerminalSessionProjection create flow', () => {
       ok: true,
       runtimeType: 'terminal',
       runtime: { sessions: [] },
-      workspacePaneTabs: { revision: 2, entries: [] },
     })
     mocks.writeWorkspaceTabsSnapshotMock.mockReset()
     mocks.writeWorkspaceTabsSnapshotMock.mockResolvedValue(true)

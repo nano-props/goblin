@@ -44,6 +44,15 @@ const terminalCreateCommandMocks = vi.hoisted(() => ({
   })),
 }))
 
+const workspacePaneTabsQueryMocks = vi.hoisted(() => ({
+  refreshWorkspacePaneTabsQueryData: vi.fn(async () => undefined),
+}))
+
+vi.mock('#/web/workspace-pane/workspace-pane-tabs-query.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#/web/workspace-pane/workspace-pane-tabs-query.ts')>()),
+  refreshWorkspacePaneTabsQueryData: workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData,
+}))
+
 vi.mock('#/web/components/terminal/TerminalSessionView.tsx', () => ({
   TerminalSessionView: (props: CapturedTerminalSessionViewProps) => {
     terminalSessionViewMocks.props.push(props)
@@ -78,6 +87,7 @@ afterEach(() => {
   resetReposStore()
   terminalSessionViewMocks.props.length = 0
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockClear()
+  workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mockClear()
 })
 
 describe('workspace pane runtime tab panel', () => {
@@ -132,7 +142,6 @@ describe('workspace pane runtime tab panel', () => {
             terminalSessionId: string
             requestRole: 'leader'
             resourceDisposition: 'created'
-            workspacePaneTabs: { revision: number; entries: [] }
             runtimeProjectionApplied: boolean
           }) => Promise<unknown>
         },
@@ -142,10 +151,9 @@ describe('workspace pane runtime tab panel', () => {
       terminalSessionId: 'term-111111111111111111111',
       requestRole: 'leader',
       resourceDisposition: 'created',
-      workspacePaneTabs: { revision: 1, entries: [] },
       runtimeProjectionApplied: true,
     })
-    expect(navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith('/repo', 'main', 'term-111111111111111111111')
+    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).toHaveBeenCalledWith('/repo', 'repo-runtime-1')
   })
 })
 

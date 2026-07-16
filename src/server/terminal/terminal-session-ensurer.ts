@@ -36,9 +36,12 @@ export type TerminalSessionPrepareManagerResult =
   | ({ ok: true; action: TerminalCreateAction; admission: TerminalSessionAdmission } & TerminalRuntimeMetadata)
   | { ok: false; message: string }
 
-export type TerminalSessionAdmission =
-  | { kind: 'existing'; terminalSessionsRevision: number }
-  | { kind: 'prepared'; commit(): number; abort(): void }
+export interface TerminalSessionAdmission {
+  kind: 'existing' | 'prepared'
+  commit(): number
+  publishCommittedEffects(): void
+  abort(): void
+}
 
 export interface TerminalSessionEnsureManagerInput {
   userId: string

@@ -102,7 +102,6 @@ function successfulRuntimeCloseSnapshot(
       terminalRuntimeSessionId,
       terminalRuntimeGeneration: terminalRuntimeSessionId === null ? null : 1,
     },
-    workspacePaneTabs: { revision: 2, entries: [] },
   }
 }
 
