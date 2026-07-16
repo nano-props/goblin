@@ -154,6 +154,7 @@ describe('RepoWorkspace', () => {
     )
 
     expect(await screen.findByText('error.failed-read-repo')).toBeTruthy()
+    expect(screen.getByRole('alert')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'error.try-again' })).toBeTruthy()
     expect(screen.queryByTestId('repo-workspace-skeleton')).toBeNull()
   })

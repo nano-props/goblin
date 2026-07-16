@@ -198,6 +198,23 @@ describe('repo-client', () => {
     )
   })
 
+  test('reads worktree status through the runtime-scoped POST endpoint', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const response = { repoRuntimeId, status: [], loadedAt: 1_000 }
+    const fetchMock = mockFetch(async () => ({ ok: true, json: async () => response }))
+    const { getRepoWorktreeStatus } = await import('#/web/repo-client.ts')
+
+    await expect(getRepoWorktreeStatus('/tmp/repo', repoRuntimeId)).resolves.toEqual(response)
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100/api/repo/worktree-status',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId }),
+      }),
+    )
+  })
+
   test('times out long-running fetch requests with a stable error key', async () => {
     vi.useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))

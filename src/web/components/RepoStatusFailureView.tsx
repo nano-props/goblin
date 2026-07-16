@@ -14,19 +14,21 @@ export function RepoStatusFailureView({
 }) {
   const t = useT()
   return (
-    <EmptyState
-      icon={<AlertCircle size={18} />}
-      title={t('error.failed-read-repo')}
-      body={
-        <div className="space-y-3">
-          <div className="break-words">{t(messageKey)}</div>
-          <Button type="button" variant="default" disabled={retrying} onClick={onRetry}>
-            <RefreshCw className={retrying ? 'animate-spin' : undefined} />
-            {t('error.try-again')}
-          </Button>
-        </div>
-      }
-    />
+    <div role="alert" className="flex min-h-0 flex-1">
+      <EmptyState
+        icon={<AlertCircle size={18} />}
+        title={t('error.failed-read-repo')}
+        body={
+          <div className="space-y-3">
+            <div className="break-words">{t(messageKey)}</div>
+            <Button type="button" variant="default" disabled={retrying} onClick={onRetry}>
+              <RefreshCw className={retrying ? 'animate-spin' : undefined} />
+              {t('error.try-again')}
+            </Button>
+          </div>
+        }
+      />
+    </div>
   )
 }
 
