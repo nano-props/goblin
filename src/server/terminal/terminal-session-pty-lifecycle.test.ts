@@ -35,7 +35,7 @@ describe('TerminalPtyBinding aborted spawn retirement', () => {
       emitBell: vi.fn(),
       emitTitle: vi.fn(),
       emitExit: vi.fn(),
-      closeSession: vi.fn(),
+      confirmedExit: vi.fn(),
     } satisfies TerminalPtyBindingEvents<TerminalPtySessionState<string>>
     const binding = new TerminalPtyBinding(supervisor, events)
     const session: TerminalPtySessionState<string> = {
@@ -122,7 +122,7 @@ async function createBoundBinding(write: () => Promise<TerminalWriteResult>) {
     emitBell: vi.fn(),
     emitTitle: vi.fn(),
     emitExit: vi.fn(),
-    closeSession: vi.fn(),
+    confirmedExit: vi.fn(),
   } satisfies TerminalPtyBindingEvents<TerminalPtySessionState<string>>
   const binding = new TerminalPtyBinding(supervisor, events)
   const session: TerminalPtySessionState<string> = {

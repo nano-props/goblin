@@ -40,7 +40,7 @@ import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-remo
 interface TerminalSessionServiceManager extends TerminalSessionEnsureManager {
   listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
   terminalSessionsSnapshotForUser(userId: string, scope: string): TerminalSessionsSnapshot
-  closeSession(terminalRuntimeSessionId: string): Promise<boolean>
+  requestSessionRetirement(terminalRuntimeSessionId: string): Promise<boolean>
 }
 
 interface TerminalSessionServiceOptions {

@@ -39,7 +39,7 @@ describe('terminal session pruner', () => {
     const pruner = createTerminalSessionPruner({
       manager: {
         listSessionsForUser: vi.fn(async () => [...sessions]),
-        closeSession,
+        requestSessionRetirement: closeSession,
       },
     })
 
@@ -66,7 +66,7 @@ describe('terminal session pruner', () => {
     const pruner = createTerminalSessionPruner({
       manager: {
         listSessionsForUser: vi.fn(async () => sessions),
-        closeSession,
+        requestSessionRetirement: closeSession,
       },
     })
 
@@ -93,7 +93,7 @@ describe('terminal session pruner', () => {
         listSessionsForUser: vi.fn(async () => [
           terminalSession('term-stalestalestalestale1', { repoRoot: REPO_ROOT, worktreePath: STALE_WORKTREE_PATH }),
         ]),
-        closeSession,
+        requestSessionRetirement: closeSession,
       },
     })
 

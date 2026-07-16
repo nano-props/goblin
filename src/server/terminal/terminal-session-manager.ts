@@ -374,10 +374,10 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   async closeSessionForUser(userId: TUser, terminalRuntimeSessionId: string): Promise<boolean> {
     if (!this.getSession(userId, terminalRuntimeSessionId)) return false
-    return await this.closeSession(terminalRuntimeSessionId)
+    return await this.requestSessionRetirement(terminalRuntimeSessionId)
   }
 
-  async closeSession(
+  async requestSessionRetirement(
     terminalRuntimeSessionId: string,
     reason: TerminalSessionCloseReason = 'session',
   ): Promise<boolean> {
@@ -447,7 +447,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     const failures: TerminalBatchRetirementResult['failures'] = []
     for (const session of sessions) {
       const summary = this.sessionSummary(session)
-      if (await this.closeSession(session.id, reason)) removedEffects.push(summary)
+      if (await this.requestSessionRetirement(session.id, reason)) removedEffects.push(summary)
       else failures.push({ terminalRuntimeSessionId: session.id, message: session.message ?? 'error.unavailable' })
     }
     return { removedEffects, failures }
@@ -479,7 +479,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       if (sessionKey !== targetKey) continue
       const key = `${String(session.userId)}\0${session.scope}`
       affected.set(key, { userId: session.userId, repoRoot: session.repoRoot, scope: session.scope })
-      const closed = await this.closeSession(session.id, 'scope')
+      const closed = await this.requestSessionRetirement(session.id, 'scope')
       if (!closed && this.directory.get(session.id) === session) {
         return {
           ok: false,
@@ -501,7 +501,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     }
   }
 
-  forceCloseAllForShutdown(): void {
+  forceShutdown(): void {
     for (const session of Array.from(this.directory.entries())) {
       const closedSession = this.detachSession(session)
       session.ptyBinding.dispose(session)
@@ -829,15 +829,24 @@ export class TerminalSessionManager<TUser extends string | number> {
           ...this.terminalSessionIdentity(session),
           repoRoot: session.repoRoot,
           repoRuntimeId: session.repoRuntimeId,
-        }),
-      closeSession: (terminalRuntimeSessionId) => {
-        void this.closeSession(terminalRuntimeSessionId)
+        })
+      },
+      confirmedExit: (session, terminalRuntimeGeneration) => {
+        this.confirmSessionExit(session, terminalRuntimeGeneration)
       },
     })
   }
 
   private isLiveSession(session: TerminalSessionView<TUser>): boolean {
     return this.directory.get(session.id) === session
+  }
+
+  private confirmSessionExit(session: TerminalSessionView<TUser>, terminalRuntimeGeneration: number): void {
+    if (this.directory.get(session.id) !== session) return
+    if (session.terminalRuntimeGeneration !== terminalRuntimeGeneration) return
+    const closedSession = this.detachSession(session)
+    this.sink.onSessionClosed?.(session.userId, closedSession, 'session')
+    session.ptyBinding.disposeAfterConfirmedExit(session)
   }
 
   private isSessionClosing(terminalRuntimeSessionId: string): boolean {

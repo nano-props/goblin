@@ -311,7 +311,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       unsubscribeRepoRuntimeClosed()
       physicalWorktrees.dispose()
       coordinator.shutdown()
-      manager.forceCloseAllForShutdown()
+      manager.forceShutdown()
       ptySupervisor.shutdown()
     },
   })
