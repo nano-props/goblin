@@ -62,10 +62,10 @@ describe('TerminalDirectory', () => {
     expect(directory.catalogRevision('user_a', 'scope_a')).toBe(0)
     expect(directory.reserve(entry('pty_conflict', 'term_reserved', 'scope_a'))).toBeNull()
 
-    expect(admission?.commit(reserved)).toBe(true)
+    admission?.commit(reserved)
     expect(directory.get('pty_reserved')).toBe(reserved)
     expect(directory.catalogRevision('user_a', 'scope_a')).toBe(1)
-    expect(admission?.commit(reserved)).toBe(false)
+    expect(() => admission?.commit(reserved)).toThrow('terminal directory reservation already settled')
   })
 
   test('aborts a reservation without a revision or close transition', () => {
@@ -84,7 +84,9 @@ describe('TerminalDirectory', () => {
     const reserved = entry('pty_reserved', 'term_reserved', 'scope_a')
     const admission = directory.reserve(reserved)
 
-    expect(admission?.commit(entry('pty_other', 'term_other', 'scope_a'))).toBe(false)
+    expect(() => admission?.commit(entry('pty_other', 'term_other', 'scope_a'))).toThrow(
+      'terminal directory reservation identity mismatch',
+    )
     expect(directory.catalogRevision('user_a', 'scope_a')).toBe(0)
     admission?.abort()
     expect(directory.reserve(entry('pty_retry', 'term_reserved', 'scope_a'))).not.toBeNull()
@@ -97,5 +99,7 @@ function entry(id: string, terminalSessionId: string, scope: string): Entry {
 
 function commit(directory: TerminalDirectory<string, Entry>, value: Entry): boolean {
   const admission = directory.reserve(value)
-  return admission?.commit(value) ?? false
+  if (!admission) return false
+  admission.commit(value)
+  return true
 }

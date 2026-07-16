@@ -22,18 +22,17 @@ export class TerminalDirectory<
   private readonly reservedRuntimeIdByUserSession = new Map<string, string>()
   private readonly catalogRevisionByScope = new Map<string, number>()
 
-  private publish(entry: TEntry): boolean {
-    if (this.entriesByRuntimeId.has(entry.id)) return false
+  private publish(entry: TEntry): void {
+    if (this.entriesByRuntimeId.has(entry.id)) throw new Error('terminal directory runtime identity conflict')
     const durableKey = this.userSessionKey(entry.userId, entry.terminalSessionId)
-    if (this.runtimeIdByUserSession.has(durableKey)) return false
+    if (this.runtimeIdByUserSession.has(durableKey)) throw new Error('terminal directory durable identity conflict')
     this.entriesByRuntimeId.set(entry.id, entry)
     this.runtimeIdByUserSession.set(durableKey, entry.id)
     this.advanceCatalogRevision(entry.userId, entry.scope)
-    return true
   }
 
   reserve(identity: TerminalDirectoryReservation<TUser>): {
-    commit: (entry: TEntry) => boolean
+    commit: (entry: TEntry) => void
     abort: () => void
   } | null {
     const durableKey = this.userSessionKey(identity.userId, identity.terminalSessionId)
@@ -43,13 +42,14 @@ export class TerminalDirectory<
     let settled = false
     return {
       commit: (entry) => {
-        if (settled) return false
-        if (this.reservationsByRuntimeId.get(identity.id) !== identity) return false
-        if (!reservationMatchesEntry(identity, entry)) return false
+        if (settled) throw new Error('terminal directory reservation already settled')
+        if (this.reservationsByRuntimeId.get(identity.id) !== identity)
+          throw new Error('terminal directory reservation ownership lost')
+        if (!reservationMatchesEntry(identity, entry)) throw new Error('terminal directory reservation identity mismatch')
+        this.publish(entry)
         settled = true
         this.reservationsByRuntimeId.delete(identity.id)
         this.reservedRuntimeIdByUserSession.delete(durableKey)
-        return this.publish(entry)
       },
       abort: () => {
         if (settled) return

@@ -242,7 +242,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       kind: 'prepared',
       commit: () => {
         if (settled) throw new Error('error.unavailable')
-        if (!reservation.commit(session)) throw new Error('error.unavailable')
+        reservation.commit(session)
         settled = true
         if (input.clientId) {
           this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId, this.sessionPresence(session)))
