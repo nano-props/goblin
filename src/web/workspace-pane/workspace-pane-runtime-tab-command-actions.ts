@@ -17,6 +17,7 @@ export interface WorkspacePaneRuntimeTabCommandContext {
     bridge: TerminalSessionCommandBridge | null
     openerIdentity: string | null
     showTerminalSession: (terminalSessionId: string) => boolean | Promise<boolean>
+    showCreatedTerminalSession: (terminalSessionId: string, canonicalBranch: string) => boolean | Promise<boolean>
     t?: TerminalCreateTranslator
   }
 }
@@ -72,6 +73,8 @@ async function terminalRuntimePrimaryAction({
       workspacePaneRoute,
       showRuntimeTab: (type, sessionId) =>
         showTerminalRuntimeTab(type, sessionId, repoId, branchName, workspacePaneRoute, navigation),
+      showCreatedRuntimeTab: (type, sessionId, canonicalBranch) =>
+        showTerminalRuntimeTab(type, sessionId, repoId, canonicalBranch, workspacePaneRoute, navigation),
       terminalCreateTranslator: t,
     }),
   )
@@ -99,6 +102,8 @@ function newTerminalRuntimeTabActionContext({
     workspacePaneRoute,
     showRuntimeTab: (type, sessionId) =>
       showTerminalRuntimeTab(type, sessionId, repoId, branchName, workspacePaneRoute, navigation),
+    showCreatedRuntimeTab: (type, sessionId, canonicalBranch) =>
+      showTerminalRuntimeTab(type, sessionId, repoId, canonicalBranch, workspacePaneRoute, navigation),
     terminalCreateTranslator: t,
   })
 }
@@ -153,7 +158,7 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
     base,
     createTerminal: bridge.createTerminalWithAdmission,
     openerIdentity: terminal.openerIdentity,
-    showCreatedTerminalTab: terminal.showTerminalSession,
+    showCreatedTerminalTab: terminal.showCreatedTerminalSession,
     t: terminal.t,
     logMessage: 'terminal primary action create failed',
   })
@@ -169,7 +174,7 @@ async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandConte
     base,
     createTerminal: bridge.createTerminalWithAdmission,
     openerIdentity: terminal.openerIdentity,
-    showCreatedTerminalTab: terminal.showTerminalSession,
+    showCreatedTerminalTab: terminal.showCreatedTerminalSession,
     t: terminal.t,
   })
   return result.ok

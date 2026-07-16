@@ -233,6 +233,33 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions[0]?.branch).toBe('renamed-branch')
   })
 
+  test('rejects reuse under a different worktree path even with the same physical identity', () => {
+    const manager = createManager(createDeferredPtySupervisor())
+    const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)
+    const input = {
+      userId: USER_ID,
+      scope: SCOPE,
+      repoRoot: SCOPE,
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      physicalWorktreeCapability,
+      cwd: '/tmp',
+      cols: 80,
+      rows: 24,
+      clientId: CLIENT_ID,
+    }
+    const created = manager.prepareSession(input)
+    if (!created.ok) throw new Error(created.message)
+    created.admission.commit({ canonicalBranch: BRANCH_NAME })
+
+    expect(manager.prepareSession({ ...input, worktreePath: '/repo/other-worktree' })).toEqual({
+      ok: false,
+      message: 'error.invalid-arguments',
+    })
+  })
+
   test('publishes committed controller identity when its PTY resize fails', async () => {
     const supervisor = createDeferredPtySupervisor()
     const onIdentity = vi.fn()

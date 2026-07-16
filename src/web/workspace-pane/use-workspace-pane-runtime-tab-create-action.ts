@@ -19,7 +19,11 @@ export interface UseWorkspacePaneRuntimeTabCreateActionInput {
   runtimeTabStateByType: WorkspacePaneRuntimeTabCreateStateByType
   initialRuntimeProjectionHydrating: boolean
   workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
-  showCreatedRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean | Promise<boolean>
+  showCreatedRuntimeTab: (
+    type: WorkspacePaneRuntimeTabType,
+    sessionId: string,
+    canonicalBranch: string,
+  ) => boolean | Promise<boolean>
   t: TerminalCreateTranslator
 }
 

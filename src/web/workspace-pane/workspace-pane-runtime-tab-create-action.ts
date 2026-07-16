@@ -32,7 +32,11 @@ export interface WorkspacePaneRuntimeTabCreateActionContext {
   repoRoot: string
   runtimeTabStateByType: WorkspacePaneRuntimeTabCreateStateByType
   initialRuntimeProjectionHydrating: boolean
-  showCreatedRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean | Promise<boolean>
+  showCreatedRuntimeTab: (
+    type: WorkspacePaneRuntimeTabType,
+    sessionId: string,
+    canonicalBranch: string,
+  ) => boolean | Promise<boolean>
   t: TerminalCreateTranslator
   terminal?: WorkspacePaneTerminalCreateActionContext
 }
@@ -226,7 +230,8 @@ function terminalRuntimeTabCreateAction(
         base,
         createTerminal: terminal.createTerminal,
         openerIdentity,
-        showCreatedTerminalTab: (terminalSessionId) => context.showCreatedRuntimeTab('terminal', terminalSessionId),
+        showCreatedTerminalTab: (terminalSessionId, canonicalBranch) =>
+          context.showCreatedRuntimeTab('terminal', terminalSessionId, canonicalBranch),
         t: context.t,
       })
     },

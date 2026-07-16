@@ -103,7 +103,7 @@ describe('workspace pane runtime tab create action', () => {
       commitCreatedTerminalTab: (admission: TerminalCreateLeaderAdmissionResult) => Promise<unknown>
     }
     await commandInput.commitCreatedTerminalTab(createAdmission())
-    expect(showCreatedRuntimeTab).toHaveBeenCalledWith('terminal', TERMINAL_SESSION_ID)
+    expect(showCreatedRuntimeTab).toHaveBeenCalledWith('terminal', TERMINAL_SESSION_ID, BRANCH_NAME)
   })
 
   test('dispatches immediately without holding the client workspace-pane operation queue', async () => {

@@ -15,6 +15,11 @@ export interface WorkspacePaneRuntimeTabCommandContextInput {
   branchName: string
   workspacePaneRoute: WorkspacePaneCommandRoute
   showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean | Promise<boolean>
+  showCreatedRuntimeTab: (
+    type: WorkspacePaneRuntimeTabType,
+    sessionId: string,
+    canonicalBranch: string,
+  ) => boolean | Promise<boolean>
   terminalCreateTranslator?: TerminalCreateTranslator
 }
 
@@ -57,6 +62,8 @@ function assignTerminalRuntimeTabCommandContext(
       },
     ),
     showTerminalSession: (terminalSessionId) => input.showRuntimeTab('terminal', terminalSessionId),
+    showCreatedTerminalSession: (terminalSessionId, canonicalBranch) =>
+      input.showCreatedRuntimeTab('terminal', terminalSessionId, canonicalBranch),
     t: input.terminalCreateTranslator,
   }
 }

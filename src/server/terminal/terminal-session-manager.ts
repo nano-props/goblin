@@ -950,6 +950,7 @@ function sameTerminalScope<TUser extends string | number>(
   return (
     session.scope === input.scope &&
     session.repoRuntimeId === input.repoRuntimeId &&
-    session.repoRoot === input.repoRoot
+    session.repoRoot === input.repoRoot &&
+    session.worktreePath === input.worktreePath
   )
 }
