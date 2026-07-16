@@ -344,13 +344,18 @@ export interface RepoOperationsSnapshot {
 
 export interface RepoRuntimeProjection {
   snapshot: RepoSnapshot | null
-  status: WorktreeStatus[]
   pullRequests: PullRequestEntry[] | null
   operations: RepoOperationsSnapshot
   requested: {
     branch: string | null
     pullRequestMode: PullRequestFetchMode
   }
+  loadedAt: number
+}
+
+export interface RepoWorktreeStatusSnapshot {
+  repoRuntimeId: string
+  status: WorktreeStatus[]
   loadedAt: number
 }
 

@@ -71,7 +71,7 @@ describe('repo runtime task scheduling', () => {
         }),
     )
     const replaced = scheduleRepoOperation(REPO_ID, 'network', async () => 'replaced', {
-      replaceQueuedKey: 'visible-status',
+      replaceQueuedKey: 'read-model-refresh',
     })
     const latest = scheduleRepoOperation(
       REPO_ID,
@@ -80,7 +80,7 @@ describe('repo runtime task scheduling', () => {
         starts.push('latest')
         return 'latest'
       },
-      { replaceQueuedKey: 'visible-status' },
+      { replaceQueuedKey: 'read-model-refresh' },
     )
 
     await expect(replaced).rejects.toThrow('cancelled')
@@ -168,7 +168,7 @@ describe('repo runtime task scheduling', () => {
     markRepoOperationTargets(
       REPO_ID,
       nextRepoOperationId(REPO_ID),
-      [{ key: 'visibleStatus', reason: 'visible-status' }],
+      [{ key: 'repoReadModel', reason: 'repo-read-model' }],
       'running',
     )
     expect(repoLocalProjectionReadBusy(REPO_ID)).toBe(true)

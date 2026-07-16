@@ -24,8 +24,13 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
     },
     'repo.projection': ({ cwd }: { cwd: string }) => {
       calls.projection.push(cwd)
-      return { snapshot: { branches: [], current: '' }, status: [], pullRequests: null }
+      return { snapshot: { branches: [], current: '' }, pullRequests: null }
     },
+    'repo.worktreeStatus': ({ repoRuntimeId }: { repoRuntimeId: string }) => ({
+      repoRuntimeId,
+      status: [],
+      loadedAt: Date.now(),
+    }),
     'repo.abort': async () => undefined,
     'remote.resolveTarget': ({ alias, remotePath }: { alias: string; remotePath: string }) => {
       calls.resolveTarget.push({ alias, remotePath })

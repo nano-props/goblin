@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { repoDataQueryKey } from '#/web/repo-data-query.ts'
-import { refreshVisibleStatusCache } from '#/web/stores/repos/visible-status-refresh.ts'
+import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
 import {
   handleRepoInvalidationRefresh,
   requestVisibleWorkspaceStatusRefresh,
@@ -10,18 +10,14 @@ import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import { refreshRepoRuntimes } from '#/web/repo-runtime-query.ts'
 import { acceptRemoteLifecycleSnapshot } from '#/web/stores/repos/remote-lifecycle-projection.ts'
 
-vi.mock('#/web/stores/repos/visible-status-refresh.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#/web/stores/repos/visible-status-refresh.ts')>()
-  return { ...actual, refreshVisibleStatusCache: vi.fn(async () => {}) }
+vi.mock('#/web/stores/repos/worktree-status-refresh.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#/web/stores/repos/worktree-status-refresh.ts')>()
+  return { ...actual, refreshRepoWorktreeStatus: vi.fn(async () => {}) }
 })
 vi.mock('#/web/repo-runtime-query.ts', () => ({ refreshRepoRuntimes: vi.fn() }))
 vi.mock('#/web/stores/repos/remote-lifecycle-projection.ts', () => ({ acceptRemoteLifecycleSnapshot: vi.fn() }))
 
-function repoRefreshStoreAccess(
-  repoRuntimeId = 'repo-runtime-test-9',
-  unavailable = false,
-  visibleStatusPhase: 'idle' | 'loading' | 'refreshing' = 'idle',
-) {
+function repoRefreshStoreAccess(repoRuntimeId = 'repo-runtime-test-9', unavailable = false) {
   const get: ReposGet = () =>
     ({
       repos: {
@@ -31,7 +27,6 @@ function repoRefreshStoreAccess(
           availability: unavailable
             ? { phase: 'unavailable', reason: 'offline', checkedAt: 1 }
             : { phase: 'available' },
-          dataLoads: { visibleStatus: { phase: visibleStatusPhase, loadedAt: null, error: null, stale: false } },
         },
       },
     }) as unknown as ReturnType<ReposGet>
@@ -41,15 +36,15 @@ function repoRefreshStoreAccess(
 describe('repo refresh actions', () => {
   beforeEach(() => {
     primaryWindowQueryClient.clear()
-    vi.mocked(refreshVisibleStatusCache).mockReset()
-    vi.mocked(refreshVisibleStatusCache).mockResolvedValue(undefined)
+    vi.mocked(refreshRepoWorktreeStatus).mockReset()
+    vi.mocked(refreshRepoWorktreeStatus).mockResolvedValue(undefined)
     vi.mocked(refreshRepoRuntimes).mockReset()
     vi.mocked(acceptRemoteLifecycleSnapshot).mockReset()
   })
 
   afterEach(() => primaryWindowQueryClient.clear())
 
-  test('requests a visible projection only for the current idle runtime with a branch', () => {
+  test('requests visible status only for the current available runtime with a branch', () => {
     const store = repoRefreshStoreAccess()
 
     expect(requestVisibleWorkspaceStatusRefresh(store, '/repo', 'repo-runtime-test-9', 'feature/query')).toBe(true)
@@ -63,17 +58,8 @@ describe('repo refresh actions', () => {
         'feature/query',
       ),
     ).toBe(false)
-    expect(
-      requestVisibleWorkspaceStatusRefresh(
-        repoRefreshStoreAccess('repo-runtime-test-9', false, 'loading'),
-        '/repo',
-        'repo-runtime-test-9',
-        'feature/query',
-      ),
-    ).toBe(false)
-
-    expect(refreshVisibleStatusCache).toHaveBeenCalledOnce()
-    expect(refreshVisibleStatusCache).toHaveBeenCalledWith(store, '/repo', 'repo-runtime-test-9', 'feature/query')
+    expect(refreshRepoWorktreeStatus).toHaveBeenCalledOnce()
+    expect(refreshRepoWorktreeStatus).toHaveBeenCalledWith(store, '/repo', 'repo-runtime-test-9')
   })
 
   test('routes repo snapshot invalidation through query invalidation only', async () => {
@@ -82,7 +68,7 @@ describe('repo refresh actions', () => {
 
     await handleRepoInvalidationRefresh(store, { repoId: '/repo', query: 'repo-snapshot' }, 'repo-runtime-test-9')
 
-    expect(refreshVisibleStatusCache).not.toHaveBeenCalled()
+    expect(refreshRepoWorktreeStatus).not.toHaveBeenCalled()
     expect(invalidateSpy).toHaveBeenCalledWith(
       { queryKey: repoDataQueryKey('/repo', 'repo-runtime-test-9'), refetchType: 'active' },
       { cancelRefetch: false },

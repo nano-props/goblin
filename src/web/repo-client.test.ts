@@ -198,6 +198,38 @@ describe('repo-client', () => {
     )
   })
 
+  test('reads worktree status through the runtime-scoped POST endpoint', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const response = { repoRuntimeId, status: [], loadedAt: 1_000 }
+    const fetchMock = mockFetch(async () => ({ ok: true, json: async () => response }))
+    const { getRepoWorktreeStatus } = await import('#/web/repo-client.ts')
+
+    await expect(getRepoWorktreeStatus('/tmp/repo', repoRuntimeId)).resolves.toEqual(response)
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100/api/repo/worktree-status',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId }),
+      }),
+    )
+  })
+
+  test('maps worktree status transport failures to a stable display key while preserving the cause', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    mockFetch(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' }),
+    }))
+    const { getRepoWorktreeStatus } = await import('#/web/repo-client.ts')
+
+    await expect(getRepoWorktreeStatus('/tmp/repo', repoRuntimeId)).rejects.toMatchObject({
+      message: 'error.failed-read-repo',
+      cause: expect.objectContaining({ message: 'Server request failed (BAD_REQUEST: error.failed-read-repo)' }),
+    })
+  })
+
   test('times out long-running fetch requests with a stable error key', async () => {
     vi.useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))

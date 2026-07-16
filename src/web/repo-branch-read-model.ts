@@ -2,7 +2,9 @@ import type { QueryClient } from '@tanstack/react-query'
 import {
   getRepoProjectionPlaceholderData,
   getRepoProjectionQueryData,
+  getRepoWorktreeStatusQueryData,
   useRepoProjectionReadModel,
+  useRepoWorktreeStatusReadModel,
 } from '#/web/repo-data-query.ts'
 import { stripBranchWorktreeMetadata, worktreeStatesFromBranchReadModel } from '#/web/stores/repos/worktree-state.ts'
 import type { RepoBranchState, RepoState, RepoWorktreeState } from '#/web/stores/repos/types.ts'
@@ -44,10 +46,12 @@ export function useRepoBranchReadModel(
   enabled: boolean,
 ): RepoBranchReadModelData | null {
   const projectionReadModel = useRepoProjectionReadModel(repoRoot, repoRuntimeId, null, 'full', enabled)
+  const statusReadModel = useRepoWorktreeStatusReadModel(repoRoot, repoRuntimeId, enabled)
   if (!enabled) return null
   const projection = projectionReadModel.data
   if (!projection?.snapshot) return null
-  return repoBranchReadModelFromSnapshot(projection.snapshot, projection.status)
+  if (!statusReadModel.data) return null
+  return repoBranchReadModelFromSnapshot(projection.snapshot, statusReadModel.data.status)
 }
 
 export function readRepoBranchQueryProjection(
@@ -57,15 +61,26 @@ export function readRepoBranchQueryProjection(
   const projection =
     getRepoProjectionQueryData(repo.id, repo.repoRuntimeId, null, 'full', queryClient) ??
     getRepoProjectionPlaceholderData(repo.id, repo.repoRuntimeId, null, 'full', queryClient)
-  if (projection?.snapshot) return repoBranchReadModelFromSnapshot(projection.snapshot, projection.status)
+  const status = getRepoWorktreeStatusQueryData(repo.id, repo.repoRuntimeId, queryClient)
+  if (projection?.snapshot && status) return repoBranchReadModelFromSnapshot(projection.snapshot, status.status)
   return null
 }
 
-export function requireRepoBranchQueryProjection(
+export function readRepoBranchSnapshotQueryProjection(
   repo: Pick<RepoState, 'id' | 'repoRuntimeId'>,
   queryClient?: QueryClient,
-): RepoBranchReadModelData {
-  const projection = readRepoBranchQueryProjection(repo, queryClient)
-  if (!projection) throw new Error(`repo branch read model query data unavailable for repo: ${repo.id}`)
+): RepoBranchSnapshotData | null {
+  const projection =
+    getRepoProjectionQueryData(repo.id, repo.repoRuntimeId, null, 'full', queryClient) ??
+    getRepoProjectionPlaceholderData(repo.id, repo.repoRuntimeId, null, 'full', queryClient)
+  return projection?.snapshot ? repoBranchSnapshotDataFromSnapshot(projection.snapshot) : null
+}
+
+export function requireRepoBranchSnapshotQueryProjection(
+  repo: Pick<RepoState, 'id' | 'repoRuntimeId'>,
+  queryClient?: QueryClient,
+): RepoBranchSnapshotData {
+  const projection = readRepoBranchSnapshotQueryProjection(repo, queryClient)
+  if (!projection) throw new Error(`repo branch snapshot query data unavailable for repo: ${repo.id}`)
   return projection
 }

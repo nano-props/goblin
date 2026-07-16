@@ -7,7 +7,7 @@ import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { workspacePaneTabsInteractionBlockedForTarget } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import type { WorkspacePaneActionTarget } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
@@ -39,8 +39,7 @@ export interface WorkspacePaneDestinationTargetLease extends WorkspacePaneAction
 export type WorkspacePaneTargetLease = WorkspacePaneActionTarget & { branchName: string }
 
 export type WorkspacePaneDestinationTargetResolution =
-  | { kind: 'ready'; lease: WorkspacePaneDestinationTargetLease }
-  | { kind: 'missing' }
+  { kind: 'ready'; lease: WorkspacePaneDestinationTargetLease } | { kind: 'missing' }
 
 export function resolveWorkspacePaneDestinationTarget(
   repoId: string,
@@ -48,7 +47,7 @@ export function resolveWorkspacePaneDestinationTarget(
 ): WorkspacePaneDestinationTargetResolution {
   const repo = useReposStore.getState().repos[repoId]
   if (!repo) return { kind: 'missing' }
-  const branchModel = readRepoBranchQueryProjection(repo)
+  const branchModel = readRepoBranchSnapshotQueryProjection(repo)
   const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return { kind: 'missing' }
   const worktreePath = branch.worktree?.path ?? null
@@ -74,9 +73,7 @@ export function resolveWorkspacePaneDestinationTargetLease(
 export function workspacePaneTargetLeaseIsCurrent(lease: WorkspacePaneTargetLease): boolean {
   const current = resolveWorkspacePaneDestinationTargetLease(lease.repoId, lease.branchName)
   return (
-    current !== null &&
-    current.repoRuntimeId === lease.repoRuntimeId &&
-    current.worktreePath === lease.worktreePath
+    current !== null && current.repoRuntimeId === lease.repoRuntimeId && current.worktreePath === lease.worktreePath
   )
 }
 
@@ -85,7 +82,7 @@ export function workspacePaneCommittedRuntimeTargetIsCurrent(target: WorkspacePa
   const repo = useReposStore.getState().repos[target.repoId]
   if (!repo || repo.repoRuntimeId !== target.repoRuntimeId) return false
   return (
-    readRepoBranchQueryProjection(repo)?.branches.some(
+    readRepoBranchSnapshotQueryProjection(repo)?.branches.some(
       (branch) => branch.worktree?.path === target.worktreePath,
     ) ?? false
   )
@@ -142,11 +139,7 @@ function resolveWorkspacePaneTabTarget(
       repoRuntimeId: repo.repoRuntimeId,
       branchName,
       worktreePath,
-      preferredTab: preferredWorkspacePaneTabForRoute(
-        repo.ui,
-        { repoRoot: repoId, branchName, worktreePath },
-        options,
-      ),
+      preferredTab: preferredWorkspacePaneTabForRoute(repo.ui, { repoRoot: repoId, branchName, worktreePath }, options),
       allowPreferredTabFallback: options.workspacePaneRoute === undefined,
       tabEntries: tabEntriesProjection.tabs,
       tabEntriesProjectionPhase: tabEntriesProjection.phase,
@@ -174,7 +167,7 @@ export function workspacePaneRouteNavigationBlockedForBranch(repoId: string, bra
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
   if (!repo) return false
-  const branchModel = readRepoBranchQueryProjection(repo)
+  const branchModel = readRepoBranchSnapshotQueryProjection(repo)
   if (!branchModel) return false
   const branch = branchModel.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return false
@@ -202,7 +195,7 @@ export function resolveWorkspacePaneTabTargetForBranch(
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
   if (!repo) return { kind: 'missing' }
-  const branchModel = readRepoBranchQueryProjection(repo)
+  const branchModel = readRepoBranchSnapshotQueryProjection(repo)
   if (!branchModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
   const branch = branchModel.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return { kind: 'missing' }

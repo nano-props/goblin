@@ -399,11 +399,10 @@ function createLocalRepoSource(
       }
     },
     async getStatus(signal) {
-      if (!isValidCwd(repoId)) return []
+      if (!isValidCwd(repoId)) throw new Error('error.invalid-path')
       const available = await probeGitRepo(repoId)
       if (!available.ok) throw new Error(available.message)
-      const status = await getWorkingStatus(repoId, { signal })
-      return signal?.aborted ? [] : status
+      return await getWorkingStatus(repoId, { signal })
     },
     async getPullRequests(branches, options) {
       if (!isValidCwd(repoId)) return null
@@ -598,8 +597,7 @@ async function createRemoteRepoSource(
       return { branches: remoteSnapshot.branches, current: remoteSnapshot.current, remote: remoteSnapshot.remote }
     },
     async getStatus(signal) {
-      const status = await getRemoteStatus(target, { signal, run })
-      return signal?.aborted ? [] : status
+      return await getRemoteStatus(target, { signal, run })
     },
     async getPullRequests(branches, options) {
       const branchSet = normalizeRequestedBranches(branches)

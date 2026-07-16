@@ -5,7 +5,7 @@ import {
   workspacePaneTabTargetForBranch,
   type WorkspacePaneTabTargetOptions,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 // Chrome-tab-style "opener" tracking, covering every workspace pane tab,
@@ -50,12 +50,9 @@ export function recordWorkspacePaneTabOpener(
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
   if (!repo || repo.repoRuntimeId !== repoRuntimeId) return 'missing'
-  const branchModel = readRepoBranchQueryProjection(repo)
+  const branchModel = readRepoBranchSnapshotQueryProjection(repo)
   if (!branchModel) return 'unavailable'
-  const target = workspacePaneTabsTargetForRepoBranch(
-    { repoRoot: repo.id, branches: branchModel.branches },
-    branchName,
-  )
+  const target = workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
   if (!target) return 'missing'
   state.setTabOpener(runtimeScopedTabOpenerKey(target, repoRuntimeId), childIdentity, openerIdentity)
   return 'recorded'
@@ -98,7 +95,7 @@ function runtimeScopedTabOpenerKey(target: WorkspacePaneTabsTarget, repoRuntimeI
 
 function workspacePaneTabOpenerTarget(repoId: string, branchName: string): WorkspacePaneTabsTarget | null {
   const repo = useReposStore.getState().repos[repoId]
-  const branchModel = repo ? readRepoBranchQueryProjection(repo) : null
+  const branchModel = repo ? readRepoBranchSnapshotQueryProjection(repo) : null
   if (!repo || !branchModel) return null
   return workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
 }

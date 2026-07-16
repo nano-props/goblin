@@ -448,7 +448,14 @@ function scriptForCommand(command: RemoteCommandKind): string {
       // caller needs for `parseWorktrees` (it sets `isBare`).
       const repo = shellQuote(command.path)
       return [
-        `git -C ${repo} worktree list --porcelain`,
+        // Capture the worktree list once and require that authoritative
+        // membership read to succeed. Reusing the captured file keeps the
+        // emitted list and the generated status jobs on the same projection.
+        `WT_TMPDIR=$(mktemp -d)`,
+        `export WT_TMPDIR`,
+        `trap 'rm -rf "$WT_TMPDIR"' EXIT`,
+        `if ! git -C ${repo} worktree list --porcelain > "$WT_TMPDIR/worktrees"; then exit 1; fi`,
+        `cat "$WT_TMPDIR/worktrees"`,
         // Emit the boundary marker on its own line. printf format
         // `\n%s\n` puts newlines around the single-quoted marker
         // text. The marker is plain ASCII -- no RS bytes or other
@@ -467,9 +474,6 @@ function scriptForCommand(command: RemoteCommandKind): string {
         // was a perf regression (F5): wall time scaled as N *
         // per-status-time instead of ceil(N/8) * per-status-time.
         // On a repo with 12 worktrees that is a ~6x slowdown.
-        `WT_TMPDIR=$(mktemp -d)`,
-        `export WT_TMPDIR`,
-        `trap 'rm -rf "$WT_TMPDIR"' EXIT`,
         // Build a jobs file. Each line is one worktree:
         //   "<idx>\t<path>\n"
         // (TAB-separated). The original shape used a NUL separator
@@ -498,12 +502,12 @@ function scriptForCommand(command: RemoteCommandKind): string {
         // acceptable because this script runs only on hosts that
         // already accept worktree paths, and the rest of the
         // system treats them as opaque strings.
-        `git -C ${repo} worktree list --porcelain | awk -v RS= 'BEGIN { idx = 0 }`,
+        `awk -v RS= 'BEGIN { idx = 0 }`,
         `  /(^|\\n)bare(\\n|$)/ { next }`,
         `  match($0, /^worktree[ \\t]+/) {`,
         `    p = substr($0, RSTART + RLENGTH); sub(/\\n.*/, "", p);`,
         `    if (p != "") { idx++; printf "%05d\\t%s\\n", idx, p }`,
-        `  }' > "$WT_TMPDIR/jobs"`,
+        `  }' "$WT_TMPDIR/worktrees" > "$WT_TMPDIR/jobs"`,
         // Fan out workers as POSIX shell background processes (F5). The
         // previous `xargs -I {} -P 8` shape worked under GNU xargs
         // but broke in two ways:
@@ -547,16 +551,18 @@ function scriptForCommand(command: RemoteCommandKind): string {
         `    pending=$((pending - 1))`,
         `  done`,
         `  (`,
-        // Each worker writes its NUL section to <tmpdir>/<idx>.out.
-        // `cd` may fail for a worktree the script cannot enter;
-        // treat that as a no-op (no file written) so the parser
-        // simply omits this section from the result.
+        // Each worker builds its NUL section in <tmpdir>/<idx>.tmp and
+        // publishes <idx>.out only after `git status` succeeds.
+        // A worktree the script cannot enter also produces no published
+        // section, so the complete-read parser rejects the response.
         `    if ! cd "$wt" 2>/dev/null; then exit 0; fi`,
         `    abs=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0`,
+        `    tmp="$WT_TMPDIR/$idx.tmp"`,
         `    out="$WT_TMPDIR/$idx.out"`,
-        `    printf "%s\\0" "$abs" > "$out"`,
-        `    git -C "$abs" status --porcelain -z -uall 2>/dev/null >> "$out" || true`,
-        `    printf "\\0" >> "$out"`,
+        `    printf "%s\\0" "$abs" > "$tmp"`,
+        `    if ! git -C "$abs" status --porcelain -z -uall 2>/dev/null >> "$tmp"; then rm -f "$tmp"; exit 0; fi`,
+        `    printf "\\0" >> "$tmp"`,
+        `    mv "$tmp" "$out"`,
         `  ) &`,
         `  pid=$!`,
         `  if [ -n "$pids" ]; then`,
@@ -569,12 +575,15 @@ function scriptForCommand(command: RemoteCommandKind): string {
         `for pid in $pids; do`,
         `  wait "$pid" 2>/dev/null || true`,
         `done`,
-        // Concatenate in index order. If a worker skipped its
-        // worktree (cd/rev-parse failure) no .out file is written;
-        // the parser will simply not see a section for it.
+        // Concatenate in index order. Any worker failure leaves no .out
+        // file, which the complete-read parser rejects as a missing section.
+        // A bare-only repository legitimately has no output files, so the
+        // loop must still finish successfully in that case.
         `for f in "$WT_TMPDIR"/*.out; do`,
-        `  [ -f "$f" ] && cat "$f"`,
+        `  [ -f "$f" ] || continue`,
+        `  cat "$f" || exit 1`,
         `done`,
+        `:`,
       ].join('\n')
     }
     case 'gitStatus':

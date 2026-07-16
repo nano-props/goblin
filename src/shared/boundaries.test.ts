@@ -208,21 +208,31 @@ describe('architecture boundary rules', () => {
           relativeFilePath: '/src/web/repo-client.ts',
           source: 'const schema = REPO_PROCEDURE_SCHEMAS.status\n',
         },
+        {
+          relativeFilePath: '/src/web/repo-branch-read-model.ts',
+          source: 'repoBranchReadModelFromSnapshot(projection.snapshot, projection.status)\n',
+        },
+        {
+          relativeFilePath: '/src/web/stores/repos/refresh.ts',
+          source: 'repo.dataLoads.visibleStatus.error = message\n',
+        },
       ]),
     ).toEqual([
       expect.stringContaining('legacy repo IPC read route'),
       expect.stringContaining('legacy repo HTTP read route'),
       expect.stringContaining('legacy repo read helper'),
       expect.stringContaining('legacy repo procedure schema key'),
+      expect.stringContaining('projection-owned worktree status'),
+      expect.stringContaining('store-owned worktree status lifecycle'),
     ])
   })
 
-  test('allows projection payload and invalidation names in web code', () => {
+  test('allows independent status composition and projection invalidation names in web code', () => {
     expect(
       checkArchitectureSources([
         {
           relativeFilePath: '/src/web/repo-branch-read-model.ts',
-          source: 'repoBranchReadModelFromSnapshot(projection.snapshot, projection.status)\n',
+          source: 'repoBranchReadModelFromSnapshot(projection.snapshot, statusSnapshot.status)\n',
         },
         {
           relativeFilePath: '/src/web/hooks/useRepoStoreInvalidationRefresh.ts',

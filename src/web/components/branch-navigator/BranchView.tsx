@@ -12,6 +12,10 @@ import { EmptyState } from '#/web/components/Layout.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { BranchNavigatorSkeleton } from '#/web/components/Skeleton.tsx'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
+import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
+import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
 
 interface Props {
   repoId: string
@@ -27,6 +31,8 @@ interface Props {
 export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterSelect, onAfterOpenStatus }: Props) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
+  const repoRuntimeId = useReposStore((state) => state.repos[repoId]?.repoRuntimeId ?? null)
+  const statusReadModel = useRepoWorktreeStatusReadModel(repoId, repoRuntimeId ?? '', repoRuntimeId !== null)
   const repo = useBranchListRepo(repoId)
 
   const branches = useMemo(
@@ -64,17 +70,41 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
     : 'branches.empty'
 
   const highlightedBranch = currentBranchName ?? null
+  const statusError = statusReadModel.error
+  const statusErrorKey = statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
+  const retryStatus = () => {
+    if (!repoRuntimeId) return
+    void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repoId, repoRuntimeId)
+  }
 
+  if (!repo && !statusReadModel.data && statusReadModel.isError && repoRuntimeId) {
+    return (
+      <RepoStatusFailureView
+        messageKey={statusErrorKey ?? 'error.failed-read-repo'}
+        retrying={statusReadModel.isFetching}
+        onRetry={retryStatus}
+      />
+    )
+  }
   if (!repo) return <BranchNavigatorSkeleton />
 
   return (
-    <BranchList
-      repo={repo}
-      branches={branches}
-      highlightedBranch={highlightedBranch}
-      onSelectBranch={handleSelectBranch}
-      onOpenBranchStatus={handleOpenBranchStatus}
-      emptyState={<EmptyState title={t(emptyLabel)} />}
-    />
+    <>
+      {statusReadModel.data && statusReadModel.isError && statusErrorKey && (
+        <RepoStatusStaleNotice
+          messageKey={statusErrorKey}
+          retrying={statusReadModel.isFetching}
+          onRetry={retryStatus}
+        />
+      )}
+      <BranchList
+        repo={repo}
+        branches={branches}
+        highlightedBranch={highlightedBranch}
+        onSelectBranch={handleSelectBranch}
+        onOpenBranchStatus={handleOpenBranchStatus}
+        emptyState={<EmptyState title={t(emptyLabel)} />}
+      />
+    </>
   )
 }

@@ -14,18 +14,19 @@ import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
-import { useRepoProjectionReadModel } from '#/web/repo-data-query.ts'
+import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
 import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
+import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { useWorkspacePaneRouteController } from '#/web/components/repo-workspace/workspace-pane-route-controller.ts'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
+import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
 
 export type RepoWorkspacePaneRouteContext =
-  | { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null }
-  | { kind: 'inactive' }
+  { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null } | { kind: 'inactive' }
 
 interface Props {
   repoId: string
@@ -53,7 +54,6 @@ function repoWorkspaceRepoShellEqual(
       a.repoRuntimeId === b.repoRuntimeId &&
       a.ui.currentBranchName === b.ui.currentBranchName &&
       a.ui.preferredWorkspacePaneTabByTarget === b.ui.preferredWorkspacePaneTabByTarget &&
-      a.dataLoads.visibleStatus === b.dataLoads.visibleStatus &&
       a.unavailable === b.unavailable &&
       a.operations.branchAction === b.operations.branchAction &&
       a.remote.lifecycle === b.remote.lifecycle &&
@@ -86,9 +86,6 @@ export function RepoWorkspace({
             ui: {
               currentBranchName: currentBranch,
               preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
-            },
-            dataLoads: {
-              visibleStatus: repo.dataLoads.visibleStatus,
             },
             unavailable: isRepoUnavailable(repo),
             operations: {
@@ -145,17 +142,31 @@ function RepoWorkspaceLoaded({
     true,
   )
   const projection = projectionReadModel.data
-  const branchReadModel = projection?.snapshot
-    ? repoBranchReadModelFromSnapshot(projection.snapshot, projection.status)
-    : null
+  const statusReadModel = useRepoWorktreeStatusReadModel(repoShell.id, repoShell.repoRuntimeId, true)
+  const statusSnapshot = statusReadModel.data
+  if (projection?.snapshot && !statusSnapshot && statusReadModel.isError) {
+    const statusErrorKey =
+      statusReadModel.error instanceof Error ? statusReadModel.error.message : String(statusReadModel.error)
+    return (
+      <section className="flex min-h-0 flex-1 flex-col bg-background">
+        <RepoStatusFailureView
+          messageKey={statusErrorKey}
+          retrying={statusReadModel.isFetching}
+          onRetry={() => {
+            void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repoShell.id, repoShell.repoRuntimeId)
+          }}
+        />
+      </section>
+    )
+  }
+  const branchReadModel =
+    projection?.snapshot && statusSnapshot
+      ? repoBranchReadModelFromSnapshot(projection.snapshot, statusSnapshot.status)
+      : null
   if (!branchReadModel || !projection) {
     return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }
-  let presentationBranchModel: RepoWorkspaceRepo['branchModel'] = {
-    ...branchReadModel,
-    status: projection.status,
-    statusReady: projectionReadModel.isSuccess,
-  }
+  let presentationBranchModel: RepoWorkspaceRepo['branchModel'] = branchReadModel
   if (currentBranchName && Array.isArray(projection.pullRequests)) {
     const pullRequest = projection.pullRequests.find((entry) => entry.branch === currentBranchName)?.pullRequest
     presentationBranchModel = {
@@ -172,7 +183,13 @@ function RepoWorkspaceLoaded({
     ...projectBranchActionRepo(repoShell, projection.operations.operations, currentBranchName),
     branchModel: presentationBranchModel,
   }
-  const detailBase = getCurrentRepoWorkspacePresentation(presentationRepo)
+  const statusError = statusReadModel.error
+  const statusErrorKey = statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
+  const detailBase = getCurrentRepoWorkspacePresentation(presentationRepo, {
+    loading: statusReadModel.isFetching,
+    error: statusErrorKey,
+    stale: !!statusSnapshot && statusReadModel.isError,
+  })
   const detail: CurrentRepoWorkspacePresentation = {
     ...detailBase,
     loading: {
@@ -235,7 +252,6 @@ function RepoWorkspacePane({
     repoRuntimeId: repo.repoRuntimeId,
     branchName: workspacePaneTabModel.branchName,
     renderedTab: workspacePaneTabModel.renderedTab,
-    visibleStatusPhase: repo.dataLoads.visibleStatus.phase,
     unavailable: repo.unavailable,
   })
   useWorkspacePaneRouteController({
@@ -264,6 +280,9 @@ function RepoWorkspacePane({
         detail={detail}
         workspacePaneId={workspacePaneId}
         workspacePaneTabModel={workspacePaneTabModel}
+        onRetryStatus={() => {
+          void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repo.id, repo.repoRuntimeId)
+        }}
       />
     </>
   )

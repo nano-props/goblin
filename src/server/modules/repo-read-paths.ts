@@ -14,6 +14,7 @@ import type {
   PullRequestEntry,
   RepoOperationsSnapshot,
   RepoRuntimeProjection,
+  RepoWorktreeStatusSnapshot,
   RepoServerOperationState,
   RepoSnapshot,
 } from '#/shared/api-types.ts'
@@ -29,20 +30,21 @@ export async function getRepoSnapshot(
 ): Promise<RepoSnapshot | null> {
   return options.signal?.aborted
     ? null
-    : await runWithRepoSource(
-        cwd,
-        async (source) => await source.getSnapshot(options.signal),
-        repoReadRuntime(options),
-      )
+    : await runWithRepoSource(cwd, async (source) => await source.getSnapshot(options.signal), repoReadRuntime(options))
 }
 
 export async function getRepoStatus(
   cwd: string,
   options: { signal?: AbortSignal; repoRuntimeId?: string } = {},
 ): Promise<WorktreeStatus[]> {
-  return options.signal?.aborted
-    ? []
-    : await runWithRepoSource(cwd, async (source) => await source.getStatus(options.signal), repoReadRuntime(options))
+  options.signal?.throwIfAborted()
+  const status = await runWithRepoSource(
+    cwd,
+    async (source) => await source.getStatus(options.signal),
+    repoReadRuntime(options),
+  )
+  options.signal?.throwIfAborted()
+  return status
 }
 
 export async function getRepoPullRequests(
@@ -113,25 +115,23 @@ export async function getRepoWorktreeBootstrapPreview(
   )
 }
 
-export type RepoBulkReadSection = 'snapshot' | 'status' | 'pullRequests'
-
-export interface RepoBulkReadResult {
+interface RepoProjectionSections {
   snapshot: RepoSnapshot | null
-  status: WorktreeStatus[]
   pullRequests: PullRequestEntry[] | null
 }
 
 /**
- * Default per-section deadline for the composite endpoint. Each
- * included section (snapshot / status / pullRequests) gets its own
+ * Default deadline for an individual repository read. Each included
+ * projection section (snapshot / pullRequests) gets its own
  * timer; the slowest leg is bounded by `timeoutMs` regardless of what
  * the underlying git / network operation would have done. Set to
  * `0` to disable the timeout.
  */
-export const DEFAULT_BULK_READ_TIMEOUT_MS = 15_000
+export const DEFAULT_REPO_READ_TIMEOUT_MS = 15_000
 
-export interface RepoBulkReadOptions {
+interface RepoProjectionSectionReadOptions {
   branches?: string[]
+  includePullRequests: boolean
   mode?: PullRequestFetchMode
   signal?: AbortSignal
   repoRuntimeId?: string
@@ -165,7 +165,7 @@ function sortedRepoOperations(states: RepoServerOperationState[]): RepoServerOpe
  * Build a per-section `AbortSignal` that fires when either the
  * caller's signal or the timeout fires. The timeout is a hard cap
  * independent of any source-specific backoff; its job is to bound
- * how long the composite endpoint can block the request worker.
+ * how long a repository read can block the request worker.
  */
 function composeSectionSignal(
   callerSignal: AbortSignal | undefined,
@@ -184,7 +184,7 @@ function composeSectionSignal(
   const controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
   if (timeoutMs > 0) {
-    timer = setTimeout(() => controller.abort(new Error('composite section timeout')), timeoutMs)
+    timer = setTimeout(() => controller.abort(new Error('repository read timeout')), timeoutMs)
   }
   const onCallerAbort = () => controller.abort(callerSignal?.reason)
   if (callerSignal) {
@@ -201,41 +201,31 @@ function composeSectionSignal(
 }
 
 /**
- * Fetch several repo read results in parallel. Each field is independent:
- * requested section fails the whole composite read fails; callers must not
- * mistake a missing section for authoritative empty repo data. The composite
+ * Fetch the requested projection sections in parallel. If any requested
+ * section fails, the projection read fails; callers must not mistake a missing
+ * section for authoritative empty repo data. The shared
  * request is aborted when the caller's signal fires, and each section
  * additionally gets a hard `timeoutMs` deadline so a slow git / network
  * operation cannot pin the request worker.
  */
-export async function readRepoBulk(
+async function readRepoProjectionSections(
   cwd: string,
-  includes: ReadonlyArray<RepoBulkReadSection>,
-  options: RepoBulkReadOptions = {},
-): Promise<RepoBulkReadResult> {
-  const { branches, mode, signal, timeoutMs = DEFAULT_BULK_READ_TIMEOUT_MS } = options
-  const want = (name: RepoBulkReadSection) => includes.includes(name)
+  options: RepoProjectionSectionReadOptions,
+): Promise<RepoProjectionSections> {
+  const { branches, includePullRequests, mode, signal, timeoutMs = DEFAULT_REPO_READ_TIMEOUT_MS } = options
 
   // One signal per section so the slow leg can be cancelled
   // independently — the others keep going. We materialise the
   // controllers up front and only attach a timeout where the caller
   // asked for one.
-  const snapshotCtl = want('snapshot') ? composeSectionSignal(signal, timeoutMs) : null
-  const statusCtl = want('status') ? composeSectionSignal(signal, timeoutMs) : null
-  const prsCtl = want('pullRequests') ? composeSectionSignal(signal, timeoutMs) : null
+  const snapshotCtl = composeSectionSignal(signal, timeoutMs)
+  const prsCtl = includePullRequests ? composeSectionSignal(signal, timeoutMs) : null
 
   try {
-    const [snapshot, status, pullRequests] = await Promise.all([
-      snapshotCtl
-        ? getRepoSnapshot(cwd, { signal: snapshotCtl.signal, repoRuntimeId: options.repoRuntimeId }).finally(() =>
-            snapshotCtl.cancel(),
-          )
-        : Promise.resolve(null as RepoSnapshot | null),
-      statusCtl
-        ? getRepoStatus(cwd, { signal: statusCtl.signal, repoRuntimeId: options.repoRuntimeId }).finally(() =>
-            statusCtl.cancel(),
-          )
-        : Promise.resolve([] as WorktreeStatus[]),
+    const [snapshot, pullRequests] = await Promise.all([
+      getRepoSnapshot(cwd, { signal: snapshotCtl.signal, repoRuntimeId: options.repoRuntimeId }).finally(() =>
+        snapshotCtl.cancel(),
+      ),
       prsCtl
         ? getRepoPullRequests(cwd, branches, {
             mode,
@@ -244,10 +234,9 @@ export async function readRepoBulk(
           }).finally(() => prsCtl.cancel())
         : Promise.resolve(null as PullRequestEntry[] | null),
     ])
-    return { snapshot, status, pullRequests }
+    return { snapshot, pullRequests }
   } finally {
-    snapshotCtl?.cancel()
-    statusCtl?.cancel()
+    snapshotCtl.cancel()
     prsCtl?.cancel()
   }
 }
@@ -259,25 +248,39 @@ export async function readRepoProjection(
   const branch = typeof options.branch === 'string' && options.branch.length > 0 ? options.branch : null
   const mode: PullRequestFetchMode = options.mode === 'summary' ? 'summary' : 'full'
   const includePullRequests = !!branch || mode === 'summary'
-  const result = await readRepoBulk(
-    cwd,
-    includePullRequests ? ['snapshot', 'status', 'pullRequests'] : ['snapshot', 'status'],
-    {
-      branches: branch ? [branch] : undefined,
-      mode,
-      signal: options.signal,
-      timeoutMs: options.timeoutMs,
-      repoRuntimeId: options.repoRuntimeId,
-    },
-  )
+  const result = await readRepoProjectionSections(cwd, {
+    branches: branch ? [branch] : undefined,
+    includePullRequests,
+    mode,
+    signal: options.signal,
+    timeoutMs: options.timeoutMs,
+    repoRuntimeId: options.repoRuntimeId,
+  })
   return {
-    ...result,
+    snapshot: result.snapshot,
+    pullRequests: result.pullRequests,
     operations: await readRepoOperationsSnapshot(cwd, { signal: options.signal, repoRuntimeId: options.repoRuntimeId }),
     requested: {
       branch,
       pullRequestMode: mode,
     },
     loadedAt: Date.now(),
+  }
+}
+
+export async function readRepoWorktreeStatus(
+  cwd: string,
+  options: { signal?: AbortSignal; repoRuntimeId: string; timeoutMs?: number },
+): Promise<RepoWorktreeStatusSnapshot> {
+  const statusCtl = composeSectionSignal(options.signal, options.timeoutMs ?? DEFAULT_REPO_READ_TIMEOUT_MS)
+  try {
+    return {
+      repoRuntimeId: options.repoRuntimeId,
+      status: await getRepoStatus(cwd, { signal: statusCtl.signal, repoRuntimeId: options.repoRuntimeId }),
+      loadedAt: Date.now(),
+    }
+  } finally {
+    statusCtl.cancel()
   }
 }
 

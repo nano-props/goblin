@@ -66,22 +66,6 @@ describe('RepoActivityControl', () => {
     ).toMatchObject({ kind: 'refresh-button', manualSyncBusy: true })
   })
 
-  test('keeps the primary refresh button idle during contextual visible projection refreshes', () => {
-    resetReposStore()
-    seedRepoShellForTest({ id: REPO_ID })
-    markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'visibleStatus', reason: 'visible-status' }], 'running')
-
-    const repo = useReposStore.getState().repos[REPO_ID]!
-    expect(isRepoPrimaryRefreshBusy(repo)).toBe(false)
-    expect(
-      getRepoActivityControlView({
-        visibleActivity: null,
-        completion: null,
-        manualSyncBusy: isRepoPrimaryRefreshBusy(repo),
-      }),
-    ).toMatchObject({ kind: 'refresh-button', manualSyncBusy: false })
-  })
-
   test('marks the primary refresh button busy during manual refreshes', () => {
     resetReposStore()
     seedRepoShellForTest({ id: REPO_ID })

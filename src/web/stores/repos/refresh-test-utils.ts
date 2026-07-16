@@ -1,5 +1,5 @@
 import type { RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
-import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
+import type { BranchSnapshotInfo, PullRequestInfo } from '#/web/types.ts'
 import {
   createBranchSnapshot,
   createPullRequest,
@@ -8,7 +8,6 @@ import {
   seedRepoWithReadModelForTest,
   type IpcTestHandler,
 } from '#/web/test-utils/bridge.ts'
-import { resetVisibleStatusRefreshStateForTest } from '#/web/stores/repos/visible-status-refresh.ts'
 export const REPO_ID = '/tmp/goblin-test-repo'
 export const ipcHandlers: Record<string, IpcTestHandler> = {}
 export const pullRequest = createPullRequest
@@ -31,12 +30,10 @@ export function pullRequestWithHealth(number: number): PullRequestInfo {
 
 export function repoProjection(
   snapshot: RepoSnapshot | null,
-  status: WorktreeStatus[] = [],
   options: Partial<Pick<RepoRuntimeProjection, 'pullRequests' | 'operations' | 'requested' | 'loadedAt'>> = {},
 ): RepoRuntimeProjection {
   return {
     snapshot,
-    status,
     pullRequests: options.pullRequests ?? null,
     operations: options.operations ?? { operations: [], loadedAt: 0 },
     requested: options.requested ?? { branch: null, pullRequestMode: 'full' },
@@ -62,7 +59,6 @@ export function seedRepo(branches: BranchSnapshotInfo[], repoRuntimeId = 'repo-r
 
 export function resetRefreshTest(): void {
   for (const key of Object.keys(ipcHandlers)) delete ipcHandlers[key]
-  resetVisibleStatusRefreshStateForTest()
   resetReposStore()
   installGoblinTestBridge(ipcHandlers)
   ipcHandlers['repo.abort'] = async () => false
@@ -71,7 +67,10 @@ export function resetRefreshTest(): void {
     openRepoEntries: [],
     workspacePaneTabsByTargetByRepo: {},
   })
-  // Tests that need repo read responses install `repo.projection`
-  // directly; snapshot/status are no longer standalone read routes.
+  ipcHandlers['repo.worktreeStatus'] = ({ repoRuntimeId }: { repoRuntimeId: string }) => ({
+    repoRuntimeId,
+    status: [],
+    loadedAt: Date.now(),
+  })
   ipcHandlers['terminal.prune'] = async () => ({ pruned: 0, remaining: 0 })
 }

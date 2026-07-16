@@ -5,28 +5,22 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { useWorkspacePaneVisibleStatusRefresh } from '#/web/components/repo-workspace/use-workspace-pane-visible-status-refresh.ts'
 import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
-import { requestRepoRuntimeProjectionRefresh } from '#/web/stores/repos/refresh.ts'
 
 vi.mock('#/web/stores/repos/repo-refresh-actions.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('#/web/stores/repos/repo-refresh-actions.ts')>()
   return { ...actual, requestVisibleWorkspaceStatusRefresh: vi.fn(() => true) }
 })
-vi.mock('#/web/stores/repos/refresh.ts', () => ({ requestRepoRuntimeProjectionRefresh: vi.fn(async () => {}) }))
 
 const REPO_ID = '/tmp/visible-status-refresh-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-visible-status-refresh'
 
-type VisibleStatusPhase = 'idle' | 'loading' | 'refreshing'
-
 function Harness({
   branchName = 'main',
   renderedTab = 'status',
-  visibleStatusPhase = 'idle',
   unavailable = false,
 }: {
   branchName?: string | null
   renderedTab?: WorkspacePaneTabType | null
-  visibleStatusPhase?: VisibleStatusPhase
   unavailable?: boolean
 }) {
   useWorkspacePaneVisibleStatusRefresh({
@@ -34,7 +28,6 @@ function Harness({
     repoRuntimeId: REPO_RUNTIME_ID,
     branchName,
     renderedTab,
-    visibleStatusPhase,
     unavailable,
   })
   return null
@@ -51,8 +44,6 @@ describe('useWorkspacePaneVisibleStatusRefresh', () => {
     root = createRoot(container)
     vi.mocked(requestVisibleWorkspaceStatusRefresh).mockReset()
     vi.mocked(requestVisibleWorkspaceStatusRefresh).mockReturnValue(true)
-    vi.mocked(requestRepoRuntimeProjectionRefresh).mockReset()
-    vi.mocked(requestRepoRuntimeProjectionRefresh).mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -61,29 +52,33 @@ describe('useWorkspacePaneVisibleStatusRefresh', () => {
     ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false
   })
 
-  test.each(['status', 'changes'] satisfies WorkspacePaneTabType[])('refreshes visible status for rendered %s', async (renderedTab) => {
-    await act(async () => {
-      root.render(<Harness renderedTab={renderedTab} />)
-    })
+  test.each(['status', 'changes'] satisfies WorkspacePaneTabType[])(
+    'refreshes visible status for rendered %s',
+    async (renderedTab) => {
+      await act(async () => {
+        root.render(<Harness renderedTab={renderedTab} />)
+      })
 
-    expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledOnce()
-    expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledWith(
-      expect.any(Object),
-      REPO_ID,
-      REPO_RUNTIME_ID,
-      'main',
-    )
-    expect(requestRepoRuntimeProjectionRefresh).not.toHaveBeenCalled()
-  })
+      expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledOnce()
+      expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledWith(
+        expect.any(Object),
+        REPO_ID,
+        REPO_RUNTIME_ID,
+        'main',
+      )
+    },
+  )
 
-  test.each(['files', 'history', 'terminal'] satisfies WorkspacePaneTabType[])('does not refresh for rendered %s', async (renderedTab) => {
-    await act(async () => {
-      root.render(<Harness renderedTab={renderedTab} />)
-    })
+  test.each(['files', 'history', 'terminal'] satisfies WorkspacePaneTabType[])(
+    'does not refresh for rendered %s',
+    async (renderedTab) => {
+      await act(async () => {
+        root.render(<Harness renderedTab={renderedTab} />)
+      })
 
-    expect(requestVisibleWorkspaceStatusRefresh).not.toHaveBeenCalled()
-    expect(requestRepoRuntimeProjectionRefresh).not.toHaveBeenCalled()
-  })
+      expect(requestVisibleWorkspaceStatusRefresh).not.toHaveBeenCalled()
+    },
+  )
 
   test('refreshes again when the visible branch changes', async () => {
     await act(async () => {
@@ -95,30 +90,6 @@ describe('useWorkspacePaneVisibleStatusRefresh', () => {
       root.render(<Harness branchName="feature/a" renderedTab="status" />)
     })
 
-    expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledWith(
-      expect.any(Object),
-      REPO_ID,
-      REPO_RUNTIME_ID,
-      'feature/a',
-    )
-  })
-
-  test('waits until visible status is idle before refreshing the latest visible branch', async () => {
-    await act(async () => {
-      root.render(<Harness branchName="main" renderedTab="status" visibleStatusPhase="loading" />)
-    })
-    expect(requestVisibleWorkspaceStatusRefresh).not.toHaveBeenCalled()
-
-    await act(async () => {
-      root.render(<Harness branchName="feature/a" renderedTab="status" visibleStatusPhase="loading" />)
-    })
-    expect(requestVisibleWorkspaceStatusRefresh).not.toHaveBeenCalled()
-
-    await act(async () => {
-      root.render(<Harness branchName="feature/a" renderedTab="status" visibleStatusPhase="idle" />)
-    })
-
-    expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledOnce()
     expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledWith(
       expect.any(Object),
       REPO_ID,
@@ -139,30 +110,6 @@ describe('useWorkspacePaneVisibleStatusRefresh', () => {
 
     expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledOnce()
     expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledWith(
-      expect.any(Object),
-      REPO_ID,
-      REPO_RUNTIME_ID,
-      'feature/a',
-    )
-  })
-
-  test('does not record a visible target when the refresh request is skipped by the store guard', async () => {
-    vi.mocked(requestVisibleWorkspaceStatusRefresh).mockReturnValueOnce(false).mockReturnValue(true)
-
-    await act(async () => {
-      root.render(<Harness branchName="feature/a" renderedTab="status" visibleStatusPhase="idle" />)
-    })
-    expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledOnce()
-
-    await act(async () => {
-      root.render(<Harness branchName="feature/a" renderedTab="status" visibleStatusPhase="refreshing" />)
-    })
-    await act(async () => {
-      root.render(<Harness branchName="feature/a" renderedTab="status" visibleStatusPhase="idle" />)
-    })
-
-    expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledTimes(2)
-    expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenLastCalledWith(
       expect.any(Object),
       REPO_ID,
       REPO_RUNTIME_ID,

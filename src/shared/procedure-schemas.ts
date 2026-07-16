@@ -178,6 +178,10 @@ export const REPO_PROCEDURE_SCHEMAS = {
     branch: v.optional(v.string()),
     mode: v.optional(v.picklist(['summary', 'full'])),
   }),
+  worktreeStatus: v.object({
+    cwd: v.string(),
+    repoRuntimeId: RepoRuntimeIdSchema,
+  }),
   operations: v.object({
     cwd: v.optional(v.string()),
     repoRuntimeId: v.optional(RepoRuntimeIdSchema),

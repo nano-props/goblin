@@ -186,11 +186,11 @@ describe('setBranchViewMode', () => {
 })
 
 describe('setWorkspacePaneTab', () => {
-  test('fails when the repo branch read model is unavailable', () => {
+  test('fails when the repo branch snapshot is unavailable', () => {
     seedRepoShellWithoutBranchReadModel()
 
     expect(() => useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/plain', 'changes')).toThrow(
-      'repo branch read model query data unavailable for repo',
+      'repo branch snapshot query data unavailable for repo',
     )
   })
 

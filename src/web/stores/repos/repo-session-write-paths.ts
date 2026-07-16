@@ -336,7 +336,6 @@ function repoShellForNewRuntimeEpoch(repo: RepoState, repoRuntimeId: string): Re
     repoRuntimeId,
     dataLoads: {
       repoReadModel: { phase: 'idle', loadedAt: repo.dataLoads.repoReadModel.loadedAt, error: null, stale: true },
-      visibleStatus: { phase: 'idle', loadedAt: repo.dataLoads.visibleStatus.loadedAt, error: null, stale: true },
       fetch: { phase: 'idle', loadedAt: null, error: null, stale: false },
     },
     operations: emptyRepoOperations(),

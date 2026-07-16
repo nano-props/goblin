@@ -4,7 +4,6 @@ import type { Key } from 'react-aria-components'
 import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
-import { StatusListSkeleton } from '#/web/components/Skeleton.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
 import { useRepoLogQuery } from '#/web/repo-data-query.ts'
 import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
@@ -97,7 +96,11 @@ function selectedRuntimeSessionId(selection: RepoWorkspaceSelection, type: Works
 
 function StatusWorkspacePanePanel({ repo, workspacePaneId, panelLabel, detail }: WorkspacePanePanelProps) {
   return (
-    <WorkspacePanePanelFrame id={`${workspacePaneId}-status-panel`} {...panelLabel} busy={detail.loading.pullRequests}>
+    <WorkspacePanePanelFrame
+      id={`${workspacePaneId}-status-panel`}
+      {...panelLabel}
+      busy={detail.loading.pullRequests || detail.loading.status}
+    >
       <ScrollPane>
         <BranchStatus detail={detail} repoRuntimeId={repo.repoRuntimeId} />
       </ScrollPane>
@@ -119,19 +122,16 @@ function HistoryWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }
   )
 }
 
-function ChangesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: WorkspacePanePanelProps) {
+function ChangesWorkspacePanePanel({ detail, workspacePaneId, panelLabel }: WorkspacePanePanelProps) {
   const branch = detail.branch
   if (!branch) return null
   return (
     <BranchChangesTab
       workspacePaneId={workspacePaneId}
       panelLabel={panelLabel}
-      repo={repo}
       branch={branch}
       currentBranchStatus={detail.currentBranchStatus}
       statusLoading={detail.loading.status}
-      statusError={detail.errors.status}
-      statusStale={detail.stale.status}
     />
   )
 }
@@ -387,34 +387,23 @@ function BranchHistoryTab({
 function BranchChangesTab({
   workspacePaneId,
   panelLabel,
-  repo,
   branch,
   currentBranchStatus,
   statusLoading,
-  statusError,
-  statusStale,
 }: {
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
-  repo: WorkspacePanePanelRenderInput['repo']
   branch: RepoWorkspaceBranch
   currentBranchStatus: CurrentRepoWorkspacePresentation['currentBranchStatus']
   statusLoading: boolean
-  statusError: string | null
-  statusStale: boolean
 }) {
   const t = useT()
   const totalEntries = currentBranchStatus.reduce((n, wt) => n + wt.entries.length, 0)
 
   return (
     <WorkspacePanePanelFrame id={`${workspacePaneId}-changes-panel`} {...panelLabel} busy={statusLoading}>
-      {branch.worktree?.path && statusLoading && !repo.branchModel.statusReady ? (
-        <StatusListSkeleton rows={8} />
-      ) : branch.worktree?.path && !repo.branchModel.statusReady && statusError ? (
-        <EmptyState title={t(statusError)} />
-      ) : branch.worktree?.path ? (
+      {branch.worktree?.path ? (
         <div className="relative flex min-h-0 flex-1 flex-col">
-          {statusStale && statusError && <StaleStatusNotice message={statusError} />}
           {totalEntries > 0 ? (
             <ScrollPane>
               <StatusList status={currentBranchStatus} />
@@ -431,18 +420,5 @@ function BranchChangesTab({
         />
       )}
     </WorkspacePanePanelFrame>
-  )
-}
-
-function StaleStatusNotice({ message }: { message: string }) {
-  const t = useT()
-  return (
-    <div className="border-b border-warning-border bg-warning-surface px-4 py-2 text-xs text-warning">
-      <span className="font-medium">{t('status.stale-title')}</span>
-      <span className="text-muted-foreground">
-        {' \u2014 '}
-        {t(message)}
-      </span>
-    </div>
   )
 }

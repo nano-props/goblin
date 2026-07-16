@@ -22,7 +22,7 @@ import {
   preferredWorkspacePaneTabByTargetRecordWith,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { requireRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { requireRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 type RestorableWorkspaceActions = Pick<
   ReposStore,
@@ -176,7 +176,7 @@ function createRuntimeWorkspacePreferenceActions(set: ReposSet, get: ReposGet): 
       // this action only changes the target-scoped preferred tab/empty pane.
       const repo = get().repos[id]
       if (!repo) return
-      const branchModel = requireRepoBranchQueryProjection(repo)
+      const branchModel = requireRepoBranchSnapshotQueryProjection(repo)
       const target = workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branch)
       if (target) setWorkspacePaneTabForTarget(target, tab)
     },

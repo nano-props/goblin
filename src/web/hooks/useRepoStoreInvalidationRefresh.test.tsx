@@ -15,7 +15,6 @@ const storeState = {
       repoRuntimeId: 'repo-runtime-test-7',
       dataLoads: {
         repoReadModel: { phase: 'idle', loadedAt: 0, stale: false, error: null },
-        visibleStatus: { phase: 'idle', loadedAt: 0, stale: false, error: null },
         fetch: { phase: 'idle', loadedAt: 0, stale: false, error: null },
       },
     },
@@ -53,7 +52,6 @@ describe('useRepoStoreInvalidationRefresh', () => {
       repoRuntimeId: 'repo-runtime-test-7',
       dataLoads: {
         repoReadModel: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
-        visibleStatus: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
         fetch: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
       },
     }

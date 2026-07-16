@@ -436,6 +436,27 @@ describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
     expect(parsed.size).toBe(2)
   })
 
+  testPosix('accepts a bare-only repository as a complete empty status read', async () => {
+    const repoDir = path.join(os.tmpdir(), `goblin-ssh-bare-test-${Date.now()}-${process.pid}`)
+    tempDirs.push(repoDir)
+    await execa('git', ['init', '--bare', repoDir])
+    const invocation = buildRemoteCommandInvocation(targetWithPath(repoDir), {
+      type: 'gitWorktreeListAndStatus',
+      path: repoDir,
+    })
+
+    const result = await execa('sh', ['-lc', invocation.script])
+    const { parseWorktreeStatusBatch, parseWorktrees, splitWorktreeStatusBatch } = await import(
+      '#/system/git/parsers.ts'
+    )
+    const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(result.stdout)
+
+    expect(parseWorktrees(worktreeListOutput)).toEqual([
+      expect.objectContaining({ path: realpathSync(repoDir), isBare: true }),
+    ])
+    expect(parseWorktreeStatusBatch(statusStream).size).toBe(0)
+  })
+
   testPosix('runs per-worktree status work in parallel via POSIX background jobs (F5 regression check)', async () => {
     // The script source must contain the parallelisation primitives
     // we documented; a future refactor that re-serialises the loop
@@ -459,6 +480,8 @@ describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
     expect(invocation.script).toMatch(/wait "\$first_pid"/)
     expect(invocation.script).toMatch(/max_in_flight=8/)
     expect(invocation.script).toMatch(/mktemp -d/)
+    expect(invocation.script).toContain('mv "$tmp" "$out"')
+    expect(invocation.script).not.toMatch(/status --porcelain -z -uall[^\n]*\|\| true/)
     expect(invocation.script).not.toMatch(/wait -n/)
     expect(invocation.script).not.toMatch(/\$'\\t'/)
     // The previous serial-loop shape must NOT have crept back in.

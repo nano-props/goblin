@@ -1039,10 +1039,16 @@ describe('getRemoteStatusAndWorktrees', () => {
     expect(result.statuses[0]?.path).toBe('/srv/repo-feature')
   })
 
-  test('soft-fails when the remote command fails', async () => {
+  test('rejects when the remote command fails', async () => {
     const run = vi.fn(async () => failRemoteResult('boom'))
-    const result = await getRemoteStatusAndWorktrees(TARGET, { run: run as any })
-    expect(result).toEqual({ statuses: [], worktrees: [] })
+    await expect(getRemoteStatusAndWorktrees(TARGET, { run: run as any })).rejects.toThrow('boom')
+  })
+
+  test('rejects when a non-bare worktree is missing from the status stream', async () => {
+    const worktreeListOutput = ['worktree /srv/repo', 'HEAD f00ba4', 'branch refs/heads/main'].join('\n')
+    const run = vi.fn(async () => okRemoteResult(buildBatchedOutput(worktreeListOutput, '')))
+
+    await expect(getRemoteStatusAndWorktrees(TARGET, { run: run as any })).rejects.toThrow('error.failed-read-repo')
   })
 })
 

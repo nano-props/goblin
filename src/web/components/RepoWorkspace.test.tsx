@@ -34,7 +34,7 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
+import { repoWorktreeStatusQueryKey, setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { nextRepoWorkspaceTabAfterClose } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
@@ -120,8 +120,47 @@ afterEach(() => {
 })
 
 describe('RepoWorkspace', () => {
-  test('can render after the repo appears without changing hook order', () => {
+  test('shows a retryable error when the initial worktree status read fails', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main')],
+      currentBranchName: 'main',
+    })
+    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId) })
+    await expect(
+      primaryWindowQueryClient.fetchQuery({
+        queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId),
+        queryFn: async () => {
+          throw new Error('status failed')
+        },
+        retry: false,
+      }),
+    ).rejects.toThrow('status failed')
+
     render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName="main"
+                workspacePaneRouteContext={{ kind: 'routed', route: null }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText('error.failed-read-repo')).toBeTruthy()
+    expect(screen.getByRole('alert')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'error.try-again' })).toBeTruthy()
+    expect(screen.queryByTestId('repo-workspace-skeleton')).toBeNull()
+  })
+
+  test('can render after the repo appears without changing hook order', () => {
+    const { container } = render(
       <QueryClientProvider client={primaryWindowQueryClient}>
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
@@ -262,6 +301,53 @@ describe('RepoWorkspace', () => {
     expect(container.querySelector('button[aria-label="status.copy-patch-title"]')).not.toBeNull()
   })
 
+  test('keeps the last accepted status visible after a background refresh fails', () => {
+    const worktreePath = '/tmp/repo-workspace-container-repo-stale'
+    const branch = createRepoBranch('feature/stale', { worktree: { path: worktreePath } })
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [branch],
+      currentBranchName: 'feature/stale',
+      preferredWorkspacePaneTab: 'changes',
+      workspacePaneTabsByBranch: {
+        'feature/stale': [workspacePaneStaticTabEntry('changes')],
+      },
+      status: [
+        {
+          path: worktreePath,
+          branch: 'feature/stale',
+          isMain: false,
+          entries: [{ x: 'M', y: ' ', path: 'changed.ts' }],
+        },
+      ],
+    })
+    const statusQuery = primaryWindowQueryClient.getQueryCache().find({
+      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId),
+      exact: true,
+    })!
+    statusQuery.setState({ ...statusQuery.state, status: 'error', error: new Error('status failed') })
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName="feature/stale"
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'changes' } }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByLabelText('changed.ts')).toBeTruthy()
+    expect(screen.getByText('status.stale-title')).toBeTruthy()
+    expect(screen.getByText(/status failed/)).toBeTruthy()
+  })
+
   test('records workspace history when creating a terminal from the status tab', async () => {
     const worktreePath = '/tmp/repo-workspace-container-repo-a'
     const branch = createRepoBranch('feature/a', { worktree: { path: worktreePath } })
@@ -298,16 +384,11 @@ describe('RepoWorkspace', () => {
     }
     let terminalCreated = false
     const terminalListeners = new Set<() => void>()
-    const createdTerminalReadContext = terminalReadContextWithSession(
-      terminalWorktreeKey,
-      'term-111111111111111111111',
-    )
+    const createdTerminalReadContext = terminalReadContextWithSession(terminalWorktreeKey, 'term-111111111111111111111')
     const readContext: TerminalSessionReadContextValue = {
       ...terminalReadContext,
       terminalWorktreeSnapshot: (key) =>
-        terminalCreated
-          ? createdTerminalReadContext.terminalWorktreeSnapshot(key)
-          : EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
+        terminalCreated ? createdTerminalReadContext.terminalWorktreeSnapshot(key) : EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
       subscribeTerminalWorktree: (_key, listener) => {
         terminalListeners.add(listener)
         return () => terminalListeners.delete(listener)
@@ -1270,7 +1351,6 @@ describe('RepoWorkspace', () => {
     const pullRequest = createPullRequest(42, { headRefName: 'feature/pr' })
     setRepoProjectionQueryData(REPO_ID, repo.repoRuntimeId, 'feature/pr', 'full', {
       snapshot: { current: 'feature/pr', branches: [branch] },
-      status: [],
       pullRequests: [{ branch: 'feature/pr', pullRequest }],
       operations: { operations: [], loadedAt: 123 },
       requested: { branch: 'feature/pr', pullRequestMode: 'full' },

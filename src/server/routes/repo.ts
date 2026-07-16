@@ -2,6 +2,7 @@ import { getBackgroundSyncRepos, setBackgroundSyncRepos } from '#/server/modules
 import { serverRepoNodeLog } from '#/node/logger.ts'
 import {
   readRepoProjection,
+  readRepoWorktreeStatus,
   readRepoOperationsSnapshot,
   getRepoLog,
   getRepoPatch,
@@ -198,6 +199,18 @@ export function createRepoRoutes(options: {
         userId,
         () => readRepoProjection(cwd, { branch, mode: mode ?? 'full', signal: c.req.raw.signal, repoRuntimeId }),
         'projection',
+      ),
+    )
+  })
+  app.post('/worktree-status', async (c) => {
+    const { cwd, repoRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.worktreeStatus, c)
+    const userId = userIdFromContext(c)
+    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
+    return c.json(
+      await runtimeReadJsonOrThrow(
+        userId,
+        () => readRepoWorktreeStatus(cwd, { signal: c.req.raw.signal, repoRuntimeId }),
+        'worktree-status',
       ),
     )
   })

@@ -195,8 +195,6 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
     expect(fullProjection?.snapshot?.current).toBe('feature/a')
     expect(fullProjection?.snapshot?.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
     expect(fullProjection?.snapshot?.branches[0]?.pullRequest).toBeUndefined()
-    expect(fullProjection?.status).toEqual([])
     expect(summaryProjection?.snapshot).toEqual(fullProjection?.snapshot)
-    expect(summaryProjection?.status).toEqual([])
   })
 })

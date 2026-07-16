@@ -246,7 +246,7 @@ export function repoLocalPrimaryRefreshBusy(repoId: string): boolean {
 }
 
 export function repoLocalProjectionReadBusy(repoId: string): boolean {
-  return repoOperationBusy(repoId, 'repoReadModel') || repoOperationBusy(repoId, 'visibleStatus')
+  return repoOperationBusy(repoId, 'repoReadModel')
 }
 
 export function repoLocalRemoteFetchBlocked(repoId: string): boolean {

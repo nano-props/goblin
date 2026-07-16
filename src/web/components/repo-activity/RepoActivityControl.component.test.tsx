@@ -80,16 +80,6 @@ describe('RepoActivityControl component', () => {
     expect(button(container).getAttribute('aria-busy')).toBe('true')
   })
 
-  test('keeps the primary refresh button enabled during background-blocked refresh states', () => {
-    seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
-    markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'visibleStatus', reason: 'visible-status' }], 'running')
-
-    const { container } = renderControl()
-
-    expect(button(container).disabled).toBe(false)
-    expect(button(container).getAttribute('aria-busy')).toBeNull()
-  })
-
   test('disables the primary refresh button during manual refreshes', () => {
     seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     markRepoOperationTargets(

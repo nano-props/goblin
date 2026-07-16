@@ -19,6 +19,7 @@ import {
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { repoWorktreeStatusQueryKey } from '#/web/repo-data-query.ts'
 
 const REPO_ID = '/tmp/workspace-pane-target-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-target-worktree'
@@ -57,6 +58,7 @@ describe('workspace pane tab target read model', () => {
       branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
       currentBranch: 'feature/query',
     })
+    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId) })
     expect(
       resolveWorkspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions),
     ).toEqual({
@@ -64,9 +66,9 @@ describe('workspace pane tab target read model', () => {
       reason: 'workspace-pane-tabs-pending',
     })
     expect(workspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions)).toBeNull()
-    expect(workspacePaneTabInteractionBlockedForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions)).toBe(
-      true,
-    )
+    expect(
+      workspacePaneTabInteractionBlockedForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions),
+    ).toBe(true)
   })
 
   test('resolves branch targets from the React Query projection when store branches are stale', () => {
@@ -80,6 +82,7 @@ describe('workspace pane tab target read model', () => {
       branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
       currentBranch: 'feature/query',
     })
+    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId) })
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: REPO_ID,
       repoRuntimeId: repo.repoRuntimeId,
@@ -165,9 +168,7 @@ describe('workspace pane tab target read model', () => {
     expect(
       useReposStore.getState().tabOpenerIdentityByScope[
         `${tabOpenerScopeKey({ repoRoot: REPO_ID, branchName: 'feature/query', worktreePath: null })}\0${repo.repoRuntimeId}`
-      ]?.[
-        'workspace-pane:changes'
-      ],
+      ]?.['workspace-pane:changes'],
     ).toBe('workspace-pane:status')
   })
 

@@ -21,9 +21,9 @@ describe('runLatestOperation', () => {
       id: REPO_ID,
       repoRuntimeId: 'repo-runtime-test',
       lane: 'network',
-      operationKey: 'visible-status',
+      operationKey: 'repo-read-model',
       priority: 1,
-      targets: [{ key: 'visibleStatus', reason: 'visible-status' }],
+      targets: [{ key: 'repoReadModel', reason: 'repo-read-model' }],
       task: () =>
         new Promise<string>((resolve) => {
           starts.push('active')
@@ -36,9 +36,9 @@ describe('runLatestOperation', () => {
       id: REPO_ID,
       repoRuntimeId: 'repo-runtime-test',
       lane: 'network',
-      operationKey: 'visible-status',
+      operationKey: 'repo-read-model',
       priority: 1,
-      targets: [{ key: 'visibleStatus', reason: 'visible-status' }],
+      targets: [{ key: 'repoReadModel', reason: 'repo-read-model' }],
       task: async () => {
         starts.push('replaced')
         return 'replaced'
@@ -50,25 +50,25 @@ describe('runLatestOperation', () => {
       id: REPO_ID,
       repoRuntimeId: 'repo-runtime-test',
       lane: 'network',
-      operationKey: 'visible-status',
+      operationKey: 'repo-read-model',
       priority: 1,
-      targets: [{ key: 'visibleStatus', reason: 'visible-status' }],
+      targets: [{ key: 'repoReadModel', reason: 'repo-read-model' }],
       task: async () => {
         starts.push('latest')
         return 'latest'
       },
     })
 
-    expect(repoOperation(REPO_ID, 'visibleStatus').phase).toBe('queued')
-    expect(useReposStore.getState().repos[REPO_ID]?.operations.visibleStatus.phase).toBe('queued')
+    expect(repoOperation(REPO_ID, 'repoReadModel').phase).toBe('queued')
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.repoReadModel.phase).toBe('queued')
     releaseActive()
 
     await expect(active).resolves.toBeNull()
     await expect(replaced).resolves.toBeNull()
     await expect(latest).resolves.toBe('latest')
     expect(starts).toEqual(['active', 'latest'])
-    expect(repoOperation(REPO_ID, 'visibleStatus').phase).toBe('idle')
-    expect(useReposStore.getState().repos[REPO_ID]?.operations.visibleStatus.phase).toBe('idle')
+    expect(repoOperation(REPO_ID, 'repoReadModel').phase).toBe('idle')
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.repoReadModel.phase).toBe('idle')
   })
 })
 
@@ -416,13 +416,13 @@ describe('runLatestOperation active-task cancellation', () => {
       id: REPO_ID,
       repoRuntimeId: 'repo-runtime-test',
       lane: 'read',
-      operationKey: 'visible-status',
+      operationKey: 'repo-read-model',
       priority: 1,
-      targets: [{ key: 'visibleStatus', reason: 'visible-status' }],
+      targets: [{ key: 'repoReadModel', reason: 'repo-read-model' }],
       task: async () => ({ ok: true }),
     })
     // `read` is still running. The cancelActiveByKey for
-    // `read:visible-status` finds no active match (the active one is
+    // `read:repo-read-model` finds no active match (the active one is
     // keyed `undefined`). So the original read is NOT aborted.
     await new Promise((r) => setTimeout(r, 0))
     expect(reads).toEqual(['started'])
@@ -494,7 +494,7 @@ describe('runLatestOperation active-task cancellation', () => {
       priority: 50,
       targets: [
         { key: 'repoReadModel', reason: 'repo-read-model' },
-        { key: 'visibleStatus', reason: 'visible-status' },
+        { key: 'manualRefresh', reason: 'manual-refresh' },
       ],
       task: () =>
         new Promise<string>((_resolve, reject) => {
@@ -511,10 +511,10 @@ describe('runLatestOperation active-task cancellation', () => {
       id: REPO_ID,
       repoRuntimeId: 'repo-runtime-test',
       lane: 'read',
-      operationKey: 'visible-status',
+      operationKey: 'manual-refresh',
       priority: 40,
-      targets: [{ key: 'visibleStatus', reason: 'visible-status' }],
-      task: async () => 'visible-status',
+      targets: [{ key: 'manualRefresh', reason: 'manual-refresh' }],
+      task: async () => 'manual-refresh',
     })
     rejectReadModel(new CancelledError())
 

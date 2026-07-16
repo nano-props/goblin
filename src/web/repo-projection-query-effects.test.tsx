@@ -28,7 +28,6 @@ function Harness({ queryClient }: { queryClient?: QueryClient }) {
 function projection(loadedAt: number, current = 'main'): RepoRuntimeProjection {
   return {
     snapshot: { branches: [createBranchSnapshot(current)], current },
-    status: [],
     pullRequests: null,
     operations: { operations: [], loadedAt },
     requested: { branch: null, pullRequestMode: 'full' },

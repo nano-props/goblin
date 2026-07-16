@@ -14,12 +14,14 @@ import {
   type WorkspacePanePanelLabel,
 } from '#/web/workspace-pane/tab-providers.ts'
 import { renderRepoWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
+import { RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 
 interface Props {
   repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'branchModel' | 'ui'>
   detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
   workspacePaneTabModel: RepoWorkspaceTabModel
+  onRetryStatus?: () => void
 }
 
 // Pure view: the workspace pane body is derived from the repos store's
@@ -27,7 +29,7 @@ interface Props {
 // never re-projects on snapshot refresh, branch switch, or session restore.
 // The tab model keeps the body render target separate from the active
 // materialized tab.
-export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspacePaneTabModel }: Props) {
+export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspacePaneTabModel, onRetryStatus }: Props) {
   const t = useT()
   const compact = useIsCompactUi()
   const { branch } = detail
@@ -54,6 +56,13 @@ export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspaceP
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {(renderedTab === 'status' || renderedTab === 'changes') && detail.stale.status && detail.errors.status && (
+        <RepoStatusStaleNotice
+          messageKey={detail.errors.status}
+          retrying={detail.loading.status}
+          onRetry={onRetryStatus}
+        />
+      )}
       {renderedTab
         ? renderRepoWorkspacePanePanel({
             type: renderedTab,
