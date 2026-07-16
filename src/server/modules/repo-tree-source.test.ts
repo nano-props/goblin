@@ -172,7 +172,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
 
 function remoteTarget(): RemoteRepoTarget {
   return {
-    id: 'ssh-config://mybox/myrepo',
+    id: 'goblin+ssh://mybox/myrepo',
     alias: 'mybox',
     remotePath: '/srv/repos/myrepo',
     displayName: 'mybox:myrepo',

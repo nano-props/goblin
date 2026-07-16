@@ -27,7 +27,7 @@ vi.mock('sonner', () => ({
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 
 const target = {
-  id: 'ssh-config://prod/srv/repo',
+  id: 'goblin+ssh://prod/srv/repo',
   alias: 'prod',
   host: 'example.com',
   user: 'alice',

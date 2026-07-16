@@ -33,6 +33,7 @@ import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import {
   acquireRepoRuntime,
+  commitWorkspaceProbeState,
   isCurrentRepoRuntime,
   listRepoRuntimes,
   releaseRepoRuntime,
@@ -48,6 +49,13 @@ import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktre
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import { probeLocalWorkspace } from '#/server/modules/workspace-probe.ts'
+import {
+  formatWorkspaceLocator,
+  parseWorkspaceLocator,
+  type WorkspaceLocatorPlatform,
+} from '#/shared/workspace-locator.ts'
+import path from 'node:path'
 
 // Soft-fail envelope returned by `jsonOr` for every repo action that
 // doesn't have a more specific success shape. Keep this in one place
@@ -391,20 +399,30 @@ export function createRepoRoutes(options: {
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
     const input = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeOpen, c)
     if ('repoInput' in input) {
-      const probe = await jsonOr(() => probeRepo(input.repoInput), READ_REPO_ERROR, 'runtime-open')
-      if (!probe.ok || !probe.root) {
+      const platform = serverLocatorPlatform()
+      const workspaceId = workspaceLocatorFromCommandInput(input.repoInput, platform)
+      if (!workspaceId) {
         return c.json({
           ok: false as const,
           input: input.repoInput,
-          reason: probe.message ?? 'error.not-git-repo',
+          reason: 'error.workspace-locator-malformed',
         })
       }
-      const repo = { id: probe.root, name: probe.name ?? probe.root.split('/').filter(Boolean).at(-1) ?? probe.root }
-      const repoRuntimeId = acquireRepoRuntime(userId, repo.id, input.clientId)
+      const probe = await probeLocalWorkspace(workspaceId, platform, { signal: c.req.raw.signal })
+      if (probe.status !== 'ready') {
+        return c.json({ ok: false as const, input: input.repoInput, reason: probe.reason })
+      }
+      const repo = { id: workspaceId, name: probe.name }
+      const repoRuntimeId = acquireRepoRuntime(userId, workspaceId, input.clientId)
+      if (!commitWorkspaceProbeState({ userId, repoRoot: workspaceId, repoRuntimeId, probe })) {
+        return c.json({ ok: false as const, input: input.repoInput, reason: 'error.workspace-transport-unavailable' })
+      }
       return c.json({
         ok: true as const,
         repo,
         repoRuntimeId,
+        capabilities: probe.capabilities,
+        diagnostics: probe.diagnostics,
       })
     }
     const repoRuntimeId = acquireRepoRuntime(userId, input.repoRoot, input.clientId)
@@ -435,4 +453,15 @@ export function createRepoRoutes(options: {
     return c.json(await jsonOr(async () => abortRepoOperation(cwd), false, 'abort'))
   })
   return app
+}
+
+function serverLocatorPlatform(): WorkspaceLocatorPlatform {
+  return process.platform === 'win32' ? 'win32' : 'posix'
+}
+
+function workspaceLocatorFromCommandInput(input: string, platform: WorkspaceLocatorPlatform): string | null {
+  if (parseWorkspaceLocator(input, platform)?.transport === 'file') return input
+  const implementation = platform === 'win32' ? path.win32 : path.posix
+  if (!implementation.isAbsolute(input)) return null
+  return formatWorkspaceLocator({ transport: 'file', platform, path: input }, platform)
 }

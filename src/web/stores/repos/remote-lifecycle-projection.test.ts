@@ -7,10 +7,14 @@ import {
 } from '#/web/stores/repos/remote-lifecycle-projection.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
-const repoRoot = 'ssh-config://example/repo'
+const repoRoot = 'goblin+ssh://example/repo'
 const repoRuntimeId = 'repo-runtime-test-1'
 const target = normalizeRemoteTarget({
-  alias: 'example', host: 'example.test', user: 'developer', port: 22, remotePath: '/repo',
+  alias: 'example',
+  host: 'example.test',
+  user: 'developer',
+  port: 22,
+  remotePath: '/repo',
 })!
 
 describe('remote lifecycle projection acceptance', () => {
@@ -34,7 +38,8 @@ describe('remote lifecycle projection acceptance', () => {
     expect(accept({ kind: 'ready', attemptId: 2, target })).toBe(false)
     expect(accept({ kind: 'connecting', attemptId: 3 })).toBe(false)
     expect(useReposStore.getState().repos[repoRoot]?.remote.lifecycle).toEqual({
-      kind: 'failed', reason: 'timeout',
+      kind: 'failed',
+      reason: 'timeout',
     })
   })
 
@@ -48,21 +53,31 @@ describe('remote lifecycle projection acceptance', () => {
   test('applies only runtime entries represented by this window', () => {
     acceptRemoteLifecycleSnapshot(useReposStore.setState, useReposStore.getState, {
       runtimes: [
-        { repoRoot, repoRuntimeId, remoteLifecycle: { kind: 'ready', attemptId: 1, target } },
         {
-          repoRoot: 'ssh-config://other/repo',
+          repoRoot,
+          repoRuntimeId,
+          workspaceProbe: { status: 'probing' },
+          remoteLifecycle: { kind: 'ready', attemptId: 1, target },
+        },
+        {
+          repoRoot: 'goblin+ssh://other/repo',
           repoRuntimeId: 'repo-runtime-other',
+          workspaceProbe: { status: 'probing' },
           remoteLifecycle: { kind: 'failed', attemptId: 4, reason: 'timeout' },
         },
       ],
     })
     expect(useReposStore.getState().repos[repoRoot]?.remote.lifecycle).toEqual({ kind: 'ready', target })
-    expect(useReposStore.getState().repos['ssh-config://other/repo']).toBeUndefined()
+    expect(useReposStore.getState().repos['goblin+ssh://other/repo']).toBeUndefined()
   })
 })
 
-function accept(remoteLifecycle: NonNullable<Parameters<typeof acceptRemoteLifecycleProjection>[2]['remoteLifecycle']>) {
+function accept(
+  remoteLifecycle: NonNullable<Parameters<typeof acceptRemoteLifecycleProjection>[2]['remoteLifecycle']>,
+) {
   return acceptRemoteLifecycleProjection(useReposStore.setState, useReposStore.getState, {
-    repoRoot, repoRuntimeId, remoteLifecycle,
+    repoRoot,
+    repoRuntimeId,
+    remoteLifecycle,
   })
 }

@@ -7,21 +7,31 @@ describe('repo runtime query cache', () => {
   test('preserves lifecycle projection during a partial membership cache update', async () => {
     const queryClient = new QueryClient()
     queryClient.setQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey(), {
-      runtimes: [{
-        repoRoot: 'ssh-config://example/repo',
-        repoRuntimeId: 'repo-runtime-test-1',
-        remoteLifecycle: { kind: 'connecting', attemptId: 2 },
-      }],
+      runtimes: [
+        {
+          repoRoot: 'goblin+ssh://example/repo',
+          repoRuntimeId: 'repo-runtime-test-1',
+          workspaceProbe: { status: 'probing' },
+          remoteLifecycle: { kind: 'connecting', attemptId: 2 },
+        },
+      ],
     })
 
-    await updateRepoRuntimeCache({
-      repoRoot: 'ssh-config://example/repo', repoRuntimeId: 'repo-runtime-test-1',
-    }, queryClient)
+    await updateRepoRuntimeCache(
+      {
+        repoRoot: 'goblin+ssh://example/repo',
+        repoRuntimeId: 'repo-runtime-test-1',
+      },
+      queryClient,
+    )
 
-    expect(queryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())?.runtimes).toEqual([{
-      repoRoot: 'ssh-config://example/repo',
-      repoRuntimeId: 'repo-runtime-test-1',
-      remoteLifecycle: { kind: 'connecting', attemptId: 2 },
-    }])
+    expect(queryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())?.runtimes).toEqual([
+      {
+        repoRoot: 'goblin+ssh://example/repo',
+        repoRuntimeId: 'repo-runtime-test-1',
+        workspaceProbe: { status: 'probing' },
+        remoteLifecycle: { kind: 'connecting', attemptId: 2 },
+      },
+    ])
   })
 })

@@ -4,6 +4,7 @@ import {
   acquireRepoRuntimeLease,
   captureRepoRuntimeMembershipLease,
   clearRepoRuntimesForUser,
+  commitWorkspaceProbeState,
   expireRepoRuntimeMembershipLease,
   isCurrentRepoRuntime,
   isCurrentRepoRuntimeMembership,
@@ -12,6 +13,7 @@ import {
   releaseRepoRuntime,
   releaseRepoRuntimeMembershipLease,
   replaceRepoRuntimeMembershipsForClient,
+  runSerializedWorkspaceRefresh,
   runRepoRemoteLifecycle,
 } from '#/server/modules/repo-runtimes.ts'
 
@@ -52,6 +54,86 @@ describe('repo runtimes', () => {
       unsubscribeGood()
       clearRepoRuntimesForUser(USER_ID)
     }
+  })
+
+  test('commits probe state only to the current runtime epoch', () => {
+    const runtimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    const probe = {
+      status: 'ready' as const,
+      name: 'repo',
+      capabilities: {
+        files: { read: true as const, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' as const },
+      },
+      diagnostics: [],
+    }
+
+    expect(commitWorkspaceProbeState({ userId: USER_ID, repoRoot: REPO_ROOT, repoRuntimeId: runtimeId, probe })).toBe(
+      true,
+    )
+    expect(listRepoRuntimes(USER_ID)[0]?.workspaceProbe).toEqual(probe)
+    expect(
+      commitWorkspaceProbeState({ userId: USER_ID, repoRoot: REPO_ROOT, repoRuntimeId: 'repo-runtime-stale', probe }),
+    ).toBe(false)
+
+    releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')
+    const reopened = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    expect(reopened).not.toBe(runtimeId)
+    expect(listRepoRuntimes(USER_ID)[0]?.workspaceProbe).toEqual({ status: 'probing' })
+  })
+
+  test('serializes refresh and preserves the committed probe after an inconclusive result', async () => {
+    const runtimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    const initial = {
+      status: 'ready' as const,
+      name: 'repo',
+      capabilities: {
+        files: { read: true as const, write: true },
+        terminal: { available: true },
+        git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+      },
+      diagnostics: [],
+    }
+    commitWorkspaceProbeState({ userId: USER_ID, repoRoot: REPO_ROOT, repoRuntimeId: runtimeId, probe: initial })
+    let finishFirst!: () => void
+    const firstGate = new Promise<void>((resolve) => {
+      finishFirst = resolve
+    })
+    const calls: string[] = []
+    const first = runSerializedWorkspaceRefresh({
+      userId: USER_ID,
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: runtimeId,
+      probe: async () => {
+        calls.push('first')
+        await firstGate
+        return {
+          ...initial,
+          capabilities: { ...initial.capabilities, git: { status: 'unavailable' as const } },
+        }
+      },
+    })
+    const second = runSerializedWorkspaceRefresh({
+      userId: USER_ID,
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: runtimeId,
+      probe: async () => {
+        calls.push('second')
+        return { ...initial, diagnostics: [{ scope: 'git' as const, message: 'git timed out' }] }
+      },
+    })
+    await Promise.resolve()
+    expect(calls).toEqual(['first'])
+    finishFirst()
+    await expect(first).resolves.toMatchObject({ kind: 'committed' })
+    await expect(second).resolves.toMatchObject({ kind: 'failed' })
+    expect(calls).toEqual(['first', 'second'])
+    expect(listRepoRuntimes(USER_ID)[0]?.workspaceProbe).toMatchObject({
+      status: 'ready',
+      capabilities: { git: { status: 'unavailable' } },
+      diagnostics: [],
+    })
   })
 
   test('makes repeated acquire and release idempotent per client', () => {
@@ -122,7 +204,7 @@ describe('repo runtimes', () => {
   })
 
   test('ensure retries a failed remote lifecycle and joins the ready state', async () => {
-    const repoRoot = 'ssh-config://example/repo'
+    const repoRoot = 'goblin+ssh://example/repo'
     const repoRuntimeId = acquireRepoRuntime(USER_ID, repoRoot, 'client-a')
     const failed = vi.fn(async () => ({
       kind: 'failed' as const,

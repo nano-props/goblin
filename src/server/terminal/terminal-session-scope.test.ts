@@ -9,11 +9,11 @@ describe('terminalSessionScope', () => {
   })
 
   test('preserves remote repo roots as opaque session scopes', () => {
-    expect(terminalSessionScope('ssh-config://prod/%2Frepo')).toBe('ssh-config://prod/%2Frepo')
+    expect(terminalSessionScope('goblin+ssh://prod/%252Frepo')).toBe('goblin+ssh://prod/%252Frepo')
   })
 
   test('normalizes local worktrees and preserves remote worktree paths', () => {
     expect(terminalSessionWorktreePath('/repo', './repo-worktree')).toBe(path.resolve('./repo-worktree'))
-    expect(terminalSessionWorktreePath('ssh-config://prod/%2Frepo', '/srv/repo')).toBe('/srv/repo')
+    expect(terminalSessionWorktreePath('goblin+ssh://prod/%252Frepo', '/srv/repo')).toBe('/srv/repo')
   })
 })

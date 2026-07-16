@@ -263,7 +263,7 @@ describe('main repo ipc cancellation', () => {
     resolveRemoteTargetMock.mockImplementation(
       async ({ alias, remotePath }: { alias: string; remotePath: string }) => ({
         target: {
-          id: `ssh-config://${alias}${remotePath}`,
+          id: `goblin+ssh://${alias}${remotePath}`,
           alias,
           host: 'example.com',
           user: 'alice',
@@ -375,7 +375,7 @@ describe('main repo ipc cancellation', () => {
       ok: true,
       json: async () => ({
         target: {
-          id: 'ssh-config://prod/repo',
+          id: 'goblin+ssh://prod/repo',
           alias: 'prod',
           host: 'example.com',
           user: 'tester',
@@ -511,9 +511,9 @@ describe('main repo ipc cancellation', () => {
         recentRepos: [
           {
             kind: 'remote',
-            id: 'ssh-config://prodrepo',
+            id: 'goblin+ssh://prodrepo',
             ref: {
-              id: 'ssh-config://prodrepo',
+              id: 'goblin+ssh://prodrepo',
               alias: 'prod',
               remotePath: 'repo',
               displayName: 'prod:repo',

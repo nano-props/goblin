@@ -114,14 +114,14 @@ describe('ssh config resolution', () => {
 
     await expect(
       mod.resolveTrackedRemoteTarget({
-        id: 'ssh-config://prod/srv/repo',
+        id: 'goblin+ssh://prod/srv/repo',
         alias: 'prod',
         remotePath: '/srv/repo',
         displayName: 'prod:/srv/repo',
       }),
     ).resolves.toMatchObject({
       target: {
-        id: 'ssh-config://prod/srv/repo',
+        id: 'goblin+ssh://prod/srv/repo',
         alias: 'prod',
         host: 'changed.example.com',
         user: 'ubuntu',
@@ -137,7 +137,7 @@ describe('ssh config resolution', () => {
 
     await expect(
       mod.resolveTrackedRemoteTarget({
-        id: 'ssh-config://prod/srv/repo',
+        id: 'goblin+ssh://prod/srv/repo',
         alias: 'prod',
         remotePath: '/srv/repo',
         displayName: 'prod:/srv/repo',

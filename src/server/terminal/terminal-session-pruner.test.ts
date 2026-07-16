@@ -16,7 +16,7 @@ const SCOPE = 'repo-runtime-terminal-pruner'
 const REPO_ROOT = '/repo'
 const LIVE_WORKTREE_PATH = '/repo/live-worktree'
 const STALE_WORKTREE_PATH = '/repo/stale-worktree'
-const REMOTE_REPO_ROOT = 'ssh-config://prod/srv/repo'
+const REMOTE_REPO_ROOT = 'goblin+ssh://prod/srv/repo'
 
 describe('terminal session pruner', () => {
   beforeEach(() => {
@@ -117,7 +117,7 @@ function terminalSession(
 ): TerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
-        terminalRuntimeGeneration: 1,
+    terminalRuntimeGeneration: 1,
     terminalSessionId,
     repoRuntimeId: 'repo-runtime-test',
     repoRoot: overrides.repoRoot ?? REPO_ROOT,

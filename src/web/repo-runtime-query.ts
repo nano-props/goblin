@@ -3,6 +3,8 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import type { RepoRuntimeEntry, RepoRuntimesSnapshot } from '#/shared/api-types.ts'
 import { listRepoRuntimes } from '#/web/repo-client.ts'
 
+type RepoRuntimeCachePatch = Pick<RepoRuntimeEntry, 'repoRoot' | 'repoRuntimeId'> & Partial<RepoRuntimeEntry>
+
 export function repoRuntimesQueryKey() {
   return ['repo-runtime', 'runtimes'] as const
 }
@@ -25,7 +27,7 @@ export async function refreshRepoRuntimes(
 }
 
 export async function updateRepoRuntimeCache(
-  entry: RepoRuntimeEntry,
+  entry: RepoRuntimeCachePatch,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): Promise<void> {
   await queryClient.cancelQueries({ queryKey: repoRuntimesQueryKey(), exact: true })
@@ -33,7 +35,7 @@ export async function updateRepoRuntimeCache(
     const existing = current?.runtimes ?? []
     const previous = existing.find((item) => item.repoRoot === entry.repoRoot)
     const runtimes = existing.filter((item) => item.repoRoot !== entry.repoRoot)
-    runtimes.push({ ...previous, ...entry })
+    runtimes.push({ workspaceProbe: { status: 'probing' }, ...previous, ...entry })
     return { runtimes }
   })
 }
@@ -47,7 +49,7 @@ export async function replaceRepoRuntimeCache(
 }
 
 export async function removeRepoRuntimeFromCache(
-  entry: RepoRuntimeEntry,
+  entry: Pick<RepoRuntimeEntry, 'repoRoot' | 'repoRuntimeId'>,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): Promise<void> {
   await queryClient.cancelQueries({ queryKey: repoRuntimesQueryKey(), exact: true })

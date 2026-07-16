@@ -87,7 +87,9 @@ describe('repo session hydration', () => {
       projection: () => new Promise(() => {}),
     })
     primaryWindowQueryClient.setQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey(), {
-      runtimes: [{ repoRoot: REPO_B, repoRuntimeId: 'repo-runtime-other-window' }],
+      runtimes: [
+        { repoRoot: REPO_B, repoRuntimeId: 'repo-runtime-other-window', workspaceProbe: { status: 'probing' } },
+      ],
     })
     const runtime: WorkspaceRuntimeRestoreSnapshot = {
       repos: [
@@ -125,8 +127,8 @@ describe('repo session hydration', () => {
     expect(readRepoBranchSnapshotQueryProjection(repo!)?.currentBranch).toBe('server-main')
     expect(primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())).toEqual({
       runtimes: [
-        { repoRoot: REPO_B, repoRuntimeId: 'repo-runtime-other-window' },
-        { repoRoot: REPO_A, repoRuntimeId: 'repo-runtime-server-a' },
+        { repoRoot: REPO_B, repoRuntimeId: 'repo-runtime-other-window', workspaceProbe: { status: 'probing' } },
+        { repoRoot: REPO_A, repoRuntimeId: 'repo-runtime-server-a', workspaceProbe: { status: 'probing' } },
       ],
     })
     expect(

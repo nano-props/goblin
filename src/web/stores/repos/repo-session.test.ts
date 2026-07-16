@@ -6,7 +6,7 @@ import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { createRepoBranch, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { removeRepoRuntimeFromCache,  repoRuntimesQueryKey } from '#/web/repo-runtime-query.ts'
+import { removeRepoRuntimeFromCache, repoRuntimesQueryKey } from '#/web/repo-runtime-query.ts'
 import type { RepoRuntimesSnapshot } from '#/shared/api-types.ts'
 import {
   branchSnapshot,
@@ -42,9 +42,13 @@ describe('repo lifecycle', () => {
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
 
     expect(result).toMatchObject({ ok: true, id: REPO_A })
-    const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>( repoRuntimesQueryKey())
+    const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())
     expect(cached?.runtimes).toEqual([
-      { repoRoot: REPO_A, repoRuntimeId: useReposStore.getState().repos[REPO_A]!.repoRuntimeId },
+      {
+        repoRoot: REPO_A,
+        repoRuntimeId: useReposStore.getState().repos[REPO_A]!.repoRuntimeId,
+        workspaceProbe: { status: 'probing' },
+      },
     ])
   })
 
@@ -153,9 +157,13 @@ describe('repo lifecycle', () => {
       { kind: 'recent-repo', message: 'recent write failed' },
     ])
     expect(useReposStore.getState().repos[REPO_A]).toBeDefined()
-    const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>( repoRuntimesQueryKey())
+    const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())
     expect(cached?.runtimes).toEqual([
-      { repoRoot: REPO_A, repoRuntimeId: useReposStore.getState().repos[REPO_A]!.repoRuntimeId },
+      {
+        repoRoot: REPO_A,
+        repoRuntimeId: useReposStore.getState().repos[REPO_A]!.repoRuntimeId,
+        workspaceProbe: { status: 'probing' },
+      },
     ])
   })
 
@@ -272,7 +280,7 @@ describe('repo lifecycle', () => {
 
     await useReposStore.getState().closeRepo(REPO_A)
     await vi.waitFor(() => {
-      const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>( repoRuntimesQueryKey())
+      const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())
       expect(cached?.runtimes).not.toContainEqual({ repoRoot: REPO_A, repoRuntimeId })
     })
   })
@@ -283,8 +291,10 @@ describe('repo lifecycle', () => {
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     expect(result).toMatchObject({ ok: true, id: REPO_A })
     const repoRuntimeId = useReposStore.getState().repos[REPO_A]!.repoRuntimeId
-    primaryWindowQueryClient.setQueryData<RepoRuntimesSnapshot>( repoRuntimesQueryKey(), {
-      runtimes: [{ repoRoot: REPO_B, repoRuntimeId: 'repo-runtime-stale-cache' }],
+    primaryWindowQueryClient.setQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey(), {
+      runtimes: [
+        { repoRoot: REPO_B, repoRuntimeId: 'repo-runtime-stale-cache', workspaceProbe: { status: 'probing' } },
+      ],
     })
 
     await removeRepoRuntimeFromCache({
@@ -292,7 +302,7 @@ describe('repo lifecycle', () => {
       repoRuntimeId: 'repo-runtime-not-in-cache',
     })
 
-    const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>( repoRuntimesQueryKey())
+    const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())
     expect(cached?.runtimes).toEqual([{ repoRoot: REPO_A, repoRuntimeId }])
   })
 
@@ -319,7 +329,11 @@ describe('repo lifecycle', () => {
 
   test('keeps a remote workspace open when lifecycle transport is temporarily unavailable', async () => {
     const target = normalizeRemoteTarget({
-      alias: 'example', host: 'example.com', user: 'developer', port: 22, remotePath: '/srv/repo',
+      alias: 'example',
+      host: 'example.com',
+      user: 'developer',
+      port: 22,
+      remotePath: '/srv/repo',
     })
     expect(target).not.toBeNull()
     const calls = installGoblin({
@@ -328,16 +342,21 @@ describe('repo lifecycle', () => {
       },
     })
 
-    await expect(
-      useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!)),
-    ).resolves.toMatchObject({ ok: true, id: target!.id })
+    await expect(useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!))).resolves.toMatchObject({
+      ok: true,
+      id: target!.id,
+    })
     expect(calls.workspaceRepos).toEqual([remoteRepoSessionEntry(target!)])
     expect(useReposStore.getState().repos[target!.id]).toBeDefined()
   })
 
   test('does not resurrect a remote repo closed during lifecycle probing', async () => {
     const target = normalizeRemoteTarget({
-      alias: 'example', host: 'example.com', user: 'developer', port: 22, remotePath: '/srv/repo',
+      alias: 'example',
+      host: 'example.com',
+      user: 'developer',
+      port: 22,
+      remotePath: '/srv/repo',
     })
     expect(target).not.toBeNull()
     const lifecycle = Promise.withResolvers<{
@@ -365,7 +384,11 @@ describe('repo lifecycle', () => {
 
   test('retryRemoteRepoConnection returns a failure when the command transport fails', async () => {
     const target = normalizeRemoteTarget({
-      alias: 'example', host: 'example.com', user: 'developer', port: 22, remotePath: '/srv/repo',
+      alias: 'example',
+      host: 'example.com',
+      user: 'developer',
+      port: 22,
+      remotePath: '/srv/repo',
     })
     expect(target).not.toBeNull()
     installGoblin({
@@ -376,7 +399,8 @@ describe('repo lifecycle', () => {
     await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!))
 
     await expect(useReposStore.getState().retryRemoteRepoConnection(target!.id)).resolves.toEqual({
-      ok: false, reason: 'unknown',
+      ok: false,
+      reason: 'unknown',
     })
   })
 
@@ -413,9 +437,7 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().repos[target!.id]?.name).toBe('example:repo')
     await vi.waitFor(() => {
       const repo = useReposStore.getState().repos[target!.id]
-      expect(
-        repo ? readRepoBranchQueryProjection(repo)?.branches.map((branch) => branch.name) : null,
-      ).toEqual([])
+      expect(repo ? readRepoBranchQueryProjection(repo)?.branches.map((branch) => branch.name) : null).toEqual([])
     })
   })
 
@@ -510,7 +532,9 @@ describe('repo lifecycle', () => {
     await useReposStore.getState().closeRepo(REPO_A)
 
     const openers = useReposStore.getState().tabOpenerIdentityByScope
-    expect(openers[tabOpenerScopeKey({ repoRoot: REPO_A, branchName: 'feature/a', worktreePath: null })]).toBeUndefined()
+    expect(
+      openers[tabOpenerScopeKey({ repoRoot: REPO_A, branchName: 'feature/a', worktreePath: null })],
+    ).toBeUndefined()
     expect(
       openers[tabOpenerScopeKey({ repoRoot: REPO_B, branchName: 'feature/b', worktreePath: null })]?.[
         'workspace-pane:changes'

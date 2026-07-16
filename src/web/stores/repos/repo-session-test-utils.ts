@@ -36,7 +36,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       calls.resolveTarget.push({ alias, remotePath })
       return {
         target: {
-          id: `ssh-config://${encodeURIComponent(alias)}${remotePath}`,
+          id: `goblin+ssh://${encodeURIComponent(alias)}${remotePath}`,
           alias,
           host: alias === 'example' ? 'example.com' : `${alias}.example.com`,
           user: 'alice',
@@ -91,8 +91,18 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
     handlers['remote.lifecycle'] = async ({ repoId }: { repoId: string; repoRuntimeId: string }) => {
       const result = await resolveServerRemoteRepoConnection({ repoId }, undefined, deps)
       return result.kind === 'ready'
-        ? { kind: 'settled', repoId: result.repoId, name: result.name, lifecycle: { ...result.lifecycle, attemptId: 1 } }
-        : { kind: 'settled', repoId: result.repoId, name: result.name, lifecycle: { ...result.lifecycle, attemptId: 1 } }
+        ? {
+            kind: 'settled',
+            repoId: result.repoId,
+            name: result.name,
+            lifecycle: { ...result.lifecycle, attemptId: 1 },
+          }
+        : {
+            kind: 'settled',
+            repoId: result.repoId,
+            name: result.name,
+            lifecycle: { ...result.lifecycle, attemptId: 1 },
+          }
     }
   }
   installGoblinTestBridge(handlers)

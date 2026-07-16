@@ -10,7 +10,7 @@ import {
 } from '#/shared/repo-locator.ts'
 
 describe('toSafeCanonicalRepoLocator', () => {
-  test.each(['/repo', 'C:\\repo', 'C:/repo', '\\\\server\\repo', 'ssh-config://host/repo'])(
+  test.each(['/repo', 'C:\\repo', 'C:/repo', '\\\\server\\repo', 'goblin+ssh://host/repo'])(
     'preserves canonical locator %s',
     (locator) => expect(toSafeCanonicalRepoLocator(locator)).toBe(locator),
   )
@@ -52,9 +52,9 @@ describe('repo locators', () => {
       formatRepoSessionEntryLocator(
         {
           kind: 'remote',
-          id: 'ssh-config://prod/srv/repo',
+          id: 'goblin+ssh://prod/srv/repo',
           ref: {
-            id: 'ssh-config://prod/srv/repo',
+            id: 'goblin+ssh://prod/srv/repo',
             alias: 'prod',
             remotePath: '/srv/repo',
             displayName: 'prod:repo',

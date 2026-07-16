@@ -15,7 +15,7 @@ describe('remote lifecycle route', () => {
   test('passes authenticated and validated input to the write path', async () => {
     mocks.runLifecycleWrite.mockResolvedValue({
       kind: 'settled',
-      repoId: 'ssh-config://example/repo',
+      repoId: 'goblin+ssh://example/repo',
       name: 'repo',
       lifecycle: { kind: 'failed', attemptId: 1, reason: 'unreachable' },
     })
@@ -25,7 +25,7 @@ describe('remote lifecycle route', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          repoId: 'ssh-config://example/repo',
+          repoId: 'goblin+ssh://example/repo',
           repoRuntimeId: 'repo-runtime-test',
         }),
       }),
@@ -34,7 +34,7 @@ describe('remote lifecycle route', () => {
     expect(response.status).toBe(200)
     expect(mocks.runLifecycleWrite).toHaveBeenCalledWith({
       userId: 'user-test',
-      repoId: 'ssh-config://example/repo',
+      repoId: 'goblin+ssh://example/repo',
       repoRuntimeId: 'repo-runtime-test',
       mode: 'restart',
     })
@@ -46,7 +46,7 @@ describe('remote lifecycle route', () => {
       new Request('http://localhost/lifecycle', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoId: 'ssh-config://example/repo', repoRuntimeId: '' }),
+        body: JSON.stringify({ repoId: 'goblin+ssh://example/repo', repoRuntimeId: '' }),
       }),
     )
 

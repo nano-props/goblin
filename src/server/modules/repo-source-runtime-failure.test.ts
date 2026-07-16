@@ -3,7 +3,7 @@ import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-f
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 
 const target: RemoteRepoTarget = {
-  id: 'ssh-config://prod/home/alice/service',
+  id: 'goblin+ssh://prod/home/alice/service',
   alias: 'prod',
   remotePath: '/home/alice/service',
   displayName: 'prod:service',
@@ -45,9 +45,7 @@ describe('repo source runtime failure classification', () => {
     })
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
 
-    await expect(
-      getRepoLog(target.id, 'main', { repoRuntimeId: 'repo-runtime-test' }),
-    ).rejects.toMatchObject({
+    await expect(getRepoLog(target.id, 'main', { repoRuntimeId: 'repo-runtime-test' })).rejects.toMatchObject({
       name: 'RemoteRepoRuntimeFailureError',
       repoRoot: target.id,
       repoRuntimeId: 'repo-runtime-test',
@@ -88,9 +86,7 @@ describe('repo source runtime failure classification', () => {
     mocks.resolveRemoteTarget.mockRejectedValueOnce(new Error('error.ssh-config-changed'))
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
 
-    await expect(
-      getRepoLog(target.id, 'main', { repoRuntimeId: 'repo-runtime-test' }),
-    ).rejects.toMatchObject({
+    await expect(getRepoLog(target.id, 'main', { repoRuntimeId: 'repo-runtime-test' })).rejects.toMatchObject({
       name: 'RemoteRepoRuntimeFailureError',
       repoRoot: target.id,
       repoRuntimeId: 'repo-runtime-test',

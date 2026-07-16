@@ -13,7 +13,7 @@ const LIFECYCLE_PHASE_ORDER = { idle: 0, connecting: 1, ready: 2, failed: 2 } as
 export function acceptRemoteLifecycleProjection(
   set: ReposSet,
   get: ReposGet,
-  entry: RepoRuntimeEntry,
+  entry: Pick<RepoRuntimeEntry, 'repoRoot' | 'repoRuntimeId' | 'remoteLifecycle'>,
   options: { name?: string } = {},
 ): boolean {
   const lifecycle = entry.remoteLifecycle
@@ -26,7 +26,8 @@ export function acceptRemoteLifecycleProjection(
 
   let accepted = false
   updateIfFresh(set, entry.repoRoot, entry.repoRuntimeId, (repo) => {
-    if (!remoteLifecycleProjectionIsFresh(repo.remote.lifecycleAttemptId, repo.remote.lifecycle?.kind, lifecycle)) return
+    if (!remoteLifecycleProjectionIsFresh(repo.remote.lifecycleAttemptId, repo.remote.lifecycle?.kind, lifecycle))
+      return
     repo.remote.lifecycleAttemptId = lifecycle.attemptId
     if (lifecycle.kind === 'idle') repo.remote.lifecycle = null
     else if (lifecycle.kind === 'connecting') markRemoteLifecycleConnecting(repo)

@@ -34,7 +34,7 @@ describe('classifySshFailure', () => {
 
 describe('testRemoteRepo parallel stages', () => {
   const target: RemoteRepoTarget = {
-    id: 'ssh-config://example/srv%2Frepo',
+    id: 'goblin+ssh://example/srv%2Frepo',
     alias: 'example',
     host: 'example.local',
     user: 'me',

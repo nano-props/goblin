@@ -46,7 +46,7 @@ describe('remote client web helpers', () => {
       json: async () => ({
         ok: true,
         target: {
-          id: 'ssh-config://prod/srv/repo',
+          id: 'goblin+ssh://prod/srv/repo',
           alias: 'prod',
           host: 'example.com',
           user: 'alice',
@@ -61,7 +61,7 @@ describe('remote client web helpers', () => {
 
     await expect(
       testRemoteRepoConnection({
-        id: 'ssh-config://prod/srv/repo',
+        id: 'goblin+ssh://prod/srv/repo',
         alias: 'prod',
         host: 'example.com',
         user: 'alice',

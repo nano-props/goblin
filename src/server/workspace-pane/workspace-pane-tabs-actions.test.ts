@@ -7,7 +7,7 @@ import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 const CLIENT_ID = 'client_workspace_pane_tabs_actions'
 const USER_ID = 'user_workspace_pane_tabs_actions'
-const REPO_ROOT = '/repo'
+const REPO_ROOT = 'goblin+file:///repo'
 let REPO_RUNTIME_ID = ''
 
 function syncCurrentRepoRuntime(): void {

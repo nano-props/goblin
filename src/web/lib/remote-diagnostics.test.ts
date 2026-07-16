@@ -41,7 +41,7 @@ describe('remote diagnostics helpers', () => {
         message: 'auth-failed',
         details: 'Permission denied',
         target: {
-          id: 'ssh-config://prod/srv/repo',
+          id: 'goblin+ssh://prod/srv/repo',
           alias: 'prod',
           host: 'example.com',
           user: 'alice',

@@ -1,5 +1,9 @@
 import { afterEach, expect, test, vi } from 'vitest'
 
+const REPO_A = 'goblin+file:///repo-a'
+const REPO_B = 'goblin+file:///repo-b'
+const REPO_C = 'goblin+file:///repo-c'
+
 const persistence = vi.hoisted(() => ({
   stored: null as unknown,
   failNextWrite: false,
@@ -28,15 +32,15 @@ afterEach(async () => {
 test('does not expose failed settings writes through the in-memory cache', async () => {
   const mod = await import('#/server/modules/settings-source.ts')
 
-  await mod.addServerRecentRepo({ kind: 'local', id: '/repo-a' })
+  await mod.addServerRecentRepo({ kind: 'local', id: REPO_A })
   persistence.failNextWrite = true
 
-  await expect(mod.addServerRecentRepo({ kind: 'local', id: '/repo-b' })).rejects.toThrow('disk full')
+  await expect(mod.addServerRecentRepo({ kind: 'local', id: REPO_B })).rejects.toThrow('disk full')
 
-  expect(await mod.getServerRecentRepos()).toEqual([{ kind: 'local', id: '/repo-a' }])
-  await expect(mod.addServerRecentRepo({ kind: 'local', id: '/repo-c' })).resolves.toEqual([
-    { kind: 'local', id: '/repo-c' },
-    { kind: 'local', id: '/repo-a' },
+  expect(await mod.getServerRecentRepos()).toEqual([{ kind: 'local', id: REPO_A }])
+  await expect(mod.addServerRecentRepo({ kind: 'local', id: REPO_C })).resolves.toEqual([
+    { kind: 'local', id: REPO_C },
+    { kind: 'local', id: REPO_A },
   ])
 })
 

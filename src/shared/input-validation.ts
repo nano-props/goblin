@@ -8,6 +8,7 @@ import {
   parseRemoteRepoId,
   type RepoSessionEntry,
 } from '#/shared/remote-repo.ts'
+import { parseWorkspaceLocator, type WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
 
 export const MAX_IPC_PATH_LENGTH = MAX_REPO_LOCATOR_LENGTH
 export const MAX_IPC_BRANCH_LENGTH = 1024
@@ -46,19 +47,21 @@ export function toSafeRepoLocator(value: unknown): string | null {
   if (typeof value !== 'string' || value.length === 0 || value.length > MAX_IPC_PATH_LENGTH || value.includes('\0')) {
     return null
   }
-  if (path.isAbsolute(value)) return path.normalize(value)
-  return isRemoteRepoId(value) ? value : null
+  return parseWorkspaceLocator(value, currentPlatform()) ? value : null
 }
 
 export function toSafeSessionRepoEntry(value: unknown): RepoSessionEntry | null {
   const entry = normalizeRepoSessionEntry(value)
-  if (entry) return entry
-  const id = toSafeRepoLocator(value)
+  const id = toSafeRepoLocator(entry?.id ?? value)
   if (!id) return null
-  if (!isRemoteRepoId(id)) return { kind: 'local', id }
+  if (!isRemoteRepoId(id)) return entry?.kind === 'local' ? { kind: 'local', id } : null
   const parsed = parseRemoteRepoId(id)
   const ref = parsed ? normalizeRemoteRepoRef(parsed) : null
-  return ref ? { kind: 'remote', id: ref.id, ref } : null
+  return ref && entry?.kind === 'remote' && entry.ref.id === id ? { kind: 'remote', id: ref.id, ref } : null
+}
+
+function currentPlatform(): WorkspaceLocatorPlatform {
+  return process.platform === 'win32' ? 'win32' : 'posix'
 }
 
 export function isValidBranch(value: unknown): value is string {

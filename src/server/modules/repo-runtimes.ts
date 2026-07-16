@@ -7,6 +7,7 @@ import type {
   RemoteRepoTarget,
 } from '#/shared/remote-repo.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 
 interface RepoRuntimeState {
   currentRepoRuntimeId: string | null
@@ -16,6 +17,8 @@ interface RepoRuntimeState {
   remoteName: string | null
   remoteAttemptController: AbortController | null
   remoteAttemptPromise: Promise<RepoRemoteLifecycleRunResult> | null
+  workspaceProbe: WorkspaceProbeState
+  workspaceLifecycleTail: Promise<void>
 }
 
 export interface RepoRuntimeClosedEvent {
@@ -33,6 +36,7 @@ export interface RepoRuntimeEntry {
   repoRoot: string
   repoRuntimeId: string
   remoteLifecycle: RemoteRepoRuntimeLifecycle | null
+  workspaceProbe: WorkspaceProbeState
 }
 
 export interface RepoRuntimeMembershipLeaseEntry {
@@ -84,6 +88,8 @@ function repoRuntimeState(userId: string, repoRoot: string): RepoRuntimeState {
     remoteName: null,
     remoteAttemptController: null,
     remoteAttemptPromise: null,
+    workspaceProbe: { status: 'probing' },
+    workspaceLifecycleTail: Promise.resolve(),
   }
   byRepo.set(repoRoot, created)
   return created
@@ -219,6 +225,7 @@ export function listRepoRuntimes(userId: string): RepoRuntimeEntry[] {
         repoRoot,
         repoRuntimeId: state.currentRepoRuntimeId,
         remoteLifecycle: isRemoteRepoId(repoRoot) ? state.remoteLifecycle : null,
+        workspaceProbe: state.workspaceProbe,
       })
     }
   }
@@ -265,6 +272,57 @@ function assertValidRepoRuntimeMembershipDeclaration(clientId: string, repoRoots
 
 export function isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean {
   return repoRuntimesByUser.get(userId)?.get(repoRoot)?.currentRepoRuntimeId === repoRuntimeId
+}
+
+export function commitWorkspaceProbeState(input: {
+  userId: string
+  repoRoot: string
+  repoRuntimeId: string
+  probe: WorkspaceSettledProbeState
+}): boolean {
+  const state = repoRuntimesByUser.get(input.userId)?.get(input.repoRoot)
+  if (!state || state.currentRepoRuntimeId !== input.repoRuntimeId) return false
+  state.workspaceProbe = input.probe
+  return true
+}
+
+export type WorkspaceRefreshRunResult =
+  | { kind: 'committed'; probe: WorkspaceSettledProbeState }
+  | { kind: 'failed'; probe: WorkspaceSettledProbeState }
+  | { kind: 'stale-runtime' }
+
+export async function runSerializedWorkspaceRefresh(input: {
+  userId: string
+  repoRoot: string
+  repoRuntimeId: string
+  probe: () => Promise<WorkspaceSettledProbeState>
+}): Promise<WorkspaceRefreshRunResult> {
+  const state = repoRuntimesByUser.get(input.userId)?.get(input.repoRoot)
+  if (!state || state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
+
+  const predecessor = state.workspaceLifecycleTail
+  let releaseTurn!: () => void
+  const turn = new Promise<void>((resolve) => {
+    releaseTurn = resolve
+  })
+  state.workspaceLifecycleTail = predecessor.then(async () => await turn)
+  await predecessor
+  try {
+    if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
+    const probe = await input.probe()
+    if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
+    if (workspaceRefreshMayCommit(probe)) {
+      state.workspaceProbe = probe
+      return { kind: 'committed', probe }
+    }
+    return { kind: 'failed', probe }
+  } finally {
+    releaseTurn()
+  }
+}
+
+function workspaceRefreshMayCommit(probe: WorkspaceSettledProbeState): boolean {
+  return probe.status === 'ready' && probe.diagnostics.length === 0
 }
 
 export function isCurrentRepoRuntimeMembership(
@@ -477,6 +535,8 @@ function stopRepoRuntimeEpoch(state: RepoRuntimeState): string | null {
   state.remoteAttemptController?.abort()
   state.remoteAttemptController = null
   state.remoteAttemptPromise = null
+  state.workspaceProbe = { status: 'probing' }
+  state.workspaceLifecycleTail = Promise.resolve()
   state.currentRepoRuntimeId = null
   state.members.clear()
   return repoRuntimeId

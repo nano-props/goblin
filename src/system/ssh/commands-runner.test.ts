@@ -150,7 +150,7 @@ describe('runRemoteCommand', () => {
 
 function target(): RemoteRepoTarget {
   return {
-    id: 'ssh-config://prod/srv/repo',
+    id: 'goblin+ssh://prod/srv/repo',
     alias: 'prod',
     host: 'example.test',
     user: 'deploy',

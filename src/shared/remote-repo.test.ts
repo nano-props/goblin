@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   isRemoteRepoTarget,
   normalizeRemoteRepoRef,
+  normalizeRepoSessionEntry,
   normalizeRemoteTarget,
   remoteRepoRefFromTarget,
   remoteRepoSessionEntry,
@@ -11,7 +12,7 @@ import {
 describe('remote repository normalization', () => {
   test('compares complete persisted repo entry identity', () => {
     const entry = remoteRepoSessionEntry({
-      id: 'ssh-config://host/repo',
+      id: 'goblin+ssh://host/repo',
       alias: 'host',
       remotePath: '/repo',
       displayName: 'host:repo',
@@ -22,6 +23,24 @@ describe('remote repository normalization', () => {
     expect(sameRepoSessionEntry(null, entry)).toBe(false)
   })
 
+  test('rejects legacy, raw-path, and mismatched persisted identities without repairing them', () => {
+    expect(normalizeRepoSessionEntry({ kind: 'local', id: '/repo' })).toBeNull()
+    expect(
+      normalizeRepoSessionEntry({
+        kind: 'remote',
+        id: 'goblin+ssh://other/srv/repo',
+        ref: { alias: 'prod', remotePath: '/srv/repo', displayName: 'prod:repo' },
+      }),
+    ).toBeNull()
+    expect(
+      normalizeRepoSessionEntry({
+        kind: 'remote',
+        id: 'goblin+ssh://prod/srv/repo',
+        target: { alias: 'prod', remotePath: '/srv/repo' },
+      }),
+    ).toBeNull()
+  })
+
   test('derives ref display names from the normalized remote path', () => {
     expect(
       normalizeRemoteRepoRef({
@@ -30,7 +49,7 @@ describe('remote repository normalization', () => {
         displayName: 'prod:/',
       }),
     ).toEqual({
-      id: 'ssh-config://prod/home/alice/service',
+      id: 'goblin+ssh://prod/home/alice/service',
       alias: 'prod',
       remotePath: '/home/alice/service',
       displayName: 'prod:service',
@@ -48,7 +67,7 @@ describe('remote repository normalization', () => {
         displayName: 'prod:/',
       }),
     ).toMatchObject({
-      id: 'ssh-config://prod/home/alice/service',
+      id: 'goblin+ssh://prod/home/alice/service',
       remotePath: '/home/alice/service',
       displayName: 'prod:service',
     })
@@ -57,16 +76,16 @@ describe('remote repository normalization', () => {
   test('normalizes persisted remote session entries before reuse', () => {
     expect(
       remoteRepoSessionEntry({
-        id: 'ssh-config://prod/',
+        id: 'goblin+ssh://prod/',
         alias: 'prod',
         remotePath: '/srv/repo',
         displayName: 'prod:/',
       }),
     ).toEqual({
       kind: 'remote',
-      id: 'ssh-config://prod/srv/repo',
+      id: 'goblin+ssh://prod/srv/repo',
       ref: {
-        id: 'ssh-config://prod/srv/repo',
+        id: 'goblin+ssh://prod/srv/repo',
         alias: 'prod',
         remotePath: '/srv/repo',
         displayName: 'prod:repo',
@@ -76,7 +95,7 @@ describe('remote repository normalization', () => {
 
   test('treats display names as canonical target data', () => {
     const target = {
-      id: 'ssh-config://prod/srv/repo',
+      id: 'goblin+ssh://prod/srv/repo',
       alias: 'prod',
       host: 'example.test',
       user: 'alice',
@@ -87,7 +106,7 @@ describe('remote repository normalization', () => {
 
     expect(isRemoteRepoTarget(target)).toBe(false)
     expect(remoteRepoRefFromTarget({ ...target, displayName: 'prod:repo' })).toEqual({
-      id: 'ssh-config://prod/srv/repo',
+      id: 'goblin+ssh://prod/srv/repo',
       alias: 'prod',
       remotePath: '/srv/repo',
       displayName: 'prod:repo',

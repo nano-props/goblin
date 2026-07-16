@@ -104,7 +104,9 @@ describe('remote ssh command builders', () => {
     const terminal = buildRemoteTerminalInvocation(captured, '/srv/repo', { cols: 80, rows: 24 })
 
     for (const invocation of [command, terminal]) {
-      expect(invocation.args).toEqual(expect.arrayContaining(['-F', expect.any(String), '-o', 'hostname=edge.example.test']))
+      expect(invocation.args).toEqual(
+        expect.arrayContaining(['-F', expect.any(String), '-o', 'hostname=edge.example.test']),
+      )
       expect(invocation.args).toContain('proxycommand=route --alias %n --host %h')
       expect(invocation.args.at(-2)).toBe('prod')
     }
@@ -446,9 +448,8 @@ describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
     })
 
     const result = await execa('sh', ['-lc', invocation.script])
-    const { parseWorktreeStatusBatch, parseWorktrees, splitWorktreeStatusBatch } = await import(
-      '#/system/git/parsers.ts'
-    )
+    const { parseWorktreeStatusBatch, parseWorktrees, splitWorktreeStatusBatch } =
+      await import('#/system/git/parsers.ts')
     const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(result.stdout)
 
     expect(parseWorktrees(worktreeListOutput)).toEqual([
@@ -612,7 +613,7 @@ async function initRepoWithWorktrees(
 
 function targetWithPath(repoPath: string): RemoteRepoTarget {
   return {
-    id: `ssh-config://prod${repoPath}`,
+    id: `goblin+ssh://prod${repoPath}`,
     alias: 'prod',
     host: 'example.test',
     user: 'deploy',
@@ -624,7 +625,7 @@ function targetWithPath(repoPath: string): RemoteRepoTarget {
 
 function target(): RemoteRepoTarget {
   return {
-    id: 'ssh-config://prod/srv/repo',
+    id: 'goblin+ssh://prod/srv/repo',
     alias: 'prod',
     host: 'example.test',
     user: 'deploy',

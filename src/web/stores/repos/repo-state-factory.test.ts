@@ -3,7 +3,7 @@ import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { deriveConnectivity } from '#/web/stores/repos/repo-guards.ts'
 
-const REMOTE_ID = 'ssh-config://example/srv/repo'
+const REMOTE_ID = 'goblin+ssh://example/srv/repo'
 
 function remoteTargetFixture() {
   const target = normalizeRemoteTarget({

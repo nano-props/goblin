@@ -130,7 +130,7 @@ describe('getRepoWorktreeBootstrapPreview', () => {
     const { getRepoWorktreeBootstrapPreview } = await import('#/server/modules/repo-read-paths.ts')
     const signal = new AbortController().signal
 
-    await expect(getRepoWorktreeBootstrapPreview('/tmp/repo', { signal })).resolves.toMatchObject({
+    await expect(getRepoWorktreeBootstrapPreview('goblin+file:///tmp/repo', { signal })).resolves.toMatchObject({
       ok: true,
       preview: { hasOperations: true },
     })

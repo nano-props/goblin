@@ -13,7 +13,7 @@ const CLIENT_ID = 'client_terminal_actions'
 // manager. The test stub uses a fixed value so the assertions
 // don't have to mock the derivation helper.
 const USER_ID = 'user_terminal_actions'
-const REPO_ROOT = '/repo'
+const REPO_ROOT = 'goblin+file:///repo'
 let REPO_RUNTIME_ID = ''
 // 16+ alphanumerics, matches TERMINAL_RUNTIME_SESSION_ID_RE in
 // shared/terminal-validators.ts.
@@ -125,7 +125,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const provider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: USER_ID,
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
     })
     await expect(
@@ -136,7 +136,7 @@ describe('terminal-runtime-actions close broadcast', () => {
             CLIENT_ID,
             USER_ID,
             {
-              repoRoot: '/repo',
+              repoRoot: REPO_ROOT,
               repoRuntimeId: REPO_RUNTIME_ID,
               branch: 'feature/worktree',
               worktreePath: '/repo',
@@ -160,7 +160,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const provider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: USER_ID,
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
     })
     await expect(
@@ -171,7 +171,7 @@ describe('terminal-runtime-actions close broadcast', () => {
             CLIENT_ID,
             USER_ID,
             {
-              repoRoot: '/repo',
+              repoRoot: REPO_ROOT,
               repoRuntimeId: REPO_RUNTIME_ID,
               branch: 'feature/worktree',
               worktreePath: '/repo',
@@ -233,7 +233,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const close = vi.fn(() => true)
     const { actions, broadcasts } = makeActions({
       closeSessionForUser: close,
-      getSlotScope: () => '/repo',
+      getSlotScope: () => REPO_ROOT,
     })
 
     const closed = await actions.close(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID })
@@ -246,7 +246,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
-      repoRoot: '/repo',
+      repoRoot: REPO_ROOT,
       worktreePath: '/repo',
     })
   })
@@ -256,7 +256,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     // sibling windows. The guard is `if (closed && repoRoot)`.
     const { actions, broadcasts } = makeActions({
       closeSessionForUser: () => false,
-      getSlotScope: () => '/repo',
+      getSlotScope: () => REPO_ROOT,
     })
 
     const closed = await actions.close(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID })
@@ -302,7 +302,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const close = vi.fn(() => true)
     const { actions, broadcasts } = makeActions({
       closeSessionForUser: close,
-      getSlotScope: () => '/repo',
+      getSlotScope: () => REPO_ROOT,
     })
 
     const closed = await actions.close('not_a_client', USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID })
@@ -321,7 +321,7 @@ describe('terminal-runtime-actions prune', () => {
 
     await expect(
       actions.prune(CLIENT_ID, USER_ID, {
-        repoRoot: '/repo',
+        repoRoot: REPO_ROOT,
         repoRuntimeId: 'repo-runtime-stale',
       }),
     ).rejects.toThrow('error.repo-runtime-stale')
@@ -410,7 +410,7 @@ describe('terminal-runtime-actions clientId gate', () => {
   test('restart rejects invalid arguments before looking up the session scope', async () => {
     const { actions, manager } = makeActions({
       closeSessionForUser: () => false,
-      getSlotScope: () => '/repo',
+      getSlotScope: () => REPO_ROOT,
     })
 
     await expect(actions.restart(CLIENT_ID, USER_ID, undefined as never)).resolves.toEqual({

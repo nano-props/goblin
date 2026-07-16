@@ -74,7 +74,11 @@ describe('restoreRepoTabsForRepo', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 5, entries: [] }, repaired: false })),
+      restoreTabs: vi.fn(async () => ({
+        kind: 'restored' as const,
+        snapshot: { revision: 5, entries: [] },
+        repaired: false,
+      })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
       updateTabs: vi.fn(),
@@ -123,7 +127,11 @@ describe('restoreRepoTabsForRepo', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
+      restoreTabs: vi.fn(async () => ({
+        kind: 'restored' as const,
+        snapshot: { revision: 0, entries: [] },
+        repaired: false,
+      })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
       updateTabs: vi.fn(),
@@ -300,8 +308,8 @@ describe('restoreRepoTabsForRepo', () => {
   test('keeps the existing membership when lazy remote ensure fails', async () => {
     const remoteEntry = {
       kind: 'remote' as const,
-      id: 'ssh-config://host/repo',
-      ref: { id: 'ssh-config://host/repo', alias: 'host', remotePath: '/repo', displayName: 'repo' },
+      id: 'goblin+ssh://host/repo',
+      ref: { id: 'goblin+ssh://host/repo', alias: 'host', remotePath: '/repo', displayName: 'repo' },
     }
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),

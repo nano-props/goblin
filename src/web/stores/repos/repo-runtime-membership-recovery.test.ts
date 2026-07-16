@@ -7,14 +7,10 @@ import {
   reconcileOpenRepoRuntimeMemberships,
 } from '#/web/stores/repos/repo-session-write-paths.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import {
-  installGoblinTestBridge,
-  resetReposStore,
-  seedRepoWithReadModelForTest,
-} from '#/web/test-utils/bridge.ts'
+import { installGoblinTestBridge, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 const REPO_ROOT = '/tmp/runtime-membership-recovery'
-const REMOTE_REPO_ROOT = 'ssh-config://example/srv/runtime-membership-recovery'
+const REMOTE_REPO_ROOT = 'goblin+ssh://example/srv/runtime-membership-recovery'
 
 describe('repo runtime membership recovery', () => {
   beforeEach(() => {
@@ -34,11 +30,13 @@ describe('repo runtime membership recovery', () => {
     expect(result).toEqual({
       kind: 'settled',
       targets: [{ repoRoot: REPO_ROOT, repoRuntimeId: 'repo-runtime-123456789012345678901' }],
-      changedTargets: [{
-        repoRoot: REPO_ROOT,
-        previousRepoRuntimeId,
-        repoRuntimeId: 'repo-runtime-123456789012345678901',
-      }],
+      changedTargets: [
+        {
+          repoRoot: REPO_ROOT,
+          previousRepoRuntimeId,
+          repoRuntimeId: 'repo-runtime-123456789012345678901',
+        },
+      ],
     })
     const repo = useReposStore.getState().repos[REPO_ROOT]
     expect(repo?.repoRuntimeId).toBe('repo-runtime-123456789012345678901')
@@ -52,9 +50,7 @@ describe('repo runtime membership recovery', () => {
     const firstResponse = Promise.withResolvers<{
       runtimes: Array<{ repoRoot: string; repoRuntimeId: string }>
     }>()
-    const reconcile = vi.fn()
-      .mockReturnValueOnce(firstResponse.promise)
-      .mockResolvedValueOnce({ runtimes: [] })
+    const reconcile = vi.fn().mockReturnValueOnce(firstResponse.promise).mockResolvedValueOnce({ runtimes: [] })
     installGoblinTestBridge({ 'repo.runtimeReconcile': reconcile })
     seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
 
@@ -167,11 +163,13 @@ describe('repo runtime membership recovery', () => {
     seedRepoWithReadModelForTest({ id: REMOTE_REPO_ROOT, branches: [] })
     installGoblinTestBridge({
       'repo.runtimeReconcile': async () => ({
-        runtimes: [{
-          repoRoot: REMOTE_REPO_ROOT,
-          repoRuntimeId: nextRemoteRuntimeId,
-          remoteLifecycle: { kind: 'connecting', attemptId: 1 },
-        }],
+        runtimes: [
+          {
+            repoRoot: REMOTE_REPO_ROOT,
+            repoRuntimeId: nextRemoteRuntimeId,
+            remoteLifecycle: { kind: 'connecting', attemptId: 1 },
+          },
+        ],
       }),
       'remote.lifecycle': () => remoteEnsure.promise,
       'repo.runtimeOpen': async () => ({ ok: true, repoRuntimeId: 'repo-runtime-abcdefghijklmnopqrstu' }),
@@ -182,9 +180,7 @@ describe('repo runtime membership recovery', () => {
       expect(useReposStore.getState().repos[REMOTE_REPO_ROOT]?.repoRuntimeId).toBe(nextRemoteRuntimeId)
     })
 
-    await expect(openRepoRuntimeWithCache('/tmp/unrelated-runtime')).resolves.toBe(
-      'repo-runtime-abcdefghijklmnopqrstu',
-    )
+    await expect(openRepoRuntimeWithCache('/tmp/unrelated-runtime')).resolves.toBe('repo-runtime-abcdefghijklmnopqrstu')
     await expect(recovery).resolves.toMatchObject({ kind: 'settled' })
 
     remoteEnsure.resolve({ kind: 'superseded', repoId: REMOTE_REPO_ROOT })

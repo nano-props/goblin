@@ -1,5 +1,7 @@
 export type RepoKind = 'local' | 'remote'
 
+import { formatWorkspaceLocator, parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
+
 export interface RemoteRepoRef {
   id: string
   alias: string
@@ -285,16 +287,19 @@ export interface RemoteRepoRefInput {
   displayName?: unknown
 }
 
-const REMOTE_REPO_ID_PREFIX = 'ssh-config://'
-
 export function normalizeRemoteRepoId(input: RemoteRepoRefInput): string {
   const normalized = remoteRefFields(input)
   if (!normalized) throw new TypeError('Invalid remote repository reference')
-  return `${REMOTE_REPO_ID_PREFIX}${encodeURIComponent(normalized.alias)}${encodeRemotePath(normalized.remotePath)}`
+  const locator = formatWorkspaceLocator(
+    { transport: 'ssh', profile: normalized.alias, path: normalized.remotePath },
+    'posix',
+  )
+  if (!locator) throw new TypeError('Invalid remote repository reference')
+  return locator
 }
 
 export function isRemoteRepoId(value: string): boolean {
-  return value.startsWith(REMOTE_REPO_ID_PREFIX)
+  return parseWorkspaceLocator(value, 'posix')?.transport === 'ssh'
 }
 
 export function normalizeRemoteRepoRef(input: RemoteRepoRefInput): RemoteRepoRef | null {
@@ -352,28 +357,24 @@ export function remoteRepoSessionEntry(ref: RemoteRepoRef | RemoteRepoTarget): R
 
 export function normalizeRepoSessionEntry(input: unknown): RepoSessionEntry | null {
   if (!input || typeof input !== 'object') return null
-  const entry = input as Partial<RepoSessionEntry> & { target?: unknown; ref?: unknown }
+  const entry = input as Partial<RepoSessionEntry> & { ref?: unknown }
   if (entry.kind === 'local') {
-    return typeof entry.id === 'string' && safeText(entry.id) ? { kind: 'local', id: entry.id } : null
+    if (typeof entry.id !== 'string') return null
+    const parsed = parseWorkspaceLocator(entry.id, 'posix') ?? parseWorkspaceLocator(entry.id, 'win32')
+    return parsed?.transport === 'file' ? { kind: 'local', id: entry.id } : null
   }
   if (entry.kind === 'remote') {
     if (typeof entry.id !== 'string') return null
-    const ref = normalizeRemoteRepoRef((entry.ref ?? entry.target) as RemoteRepoRefInput)
-    if (!ref) return null
+    const ref = normalizeRemoteRepoRef(entry.ref as RemoteRepoRefInput)
+    if (!ref || entry.id !== ref.id) return null
     return { kind: 'remote', id: ref.id, ref }
   }
   return null
 }
 
 export function parseRemoteRepoId(repoId: string): Pick<RemoteRepoRef, 'alias' | 'remotePath'> | null {
-  if (!isRemoteRepoId(repoId)) return null
-  const rest = repoId.slice(REMOTE_REPO_ID_PREFIX.length)
-  const pathIdx = rest.indexOf('/')
-  if (pathIdx === -1) return null
-  const alias = decodeURIComponent(rest.slice(0, pathIdx))
-  const remotePath = decodeURIComponent(rest.slice(pathIdx).replace(/\+/g, '%20'))
-  if (!alias || !safeText(alias) || !normalizeRemotePath(remotePath)) return null
-  return { alias, remotePath }
+  const parsed = parseWorkspaceLocator(repoId, 'posix')
+  return parsed?.transport === 'ssh' ? { alias: parsed.profile, remotePath: parsed.path } : null
 }
 
 export function remoteRepoRefFromTarget(target: RemoteRepoTarget): RemoteRepoRef {
@@ -383,6 +384,7 @@ export function remoteRepoRefFromTarget(target: RemoteRepoTarget): RemoteRepoRef
 }
 
 function remoteTargetFields(input: RemoteRepoTargetInput): Pick<RemoteRepoTarget, 'host' | 'user' | 'port'> | null {
+  if (!input || typeof input !== 'object') return null
   const host = typeof input.host === 'string' ? input.host.trim() : ''
   const user = typeof input.user === 'string' ? input.user.trim() : ''
   const port = normalizePort(input.port)
@@ -391,9 +393,11 @@ function remoteTargetFields(input: RemoteRepoTargetInput): Pick<RemoteRepoTarget
 }
 
 function remoteRefFields(input: RemoteRepoRefInput): Pick<RemoteRepoRef, 'alias' | 'remotePath'> | null {
-  const alias = typeof input.alias === 'string' ? input.alias.trim() : ''
-  const remotePath = typeof input.remotePath === 'string' ? normalizeRemotePath(input.remotePath) : null
-  if (!safeText(alias) || !remotePath) return null
+  if (!input || typeof input !== 'object') return null
+  const alias = typeof input.alias === 'string' ? input.alias : ''
+  const remotePath = typeof input.remotePath === 'string' ? input.remotePath : ''
+  const locator = formatWorkspaceLocator({ transport: 'ssh', profile: alias, path: remotePath }, 'posix')
+  if (!locator) return null
   return { alias, remotePath }
 }
 
@@ -418,13 +422,6 @@ function basename(remotePath: string): string {
   const trimmed = remotePath.replace(/\/+$/, '')
   if (!trimmed || trimmed === '/') return '/'
   return trimmed.slice(trimmed.lastIndexOf('/') + 1) || trimmed
-}
-
-function encodeRemotePath(remotePath: string): string {
-  return remotePath
-    .split('/')
-    .map((segment, index) => (index === 0 ? '' : encodeURIComponent(segment)))
-    .join('/')
 }
 
 export function isAbsoluteRemotePath(value: string): boolean {

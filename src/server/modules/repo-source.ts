@@ -85,6 +85,11 @@ import {
   remoteRuntimeFailureFromCommandResult,
   remoteRuntimeFailureFromTargetResolutionError,
 } from '#/server/modules/remote-runtime-failure.ts'
+import {
+  formatWorkspaceLocator,
+  parseWorkspaceLocator,
+  type WorkspaceLocatorPlatform,
+} from '#/shared/workspace-locator.ts'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
@@ -193,9 +198,15 @@ export async function runWithCapturedRepoSource<T>(
 }
 
 export async function resolveRepoSource(repoId: string, runtime?: RepoSourceRuntimeContext): Promise<RepoSource> {
-  return isRemoteRepoId(repoId)
+  const locator = parseWorkspaceLocator(repoId, serverWorkspaceLocatorPlatform())
+  if (!locator) throw new Error('error.workspace-locator-malformed')
+  return locator.transport === 'ssh'
     ? await createRemoteRepoSource(repoId, undefined, null, runtime)
-    : createLocalRepoSource(repoId)
+    : createLocalRepoSource(locator.path)
+}
+
+function serverWorkspaceLocatorPlatform(): WorkspaceLocatorPlatform {
+  return process.platform === 'win32' ? 'win32' : 'posix'
 }
 
 function repoWriteBoundaryKey(boundary: RepoWriteBoundary): string {
@@ -212,8 +223,10 @@ function repoWriteBoundaryKey(boundary: RepoWriteBoundary): string {
 }
 
 async function resolveLocalRepoWriteBoundary(repoId: string, signal?: AbortSignal): Promise<RepoWriteBoundary> {
-  const commonDir = await getRepoCommonDir(repoId, { signal })
-  return commonDir ? { kind: 'local-git', commonDir } : { kind: 'local-path', repoPath: path.resolve(repoId) }
+  const locator = parseWorkspaceLocator(repoId, serverWorkspaceLocatorPlatform())
+  if (!locator || locator.transport !== 'file') throw new Error('error.workspace-locator-malformed')
+  const commonDir = await getRepoCommonDir(locator.path, { signal })
+  return commonDir ? { kind: 'local-git', commonDir } : { kind: 'local-path', repoPath: path.resolve(locator.path) }
 }
 
 async function resolveRemoteRepoWriteBoundary(repoId: string, signal?: AbortSignal): Promise<RepoWriteBoundary> {
@@ -243,7 +256,16 @@ function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonly strin
 }
 
 function localWorktreeRepoIds(worktrees: WorktreeInfo[]): string[] {
-  return worktrees.filter((worktree) => !worktree.isBare).map((worktree) => worktree.path)
+  return worktrees.flatMap((worktree) => {
+    if (worktree.isBare) return []
+    const id = localWorkspaceId(worktree.path)
+    return id ? [id] : []
+  })
+}
+
+function localWorkspaceId(worktreePath: string): string | null {
+  const platform = serverWorkspaceLocatorPlatform()
+  return formatWorkspaceLocator({ transport: 'file', platform, path: worktreePath }, platform)
 }
 
 function remoteWorktreeRepoIds(target: RemoteRepoTarget, worktreePaths: readonly string[] | undefined): string[] {
@@ -305,7 +327,8 @@ async function probeGitRepo(cwd: string): Promise<ProbeAvailability> {
 function createLocalRepoSource(
   repoId: string,
   physicalWorktreeCapability:
-    import('#/server/worktree-removal/physical-worktree-identity-resolver.ts').PhysicalWorktreeExecutionCapability | null = null,
+    | import('#/server/worktree-removal/physical-worktree-identity-resolver.ts').PhysicalWorktreeExecutionCapability
+    | null = null,
 ): RepoSource {
   const capabilities: RepoSourceCapabilities = { pullRequests: 'cwd-github' }
 
@@ -448,7 +471,11 @@ function createLocalRepoSource(
     },
     async createWorktree(input, signal, options) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
-      const affectedRepoIds = [...(await readLocalAffectedRepoIds(repoId, signal)), input.worktreePath]
+      const createdWorkspaceId = localWorkspaceId(input.worktreePath)
+      const affectedRepoIds = [
+        ...(await readLocalAffectedRepoIds(repoId, signal)),
+        ...(createdWorkspaceId ? [createdWorkspaceId] : []),
+      ]
       const created = await createWorktree(repoId, input, signal)
       if (!created.ok) return created.repositoryStateChanged ? withAffectedRepoIds(created, affectedRepoIds) : created
       if (options?.worktreeBootstrap?.kind !== 'run') return withAffectedRepoIds(created, affectedRepoIds)
@@ -577,7 +604,8 @@ async function createRemoteRepoSource(
   repoId: string,
   capturedTarget?: RemoteRepoTarget,
   physicalWorktreeCapability:
-    import('#/server/worktree-removal/physical-worktree-identity-resolver.ts').PhysicalWorktreeExecutionCapability | null = null,
+    | import('#/server/worktree-removal/physical-worktree-identity-resolver.ts').PhysicalWorktreeExecutionCapability
+    | null = null,
   runtime?: RepoSourceRuntimeContext,
 ): Promise<RepoSource> {
   const target = capturedTarget ?? (await resolveRemoteRepoTarget(repoId, runtime))

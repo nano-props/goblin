@@ -55,7 +55,7 @@ describe('server remote target resolution', () => {
     expect('target' in result).toBe(true)
     if (!('target' in result)) return
     expect(result.target).toMatchObject({
-      id: 'ssh-config://prod/home/alice/service',
+      id: 'goblin+ssh://prod/home/alice/service',
       alias: 'prod',
       host: 'example.test',
       user: 'alice',

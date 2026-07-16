@@ -44,6 +44,7 @@ import { RemoteAbsolutePathSchema } from '#/shared/remote-repo-schema.ts'
 import type { CreateWorktreeIpcInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
+import type { WorkspaceCapabilities, WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 
 export type { SettingsPage } from '#/shared/settings-pages.ts'
 export type {
@@ -120,6 +121,7 @@ export interface RepoRuntimeEntry {
   repoRoot: string
   repoRuntimeId: string
   remoteLifecycle?: RemoteRepoRuntimeLifecycle | null
+  workspaceProbe: WorkspaceProbeState
 }
 
 export interface RepoRuntimesSnapshot {
@@ -279,7 +281,14 @@ export interface ProbeResult {
 }
 
 export type RepoRuntimeOpenResult =
-  { ok: true; repo: { id: string; name: string }; repoRuntimeId: string } | { ok: false; input: string; reason: string }
+  | {
+      ok: true
+      repo: { id: string; name: string }
+      repoRuntimeId: string
+      capabilities: WorkspaceCapabilities
+      diagnostics: Array<{ scope: 'git' | 'transport'; message: string }>
+    }
+  | { ok: false; input: string; reason: string }
 export type RepoRuntimeOpenResponse = { ok: true; repoRuntimeId: string } | RepoRuntimeOpenResult
 
 export interface CloneRepoResult extends ExecResult {

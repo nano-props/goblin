@@ -3,7 +3,7 @@ import { remoteRuntimeFailureReasonFromCommandResult } from '#/server/modules/re
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 
 const target: RemoteRepoTarget = {
-  id: 'ssh-config://example/srv/repo',
+  id: 'goblin+ssh://example/srv/repo',
   alias: 'example',
   host: 'example.test',
   user: 'deploy',

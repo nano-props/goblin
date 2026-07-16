@@ -71,7 +71,7 @@ describe('restoreServerWorkspace', () => {
       kind: 'settled',
       lifecycle: { kind: 'ready' },
       name: 'repo',
-      repoId: 'ssh-config://prod/srv/repo',
+      repoId: 'goblin+ssh://prod/srv/repo',
     })
   })
 
@@ -86,7 +86,11 @@ describe('restoreServerWorkspace', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 1, entries: [] }, repaired: false })),
+      restoreTabs: vi.fn(async () => ({
+        kind: 'restored' as const,
+        snapshot: { revision: 1, entries: [] },
+        repaired: false,
+      })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -125,7 +129,11 @@ describe('restoreServerWorkspace', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.probeRepo.mockResolvedValue({ ok: true, root: '/repo', name: 'repo' })
     const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
+      restoreTabs: vi.fn(async () => ({
+        kind: 'restored' as const,
+        snapshot: { revision: 0, entries: [] },
+        repaired: false,
+      })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -156,7 +164,11 @@ describe('restoreServerWorkspace', () => {
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(),
-      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 3, entries: [] }, repaired: true })),
+      restoreTabs: vi.fn(async () => ({
+        kind: 'restored' as const,
+        snapshot: { revision: 3, entries: [] },
+        repaired: true,
+      })),
       updateTabs: vi.fn(),
     }
 
@@ -188,7 +200,11 @@ describe('restoreServerWorkspace', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
     const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
+      restoreTabs: vi.fn(async () => ({
+        kind: 'restored' as const,
+        snapshot: { revision: 0, entries: [] },
+        repaired: false,
+      })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -236,8 +252,8 @@ describe('restoreServerWorkspace', () => {
   test('keeps an active remote repo as a stub when lifecycle is temporarily unavailable', async () => {
     const remoteEntry = {
       kind: 'remote' as const,
-      id: 'ssh-config://prod/srv/repo',
-      ref: { id: 'ssh-config://prod/srv/repo', alias: 'prod', remotePath: '/srv/repo', displayName: 'repo' },
+      id: 'goblin+ssh://prod/srv/repo',
+      ref: { id: 'goblin+ssh://prod/srv/repo', alias: 'prod', remotePath: '/srv/repo', displayName: 'repo' },
     }
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
@@ -250,7 +266,11 @@ describe('restoreServerWorkspace', () => {
       name: 'repo',
     })
     const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
+      restoreTabs: vi.fn(async () => ({
+        kind: 'restored' as const,
+        snapshot: { revision: 0, entries: [] },
+        repaired: false,
+      })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -334,7 +354,11 @@ describe('restoreServerWorkspace', () => {
       }
     })
     const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 5, entries: [] }, repaired: false })),
+      restoreTabs: vi.fn(async () => ({
+        kind: 'restored' as const,
+        snapshot: { revision: 5, entries: [] },
+        repaired: false,
+      })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -361,8 +385,8 @@ describe('restoreServerWorkspace', () => {
   test('releases the acquired remote runtime when remote lifecycle restore is aborted', async () => {
     const remoteEntry = {
       kind: 'remote' as const,
-      id: 'ssh-config://prod/srv/repo',
-      ref: { id: 'ssh-config://prod/srv/repo', alias: 'prod', remotePath: '/srv/repo', displayName: 'repo' },
+      id: 'goblin+ssh://prod/srv/repo',
+      ref: { id: 'goblin+ssh://prod/srv/repo', alias: 'prod', remotePath: '/srv/repo', displayName: 'repo' },
     }
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
@@ -373,7 +397,11 @@ describe('restoreServerWorkspace', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.runRemoteLifecycleWrite.mockImplementation(() => new Promise(() => {}))
     const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
+      restoreTabs: vi.fn(async () => ({
+        kind: 'restored' as const,
+        snapshot: { revision: 0, entries: [] },
+        repaired: false,
+      })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -414,7 +442,9 @@ describe('restoreServerWorkspace', () => {
     const persistError = new Error('settings write failed')
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => { throw persistError }),
+      restoreTabs: vi.fn(async () => {
+        throw persistError
+      }),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -464,7 +494,11 @@ describe('restoreServerWorkspace', () => {
       .mockResolvedValueOnce({ matched: true, workspace: invalidWorkspace })
       .mockResolvedValueOnce({ matched: true, workspace: currentWorkspace })
     const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
+      restoreTabs: vi.fn(async () => ({
+        kind: 'restored' as const,
+        snapshot: { revision: 0, entries: [] },
+        repaired: false,
+      })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),

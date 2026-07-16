@@ -37,7 +37,7 @@ import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 // derivation helper.
 const USER_1 = 'user_terminal_runtime'
 const USER_2 = 'user_terminal_runtime_second'
-const REPO_ROOT = '/repo'
+const REPO_ROOT = 'goblin+file:///repo'
 let REPO_RUNTIME_ID = ''
 let SSH_REPO_RUNTIME_ID = ''
 let USER_2_REPO_RUNTIME_ID = ''
@@ -52,7 +52,7 @@ vi.mock('#/system/git/worktrees.ts', () => ({
 vi.mock('#/system/ssh/config.ts', () => ({
   resolveRemoteTarget: vi.fn(async () => ({
     target: {
-      id: 'ssh-config://prod/srv/repo',
+      id: 'goblin+ssh://prod/srv/repo',
       alias: 'prod',
       host: 'example.test',
       user: 'deploy',
@@ -63,7 +63,7 @@ vi.mock('#/system/ssh/config.ts', () => ({
   })),
   resolveRemoteTargetWithConfigFingerprint: vi.fn(async () => ({
     target: {
-      id: 'ssh-config://prod/srv/repo',
+      id: 'goblin+ssh://prod/srv/repo',
       alias: 'prod',
       host: 'example.test',
       user: 'deploy',
@@ -80,7 +80,7 @@ vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', asyn
     await importOriginal<typeof import('#/server/worktree-removal/physical-worktree-identity-resolver.ts')>()
   class RuntimeTestPhysicalWorktreeResolver extends original.PhysicalWorktreeIdentityResolver {
     issue(input: { userId: string; repoRoot: string; repoRuntimeId: string; worktreePath: string }) {
-      const remote = input.repoRoot.startsWith('ssh-config://')
+      const remote = input.repoRoot.startsWith('goblin+ssh://')
       return this.issueCapability({
         ...input,
         identity: remote
@@ -221,15 +221,15 @@ function buildRuntime(): RuntimeHandle {
         {
           repoRoot,
           branchName: 'feature',
-          worktreePath: repoRoot.startsWith('ssh-config://') ? '/srv/repo' : '/repo-linked',
+          worktreePath: repoRoot.startsWith('goblin+ssh://') ? '/srv/repo' : '/repo-linked',
         },
       ],
     },
   })
   REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_a')
-  SSH_REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, 'ssh-config://prod/srv/repo', 'client_a')
+  SSH_REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, 'goblin+ssh://prod/srv/repo', 'client_a')
   USER_2_REPO_RUNTIME_ID = acquireRepoRuntime(USER_2, REPO_ROOT, 'client_b')
-  acquireRepoRuntime(USER_2, 'ssh-config://prod/srv/repo', 'client_b')
+  acquireRepoRuntime(USER_2, 'goblin+ssh://prod/srv/repo', 'client_b')
   createTerminalApplications.set(runtime.host, runtime.workspacePaneRuntimeHost)
   const shutdown = () => {
     if (!activeRuntimeShutdowns.delete(shutdown)) return
@@ -690,7 +690,7 @@ describe('server terminal runtime', () => {
       event: {
         terminalRuntimeSessionId,
         terminalSessionId: expect.any(String),
-        repoRoot: '/repo',
+        repoRoot: REPO_ROOT,
         worktreePath: '/repo-linked',
         processName: 'zsh',
         canonicalTitle: 'build running',
@@ -705,7 +705,7 @@ describe('server terminal runtime', () => {
       event: {
         terminalRuntimeSessionId,
         terminalSessionId: expect.any(String),
-        repoRoot: '/repo',
+        repoRoot: REPO_ROOT,
         worktreePath: '/repo-linked',
         canonicalTitle: 'devin: hello',
       },
@@ -749,7 +749,7 @@ describe('server terminal runtime', () => {
       event: {
         terminalRuntimeSessionId,
         terminalSessionId: expect.any(String),
-        repoRoot: '/repo',
+        repoRoot: REPO_ROOT,
         worktreePath: '/repo-linked',
         canonicalTitle: 'devin running',
       },
@@ -894,7 +894,7 @@ describe('server terminal runtime', () => {
     vi.mocked(getWorktrees).mockResolvedValueOnce([])
 
     await expect(
-      host.prune('client_a', USER_1, { repoRoot: '/repo', repoRuntimeId: REPO_RUNTIME_ID }),
+      host.prune('client_a', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
     ).resolves.toEqual({ pruned: 1, remaining: 0 })
 
     await vi.waitFor(() => {
@@ -1081,7 +1081,7 @@ describe('server terminal runtime', () => {
   test('returns created terminal sessions for SSH remote repositories', async () => {
     const { host, shutdown } = buildRuntime()
     const result = await createAdmittedTerminal(host, 'client_a', USER_1, {
-      repoRoot: 'ssh-config://prod/srv/repo',
+      repoRoot: 'goblin+ssh://prod/srv/repo',
       repoRuntimeId: SSH_REPO_RUNTIME_ID,
       branch: 'feature',
       worktreePath: '/srv/repo',
@@ -1097,13 +1097,13 @@ describe('server terminal runtime', () => {
     expect(result).not.toHaveProperty('sessions')
     await expect(
       host.listSessions('client_a', USER_1, {
-        repoRoot: 'ssh-config://prod/srv/repo',
+        repoRoot: 'goblin+ssh://prod/srv/repo',
         repoRuntimeId: SSH_REPO_RUNTIME_ID,
       }),
     ).resolves.toEqual([
       expect.objectContaining({
         terminalSessionId: result.terminalSessionId,
-        repoRoot: 'ssh-config://prod/srv/repo',
+        repoRoot: 'goblin+ssh://prod/srv/repo',
         worktreePath: '/srv/repo',
       }),
     ])
@@ -1824,7 +1824,7 @@ describe('server terminal runtime', () => {
     expect(
       socketB.send.mock.calls.some(([payload]) => {
         const parsed = JSON.parse(String(payload))
-        return parsed.type === 'sessions-changed' && parsed.repoRoot === '/repo'
+        return parsed.type === 'sessions-changed' && parsed.repoRoot === REPO_ROOT
       }),
     ).toBe(true)
 
@@ -1870,7 +1870,7 @@ describe('server terminal runtime', () => {
     expect(
       userBSocket.send.mock.calls.some(([payload]) => {
         const parsed = JSON.parse(String(payload))
-        return parsed.type === 'sessions-changed' && parsed.repoRoot === '/repo'
+        return parsed.type === 'sessions-changed' && parsed.repoRoot === REPO_ROOT
       }),
     ).toBe(false)
 
@@ -2414,7 +2414,7 @@ describe('server terminal runtime', () => {
       const terminalRuntimeSessionId = await createTerminalSession(host, 'client_idle')
 
       expect(
-        await host.listSessions('client_idle', USER_1, { repoRoot: '/repo', repoRuntimeId: REPO_RUNTIME_ID }),
+        await host.listSessions('client_idle', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
       ).toEqual([
         expect.objectContaining({
           terminalRuntimeSessionId,
@@ -2425,7 +2425,7 @@ describe('server terminal runtime', () => {
       vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
       expect(handle.isClientOnline('client_idle')).toBe(false)
       expect(
-        await host.listSessions('client_idle', USER_1, { repoRoot: '/repo', repoRuntimeId: REPO_RUNTIME_ID }),
+        await host.listSessions('client_idle', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
       ).toEqual([
         expect.objectContaining({
           terminalRuntimeSessionId,
@@ -2437,7 +2437,7 @@ describe('server terminal runtime', () => {
       host.registerSocket('client_idle', USER_1, reconnectedSocket)
       expect(handle.isClientOnline('client_idle')).toBe(true)
       expect(
-        await host.listSessions('client_idle', USER_1, { repoRoot: '/repo', repoRuntimeId: REPO_RUNTIME_ID }),
+        await host.listSessions('client_idle', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
       ).toEqual([
         expect.objectContaining({
           terminalRuntimeSessionId,
@@ -2476,7 +2476,7 @@ describe('server terminal runtime', () => {
       }
       await vi.runOnlyPendingTimersAsync()
       await expect(
-        host.listSessions('client_recovered', USER_1, { repoRoot: '/repo', repoRuntimeId: REPO_RUNTIME_ID }),
+        host.listSessions('client_recovered', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
       ).resolves.toHaveLength(1)
     } finally {
       vi.useRealTimers()
@@ -2507,7 +2507,7 @@ describe('server terminal runtime', () => {
       expect(host.getDiagnostics().terminal.liveSessionCount).toBe(0)
       REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_half_open')
       await expect(
-        host.listSessions('client_half_open', USER_1, { repoRoot: '/repo', repoRuntimeId: REPO_RUNTIME_ID }),
+        host.listSessions('client_half_open', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
       ).resolves.toEqual([])
     } finally {
       vi.useRealTimers()
@@ -2539,7 +2539,7 @@ describe('server terminal runtime', () => {
       expect(host.getDiagnostics().terminal.liveSessionCount).toBe(0)
       REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_late_drain')
       await expect(
-        host.listSessions('client_late_drain', USER_1, { repoRoot: '/repo', repoRuntimeId: REPO_RUNTIME_ID }),
+        host.listSessions('client_late_drain', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
       ).resolves.toEqual([])
     } finally {
       vi.useRealTimers()

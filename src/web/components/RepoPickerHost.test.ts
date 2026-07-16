@@ -8,14 +8,14 @@ describe('repoPickerReposEqual', () => {
   test('treats remote lifecycle target changes as unequal even when repo id stays the same', () => {
     const left: RepoPickerRepo[] = [
       {
-        id: 'ssh-config://example/srv%2Frepo',
+        id: 'goblin+ssh://example/srv%2Frepo',
         name: 'repo',
         remoteDetails: [],
         lastSyncedAt: null,
         lifecycle: {
           kind: 'ready',
           target: {
-            id: 'ssh-config://example/srv%2Frepo',
+            id: 'goblin+ssh://example/srv%2Frepo',
             alias: 'example',
             host: 'old-host.internal',
             user: 'old-user',
@@ -28,14 +28,14 @@ describe('repoPickerReposEqual', () => {
     ]
     const right: RepoPickerRepo[] = [
       {
-        id: 'ssh-config://example/srv%2Frepo',
+        id: 'goblin+ssh://example/srv%2Frepo',
         name: 'repo',
         remoteDetails: [],
         lastSyncedAt: null,
         lifecycle: {
           kind: 'ready',
           target: {
-            id: 'ssh-config://example/srv%2Frepo',
+            id: 'goblin+ssh://example/srv%2Frepo',
             alias: 'example',
             host: 'new-host.internal',
             user: 'new-user',
@@ -52,7 +52,7 @@ describe('repoPickerReposEqual', () => {
 
   test('treats failed lifecycle target locator changes as unequal', () => {
     const target = {
-      id: 'ssh-config://example/srv%2Frepo',
+      id: 'goblin+ssh://example/srv%2Frepo',
       alias: 'example',
       host: 'same-host.internal',
       user: 'old-user',

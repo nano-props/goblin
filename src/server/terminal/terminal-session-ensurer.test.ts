@@ -27,7 +27,7 @@ vi.mock('#/shared/worktree-guards.ts', () => ({
 vi.mock('#/system/ssh/config.ts', () => ({
   resolveRemoteTarget: vi.fn(async () => ({
     target: {
-      id: 'ssh-config://prod/srv/repo',
+      id: 'goblin+ssh://prod/srv/repo',
       alias: 'prod',
       host: 'example.test',
       user: 'deploy',
@@ -44,7 +44,7 @@ const REPO_ROOT = '/repo'
 const REPO_RUNTIME_ID = 'repo-runtime-ensure'
 const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'
-const REMOTE_REPO_ROOT = 'ssh-config://prod/srv/repo'
+const REMOTE_REPO_ROOT = 'goblin+ssh://prod/srv/repo'
 const REMOTE_WORKTREE_PATH = '/srv/repo'
 
 function ensureContext(context: Omit<TerminalSessionEnsureContext, 'signal'>): TerminalSessionEnsureContext {

@@ -11,7 +11,7 @@ import {
   testPhysicalWorktreeIdentity,
 } from '#/server/test-utils/physical-worktree-identity.ts'
 
-const REMOTE_REPO = 'ssh-config://prod/srv/repo'
+const REMOTE_REPO = 'goblin+ssh://prod/srv/repo'
 const REMOTE_PATH = '/srv/worktrees/feature'
 
 describe('physical worktree capability boundaries', () => {

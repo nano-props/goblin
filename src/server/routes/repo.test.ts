@@ -7,6 +7,7 @@ import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 
 const mocks = vi.hoisted(() => ({
   probeRepo: vi.fn(),
+  probeLocalWorkspace: vi.fn(),
   getRepoLog: vi.fn(),
   getRepoPatch: vi.fn(),
   readRepoProjection: vi.fn(),
@@ -49,6 +50,9 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   readRepoOperationsSnapshot: mocks.readRepoOperationsSnapshot,
   getRepoWorktreeBootstrapPreview: mocks.getRepoWorktreeBootstrapPreview,
 }))
+vi.mock('#/server/modules/workspace-probe.ts', () => ({
+  probeLocalWorkspace: mocks.probeLocalWorkspace,
+}))
 vi.mock('#/server/modules/repo-tree.ts', () => ({
   getRepositoryTree: mocks.getRepositoryTree,
 }))
@@ -86,6 +90,16 @@ vi.mock('#/server/common/identity.ts', () => ({
 beforeEach(() => {
   vi.clearAllMocks()
   clearRepoRuntimesForUser('user-test')
+  mocks.probeLocalWorkspace.mockResolvedValue({
+    status: 'ready',
+    name: 'workspace',
+    capabilities: {
+      files: { read: true, write: true },
+      terminal: { available: true },
+      git: { status: 'unavailable' },
+    },
+    diagnostics: [],
+  })
 })
 
 function createTestRepoRoutes(
@@ -215,8 +229,17 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(mocks.probeRepo).toHaveBeenCalledWith('/tmp/repo')
   })
 
-  test('runtime-open with repoInput canonicalizes and binds the runtime id to the probed root', async () => {
-    mocks.probeRepo.mockResolvedValue({ ok: true, root: '/tmp/repo', name: 'repo' })
+  test('runtime-open with repoInput preserves the opened directory identity', async () => {
+    mocks.probeLocalWorkspace.mockResolvedValue({
+      status: 'ready',
+      name: 'subdir',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [],
+    })
     const app = createTestRepoRoutes()
 
     const response = await app.request(
@@ -233,13 +256,21 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       repo: { id: string; name: string }
       repoRuntimeId: string
     }
-    expect(json).toMatchObject({ ok: true, repo: { id: '/tmp/repo', name: 'repo' } })
+    expect(json).toMatchObject({
+      ok: true,
+      repo: { id: 'goblin+file:///tmp/repo/subdir', name: 'subdir' },
+      capabilities: { git: { status: 'unavailable' } },
+    })
     expect(json.repoRuntimeId).toMatch(/^repo-runtime-/)
-    expect(mocks.probeRepo).toHaveBeenCalledWith('/tmp/repo/subdir')
+    expect(mocks.probeLocalWorkspace).toHaveBeenCalledWith(
+      'goblin+file:///tmp/repo/subdir',
+      process.platform === 'win32' ? 'win32' : 'posix',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    )
   })
 
   test('runtime-open with repoInput fails without minting a runtime id when probe fails', async () => {
-    mocks.probeRepo.mockResolvedValue({ ok: false, message: 'missing' })
+    mocks.probeLocalWorkspace.mockResolvedValue({ status: 'unavailable', reason: 'error.workspace-path-not-found' })
     const app = createTestRepoRoutes()
 
     const response = await app.request(
@@ -251,7 +282,11 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     )
 
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({ ok: false, input: '/missing', reason: 'missing' })
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      input: '/missing',
+      reason: 'error.workspace-path-not-found',
+    })
   })
 
   test('runtime-list returns the server-owned open runtimes for the user', async () => {
@@ -280,6 +315,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       repoRoot: '/tmp/runtime-list-repo',
       repoRuntimeId: opened.repoRuntimeId,
       remoteLifecycle: null,
+      workspaceProbe: { status: 'probing' },
     })
   })
 
@@ -581,7 +617,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
   test('marks remote lifecycle failed when a runtime-scoped repo read hits transport failure', async () => {
     const app = createTestRepoRoutes()
-    const repoId = 'ssh-config://prod/home/alice/service'
+    const repoId = 'goblin+ssh://prod/home/alice/service'
     const repoRuntimeId = await openTestRepoRuntime(app, repoId)
     mocks.getRepoLog.mockRejectedValueOnce(
       new RemoteRepoRuntimeFailureError({
@@ -683,7 +719,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     },
   ])('marks remote lifecycle failed when /$name hits transport failure', async ({ path, body, mock }) => {
     const app = createTestRepoRoutes()
-    const repoId = 'ssh-config://prod/home/alice/service'
+    const repoId = 'goblin+ssh://prod/home/alice/service'
     const repoRuntimeId = await openTestRepoRuntime(app, repoId)
     mock.mockRejectedValueOnce(
       new RemoteRepoRuntimeFailureError({
@@ -713,7 +749,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
   test('marks remote lifecycle failed when a runtime-scoped repo write hits transport failure', async () => {
     const app = createTestRepoRoutes()
-    const repoId = 'ssh-config://prod/home/alice/service'
+    const repoId = 'goblin+ssh://prod/home/alice/service'
     const repoRuntimeId = await openTestRepoRuntime(app, repoId)
     mocks.pullRepoBranch.mockRejectedValueOnce(
       new RemoteRepoRuntimeFailureError({
