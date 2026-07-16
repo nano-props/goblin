@@ -39,7 +39,10 @@ import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/sha
 import { nextRepoWorkspaceTabAfterClose } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
-import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
+import {
+  createTerminalWithAdmissionForContextTest,
+  terminalSessionContextForTest,
+} from '#/web/test-utils/terminal-session-context.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
@@ -101,11 +104,13 @@ const navigation: PrimaryWindowNavigationActions = {
   openCreateWorktree: vi.fn(),
 }
 
+let workspacePaneTabsTestBridge: ReturnType<typeof installWorkspacePaneTabsTestBridge>
+
 beforeEach(() => {
   resetWorkspacePaneActionQueueForTest()
   primaryWindowQueryClient.clear()
   resetReposStore()
-  installWorkspacePaneTabsTestBridge()
+  workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
   useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
 })
 
@@ -291,29 +296,53 @@ describe('RepoWorkspace', () => {
         terminalSessionId: 'term-111111111111111111111',
       },
     }
+    let terminalCreated = false
+    const terminalListeners = new Set<() => void>()
+    const createdTerminalReadContext = terminalReadContextWithSession(
+      terminalWorktreeKey,
+      'term-111111111111111111111',
+    )
+    const readContext: TerminalSessionReadContextValue = {
+      ...terminalReadContext,
+      terminalWorktreeSnapshot: (key) =>
+        terminalCreated
+          ? createdTerminalReadContext.terminalWorktreeSnapshot(key)
+          : EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
+      subscribeTerminalWorktree: (_key, listener) => {
+        terminalListeners.add(listener)
+        return () => terminalListeners.delete(listener)
+      },
+    }
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-111111111111111111111'
-      setWorkspacePaneTabsForTargetQueryData({
+      workspacePaneTabsTestBridge.addRuntimeTab({
         repoRoot: base.repoRoot,
         repoRuntimeId: base.repoRuntimeId!,
         branchName: base.branch,
         worktreePath: base.worktreePath,
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+        terminalSessionId,
       })
+      terminalCreated = true
+      for (const listener of terminalListeners) listener()
       useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, terminalSessionId)
       return terminalSessionId
     })
     const route = routeNavigation()
     const testNavigation = navigationWithStore(route)
+    const commandContext = {
+      ...terminalCommandContext,
+      createTerminal,
+      createTerminalWithAdmission: createTerminalWithAdmissionForContextTest(createTerminal),
+    }
 
     const workspace = (
       workspacePaneRoute: RepoBranchWorkspacePaneRoute | null,
-      readContext: TerminalSessionReadContextValue = terminalReadContext,
+      nextReadContext: TerminalSessionReadContextValue = readContext,
     ) => (
       <QueryClientProvider client={primaryWindowQueryClient}>
         <PrimaryWindowNavigationProvider value={testNavigation}>
-          <TerminalSessionContext value={{ ...terminalCommandContext, createTerminal }}>
-            <TerminalSessionReadContext value={readContext}>
+          <TerminalSessionContext value={commandContext}>
+            <TerminalSessionReadContext value={nextReadContext}>
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName="feature/a"

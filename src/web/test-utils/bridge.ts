@@ -228,6 +228,7 @@ export function installWorkspacePaneTabsTestBridge(
     branchName: string
     worktreePath: string | null
     terminalSessionId: string
+    insertAfterIdentity?: string | null
   }) => void
   removeRuntimeTab: (input: {
     repoRoot: string
@@ -445,7 +446,9 @@ export function installWorkspacePaneTabsTestBridge(
     addRuntimeTab: (input) => {
       replaceServerTarget(
         input,
-        workspacePaneTabsWithRuntimeTab(serverTabsForTarget(input), 'terminal', input.terminalSessionId),
+        workspacePaneTabsWithRuntimeTab(serverTabsForTarget(input), 'terminal', input.terminalSessionId, {
+          insertAfterIdentity: input.insertAfterIdentity,
+        }),
       )
       commitServerSnapshot()
     },

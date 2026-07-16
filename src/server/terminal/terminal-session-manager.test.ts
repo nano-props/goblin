@@ -226,6 +226,76 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(onIdentity).toHaveBeenCalledOnce()
   })
 
+  test('rejects an existing admission after the PTY exits during placement preparation', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onIdentity = vi.fn()
+    const manager = createManager(supervisor, { onIdentity })
+    await createSession(manager, supervisor)
+
+    const admission = manager.prepareSession({
+      userId: USER_ID,
+      scope: SCOPE,
+      repoRoot: SCOPE,
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+      cwd: '/tmp',
+      cols: 80,
+      rows: 24,
+      clientId: 'client-after-exit',
+    })
+    if (!admission.ok) throw new Error(admission.message)
+    onIdentity.mockClear()
+
+    supervisor.emitExit('pty_initial_123456')
+
+    expect(() => admission.admission.commit()).toThrow('error.unavailable')
+    admission.admission.publishCommittedEffects()
+    expect(onIdentity).not.toHaveBeenCalled()
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
+  })
+
+  test('rejects an existing admission while retirement is in progress', async () => {
+    let finishRetirement: (() => void) | undefined
+    const supervisor = createDeferredPtySupervisor()
+    supervisor.killAndWait = vi.fn(
+      async () =>
+        await new Promise<void>((resolve) => {
+          finishRetirement = resolve
+        }),
+    )
+    const onIdentity = vi.fn()
+    const manager = createManager(supervisor, { onIdentity })
+    const created = await createSession(manager, supervisor)
+    const admission = manager.prepareSession({
+      userId: USER_ID,
+      scope: SCOPE,
+      repoRoot: SCOPE,
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+      cwd: '/tmp',
+      cols: 80,
+      rows: 24,
+      clientId: 'client-during-close',
+    })
+    if (!admission.ok) throw new Error(admission.message)
+    onIdentity.mockClear()
+
+    const retirement = manager.requestSessionRetirement(created.terminalRuntimeSessionId)
+
+    expect(() => admission.admission.commit()).toThrow('error.unavailable')
+    admission.admission.publishCommittedEffects()
+    expect(onIdentity).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(finishRetirement).toBeTypeOf('function'))
+    finishRetirement?.()
+    await expect(retirement).resolves.toBe(true)
+  })
+
   test('prepares without spawning, then starts at fitted geometry and snapshots only later attaches', async () => {
     const supervisor = createDeferredPtySupervisor()
     const onOutput = vi.fn()

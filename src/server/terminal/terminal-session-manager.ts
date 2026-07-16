@@ -175,7 +175,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       ) {
         return { ok: false, message: 'error.invalid-worktree-identity' }
       }
-      if (this.closeOperationsByTerminalRuntimeSessionId.has(existing.id)) {
+      if (!this.isSessionAvailableForAdmission(existing)) {
         return { ok: false, message: 'error.unavailable' }
       }
       const action = this.effectiveController(existing) ? 'restored' : 'reused'
@@ -198,6 +198,10 @@ export class TerminalSessionManager<TUser extends string | number> {
           kind: 'existing',
           commit: () => {
             if (admissionState !== 'pending') throw new Error('error.unavailable')
+            if (!this.isSessionAvailableForAdmission(existing)) {
+              admissionState = 'aborted'
+              throw new Error('error.unavailable')
+            }
             if (input.clientId) {
               registerTerminalClient(existing, input.clientId, size.cols, size.rows)
               committedEffect = attachTerminalClient(existing, input.clientId, this.sessionPresence(existing))
@@ -873,6 +877,10 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   private isLiveSession(session: TerminalSessionView<TUser>): boolean {
     return this.directory.get(session.id) === session
+  }
+
+  private isSessionAvailableForAdmission(session: TerminalSessionView<TUser>): boolean {
+    return this.isLiveSession(session) && !this.isSessionClosing(session.id)
   }
 
   private confirmSessionExit(session: TerminalSessionView<TUser>, terminalRuntimeGeneration: number): void {
