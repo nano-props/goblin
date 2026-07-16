@@ -261,10 +261,9 @@ export async function remoteCommandExists(
 }
 
 /** Resolve a remote worktree path against the remote repo's worktree
- *  list. Unlike display reads such as `getRemoteStatusAndWorktrees`,
- *  this is an authority boundary: remote list failures throw their
- *  real error, while a successful list that lacks the target path
- *  throws `error.worktree-not-found`. */
+ *  list. This membership authority distinguishes remote list failures
+ *  from a successful list that lacks the target path, which throws
+ *  `error.worktree-not-found`. */
 export async function resolveRemoteWorktree(
   target: RemoteRepoTarget,
   worktreePath: string,
