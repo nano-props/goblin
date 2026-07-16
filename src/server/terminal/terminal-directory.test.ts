@@ -62,10 +62,10 @@ describe('TerminalDirectory', () => {
     expect(directory.catalogRevision('user_a', 'scope_a')).toBe(0)
     expect(directory.reserve(entry('pty_conflict', 'term_reserved', 'scope_a'))).toBeNull()
 
-    expect(admission?.commit()).toBe(true)
+    expect(admission?.commit(reserved)).toBe(true)
     expect(directory.get('pty_reserved')).toBe(reserved)
     expect(directory.catalogRevision('user_a', 'scope_a')).toBe(1)
-    expect(admission?.commit()).toBe(false)
+    expect(admission?.commit(reserved)).toBe(false)
   })
 
   test('aborts a reservation without a revision or close transition', () => {

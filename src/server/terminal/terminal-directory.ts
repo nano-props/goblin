@@ -5,13 +5,20 @@ export interface TerminalDirectoryEntry<TUser extends string | number> {
   terminalSessionId: string
 }
 
+export interface TerminalDirectoryReservation<TUser extends string | number> {
+  id: string
+  userId: TUser
+  scope: string
+  terminalSessionId: string
+}
+
 export class TerminalDirectory<
   TUser extends string | number,
   TEntry extends TerminalDirectoryEntry<TUser>,
 > {
   private readonly entriesByRuntimeId = new Map<string, TEntry>()
   private readonly runtimeIdByUserSession = new Map<string, string>()
-  private readonly reservationsByRuntimeId = new Map<string, TEntry>()
+  private readonly reservationsByRuntimeId = new Map<string, TerminalDirectoryReservation<TUser>>()
   private readonly reservedRuntimeIdByUserSession = new Map<string, string>()
   private readonly catalogRevisionByScope = new Map<string, number>()
 
@@ -25,29 +32,32 @@ export class TerminalDirectory<
     return true
   }
 
-  reserve(entry: TEntry): { commit: () => boolean; abort: () => void } | null {
-    const durableKey = this.userSessionKey(entry.userId, entry.terminalSessionId)
+  reserve(identity: TerminalDirectoryReservation<TUser>): {
+    commit: (entry: TEntry) => boolean
+    abort: () => void
+  } | null {
+    const durableKey = this.userSessionKey(identity.userId, identity.terminalSessionId)
     if (
-      this.entriesByRuntimeId.has(entry.id) ||
-      this.reservationsByRuntimeId.has(entry.id) ||
+      this.entriesByRuntimeId.has(identity.id) ||
+      this.reservationsByRuntimeId.has(identity.id) ||
       this.runtimeIdByUserSession.has(durableKey) ||
       this.reservedRuntimeIdByUserSession.has(durableKey)
     ) return null
-    this.reservationsByRuntimeId.set(entry.id, entry)
-    this.reservedRuntimeIdByUserSession.set(durableKey, entry.id)
+    this.reservationsByRuntimeId.set(identity.id, identity)
+    this.reservedRuntimeIdByUserSession.set(durableKey, identity.id)
     let settled = false
     return {
-      commit: () => {
-        if (settled || this.reservationsByRuntimeId.get(entry.id) !== entry) return false
+      commit: (entry) => {
+        if (settled || this.reservationsByRuntimeId.get(identity.id) !== identity) return false
         settled = true
-        this.reservationsByRuntimeId.delete(entry.id)
+        this.reservationsByRuntimeId.delete(identity.id)
         this.reservedRuntimeIdByUserSession.delete(durableKey)
         return this.publish(entry)
       },
       abort: () => {
         if (settled) return
         settled = true
-        this.reservationsByRuntimeId.delete(entry.id)
+        this.reservationsByRuntimeId.delete(identity.id)
         this.reservedRuntimeIdByUserSession.delete(durableKey)
       },
     }

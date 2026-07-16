@@ -542,8 +542,8 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: async () => runtime, close },
       workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: async (input: { commitRuntime?: () => number }) => {
-          input.commitRuntime?.()
+        ensureRuntimeTabForSession: async (input: { onPlacementCommitted?: () => void }) => {
+          input.onPlacementCommitted?.()
           throw new Error('projection failed after admission')
         },
         reconcileWorktreeAdmitted: vi.fn(),

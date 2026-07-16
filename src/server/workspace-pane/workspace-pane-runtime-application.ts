@@ -156,7 +156,7 @@ export class WorkspacePaneRuntimeApplication {
         physicalWorktreeCapability,
         isRuntimeCurrent: () =>
           this.deps.isCurrentRepoRuntime(userId, input.request.repoRoot, input.request.repoRuntimeId),
-        commitRuntime:
+        onPlacementCommitted:
           runtime.admission.kind === 'prepared'
             ? () => {
                 admittedRevision = runtime.admission.kind === 'prepared' ? runtime.admission.commit() : null
@@ -181,7 +181,6 @@ export class WorkspacePaneRuntimeApplication {
       return runtimeFailure('terminal', 'error.repo-runtime-stale')
     }
 
-    admittedRevision ??= paneCommit.terminalSessionsRevision
     if (admittedRevision === null) throw new Error('terminal admission did not produce a catalog revision')
     const { admission: _admission, ...runtimeResult } = runtime
     const workspacePaneTabs = paneCommit.snapshot

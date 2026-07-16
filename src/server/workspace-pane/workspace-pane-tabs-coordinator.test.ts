@@ -49,7 +49,7 @@ describe('workspace pane tabs coordinator queues', () => {
         worktreePath: '/repo/worktree', runtimeType: 'terminal', sessionId: 'term-preparedprepared001',
         insertAfterIdentity: 'workspace-pane:status', permit, physicalWorktreeCapability: capability,
         isRuntimeCurrent: () => true,
-        commitRuntime: () => {
+        onPlacementCommitted: () => {
           events.push('publish')
           published = true
           return 1
@@ -61,7 +61,6 @@ describe('workspace pane tabs coordinator queues', () => {
     expect(events).toEqual(['sample:false', 'publish', 'sample:true'])
     expect(admitted.value).toMatchObject({
       kind: 'committed',
-      terminalSessionsRevision: 1,
       snapshot: { entries: [{ tabs: [
         workspacePaneStaticTabEntry('status'),
         { type: 'terminal', runtimeSessionId: 'term-preparedprepared001' },
