@@ -341,13 +341,10 @@ describe('terminal-runtime-actions catalog recovery', () => {
 
     await expect(
       actions.recoverSessions(CLIENT_ID, USER_ID, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
-    ).resolves.toEqual({
-      terminalSessions: { revision: 2, sessions: [] },
-      snapshots: [],
-      workspacePaneTabs: { revision: 9, entries: [] },
-    })
+    ).resolves.toEqual({ revision: 2, sessions: [] })
 
     expect(manager.terminalSessionsSnapshotForUser).toHaveBeenCalledOnce()
+    expect(sessionService.listWorkspaceTabs).not.toHaveBeenCalled()
   })
 
   test('does not use the workspace-tabs revision as terminal freshness', async () => {
@@ -359,12 +356,9 @@ describe('terminal-runtime-actions catalog recovery', () => {
 
     await expect(
       actions.recoverSessions(CLIENT_ID, USER_ID, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
-    ).resolves.toEqual({
-      terminalSessions: { revision: 4, sessions: [] },
-      snapshots: [],
-      workspacePaneTabs: { revision: 27, entries: [] },
-    })
+    ).resolves.toEqual({ revision: 4, sessions: [] })
     expect(manager.terminalSessionsSnapshotForUser).toHaveBeenCalledOnce()
+    expect(sessionService.listWorkspaceTabs).not.toHaveBeenCalled()
   })
 })
 

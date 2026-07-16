@@ -1,4 +1,4 @@
-import { normalizeTerminalSessionsRecoveryResult } from '#/shared/terminal-validators.ts'
+import { normalizeTerminalSessionsSnapshot } from '#/shared/terminal-validators.ts'
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import type {
@@ -61,9 +61,9 @@ export function createServerTerminalClient(options: {
     },
     recoverSessions(input) {
       return options.realtime.request('recover-sessions', input).then((value) => {
-        const recovery = normalizeTerminalSessionsRecoveryResult(value)
-        if (!recovery) throw new Error('Terminal socket response failed: invalid terminal recovery response')
-        return recovery
+        const catalog = normalizeTerminalSessionsSnapshot(value)
+        if (!catalog) throw new Error('Terminal socket response failed: invalid terminal catalog response')
+        return catalog
       })
     },
     notifyBell(input: TerminalNotifyBellInput) {

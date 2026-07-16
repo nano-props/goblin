@@ -44,7 +44,7 @@ import type {
   TerminalRestartResult,
   TerminalMutationResult,
   TerminalWriteResult,
-  TerminalSessionsRecoveryResult,
+  TerminalSessionsSnapshot,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
@@ -137,7 +137,7 @@ interface TerminalClientTestOutputs {
   'terminal.takeover': TerminalTakeoverResult
   'terminal.close': TerminalMutationResult
   'terminal.prune': { pruned: number; remaining: number }
-  'terminal.recoverSessions': TerminalSessionsRecoveryResult
+  'terminal.recoverSessions': TerminalSessionsSnapshot
   'terminal.notifyBell': TerminalMutationResult
   'workspacePaneTabs.replace': WorkspacePaneTabsSnapshot
   'workspacePaneTabs.update': WorkspacePaneTabsSnapshot
@@ -324,11 +324,7 @@ export function installWorkspacePaneTabsTestBridge(
         canonicalRows: 24,
       }),
       pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
-      recoverSessions: async () => ({
-        terminalSessions: { revision: 0, sessions: [] },
-        snapshots: [],
-        workspacePaneTabs: { revision: 0, entries: [] },
-      }),
+      recoverSessions: async () => ({ revision: 0, sessions: [] }),
       notifyBell: async () => true,
       sendTestNotification: async () => true,
       setBadge: () => {},
@@ -588,12 +584,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             }),
           close: () => Promise.resolve(true),
           pruneTerminals: () => Promise.resolve({ pruned: 0, remaining: 0 }),
-          recoverSessions: () =>
-            Promise.resolve({
-              terminalSessions: { revision: 0, sessions: [] },
-              snapshots: [],
-              workspacePaneTabs: { revision: 0, entries: [] },
-            }),
+          recoverSessions: () => Promise.resolve({ revision: 0, sessions: [] }),
           notifyBell: () => Promise.resolve(true),
           sendTestNotification: () => Promise.resolve(true),
           setBadge: () => {},
@@ -744,11 +735,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           }
         }
         case 'terminal.recoverSessions':
-          return {
-            terminalSessions: { revision: 0, sessions: [] },
-            snapshots: [],
-            workspacePaneTabs: { revision: 0, entries: [] },
-          }
+          return { revision: 0, sessions: [] }
       }
     }
     return handler(payload) as TerminalClientTestOutputs[keyof TerminalClientTestOutputs]

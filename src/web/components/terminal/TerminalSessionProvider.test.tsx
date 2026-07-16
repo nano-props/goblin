@@ -601,9 +601,8 @@ beforeEach(() => {
         setBadge: vi.fn(async () => {}),
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         recoverSessions: async (input: { repoRoot: string }) => ({
-          terminalSessions: { revision: 1, sessions: completeServerSessions(await listSessionsMock(input)) },
-          snapshots: [],
-          workspacePaneTabs: { revision: 0, entries: [] },
+          revision: 1,
+          sessions: completeServerSessions(await listSessionsMock(input)),
         }),
         onOutput: vi.fn((cb: (event: TerminalOutputEvent) => void) => {
           outputHandler = cb
@@ -712,9 +711,8 @@ beforeEach(() => {
       close: closeMock,
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       recoverSessions: async (input) => ({
-        terminalSessions: { revision: 1, sessions: completeServerSessions(await listSessionsMock(input)) },
-        snapshots: [],
-        workspacePaneTabs: { revision: 0, entries: [] },
+        revision: 1,
+        sessions: completeServerSessions(await listSessionsMock(input)),
       }),
       notifyBell: window.goblinNative.terminal.notifyBell ?? vi.fn(async () => true),
       sendTestNotification: vi.fn(async () => true),

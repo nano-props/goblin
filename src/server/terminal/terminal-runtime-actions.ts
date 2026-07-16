@@ -10,7 +10,7 @@ import type {
   TerminalResizeInput,
   TerminalSessionInput,
   TerminalSessionSummary,
-  TerminalSessionsRecoveryResult,
+  TerminalSessionsSnapshot,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalWriteInput,
@@ -183,19 +183,13 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       clientId: string,
       userId: string,
       input: TerminalListSessionsInput,
-    ): Promise<TerminalSessionsRecoveryResult> {
+    ): Promise<TerminalSessionsSnapshot> {
       if (!isValidTerminalClientId(clientId) || !isValidRepoLocator(input.repoRoot)) {
-        return {
-          terminalSessions: { revision: 0, sessions: [] },
-          snapshots: [],
-          workspacePaneTabs: { revision: 0, entries: [] },
-        }
+        return { revision: 0, sessions: [] }
       }
       assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
       const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
-      const terminalSessions = manager.terminalSessionsSnapshotForUser(userId, scope)
-      const workspacePaneTabs = await sessionService.listWorkspaceTabs(userId, input.repoRoot, input.repoRuntimeId)
-      return { terminalSessions, snapshots: [], workspacePaneTabs }
+      return manager.terminalSessionsSnapshotForUser(userId, scope)
     },
 
     async listSessions(

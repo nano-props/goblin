@@ -8,7 +8,6 @@ import {
   isValidTerminalRuntimeSessionId,
   normalizeTerminalClientMessage,
   normalizeTerminalCreateResult,
-  normalizeTerminalSessionsRecoveryResult,
   normalizeTerminalSize,
   normalizeTerminalSocketServerMessage,
   terminalUtf8ByteLength,
@@ -376,33 +375,6 @@ describe('shared terminal validators', () => {
       ok: false,
       message: 'error.spawn-failed',
     })
-  })
-
-  test('normalizes independently revisioned terminal and workspace-tab recovery snapshots', () => {
-    const recovery = {
-      terminalSessions: { revision: 7, sessions: [] },
-      snapshots: [],
-      workspacePaneTabs: { revision: 11, entries: [] },
-    }
-    expect(normalizeTerminalSessionsRecoveryResult(recovery)).toEqual(recovery)
-    expect(
-      normalizeTerminalSessionsRecoveryResult({
-        ...recovery,
-        terminalSessions: { revision: -1, sessions: [] },
-      }),
-    ).toBeNull()
-    expect(
-      normalizeTerminalSessionsRecoveryResult({
-        ...recovery,
-        terminalSessions: { revision: 1.5, sessions: [] },
-      }),
-    ).toBeNull()
-    expect(
-      normalizeTerminalSessionsRecoveryResult({
-        ...recovery,
-        workspacePaneTabs: { revision: -1, entries: [] },
-      }),
-    ).toBeNull()
   })
 
   test('normalizes valid terminal socket server messages', () => {

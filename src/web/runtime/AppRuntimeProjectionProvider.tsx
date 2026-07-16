@@ -62,24 +62,13 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
         TERMINAL_RECOVERY_LANE,
         async () => ({
           clientId: readOrCreateWebTerminalClientId(),
-          recovery: await terminalClient.recoverSessions(scope.target),
+          catalog: await terminalClient.recoverSessions(scope.target),
         }),
-        ({ clientId, recovery }) => {
-          try {
-            writeCanonicalWorkspacePaneTabsSnapshot(
-              scope.target.repoRoot,
-              scope.target.repoRuntimeId,
-              recovery.workspacePaneTabs,
-            )
-          } catch (error) {
-            appRuntimeProjectionLog.debug('failed to apply workspace pane tabs from terminal recovery', { error })
-            refreshWorkspacePaneTabsForScope(scope)
-          }
+        ({ clientId, catalog }) => {
           const reconciled = terminalProjection.reconcileServerSessionsSnapshot(
             scope.target,
-            recovery.terminalSessions,
+            catalog,
             clientId,
-            terminalHydrationSnapshotMap(recovery.snapshots),
           )
           if (!reconciled) return
           if (options.resynchronizeConnectedViews) {
@@ -103,7 +92,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
         },
       )
     },
-    [refreshWorkspacePaneTabsForScope, terminalProjection],
+    [terminalProjection],
   )
 
   useEffect(() => () => scopeRegistry.disposeScopes(), [scopeRegistry])

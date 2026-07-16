@@ -253,12 +253,6 @@ export interface TerminalSessionsSnapshot {
   sessions: TerminalSessionSummary[]
 }
 
-export interface TerminalSessionsRecoveryResult {
-  terminalSessions: TerminalSessionsSnapshot
-  snapshots: TerminalHydrationSnapshot[]
-  workspacePaneTabs: WorkspacePaneTabsSnapshot
-}
-
 export type TerminalMutationResult = boolean
 
 /**
