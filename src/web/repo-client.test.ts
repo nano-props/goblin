@@ -307,7 +307,7 @@ describe('repo-client', () => {
           cwd: '/tmp/repo',
           repoRuntimeId: 'repo-runtime-test',
           branch: 'feature/work',
-          count: 50,
+          count: 100,
           skip: 0,
         }),
       }),

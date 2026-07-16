@@ -1221,7 +1221,7 @@ describe('RepoWorkspaceContent', () => {
       REPO_ID,
       repo.repoRuntimeId,
       'feature/history',
-      expect.objectContaining({ count: 50 }),
+      expect.objectContaining({ count: 100 }),
     )
     await waitFor(() => {
       expect(container.querySelector('[data-history-commit-graph=""]')).not.toBeNull()
