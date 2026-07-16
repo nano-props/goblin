@@ -71,7 +71,6 @@ class TerminalSessionService {
     this.createCoordinator = createTerminalSessionCreateCoordinator({ manager: options.manager })
     this.ensurer = createTerminalSessionEnsurer({
       manager: options.manager,
-      broadcastSessionsChanged: options.broadcastSessionsChanged,
       gCommand: options.gCommand,
     })
     this.pruner = createTerminalSessionPruner({ manager: options.manager })

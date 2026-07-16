@@ -32,7 +32,6 @@ describe('physical worktree capability boundaries', () => {
     const prepareSession = vi.fn(async () => ({ ok: false as const, message: 'stop-after-capture' }))
     const ensurer = createTerminalSessionEnsurer({
       manager: { prepareSession },
-      broadcastSessionsChanged: vi.fn(),
     })
     const capability = remoteCapability(remoteTarget('host-a.test'))
 

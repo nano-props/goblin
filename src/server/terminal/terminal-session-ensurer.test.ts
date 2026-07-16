@@ -101,10 +101,8 @@ describe('terminal session ensurer', () => {
 
   test('ensures local terminal sessions with resolved worktree metadata', async () => {
     const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId, input.cols, input.rows))
-    const broadcastSessionsChanged = vi.fn()
     const ensurer = createTerminalSessionEnsurer({
       manager: { prepareSession },
-      broadcastSessionsChanged,
     })
 
     const context = ensureContext({
@@ -153,15 +151,12 @@ describe('terminal session ensurer', () => {
       env: undefined,
       signal: context.signal,
     })
-    expect(broadcastSessionsChanged).not.toHaveBeenCalled()
   })
 
   test('ensures remote terminal sessions through an SSH invocation', async () => {
     const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId, input.cols, input.rows))
-    const broadcastSessionsChanged = vi.fn()
     const ensurer = createTerminalSessionEnsurer({
       manager: { prepareSession },
-      broadcastSessionsChanged,
     })
 
     const result = await ensurer.ensure(
@@ -213,16 +208,13 @@ describe('terminal session ensurer', () => {
     expect(input?.args?.at(-1)).toContain(REMOTE_WORKTREE_PATH)
     expect(input?.args?.at(-1)).toContain('pwd')
     expect(input?.startupShellCommand).toBeUndefined()
-    expect(broadcastSessionsChanged).not.toHaveBeenCalled()
   })
 
   test('uses the captured remote target after SSH config changes', async () => {
     vi.mocked(resolveRemoteTarget).mockRejectedValueOnce(new Error('error.ssh-config-changed'))
     const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId, input.cols, input.rows))
-    const broadcastSessionsChanged = vi.fn()
     const ensurer = createTerminalSessionEnsurer({
       manager: { prepareSession },
-      broadcastSessionsChanged,
     })
 
     await expect(

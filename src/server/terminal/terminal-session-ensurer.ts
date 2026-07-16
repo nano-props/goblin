@@ -68,7 +68,6 @@ export interface TerminalSessionEnsureManager {
 
 export interface TerminalSessionEnsurerOptions {
   manager: TerminalSessionEnsureManager
-  broadcastSessionsChanged(userId: string, repoRoot: string): void
   gCommand?: GoblinTerminalCommandRuntime
 }
 
