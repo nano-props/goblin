@@ -37,12 +37,7 @@ export class TerminalDirectory<
     abort: () => void
   } | null {
     const durableKey = this.userSessionKey(identity.userId, identity.terminalSessionId)
-    if (
-      this.entriesByRuntimeId.has(identity.id) ||
-      this.reservationsByRuntimeId.has(identity.id) ||
-      this.runtimeIdByUserSession.has(durableKey) ||
-      this.reservedRuntimeIdByUserSession.has(durableKey)
-    ) return null
+    if (this.hasIdentityConflict(identity, durableKey)) return null
     this.reservationsByRuntimeId.set(identity.id, identity)
     this.reservedRuntimeIdByUserSession.set(durableKey, identity.id)
     let settled = false
@@ -63,6 +58,15 @@ export class TerminalDirectory<
         this.reservedRuntimeIdByUserSession.delete(durableKey)
       },
     }
+  }
+
+  private hasIdentityConflict(identity: TerminalDirectoryReservation<TUser>, durableKey: string): boolean {
+    return (
+      this.entriesByRuntimeId.has(identity.id) ||
+      this.reservationsByRuntimeId.has(identity.id) ||
+      this.runtimeIdByUserSession.has(durableKey) ||
+      this.reservedRuntimeIdByUserSession.has(durableKey)
+    )
   }
 
   get(runtimeId: string): TEntry | undefined {

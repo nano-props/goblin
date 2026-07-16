@@ -166,11 +166,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (!this.isValidUserId(userId)) return { ok: false, message: 'error.invalid-arguments' }
     const existing = this.directory.getByDurableId(userId, input.terminalSessionId)
     if (existing) {
-      if (
-        existing.scope !== input.scope ||
-        existing.repoRuntimeId !== input.repoRuntimeId ||
-        existing.repoRoot !== input.repoRoot
-      ) {
+      if (!sameTerminalScope(existing, input)) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
       if (
@@ -924,4 +920,15 @@ function authorityReasonToMessage(reason: 'not-controller' | 'session-unowned' |
 
 function createTerminalRuntimeSessionId(): string {
   return createOpaqueId('pty')
+}
+
+function sameTerminalScope<TUser extends string | number>(
+  session: TerminalSessionView<TUser>,
+  input: TerminalEnsureSessionInput<TUser>,
+): boolean {
+  return (
+    session.scope === input.scope &&
+    session.repoRuntimeId === input.repoRuntimeId &&
+    session.repoRoot === input.repoRoot
+  )
 }
