@@ -182,6 +182,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       if (this.closeOperationsByTerminalRuntimeSessionId.has(existing.id)) {
         return { ok: false, message: 'error.unavailable' }
       }
+      const action = this.effectiveController(existing) ? 'restored' : 'reused'
       if (input.clientId) {
         registerTerminalClient(existing, input.clientId, size.cols, size.rows)
         this.applyIdentityEffect(
@@ -189,7 +190,6 @@ export class TerminalSessionManager<TUser extends string | number> {
           attachTerminalClient(existing, input.clientId, this.sessionPresence(existing)),
         )
       }
-      const action = this.effectiveController(existing) ? 'restored' : 'reused'
       return {
         ...this.prepareResult(existing),
         action,
@@ -229,7 +229,8 @@ export class TerminalSessionManager<TUser extends string | number> {
       // write path on the others without an identity round-trip.
       takeoverPending: false,
     }
-    if (!this.directory.publish(session)) return { ok: false, message: 'error.unavailable' }
+    const admission = this.directory.reserve(session)
+    if (!admission) return { ok: false, message: 'error.unavailable' }
     if (input.clientId) {
       registerTerminalClient(session, input.clientId, size.cols, size.rows)
       this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId, this.sessionPresence(session)))
@@ -242,17 +243,18 @@ export class TerminalSessionManager<TUser extends string | number> {
     const publication: TerminalSessionPublication = {
       kind: 'prepared',
       publish: () => {
-        if (settled || this.directory.get(session.id) !== session) throw new Error('error.unavailable')
+        if (settled) throw new Error('error.unavailable')
+        if (!admission.commit()) throw new Error('error.unavailable')
         settled = true
+        this.sink.onSessionsProjectionChanged?.(session.userId, session.repoRoot)
         return this.projectionRevision(userId, input.scope)
       },
       retire: () => {
         if (settled) return
         settled = true
-        if (this.directory.get(session.id) === session) {
-          const closedSession = this.detachSession(session)
-          this.sink.onSessionClosed?.(session.userId, closedSession, 'session')
-        }
+        admission.abort()
+        session.ptyBinding.invalidateOwnership()
+        session.ptyBinding.dispose(session)
       },
     }
     return {
@@ -816,7 +818,6 @@ export class TerminalSessionManager<TUser extends string | number> {
     // 1 events cannot safely activate sibling clients. Publish one complete
     // projection invalidation for every current fresh-generation outcome,
     // including spawn failure, so success and error converge identically.
-    this.sink.onSessionsProjectionChanged?.(session.userId, session.repoRoot)
     if (!spawn.result.ok) return { generation: spawn.generation, result: spawn.result }
     return { generation: spawn.generation, result: this.streamAttachResult(session) }
   }

@@ -152,6 +152,7 @@ function ensureSession(
     physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(input.worktreePath),
   })
   if (!prepared.ok) return Promise.resolve(prepared)
+  if (prepared.publication.kind === 'prepared') prepared.publication.publish()
   return manager.attachSession(
     input.userId,
     prepared.terminalRuntimeSessionId,
@@ -179,7 +180,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       rows: 24,
     })
     if (!prepared.ok) throw new Error(prepared.message)
-    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toHaveLength(1)
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toHaveLength(0)
     expect(prepared.publication.kind).toBe('prepared')
     if (prepared.publication.kind === 'prepared') prepared.publication.retire()
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
@@ -211,6 +212,8 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(prepared).toMatchObject({ ok: true, phase: 'opening', terminalRuntimeGeneration: 0 })
     expect(supervisor.spawn).not.toHaveBeenCalled()
     if (!prepared.ok) return
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
+    if (prepared.publication.kind === 'prepared') prepared.publication.publish()
 
     const freshAttach = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 123, 41, CLIENT_ID)
     expect(supervisor.spawn).toHaveBeenCalledWith(
@@ -273,6 +276,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       clientId: CLIENT_ID,
     })
     if (!prepared.ok) throw new Error(prepared.message)
+    if (prepared.publication.kind === 'prepared') prepared.publication.publish()
 
     const first = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
     const second = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 120, 40, 'client-test-2')
@@ -308,7 +312,8 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     })
     if (!prepared.ok) throw new Error(prepared.message)
 
-    await expect(manager.closeSessionForUser(USER_ID, prepared.terminalRuntimeSessionId)).resolves.toBe(true)
+    await expect(manager.closeSessionForUser(USER_ID, prepared.terminalRuntimeSessionId)).resolves.toBe(false)
+    if (prepared.publication.kind === 'prepared') prepared.publication.retire()
     expect(supervisor.spawn).not.toHaveBeenCalled()
     expect(supervisor.killed).toEqual([])
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])

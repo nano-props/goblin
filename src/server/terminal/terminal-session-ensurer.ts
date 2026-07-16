@@ -131,7 +131,6 @@ class TerminalSessionEnsurer {
       signal: context.signal,
     })
     if (!result.ok) return { ok: false, message: result.message }
-    this.options.broadcastSessionsChanged(userId, input.repoRoot)
     return toEnsureResult(context.terminalSessionId, result)
   }
 
@@ -169,7 +168,6 @@ class TerminalSessionEnsurer {
       signal: context.signal,
     })
     if (!result.ok) return { ok: false, message: result.message }
-    this.options.broadcastSessionsChanged(userId, input.repoRoot)
     return toEnsureResult(context.terminalSessionId, result)
   }
 }

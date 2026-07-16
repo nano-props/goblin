@@ -97,6 +97,13 @@ scope membership, and a membership-only catalog clock. Pending creation is not
 Directory state. Runtime objects continue to own mutable controller, lifecycle,
 title, process, geometry, generation, and render state.
 
+The Directory may reserve runtime and durable identities for one in-flight
+admission. A reservation participates only in uniqueness checks: catalog reads,
+runtime lookup, attach, and the membership clock cannot observe it. The
+operation-owned capability commits the reservation exactly once after Workspace
+placement validation, or aborts it without a membership transition. Commit is
+the sole new-session membership linearization point.
+
 Workspace runtime tabs are a pure projection of static layout, ordered epoch
 overlay hints, and Directory membership. Closing durably retires the PTY before
 removing Directory membership; the hidden placement hint is reclaimed later

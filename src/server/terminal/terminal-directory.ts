@@ -11,6 +11,8 @@ export class TerminalDirectory<
 > {
   private readonly entriesByRuntimeId = new Map<string, TEntry>()
   private readonly runtimeIdByUserSession = new Map<string, string>()
+  private readonly reservationsByRuntimeId = new Map<string, TEntry>()
+  private readonly reservedRuntimeIdByUserSession = new Map<string, string>()
   private readonly catalogRevisionByScope = new Map<string, number>()
 
   publish(entry: TEntry): boolean {
@@ -21,6 +23,34 @@ export class TerminalDirectory<
     this.runtimeIdByUserSession.set(durableKey, entry.id)
     this.advanceCatalogRevision(entry.userId, entry.scope)
     return true
+  }
+
+  reserve(entry: TEntry): { commit: () => boolean; abort: () => void } | null {
+    const durableKey = this.userSessionKey(entry.userId, entry.terminalSessionId)
+    if (
+      this.entriesByRuntimeId.has(entry.id) ||
+      this.reservationsByRuntimeId.has(entry.id) ||
+      this.runtimeIdByUserSession.has(durableKey) ||
+      this.reservedRuntimeIdByUserSession.has(durableKey)
+    ) return null
+    this.reservationsByRuntimeId.set(entry.id, entry)
+    this.reservedRuntimeIdByUserSession.set(durableKey, entry.id)
+    let settled = false
+    return {
+      commit: () => {
+        if (settled || this.reservationsByRuntimeId.get(entry.id) !== entry) return false
+        settled = true
+        this.reservationsByRuntimeId.delete(entry.id)
+        this.reservedRuntimeIdByUserSession.delete(durableKey)
+        return this.publish(entry)
+      },
+      abort: () => {
+        if (settled) return
+        settled = true
+        this.reservationsByRuntimeId.delete(entry.id)
+        this.reservedRuntimeIdByUserSession.delete(durableKey)
+      },
+    }
   }
 
   get(runtimeId: string): TEntry | undefined {

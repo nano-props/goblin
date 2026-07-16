@@ -153,7 +153,7 @@ describe('terminal session ensurer', () => {
       env: undefined,
       signal: context.signal,
     })
-    expect(broadcastSessionsChanged).toHaveBeenCalledWith(USER_ID, REPO_ROOT)
+    expect(broadcastSessionsChanged).not.toHaveBeenCalled()
   })
 
   test('ensures remote terminal sessions through an SSH invocation', async () => {
@@ -213,7 +213,7 @@ describe('terminal session ensurer', () => {
     expect(input?.args?.at(-1)).toContain(REMOTE_WORKTREE_PATH)
     expect(input?.args?.at(-1)).toContain('pwd')
     expect(input?.startupShellCommand).toBeUndefined()
-    expect(broadcastSessionsChanged).toHaveBeenCalledWith(USER_ID, REMOTE_REPO_ROOT)
+    expect(broadcastSessionsChanged).not.toHaveBeenCalled()
   })
 
   test('uses the captured remote target after SSH config changes', async () => {

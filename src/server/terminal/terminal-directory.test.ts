@@ -50,6 +50,34 @@ describe('TerminalDirectory', () => {
     directory.releaseScope('user_a', 'scope_a')
     expect(directory.catalogRevision('user_a', 'scope_a')).toBe(0)
   })
+
+  test('reserves durable identity without catalog visibility until commit', () => {
+    const directory = new TerminalDirectory<string, Entry>()
+    const reserved = entry('pty_reserved', 'term_reserved', 'scope_a')
+    const admission = directory.reserve(reserved)
+
+    expect(admission).not.toBeNull()
+    expect(directory.get('pty_reserved')).toBeUndefined()
+    expect(directory.getByDurableId('user_a', 'term_reserved')).toBeUndefined()
+    expect(directory.catalogRevision('user_a', 'scope_a')).toBe(0)
+    expect(directory.reserve(entry('pty_conflict', 'term_reserved', 'scope_a'))).toBeNull()
+
+    expect(admission?.commit()).toBe(true)
+    expect(directory.get('pty_reserved')).toBe(reserved)
+    expect(directory.catalogRevision('user_a', 'scope_a')).toBe(1)
+    expect(admission?.commit()).toBe(false)
+  })
+
+  test('aborts a reservation without a revision or close transition', () => {
+    const directory = new TerminalDirectory<string, Entry>()
+    const reserved = entry('pty_reserved', 'term_reserved', 'scope_a')
+    const admission = directory.reserve(reserved)
+
+    admission?.abort()
+    expect(directory.get('pty_reserved')).toBeUndefined()
+    expect(directory.catalogRevision('user_a', 'scope_a')).toBe(0)
+    expect(directory.reserve(entry('pty_retry', 'term_reserved', 'scope_a'))).not.toBeNull()
+  })
 })
 
 function entry(id: string, terminalSessionId: string, scope: string): Entry {
