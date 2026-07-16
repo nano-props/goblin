@@ -60,7 +60,6 @@ describe('terminal session creator', () => {
       terminalSessionId: 'term-createdcreatedcreated',
       admission: { kind: 'existing' },
       terminalRuntimeSessionId: 'pty_term-createdcreatedcreated',
-      terminalRuntimeGeneration: 1,
     })
     expect(result).not.toHaveProperty('sessions')
   })
@@ -149,7 +148,7 @@ function terminalSession(terminalSessionId: string): TerminalSessionSummary {
     controller: null,
     processName: 'zsh',
     canonicalTitle: null,
-    phase: 'open',
+    phase: 'open' as const,
     message: null,
     cols: 80,
     rows: 24,
@@ -159,14 +158,26 @@ function terminalSession(terminalSessionId: string): TerminalSessionSummary {
 function ensureResult(terminalSessionId: string): Extract<TerminalSessionEnsureResult, { ok: true }> {
   return {
     ok: true,
-    admission: { kind: 'existing', commit: () => 7, publishCommittedEffects: () => {}, abort: () => {} },
+    admission: {
+      kind: 'existing',
+      commit: () => committedResult(`pty_${terminalSessionId}`),
+      publishCommittedEffects: () => {},
+      abort: () => {},
+    },
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
-    terminalRuntimeGeneration: 1,
     terminalSessionId,
-    action: 'created',
+  }
+}
+
+function committedResult(terminalRuntimeSessionId: string) {
+  return {
+    action: 'created' as const,
+    terminalSessionsRevision: 7,
+    terminalRuntimeSessionId,
+    terminalRuntimeGeneration: 1,
     processName: 'zsh',
     canonicalTitle: null,
-    phase: 'open',
+    phase: 'open' as const,
     message: null,
     controller: null,
     canonicalCols: 80,

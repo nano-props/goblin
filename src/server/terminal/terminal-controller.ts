@@ -96,25 +96,6 @@ export function registerTerminalClient(
   state.attachments.set(clientId, { cols, rows })
 }
 
-export function projectAttachedTerminalController(
-  state: TerminalControllerState,
-  clientId: string,
-  cols: number,
-  rows: number,
-  isClientOnline: TerminalClientPresence,
-): TerminalController | null {
-  const projected: TerminalControllerState = {
-    controllerClientId: state.controllerClientId,
-    userSticky: state.userSticky,
-    attachments: new Map(state.attachments),
-    cols: state.cols,
-    rows: state.rows,
-  }
-  registerTerminalClient(projected, clientId, cols, rows)
-  attachTerminalClient(projected, clientId, isClientOnline)
-  return effectiveTerminalController(projected, isClientOnline)
-}
-
 export function attachTerminalClient(
   state: TerminalControllerState,
   clientId: string,

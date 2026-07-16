@@ -86,7 +86,7 @@ export interface WorkspaceRuntimeTabPlacementInput {
   permit: PhysicalWorktreeOperationPermit
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   isRuntimeCurrent: () => boolean
-  commitAdmission?: () => void
+  commitAdmission?: (canonicalBranchName: string) => void
 }
 
 export interface WorkspaceRuntimeTabPlacement {
@@ -128,11 +128,12 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
         worktreePath: input.worktreePath,
       }
       const requestedTargetKey = workspacePaneTabsTargetIdentityKey(requestedTarget)
-      const validTargets = capturedTargets.some(
+      const canonicalTarget = capturedTargets.find(
         (target) => workspacePaneTabsTargetIdentityKey(target) === requestedTargetKey,
-      )
-        ? capturedTargets
-        : [...capturedTargets, requestedTarget]
+      ) ?? requestedTarget
+      const validTargets = canonicalTarget === requestedTarget
+        ? [...capturedTargets, requestedTarget]
+        : capturedTargets
       const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
@@ -154,7 +155,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
         lease: physicalWorktreeAdmissionLease(physicalCapability),
         tabs,
       })
-      input.commitAdmission?.()
+      input.commitAdmission?.(canonicalTarget.branchName)
       return { kind: 'committed' }
     })
   }

@@ -24,7 +24,6 @@ import {
   effectiveTerminalController,
   explainAuthority,
   isAuthoritative,
-  projectAttachedTerminalController,
   registerTerminalClient,
   restartTerminalClientControl,
   terminalIdentityChanged,
@@ -53,11 +52,7 @@ interface TerminalPtyRestartResult {
 }
 
 export type TerminalSessionPrepareResult =
-  | ({
-      ok: true
-      action: TerminalCreateAction
-      admission: TerminalSessionAdmission
-    } & TerminalRuntimeMetadata)
+  | { ok: true; terminalRuntimeSessionId: string; admission: TerminalSessionAdmission }
   | { ok: false; message: string }
 
 export interface TerminalEnsureSessionInput<TUser extends string | number> {
@@ -178,41 +173,41 @@ export class TerminalSessionManager<TUser extends string | number> {
       if (!this.isSessionAvailableForAdmission(existing)) {
         return { ok: false, message: 'error.unavailable' }
       }
-      const action = this.effectiveController(existing) ? 'restored' : 'reused'
-      const projectedController = input.clientId
-        ? projectAttachedTerminalController(
-            existing,
-            input.clientId,
-            size.cols,
-            size.rows,
-            this.sessionPresence(existing),
-          )
-        : undefined
       let admissionState: 'pending' | 'committed' | 'aborted' = 'pending'
       let committedEffect: ReturnType<typeof attachTerminalClient> | null = null
+      let branchChanged = false
       let effectsPublished = false
       return {
-        ...this.prepareResult(existing, projectedController),
-        action,
+        ok: true,
+        terminalRuntimeSessionId: existing.id,
         admission: {
           kind: 'existing',
-          commit: () => {
+          commit: ({ canonicalBranch }) => {
             if (admissionState !== 'pending') throw new Error('error.unavailable')
             if (!this.isSessionAvailableForAdmission(existing)) {
               admissionState = 'aborted'
               throw new Error('error.unavailable')
             }
+            const action: TerminalCreateAction = this.effectiveController(existing) ? 'restored' : 'reused'
+            branchChanged = existing.branch !== canonicalBranch
+            existing.branch = canonicalBranch
             if (input.clientId) {
               registerTerminalClient(existing, input.clientId, size.cols, size.rows)
               committedEffect = attachTerminalClient(existing, input.clientId, this.sessionPresence(existing))
+              committedEffect = this.commitIdentityMutation(existing, committedEffect)
             }
             admissionState = 'committed'
-            return this.projectionRevision(userId, input.scope)
+            return {
+              action,
+              terminalSessionsRevision: this.projectionRevision(userId, input.scope),
+              ...this.runtimeMetadata(existing),
+            }
           },
           publishCommittedEffects: () => {
             if (admissionState !== 'committed' || effectsPublished) return
             effectsPublished = true
-            if (committedEffect) this.applyIdentityEffect(existing, committedEffect)
+            if (committedEffect?.emitIdentity) this.emitIdentity(existing)
+            if (branchChanged) this.sink.onSessionsProjectionChanged?.(existing.userId, existing.repoRoot)
           },
           abort: () => {
             if (admissionState !== 'pending') return
@@ -257,13 +252,6 @@ export class TerminalSessionManager<TUser extends string | number> {
     const reservation = this.directory.reserve({ id, userId, scope: input.scope, terminalSessionId: input.terminalSessionId })
     if (!reservation) return { ok: false, message: 'error.unavailable' }
     let committedEffect: ReturnType<typeof attachTerminalClient> | null = null
-    if (input.clientId) {
-      registerTerminalClient(session, input.clientId, size.cols, size.rows)
-      // Update the local authoritative controller projection now so the
-      // admission response is complete, but defer realtime emission until
-      // Directory commit makes the session visible.
-      committedEffect = attachTerminalClient(session, input.clientId, this.sessionPresence(session))
-    }
     // Logical creation stops here. The selected client mounts and fits its
     // single xterm before `attachSession` starts the PTY with exact geometry.
     // Until admission commit, this operation-owned session is not addressable
@@ -272,16 +260,26 @@ export class TerminalSessionManager<TUser extends string | number> {
     let effectsPublished = false
     const admission: TerminalSessionAdmission = {
       kind: 'prepared',
-      commit: () => {
+      commit: ({ canonicalBranch }) => {
         if (admissionState !== 'pending') throw new Error('error.unavailable')
         reservation.commit(session)
+        session.branch = canonicalBranch
+        if (input.clientId) {
+          registerTerminalClient(session, input.clientId, size.cols, size.rows)
+          committedEffect = attachTerminalClient(session, input.clientId, this.sessionPresence(session))
+          committedEffect = this.commitIdentityMutation(session, committedEffect)
+        }
         admissionState = 'committed'
-        return this.projectionRevision(userId, input.scope)
+        return {
+          action: 'created',
+          terminalSessionsRevision: this.projectionRevision(userId, input.scope),
+          ...this.runtimeMetadata(session),
+        }
       },
       publishCommittedEffects: () => {
         if (admissionState !== 'committed' || effectsPublished) return
         effectsPublished = true
-        if (committedEffect) this.applyIdentityEffect(session, committedEffect)
+        if (committedEffect?.emitIdentity) this.emitIdentity(session)
         this.sink.onSessionsProjectionChanged?.(session.userId, session.repoRoot)
       },
       abort: () => {
@@ -293,8 +291,8 @@ export class TerminalSessionManager<TUser extends string | number> {
       },
     }
     return {
-      ...this.prepareResult(session),
-      action: 'created',
+      ok: true,
+      terminalRuntimeSessionId: session.id,
       admission,
     }
   }
@@ -692,16 +690,6 @@ export class TerminalSessionManager<TUser extends string | number> {
     }
   }
 
-  private prepareResult(
-    session: TerminalSessionView<TUser>,
-    controller?: TerminalController | null,
-  ): { ok: true } & TerminalRuntimeMetadata {
-    return {
-      ok: true,
-      ...this.runtimeMetadata(session, controller),
-    }
-  }
-
   private streamAttachResult(session: TerminalSessionView<TUser>): TerminalAttachResult {
     if (session.phase !== 'open') return { ok: false, message: 'error.unavailable' }
     return {
@@ -803,6 +791,15 @@ export class TerminalSessionManager<TUser extends string | number> {
   ): void {
     if (effect.resizeTo) this.resizeSessionPty(session, effect.resizeTo.cols, effect.resizeTo.rows)
     if (effect.emitIdentity) this.emitIdentity(session)
+  }
+
+  private commitIdentityMutation(
+    session: TerminalSessionView<TUser>,
+    effect: ReturnType<typeof attachTerminalClient>,
+  ): ReturnType<typeof attachTerminalClient> {
+    if (!effect.resizeTo) return effect
+    const resized = session.ptyBinding.resize(session, effect.resizeTo.cols, effect.resizeTo.rows)
+    return { emitIdentity: effect.emitIdentity || resized }
   }
 
   private async restartAndAttachSession(

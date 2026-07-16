@@ -152,7 +152,7 @@ function ensureSession(
     physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(input.worktreePath),
   })
   if (!prepared.ok) return Promise.resolve(prepared)
-  prepared.admission.commit()
+  prepared.admission.commit({ canonicalBranch: BRANCH_NAME })
   prepared.admission.publishCommittedEffects()
   return manager.attachSession(
     input.userId,
@@ -189,7 +189,8 @@ describe('TerminalSessionManager fresh stream boundary', () => {
 
   test('defers an existing session attachment until placement admission commits', () => {
     const onIdentity = vi.fn()
-    const manager = createManager(createDeferredPtySupervisor(), { onIdentity })
+    const onSessionsProjectionChanged = vi.fn()
+    const manager = createManager(createDeferredPtySupervisor(), { onIdentity, onSessionsProjectionChanged })
     const input = {
       userId: USER_ID,
       scope: SCOPE,
@@ -205,18 +206,22 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     }
     const created = manager.prepareSession(input)
     if (!created.ok) throw new Error(created.message)
-    created.admission.commit()
+    created.admission.commit({ canonicalBranch: BRANCH_NAME })
     created.admission.publishCommittedEffects()
+    onSessionsProjectionChanged.mockClear()
 
     const aborted = manager.prepareSession({ ...input, clientId: 'client-aborted' })
     if (!aborted.ok) throw new Error(aborted.message)
-    expect(aborted).toMatchObject({ action: 'reused', controller: { clientId: 'client-aborted' } })
+    expect(aborted).toMatchObject({ ok: true })
     aborted.admission.abort()
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions[0]?.controller).toBeNull()
 
     const admitted = manager.prepareSession({ ...input, clientId: CLIENT_ID })
     if (!admitted.ok) throw new Error(admitted.message)
-    admitted.admission.commit()
+    expect(admitted.admission.commit({ canonicalBranch: 'renamed-branch' })).toMatchObject({
+      action: 'reused',
+      controller: { clientId: CLIENT_ID },
+    })
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions[0]?.controller).toEqual({
       clientId: CLIENT_ID,
       status: 'connected',
@@ -224,6 +229,8 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(onIdentity).not.toHaveBeenCalled()
     admitted.admission.publishCommittedEffects()
     expect(onIdentity).toHaveBeenCalledOnce()
+    expect(onSessionsProjectionChanged).toHaveBeenCalledOnce()
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions[0]?.branch).toBe('renamed-branch')
   })
 
   test('rejects an existing admission after the PTY exits during placement preparation', async () => {
@@ -251,7 +258,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
 
     supervisor.emitExit('pty_initial_123456')
 
-    expect(() => admission.admission.commit()).toThrow('error.unavailable')
+    expect(() => admission.admission.commit({ canonicalBranch: BRANCH_NAME })).toThrow('error.unavailable')
     admission.admission.publishCommittedEffects()
     expect(onIdentity).not.toHaveBeenCalled()
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
@@ -288,7 +295,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
 
     const retirement = manager.requestSessionRetirement(created.terminalRuntimeSessionId)
 
-    expect(() => admission.admission.commit()).toThrow('error.unavailable')
+    expect(() => admission.admission.commit({ canonicalBranch: BRANCH_NAME })).toThrow('error.unavailable')
     admission.admission.publishCommittedEffects()
     expect(onIdentity).not.toHaveBeenCalled()
     await vi.waitFor(() => expect(finishRetirement).toBeTypeOf('function'))
@@ -319,11 +326,15 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       startupShellCommand: 'echo ready\r',
       env: { GOBLIN_TEST: '1' },
     })
-    expect(prepared).toMatchObject({ ok: true, phase: 'opening', terminalRuntimeGeneration: 0 })
+    expect(prepared).toMatchObject({ ok: true })
     expect(supervisor.spawn).not.toHaveBeenCalled()
     if (!prepared.ok) return
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
-    prepared.admission.commit()
+    expect(prepared.admission.commit({ canonicalBranch: BRANCH_NAME })).toMatchObject({
+      action: 'created',
+      phase: 'opening',
+      terminalRuntimeGeneration: 0,
+    })
     expect(onSessionsProjectionChanged).not.toHaveBeenCalled()
     prepared.admission.publishCommittedEffects()
     expect(onSessionsProjectionChanged).toHaveBeenCalledOnce()
@@ -389,7 +400,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       clientId: CLIENT_ID,
     })
     if (!prepared.ok) throw new Error(prepared.message)
-    prepared.admission.commit()
+    prepared.admission.commit({ canonicalBranch: BRANCH_NAME })
     prepared.admission.publishCommittedEffects()
 
     const first = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 100, 30, CLIENT_ID)

@@ -30,8 +30,8 @@ A session is the long-lived terminal business object.
 It owns:
 
 - session identity
-- target metadata (`repoRoot`, `repoRuntimeId`, `branch`, `worktreePath`)
-- worktree identity
+- stable target identity (`repoRoot`, `repoRuntimeId`, `worktreePath`, physical worktree identity)
+- the current canonical branch label for that target
 - canonical geometry
 - PTY lifecycle association
 - attachment set
@@ -47,9 +47,12 @@ snapshots. It should not try to predict browser font metrics or local xterm
 layout details before a real view exists.
 
 The server-owned session is also authoritative for the terminal's workspace
-target metadata. `branch` is stored on the session at creation time for both
-local and remote sessions; workspace-pane tab recovery must not depend on a
-client-side repo snapshot or a local `git worktree` lookup to rediscover it.
+target projection. Worktree identity does not include `branch`: a branch can be
+renamed while the physical worktree and terminal session remain the same. A
+new or reused admission therefore resolves the current canonical branch at the
+Workspace target-capture boundary and stores that label on the session. Tab
+recovery uses the stored canonical label and does not depend on a client-side
+repo snapshot or an ad hoc local `git worktree` lookup.
 
 Server-owned runtime ids should also drive terminal writes. If a mutation
 targets a live session by `terminalRuntimeSessionId`, close/restart/takeover should be
@@ -92,7 +95,7 @@ publishes the resulting canonical geometry.
 ## Target server session shape
 
 `TerminalDirectory` is the sole live membership authority. It owns runtime and
-durable identity indexes, immutable target facts, physical-worktree capability,
+durable identity indexes, stable target identity facts, physical-worktree capability,
 scope membership, and a membership-only catalog clock. Pending creation is not
 Directory state. Runtime objects continue to own mutable controller, lifecycle,
 title, process, geometry, generation, and render state.
@@ -112,7 +115,8 @@ with its Workspace target or epoch.
 At a high level, the server-side session model should evolve toward:
 
 - session identity and scope
-- target metadata: `repoRoot`, `repoRuntimeId`, `branch`, `worktreePath`
+- stable target identity: `repoRoot`, `repoRuntimeId`, `worktreePath`, physical worktree identity
+- mutable canonical target label: `branch`
 - lifecycle phase
 - canonical geometry
 - PTY binding information

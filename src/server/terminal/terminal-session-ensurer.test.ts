@@ -129,8 +129,6 @@ describe('terminal session ensurer', () => {
       ok: true,
       admission: { kind: 'existing' },
       terminalSessionId: 'term-locallocallocallocal1',
-      canonicalCols: 100,
-      canonicalRows: 40,
     })
     expect(getWorktrees).not.toHaveBeenCalled()
     expect(resolveKnownWorktree).not.toHaveBeenCalled()
@@ -179,10 +177,7 @@ describe('terminal session ensurer', () => {
 
     expect(result).toMatchObject({
       ok: true,
-      action: 'created',
       terminalSessionId: 'term-remoteremoteremote001',
-      canonicalCols: 120,
-      canonicalRows: 32,
     })
     expect(resolveRemoteTarget).not.toHaveBeenCalled()
     expect(prepareSession).toHaveBeenCalledTimes(1)
@@ -247,16 +242,24 @@ function preparedResult(
 ): Extract<TerminalSessionPrepareManagerResult, { ok: true }> {
   return {
     ok: true,
-    action: 'created',
-    admission: { kind: 'existing', commit: () => 7, publishCommittedEffects: () => {}, abort: () => {} },
+    admission: {
+      kind: 'existing',
+      commit: () => ({
+        action: 'created',
+        terminalSessionsRevision: 7,
+        terminalRuntimeSessionId: `pty_${terminalSessionId}`,
+        terminalRuntimeGeneration: 1,
+        processName: 'zsh',
+        canonicalTitle: null,
+        phase: 'open',
+        message: null,
+        controller: null,
+        canonicalCols: cols,
+        canonicalRows: rows,
+      }),
+      publishCommittedEffects: () => {},
+      abort: () => {},
+    },
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
-    terminalRuntimeGeneration: 1,
-    processName: 'zsh',
-    canonicalTitle: null,
-    phase: 'open',
-    message: null,
-    controller: null,
-    canonicalCols: cols,
-    canonicalRows: rows,
   }
 }

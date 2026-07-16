@@ -62,6 +62,33 @@ describe('workspace pane tabs coordinator queues', () => {
     expect(admitted.value).toEqual({ kind: 'committed' })
   })
 
+  test('commits admission with the canonical branch for an existing worktree target', async () => {
+    const operations = createPhysicalWorktreeOperationCoordinator()
+    const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
+      userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a',
+    })
+    const commitAdmission = vi.fn()
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      layoutAggregate: aggregateFor(memoryRepository()),
+      runtimeProviders: [],
+      worktreeOperations: operations,
+      physicalWorktrees: { capture: async () => capability },
+      targetProjection: testTargetProjection([{
+        repoRoot: '/repo', branchName: 'feature/renamed', worktreePath: '/repo/worktree',
+      }]),
+    })
+
+    const admitted = await operations.runOperation(capability, async (permit) =>
+      await coordinator.ensureRuntimeTabForSession({
+        userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a', branchName: 'feature/old',
+        worktreePath: '/repo/worktree', runtimeType: 'terminal', sessionId: 'term-preparedprepared001',
+        permit, physicalWorktreeCapability: capability, isRuntimeCurrent: () => true, commitAdmission,
+      }))
+
+    expect(admitted.admitted).toBe(true)
+    expect(commitAdmission).toHaveBeenCalledWith('feature/renamed')
+  })
+
   test('serializes repository reads with a later durable command', async () => {
     let layout: WorkspacePaneDurableLayout = { entries: [{
       repoRoot: '/repo', branchName: 'main', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')],

@@ -24,21 +24,26 @@ export interface TerminalSessionEnsureInput {
 }
 
 export type TerminalSessionEnsureResult =
-  | ({
+  | {
       ok: true
       terminalSessionId: string
-      action: TerminalCreateAction
+      terminalRuntimeSessionId: string
       admission: TerminalSessionAdmission
-    } & TerminalRuntimeMetadata)
+    }
   | { ok: false; message: string }
 
 export type TerminalSessionPrepareManagerResult =
-  | ({ ok: true; action: TerminalCreateAction; admission: TerminalSessionAdmission } & TerminalRuntimeMetadata)
+  | { ok: true; terminalRuntimeSessionId: string; admission: TerminalSessionAdmission }
   | { ok: false; message: string }
+
+export type TerminalSessionAdmissionCommitResult = {
+  action: TerminalCreateAction
+  terminalSessionsRevision: number
+} & TerminalRuntimeMetadata
 
 export interface TerminalSessionAdmission {
   kind: 'existing' | 'prepared'
-  commit(): number
+  commit(input: { canonicalBranch: string }): TerminalSessionAdmissionCommitResult
   publishCommittedEffects(): void
   abort(): void
 }
@@ -185,16 +190,7 @@ function toEnsureResult(
   return {
     ok: true,
     terminalRuntimeSessionId: prepared.terminalRuntimeSessionId,
-    terminalRuntimeGeneration: prepared.terminalRuntimeGeneration,
     terminalSessionId,
-    action: prepared.action,
     admission: prepared.admission,
-    processName: prepared.processName,
-    canonicalTitle: prepared.canonicalTitle,
-    phase: prepared.phase,
-    message: prepared.message,
-    controller: prepared.controller,
-    canonicalCols: prepared.canonicalCols,
-    canonicalRows: prepared.canonicalRows,
   }
 }

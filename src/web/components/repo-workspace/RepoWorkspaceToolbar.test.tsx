@@ -39,6 +39,7 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import {
   createRepoBranch,

@@ -10,9 +10,12 @@ import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-remo
 type TerminalSessionCreateCoordinator = ReturnType<typeof createTerminalSessionCreateCoordinator>
 type TerminalCreateFailure = Extract<TerminalCreateResult, { ok: false }>
 export type ServerTerminalCreateResult =
-  | (Omit<Extract<TerminalCreateResult, { ok: true }>, 'terminalSessionsRevision'> & {
+  | {
+      ok: true
+      terminalSessionId: string
+      terminalRuntimeSessionId: string
       admission: Extract<TerminalSessionEnsureResult, { ok: true }>['admission']
-    })
+    }
   | TerminalCreateFailure
 
 interface TerminalSessionCreatorOptions {
@@ -74,18 +77,9 @@ class TerminalSessionCreator {
         }
         return {
           ok: true,
-          action: createResult.action,
           terminalSessionId: createResult.terminalSessionId,
           admission: createResult.admission,
           terminalRuntimeSessionId: createResult.terminalRuntimeSessionId,
-          terminalRuntimeGeneration: createResult.terminalRuntimeGeneration,
-          processName: createResult.processName,
-          canonicalTitle: createResult.canonicalTitle,
-          phase: createResult.phase,
-          message: createResult.message,
-          controller: createResult.controller,
-          canonicalCols: createResult.canonicalCols,
-          canonicalRows: createResult.canonicalRows,
         }
       },
     )

@@ -1,4 +1,9 @@
-import type { TerminalCreateInput, TerminalSessionInput, TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import type {
+  TerminalCreateInput,
+  TerminalCreateResult,
+  TerminalSessionInput,
+  TerminalSessionSummary,
+} from '#/shared/terminal-types.ts'
 import type {
   TerminalWorkspacePaneRuntimeOpenInput,
   WorkspacePaneRuntimeCloseInput,
@@ -130,7 +135,7 @@ export class WorkspacePaneRuntimeApplication {
     if (!runtime.ok) return { ok: false, runtimeType: 'terminal', message: runtime.message }
 
     const worktreePath = requestedWorktreePath
-    let admittedRevision: number | null = null
+    let committedRuntime: Extract<TerminalCreateResult, { ok: true }> | null = null
     let paneCommit
     try {
       paneCommit = await this.deps.workspaceTabsCoordinator.ensureRuntimeTabForSession({
@@ -146,13 +151,16 @@ export class WorkspacePaneRuntimeApplication {
         physicalWorktreeCapability,
         isRuntimeCurrent: () =>
           this.deps.isCurrentRepoRuntime(userId, input.request.repoRoot, input.request.repoRuntimeId),
-        commitAdmission: () => {
-          admittedRevision = runtime.admission.commit()
-          return admittedRevision
+        commitAdmission: (canonicalBranch) => {
+          committedRuntime = {
+            ok: true,
+            terminalSessionId: runtime.terminalSessionId,
+            ...runtime.admission.commit({ canonicalBranch }),
+          }
         },
       })
     } catch (error) {
-      if (admittedRevision === null) runtime.admission.abort()
+      if (committedRuntime === null) runtime.admission.abort()
       workspacePaneRuntimeApplicationLogger.error(
         { error, userId, repoRoot: input.request.repoRoot, worktreePath },
         'terminal open application command failed',
@@ -164,14 +172,13 @@ export class WorkspacePaneRuntimeApplication {
       return runtimeFailure('terminal', 'error.repo-runtime-stale')
     }
 
-    if (admittedRevision === null) throw new Error('terminal admission did not produce a catalog revision')
+    if (committedRuntime === null) throw new Error('terminal admission did not produce a committed result')
     runtime.admission.publishCommittedEffects()
-    const { admission: _admission, ...runtimeResult } = runtime
     this.deps.broadcastWorkspaceTabsChanged(userId, input.request.repoRoot)
     return {
       ok: true,
       runtimeType: 'terminal',
-      runtime: { ...runtimeResult, terminalSessionsRevision: admittedRevision },
+      runtime: committedRuntime,
     }
   }
 

@@ -37,8 +37,8 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const create = vi.fn(async () => runtime)
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(request.worktreePath)
     const capture = vi.fn(async () => physicalWorktreeCapability)
-    const ensureRuntimeTabForSession = vi.fn(async (input: { commitAdmission?: () => void }) => {
-      input.commitAdmission?.()
+    const ensureRuntimeTabForSession = vi.fn(async (input: { commitAdmission?: (canonicalBranch: string) => void }) => {
+      input.commitAdmission?.(request.branch)
       return { kind: 'committed' as const }
     })
     const broadcastWorkspaceTabsChanged = vi.fn()
@@ -179,13 +179,12 @@ describe('WorkspacePaneRuntimeApplication', () => {
   test.each(['created', 'reused', 'restored'] as const)(
     'rechecks repo runtime authority at the tab commit boundary for a %s terminal',
     async (action) => {
-      const runtime = terminalCreateSuccess()
-      runtime.action = action
+      const runtime = terminalCreateSuccess(action)
       const retire = vi.fn()
       runtime.admission =
         action === 'created'
-          ? { kind: 'prepared', commit: () => 1, publishCommittedEffects: vi.fn(), abort: retire }
-          : { kind: 'existing', commit: () => 1, publishCommittedEffects: vi.fn(), abort: vi.fn() }
+          ? { ...runtime.admission, kind: 'prepared', abort: retire }
+          : { ...runtime.admission, kind: 'existing', abort: vi.fn() }
       const close = vi.fn(() => true)
       const stale = { ok: false as const, runtimeType: 'terminal' as const, message: 'error.repo-runtime-stale' }
       const ensureRuntimeTabForSession = vi.fn(async (input: { isRuntimeCurrent: () => boolean }) =>
@@ -341,8 +340,8 @@ describe('WorkspacePaneRuntimeApplication', () => {
         close: () => true,
       },
       workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: async (input: { commitAdmission?: () => void }) => {
-          input.commitAdmission?.()
+        ensureRuntimeTabForSession: async (input: { commitAdmission?: (canonicalBranch: string) => void }) => {
+          input.commitAdmission?.(request.branch)
           return { kind: 'committed' as const }
         },
       },
@@ -384,10 +383,10 @@ describe('WorkspacePaneRuntimeApplication', () => {
         ensureRuntimeTabForSession: async (input: {
           physicalWorktreeCapability: ReturnType<typeof testPhysicalWorktreeExecutionCapability>
           permit: PhysicalWorktreeOperationPermit
-          commitAdmission?: () => void
+          commitAdmission?: (canonicalBranch: string) => void
         }) => {
           worktreeOperations.assertPermit(input.physicalWorktreeCapability, input.permit)
-          input.commitAdmission?.()
+          input.commitAdmission?.(request.branch)
           return { kind: 'committed' as const }
         },
       },
@@ -442,7 +441,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
   test('retires an unpublished terminal if placement preparation throws', async () => {
     const runtime = terminalCreateSuccess()
     const retire = vi.fn()
-    runtime.admission = { kind: 'prepared', commit: () => 1, publishCommittedEffects: vi.fn(), abort: retire }
+    runtime.admission = { ...runtime.admission, kind: 'prepared', abort: retire }
     const close = vi.fn(async () => true)
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
@@ -471,7 +470,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
 
   test('does not compensate an invariant failure after admission', async () => {
     const runtime = terminalCreateSuccess()
-    const publish = vi.fn(() => 1)
+    const publish = vi.fn(() => committedTerminalResult('created'))
     const retire = vi.fn()
     const publishCommittedEffects = vi.fn()
     runtime.admission = { kind: 'prepared', commit: publish, publishCommittedEffects, abort: retire }
@@ -483,8 +482,8 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: async () => runtime, close },
       workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: async (input: { commitAdmission?: () => void }) => {
-          input.commitAdmission?.()
+        ensureRuntimeTabForSession: async (input: { commitAdmission?: (canonicalBranch: string) => void }) => {
+          input.commitAdmission?.(request.branch)
           throw new Error('invariant failure after admission')
         },
       },
@@ -505,21 +504,33 @@ describe('WorkspacePaneRuntimeApplication', () => {
   })
 })
 
-function terminalCreateSuccess(): Extract<ServerTerminalCreateResult, { ok: true }> {
+function terminalCreateSuccess(action: 'created' | 'restored' | 'reused' = 'created'): Extract<ServerTerminalCreateResult, { ok: true }> {
   const terminalRuntimeSessionId = 'pty_session_1_aaaaaaaaa'
   const terminalSessionId = 'term-111111111111111111111'
   return {
     ok: true,
-    action: 'created',
     terminalSessionId,
-    admission: { kind: 'existing', commit: () => 1, publishCommittedEffects: vi.fn(), abort: vi.fn() },
+    admission: {
+      kind: 'existing',
+      commit: () => committedTerminalResult(action),
+      publishCommittedEffects: vi.fn(),
+      abort: vi.fn(),
+    },
     terminalRuntimeSessionId,
+  }
+}
+
+function committedTerminalResult(action: 'created' | 'restored' | 'reused') {
+  return {
+    action,
+    terminalSessionsRevision: 1,
+    terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
     terminalRuntimeGeneration: 1,
     processName: 'zsh',
     canonicalTitle: null,
-    phase: 'open',
+    phase: 'open' as const,
     message: null,
-    controller: { clientId: 'client-test', status: 'connected' },
+    controller: { clientId: 'client-test', status: 'connected' as const },
     canonicalCols: 100,
     canonicalRows: 30,
   }
@@ -528,10 +539,10 @@ function terminalCreateSuccess(): Extract<ServerTerminalCreateResult, { ok: true
 function publishedTerminalResult(
   runtime: Extract<ServerTerminalCreateResult, { ok: true }>,
 ): Extract<TerminalCreateResult, { ok: true }> {
-  const { admission, ...result } = runtime
   return {
-    ...result,
-    terminalSessionsRevision: admission.commit(),
+    ok: true,
+    terminalSessionId: runtime.terminalSessionId,
+    ...runtime.admission.commit({ canonicalBranch: request.branch }),
   }
 }
 
