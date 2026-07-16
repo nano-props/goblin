@@ -6,7 +6,7 @@ import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
-import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import { runtimeWorkspacePaneTarget, workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface CommitWorkspacePaneTabsInput {
   repoRoot: string
@@ -214,11 +214,12 @@ export function writeCanonicalWorkspacePaneTabsSnapshot(
 export async function replaceWorkspacePaneTabsOnServer(
   input: CommitWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsSnapshot> {
+  const target = runtimeWorkspacePaneTarget(input, input.repoRuntimeId)
+  if (!target) throw new Error('error.workspace-tabs-target-invalid')
   return await workspacePaneTabsClient.replace({
-    repoRoot: input.repoRoot,
-    repoRuntimeId: input.repoRuntimeId,
-    branchName: input.branchName,
-    worktreePath: input.worktreePath,
+    workspaceId: input.repoRoot,
+    workspaceRuntimeId: input.repoRuntimeId,
+    target,
     tabs: input.tabs,
   })
 }
@@ -226,11 +227,12 @@ export async function replaceWorkspacePaneTabsOnServer(
 export async function updateWorkspacePaneTabsOnServer(
   input: UpdateWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsSnapshot> {
+  const target = runtimeWorkspacePaneTarget(input, input.repoRuntimeId)
+  if (!target) throw new Error('error.workspace-tabs-target-invalid')
   return await workspacePaneTabsClient.update({
-    repoRoot: input.repoRoot,
-    repoRuntimeId: input.repoRuntimeId,
-    branchName: input.branchName,
-    worktreePath: input.worktreePath,
+    workspaceId: input.repoRoot,
+    workspaceRuntimeId: input.repoRuntimeId,
+    target,
     operation: input.operation,
   })
 }

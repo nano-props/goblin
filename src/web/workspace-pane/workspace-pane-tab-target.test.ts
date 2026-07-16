@@ -21,7 +21,7 @@ import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { repoWorktreeStatusQueryKey } from '#/web/repo-data-query.ts'
 
-const REPO_ID = '/tmp/workspace-pane-target-repo'
+const REPO_ID = 'goblin+file:///tmp/workspace-pane-target-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-target-worktree'
 
 beforeEach(() => {

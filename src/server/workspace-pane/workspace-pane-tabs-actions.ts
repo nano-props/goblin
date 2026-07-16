@@ -1,4 +1,5 @@
-import { isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
+import { isValidRepoLocator } from '#/shared/input-validation.ts'
+import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import type {
   WorkspacePaneTabsListInput,
   WorkspacePaneTabsReplaceInput,
@@ -28,9 +29,8 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       input: WorkspacePaneTabsReplaceInput,
     ): Promise<WorkspacePaneTabsSnapshot> {
       if (!isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
-      if (!isValidRepoLocator(input?.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
-      if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
-      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
+      if (!validInputTarget(input)) return emptyWorkspacePaneTabsSnapshot()
+      assertCurrentRepoRuntime(userId, input.workspaceId, input.workspaceRuntimeId)
       return await sessionService.replaceTabs(userId, input)
     },
 
@@ -40,9 +40,8 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       input: WorkspacePaneTabsUpdateInput,
     ): Promise<WorkspacePaneTabsSnapshot> {
       if (!isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
-      if (!isValidRepoLocator(input?.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
-      if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
-      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
+      if (!validInputTarget(input)) return emptyWorkspacePaneTabsSnapshot()
+      assertCurrentRepoRuntime(userId, input.workspaceId, input.workspaceRuntimeId)
       return await sessionService.updateTabs(userId, input)
     },
 
@@ -52,9 +51,9 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       input: WorkspacePaneTabsListInput,
     ): Promise<WorkspacePaneTabsSnapshot> {
       if (!isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
-      if (!isValidRepoLocator(input?.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
-      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-      return await sessionService.listWorkspaceTabs(userId, input.repoRoot, input.repoRuntimeId)
+      if (!isValidRepoLocator(input?.workspaceId)) return emptyWorkspacePaneTabsSnapshot()
+      assertCurrentRepoRuntime(userId, input.workspaceId, input.workspaceRuntimeId)
+      return await sessionService.listWorkspaceTabs(userId, input.workspaceId, input.workspaceRuntimeId)
     },
   }
 
@@ -63,6 +62,15 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       throw new Error('error.repo-runtime-stale')
     }
   }
+}
+
+function validInputTarget(input: WorkspacePaneTabsReplaceInput | WorkspacePaneTabsUpdateInput): boolean {
+  return Boolean(
+    isValidRepoLocator(input?.workspaceId) &&
+      input.target.workspaceId === input.workspaceId &&
+      input.target.workspaceRuntimeId === input.workspaceRuntimeId &&
+      workspacePaneTabsTargetFromRuntime(input.target),
+  )
 }
 
 function emptyWorkspacePaneTabsSnapshot(): WorkspacePaneTabsSnapshot {

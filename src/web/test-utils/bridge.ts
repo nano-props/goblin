@@ -35,7 +35,11 @@ import {
   workspacePaneTabsWithStaticTab,
   workspacePaneTabsWithoutStaticTab,
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  runtimeWorkspacePaneTarget,
+  workspacePaneTabsTargetFromRuntime,
+  workspacePaneTabsTargetIdentityKey,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import { workspacePaneTabEntryIdentity, workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
@@ -242,31 +246,41 @@ export function installWorkspacePaneTabsTestBridge(
   let serverRevision = 0
   const targetKey = (input: { repoRoot: string; branchName: string; worktreePath: string | null }) =>
     workspacePaneTabsTargetIdentityKey(input)
+  const entryTarget = (entry: WorkspacePaneTabsEntry) => workspacePaneTabsTargetFromRuntime(entry.target)
   const serverTabsForTarget = (input: {
     repoRoot: string
     repoRuntimeId: string
     branchName: string
     worktreePath: string | null
   }): WorkspacePaneTabEntry[] => {
-    const entry = serverEntries.find((candidate) => targetKey(candidate) === targetKey(input))
+    const entry = serverEntries.find((candidate) => {
+      const target = entryTarget(candidate)
+      return target && targetKey(target) === targetKey(input)
+    })
     if (entry) return [...entry.tabs]
     const tabs = readWorkspacePaneTabsForTarget(input)
     const key = targetKey(input)
     serverEntries = [
-      ...serverEntries.filter((candidate) => targetKey(candidate) !== key),
-      { repoRoot: input.repoRoot, branchName: input.branchName, worktreePath: input.worktreePath, tabs },
+      ...serverEntries.filter((candidate) => {
+        const target = entryTarget(candidate)
+        return !target || targetKey(target) !== key
+      }),
+      { target: runtimeWorkspacePaneTarget(input, input.repoRuntimeId)!, tabs },
     ]
     return tabs
   }
   const replaceServerTarget = (
-    input: { repoRoot: string; branchName: string; worktreePath: string | null },
+    input: { repoRoot: string; repoRuntimeId: string; branchName: string; worktreePath: string | null },
     tabs: readonly WorkspacePaneTabEntry[],
   ): WorkspacePaneTabEntry[] => {
     const nextTabs = [...tabs]
     const key = targetKey(input)
     serverEntries = [
-      ...serverEntries.filter((entry) => targetKey(entry) !== key),
-      { repoRoot: input.repoRoot, branchName: input.branchName, worktreePath: input.worktreePath, tabs: nextTabs },
+      ...serverEntries.filter((entry) => {
+        const target = entryTarget(entry)
+        return !target || targetKey(target) !== key
+      }),
+      { target: runtimeWorkspacePaneTarget(input, input.repoRuntimeId)!, tabs: nextTabs },
     ]
     return nextTabs
   }
@@ -356,15 +370,20 @@ export function installWorkspacePaneTabsTestBridge(
     workspacePaneTabs: () => ({
       replace: async (input) => {
         const tabs = options.replaceWorkspaceTabs ? await options.replaceWorkspaceTabs(input) : [...input.tabs]
-        replaceServerTarget(input, tabs)
+        const target = workspacePaneTabsTargetFromRuntime(input.target)
+        if (!target) return serverSnapshot()
+        replaceServerTarget({ ...target, repoRuntimeId: input.workspaceRuntimeId }, tabs)
         return commitServerSnapshot()
       },
       update: async (input) => {
-        if (options.updateWorkspaceTabs) serverTabsForTarget(input)
+        const target = workspacePaneTabsTargetFromRuntime(input.target)
+        if (!target) return serverSnapshot()
+        const legacyInput = { ...target, repoRuntimeId: input.workspaceRuntimeId }
+        if (options.updateWorkspaceTabs) serverTabsForTarget(legacyInput)
         const tabs = options.updateWorkspaceTabs
           ? await options.updateWorkspaceTabs(input)
-          : defaultWorkspacePaneTabsOperationResult(input, serverTabsForTarget(input))
-        replaceServerTarget(input, tabs)
+          : defaultWorkspacePaneTabsOperationResult(input, serverTabsForTarget(legacyInput))
+        replaceServerTarget(legacyInput, tabs)
         return commitServerSnapshot()
       },
       list: async (input) => {
@@ -376,7 +395,7 @@ export function installWorkspacePaneTabsTestBridge(
         }
         return {
           revision: serverRevision,
-          entries: serverEntries.filter((entry) => entry.repoRoot === input.repoRoot),
+          entries: serverEntries.filter((entry) => entry.target.workspaceId === input.workspaceId),
         }
       },
       onChanged: () => () => {},
@@ -463,7 +482,7 @@ export function installWorkspacePaneTabsTestBridge(
 }
 
 function defaultWorkspacePaneTabsOperationResult(
-  input: WorkspacePaneTabsUpdateInput,
+  input: Pick<WorkspacePaneTabsUpdateInput, 'operation'>,
   currentTabs: readonly WorkspacePaneTabEntry[],
 ): WorkspacePaneTabEntry[] {
   switch (input.operation.type) {
@@ -480,11 +499,11 @@ function defaultWorkspacePaneTabsOperationResult(
 
 function isWorkspacePaneTabsUpdateInput(value: unknown): value is WorkspacePaneTabsUpdateInput {
   if (!value || typeof value !== 'object') return false
-  const input = value as { repoRoot?: unknown; branchName?: unknown; worktreePath?: unknown; operation?: unknown }
+  const input = value as { workspaceId?: unknown; workspaceRuntimeId?: unknown; target?: unknown; operation?: unknown }
   return (
-    typeof input.repoRoot === 'string' &&
-    typeof input.branchName === 'string' &&
-    (typeof input.worktreePath === 'string' || input.worktreePath === null) &&
+    typeof input.workspaceId === 'string' &&
+    typeof input.workspaceRuntimeId === 'string' &&
+    Boolean(input.target) &&
     !!input.operation &&
     typeof input.operation === 'object'
   )
@@ -493,17 +512,15 @@ function isWorkspacePaneTabsUpdateInput(value: unknown): value is WorkspacePaneT
 function isWorkspacePaneTabsReplaceInput(value: unknown): value is WorkspacePaneTabsReplaceInput {
   if (!value || typeof value !== 'object') return false
   const input = value as {
-    repoRoot?: unknown
-    repoRuntimeId?: unknown
-    branchName?: unknown
-    worktreePath?: unknown
+    workspaceId?: unknown
+    workspaceRuntimeId?: unknown
+    target?: unknown
     tabs?: unknown
   }
   return (
-    typeof input.repoRoot === 'string' &&
-    typeof input.repoRuntimeId === 'string' &&
-    typeof input.branchName === 'string' &&
-    (typeof input.worktreePath === 'string' || input.worktreePath === null) &&
+    typeof input.workspaceId === 'string' &&
+    typeof input.workspaceRuntimeId === 'string' &&
+    Boolean(input.target) &&
     Array.isArray(input.tabs)
   )
 }
@@ -730,9 +747,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             entries: isWorkspacePaneTabsReplaceInput(payload)
               ? [
                   {
-                    repoRoot: payload.repoRoot,
-                    branchName: payload.branchName,
-                    worktreePath: payload.worktreePath,
+                    target: payload.target,
                     tabs: [...payload.tabs],
                   },
                 ]
@@ -740,15 +755,17 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           }
         case 'workspacePaneTabs.update': {
           const input = isWorkspacePaneTabsUpdateInput(payload) ? payload : null
+          const target = input ? workspacePaneTabsTargetFromRuntime(input.target) : null
           return {
             revision: 1,
-            entries: input
+            entries: input && target
               ? [
                   {
-                    repoRoot: input.repoRoot,
-                    branchName: input.branchName,
-                    worktreePath: input.worktreePath,
-                    tabs: defaultWorkspacePaneTabsOperationResult(input, readWorkspacePaneTabsForTarget(input)),
+                    target: input.target,
+                    tabs: defaultWorkspacePaneTabsOperationResult(
+                      input,
+                      readWorkspacePaneTabsForTarget({ ...target, repoRuntimeId: input.workspaceRuntimeId }),
+                    ),
                   },
                 ]
               : [],

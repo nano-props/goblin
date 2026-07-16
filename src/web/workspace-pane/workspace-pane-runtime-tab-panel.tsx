@@ -12,6 +12,7 @@ import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 
 export interface WorkspacePaneRuntimeTabPanelState {
   projectionPhase: WorkspacePaneRuntimeProjectionPhase
@@ -23,6 +24,7 @@ export interface WorkspacePaneRuntimeTabPanelTarget {
   repoRuntimeId: string
   branchName: string | null
   worktreePath: string | null
+  runtimeTarget?: RuntimeWorkspacePaneTarget
 }
 
 export interface WorkspacePaneRuntimeTabPanelRenderInput {
@@ -78,11 +80,13 @@ function TerminalWorkspacePaneRuntimeTabPanel({
         createTerminal: createTerminalWithAdmission,
         openerIdentity: null,
         showCreatedTerminalTab: (terminalSessionId, canonicalBranch) =>
-          showCreatedTerminalWorkspacePaneRuntimeTab(
-            { ...base, branch: canonicalBranch },
-            terminalSessionId,
-            navigation,
-          ),
+          base.target?.kind === 'workspace'
+            ? true
+            : showCreatedTerminalWorkspacePaneRuntimeTab(
+                { ...base, branch: canonicalBranch },
+                terminalSessionId,
+                navigation,
+              ),
         t,
         logMessage: 'workspace pane terminal create failed',
       })
@@ -90,18 +94,19 @@ function TerminalWorkspacePaneRuntimeTabPanel({
     [createTerminalWithAdmission, navigation, t],
   )
 
-  if (!target.branchName || !target.worktreePath) return null
+  if ((!target.branchName && target.runtimeTarget?.kind !== 'workspace') || !target.worktreePath) return null
   return (
     <WorkspacePanePanelFrame id={`${workspacePaneId}-terminal-panel`} {...panelLabel}>
       <TerminalSessionView
         repoRoot={target.repoRoot}
         repoRuntimeId={target.repoRuntimeId}
-        branch={target.branchName}
+        branch={target.branchName ?? ''}
         worktreePath={target.worktreePath}
         selectedTerminalSessionId={selectedSessionId}
         projectionPhase={runtimeState.projectionPhase}
         projectionErrorMessage={runtimeState.projectionErrorMessage}
         createTerminalForSlot={createTerminalForSlot}
+        target={target.runtimeTarget}
       />
     </WorkspacePanePanelFrame>
   )

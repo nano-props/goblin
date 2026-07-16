@@ -1,4 +1,4 @@
-import { useEffect, useId } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
@@ -29,6 +29,9 @@ import { useT } from '#/web/stores/i18n.ts'
 import { FiletreeTab } from '#/web/components/repo-workspace/panels.tsx'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
+import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { cn } from '#/web/lib/cn.ts'
 
 export type RepoWorkspacePaneRouteContext =
   { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null } | { kind: 'inactive' }
@@ -267,6 +270,11 @@ function PlainWorkspaceFiles({
 }) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
+  const [activePanel, setActivePanel] = useState<'files' | 'terminal'>('files')
+  const runtimeTarget = runtimeWorkspacePaneTarget(
+    { repoRoot: repo.id, branchName: '', worktreePath: repo.id },
+    repo.repoRuntimeId,
+  )
   useEffect(() => {
     if (routeContext.kind === 'routed' && routeContext.route !== null) {
       navigation.showWorkspaceFiles?.(repo.id, { replace: true })
@@ -276,16 +284,45 @@ function PlainWorkspaceFiles({
     <section className="flex min-h-0 flex-1 flex-col bg-background">
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border/70 px-3">
         <FolderTree className="size-4 text-muted-foreground" aria-hidden />
-        <span className="text-sm font-medium">{t('tab.files')}</span>
+        {(['files', 'terminal'] as const).map((panel) => (
+          <button
+            key={panel}
+            type="button"
+            className={cn(
+              'h-7 rounded-md px-2 text-sm transition-colors',
+              activePanel === panel ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
+            )}
+            onClick={() => setActivePanel(panel)}
+          >
+            {t(panel === 'files' ? 'tab.files' : 'tab.terminal')}
+          </button>
+        ))}
       </div>
-      <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} label={t('tab.files')}>
-        <FiletreeTab
-          repoId={repo.id}
-          repoRuntimeId={repo.repoRuntimeId}
-          branchName={null}
-          worktreePath={repo.id}
-        />
-      </WorkspacePanePanelFrame>
+      {activePanel === 'files' ? (
+        <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} label={t('tab.files')}>
+          <FiletreeTab
+            repoId={repo.id}
+            repoRuntimeId={repo.repoRuntimeId}
+            branchName={null}
+            worktreePath={repo.id}
+          />
+        </WorkspacePanePanelFrame>
+      ) : runtimeTarget ? (
+        renderWorkspacePaneRuntimeTabPanel({
+          type: 'terminal',
+          workspacePaneId,
+          panelLabel: { label: t('tab.terminal') },
+          target: {
+            repoRoot: repo.id,
+            repoRuntimeId: repo.repoRuntimeId,
+            branchName: null,
+            worktreePath: repo.id,
+            runtimeTarget,
+          },
+          selectedSessionId: null,
+          runtimeState: { projectionPhase: 'ready' },
+        })
+      ) : null}
     </section>
   )
 }

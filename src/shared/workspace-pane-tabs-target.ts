@@ -1,3 +1,6 @@
+import type { RestorableWorkspacePaneTarget, RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import { formatWorkspaceLocator, parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
+
 export interface WorkspacePaneTabsTarget {
   repoRoot: string
   branchName: string
@@ -99,5 +102,36 @@ export function workspacePaneTabsTargetFromRestorable(
   if (root.transport === 'ssh' && (workspace.transport !== 'ssh' || root.profile !== workspace.profile)) return null
   return { repoRoot: workspaceId, branchName: '', worktreePath: root.path }
 }
-import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import { formatWorkspaceLocator, parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
+
+export function workspacePaneTabsTargetFromRuntime(target: RuntimeWorkspacePaneTarget): WorkspacePaneTabsTarget | null {
+  if (!target.workspaceId || !target.workspaceRuntimeId) return null
+  if (target.kind === 'workspace') {
+    return { repoRoot: target.workspaceId, branchName: '', worktreePath: target.workspaceId }
+  }
+  if (target.kind === 'git-branch') {
+    return target.branch ? { repoRoot: target.workspaceId, branchName: target.branch, worktreePath: null } : null
+  }
+  const platform = typeof process !== 'undefined' && process.platform === 'win32' ? 'win32' : 'posix'
+  const root = parseWorkspaceLocator(target.root, platform)
+  return root ? { repoRoot: target.workspaceId, branchName: '', worktreePath: root.path } : null
+}
+
+export function runtimeWorkspacePaneTarget(
+  target: WorkspacePaneTabsTarget,
+  workspaceRuntimeId: string,
+): RuntimeWorkspacePaneTarget | null {
+  const platform = typeof process !== 'undefined' && process.platform === 'win32' ? 'win32' : 'posix'
+  const parsedWorkspaceId = parseWorkspaceLocator(target.repoRoot, platform)
+  const workspaceId = parsedWorkspaceId ? formatWorkspaceLocator(parsedWorkspaceId, platform) : null
+  if (!workspaceId || !workspaceRuntimeId) return null
+  if (target.worktreePath === target.repoRoot) return { kind: 'workspace', workspaceId, workspaceRuntimeId }
+  if (target.worktreePath === null) {
+    return target.branchName
+      ? { kind: 'git-branch', workspaceId, workspaceRuntimeId, branch: target.branchName }
+      : null
+  }
+  const restorable = restorableWorkspacePaneTarget(target)
+  return restorable?.kind === 'git-worktree'
+    ? { kind: 'git-worktree', workspaceId, workspaceRuntimeId, root: restorable.root }
+    : null
+}

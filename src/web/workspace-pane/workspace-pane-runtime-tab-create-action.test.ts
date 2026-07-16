@@ -11,7 +11,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 
-const REPO_ROOT = '/tmp/workspace-pane-runtime-create-repo'
+const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-runtime-create-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-workspace-pane-create'
 const BRANCH_NAME = 'main'
 const WORKTREE_PATH = '/tmp/workspace-pane-runtime-create-worktree'

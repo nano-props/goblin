@@ -21,6 +21,7 @@ export interface TerminalSessionEnsureInput {
   cols?: number
   rows?: number
   clientId?: string
+  target?: import('#/shared/workspace-runtime.ts').RuntimeWorkspacePaneTarget
 }
 
 export type TerminalSessionEnsureResult =
@@ -67,6 +68,7 @@ export interface TerminalSessionEnsureManagerInput {
   startupShellCommand?: string
   env?: Record<string, string>
   signal?: AbortSignal
+  target?: import('#/shared/workspace-runtime.ts').RuntimeWorkspacePaneTarget
 }
 
 export interface TerminalSessionEnsureManager {
@@ -128,7 +130,7 @@ class TerminalSessionEnsurer {
       repoRuntimeId: input.repoRuntimeId,
       branch: input.branch,
       terminalSessionId: context.terminalSessionId,
-      worktreePath: context.scopedWorktreePath,
+      worktreePath: execution.canonicalWorktreePath,
       physicalWorktreeCapability: context.physicalWorktreeCapability,
       cwd: process.cwd(),
       cols: context.cols,
@@ -137,6 +139,7 @@ class TerminalSessionEnsurer {
       command: invocation.command,
       args: invocation.args,
       signal: context.signal,
+      target: input.target,
     })
     if (!result.ok) return { ok: false, message: result.message }
     return toEnsureResult(context.terminalSessionId, result)
@@ -174,6 +177,7 @@ class TerminalSessionEnsurer {
       startupShellCommand: input.startupShellCommand,
       env,
       signal: context.signal,
+      target: input.target,
     })
     if (!result.ok) return { ok: false, message: result.message }
     return toEnsureResult(context.terminalSessionId, result)

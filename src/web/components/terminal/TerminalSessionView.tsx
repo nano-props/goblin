@@ -32,6 +32,7 @@ import {
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
 import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
@@ -45,6 +46,7 @@ interface TerminalSessionViewProps {
   projectionPhase?: TerminalProjectionHydrationPhase
   projectionErrorMessage?: string
   createTerminalForSlot: (base: TerminalSessionBase) => Promise<unknown>
+  target?: RuntimeWorkspacePaneTarget
 }
 
 export function TerminalSessionView({
@@ -56,6 +58,7 @@ export function TerminalSessionView({
   projectionPhase = 'ready',
   projectionErrorMessage,
   createTerminalForSlot,
+  target,
 }: TerminalSessionViewProps) {
   const t = useT()
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -533,7 +536,7 @@ export function TerminalSessionView({
         // loading state is still the right user signal).
         <EmptyTerminalCta
           onCreate={async () => {
-            await createTerminalForSlot({ repoRoot, repoRuntimeId, branch, worktreePath })
+            await createTerminalForSlot({ repoRoot, repoRuntimeId, branch, worktreePath, target })
           }}
           emptyLabel={t('terminal.empty')}
           newTerminalLabel={t('terminal.new')}

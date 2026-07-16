@@ -12,6 +12,7 @@ import type {
   WorkspacePaneTabsUpdateOperation,
 } from '#/shared/workspace-pane-tabs.ts'
 import {
+  restorableWorkspacePaneTarget,
   workspacePaneTabsTargetIdentityKey,
   type WorkspacePaneTabsTarget,
   type WorkspacePaneTabsTargetIdentity,
@@ -32,6 +33,7 @@ import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { PhysicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
+import { formatWorkspaceLocator, parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const MAX_LAYOUT_CAS_RETRIES = 3
 
@@ -388,9 +390,7 @@ function projectCanonicalEntries(
 ): WorkspacePaneTabsSnapshot['entries'] {
   const liveTargets = providerTargets(scope, providers)
   layout = {
-    entries: layout.entries.filter((entry) =>
-      validatedTargets.has(workspacePaneTabsTargetIdentityKey(entry)),
-    ),
+    entries: layout.entries.filter((entry) => validatedTargets.has(workspacePaneTabsTargetIdentityKey(entry))),
   }
   const targets = new Map<string, WorkspacePaneTabsTarget>()
   for (const entry of layout.entries) {
@@ -400,7 +400,7 @@ function projectCanonicalEntries(
   for (const [key, target] of liveTargets) targets.set(key, target)
   return Array.from(targets.values()).map((target) => {
     const tabs = canonicalTabsForTarget({ ...scope, ...target }, layout, overlay, providers)
-    return { repoRoot: scope.repoRoot, branchName: target.branchName, worktreePath: target.worktreePath, tabs }
+    return { target: runtimeTarget(scope, target), tabs }
   })
 }
 
@@ -438,9 +438,8 @@ function canonicalTabsForTarget(
   overlay: WorkspacePaneEpochOverlay,
   providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
 ): WorkspacePaneTabEntry[] {
-  const key = workspacePaneTabsTargetIdentityKey(input)
-  const durable = layout.entries.find((entry) => workspacePaneTabsTargetIdentityKey(entry) === key)
-  const staticTabs = durable?.tabs ?? [workspacePaneStaticTabEntry('status')]
+  const durable = layout.entries.find((entry) => workspacePaneTabsTargetIdentityKey(entry) === workspacePaneTabsTargetIdentityKey(input))
+  const staticTabs = durable?.tabs ?? [workspacePaneStaticTabEntry(input.worktreePath === input.repoRoot ? 'files' : 'status')]
   const liveRuntimeTabs = providers.flatMap((provider) => provider.liveSessions
     .filter((session) => input.worktreePath !== null && session.worktreePath === input.worktreePath)
     .map((session) => workspacePaneRuntimeTabEntry(provider.type, session.sessionId)))
@@ -449,6 +448,32 @@ function canonicalTabsForTarget(
     hints: overlay.placementHints({ ...input, target: targetIdentity(input) }),
     liveRuntimeTabs,
   })
+}
+
+function runtimeTarget(scope: WorkspacePaneEpochScope, target: WorkspacePaneTabsTarget) {
+  const platform = process.platform === 'win32' ? 'win32' : 'posix'
+  const parsedWorkspaceId = parseWorkspaceLocator(target.repoRoot, platform)
+  const workspaceId = parsedWorkspaceId ? formatWorkspaceLocator(parsedWorkspaceId, platform) : null
+  if (!workspaceId) throw new Error('error.workspace-locator-malformed')
+  if (target.worktreePath === target.repoRoot) {
+    return { kind: 'workspace' as const, workspaceId, workspaceRuntimeId: scope.repoRuntimeId }
+  }
+  if (target.worktreePath === null) {
+    return {
+      kind: 'git-branch' as const,
+      workspaceId,
+      workspaceRuntimeId: scope.repoRuntimeId,
+      branch: target.branchName,
+    }
+  }
+  const restorable = restorableWorkspacePaneTarget(target)
+  if (!restorable || restorable.kind !== 'git-worktree') throw new Error('error.workspace-tabs-target-invalid')
+  return {
+    kind: 'git-worktree' as const,
+    workspaceId,
+    workspaceRuntimeId: scope.repoRuntimeId,
+    root: restorable.root,
+  }
 }
 
 function targetIdentity(target: WorkspacePaneTabsTarget): WorkspacePaneTabsTargetIdentity {

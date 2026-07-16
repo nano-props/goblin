@@ -1,4 +1,5 @@
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 
 /**
  * `controllerStatus === 'connected'` while the broker reports the
@@ -28,6 +29,7 @@ export interface TerminalSessionBase {
   branch: string
   worktreePath: string
   repoRuntimeId?: string
+  target?: RuntimeWorkspacePaneTarget
 }
 
 export interface RepoRuntimeInput {
@@ -64,6 +66,7 @@ export interface TerminalCreateInput {
   cols?: number
   rows?: number
   clientId?: string
+  target?: RuntimeWorkspacePaneTarget
 }
 
 export interface TerminalRestartInput {
@@ -233,6 +236,7 @@ export interface TerminalSessionSummary {
   message: string | null
   cols: number
   rows: number
+  target?: RuntimeWorkspacePaneTarget
 }
 
 /**

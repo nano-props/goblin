@@ -9,8 +9,10 @@ import {
   WORKSPACE_PANE_TABS_REALTIME_EVENTS,
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
 } from '#/shared/workspace-pane-tabs.ts'
+import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 let wsMock: WebSocketMockHandle
 const REPO_RUNTIME_ID = 'repo-runtime-test'
+const WORKSPACE_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/tmp/repo' }, 'posix')!
 describe('terminal web host client', () => {
   beforeEach(() => {
     wsMock = installWebSocketMock({ autoOpen: false })
@@ -200,7 +202,7 @@ describe('terminal web host client', () => {
     const fetchMock = mockFetch()
     const { workspacePaneTabsClient } = await import('#/web/workspace-pane/workspace-pane-tabs-client.ts')
 
-    const listPromise = workspacePaneTabsClient.list({ repoRoot: '/tmp/repo', repoRuntimeId: REPO_RUNTIME_ID })
+    const listPromise = workspacePaneTabsClient.list({ workspaceId: WORKSPACE_ID, workspaceRuntimeId: REPO_RUNTIME_ID })
     const socket = wsMock.instances[0]
     socket?.emitOpen()
     await Promise.resolve()

@@ -12,7 +12,10 @@ import {
   writeWorkspacePaneTabsSnapshotQueryData,
   type WorkspacePaneTabsQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import {
+  runtimeWorkspacePaneTargetForTest,
+  setWorkspacePaneTabsForTargetQueryData,
+} from '#/web/test-utils/workspace-pane-tabs.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 
 vi.mock('#/web/workspace-pane/workspace-pane-tabs-client.ts', () => ({
@@ -24,7 +27,7 @@ vi.mock('#/web/workspace-pane/workspace-pane-tabs-client.ts', () => ({
   },
 }))
 
-const REPO_ROOT = '/tmp/workspace-pane-tabs-query-repo'
+const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-tabs-query-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 
 beforeEach(() => {
@@ -214,5 +217,13 @@ function entry(
   worktreePath: string | null,
   tabs: WorkspacePaneTabsEntry['tabs'],
 ): WorkspacePaneTabsEntry {
-  return { repoRoot: REPO_ROOT, branchName, worktreePath, tabs }
+  return {
+    target: runtimeWorkspacePaneTargetForTest({
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+      branchName,
+      worktreePath,
+    }),
+    tabs,
+  }
 }

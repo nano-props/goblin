@@ -17,10 +17,13 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import {
+  runtimeWorkspacePaneTargetForTest,
+  setWorkspacePaneTabsForTargetQueryData,
+} from '#/web/test-utils/workspace-pane-tabs.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 
-const REPO_ROOT = '/tmp/workspace-pane-tabs-commit-repo'
+const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-tabs-commit-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 const NEXT_REPO_RUNTIME_ID = 'repo-runtime-next'
 const BRANCH_NAME = 'feature/worktree'
@@ -210,7 +213,15 @@ function workspacePaneTabsInteractionBlocked(): boolean {
 function snapshot(revision: number, tabs: WorkspacePaneTabEntry[]): WorkspacePaneTabsSnapshot {
   return {
     revision,
-    entries: [{ repoRoot: REPO_ROOT, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH, tabs }],
+    entries: [{
+      target: runtimeWorkspacePaneTargetForTest({
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+      }),
+      tabs,
+    }],
   }
 }
 

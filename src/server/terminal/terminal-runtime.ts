@@ -21,6 +21,7 @@ import {
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { WorkspacePaneLayoutAggregate } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
+import { workspacePaneDurableLayoutsEqual } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
@@ -55,6 +56,7 @@ import { createWorktreeRemovalApplication } from '#/server/worktree-removal/work
 import { createPhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 import { getRepoSnapshot } from '#/server/modules/repo-read-paths.ts'
+import { workspaceRuntimeHasGitCapability } from '#/server/modules/repo-runtimes.ts'
 
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
@@ -70,17 +72,18 @@ const REPO_RUNTIME_MEMBERSHIP_TTL_MS = 24 * 60 * 60 * 1000
 const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })
 
 const serverWorkspacePaneTargetProjection: WorkspacePaneTargetProjectionProvider = {
-  async captureTargets(_userId, repoRoot, scope) {
+  async captureTargets(userId, repoRoot, scope) {
     const separator = scope.lastIndexOf('\0')
     if (separator < 0 || separator === scope.length - 1) throw new Error('invalid workspace pane runtime scope')
-    const snapshot = await getRepoSnapshot(repoRoot, {
-      repoRuntimeId: scope.slice(separator + 1),
-    })
-    return (snapshot?.branches ?? []).map((branch) => ({
+    const repoRuntimeId = scope.slice(separator + 1)
+    const workspaceTarget = { repoRoot, branchName: '', worktreePath: repoRoot }
+    if (!workspaceRuntimeHasGitCapability(userId, repoRoot, repoRuntimeId)) return [workspaceTarget]
+    const snapshot = await getRepoSnapshot(repoRoot, { repoRuntimeId })
+    return [workspaceTarget, ...(snapshot?.branches ?? []).map((branch) => ({
       repoRoot,
       branchName: branch.name,
       worktreePath: branch.worktree?.path ?? null,
-    }))
+    }))]
   },
 }
 
@@ -332,9 +335,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost = {
     async removeGitScopedResources({ userId, workspaceId, workspaceRuntimeId }) {
       const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
-      const retirement = await manager.closeSessionsForRepo(userId, scope)
+      const retirement = await manager.closeGitScopedSessionsForRepo(userId, scope)
       if (retirement.failures.length > 0) throw new Error('terminal session cleanup failed')
-      manager.releaseProjectionRevisionForScope(userId, scope)
       await workspaceTabsCoordinator.closeInvalidatedScope({ userId, scope })
       await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, workspaceId)
       broadcastRepoSessionsChanged(userId, workspaceId)
@@ -389,11 +391,14 @@ async function clearWorkspacePaneDurableLayout(
 ): Promise<void> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const current = await repository.load(workspaceId)
-    if (current.layout.entries.length === 0) return
+    const replacement = {
+      entries: current.layout.entries.filter((entry) => entry.worktreePath === workspaceId),
+    }
+    if (workspacePaneDurableLayoutsEqual(workspaceId, current.layout, replacement)) return
     const outcome = await repository.compareAndSwap({
       repoRoot: workspaceId,
       expected: current.layout,
-      replacement: { entries: [] },
+      replacement,
     })
     if (outcome.kind === 'accepted') return
     if (outcome.kind === 'write-failure') throw outcome.error

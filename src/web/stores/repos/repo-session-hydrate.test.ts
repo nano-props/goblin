@@ -20,6 +20,7 @@ import { acceptRemoteLifecycleProjection } from '#/web/stores/repos/remote-lifec
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 beforeEach(resetLifecycleTest)
 
@@ -55,9 +56,12 @@ describe('repo session hydration', () => {
               revision: 1,
               entries: [
                 {
-                  repoRoot: REPO_A,
-                  branchName: 'main',
-                  worktreePath: null,
+                  target: runtimeWorkspacePaneTargetForTest({
+                    repoRoot: REPO_A,
+                    repoRuntimeId: 'repo-runtime-server-a',
+                    branchName: 'main',
+                    worktreePath: null,
+                  }),
                   tabs: [workspacePaneStaticTabEntry('history')],
                 },
               ],
@@ -278,9 +282,12 @@ describe('repo session hydration', () => {
         revision: 1,
         entries: [
           {
-            repoRoot: REPO_A,
-            branchName: 'main',
-            worktreePath: null,
+            target: runtimeWorkspacePaneTargetForTest({
+              repoRoot: REPO_A,
+              repoRuntimeId: 'repo-runtime-server-a',
+              branchName: 'main',
+              worktreePath: null,
+            }),
             tabs: [workspacePaneStaticTabEntry('history')],
           },
         ],

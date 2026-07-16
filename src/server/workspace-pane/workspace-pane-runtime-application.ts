@@ -25,6 +25,7 @@ import type {
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { ServerTerminalCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure-settlement.ts'
+import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 
 type MaybePromise<T> = T | Promise<T>
 const workspacePaneRuntimeApplicationLogger = serverLogger.child({ module: 'workspace-pane-runtime-application' })
@@ -32,7 +33,8 @@ const workspacePaneRuntimeApplicationLogger = serverLogger.child({ module: 'work
 interface WorkspacePaneRuntimeApplicationDependencies {
   workspaceTabsCoordinator: WorkspaceRuntimeTabPlacement
   worktreeOperations: PhysicalWorktreeOperationCoordinator
-  physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
+  physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'> &
+    Partial<Pick<PhysicalWorktreeIdentityResolver, 'captureWorkspace'>>
   terminal: ServerTerminalCreateProvider & {
     close(clientId: string, userId: string, input: TerminalSessionInput): MaybePromise<boolean>
   }
@@ -62,13 +64,25 @@ export class WorkspacePaneRuntimeApplication {
     input: WorkspacePaneRuntimeOpenInput,
   ): Promise<WorkspacePaneRuntimeOpenResult> {
     const scope = terminalSessionRuntimeScope(input.request.repoRoot, input.request.repoRuntimeId)
-    const worktreePath = terminalSessionWorktreePath(input.request.repoRoot, input.request.worktreePath)
+    const runtimeTarget = input.request.target
+    const canonicalTarget = runtimeTarget ? workspacePaneTabsTargetFromRuntime(runtimeTarget) : null
+    if (
+      runtimeTarget &&
+      (!canonicalTarget ||
+        runtimeTarget.workspaceId !== input.request.repoRoot ||
+        runtimeTarget.workspaceRuntimeId !== input.request.repoRuntimeId)
+    ) {
+      return runtimeFailure(input.runtimeType, 'error.invalid-arguments')
+    }
+    const worktreePath = runtimeTarget?.kind === 'workspace'
+      ? input.request.repoRoot
+      : terminalSessionWorktreePath(input.request.repoRoot, input.request.worktreePath)
     if (!this.deps.isCurrentRepoRuntime(userId, input.request.repoRoot, input.request.repoRuntimeId)) {
       return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
     }
     let physicalCapability: PhysicalWorktreeExecutionCapability
     try {
-      physicalCapability = await this.capturePhysicalWorktree(userId, input.request, worktreePath)
+      physicalCapability = await this.capturePhysicalWorktree(userId, input.request, worktreePath, runtimeTarget?.kind === 'workspace')
     } catch (error) {
       failRemoteRuntimeIfNeeded(userId, error)
       return runtimeFailure(input.runtimeType, error instanceof Error ? error.message : String(error))
@@ -224,13 +238,17 @@ export class WorkspacePaneRuntimeApplication {
     userId: string,
     target: { repoRoot: string; repoRuntimeId: string },
     worktreePath: string,
+    workspaceScoped = false,
   ): Promise<PhysicalWorktreeExecutionCapability> {
-    return await this.deps.physicalWorktrees.capture({
+    const input = {
       userId,
       repoRoot: target.repoRoot,
       repoRuntimeId: target.repoRuntimeId,
       worktreePath,
-    })
+    }
+    return workspaceScoped
+      ? await (this.deps.physicalWorktrees.captureWorkspace?.(input) ?? this.deps.physicalWorktrees.capture(input))
+      : await this.deps.physicalWorktrees.capture(input)
   }
 }
 

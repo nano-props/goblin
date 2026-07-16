@@ -60,21 +60,25 @@ export function projectServerTerminalSession(input: {
 }): ProjectedServerTerminalSession | null {
   if (input.serverSession.repoRoot !== input.repoRoot) return null
   if (input.serverSession.repoRuntimeId !== input.repoRuntimeId) return null
-  const branch =
-    branchForTerminalWorktree(input.repoIndex, input.serverSession.repoRoot, input.serverSession.worktreePath) ||
-    input.serverSession.branch
-  if (!branch) return null
+  const workspaceScoped = input.serverSession.target?.kind === 'workspace'
+  const branch = workspaceScoped
+    ? ''
+    : branchForTerminalWorktree(input.repoIndex, input.serverSession.repoRoot, input.serverSession.worktreePath) ||
+      input.serverSession.branch
+  if (!workspaceScoped && !branch) return null
+  const worktreePath = workspaceScoped ? input.serverSession.target!.workspaceId : input.serverSession.worktreePath
   const descriptor = terminalDescriptor(
     {
       repoRoot: input.serverSession.repoRoot,
       repoRuntimeId: input.serverSession.repoRuntimeId,
       branch,
-      worktreePath: input.serverSession.worktreePath,
+      worktreePath,
+      target: input.serverSession.target,
     },
     input.serverSession.terminalSessionId,
     input.index,
   )
-  const terminalWorktree = formatTerminalWorktreeKey(input.serverSession.repoRoot, input.serverSession.worktreePath)
+  const terminalWorktree = formatTerminalWorktreeKey(input.serverSession.repoRoot, worktreePath)
   const controller = resolveTerminalController(input.serverSession.controller, input.clientId)
   return {
     descriptor,
@@ -118,6 +122,7 @@ function createSessionSummaryFromCreate(
     message: result.message,
     cols: result.canonicalCols,
     rows: result.canonicalRows,
+    target: base.target,
   }
 }
 

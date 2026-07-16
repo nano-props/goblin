@@ -6,6 +6,8 @@ import {
   WORKSPACE_PANE_STATIC_TAB_TYPES,
 } from '#/shared/workspace-pane.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
+import { formatWorkspaceLocator, parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 
 export const RepoRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
 
@@ -17,9 +19,25 @@ export const WorkspacePaneTabIdentitySchema = v.pipe(
 export const WorkspacePaneOptionalTabIdentitySchema = v.optional(v.nullable(WorkspacePaneTabIdentitySchema))
 
 export const WorkspacePaneTabsListInputSchema = v.object({
-  repoRoot: v.string(),
-  repoRuntimeId: RepoRuntimeIdSchema,
+  workspaceId: v.string(),
+  workspaceRuntimeId: RepoRuntimeIdSchema,
 })
+
+export const RuntimeWorkspacePaneTargetSchema = v.variant('kind', [
+  v.object({ kind: v.literal('workspace'), workspaceId: v.string(), workspaceRuntimeId: RepoRuntimeIdSchema }),
+  v.object({
+    kind: v.literal('git-branch'),
+    workspaceId: v.string(),
+    workspaceRuntimeId: RepoRuntimeIdSchema,
+    branch: v.pipe(v.string(), v.minLength(1)),
+  }),
+  v.object({
+    kind: v.literal('git-worktree'),
+    workspaceId: v.string(),
+    workspaceRuntimeId: RepoRuntimeIdSchema,
+    root: v.string(),
+  }),
+])
 
 export const WorkspacePaneStaticTabEntrySchema = v.variant('type', [
   v.object({ type: v.literal('status'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.status) }),
@@ -38,18 +56,16 @@ export const WorkspacePaneTabEntrySchema = v.union([
 ])
 
 export const WorkspacePaneTabsReplaceInputSchema = v.object({
-  repoRoot: v.string(),
-  repoRuntimeId: RepoRuntimeIdSchema,
-  branchName: v.string(),
-  worktreePath: v.nullable(v.string()),
+  workspaceId: v.string(),
+  workspaceRuntimeId: RepoRuntimeIdSchema,
+  target: RuntimeWorkspacePaneTargetSchema,
   tabs: v.array(WorkspacePaneTabEntrySchema),
 })
 
 export const WorkspacePaneTabsUpdateInputSchema = v.object({
-  repoRoot: v.string(),
-  repoRuntimeId: RepoRuntimeIdSchema,
-  branchName: v.string(),
-  worktreePath: v.nullable(v.string()),
+  workspaceId: v.string(),
+  workspaceRuntimeId: RepoRuntimeIdSchema,
+  target: RuntimeWorkspacePaneTargetSchema,
   operation: v.variant('type', [
     v.object({
       type: v.literal('open-static'),
@@ -62,9 +78,7 @@ export const WorkspacePaneTabsUpdateInputSchema = v.object({
 })
 
 export const WorkspacePaneTabsEntrySchema = v.object({
-  repoRoot: v.string(),
-  branchName: v.string(),
-  worktreePath: v.nullable(v.string()),
+  target: RuntimeWorkspacePaneTargetSchema,
   tabs: v.array(WorkspacePaneTabEntrySchema),
 })
 
@@ -75,5 +89,28 @@ export const WorkspacePaneTabsSnapshotSchema = v.object({
 
 export function normalizeWorkspacePaneTabsSnapshot(value: unknown): WorkspacePaneTabsSnapshot | null {
   const parsed = v.safeParse(WorkspacePaneTabsSnapshotSchema, value)
-  return parsed.success ? parsed.output : null
+  if (!parsed.success) return null
+  const entries = parsed.output.entries.flatMap((entry) => {
+    const target = canonicalRuntimeTarget(entry.target)
+    return target ? [{ target, tabs: entry.tabs }] : []
+  })
+  return entries.length === parsed.output.entries.length ? { revision: parsed.output.revision, entries } : null
+}
+
+function canonicalRuntimeTarget(
+  target: v.InferOutput<typeof RuntimeWorkspacePaneTargetSchema>,
+): RuntimeWorkspacePaneTarget | null {
+  const workspaceId = canonicalLocator(target.workspaceId)
+  if (!workspaceId) return null
+  if (target.kind === 'workspace') return { ...target, workspaceId }
+  if (target.kind === 'git-branch') return { ...target, workspaceId }
+  const root = canonicalLocator(target.root)
+  return root ? { ...target, workspaceId, root } : null
+}
+
+function canonicalLocator(value: string) {
+  const platform = typeof process !== 'undefined' && process.platform === 'win32' ? 'win32' : 'posix'
+  const parsed = parseWorkspaceLocator(value, platform)
+  const canonical = parsed ? formatWorkspaceLocator(parsed, platform) : null
+  return canonical === value ? canonical : null
 }

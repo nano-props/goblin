@@ -73,6 +73,7 @@ export interface TerminalEnsureSessionInput<TUser extends string | number> {
   startupShellCommand?: string
   env?: Record<string, string>
   signal?: AbortSignal
+  target?: import('#/shared/workspace-runtime.ts').RuntimeWorkspacePaneTarget
 }
 
 interface TerminalSessionView<TUser extends string | number> extends TerminalPtySessionState<TUser> {
@@ -82,6 +83,7 @@ interface TerminalSessionView<TUser extends string | number> extends TerminalPty
   branch: string
   terminalSessionId: string
   worktreePath: string
+  target?: import('#/shared/workspace-runtime.ts').RuntimeWorkspacePaneTarget
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   ptyBinding: TerminalPtyBinding<TerminalSessionView<TUser>>
   attachments: Map<string, TerminalClientControllerState>
@@ -229,6 +231,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       branch: input.branch,
       terminalSessionId: input.terminalSessionId,
       worktreePath,
+      target: input.target,
       physicalWorktreeCapability: input.physicalWorktreeCapability,
       cwd,
       command: input.command,
@@ -500,6 +503,13 @@ export class TerminalSessionManager<TUser extends string | number> {
     return await this.retireSessions(sessions, 'scope')
   }
 
+  async closeGitScopedSessionsForRepo(userId: TUser, scope: string): Promise<TerminalBatchRetirementResult> {
+    const sessions = Array.from(this.directory.entries()).filter(
+      (session) => session.userId === userId && session.scope === scope && session.target?.kind !== 'workspace',
+    )
+    return await this.retireSessions(sessions, 'scope')
+  }
+
   private async retireSessions(
     sessions: readonly TerminalSessionView<TUser>[],
     reason: TerminalSessionCloseReason,
@@ -636,6 +646,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       message: session.message,
       cols: session.cols,
       rows: session.rows,
+      target: session.target,
     }
   }
 
@@ -951,6 +962,7 @@ function sameTerminalScope<TUser extends string | number>(
     session.scope === input.scope &&
     session.repoRuntimeId === input.repoRuntimeId &&
     session.repoRoot === input.repoRoot &&
-    session.worktreePath === input.worktreePath
+    session.worktreePath === input.worktreePath &&
+    JSON.stringify(session.target ?? null) === JSON.stringify(input.target ?? null)
   )
 }

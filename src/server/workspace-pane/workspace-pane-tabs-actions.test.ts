@@ -4,10 +4,12 @@ import { describe, expect, test, vi } from 'vitest'
 import { acquireRepoRuntime, clearRepoRuntimesForUser, isCurrentRepoRuntime } from '#/server/modules/repo-runtimes.ts'
 import { createWorkspacePaneTabsActions } from '#/server/workspace-pane/workspace-pane-tabs-actions.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const CLIENT_ID = 'client_workspace_pane_tabs_actions'
 const USER_ID = 'user_workspace_pane_tabs_actions'
 const REPO_ROOT = 'goblin+file:///repo'
+const WORKSPACE_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/repo' }, 'posix')!
 let REPO_RUNTIME_ID = ''
 
 function syncCurrentRepoRuntime(): void {
@@ -23,9 +25,7 @@ function makeActions(
     revision: 1,
     entries: [
       {
-        repoRoot: REPO_ROOT,
-        branchName: 'feature/worktree',
-        worktreePath: '/repo',
+        target: runtimeTarget(),
         tabs: [workspacePaneStaticTabEntry('status')],
       },
     ],
@@ -60,16 +60,14 @@ describe('workspace-pane-tabs-actions', () => {
 
     await expect(
       actions.listWorkspaceTabs(CLIENT_ID, USER_ID, {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: REPO_RUNTIME_ID,
       }),
     ).resolves.toEqual({
       revision: 1,
       entries: [
         {
-          repoRoot: REPO_ROOT,
-          branchName: 'feature/worktree',
-          worktreePath: '/repo',
+          target: runtimeTarget(),
           tabs: [workspacePaneStaticTabEntry('status')],
         },
       ],
@@ -85,10 +83,9 @@ describe('workspace-pane-tabs-actions', () => {
 
     await expect(
       actions.replaceTabs(CLIENT_ID, USER_ID, {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: 'feature/worktree',
-        worktreePath: '/repo',
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: REPO_RUNTIME_ID,
+        target: runtimeTarget(),
         tabs: [workspacePaneStaticTabEntry('status')],
       }),
     ).resolves.toMatchObject({ revision: 2 })
@@ -103,10 +100,9 @@ describe('workspace-pane-tabs-actions', () => {
 
     await expect(
       actions.updateTabs(CLIENT_ID, USER_ID, {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: 'feature/worktree',
-        worktreePath: '/repo',
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: REPO_RUNTIME_ID,
+        target: runtimeTarget(),
         operation: { type: 'open-static', tabType: 'status' },
       }),
     ).resolves.toMatchObject({ revision: 3 })
@@ -121,10 +117,9 @@ describe('workspace-pane-tabs-actions', () => {
 
     await expect(
       actions.replaceTabs(CLIENT_ID, USER_ID, {
-        repoRoot: '',
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: 'feature/worktree',
-        worktreePath: '/repo',
+        workspaceId: '',
+        workspaceRuntimeId: REPO_RUNTIME_ID,
+        target: runtimeTarget(),
         tabs: [workspacePaneStaticTabEntry('status')],
       }),
     ).resolves.toEqual({ revision: 0, entries: [] })
@@ -139,10 +134,9 @@ describe('workspace-pane-tabs-actions', () => {
 
     await expect(
       actions.updateTabs(CLIENT_ID, USER_ID, {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: 'repo-runtime-stale',
-        branchName: 'feature/worktree',
-        worktreePath: '/repo',
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: 'repo-runtime-stale',
+        target: { ...runtimeTarget(), workspaceRuntimeId: 'repo-runtime-stale' },
         operation: { type: 'open-static', tabType: 'status' },
       }),
     ).rejects.toThrow('error.repo-runtime-stale')
@@ -157,11 +151,20 @@ describe('workspace-pane-tabs-actions', () => {
 
     await expect(
       actions.listWorkspaceTabs('not_a_client', USER_ID, {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: REPO_RUNTIME_ID,
       }),
     ).resolves.toEqual({ revision: 0, entries: [] })
 
     expect(sessionService.listWorkspaceTabs).not.toHaveBeenCalled()
   })
 })
+
+function runtimeTarget() {
+  return {
+    kind: 'git-worktree' as const,
+    workspaceId: WORKSPACE_ID,
+    workspaceRuntimeId: REPO_RUNTIME_ID,
+    root: WORKSPACE_ID,
+  }
+}

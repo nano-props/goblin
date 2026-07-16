@@ -28,7 +28,7 @@ import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pan
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 
-const REPO_ID = '/tmp/workspace-pane-tab-close-repo'
+const REPO_ID = 'goblin+file:///tmp/workspace-pane-tab-close-repo'
 const BRANCH_NAME = 'feature/worktree-close'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-close-worktree'
 

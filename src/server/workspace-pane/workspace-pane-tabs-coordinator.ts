@@ -5,12 +5,14 @@ import type {
 import { isWorkspacePaneStaticTabType, workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type {
+  WorkspacePaneTabsEntry,
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateOperation,
 } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   workspacePaneTabsTargetIdentityKey,
+  workspacePaneTabsTargetFromRuntime,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
@@ -31,6 +33,7 @@ import {
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 import {
+  type WorkspacePaneRuntimeTabsProjectionEntry,
   type WorkspacePaneRuntimeTabsProviderSnapshot,
   workspaceRuntimeTabWorktreePaths,
 } from '#/server/workspace-pane/workspace-pane-runtime-tabs-projection.ts'
@@ -146,7 +149,9 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
         (target) => workspacePaneTabsTargetIdentityKey(target) === requestedTargetKey,
       )
       if (!commitTarget) return { kind: 'runtime-stale' }
-      const entry = current.entries.find((candidate) => candidate.worktreePath === input.worktreePath)
+      const entry = current.entries.find(
+        (candidate) => workspacePaneTabsTargetFromRuntime(candidate.target)?.worktreePath === input.worktreePath,
+      )
       const tabs = workspacePaneTabsWithRuntimeTab(
         entry?.tabs ?? [workspacePaneStaticTabEntry('status')],
         input.runtimeType,
@@ -454,7 +459,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
     }))
     const projectedCapabilities = await this.capturePhysicalWorktrees(
       input,
-      workspaceRuntimeTabWorktreePaths({ entries: admissionSeed.entries, providerSnapshots }),
+      workspaceRuntimeTabWorktreePaths({ entries: legacySnapshotEntries(admissionSeed.entries), providerSnapshots }),
     )
     let lockTargets = uniqueSortedAdmissionLeases([
       ...projectedCapabilities.map(physicalWorktreeAdmissionLease),
@@ -475,7 +480,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
             providerSnapshots: currentProviders,
           })
           const projectedWorktreePaths = workspaceRuntimeTabWorktreePaths({
-            entries: currentEntries,
+            entries: legacySnapshotEntries(currentEntries),
             providerSnapshots: currentProviders,
           })
           const capturedWorktrees = await Promise.all(projectedWorktreePaths.map(async (worktreePath) => ({
@@ -503,11 +508,10 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
           input.assertCurrent()
           layout.commitProjectionTargets({
             ...scope,
-            targets: currentEntries.map(({ repoRoot, branchName, worktreePath }) => ({
-              repoRoot,
-              branchName,
-              worktreePath,
-            })),
+            targets: currentEntries.flatMap((entry) => {
+              const target = workspacePaneTabsTargetFromRuntime(entry.target)
+              return target ? [target] : []
+            }),
             physicalTargets: capturedWorktrees
               .filter(({ worktreePath }) => projectedWorktreePaths.includes(worktreePath))
               .map(({ worktreePath, capability }) => ({
@@ -675,6 +679,13 @@ function admissionRecords(
     byStableIdentity.set(key, record)
   }
   return [...byStableIdentity.values()]
+}
+
+function legacySnapshotEntries(entries: WorkspacePaneTabsEntry[]): WorkspacePaneRuntimeTabsProjectionEntry[] {
+  return entries.flatMap((entry) => {
+    const target = workspacePaneTabsTargetFromRuntime(entry.target)
+    return target ? [{ branchName: target.branchName, worktreePath: target.worktreePath, tabs: entry.tabs }] : []
+  })
 }
 
 function isWorkspacePaneWorktreeTarget(target: WorkspacePaneTabsTarget): target is WorkspacePaneWorktreeTarget {

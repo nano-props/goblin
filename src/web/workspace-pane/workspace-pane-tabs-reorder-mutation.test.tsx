@@ -23,7 +23,7 @@ import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
-const REPO_ROOT = '/tmp/workspace-pane-tabs-reorder-mutation-repo'
+const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-tabs-reorder-mutation-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 const NEXT_REPO_RUNTIME_ID = 'repo-runtime-next'
 const BRANCH_NAME = 'feature/worktree'
@@ -153,10 +153,14 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
 
     await vi.waitFor(() =>
       expect(updateWorkspaceTabs).toHaveBeenCalledWith({
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: NEXT_REPO_RUNTIME_ID,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: NEXT_REPO_RUNTIME_ID,
+        target: {
+          kind: 'git-worktree',
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: NEXT_REPO_RUNTIME_ID,
+          root: 'goblin+file:///tmp/workspace-pane-tabs-reorder-mutation-worktree',
+        },
         operation: {
           type: 'reorder',
           tabIdentities: ['workspace-pane:status', 'terminal:term-111111111111111111111'],

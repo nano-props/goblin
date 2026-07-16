@@ -4,7 +4,7 @@ import { isWorkspacePaneRuntimeTabEntry, type WorkspacePaneTabEntry } from '#/sh
 import type { WorkspacePaneTabsEntry, WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import {
   type WorkspacePaneTabsTarget,
-  workspacePaneTabsEntryMatchesTarget,
+  workspacePaneTabsTargetFromRuntime,
   workspacePaneTabsTargetIdentityKey,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -160,9 +160,11 @@ export function workspacePaneTabsByTargetFromQueryData(
 ): Record<string, WorkspacePaneTabEntry[]> {
   const byTarget: Record<string, WorkspacePaneTabEntry[]> = {}
   for (const entry of data.entries) {
-    byTarget[workspacePaneTabsTargetIdentityKey(entry)] = normalizeWorkspacePaneTabs(
+    const target = workspacePaneTabsTargetFromRuntime(entry.target)
+    if (!target) continue
+    byTarget[workspacePaneTabsTargetIdentityKey(target)] = normalizeWorkspacePaneTabs(
       entry.tabs.filter((tab) => !isWorkspacePaneRuntimeTabEntry(tab)),
-      { hasWorktree: entry.worktreePath !== null },
+      { hasWorktree: target.worktreePath !== null },
     )
   }
   return byTarget
@@ -188,7 +190,9 @@ async function fetchWorkspacePaneTabsSnapshot(
   repoRoot: string,
   repoRuntimeId: string,
 ): Promise<WorkspacePaneTabsSnapshot> {
-  return normalizeWorkspacePaneTabsSnapshot(await workspacePaneTabsClient.list({ repoRoot, repoRuntimeId }))
+  return normalizeWorkspacePaneTabsSnapshot(
+    await workspacePaneTabsClient.list({ workspaceId: repoRoot, workspaceRuntimeId: repoRuntimeId }),
+  )
 }
 
 /** The single revision acceptance rule for every server-snapshot cache entry. */
@@ -210,12 +214,11 @@ function normalizeWorkspacePaneTabsSnapshot(snapshot: WorkspacePaneTabsSnapshot)
 function normalizeWorkspacePaneTabsQueryEntries(entries: readonly WorkspacePaneTabsEntry[]): WorkspacePaneTabsEntry[] {
   const byTarget = new Map<string, WorkspacePaneTabsEntry>()
   for (const entry of entries) {
-    if (!entry.branchName || entry.branchName.includes('\0')) continue
-    byTarget.set(workspacePaneTabsTargetIdentityKey(entry), {
-      repoRoot: entry.repoRoot,
-      branchName: entry.branchName,
-      worktreePath: entry.worktreePath,
-      tabs: normalizeWorkspacePaneTabs(entry.tabs, { hasWorktree: entry.worktreePath !== null }),
+    const target = workspacePaneTabsTargetFromRuntime(entry.target)
+    if (!target || (target.branchName && target.branchName.includes('\0'))) continue
+    byTarget.set(workspacePaneTabsTargetIdentityKey(target), {
+      target: entry.target,
+      tabs: normalizeWorkspacePaneTabs(entry.tabs, { hasWorktree: target.worktreePath !== null }),
     })
   }
   return Array.from(byTarget.values())
@@ -231,7 +234,8 @@ function workspacePaneTabsEntryForTarget(
 ): WorkspacePaneTabsEntry | undefined {
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index]
-    if (entry && workspacePaneTabsEntryMatchesTarget(entry, target)) return entry
+    const runtimeEntryTarget = entry ? workspacePaneTabsTargetFromRuntime(entry.target) : null
+    if (entry && runtimeEntryTarget && workspacePaneTabsTargetIdentityKey(runtimeEntryTarget) === workspacePaneTabsTargetIdentityKey(target)) return entry
   }
   return undefined
 }

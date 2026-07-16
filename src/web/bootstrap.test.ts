@@ -190,9 +190,7 @@ describe('client bootstrap', () => {
           revision: 1,
           entries: [
             {
-              repoRoot: input.repoRoot,
-              branchName: input.branchName,
-              worktreePath: input.worktreePath,
+              target: input.target,
               tabs: input.tabs,
             },
           ],

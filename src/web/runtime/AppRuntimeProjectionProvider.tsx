@@ -41,7 +41,11 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
   const refreshWorkspacePaneTabsForScope = useCallback((scope: RuntimeProjectionScope): void => {
     scope.runLatest(
       WORKSPACE_TABS_REFRESH_LANE,
-      async () => await workspacePaneTabsClient.list(scope.target),
+      async () =>
+        await workspacePaneTabsClient.list({
+          workspaceId: scope.target.repoRoot,
+          workspaceRuntimeId: scope.target.repoRuntimeId,
+        }),
       (snapshot) => {
         writeCanonicalWorkspacePaneTabsSnapshot(scope.target.repoRoot, scope.target.repoRuntimeId, snapshot)
       },

@@ -1,6 +1,7 @@
 import type { ProjectedRestoredWorkspaceRepoRuntime, ServerWorkspaceState } from '#/shared/api-types.ts'
 import { workspaceSessionEntryId, type WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import { restorableWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ServerWorkspaceMatchOutcome } from '#/server/modules/settings-source.ts'
 import type {
   ServerWorkspacePaneTabsHost,
@@ -52,14 +53,17 @@ async function restoreWorkspacePaneTabsForRepos(
   let repaired = false
   for (const repo of repos) {
     input.signal?.throwIfAborted()
-    const targets = (repo.projection.snapshot?.branches ?? []).map((branch) => ({
-      repoRoot: repo.repoRoot,
-      branchName: branch.name,
-      worktreePath: branch.worktree?.path ?? null,
-    }))
+    const targets = (repo.projection.snapshot?.branches ?? []).flatMap((branch) => {
+      const target = restorableWorkspacePaneTarget({
+        repoRoot: repo.repoRoot,
+        branchName: branch.name,
+        worktreePath: branch.worktree?.path ?? null,
+      })
+      return target ? [target] : []
+    })
     const result = await input.workspacePaneTabsHost.restoreTabs(input.userId, {
-      repoRoot: repo.repoRoot,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceId: repo.repoRoot,
+      workspaceRuntimeId: repo.repoRuntimeId,
       expectedRepoEntry: repo.entry,
       targets,
     })

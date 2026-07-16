@@ -2,6 +2,10 @@ import { describe, expect, test, vi } from 'vitest'
 import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
 import type { ClientAppRealtime } from '#/web/app-realtime-client.ts'
 import { createServerWorkspacePaneTabsClient } from '#/web/client-workspace-pane-tabs.ts'
+import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
+
+const WORKSPACE_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/repo' }, 'posix')!
+const WORKTREE_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/repo/worktree' }, 'posix')!
 
 describe('createServerWorkspacePaneTabsClient', () => {
   test.each([
@@ -12,11 +16,15 @@ describe('createServerWorkspacePaneTabsClient', () => {
     const snapshot = { revision: 7, entries: [] }
     const request = vi.fn(async () => snapshot)
     const client = createServerWorkspacePaneTabsClient(realtimeWithRequest(request))
-    const common = { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test' }
+    const common = { workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-test' }
     const input = {
       ...common,
-      branchName: 'main',
-      worktreePath: '/repo/worktree',
+      target: {
+        kind: 'git-worktree' as const,
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: common.workspaceRuntimeId,
+        root: WORKTREE_ID,
+      },
     }
     const requestInput =
       action === WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list
@@ -38,7 +46,7 @@ describe('createServerWorkspacePaneTabsClient', () => {
   test('rejects a legacy entry array without a snapshot revision', async () => {
     const client = createServerWorkspacePaneTabsClient(realtimeWithRequest(vi.fn(async () => [])))
 
-    await expect(client.list({ repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test' })).rejects.toThrow(
+    await expect(client.list({ workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-test' })).rejects.toThrow(
       'invalid list response',
     )
   })

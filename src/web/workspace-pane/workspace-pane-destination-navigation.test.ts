@@ -26,7 +26,7 @@ import {
   registerPrimaryWindowNavigation,
 } from '#/web/primary-window-presentation.ts'
 
-const REPO_ID = '/tmp/goblin-destination-navigation-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-destination-navigation-repo'
 const CURRENT_WORKTREE = '/tmp/goblin-destination-current-worktree'
 const DESTINATION_WORKTREE = '/tmp/goblin-destination-target-worktree'
 const DESTINATION_ROUTE = { kind: 'static' as const, tab: 'status' as const }

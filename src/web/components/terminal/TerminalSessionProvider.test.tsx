@@ -58,7 +58,10 @@ import {
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import {
+  runtimeWorkspacePaneTargetForTest,
+  setWorkspacePaneTabsForTargetQueryData,
+} from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const mockSessions = vi.hoisted(
   () =>
@@ -320,7 +323,7 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
   return { TerminalSession }
 })
 
-const REPO_ID = '/tmp/goblin-terminal-provider-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-terminal-provider-repo'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/goblin-terminal-provider-worktree'
 
@@ -359,7 +362,7 @@ type TestTerminalSessionSummary = Omit<
 const listSessionsMock = vi.fn<
   (...args: Array<{ repoRoot: string; repoRuntimeId?: string }>) => Promise<TestTerminalSessionSummary[]>
 >(async () => [])
-const listWorkspaceTabsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<WorkspacePaneTabsEntry[]>>(
+const listWorkspaceTabsMock = vi.fn<(...args: Array<{ workspaceId: string }>) => Promise<WorkspacePaneTabsEntry[]>>(
   async () => [],
 )
 const closeMock = vi.fn(async () => true)
@@ -640,7 +643,7 @@ beforeEach(() => {
       workspacePaneTabs: {
         replace: vi.fn(async (input: { tabs: unknown[] }) => input.tabs),
         update: vi.fn(async () => []),
-        list: async (input: { repoRoot: string }) => ({
+        list: async (input: { workspaceId: string }) => ({
           revision: 1,
           entries: await listWorkspaceTabsMock(input),
         }),
@@ -1302,9 +1305,12 @@ describe('TerminalSessionProvider', () => {
     try {
       listWorkspaceTabsMock.mockResolvedValue([
         {
-          repoRoot: REPO_ID,
-          branchName: 'feature/worktree',
-          worktreePath: WORKTREE_PATH,
+          target: runtimeWorkspacePaneTargetForTest({
+            repoRoot: REPO_ID,
+            repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
+            branchName: 'feature/worktree',
+            worktreePath: WORKTREE_PATH,
+          }),
           tabs: [workspacePaneStaticTabEntry('history')],
         },
       ])

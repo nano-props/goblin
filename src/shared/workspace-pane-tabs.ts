@@ -3,6 +3,7 @@ import type {
   WorkspacePaneStaticTabType,
   WorkspacePaneTabEntry,
 } from '#/shared/workspace-pane.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export const WORKSPACE_PANE_TABS_SOCKET_ACTIONS = {
@@ -37,11 +38,12 @@ export function workspacePaneTabsChangedRealtimeMessage(repoRoot: string): Works
 }
 
 export interface WorkspacePaneTabsListInput {
-  repoRoot: string
-  repoRuntimeId: string
+  workspaceId: string
+  workspaceRuntimeId: string
 }
 
-export interface WorkspacePaneTabsReplaceInput extends WorkspacePaneTabsTarget, WorkspacePaneTabsListInput {
+export interface WorkspacePaneTabsReplaceInput extends WorkspacePaneTabsListInput {
+  target: RuntimeWorkspacePaneTarget
   tabs: WorkspacePaneTabEntry[]
 }
 
@@ -54,11 +56,13 @@ export type WorkspacePaneTabsUpdateOperation =
   | { type: 'close-static'; tabType: WorkspacePaneStaticTabType }
   | { type: 'reorder'; tabIdentities: string[] }
 
-export interface WorkspacePaneTabsUpdateInput extends WorkspacePaneTabsTarget, WorkspacePaneTabsListInput {
+export interface WorkspacePaneTabsUpdateInput extends WorkspacePaneTabsListInput {
+  target: RuntimeWorkspacePaneTarget
   operation: WorkspacePaneTabsUpdateOperation
 }
 
-export interface WorkspacePaneTabsEntry extends WorkspacePaneTabsTarget {
+export interface WorkspacePaneTabsEntry {
+  target: RuntimeWorkspacePaneTarget
   tabs: WorkspacePaneTabEntry[]
 }
 

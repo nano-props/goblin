@@ -23,7 +23,7 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
-const scope = { userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a' }
+const scope = { userId: 'user-a', repoRoot: 'goblin+file:///repo', repoRuntimeId: 'runtime-a' }
 const target = { branchName: 'feature/worktree', worktreePath: '/repo/worktree' }
 const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')
 const providers = [{
@@ -41,14 +41,14 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       ...target,
       tabs: [workspacePaneStaticTabEntry('status'), terminal, workspacePaneStaticTabEntry('history')],
-      validTargets: [{ repoRoot: '/repo', ...target }],
+      validTargets: [{ repoRoot: 'goblin+file:///repo', ...target }],
       physicalWorktreeLease: physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath)),
       providerSnapshots: providers,
     })
-    const snapshot = await readSnapshot(aggregate, scope, [{ repoRoot: '/repo', ...target }], providers)
+    const snapshot = await readSnapshot(aggregate, scope, [{ repoRoot: 'goblin+file:///repo', ...target }], providers)
 
     expect(repository.layout).toEqual({ entries: [{
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       ...target,
       tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
     }] })
@@ -61,19 +61,19 @@ describe('workspace pane layout aggregate', () => {
 
   test('re-reads and replans the original update intent after a CAS conflict', async () => {
     const repository = memoryRepository({ entries: [{
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       ...target,
       tabs: [workspacePaneStaticTabEntry('status')],
     }] })
     const originalCas = repository.compareAndSwap
     const aggregate = aggregateFor(repository)
-    await validateTargets(aggregate, [{ repoRoot: '/repo', ...target }])
+    await validateTargets(aggregate, [{ repoRoot: 'goblin+file:///repo', ...target }])
     let first = true
     repository.compareAndSwap = vi.fn(async (input) => {
       if (first) {
         first = false
         repository.layout = { entries: [{
-          repoRoot: '/repo',
+          repoRoot: 'goblin+file:///repo',
           ...target,
           tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
         }] }
@@ -85,7 +85,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       ...target,
       operation: { type: 'open-static', tabType: 'history' },
-      validTargets: [{ repoRoot: '/repo', ...target }],
+      validTargets: [{ repoRoot: 'goblin+file:///repo', ...target }],
       physicalWorktreeLease: physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath)),
       providerSnapshots: [],
     })
@@ -99,9 +99,9 @@ describe('workspace pane layout aggregate', () => {
   })
 
   test('rejects an absolute replace after a CAS conflict instead of replaying stale layout', async () => {
-    const repository = memoryRepository({ entries: [{ repoRoot: '/repo', ...target, tabs: [] }] })
+    const repository = memoryRepository({ entries: [{ repoRoot: 'goblin+file:///repo', ...target, tabs: [] }] })
     const aggregate = aggregateFor(repository)
-    await validateTargets(aggregate, [{ repoRoot: '/repo', ...target }])
+    await validateTargets(aggregate, [{ repoRoot: 'goblin+file:///repo', ...target }])
     repository.compareAndSwap = vi.fn(async () => ({
       kind: 'conflict' as const,
       snapshot: { layout: { entries: [] } },
@@ -110,7 +110,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       ...target,
       tabs: [workspacePaneStaticTabEntry('history')],
-      validTargets: [{ repoRoot: '/repo', ...target }],
+      validTargets: [{ repoRoot: 'goblin+file:///repo', ...target }],
       physicalWorktreeLease: physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath)),
       providerSnapshots: [],
     })).rejects.toThrow('error.workspace-tabs-layout-conflict')
@@ -129,7 +129,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       ...target,
       tabs: [terminal, workspacePaneStaticTabEntry('status')],
-      validTargets: [{ repoRoot: '/repo', ...target }],
+      validTargets: [{ repoRoot: 'goblin+file:///repo', ...target }],
       physicalWorktreeLease: physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath)),
       providerSnapshots: providers,
     })).rejects.toThrow('disk full')
@@ -140,14 +140,14 @@ describe('workspace pane layout aggregate', () => {
   })
 
   test('uses one monotonic clock across durable, target, overlay, and provider dependencies', async () => {
-    const branchTarget = { repoRoot: '/repo', branchName: 'main', worktreePath: null }
+    const branchTarget = { repoRoot: 'goblin+file:///repo', branchName: 'main', worktreePath: null }
     const repository = memoryRepository({ entries: [{ ...branchTarget, tabs: [] }] })
     const aggregate = aggregateFor(repository)
     const validated = await validate(aggregate, {
       ...scope,
       validTargets: [branchTarget],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
       providerSnapshots: [],
     })
     if (validated.kind !== 'validated') throw new Error('unexpected membership conflict')
@@ -165,52 +165,52 @@ describe('workspace pane layout aggregate', () => {
 
   test('advances the canonical clock when authoritative target metadata changes', async () => {
     const repository = memoryRepository({ entries: [{
-      repoRoot: '/repo', branchName: 'feature/old', worktreePath: '/repo/worktree', tabs: [],
+      repoRoot: 'goblin+file:///repo', branchName: 'feature/old', worktreePath: '/repo/worktree', tabs: [],
     }] })
     const aggregate = aggregateFor(repository)
-    const oldTarget = { repoRoot: '/repo', branchName: 'feature/old', worktreePath: '/repo/worktree' }
+    const oldTarget = { repoRoot: 'goblin+file:///repo', branchName: 'feature/old', worktreePath: '/repo/worktree' }
     const currentTarget = { ...oldTarget, branchName: 'feature/current' }
 
     const first = await readSnapshot(aggregate, scope, [oldTarget], [])
     const current = await readSnapshot(aggregate, scope, [currentTarget], [])
 
-    expect(first).toMatchObject({ revision: 0, entries: [{ branchName: 'feature/old' }] })
-    expect(current).toMatchObject({ revision: 1, entries: [{ branchName: 'feature/current' }] })
+    expect(first).toMatchObject({ revision: 0, entries: [{ target: { kind: 'git-worktree' } }] })
+    expect(current).toMatchObject({ revision: 1, entries: [{ target: { kind: 'git-worktree' } }] })
   })
 
   test('does not expose unvalidated durable targets in a new epoch', async () => {
     const aggregate = aggregateFor(memoryRepository({ entries: [{
-        repoRoot: '/repo', branchName: 'stale', worktreePath: null, tabs: [workspacePaneStaticTabEntry('history')],
+        repoRoot: 'goblin+file:///repo', branchName: 'stale', worktreePath: null, tabs: [workspacePaneStaticTabEntry('history')],
       }] }))
 
     await expect(readSnapshot(aggregate, scope, [], [])).resolves.toMatchObject({ entries: [] })
   })
 
   test('does not durably repair targets from an unversioned projection', async () => {
-    const valid = { repoRoot: '/repo', branchName: 'main', worktreePath: null, tabs: [workspacePaneStaticTabEntry('history')] }
-    const invalid = { repoRoot: '/repo', branchName: 'deleted', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')] }
+    const valid = { repoRoot: 'goblin+file:///repo', branchName: 'main', worktreePath: null, tabs: [workspacePaneStaticTabEntry('history')] }
+    const invalid = { repoRoot: 'goblin+file:///repo', branchName: 'deleted', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')] }
     const repository = memoryRepository({ entries: [valid, invalid] })
     const aggregate = aggregateFor(repository)
 
     const result = await validate(aggregate, {
       ...scope,
-      validTargets: [{ repoRoot: '/repo', branchName: 'main', worktreePath: null }],
+      validTargets: [{ repoRoot: 'goblin+file:///repo', branchName: 'main', worktreePath: null }],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
       providerSnapshots: [],
     })
 
     expect(repository.layout).toEqual({ entries: [valid, invalid] })
     expect(result).toMatchObject({
       kind: 'validated',
-      snapshot: { entries: [valid] },
+      snapshot: { entries: [{ target: { kind: 'git-branch', branch: 'main' }, tabs: valid.tabs }] },
     })
   })
 
   test('repairs multiple invalid targets in one membership-aware transaction', async () => {
-    const valid = { repoRoot: '/repo', branchName: 'main', worktreePath: null, tabs: [] }
-    const invalidA = { repoRoot: '/repo', branchName: 'deleted-a', worktreePath: null, tabs: [] }
-    const invalidB = { repoRoot: '/repo', branchName: 'deleted-b', worktreePath: null, tabs: [] }
+    const valid = { repoRoot: 'goblin+file:///repo', branchName: 'main', worktreePath: null, tabs: [] }
+    const invalidA = { repoRoot: 'goblin+file:///repo', branchName: 'deleted-a', worktreePath: null, tabs: [] }
+    const invalidB = { repoRoot: 'goblin+file:///repo', branchName: 'deleted-b', worktreePath: null, tabs: [] }
     const repository = memoryRepository({ entries: [valid, invalidA, invalidB] })
     const repairs: string[][] = []
     const restoreTransaction: WorkspacePaneLayoutRestoreTransaction = {
@@ -224,9 +224,9 @@ describe('workspace pane layout aggregate', () => {
 
     await validate(aggregate, {
       ...scope,
-      validTargets: [{ repoRoot: '/repo', branchName: 'main', worktreePath: null }],
+      validTargets: [{ repoRoot: 'goblin+file:///repo', branchName: 'main', worktreePath: null }],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
       providerSnapshots: [],
     })
 
@@ -236,7 +236,7 @@ describe('workspace pane layout aggregate', () => {
 
   test('does not report a durable change when restore validation is a no-op', async () => {
     const valid = {
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       branchName: 'main',
       worktreePath: null,
       tabs: [workspacePaneStaticTabEntry('history')],
@@ -246,15 +246,15 @@ describe('workspace pane layout aggregate', () => {
 
     const result = await validate(aggregate, {
       ...scope,
-      validTargets: [{ repoRoot: '/repo', branchName: 'main', worktreePath: null }],
+      validTargets: [{ repoRoot: 'goblin+file:///repo', branchName: 'main', worktreePath: null }],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
       providerSnapshots: [],
     })
 
     expect(result).toMatchObject({
       kind: 'validated',
-      snapshot: { entries: [valid] },
+      snapshot: { entries: [{ target: { kind: 'git-branch', branch: 'main' }, tabs: valid.tabs }] },
     })
   })
 
@@ -265,13 +265,13 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
       providerSnapshots: [],
     })
 
     await expect(update(aggregate, {
       ...scope,
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       branchName: 'feature',
       worktreePath: null,
       operation: { type: 'open-static', tabType: 'history' },
@@ -297,7 +297,7 @@ describe('workspace pane layout aggregate', () => {
 
   test('does not treat persistence failure as repair authority', async () => {
     const repository = memoryRepository({ entries: [{
-      repoRoot: '/repo', branchName: 'deleted', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')],
+      repoRoot: 'goblin+file:///repo', branchName: 'deleted', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')],
     }] })
     repository.compareAndSwap = vi.fn(async () => ({
       kind: 'write-failure' as const,
@@ -309,7 +309,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
       providerSnapshots: [],
     })
 
@@ -323,7 +323,7 @@ describe('workspace pane layout aggregate', () => {
 
   test('keeps invalid durable tabs suppressed when only a live provider still references the target', async () => {
     const repository = memoryRepository({ entries: [{
-      repoRoot: '/repo', ...target, tabs: [workspacePaneStaticTabEntry('history')],
+      repoRoot: 'goblin+file:///repo', ...target, tabs: [workspacePaneStaticTabEntry('history')],
     }] })
     repository.compareAndSwap = vi.fn(async () => ({
       kind: 'write-failure' as const,
@@ -335,7 +335,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
       providerSnapshots: providers,
     })
 
@@ -343,7 +343,7 @@ describe('workspace pane layout aggregate', () => {
       kind: 'validated',
       snapshot: {
         entries: [{
-          worktreePath: target.worktreePath,
+          target: { kind: 'git-worktree', root: 'goblin+file:///repo/worktree' },
           tabs: [workspacePaneStaticTabEntry('status'), terminal],
         }],
       },
@@ -363,9 +363,9 @@ describe('workspace pane layout aggregate', () => {
 
     await expect(validate(aggregate, {
       ...scope,
-      validTargets: [{ repoRoot: '/repo', ...target }],
+      validTargets: [{ repoRoot: 'goblin+file:///repo', ...target }],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
       providerSnapshots: [],
     })).resolves.toEqual({ kind: 'membership-conflict' })
     expect(aggregate.activeEpochs('/repo')).toEqual([])
@@ -383,9 +383,9 @@ describe('workspace pane layout aggregate', () => {
 
     await expect(validate(aggregate, {
       ...scope,
-      validTargets: [{ repoRoot: '/repo', branchName: 'main', worktreePath: null }],
+      validTargets: [{ repoRoot: 'goblin+file:///repo', branchName: 'main', worktreePath: null }],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
       providerSnapshots: [],
       assertCurrent: () => {
         if (!current) throw new Error('error.repo-runtime-stale')
@@ -407,7 +407,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
       providerSnapshots: [],
     })).rejects.toBe(failure)
     expect(aggregate.activeEpochs('/repo')).toEqual([])
@@ -415,14 +415,14 @@ describe('workspace pane layout aggregate', () => {
 
   test('uses current provider branch metadata for a live worktree target', async () => {
     const repository = memoryRepository({ entries: [{
-      repoRoot: '/repo', branchName: 'old-branch', worktreePath: '/repo/worktree', tabs: [],
+      repoRoot: 'goblin+file:///repo', branchName: 'old-branch', worktreePath: '/repo/worktree', tabs: [],
     }] })
     const aggregate = aggregateFor(repository)
     const result = await validate(aggregate, {
       ...scope,
-      validTargets: [{ repoRoot: '/repo', branchName: 'old-branch', worktreePath: '/repo/worktree' }],
+      validTargets: [{ repoRoot: 'goblin+file:///repo', branchName: 'old-branch', worktreePath: '/repo/worktree' }],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
       providerSnapshots: [{
         type: 'terminal',
         revision: 1,
@@ -436,41 +436,41 @@ describe('workspace pane layout aggregate', () => {
 
     expect(result).toMatchObject({
       kind: 'validated',
-      snapshot: { entries: [{ branchName: 'current-branch' }] },
+      snapshot: { entries: [{ target: { kind: 'git-worktree', root: 'goblin+file:///repo/worktree' } }] },
     })
   })
 
   test('uses validated repo projection metadata for a worktree without a live provider', async () => {
     const repository = memoryRepository({ entries: [{
-      repoRoot: '/repo', branchName: '', worktreePath: '/repo/worktree', tabs: [workspacePaneStaticTabEntry('history')],
+      repoRoot: 'goblin+file:///repo', branchName: '', worktreePath: '/repo/worktree', tabs: [workspacePaneStaticTabEntry('history')],
     }] })
     const aggregate = aggregateFor(repository)
 
     const result = await validate(aggregate, {
       ...scope,
-      validTargets: [{ repoRoot: '/repo', branchName: 'feature/current', worktreePath: '/repo/worktree' }],
+      validTargets: [{ repoRoot: 'goblin+file:///repo', branchName: 'feature/current', worktreePath: '/repo/worktree' }],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
       providerSnapshots: [],
     })
 
     expect(result).toMatchObject({
       kind: 'validated',
-      snapshot: { entries: [{ branchName: 'feature/current', worktreePath: '/repo/worktree' }] },
+      snapshot: { entries: [{ target: { kind: 'git-worktree', root: 'goblin+file:///repo/worktree' } }] },
     })
   })
 
   test('returns every active user affected by a durable layout commit', async () => {
     const aggregate = aggregateFor(memoryRepository({ entries: [{
-      repoRoot: '/repo', branchName: 'main', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')],
+      repoRoot: 'goblin+file:///repo', branchName: 'main', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')],
     }] }))
-    await validateTargets(aggregate, [{ repoRoot: '/repo', branchName: 'main', worktreePath: null }])
-    const mainTarget = { repoRoot: '/repo', branchName: 'main', worktreePath: null }
+    await validateTargets(aggregate, [{ repoRoot: 'goblin+file:///repo', branchName: 'main', worktreePath: null }])
+    const mainTarget = { repoRoot: 'goblin+file:///repo', branchName: 'main', worktreePath: null }
     await readSnapshot(aggregate, { ...scope, userId: 'user-b', repoRuntimeId: 'runtime-b' }, [mainTarget], [])
 
     const result = await update(aggregate, {
       ...scope,
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       branchName: 'main',
       worktreePath: null,
       operation: { type: 'open-static', tabType: 'history' },
@@ -533,7 +533,7 @@ async function validateTargets(
     ...scope,
     validTargets,
     physicalTargets: [],
-    expectedRepoEntry: { kind: 'local', id: '/repo' },
+    expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
     providerSnapshots: [],
   })
   if (result.kind !== 'validated') throw new Error('test target validation failed')

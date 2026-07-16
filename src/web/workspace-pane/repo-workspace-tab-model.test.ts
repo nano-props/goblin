@@ -13,7 +13,7 @@ import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 
-const REPO_ID = '/tmp/goblin-repo-workspace-tab-model-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-repo-workspace-tab-model-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/tmp/goblin-repo-workspace-tab-model-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`

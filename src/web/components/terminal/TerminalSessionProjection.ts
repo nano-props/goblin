@@ -714,6 +714,7 @@ export class TerminalSessionProjection {
         cols: geometry.cols,
         rows: geometry.rows,
         clientId,
+        ...(base.target ? { target: base.target } : {}),
       },
       ...request.placement,
     })

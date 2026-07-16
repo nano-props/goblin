@@ -23,7 +23,10 @@ import {
   readWorkspacePaneTabsForTarget,
   writeWorkspacePaneTabsSnapshotQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import {
+  runtimeWorkspacePaneTargetForTest,
+  setWorkspacePaneTabsForTargetQueryData,
+} from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const projectionMocks = vi.hoisted(() => ({
   reconcileServerSessionsSnapshot: vi.fn(() => true),
@@ -39,7 +42,7 @@ vi.mock('#/web/stores/repos/repo-session-write-paths.ts', async (importOriginal)
   reconcileOpenRepoRuntimeMemberships: projectionMocks.reconcileOpenRepoRuntimeMemberships,
 }))
 
-const REPO_ID = '/tmp/goblin-runtime-provider-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-runtime-provider-repo'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/goblin-runtime-provider-worktree'
 
@@ -222,9 +225,12 @@ describe('AppRuntimeProjectionProvider', () => {
     })
     listWorkspaceTabsMock.mockResolvedValue([
       {
-        repoRoot: REPO_ID,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
+        target: runtimeWorkspacePaneTargetForTest({
+          repoRoot: REPO_ID,
+          repoRuntimeId: repo.repoRuntimeId,
+          branchName: BRANCH_NAME,
+          worktreePath: WORKTREE_PATH,
+        }),
         tabs: [workspacePaneStaticTabEntry('history')],
       },
     ])
@@ -286,9 +292,12 @@ describe('AppRuntimeProjectionProvider', () => {
       })
       listWorkspaceTabsMock.mockResolvedValue([
         {
-          repoRoot: REPO_ID,
-          branchName: BRANCH_NAME,
-          worktreePath: WORKTREE_PATH,
+          target: runtimeWorkspacePaneTargetForTest({
+            repoRoot: REPO_ID,
+            repoRuntimeId: repo.repoRuntimeId,
+            branchName: BRANCH_NAME,
+            worktreePath: WORKTREE_PATH,
+          }),
           tabs: [workspacePaneStaticTabEntry('history')],
         },
       ])
