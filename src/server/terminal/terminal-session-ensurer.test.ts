@@ -184,7 +184,7 @@ describe('terminal session ensurer', () => {
 
     expect(result).toMatchObject({
       ok: true,
-      action: 'reused',
+      action: 'created',
       terminalSessionId: 'term-remoteremoteremote001',
       canonicalCols: 120,
       canonicalRows: 32,

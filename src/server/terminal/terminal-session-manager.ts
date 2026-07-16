@@ -829,8 +829,7 @@ export class TerminalSessionManager<TUser extends string | number> {
           ...this.terminalSessionIdentity(session),
           repoRoot: session.repoRoot,
           repoRuntimeId: session.repoRuntimeId,
-        })
-      },
+        }),
       confirmedExit: (session, terminalRuntimeGeneration) => {
         this.confirmSessionExit(session, terminalRuntimeGeneration)
       },

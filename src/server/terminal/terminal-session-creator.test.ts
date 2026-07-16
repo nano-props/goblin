@@ -107,7 +107,7 @@ describe('terminal session creator', () => {
         createSessionId: () => 'term-createdcreatedcreated',
       }),
       ensureOrRestore,
-      isCurrentRepoRuntime: vi.fn(() => true),
+      isCurrentRepoRuntime: vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false),
     })
 
     await expect(

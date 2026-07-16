@@ -286,7 +286,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     })
     if (!prepared.ok) throw new Error(prepared.message)
 
-    await expect(manager.closeSession(prepared.terminalRuntimeSessionId)).resolves.toBe(true)
+    await expect(manager.closeSessionForUser(USER_ID, prepared.terminalRuntimeSessionId)).resolves.toBe(true)
     expect(supervisor.spawn).not.toHaveBeenCalled()
     expect(supervisor.killed).toEqual([])
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
