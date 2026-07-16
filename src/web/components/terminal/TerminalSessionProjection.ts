@@ -1230,17 +1230,15 @@ export class TerminalSessionProjection {
       return false
     }
     if (!result.ok) return false
-    try {
-      await refreshWorkspacePaneTabsQueryData(base.repoRoot, repoRuntimeId)
-    } catch (err) {
+    this.applyClosedServerSessionEffect(base, result.runtime, requestedBinding)
+    void refreshWorkspacePaneTabsQueryData(base.repoRoot, repoRuntimeId).catch((err) => {
       terminalSessionProviderLog.warn('terminal closed but workspace pane tabs refresh failed', {
         terminalSessionId,
         repoRoot: base.repoRoot,
         repoRuntimeId,
         err,
       })
-    }
-    this.applyClosedServerSessionEffect(base, result.runtime, requestedBinding)
+    })
     return true
   }
 

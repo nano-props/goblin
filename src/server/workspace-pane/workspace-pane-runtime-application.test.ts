@@ -37,8 +37,8 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const create = vi.fn(async () => runtime)
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(request.worktreePath)
     const capture = vi.fn(async () => physicalWorktreeCapability)
-    const ensureRuntimeTabForSession = vi.fn(async (input: { commitAdmission?: (canonicalBranch: string) => void }) => {
-      input.commitAdmission?.(request.branch)
+    const ensureRuntimeTabForSession = vi.fn(async (input: { commitAdmission: (canonicalBranch: string) => void }) => {
+      input.commitAdmission(request.branch)
       return { kind: 'committed' as const }
     })
     const broadcastWorkspaceTabsChanged = vi.fn()
@@ -340,8 +340,8 @@ describe('WorkspacePaneRuntimeApplication', () => {
         close: () => true,
       },
       workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: async (input: { commitAdmission?: (canonicalBranch: string) => void }) => {
-          input.commitAdmission?.(request.branch)
+        ensureRuntimeTabForSession: async (input: { commitAdmission: (canonicalBranch: string) => void }) => {
+          input.commitAdmission(request.branch)
           return { kind: 'committed' as const }
         },
       },
@@ -383,10 +383,10 @@ describe('WorkspacePaneRuntimeApplication', () => {
         ensureRuntimeTabForSession: async (input: {
           physicalWorktreeCapability: ReturnType<typeof testPhysicalWorktreeExecutionCapability>
           permit: PhysicalWorktreeOperationPermit
-          commitAdmission?: (canonicalBranch: string) => void
+          commitAdmission: (canonicalBranch: string) => void
         }) => {
           worktreeOperations.assertPermit(input.physicalWorktreeCapability, input.permit)
-          input.commitAdmission?.(request.branch)
+          input.commitAdmission(request.branch)
           return { kind: 'committed' as const }
         },
       },
@@ -482,8 +482,8 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: async () => runtime, close },
       workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: async (input: { commitAdmission?: (canonicalBranch: string) => void }) => {
-          input.commitAdmission?.(request.branch)
+        ensureRuntimeTabForSession: async (input: { commitAdmission: (canonicalBranch: string) => void }) => {
+          input.commitAdmission(request.branch)
           throw new Error('invariant failure after admission')
         },
       },

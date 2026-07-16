@@ -1138,6 +1138,29 @@ describe('TerminalSessionProjection', () => {
       expect(workspacePaneRuntimeMocks.refreshTabs).toHaveBeenCalledWith(REPO_ROOT, REPO_RUNTIME_ID)
     })
 
+    test('applies a successful close without waiting for workspace tabs refresh', async () => {
+      projection.setRepoIndex(makeRepoIndex())
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
+        'client_local',
+      )
+      const refresh = Promise.withResolvers<void>()
+      workspacePaneRuntimeMocks.refreshTabs.mockReturnValueOnce(refresh.promise)
+
+      await expect(
+        projection.closeTerminalByDescriptor('term-111111111111111111111', {
+          repoRoot: REPO_ROOT,
+          repoRuntimeId: REPO_RUNTIME_ID,
+          branch: BRANCH,
+          worktreePath: WORKTREE_PATH,
+        }),
+      ).resolves.toBe(true)
+
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      refresh.resolve()
+    })
+
     test('closeTerminalByDescriptor rejects a mismatched repo runtime scope', async () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(

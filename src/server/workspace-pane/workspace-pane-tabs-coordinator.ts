@@ -86,7 +86,7 @@ export interface WorkspaceRuntimeTabPlacementInput {
   permit: PhysicalWorktreeOperationPermit
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   isRuntimeCurrent: () => boolean
-  commitAdmission?: (canonicalBranchName: string) => void
+  commitAdmission: (canonicalBranchName: string) => void
 }
 
 export interface WorkspaceRuntimeTabPlacement {
@@ -160,7 +160,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
         lease: physicalWorktreeAdmissionLease(physicalCapability),
         tabs,
       })
-      input.commitAdmission?.(commitTarget.branchName)
+      input.commitAdmission(commitTarget.branchName)
       return { kind: 'committed' }
     })
   }

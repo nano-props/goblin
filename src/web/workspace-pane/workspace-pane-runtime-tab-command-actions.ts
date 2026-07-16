@@ -7,7 +7,10 @@ import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspacePaneTabControllerCommitNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { commitWorkspacePaneCurrentTargetRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  workspacePaneTabTargetForBranch,
+  workspacePaneTabTargetForCreatedRuntime,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
 import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 
@@ -73,8 +76,16 @@ async function terminalRuntimePrimaryAction({
       workspacePaneRoute,
       showRuntimeTab: (type, sessionId) =>
         showTerminalRuntimeTab(type, sessionId, repoId, branchName, workspacePaneRoute, navigation),
-      showCreatedRuntimeTab: (type, sessionId, canonicalBranch) =>
-        showTerminalRuntimeTab(type, sessionId, repoId, canonicalBranch, workspacePaneRoute, navigation),
+      showCreatedRuntimeTab: (type, sessionId, canonicalBranch, worktreePath) =>
+        showCreatedTerminalRuntimeTab(
+          type,
+          sessionId,
+          repoId,
+          canonicalBranch,
+          worktreePath,
+          workspacePaneRoute,
+          navigation,
+        ),
       terminalCreateTranslator: t,
     }),
   )
@@ -102,8 +113,16 @@ function newTerminalRuntimeTabActionContext({
     workspacePaneRoute,
     showRuntimeTab: (type, sessionId) =>
       showTerminalRuntimeTab(type, sessionId, repoId, branchName, workspacePaneRoute, navigation),
-    showCreatedRuntimeTab: (type, sessionId, canonicalBranch) =>
-      showTerminalRuntimeTab(type, sessionId, repoId, canonicalBranch, workspacePaneRoute, navigation),
+    showCreatedRuntimeTab: (type, sessionId, canonicalBranch, worktreePath) =>
+      showCreatedTerminalRuntimeTab(
+        type,
+        sessionId,
+        repoId,
+        canonicalBranch,
+        worktreePath,
+        workspacePaneRoute,
+        navigation,
+      ),
     terminalCreateTranslator: t,
   })
 }
@@ -132,6 +151,21 @@ function showTerminalRuntimeTab(
 ): boolean | Promise<boolean> {
   if (type !== 'terminal') return false
   const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
+  if (!target) return false
+  return commitWorkspacePaneCurrentTargetRoute(target, { kind: 'terminal', terminalSessionId: sessionId }, navigation)
+}
+
+function showCreatedTerminalRuntimeTab(
+  type: WorkspacePaneRuntimeTabType,
+  sessionId: string,
+  repoId: string,
+  canonicalBranch: string,
+  worktreePath: string,
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined,
+  navigation: WorkspacePaneTabControllerCommitNavigation,
+): boolean | Promise<boolean> {
+  if (type !== 'terminal') return false
+  const target = workspacePaneTabTargetForCreatedRuntime(repoId, canonicalBranch, worktreePath, { workspacePaneRoute })
   if (!target) return false
   return commitWorkspacePaneCurrentTargetRoute(target, { kind: 'terminal', terminalSessionId: sessionId }, navigation)
 }

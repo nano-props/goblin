@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
   runWorkspacePaneRuntimeNewAction,
@@ -9,6 +10,7 @@ import { createTerminalWithAdmissionForTest } from '#/web/test-utils/terminal-se
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 const terminalBase: TerminalSessionBase & { repoRuntimeId: string } = {
   repoRoot: '/repo',
@@ -20,9 +22,17 @@ const terminalBase: TerminalSessionBase & { repoRuntimeId: string } = {
 describe('workspace pane runtime tab command actions', () => {
   beforeEach(() => {
     resetWorkspacePaneActionQueueForTest()
+    resetReposStore()
   })
 
   test('routes a committed create with its canonical admission branch', async () => {
+    seedRepoWithReadModelForTest({
+      id: terminalBase.repoRoot,
+      repoRuntimeId: terminalBase.repoRuntimeId,
+      branches: [createRepoBranch(terminalBase.branch, { worktree: { path: terminalBase.worktreePath } })],
+      currentBranchName: terminalBase.branch,
+      workspacePaneTabsByBranch: { [terminalBase.branch]: [workspacePaneStaticTabEntry('status')] },
+    })
     const showCreatedRuntimeTab = vi.fn(() => true)
     const context = workspacePaneRuntimeTabCommandContext({
       repoId: terminalBase.repoRoot,
@@ -38,6 +48,7 @@ describe('workspace pane runtime tab command actions', () => {
       'terminal',
       'term-111111111111111111111',
       'feature/renamed',
+      terminalBase.worktreePath,
     )
   })
 
