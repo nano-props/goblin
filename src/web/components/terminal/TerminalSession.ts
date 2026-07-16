@@ -156,8 +156,9 @@ export class TerminalSession {
 
   resynchronizeConnectedView(): void {
     if (this.disposed || !this.view.isConnected()) return
+    if (!this.shouldStartAttachedSession()) return
     if (this.view.currentTerminal()) this.destroyActiveView()
-    if (this.shouldStartAttachedSession()) this.start()
+    this.start()
   }
 
   detach(host: HTMLElement): void {

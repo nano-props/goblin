@@ -658,10 +658,9 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   private prepareResult(
     session: TerminalSessionView<TUser>,
-  ): { ok: true; terminalSessionsRevision: number } & TerminalRuntimeMetadata {
+  ): { ok: true } & TerminalRuntimeMetadata {
     return {
       ok: true,
-      terminalSessionsRevision: this.projectionRevision(session.userId, session.scope),
       ...this.runtimeMetadata(session),
     }
   }
