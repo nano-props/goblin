@@ -23,7 +23,7 @@ import { repoBranchReadModelFromSnapshot, type RepoBranchReadModelData } from '#
 import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
 import type { PullRequestEntry } from '#/shared/api-types.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
-import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 import { refreshVisibleStatusCache } from '#/web/stores/repos/visible-status-refresh.ts'
 
 type DashboardTone = 'default' | 'attention' | 'success'
@@ -98,6 +98,15 @@ export function RepoDashboardPane({
   const hasAttentionBranches = !!summary?.attentionBranches.length
   const statusError = statusReadModel.error
   const statusErrorMessage = statusError instanceof Error ? statusError.message : String(statusError)
+  const statusStale = !!statusReadModel.data && statusReadModel.isError
+  const retryStatus = () => {
+    if (!repo) return
+    void refreshVisibleStatusCache(
+      { get: useReposStore.getState, set: useReposStore.setState },
+      repo.id,
+      repo.repoRuntimeId,
+    )
+  }
 
   return (
     <RepoPagePane
@@ -113,16 +122,17 @@ export function RepoDashboardPane({
             <RepoStatusFailureView
               message={statusErrorMessage}
               retrying={statusReadModel.isFetching}
-              onRetry={() => {
-                void refreshVisibleStatusCache(
-                  { get: useReposStore.getState, set: useReposStore.setState },
-                  repo.id,
-                  repo.repoRuntimeId,
-                )
-              }}
+              onRetry={retryStatus}
             />
           ) : repo && branchModel && summary ? (
             <>
+              {statusStale && (
+                <RepoStatusStaleNotice
+                  message={statusErrorMessage}
+                  retrying={statusReadModel.isFetching}
+                  onRetry={retryStatus}
+                />
+              )}
               <DashboardHeader repo={repo} currentBranch={branchModel.currentBranch} lang={lang} />
               <DashboardStats compact={compact} summary={summary} />
               <div

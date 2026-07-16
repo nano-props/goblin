@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
+import { RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 import { useRepoLogQuery } from '#/web/repo-data-query.ts'
 import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
 import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
@@ -406,7 +407,7 @@ function BranchChangesTab({
     <WorkspacePanePanelFrame id={`${workspacePaneId}-changes-panel`} {...panelLabel} busy={statusLoading}>
       {branch.worktree?.path ? (
         <div className="relative flex min-h-0 flex-1 flex-col">
-          {statusStale && statusError && <StaleStatusNotice message={statusError} />}
+          {statusStale && statusError && <RepoStatusStaleNotice message={statusError} />}
           {totalEntries > 0 ? (
             <ScrollPane>
               <StatusList status={currentBranchStatus} />
@@ -423,18 +424,5 @@ function BranchChangesTab({
         />
       )}
     </WorkspacePanePanelFrame>
-  )
-}
-
-function StaleStatusNotice({ message }: { message: string }) {
-  const t = useT()
-  return (
-    <div className="border-b border-warning-border bg-warning-surface px-4 py-2 text-xs text-warning">
-      <span className="font-medium">{t('status.stale-title')}</span>
-      <span className="text-muted-foreground">
-        {' \u2014 '}
-        {t(message)}
-      </span>
-    </div>
   )
 }

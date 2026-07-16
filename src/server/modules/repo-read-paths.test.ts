@@ -139,7 +139,7 @@ describe('getRepoWorktreeBootstrapPreview', () => {
 })
 
 describe('readRepoProjection', () => {
-  test('reads snapshot, status, and current-branch pull requests through one server projection', async () => {
+  test('reads snapshot and current-branch pull requests through one server projection', async () => {
     const snapshot: RepoSnapshot = {
       branches: [],
       current: 'main',
@@ -306,7 +306,7 @@ describe('repo projection section deadlines', () => {
       timeoutMs: 50,
     })
 
-    const rejected = expect(promise).rejects.toThrow('composite section timeout')
+    const rejected = expect(promise).rejects.toThrow('repository read timeout')
     await vi.advanceTimersByTimeAsync(75)
     await rejected
   })

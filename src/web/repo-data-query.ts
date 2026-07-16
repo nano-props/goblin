@@ -729,19 +729,12 @@ export async function refreshRepoWorktreeStatusReadModel(
   const queryKey = repoWorktreeStatusQueryKey(repoRoot, repoRuntimeId)
   await queryClient.invalidateQueries({ queryKey, exact: true, refetchType: 'none' }, { cancelRefetch: false })
   for (;;) {
-    const hasSharedFetchInProgress = hasRepoProjectionFetchInProgress(queryClient, queryKey)
     try {
       const snapshot = await abortablePromise(
         queryClient.fetchQuery({
           ...repoWorktreeStatusQueryOptions(repoRoot, repoRuntimeId),
           staleTime: 0,
-          queryFn: ({ signal }) =>
-            fetchRepoWorktreeStatusReadModel(
-              repoRoot,
-              repoRuntimeId,
-              options.signal && !hasSharedFetchInProgress ? AbortSignal.any([signal, options.signal]) : signal,
-              queryClient,
-            ),
+          queryFn: ({ signal }) => fetchRepoWorktreeStatusReadModel(repoRoot, repoRuntimeId, signal, queryClient),
         }),
         options.signal,
       )

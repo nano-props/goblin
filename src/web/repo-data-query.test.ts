@@ -19,7 +19,12 @@ import {
   setRepoWorktreeStatusQueryData,
   useRepoOperationsReadModel,
 } from '#/web/repo-data-query.ts'
-import type { PullRequestEntry, RepoOperationsSnapshot, RepoRuntimeProjection } from '#/shared/api-types.ts'
+import type {
+  PullRequestEntry,
+  RepoOperationsSnapshot,
+  RepoRuntimeProjection,
+  RepoWorktreeStatusSnapshot,
+} from '#/shared/api-types.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
@@ -765,6 +770,33 @@ describe('repo worktree status query data', () => {
     ])
     expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce()
     expect(getRepoWorktreeStatusQueryData('/tmp/repo', 'repo-runtime-1', queryClient)).toBeUndefined()
+  })
+
+  test('caller cancellation does not abort a shared status read', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const controller = new AbortController()
+    let transportSignal!: AbortSignal
+    let resolveRead!: (snapshot: RepoWorktreeStatusSnapshot) => void
+    repoClientMocks.getRepoWorktreeStatus.mockImplementation((_repoRoot, _repoRuntimeId, signal) => {
+      transportSignal = signal
+      return new Promise((resolve) => {
+        resolveRead = resolve
+      })
+    })
+
+    const first = refreshRepoWorktreeStatusReadModel('/tmp/repo', 'repo-runtime-1', {
+      queryClient,
+      signal: controller.signal,
+    })
+    await vi.waitFor(() => expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce())
+    const second = refreshRepoWorktreeStatusReadModel('/tmp/repo', 'repo-runtime-1', { queryClient })
+    controller.abort(new Error('caller stopped'))
+
+    await expect(first).rejects.toThrow('caller stopped')
+    expect(transportSignal.aborted).toBe(false)
+    resolveRead({ repoRuntimeId: 'repo-runtime-1', status: [], loadedAt: 2 })
+    await expect(second).resolves.toMatchObject({ loadedAt: 2 })
+    expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce()
   })
 
   test('preserves the last accepted status when refresh fails', async () => {

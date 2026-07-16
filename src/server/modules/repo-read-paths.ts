@@ -119,13 +119,13 @@ interface RepoProjectionSections {
 }
 
 /**
- * Default per-section deadline for the composite endpoint. Each
- * included section (snapshot / pullRequests) gets its own
+ * Default deadline for an individual repository read. Each included
+ * projection section (snapshot / pullRequests) gets its own
  * timer; the slowest leg is bounded by `timeoutMs` regardless of what
  * the underlying git / network operation would have done. Set to
  * `0` to disable the timeout.
  */
-export const DEFAULT_BULK_READ_TIMEOUT_MS = 15_000
+export const DEFAULT_REPO_READ_TIMEOUT_MS = 15_000
 
 interface RepoProjectionSectionReadOptions {
   branches?: string[]
@@ -163,7 +163,7 @@ function sortedRepoOperations(states: RepoServerOperationState[]): RepoServerOpe
  * Build a per-section `AbortSignal` that fires when either the
  * caller's signal or the timeout fires. The timeout is a hard cap
  * independent of any source-specific backoff; its job is to bound
- * how long the composite endpoint can block the request worker.
+ * how long a repository read can block the request worker.
  */
 function composeSectionSignal(
   callerSignal: AbortSignal | undefined,
@@ -182,7 +182,7 @@ function composeSectionSignal(
   const controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
   if (timeoutMs > 0) {
-    timer = setTimeout(() => controller.abort(new Error('composite section timeout')), timeoutMs)
+    timer = setTimeout(() => controller.abort(new Error('repository read timeout')), timeoutMs)
   }
   const onCallerAbort = () => controller.abort(callerSignal?.reason)
   if (callerSignal) {
@@ -210,7 +210,7 @@ async function readRepoProjectionSections(
   cwd: string,
   options: RepoProjectionSectionReadOptions,
 ): Promise<RepoProjectionSections> {
-  const { branches, includePullRequests, mode, signal, timeoutMs = DEFAULT_BULK_READ_TIMEOUT_MS } = options
+  const { branches, includePullRequests, mode, signal, timeoutMs = DEFAULT_REPO_READ_TIMEOUT_MS } = options
 
   // One signal per section so the slow leg can be cancelled
   // independently — the others keep going. We materialise the
@@ -270,7 +270,7 @@ export async function readRepoWorktreeStatus(
   cwd: string,
   options: { signal?: AbortSignal; repoRuntimeId: string; timeoutMs?: number },
 ): Promise<RepoWorktreeStatusSnapshot> {
-  const statusCtl = composeSectionSignal(options.signal, options.timeoutMs ?? DEFAULT_BULK_READ_TIMEOUT_MS)
+  const statusCtl = composeSectionSignal(options.signal, options.timeoutMs ?? DEFAULT_REPO_READ_TIMEOUT_MS)
   try {
     return {
       repoRuntimeId: options.repoRuntimeId,
