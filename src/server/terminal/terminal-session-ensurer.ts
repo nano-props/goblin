@@ -1,11 +1,6 @@
 import { buildRemoteTerminalInvocation } from '#/system/ssh/commands.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import {
-  type TerminalAttachResult,
-  type TerminalCreateAction,
-  type TerminalControllerStatus,
-  type TerminalSessionPhase,
-} from '#/shared/terminal-types.ts'
+import { type TerminalCreateAction, type TerminalRuntimeMetadata } from '#/shared/terminal-types.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import {
   buildGoblinTerminalCommandEnvironment,
@@ -29,29 +24,16 @@ export interface TerminalSessionEnsureInput {
 }
 
 export type TerminalSessionEnsureResult =
-  | {
+  | ({
       ok: true
       terminalSessionsRevision: number
-      terminalRuntimeSessionId: string
-      terminalRuntimeGeneration: number
       terminalSessionId: string
       action: TerminalCreateAction
-      processName: string
-      canonicalTitle: string | null
-      phase: TerminalSessionPhase
-      message: string | null
-      snapshot: string
-      snapshotSeq: number
-      outputEra: number
-      controller: { clientId: string; status: Exclude<TerminalControllerStatus, 'none'> } | null
-      canonicalCols: number
-      canonicalRows: number
-    }
+    } & TerminalRuntimeMetadata)
   | { ok: false; message: string }
 
-export type TerminalSessionEnsureAttachResult =
-  | (Extract<TerminalAttachResult, { ok: true }> & { terminalSessionsRevision: number })
-  | Extract<TerminalAttachResult, { ok: false }>
+export type TerminalSessionPrepareManagerResult =
+  ({ ok: true; terminalSessionsRevision: number } & TerminalRuntimeMetadata) | { ok: false; message: string }
 
 export interface TerminalSessionEnsureManagerInput {
   userId: string
@@ -74,7 +56,9 @@ export interface TerminalSessionEnsureManagerInput {
 }
 
 export interface TerminalSessionEnsureManager {
-  ensureSession(input: TerminalSessionEnsureManagerInput): Promise<TerminalSessionEnsureAttachResult>
+  prepareSession(
+    input: TerminalSessionEnsureManagerInput,
+  ): TerminalSessionPrepareManagerResult | Promise<TerminalSessionPrepareManagerResult>
 }
 
 export interface TerminalSessionEnsurerOptions {
@@ -125,7 +109,7 @@ class TerminalSessionEnsurer {
       },
       { startupShellCommand: input.startupShellCommand },
     )
-    const result = await this.options.manager.ensureSession({
+    const result = await this.options.manager.prepareSession({
       userId,
       scope: terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId),
       repoRoot: input.repoRoot,
@@ -163,7 +147,7 @@ class TerminalSessionEnsurer {
           worktreePath,
         }) ?? undefined)
       : undefined
-    const result = await this.options.manager.ensureSession({
+    const result = await this.options.manager.prepareSession({
       userId,
       scope: terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId),
       repoRoot,
@@ -193,24 +177,21 @@ export function createTerminalSessionEnsurer(options: TerminalSessionEnsurerOpti
 function toEnsureResult(
   terminalSessionId: string,
   action: TerminalCreateAction,
-  snapshotResult: Extract<TerminalSessionEnsureAttachResult, { ok: true }>,
+  prepared: Extract<TerminalSessionPrepareManagerResult, { ok: true }>,
 ): TerminalSessionEnsureResult {
   return {
     ok: true,
-    terminalSessionsRevision: snapshotResult.terminalSessionsRevision,
-    terminalRuntimeSessionId: snapshotResult.terminalRuntimeSessionId,
-    terminalRuntimeGeneration: snapshotResult.terminalRuntimeGeneration,
+    terminalSessionsRevision: prepared.terminalSessionsRevision,
+    terminalRuntimeSessionId: prepared.terminalRuntimeSessionId,
+    terminalRuntimeGeneration: prepared.terminalRuntimeGeneration,
     terminalSessionId,
     action,
-    processName: snapshotResult.processName,
-    canonicalTitle: snapshotResult.canonicalTitle,
-    phase: snapshotResult.phase,
-    message: snapshotResult.message,
-    snapshot: snapshotResult.snapshot,
-    snapshotSeq: snapshotResult.snapshotSeq,
-    outputEra: snapshotResult.outputEra,
-    controller: snapshotResult.controller,
-    canonicalCols: snapshotResult.canonicalCols,
-    canonicalRows: snapshotResult.canonicalRows,
+    processName: prepared.processName,
+    canonicalTitle: prepared.canonicalTitle,
+    phase: prepared.phase,
+    message: prepared.message,
+    controller: prepared.controller,
+    canonicalCols: prepared.canonicalCols,
+    canonicalRows: prepared.canonicalRows,
   }
 }

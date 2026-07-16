@@ -43,10 +43,7 @@ import {
   type AuthorizationDenialReason,
   type TerminalAuthorityGate,
 } from '#/web/components/terminal/authority-gate.ts'
-import {
-  TerminalRenderQueue,
-  type RenderedOutputCheckpoint,
-} from '#/web/components/terminal/terminal-render-queue.ts'
+import { TerminalRenderQueue, type RenderedOutputCheckpoint } from '#/web/components/terminal/terminal-render-queue.ts'
 import { WRITE_BLOCKED_KEY_BY_REASON } from '#/web/components/terminal/authority-denial-feedback.ts'
 import { terminalLog } from '#/web/logger.ts'
 import {
@@ -163,7 +160,8 @@ export class TerminalSession {
 
   private shouldStartAttachedSession(): boolean {
     if (this.runtime.isController()) return true
-    return this.runtime.phase() === 'open' && this.runtime.clientRole() === 'unowned'
+    const phase = this.runtime.phase()
+    return (phase === 'opening' || phase === 'open') && this.runtime.clientRole() === 'unowned'
   }
 
   detach(host: HTMLElement): void {
@@ -430,23 +428,23 @@ export class TerminalSession {
     return this.authorityGate
   }
 
-  hydrate(
-    input: TerminalSessionHydrationInput,
-    source: TerminalAuthoritativeHydrationSource = 'snapshot',
-  ): void {
+  hydrate(input: TerminalSessionHydrationInput, source: TerminalAuthoritativeHydrationSource = 'snapshot'): void {
     const previousTerminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
-    const hydration = this.runtime.hydrateRepoSession({
-      terminalRuntimeSessionId: input.terminalRuntimeSessionId,
-      terminalRuntimeGeneration: input.terminalRuntimeGeneration,
-      phase: input.phase,
-      message: input.message,
-      processName: input.processName,
-      canonicalTitle: input.canonicalTitle ?? null,
-      role: input.role,
-      controllerStatus: input.controllerStatus,
-      canonicalCols: input.canonicalCols,
-      canonicalRows: input.canonicalRows,
-    }, source)
+    const hydration = this.runtime.hydrateRepoSession(
+      {
+        terminalRuntimeSessionId: input.terminalRuntimeSessionId,
+        terminalRuntimeGeneration: input.terminalRuntimeGeneration,
+        phase: input.phase,
+        message: input.message,
+        processName: input.processName,
+        canonicalTitle: input.canonicalTitle ?? null,
+        role: input.role,
+        controllerStatus: input.controllerStatus,
+        canonicalCols: input.canonicalCols,
+        canonicalRows: input.canonicalRows,
+      },
+      source,
+    )
     if (hydration.disposition === 'staged') {
       if (hydration.candidateAccepted) this.stagedHydrationInput = input
       if (hydration.activationPending) this.notify('metadata')
@@ -696,7 +694,7 @@ export class TerminalSession {
         }
         this.stagedHydrationInput = null
         // Sync the gate so writes/resizes that race the next identity
-        // event use the correct role. The first-frame payload is
+        // event use the correct role. The attach response is
         // authoritative for the new terminalRuntimeSessionId, so a successful
         // attach always lands here before any keystroke.
         this.authority().setRole(result.role)
@@ -704,7 +702,18 @@ export class TerminalSession {
         if (committed.changed) this.notify('metadata')
         return
       }
-      const metadataChanged = await this.replayPhase(epoch, attempt, term, result)
+      if (result.frame === 'stream' && preloadReplayGeneration !== null) {
+        // This is a protocol invariant failure, not a state to reconcile:
+        // stream means no history existed, while a non-empty preload means
+        // this view was given recovery history for the same binding.
+        this.runtime.drainReplay(preloadReplayGeneration)
+        preloadReplayGeneration = null
+        throw new Error('terminal stream frame conflicts with recovery preload')
+      }
+      const metadataChanged =
+        result.frame === 'snapshot'
+          ? await this.replayPhase(epoch, attempt, term, result)
+          : this.streamPhase(epoch, attempt, term, result)
       this.finalizePhase(epoch, term, metadataChanged)
     } catch (err) {
       if (err instanceof StartCancelledError) {
@@ -785,7 +794,7 @@ export class TerminalSession {
       // and the attach IPC reads them synchronously when ipcPhase runs.
       // The rAF settles the *layout paint* for measurement accuracy in
       // later operations, but the attach roundtrip doesn't need that
-      // paint to have completed. A future local first-frame optimization
+      // paint to have completed. A future local geometry optimization
       // MUST restore the blocking wait before trusting local geometry.
       void waitForTerminalLayout()
       this.assertCurrentStart(epoch, term)
@@ -839,8 +848,34 @@ export class TerminalSession {
     epoch: number,
     attempt: TerminalRuntimeAttemptToken,
     term: XTermTerminal,
-    result: TerminalAttachResultWithController,
+    result: Extract<TerminalAttachResultWithController, { frame: 'snapshot' }>,
   ): Promise<boolean> {
+    const metadataChanged = this.commitAttachFrame(attempt, term, result)
+    await this.replayActiveView(epoch, term, result.snapshot, {
+      terminalRuntimeSessionId: result.terminalRuntimeSessionId,
+      outputEra: result.outputEra,
+      seq: result.snapshotSeq,
+    })
+    this.assertCurrentStart(epoch, term)
+    return metadataChanged
+  }
+
+  private streamPhase(
+    epoch: number,
+    attempt: TerminalRuntimeAttemptToken,
+    term: XTermTerminal,
+    result: Extract<TerminalAttachResultWithController, { frame: 'stream' }>,
+  ): boolean {
+    const metadataChanged = this.commitAttachFrame(attempt, term, result)
+    this.assertCurrentStart(epoch, term)
+    return metadataChanged
+  }
+
+  private commitAttachFrame(
+    attempt: TerminalRuntimeAttemptToken,
+    term: XTermTerminal,
+    result: TerminalAttachResultWithController,
+  ): boolean {
     const committed = this.runtime.commitAttachResult(attempt, result, { cols: term.cols, rows: term.rows })
     if (!committed.accepted) throw new StartCancelledError()
     if (committed.resolution === 'staged') {
@@ -850,7 +885,7 @@ export class TerminalSession {
     this.stagedHydrationInput = null
     this.syncExternalCommandGate(
       result.terminalRuntimeSessionId,
-      terminalSnapshotHasOutput(result.snapshot, result.snapshotSeq),
+      result.frame === 'snapshot' && terminalSnapshotHasOutput(result.snapshot, result.snapshotSeq),
     )
     // Sync the gate. Without this, a controller→unowned→recreate
     // cycle leaves the gate at 'viewer' even though the runtime
@@ -866,12 +901,6 @@ export class TerminalSession {
         this.queueResize(term.cols, term.rows)
       }
     }
-    await this.replayActiveView(epoch, term, result.snapshot, {
-      terminalRuntimeSessionId: result.terminalRuntimeSessionId,
-      outputEra: result.outputEra,
-      seq: result.snapshotSeq,
-    })
-    this.assertCurrentStart(epoch, term)
     return committed.changed
   }
 

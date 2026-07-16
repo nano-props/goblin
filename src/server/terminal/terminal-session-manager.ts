@@ -8,6 +8,8 @@ import {
   type TerminalHydrationSnapshot,
   type TerminalLifecycleEvent,
   type TerminalOutputEvent,
+  type TerminalRestartResult,
+  type TerminalRuntimeMetadata,
   type TerminalSessionSummary,
   type TerminalSessionsSnapshot,
   type TerminalTakeoverResult,
@@ -35,11 +37,8 @@ import {
   type TerminalPtySpawnResult,
 } from '#/server/terminal/terminal-session-pty-lifecycle.ts'
 import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
-import {
-  physicalWorktreeIdentityKey,
-} from '#/server/worktree-removal/physical-worktree-identity.ts'
+import { physicalWorktreeIdentityKey } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
-import type { TerminalSessionEnsureAttachResult } from '#/server/terminal/terminal-session-ensurer.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 
@@ -49,10 +48,13 @@ export interface TerminalSessionOrderProjection<TUser extends string | number> {
 
 export type TerminalSessionCloseReason = 'session' | 'scope' | 'detached-user' | 'shutdown'
 
-interface TerminalPtyAttachResult {
+interface TerminalPtyRestartResult {
   generation: number
-  result: TerminalSessionEnsureAttachResult
+  result: TerminalRestartResult
 }
+
+export type TerminalSessionPrepareResult =
+  ({ ok: true; terminalSessionsRevision: number } & TerminalRuntimeMetadata) | { ok: false; message: string }
 
 export interface TerminalEnsureSessionInput<TUser extends string | number> {
   userId: TUser
@@ -111,6 +113,11 @@ export interface TerminalEventSink<TUser extends string | number> {
   // looks like a role change.
   onIdentity?(userId: TUser, event: TerminalIdentityEvent): void
   onLifecycle?(userId: TUser, event: TerminalLifecycleEvent): void
+  /**
+   * The authoritative sessions projection changed in a way that cannot be
+   * reconstructed from incremental terminal events alone.
+   */
+  onSessionsProjectionChanged?(userId: TUser, repoRoot: string): void
 }
 
 export interface TerminalPhysicalWorktreeScope<TUser extends string | number> {
@@ -146,7 +153,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     this.isClientOnline = isClientOnline
   }
 
-  async ensureSession(input: TerminalEnsureSessionInput<TUser>): Promise<TerminalSessionEnsureAttachResult> {
+  prepareSession(input: TerminalEnsureSessionInput<TUser>): TerminalSessionPrepareResult {
     if (input.signal?.aborted) return { ok: false, message: 'error.repo-runtime-stale' }
     const size = normalizeTerminalSize(input.cols, input.rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
@@ -169,8 +176,12 @@ export class TerminalSessionManager<TUser extends string | number> {
       }
       if (input.clientId) {
         registerTerminalClient(existing, input.clientId, size.cols, size.rows)
+        this.applyIdentityEffect(
+          existing,
+          attachTerminalClient(existing, input.clientId, this.sessionPresence(existing)),
+        )
       }
-      return await this.attachExistingSession(existing, input.clientId)
+      return this.prepareResult(existing)
     }
 
     const worktreePath = input.worktreePath
@@ -213,23 +224,11 @@ export class TerminalSessionManager<TUser extends string | number> {
       registerTerminalClient(session, input.clientId, size.cols, size.rows)
       this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId, this.sessionPresence(session)))
     }
-    const spawn = await this.spawnAndAttachSession(session, input.signal)
-    if (!spawn.result.ok) {
-      // Spawn failed: do not leave a zombie session in the maps. The
-      // session service would otherwise find it on retry and surface it as a
-      // successful attach with an empty buffer and a null pty — i.e.
-      // a blank, non-responsive terminal. `closeSession` removes the
-      // map entry and frees pty/listener resources via the standard
-      // disposal path. Stale spawns are different: another close/restart
-      // generation already owns the session, so this caller must not tear
-      // down the current generation.
-      if (session.ptyBinding.isCurrentSpawn(session, spawn.generation)) {
-        const close = this.closeSession(id)
-        if (!input.signal?.aborted) await close
-      }
-      return spawn.result
-    }
-    return spawn.result
+    // Logical creation stops here. The selected client mounts and fits its
+    // single xterm before `attachSession` starts the PTY with exact geometry.
+    // Until then this server-owned session is intentionally addressable but
+    // has no process and no output history.
+    return this.prepareResult(session)
   }
 
   async writeSession(
@@ -269,11 +268,31 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (!session) return { ok: false, message: 'error.invalid-arguments' }
     if (this.isSessionClosing(terminalRuntimeSessionId)) return { ok: false, message: 'error.unavailable' }
     registerTerminalClient(session, clientId, size.cols, size.rows)
-    const pending = await session.ptyBinding.waitForPendingSpawn(session)
-    if (pending) return pending
+    if (session.ptyBinding.hasPendingSpawn()) {
+      const pending = await session.ptyBinding.waitForPendingSpawn(session)
+      if (pending) return pending
+    }
     if (!this.isLiveSession(session)) return { ok: false, message: 'error.unavailable' }
-    this.applyIdentityEffect(session, attachTerminalClient(session, clientId, this.sessionPresence(session)))
-    return await this.attachResult(session)
+    const identityEffect = attachTerminalClient(session, clientId, this.sessionPresence(session))
+    if (session.ptyBinding.hasPty()) {
+      this.applyIdentityEffect(session, identityEffect)
+      return await this.snapshotAttachResult(session)
+    }
+    if (signal?.aborted) return { ok: false, message: 'error.repo-runtime-stale' }
+    if (session.render.sequence !== 0) return { ok: false, message: 'error.unavailable' }
+
+    // A prepared session has no history to recover. Spawn only after the
+    // real xterm has reported its size, and let output sequence 1+ flow over
+    // realtime after this response. If another live client still controls
+    // the session, its registered geometry remains canonical.
+    const controller = this.effectiveController(session)
+    const controllerSize = controller ? session.attachments.get(controller.clientId) : undefined
+    const spawnSize = controllerSize ?? size
+    const spawn = await this.spawnFreshSession(session, spawnSize.cols, spawnSize.rows, signal)
+    if (!spawn.result.ok && session.ptyBinding.isCurrentSpawn(session, spawn.generation)) {
+      if (markTerminalSessionError(session, spawn.result.message)) this.emitLifecycle(session)
+    }
+    return spawn.result
   }
 
   resizeSession(
@@ -327,7 +346,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     rows: number,
     clientId: string,
     signal?: AbortSignal,
-  ): Promise<TerminalAttachResult> {
+  ): Promise<TerminalRestartResult> {
     if (!isValidTerminalRuntimeSessionId(terminalRuntimeSessionId))
       return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
@@ -497,7 +516,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     return Array.from(sessionsByWorktree.entries()).flatMap(([worktreePath, sessions]) =>
       this.sessionsForWorktreeTabs(userId, scope, worktreePath, sessions).map((session) => ({
         terminalRuntimeSessionId: session.id,
-      terminalRuntimeGeneration: session.terminalRuntimeGeneration,
+        terminalRuntimeGeneration: session.terminalRuntimeGeneration,
         terminalSessionId: session.terminalSessionId,
         repoRuntimeId: session.repoRuntimeId,
         repoRoot: session.repoRoot,
@@ -630,7 +649,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     // executed in `takeoverSession()` — the requesting attachment
     // is the controller and `session.cols`/`session.rows` reflect
     // any resize effect that ran during the control claim. We
-    // surface all four frame fields synchronously so the client
+    // surface role, lifecycle, and geometry synchronously so the client
     // doesn't have to wait for a follow-up realtime `identity`
     // event before painting the post-takeover frame. See
     // `docs/terminal-session-lifecycle.md` §Takeover atomicity.
@@ -647,17 +666,10 @@ export class TerminalSessionManager<TUser extends string | number> {
     }
   }
 
-  private async attachResult(session: TerminalSessionView<TUser>): Promise<TerminalSessionEnsureAttachResult> {
-    const snap = await replaySnapshot(session.render)
-    if (!snap) return { ok: false, message: 'error.unavailable' }
+  private runtimeMetadata(session: TerminalSessionView<TUser>): TerminalRuntimeMetadata {
     return {
-      ok: true,
-      terminalSessionsRevision: this.projectionRevision(session.userId, session.scope),
       terminalRuntimeSessionId: session.id,
       terminalRuntimeGeneration: session.terminalRuntimeGeneration,
-      snapshot: snap.snapshot,
-      snapshotSeq: snap.snapshotSeq,
-      outputEra: snap.outputEra,
       processName: session.ptyBinding.processName(),
       canonicalTitle: session.render.title,
       phase: session.phase,
@@ -668,16 +680,33 @@ export class TerminalSessionManager<TUser extends string | number> {
     }
   }
 
-  private async attachExistingSession(
-    session: TerminalSessionView<TUser>,
-    clientId: string | undefined,
-  ): Promise<TerminalSessionEnsureAttachResult> {
-    const pending = await session.ptyBinding.waitForPendingSpawn(session)
-    if (pending) return pending
-    if (!this.isLiveSession(session)) return { ok: false, message: 'error.unavailable' }
-    if (clientId)
-      this.applyIdentityEffect(session, attachTerminalClient(session, clientId, this.sessionPresence(session)))
-    return await this.attachResult(session)
+  private prepareResult(session: TerminalSessionView<TUser>): TerminalSessionPrepareResult {
+    return {
+      ok: true,
+      terminalSessionsRevision: this.projectionRevision(session.userId, session.scope),
+      ...this.runtimeMetadata(session),
+    }
+  }
+
+  private streamAttachResult(session: TerminalSessionView<TUser>): TerminalAttachResult {
+    return {
+      ok: true,
+      frame: 'stream',
+      ...this.runtimeMetadata(session),
+    }
+  }
+
+  private async snapshotAttachResult(session: TerminalSessionView<TUser>): Promise<TerminalRestartResult> {
+    const snap = await replaySnapshot(session.render)
+    if (!snap) return { ok: false, message: 'error.unavailable' }
+    return {
+      ok: true,
+      frame: 'snapshot',
+      snapshot: snap.snapshot,
+      snapshotSeq: snap.snapshotSeq,
+      outputEra: snap.outputEra,
+      ...this.runtimeMetadata(session),
+    }
   }
 
   private formatUserTerminalSessionIndex(userId: TUser, terminalSessionId: string): string {
@@ -767,27 +796,40 @@ export class TerminalSessionManager<TUser extends string | number> {
     cols: number,
     rows: number,
     signal?: AbortSignal,
-  ): Promise<TerminalPtyAttachResult> {
+  ): Promise<TerminalPtyRestartResult> {
     const spawn = await session.ptyBinding.restart(session, cols, rows, 'restarting', signal)
-    return await this.finishSpawnAndAttachSession(session, spawn)
+    return await this.finishRestartAndAttachSession(session, spawn)
   }
 
-  private async spawnAndAttachSession(
+  private async spawnFreshSession(
     session: TerminalSessionView<TUser>,
+    cols: number,
+    rows: number,
     signal?: AbortSignal,
-  ): Promise<TerminalPtyAttachResult> {
-    const spawn = await session.ptyBinding.spawn(session, signal)
-    return await this.finishSpawnAndAttachSession(session, spawn)
+  ): Promise<{ generation: number; result: TerminalAttachResult }> {
+    const spawn = await session.ptyBinding.spawn(session, cols, rows, signal)
+    if (!spawn.result.ok) return { generation: spawn.generation, result: spawn.result }
+    if (!session.ptyBinding.isCurrentSpawn(session, spawn.generation)) {
+      return { generation: spawn.generation, result: { ok: false, message: 'error.unavailable' } }
+    }
+    this.projectedProcessNameByTerminalRuntimeSessionId.set(session.id, session.ptyBinding.processName())
+    this.emitIdentity(session)
+    // Prepared sessions are published at generation 0. Incremental generation
+    // 1 events cannot safely activate sibling clients because they may already
+    // have missed output. Invalidate the complete sessions projection so those
+    // clients recover the new binding through its authoritative snapshot.
+    this.sink.onSessionsProjectionChanged?.(session.userId, session.repoRoot)
+    return { generation: spawn.generation, result: this.streamAttachResult(session) }
   }
 
-  private async finishSpawnAndAttachSession(
+  private async finishRestartAndAttachSession(
     session: TerminalSessionView<TUser>,
     spawn: TerminalPtySpawnResult,
-  ): Promise<TerminalPtyAttachResult> {
+  ): Promise<TerminalPtyRestartResult> {
     if (!spawn.result.ok) return { generation: spawn.generation, result: spawn.result }
     this.projectedProcessNameByTerminalRuntimeSessionId.set(session.id, session.ptyBinding.processName())
     this.advanceProjectionRevision(session.userId, session.scope)
-    const attach = await this.attachResult(session)
+    const attach = await this.snapshotAttachResult(session)
     if (!session.ptyBinding.isCurrentSpawn(session, spawn.generation)) {
       return { generation: spawn.generation, result: { ok: false, message: 'error.unavailable' } }
     }

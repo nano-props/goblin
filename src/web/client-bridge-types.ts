@@ -13,6 +13,7 @@ import type {
   TerminalOutputEvent,
   TerminalResizeInput,
   TerminalRestartInput,
+  TerminalRestartResult,
   TerminalSessionInput,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
@@ -38,7 +39,7 @@ import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } fr
 
 export interface ClientTerminal {
   attach: (input: TerminalAttachInput) => Promise<TerminalAttachResult>
-  restart: (input: TerminalRestartInput) => Promise<TerminalAttachResult>
+  restart: (input: TerminalRestartInput) => Promise<TerminalRestartResult>
   write: (input: TerminalWriteInput) => Promise<TerminalWriteResult>
   resize: (input: TerminalResizeInput) => Promise<TerminalMutationResult>
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>

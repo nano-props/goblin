@@ -7,10 +7,7 @@ import {
 } from '#/shared/workspace-pane-runtime.ts'
 import type { RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
-import type {
-  AppRealtimeOutputFlushBoundaryContext,
-  BufferedAppRealtimeSocket,
-} from '#/server/realtime/buffered-app-realtime-socket.ts'
+import type { BufferedAppRealtimeSocket } from '#/server/realtime/buffered-app-realtime-socket.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -93,19 +90,9 @@ export async function handleWorkspacePaneRuntimeRealtimeRequestMessage(
   } catch {
     bufferedSocket?.deactivate()
   }
-  bufferedSocket?.resume(outputFlushBoundaryFromResponse(response))
-}
-
-function outputFlushBoundaryFromResponse(
-  message: AppRealtimeResponseMessage,
-): AppRealtimeOutputFlushBoundaryContext | null {
-  if (!message.ok || message.action !== WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open) return null
-  const payload = message.payload
-  if (!payload.ok || payload.runtimeType !== 'terminal') return null
-  return {
-    terminalRuntimeSessionId: payload.runtime.terminalRuntimeSessionId,
-    terminalRuntimeGeneration: payload.runtime.terminalRuntimeGeneration,
-    outputEra: payload.runtime.outputEra,
-    seq: payload.runtime.snapshotSeq,
-  }
+  // Runtime open now commits terminal metadata only. A newly prepared
+  // terminal has no PTY output yet, while output from a reused live terminal
+  // must all remain observable because this response carries no snapshot
+  // checkpoint that could subsume it.
+  bufferedSocket?.resume(null)
 }

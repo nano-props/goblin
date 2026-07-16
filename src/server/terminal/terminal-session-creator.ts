@@ -55,11 +55,17 @@ class TerminalSessionCreator {
         const createResult = await this.options.createCoordinator.withSessionIdAllocation(
           { userId: input.userId, scope: sessionScope, worktreePath: scopedWorktreePath, kind: input.request.kind },
           async ({ terminalSessionId }) =>
-            await this.options.ensureOrRestore(input.clientId, input.userId, {
-              ...input.request,
-              clientId: input.terminalClientId,
-              terminalSessionId,
-            }, input.physicalWorktreeCapability, signal),
+            await this.options.ensureOrRestore(
+              input.clientId,
+              input.userId,
+              {
+                ...input.request,
+                clientId: input.terminalClientId,
+                terminalSessionId,
+              },
+              input.physicalWorktreeCapability,
+              signal,
+            ),
         )
         if (!createResult.ok) return { ok: false, message: createResult.message }
         const staleAfterEnsure = await this.options.rejectStaleCreateIfNeeded(
@@ -79,9 +85,6 @@ class TerminalSessionCreator {
           canonicalTitle: createResult.canonicalTitle,
           phase: createResult.phase,
           message: createResult.message,
-          snapshot: createResult.snapshot,
-          snapshotSeq: createResult.snapshotSeq,
-          outputEra: createResult.outputEra,
           controller: createResult.controller,
           canonicalCols: createResult.canonicalCols,
           canonicalRows: createResult.canonicalRows,

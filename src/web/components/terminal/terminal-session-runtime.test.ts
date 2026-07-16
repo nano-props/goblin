@@ -16,11 +16,13 @@ describe('TerminalSessionRuntime', () => {
   test('tracks restart flow and replacing session ids', () => {
     const runtime = new TerminalSessionRuntime()
 
-    applyAttachResult(runtime,
+    applyAttachResult(
+      runtime,
       {
         ok: true,
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        frame: 'snapshot',
         snapshot: '',
         snapshotSeq: 0,
         outputEra: 0,
@@ -51,11 +53,13 @@ describe('TerminalSessionRuntime', () => {
 
   test('routes output, identity, replay, and takeover through runtime state', () => {
     const runtime = new TerminalSessionRuntime()
-    applyAttachResult(runtime,
+    applyAttachResult(
+      runtime,
       {
         ok: true,
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        frame: 'snapshot',
         snapshot: '',
         snapshotSeq: 0,
         outputEra: 0,
@@ -119,11 +123,13 @@ describe('TerminalSessionRuntime', () => {
 
   test('does not own rendered-output dedupe outside replay', () => {
     const runtime = new TerminalSessionRuntime()
-    applyAttachResult(runtime,
+    applyAttachResult(
+      runtime,
       {
         ok: true,
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        frame: 'snapshot',
         snapshot: 'prompt',
         snapshotSeq: 1,
         outputEra: 0,
@@ -166,11 +172,13 @@ describe('TerminalSessionRuntime', () => {
 
   test('keeps metadata hydration independent from rendered-output checkpoints', () => {
     const runtime = new TerminalSessionRuntime()
-    applyAttachResult(runtime,
+    applyAttachResult(
+      runtime,
       {
         ok: true,
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        frame: 'snapshot',
         snapshot: 'prompt',
         snapshotSeq: 1,
         outputEra: 0,
@@ -200,7 +208,7 @@ describe('TerminalSessionRuntime', () => {
     ).toEqual({ changed: false, output: 'next' })
     runtime.hydrateRepoSession({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -223,7 +231,7 @@ describe('TerminalSessionRuntime', () => {
 
     runtime.hydrateRepoSession({
       terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -251,11 +259,13 @@ describe('TerminalSessionRuntime', () => {
     // attach fails partway through. drainReplay must not surface
     // captured events to the term.
     const runtime = new TerminalSessionRuntime()
-    applyAttachResult(runtime,
+    applyAttachResult(
+      runtime,
       {
         ok: true,
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        frame: 'snapshot',
         snapshot: '',
         snapshotSeq: 0,
         outputEra: 0,
@@ -275,7 +285,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.beginReplay({ outputEra: 0, seq: 2 })
     runtime.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'new',
       seq: 3,
@@ -297,11 +307,13 @@ describe('TerminalSessionRuntime', () => {
     // are in the new snapshot), events newer than the new snapshot
     // are kept (they are live output since the snapshot).
     const runtime = new TerminalSessionRuntime()
-    applyAttachResult(runtime,
+    applyAttachResult(
+      runtime,
       {
         ok: true,
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        frame: 'snapshot',
         snapshot: '',
         snapshotSeq: 0,
         outputEra: 0,
@@ -323,7 +335,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.beginReplay({ outputEra: 0, seq: 2 })
     runtime.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'preload-old',
       seq: 3,
@@ -332,7 +344,7 @@ describe('TerminalSessionRuntime', () => {
     })
     runtime.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'preload-new',
       seq: 6,
@@ -345,7 +357,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.beginReplay({ outputEra: 0, seq: 5 })
     runtime.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'post-attach',
       seq: 7,
@@ -363,11 +375,13 @@ describe('TerminalSessionRuntime', () => {
   test('preserves server-provided title when attaching an existing session', () => {
     const runtime = new TerminalSessionRuntime()
 
-    applyAttachResult(runtime,
+    applyAttachResult(
+      runtime,
       {
         ok: true,
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
+        frame: 'snapshot',
         snapshot: '',
         snapshotSeq: 0,
         outputEra: 0,
@@ -438,7 +452,7 @@ describe('TerminalSessionRuntime', () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateRepoSession({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
       processName: 'zsh',
@@ -540,7 +554,8 @@ describe('TerminalSessionRuntime restart generation activation', () => {
       }),
     ).toBe(false)
 
-    applyAttachResult(runtime,
+    applyAttachResult(
+      runtime,
       {
         ok: true,
         terminalRuntimeSessionId: 'pty_restart_activation_test',
@@ -549,6 +564,7 @@ describe('TerminalSessionRuntime restart generation activation', () => {
         canonicalTitle: null,
         phase: 'open',
         message: null,
+        frame: 'snapshot',
         snapshot: '',
         snapshotSeq: 0,
         outputEra: 0,
@@ -573,22 +589,23 @@ describe('TerminalSessionRuntime exact start attempts', () => {
   const attachResult = (
     terminalRuntimeGeneration: number,
   ): Parameters<TerminalSessionRuntime['commitAttachResult']>[1] => ({
-      ok: true,
-      terminalRuntimeSessionId: 'pty_exact_attempt_aaaa',
-      terminalRuntimeGeneration,
-      snapshot: '',
-      snapshotSeq: 0,
-      outputEra: 0,
-      phase: 'open',
-      message: null,
-      processName: 'zsh',
-      canonicalTitle: null,
-      canonicalCols: 80,
-      canonicalRows: 24,
-      role: 'controller',
-      controllerStatus: 'connected',
-      controller: { clientId: 'client-exact-attempt', status: 'connected' },
-    })
+    ok: true,
+    terminalRuntimeSessionId: 'pty_exact_attempt_aaaa',
+    terminalRuntimeGeneration,
+    frame: 'snapshot',
+    snapshot: '',
+    snapshotSeq: 0,
+    outputEra: 0,
+    phase: 'open',
+    message: null,
+    processName: 'zsh',
+    canonicalTitle: null,
+    canonicalCols: 80,
+    canonicalRows: 24,
+    role: 'controller',
+    controllerStatus: 'connected',
+    controller: { clientId: 'client-exact-attempt', status: 'connected' },
+  })
 
   test('ignores attempt A late success and failure after restart attempt B begins', () => {
     const runtime = new TerminalSessionRuntime()
@@ -649,6 +666,7 @@ describe('TerminalSessionRuntime authoritative hydration during attempts', () =>
   const attachResult = (terminalRuntimeGeneration: number) => ({
     ok: true as const,
     ...hydration(terminalRuntimeGeneration),
+    frame: 'snapshot' as const,
     snapshot: '',
     snapshotSeq: 0,
     outputEra: terminalRuntimeGeneration,
@@ -701,7 +719,7 @@ describe('TerminalSessionRuntime authoritative hydration during attempts', () =>
     expect(runtime.phase()).toBe('error')
   })
 
-  test('lets a future authoritative generation supersede an older first-frame response', () => {
+  test('lets a future authoritative generation supersede an older attach response', () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateRepoSession(hydration(1))
     const attempt = runtime.prepareRestart().attempt

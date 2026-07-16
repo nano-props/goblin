@@ -6,6 +6,7 @@ import type {
   TerminalPruneInput,
   TerminalMutationResult,
   TerminalRestartInput,
+  TerminalRestartResult,
   TerminalResizeInput,
   TerminalSessionInput,
   TerminalSessionSummary,
@@ -72,7 +73,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return result
     },
 
-    async restart(clientId: string, userId: string, input: TerminalRestartInput): Promise<TerminalAttachResult> {
+    async restart(clientId: string, userId: string, input: TerminalRestartInput): Promise<TerminalRestartResult> {
       const terminalRuntimeSessionId = input?.terminalRuntimeSessionId
       if (
         !isValidTerminalClientId(clientId) ||
@@ -82,18 +83,23 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return { ok: false, message: 'error.invalid-arguments' }
       }
       const session = manager.getSessionSummaryForUser(userId, terminalRuntimeSessionId)
-      const physicalWorktreeCapability = manager.getPhysicalWorktreeExecutionCapabilityForUser(userId, terminalRuntimeSessionId)
+      const physicalWorktreeCapability = manager.getPhysicalWorktreeExecutionCapabilityForUser(
+        userId,
+        terminalRuntimeSessionId,
+      )
       if (!physicalWorktreeCapability) return { ok: false, message: 'error.invalid-worktree-capability' }
       const terminalClientId = input.clientId ?? clientId
-      const operation = await worktreeOperations.runOperation(physicalWorktreeCapability, async (_permit, context) =>
-        await manager.restartSession(
-          userId,
-          terminalRuntimeSessionId,
-          input.cols,
-          input.rows,
-          terminalClientId,
-          context.signal,
-        ),
+      const operation = await worktreeOperations.runOperation(
+        physicalWorktreeCapability,
+        async (_permit, context) =>
+          await manager.restartSession(
+            userId,
+            terminalRuntimeSessionId,
+            input.cols,
+            input.rows,
+            terminalClientId,
+            context.signal,
+          ),
       )
       if (!operation.admitted) return { ok: false, message: 'error.worktree-removal-in-progress' }
       const result = operation.value

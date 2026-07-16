@@ -48,6 +48,8 @@ local rendering and fitted geometry while mounted. It is disposable.
 - Destroying a view does not close the PTY.
 - Inactive sessions do not resize the PTY.
 - Server render snapshots are the only cross-view render source of truth.
+- A fresh view that starts its PTY from sequence 1 consumes the live server
+  output stream directly and does not need a cross-view snapshot.
 - Client xterm serialization is not used as a reattach authority.
 - Only the selected live xterm can produce fitted client geometry.
 - Only the effective controller can update canonical PTY geometry.
@@ -60,11 +62,15 @@ local rendering and fitted geometry while mounted. It is disposable.
 3. Client waits for the visible host to become measurable.
 4. Client fits the live xterm and sends attach/restart with its `cols`/`rows`.
 5. Server validates attachment and control rules.
-6. Server returns role, lifecycle state, canonical geometry, `snapshot`,
-   `snapshotSeq`, and `outputEra`.
-7. Client applies server authority, resets xterm, and writes the snapshot.
-8. Realtime output writes to the selected controller xterm while also updating
-   server render state.
+6. Server returns exactly one frame protocol:
+   - Existing PTY: `frame: 'snapshot'`, role, lifecycle state, canonical
+     geometry, `snapshot`, `snapshotSeq`, and `outputEra`; the client resets
+     xterm and replays it.
+   - Newly prepared session: the server starts the PTY at the fitted size and
+     returns `frame: 'stream'`; the client keeps the same empty xterm and does
+     not reset or replay it.
+7. Realtime output writes to that selected controller xterm while also updating
+   the server headless render state for future recovery.
 
 The user may see a blank terminal until snapshot replay completes.
 
@@ -98,6 +104,8 @@ Any future performance work must preserve the same authority model.
 ## Acceptance
 
 - Tab switching recreates the selected xterm from a server snapshot.
+- A newly created terminal uses that one mounted xterm from output sequence 1;
+  it is never replaced by a second client xterm or seeded from a startup snapshot.
 - Output produced while inactive appears after reselect through server replay.
 - Controller/viewer/unowned semantics do not change when views are destroyed.
 - Resize authority still comes only from the selected live controller view.

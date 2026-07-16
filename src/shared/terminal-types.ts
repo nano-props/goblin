@@ -81,19 +81,17 @@ export interface TerminalRestartInput {
 /**
  * Successful `takeover` result.
  *
- * Control-frame contract: takeover is the authoritative handshake for
+ * Control-metadata contract: takeover is the authoritative handshake for
  * the new controller role/lifecycle state. The client applies the response
  * synchronously and does not need to wait for a follow-up realtime
- * `identity` event before enabling the controller view. The fields mirror
- * `TerminalFirstFrame` minus the render-snapshot fields (`snapshot`,
- * `snapshotSeq`, `outputEra`).
+ * `identity` event before enabling the controller view.
  * A viewer is a metadata/readonly projection, not an owner of the
- * terminal render buffer; the controller view fetches a fresh
- * first-frame snapshot after takeover when it needs to paint xterm.
+ * terminal render buffer; if a view must be recreated after takeover, its
+ * ordinary attach decides whether recovery needs a snapshot.
  *
  * The realtime `identity` event still has a real job on the
- * non-takeover controller-change paths (controller crash, grace
- * expiry, etc.). For those paths there is no response to be
+ * non-takeover controller-change paths (for example, controller presence
+ * going offline). For those paths there is no response to be
  * authoritative; the event remains the source of truth. Both
  * surfaces now carry the same fields so the client can apply
  * either without re-checking what shape arrived.
@@ -112,71 +110,66 @@ export type TerminalTakeoverResult =
     }
   | { ok: false; message: string }
 
-/**
- * Successful attach/restart result.
- *
- * `snapshot`/`snapshotSeq`/`outputEra` are the session's server-side
- * serialized xterm screen, the last PTY output sequence included in that
- * screen, and the reset era that sequence belongs to. The client hydrates
- * from these and re-replays any post-snapshot events the runtime captures.
- *
- * First-frame contract: a successful `attach`/`restart` response is
- * the authoritative handshake for that session's frame state. All
- * fields are required at the type level — the server must populate
- * them on every success path, and the client can hydrate the UI
- * without waiting for any follow-up event. This mirrors the R0
- * first-frame atomicity contract for `create` (see
- * `docs/terminal-session-lifecycle.md` §R0).
- */
-export type TerminalAttachResult =
-  | {
-      ok: true
-      terminalRuntimeSessionId: string
-      terminalRuntimeGeneration: TerminalRuntimeGeneration
-      processName: string
-      canonicalTitle: string | null
-      phase: TerminalSessionPhase
-      message: string | null
-      snapshot: string
-      snapshotSeq: number
-      outputEra: number
-      controller: TerminalController | null
-      canonicalCols: number
-      canonicalRows: number
-    }
-  | { ok: false; message: string }
-
-export type TerminalCreateAction = 'created' | 'restored' | 'reused'
-
-/**
- * `create` carries the same first-frame fields as `attach`/`restart`
- * — the client must be able to paint without a follow-up snapshot
- * fetch. The shared `TerminalFirstFrame` shape below is the single
- * source of truth for the first-frame contract.
- */
-export interface TerminalFirstFrame {
+/** Runtime metadata sampled atomically by create/attach/restart responses. */
+export interface TerminalRuntimeMetadata {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
   processName: string
   canonicalTitle: string | null
   phase: TerminalSessionPhase
   message: string | null
-  snapshot: string
-  snapshotSeq: number
-  outputEra: number
   controller: TerminalController | null
   canonicalCols: number
   canonicalRows: number
 }
+
+/**
+ * A fresh PTY has no missed history. Its output starts at sequence 1 and is
+ * delivered through realtime after the attach response establishes this
+ * binding. The client must not reset or replay its xterm for this frame.
+ */
+export interface TerminalStreamFrame {
+  frame: 'stream'
+}
+
+/**
+ * An existing PTY may have history the attaching view never observed.
+ * `snapshotSeq` is the exact output checkpoint represented by `snapshot`;
+ * buffered realtime output through that checkpoint is discarded when the
+ * response is committed, then later output continues normally.
+ */
+export interface TerminalSnapshotFrame {
+  frame: 'snapshot'
+  snapshot: string
+  snapshotSeq: number
+  outputEra: number
+}
+
+/**
+ * Attach chooses its frame protocol from server-owned PTY history:
+ * a prepared session with no PTY starts as `stream`, while an already-bound
+ * session attaches as `snapshot`. This distinction prevents fresh terminal
+ * startup from being represented as a recovery replay.
+ */
+export type TerminalAttachResult =
+  | ({ ok: true } & TerminalRuntimeMetadata & TerminalStreamFrame)
+  | ({ ok: true } & TerminalRuntimeMetadata & TerminalSnapshotFrame)
+  | { ok: false; message: string }
+
+/** Restart always replaces an existing binding and commits a reset snapshot. */
+export type TerminalRestartResult =
+  ({ ok: true } & TerminalRuntimeMetadata & TerminalSnapshotFrame) | { ok: false; message: string }
+
+export type TerminalCreateAction = 'created' | 'restored' | 'reused'
 
 export type TerminalCreateResult =
   | ({
       ok: true
       action: TerminalCreateAction
       terminalSessionId: string
-      /** Exact terminal projection revision sampled with this first frame. */
+      /** Exact terminal projection revision sampled with this metadata. */
       terminalSessionsRevision: number
-    } & TerminalFirstFrame)
+    } & TerminalRuntimeMetadata)
   | { ok: false; message: string }
 
 export interface TerminalWriteInput {

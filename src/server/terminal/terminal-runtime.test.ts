@@ -76,7 +76,8 @@ vi.mock('#/system/ssh/config.ts', () => ({
 }))
 
 vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', async (importOriginal) => {
-  const original = await importOriginal<typeof import('#/server/worktree-removal/physical-worktree-identity-resolver.ts')>()
+  const original =
+    await importOriginal<typeof import('#/server/worktree-removal/physical-worktree-identity-resolver.ts')>()
   class RuntimeTestPhysicalWorktreeResolver extends original.PhysicalWorktreeIdentityResolver {
     issue(input: { userId: string; repoRoot: string; repoRuntimeId: string; worktreePath: string }) {
       const remote = input.repoRoot.startsWith('ssh-config://')
@@ -194,10 +195,7 @@ interface RuntimeHandle {
   isClientOnline: (clientId: string) => boolean
 }
 
-const createTerminalApplications = new WeakMap<
-  ServerTerminalHost,
-  ServerWorkspacePaneRuntimeHost
->()
+const createTerminalApplications = new WeakMap<ServerTerminalHost, ServerWorkspacePaneRuntimeHost>()
 const activeRuntimeShutdowns = new Set<() => void>()
 let testWorkspacePaneLayout: WorkspacePaneDurableLayout = { entries: [] }
 const testWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository = {
@@ -219,11 +217,13 @@ function buildRuntime(): RuntimeHandle {
     ptySupervisor: createInProcessPtySupervisor(),
     workspacePaneLayoutRepository: testWorkspacePaneLayoutRepository,
     workspacePaneTargetProjection: {
-      captureTargets: async (_userId, repoRoot) => [{
-        repoRoot,
-        branchName: 'feature',
-        worktreePath: repoRoot.startsWith('ssh-config://') ? '/srv/repo' : '/repo-linked',
-      }],
+      captureTargets: async (_userId, repoRoot) => [
+        {
+          repoRoot,
+          branchName: 'feature',
+          worktreePath: repoRoot.startsWith('ssh-config://') ? '/srv/repo' : '/repo-linked',
+        },
+      ],
     },
   })
   REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_a')
@@ -334,6 +334,13 @@ async function createTerminalSession(host: ServerTerminalHost, clientId: string,
   })
   expect(result.ok).toBe(true)
   if (!result.ok) throw new Error(result.message)
+  const attached = await host.attach(clientId, userId, {
+    terminalRuntimeSessionId: result.terminalRuntimeSessionId,
+    cols: 80,
+    rows: 24,
+    ...(clientId ? { clientId } : {}),
+  })
+  expect(attached).toMatchObject({ ok: true, frame: 'stream' })
   return result.terminalRuntimeSessionId
 }
 
@@ -382,23 +389,23 @@ describe('server terminal runtime', () => {
     expect(result).not.toHaveProperty('sessions')
     const terminalRuntimeSessionId = result.terminalRuntimeSessionId
 
-    mockPtys[0]?.emitData('ready')
-
     await expect(
       host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
     ).resolves.toEqual([
       expect.objectContaining({
         terminalRuntimeSessionId,
-        phase: 'open',
+        terminalRuntimeGeneration: 0,
+        phase: 'opening',
         message: null,
       }),
     ])
+    expect(mockPtys).toHaveLength(0)
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
   })
 
-  test('application create broadcasts terminal sessions and workspace pane tabs', async () => {
+  test('application create and fresh binding activation both invalidate terminal sessions', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
@@ -421,6 +428,20 @@ describe('server terminal runtime', () => {
     expect(
       sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
     ).toBe(true)
+    if (!result.ok) return
+
+    await expect(
+      host.attach('client_a', USER_1, {
+        terminalRuntimeSessionId: result.terminalRuntimeSessionId,
+        cols: 80,
+        rows: 24,
+        clientId: 'client_a',
+      }),
+    ).resolves.toMatchObject({ ok: true, frame: 'stream', terminalRuntimeGeneration: 1 })
+    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toEqual([
+      { type: 'sessions-changed', repoRoot: REPO_ROOT },
+      { type: 'sessions-changed', repoRoot: REPO_ROOT },
+    ])
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
@@ -446,6 +467,14 @@ describe('server terminal runtime', () => {
     expect(createResult.ok).toBe(true)
     if (!createResult.ok) return
     const terminalRuntimeSessionId = createResult.terminalRuntimeSessionId
+    await expect(
+      host.attach('client_a', USER_1, {
+        terminalRuntimeSessionId,
+        cols: 80,
+        rows: 24,
+        clientId: 'client_a',
+      }),
+    ).resolves.toMatchObject({ ok: true, frame: 'stream' })
 
     const attachResult = await host.attach('client_a', USER_1, {
       terminalRuntimeSessionId,
@@ -495,7 +524,7 @@ describe('server terminal runtime', () => {
       clientId: 'client_a',
     })
     expect(attach.ok).toBe(true)
-    if (!attach.ok) return
+    if (!attach.ok || attach.frame !== 'snapshot') return
     expect(attach.snapshot).toBe('👾:~/repo\r\n$ ')
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
@@ -524,6 +553,15 @@ describe('server terminal runtime', () => {
     expect(createResult.ok).toBe(true)
     if (!createResult.ok) return
     const terminalRuntimeSessionId = createResult.terminalRuntimeSessionId
+
+    await expect(
+      host.attach('client_a', USER_1, {
+        terminalRuntimeSessionId,
+        cols: 80,
+        rows: 24,
+        clientId: 'client_a',
+      }),
+    ).resolves.toMatchObject({ ok: true, frame: 'stream' })
 
     host.unregisterSocket('client_a', USER_1, socketA)
     const socketA2 = { send: vi.fn(), close: vi.fn() }
@@ -607,6 +645,7 @@ describe('server terminal runtime', () => {
       action: 'attach',
       payload: {
         ok: true,
+        frame: 'stream',
         terminalRuntimeSessionId,
         phase: 'opening',
         message: null,
@@ -615,7 +654,7 @@ describe('server terminal runtime', () => {
         controller: { clientId: 'client_a', status: 'connected' },
       },
     })
-    expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(101, 31)
+    expect(mockPtys[0]?.resize).not.toHaveBeenCalled()
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
@@ -797,6 +836,15 @@ describe('server terminal runtime', () => {
       'req_open_terminal_before_exit',
     )
     expect(opened.ok).toBe(true)
+    if (!opened.ok) return
+    await expect(
+      host.attach('client_a', USER_1, {
+        terminalRuntimeSessionId: opened.runtime.terminalRuntimeSessionId,
+        cols: 80,
+        rows: 24,
+        clientId: 'client_a',
+      }),
+    ).resolves.toMatchObject({ ok: true, frame: 'stream' })
     socket.send.mockClear()
 
     mockPtys[0]?.emitExit()
@@ -1002,12 +1050,12 @@ describe('server terminal runtime', () => {
     )
 
     await vi.waitFor(() => {
-      expect(sentSocketMessages(socketA).some(
-        (message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
-      )).toBe(true)
-      expect(sentSocketMessages(socketB).some(
-        (message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
-      )).toBe(true)
+      expect(
+        sentSocketMessages(socketA).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+      ).toBe(true)
+      expect(
+        sentSocketMessages(socketB).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+      ).toBe(true)
     })
 
     host.unregisterSocket('client_a', USER_1, socketA)
@@ -1137,7 +1185,10 @@ describe('server terminal runtime', () => {
     })
     socket.send.mockClear()
 
-    expect(releaseRepoRuntime(USER_1, REPO_ROOT, REPO_RUNTIME_ID, 'client_a')).toEqual({ released: true, runtimeClosed: true })
+    expect(releaseRepoRuntime(USER_1, REPO_ROOT, REPO_RUNTIME_ID, 'client_a')).toEqual({
+      released: true,
+      runtimeClosed: true,
+    })
     await vi.waitFor(() => {
       expect(
         sentSocketMessages(socket).filter((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
@@ -1158,14 +1209,16 @@ describe('server terminal runtime', () => {
         'req_list_after_repo_reopen',
       ),
     ).resolves.toMatchObject({
-      entries: [{
-        branchName: 'feature',
-        worktreePath: '/repo-linked',
-        tabs: [
-          { type: 'status', tabId: 'workspace-pane:status' },
-          { type: 'history', tabId: 'workspace-pane:history' },
-        ],
-      }],
+      entries: [
+        {
+          branchName: 'feature',
+          worktreePath: '/repo-linked',
+          tabs: [
+            { type: 'status', tabId: 'workspace-pane:status' },
+            { type: 'history', tabId: 'workspace-pane:history' },
+          ],
+        },
+      ],
     })
 
     const second = await createAdmittedTerminal(host, 'client_a', USER_1, {
@@ -1219,8 +1272,7 @@ describe('server terminal runtime', () => {
     expect(secondResult.action).toBe('reused')
     expect(secondResult.terminalSessionId).toBe(firstResult.terminalSessionId)
     expect(secondResult.terminalRuntimeSessionId).toBe(firstResult.terminalRuntimeSessionId)
-    expect(mockPtys).toHaveLength(1)
-    expect(mockPtys[0]?.kill).not.toHaveBeenCalled()
+    expect(mockPtys).toHaveLength(0)
 
     shutdown()
   })
@@ -1264,9 +1316,16 @@ describe('server terminal runtime', () => {
     expect(reopened.action).toBe('reused')
     expect(reopened.terminalSessionId).toBe(first.terminalSessionId)
     expect(reopened.controller).toEqual({ clientId: 'client_electron', status: 'connected' })
-    expect(reopened.canonicalCols).toBe(102)
-    expect(reopened.canonicalRows).toBe(33)
-    expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(102, 33)
+    expect(reopened.canonicalCols).toBe(80)
+    expect(reopened.canonicalRows).toBe(24)
+    await expect(
+      host.attach('client_electron', USER_1, {
+        terminalRuntimeSessionId: reopened.terminalRuntimeSessionId,
+        cols: 102,
+        rows: 33,
+        clientId: 'client_electron',
+      }),
+    ).resolves.toMatchObject({ ok: true, frame: 'stream', canonicalCols: 102, canonicalRows: 33 })
 
     const sessions = await host.listSessions('client_electron', USER_1, {
       repoRoot: REPO_ROOT,
@@ -1285,7 +1344,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('a failed spawn removes the zombie session so the next create retries cleanly', async () => {
+  test('a failed first attach keeps the prepared session addressable for retry', async () => {
     const { spawn } = await import('node-pty')
     vi.mocked(spawn).mockImplementationOnce(() => {
       throw new Error('pty spawn failed')
@@ -1304,17 +1363,29 @@ describe('server terminal runtime', () => {
       cols: 80,
       rows: 24,
     })
-    expect(failed.ok).toBe(false)
-    if (failed.ok) return
+    expect(failed.ok).toBe(true)
+    if (!failed.ok) return
+    const failedAttach = await host.attach('client_a', USER_1, {
+      terminalRuntimeSessionId: failed.terminalRuntimeSessionId,
+      cols: 80,
+      rows: 24,
+      clientId: 'client_a',
+    })
+    expect(failedAttach).toEqual({ ok: false, message: 'pty spawn failed' })
 
-    // After the failure, listSessions must not report the zombie. If
-    // it did, the session service would match it on retry and surface a
-    // blank, non-responsive terminal as a successful attach.
+    // Process creation failure is lifecycle state on the logical session;
+    // the durable tab remains addressable so an explicit retry can recover.
     const sessionsAfterFailure = await host.listSessions('client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
     })
-    expect(sessionsAfterFailure).toEqual([])
+    expect(sessionsAfterFailure).toEqual([
+      expect.objectContaining({
+        terminalRuntimeSessionId: failed.terminalRuntimeSessionId,
+        phase: 'error',
+        message: 'pty spawn failed',
+      }),
+    ])
 
     // A never-spawned session has no exit event — lock in that
     // semantic so we don't regress to broadcasting a phantom exit.
@@ -1323,7 +1394,8 @@ describe('server terminal runtime', () => {
       .filter((message) => message.type === 'exit')
     expect(exitBroadcasts).toEqual([])
 
-    // Retry with a working spawn must succeed as a brand-new create.
+    // Reopening reuses the same logical session; the next attach owns the
+    // next process attempt.
     const retried = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
@@ -1334,7 +1406,18 @@ describe('server terminal runtime', () => {
       rows: 24,
     })
     expect(retried.ok).toBe(true)
-    if (retried.ok) expect(retried.action).toBe('created')
+    if (retried.ok) {
+      expect(retried.action).toBe('restored')
+      expect(retried.terminalRuntimeSessionId).toBe(failed.terminalRuntimeSessionId)
+      await expect(
+        host.attach('client_a', USER_1, {
+          terminalRuntimeSessionId: retried.terminalRuntimeSessionId,
+          cols: 80,
+          rows: 24,
+          clientId: 'client_a',
+        }),
+      ).resolves.toMatchObject({ ok: true, frame: 'stream' })
+    }
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
@@ -1424,6 +1507,7 @@ describe('server terminal runtime', () => {
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
     const terminalRuntimeSessionId = await createTerminalSession(host, 'client_1')
+    mockPtys[0]?.emitData('before-attach')
     socket.send.mockClear()
 
     host.handleRealtimeMessage(
@@ -1437,8 +1521,6 @@ describe('server terminal runtime', () => {
         input: { terminalRuntimeSessionId, cols: 80, rows: 24 },
       }),
     )
-    mockPtys[0]?.emitData('during-attach')
-
     await vi.waitFor(() => {
       expect(socket.send.mock.calls.some(([payload]) => JSON.parse(String(payload)).type === 'response')).toBe(true)
     })
@@ -1453,7 +1535,7 @@ describe('server terminal runtime', () => {
       action: 'attach',
       payload: {
         ok: true,
-        snapshot: expect.stringContaining('during-attach'),
+        snapshot: expect.stringContaining('before-attach'),
         snapshotSeq: 1,
       },
     })
@@ -1463,7 +1545,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('runtime-open returns terminal and canonical tabs before flushing provider realtime', async () => {
+  test('runtime-open returns prepared terminal metadata and canonical tabs without starting a PTY', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
@@ -1516,8 +1598,6 @@ describe('server terminal runtime', () => {
         runtime: {
           ok: true,
           action: 'created',
-          snapshot: expect.stringContaining('during-runtime-open'),
-          snapshotSeq: 1,
           controller: { clientId: 'client_a', status: 'connected' },
         },
         workspacePaneTabs: {
@@ -1533,6 +1613,7 @@ describe('server terminal runtime', () => {
         },
       },
     })
+    expect(mockPtys).toHaveLength(0)
     expect(messages.filter((message) => message.type === 'output')).toHaveLength(0)
     const firstRealtimeIndex = messages.findIndex(
       (message) => message.type === 'sessions-changed' || message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
@@ -1788,7 +1869,7 @@ describe('server terminal runtime', () => {
     if (!userACreate.ok) return
     const userASession = {
       terminalRuntimeSessionId: userACreate.terminalRuntimeSessionId,
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 0,
       terminalSessionId: userACreate.terminalSessionId,
     }
 
@@ -1822,7 +1903,7 @@ describe('server terminal runtime', () => {
     if (!userBCreate.ok) return
     const userBSession = {
       terminalRuntimeSessionId: userBCreate.terminalRuntimeSessionId,
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 0,
       terminalSessionId: userBCreate.terminalSessionId,
     }
 
@@ -1833,7 +1914,7 @@ describe('server terminal runtime', () => {
     ).toEqual([
       expect.objectContaining({
         terminalRuntimeSessionId: userASession.terminalRuntimeSessionId,
-        terminalRuntimeGeneration: 1,
+        terminalRuntimeGeneration: 0,
         terminalSessionId: userASession.terminalSessionId,
       }),
     ])
@@ -1845,7 +1926,7 @@ describe('server terminal runtime', () => {
     ).toEqual([
       expect.objectContaining({
         terminalRuntimeSessionId: userBSession.terminalRuntimeSessionId,
-        terminalRuntimeGeneration: 1,
+        terminalRuntimeGeneration: 0,
         terminalSessionId: userBSession.terminalSessionId,
       }),
     ])
@@ -1984,6 +2065,14 @@ describe('server terminal runtime', () => {
     expect(created.ok).toBe(true)
     if (!created.ok) return
     const terminalRuntimeSessionId = created.terminalRuntimeSessionId
+    await expect(
+      host.attach('client_a', USER_1, {
+        terminalRuntimeSessionId,
+        cols: 80,
+        rows: 24,
+        clientId: 'client_a',
+      }),
+    ).resolves.toMatchObject({ ok: true, frame: 'stream' })
     mockPtys[0]?.emitData('ready')
 
     // A goes offline; B attaches and claims because no effective controller remains.

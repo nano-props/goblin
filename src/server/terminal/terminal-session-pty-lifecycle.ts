@@ -122,10 +122,21 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     return this.spawnGeneration
   }
 
-  async spawn(session: TSession, signal?: AbortSignal): Promise<TerminalPtySpawnResult> {
-    // This pending promise covers only PTY spawn/bind ownership. The
-    // manager builds attach first-frame results after a successful bind.
+  hasPendingSpawn(): boolean {
+    return this.pendingSpawn !== null
+  }
+
+  async spawn(session: TSession, cols: number, rows: number, signal?: AbortSignal): Promise<TerminalPtySpawnResult> {
+    // The first real xterm fit owns initial PTY geometry. The logical
+    // session may have been prepared earlier with a best-effort hint, but no
+    // process output exists yet, so resizing the empty headless screen here
+    // preserves a single geometry boundary for both PTY and recovery state.
     const generation = this.beginSpawn()
+    session.terminalRuntimeGeneration = generation
+    session.cols = cols
+    session.rows = rows
+    resizeRender(session.render, cols, rows)
+    if (markTerminalSessionOpening(session)) this.events.emitLifecycle(session)
     const spawn = this.resolveSpawn(session, generation, signal)
     return await this.trackPendingSpawn(spawn)
   }
@@ -330,11 +341,15 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     this.disposables.push(
       this.supervisor.onData(handle, (data) => {
         if (!this.isCurrentBinding(session, generation, handle)) return
-        if (markTerminalSessionOpen(session)) this.events.emitLifecycle(session)
         const titleBeforeData = session.render.title
         const processNameBeforeData = lastProcessName
 
         const output = appendOutput(session.render, data)
+        // `open` means the authoritative output ingress has accepted at
+        // least one PTY chunk. Publish lifecycle only after that boundary;
+        // consumers can never observe an open session whose headless state
+        // has not yet received the output that made it open.
+        if (markTerminalSessionOpen(session)) this.events.emitLifecycle(session)
 
         const processNameAfterData = this.supervisor.processName(handle)
         lastProcessName = processNameAfterData

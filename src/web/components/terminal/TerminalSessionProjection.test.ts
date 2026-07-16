@@ -278,9 +278,7 @@ describe('TerminalSessionProjection', () => {
         scope,
         {
           revision: 11,
-          sessions: [
-            makeServerSession(terminalRuntimeSessionId, terminalSessionId, { terminalRuntimeGeneration: 2 }),
-          ],
+          sessions: [makeServerSession(terminalRuntimeSessionId, terminalSessionId, { terminalRuntimeGeneration: 2 })],
         },
         'client_local',
       )
@@ -379,7 +377,7 @@ describe('TerminalSessionProjection', () => {
       try {
         projection.handleOutput({
           terminalRuntimeSessionId,
-    terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           data: 'before-index',
           seq: 1,
@@ -1121,10 +1119,7 @@ describe('TerminalSessionProjection', () => {
       )
       workspacePaneRuntimeMocks.writeSnapshot.mockResolvedValueOnce(false)
       workspacePaneRuntimeMocks.close.mockResolvedValueOnce(
-        successfulRuntimeCloseSnapshot(
-          'term-111111111111111111111',
-          'pty_session_1_aaaaaaaaa',
-        ),
+        successfulRuntimeCloseSnapshot('term-111111111111111111111', 'pty_session_1_aaaaaaaaa'),
       )
 
       await expect(
@@ -1150,10 +1145,7 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
       workspacePaneRuntimeMocks.close.mockResolvedValueOnce(
-        successfulRuntimeCloseSnapshot(
-          'term-111111111111111111111',
-          'pty_session_old_aaaaaaaaa',
-        ),
+        successfulRuntimeCloseSnapshot('term-111111111111111111111', 'pty_session_old_aaaaaaaaa'),
       )
 
       await expect(
@@ -1720,7 +1712,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
     return { projection, session }
   }
 
-  test('blocks direct activation when the replacement lineage exited before its first frame', () => {
+  test('blocks direct activation when the replacement lineage exited before its attach response', () => {
     const { projection, session } = transitioningProjection()
     projection.handleExit(exitFor(lineageB))
 

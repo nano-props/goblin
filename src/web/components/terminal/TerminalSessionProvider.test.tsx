@@ -232,11 +232,13 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
       if (
         current.terminalRuntimeSessionId === binding.terminalRuntimeSessionId &&
         current.terminalRuntimeGeneration === binding.terminalRuntimeGeneration
-      ) return 'active'
+      )
+        return 'active'
       if (
         current.terminalRuntimeSessionId === binding.terminalRuntimeSessionId &&
         binding.terminalRuntimeGeneration > current.terminalRuntimeGeneration
-      ) return 'future'
+      )
+        return 'future'
       return 'foreign'
     }
 
@@ -407,11 +409,12 @@ async function waitForScheduledServerSync(): Promise<void> {
   await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
 }
 
-function attachResult(): TerminalAttachResult {
+function attachResult(): Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }> {
   return {
     ok: true,
+    frame: 'snapshot',
     terminalRuntimeSessionId: 'unused',
-        terminalRuntimeGeneration: 1,
+    terminalRuntimeGeneration: 1,
     snapshot: '',
     snapshotSeq: 0,
     outputEra: 0,
@@ -464,9 +467,8 @@ beforeEach(() => {
     ) {
       serverSessions = currentSessions
       const reused = currentSessions.find((session) => session.terminalSessionId === terminalSessionId)
-      // Reused session also has to supply first-frame hydration
-      // fields — the registry validates them on every successful
-      // `create` response, not just newly-created ones.
+      // Reused and newly prepared sessions return the same metadata shape.
+      // The later attach decides whether this existing PTY needs a snapshot.
       return {
         ok: true,
         action: 'reused',
@@ -474,9 +476,6 @@ beforeEach(() => {
         terminalSessionId,
         terminalRuntimeSessionId: reused?.terminalRuntimeSessionId ?? 'term-111111111111111111111',
         terminalRuntimeGeneration: 1,
-        snapshot: '',
-        snapshotSeq: 0,
-        outputEra: 0,
         processName: reused?.processName ?? 'zsh',
         canonicalTitle: reused?.canonicalTitle ?? null,
         phase: reused?.phase ?? 'open',
@@ -511,19 +510,15 @@ beforeEach(() => {
         rows: 24,
       },
     ]
-    // First-frame hydration contract: `create` returns
-    // `terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` directly so the
-    // client can paint without a follow-up snapshot fetch.
+    // Create materializes a logical session from metadata only. The selected
+    // view will fit its xterm and attach before the fresh PTY starts.
     return {
       ok: true,
       action: 'created',
       terminalSessionsRevision: 1,
       terminalSessionId,
       terminalRuntimeSessionId: terminalSessionId,
-        terminalRuntimeGeneration: 1,
-      snapshot: '',
-      snapshotSeq: 0,
-      outputEra: 0,
+      terminalRuntimeGeneration: 1,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open',
@@ -558,8 +553,9 @@ beforeEach(() => {
       terminal: {
         attach: vi.fn(async () => ({
           ok: true,
+          frame: 'snapshot' as const,
           terminalRuntimeSessionId: 'unused',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           snapshot: '',
           snapshotSeq: 0,
           outputEra: 0,
@@ -573,8 +569,9 @@ beforeEach(() => {
         })),
         restart: vi.fn(async () => ({
           ok: true,
+          frame: 'snapshot' as const,
           terminalRuntimeSessionId: 'unused',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           snapshot: '',
           snapshotSeq: 0,
           outputEra: 0,
@@ -591,7 +588,7 @@ beforeEach(() => {
         takeover: vi.fn(async () => ({
           ok: true as const,
           terminalRuntimeSessionId: 'term-111111111111111111111',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           role: 'controller' as const,
           controllerStatus: 'connected' as const,
           controller: { clientId: 'client_local', status: 'connected' as const },
@@ -918,7 +915,7 @@ describe('TerminalSessionProvider', () => {
       await act(async () => {
         bellHandler?.({
           terminalRuntimeSessionId: 'term-111111111111111111111',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -989,7 +986,7 @@ describe('TerminalSessionProvider', () => {
       await act(async () => {
         bellHandler?.({
           terminalRuntimeSessionId: 'term-111111111111111111111',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -1038,7 +1035,7 @@ describe('TerminalSessionProvider', () => {
       await act(async () => {
         bellHandler?.({
           terminalRuntimeSessionId: 'term-111111111111111111111',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -1092,7 +1089,7 @@ describe('TerminalSessionProvider', () => {
       await act(async () => {
         outputHandler?.({
           terminalRuntimeSessionId: 'term-111111111111111111111',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           data: 'hello',
           seq: 1,
@@ -1101,7 +1098,7 @@ describe('TerminalSessionProvider', () => {
         })
         titleHandler?.({
           terminalRuntimeSessionId: 'term-111111111111111111111',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -1109,7 +1106,7 @@ describe('TerminalSessionProvider', () => {
         })
         identityHandler?.({
           terminalRuntimeSessionId: 'term-222222222222222222222',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-222222222222222222222',
           role: 'controller',
           controllerStatus: 'connected',
@@ -1118,7 +1115,7 @@ describe('TerminalSessionProvider', () => {
         })
         lifecycleHandler?.({
           terminalRuntimeSessionId: 'term-222222222222222222222',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-222222222222222222222',
           phase: 'open',
           message: null,
@@ -1217,7 +1214,7 @@ describe('TerminalSessionProvider', () => {
         notifyBell.mockClear()
         bellHandler?.({
           terminalRuntimeSessionId: 'term-111111111111111111111',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -1276,7 +1273,7 @@ describe('TerminalSessionProvider', () => {
       expect(hydrated?.hydrate).toHaveBeenCalledWith(
         expect.objectContaining({
           terminalRuntimeSessionId: 'server_session_1',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           processName: 'zsh',
           role: 'viewer',
           controllerStatus: 'connected',
@@ -1338,7 +1335,7 @@ describe('TerminalSessionProvider', () => {
       await act(async () => {
         sessionClosedHandler?.({
           terminalRuntimeSessionId: 'server_session_1',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -1579,7 +1576,7 @@ describe('TerminalSessionProvider', () => {
       listSessionsMock.mockResolvedValue([
         {
           terminalRuntimeSessionId: 'server_session_3',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           cwd: WORKTREE_PATH,
           controller: { clientId: 'client_remote', status: 'connected' },
@@ -1643,7 +1640,7 @@ describe('TerminalSessionProvider', () => {
       listSessionsMock.mockResolvedValue([
         {
           terminalRuntimeSessionId: 'server_session_new',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           cwd: WORKTREE_PATH,
           controller: { clientId: 'client_remote', status: 'connected' },
@@ -1704,7 +1701,7 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('creates terminal from first-frame payload when the server omits it from sessions projection', async () => {
+  test('creates terminal from metadata when the server omits it from sessions projection', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1717,10 +1714,7 @@ describe('TerminalSessionProvider', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalSessionsRevision: 1,
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
-      snapshot: '',
-      snapshotSeq: 0,
-      outputEra: 0,
+      terminalRuntimeGeneration: 1,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open' as const,

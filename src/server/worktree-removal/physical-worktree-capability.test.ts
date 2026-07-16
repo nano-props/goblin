@@ -29,9 +29,9 @@ describe('physical worktree capability boundaries', () => {
   })
 
   test('remote terminal invocation consumes the captured target without resolving the alias again', async () => {
-    const ensureSession = vi.fn(async () => ({ ok: false as const, message: 'stop-after-capture' }))
+    const prepareSession = vi.fn(async () => ({ ok: false as const, message: 'stop-after-capture' }))
     const ensurer = createTerminalSessionEnsurer({
-      manager: { ensureSession },
+      manager: { prepareSession },
       broadcastSessionsChanged: vi.fn(),
     })
     const capability = remoteCapability(remoteTarget('host-a.test'))
@@ -55,7 +55,7 @@ describe('physical worktree capability boundaries', () => {
       },
     )
 
-    expect(ensureSession).toHaveBeenCalledWith(
+    expect(prepareSession).toHaveBeenCalledWith(
       expect.objectContaining({
         physicalWorktreeCapability: capability,
         args: expect.arrayContaining([expect.stringContaining('host-a.test')]),

@@ -6,6 +6,7 @@ import type {
   TerminalMutationResult,
   TerminalResizeInput,
   TerminalRestartInput,
+  TerminalRestartResult,
   TerminalSessionInput,
   TerminalSessionSummary,
   TerminalSessionsRecoveryResult,
@@ -78,7 +79,7 @@ export interface ServerTerminalActionHost {
   /** Terminal lifecycle helper used by manager/tests; not part of the app realtime route contract. */
   isClientOnline(userId: string, clientId: string): boolean
   attach(clientId: string, userId: string, input: TerminalAttachInput): MaybePromise<TerminalAttachResult>
-  restart(clientId: string, userId: string, input: TerminalRestartInput): MaybePromise<TerminalAttachResult>
+  restart(clientId: string, userId: string, input: TerminalRestartInput): MaybePromise<TerminalRestartResult>
   write(clientId: string, userId: string, input: TerminalWriteInput): MaybePromise<TerminalWriteResult>
   resize(clientId: string, userId: string, input: TerminalResizeInput): MaybePromise<TerminalMutationResult>
   takeover(clientId: string, userId: string, input: TerminalTakeoverInput): MaybePromise<TerminalTakeoverResult>

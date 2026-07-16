@@ -134,9 +134,9 @@ export function createAppRealtimeHost(options: AppRealtimeRuntimeOptions): Serve
       const rawSocket = socket as RealtimeSocket
       const bufferedSocket = bufferedSocketByRawSocket.get(rawSocket)
       if (isAppRealtimeWorkspacePaneRuntimeAction(message.action)) {
-        // Runtime open responses may carry an authoritative provider frame
-        // (terminal currently does). Keep provider realtime behind that frame;
-        // the handler resumes with the matching flush boundary.
+        // Keep provider realtime behind the runtime metadata response. Fresh
+        // terminal creation does not start a PTY; the later terminal attach
+        // request owns the stream-vs-snapshot frame boundary.
         bufferedSocket?.pause()
         void handleWorkspacePaneRuntimeRealtimeRequestMessage(
           options.workspacePaneRuntimeHandlers,

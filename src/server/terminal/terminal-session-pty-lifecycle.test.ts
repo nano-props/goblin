@@ -51,7 +51,7 @@ describe('TerminalPtyBinding aborted spawn retirement', () => {
     }
     const runtime = new AbortController()
 
-    const spawn = binding.spawn(session, runtime.signal)
+    const spawn = binding.spawn(session, session.cols, session.rows, runtime.signal)
     runtime.abort(new Error('error.repo-runtime-stale'))
     await expect(spawn).resolves.toEqual({
       generation: 1,
@@ -136,7 +136,7 @@ async function createBoundBinding(write: () => Promise<TerminalWriteResult>) {
     message: null,
     terminalRuntimeGeneration: 0,
   }
-  const spawned = await binding.spawn(session)
+  const spawned = await binding.spawn(session, session.cols, session.rows)
   expect(spawned.result).toEqual({ ok: true })
   return { binding, session, supervisor }
 }

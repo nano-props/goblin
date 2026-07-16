@@ -136,16 +136,15 @@ its destroy debounce have been removed. See
 `docs/terminal-session-lifecycle.md` for the bug analysis and why this
 work is related but separate.
 
-## P1.8: Make create deliver an atomic first frame (completed)
+## P1.8: Split fresh startup from recovery replay (completed)
 
-**Status: completed.** `create` now returns the full first-frame
-payload (`terminalRuntimeSessionId`, `snapshot`, `snapshotSeq`, `outputEra`,
-process metadata, geometry, and controller info) directly. `TerminalCreateResult`
-intersects with `TerminalFirstFrame` at the type level, and the client
-hydrates from the response without a follow-up snapshot fetch.
-`create.sessions` remains projection data only. See
-`docs/terminal-session-lifecycle.md` for the detailed bug write-up and
-contract rules.
+**Status: completed.** The former snapshot-first create contract was too strong:
+an output checkpoint could be serialized while the shell was in a transient
+prompt redraw. `create` now prepares a logical session and returns metadata
+only. The selected client mounts and fits one xterm before attach starts a fresh
+PTY; fresh output streams from sequence 1. Attach to an existing PTY and restart
+still use server headless snapshots with explicit sequence boundaries. See
+`docs/terminal.md` and `docs/terminal-session-lifecycle.md` for the contract.
 
 ## P2: Further tighten client projection boundaries
 

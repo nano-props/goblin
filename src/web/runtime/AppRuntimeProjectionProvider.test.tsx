@@ -683,9 +683,10 @@ function testBridge(): ClientBridge {
   }
 }
 
-function attachResult(): TerminalAttachResult {
+function attachResult(): Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }> {
   return {
     ok: true,
+    frame: 'snapshot',
     terminalRuntimeSessionId: 'unused',
     terminalRuntimeGeneration: 1,
     snapshot: '',

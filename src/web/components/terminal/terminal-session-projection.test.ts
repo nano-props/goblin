@@ -49,7 +49,7 @@ describe('terminal session projection helpers', () => {
         terminalRuntimeGeneration: 1,
         snapshot: 'server-snap',
         snapshotSeq: 9,
-      outputEra: 0,
+        outputEra: 0,
       },
     })
 
@@ -77,7 +77,7 @@ describe('terminal session projection helpers', () => {
         canonicalRows: 40,
         snapshot: 'server-snap',
         snapshotSeq: 9,
-      outputEra: 0,
+        outputEra: 0,
       },
       controlsTerminal: true,
     })
@@ -183,6 +183,7 @@ describe('terminal session projection helpers', () => {
     const projected = projectTerminalAttachResultForClient(
       {
         ok: true,
+        frame: 'snapshot',
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         snapshot: '',
@@ -203,7 +204,7 @@ describe('terminal session projection helpers', () => {
     expect(projected.controllerStatus).toBe('connected')
   })
 
-  test('materializes create projection from the first-frame payload', () => {
+  test('materializes a prepared create projection from metadata only', () => {
     const projected = projectCreateResultForClient(
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'main', worktreePath: WORKTREE_PATH },
       {
@@ -217,9 +218,6 @@ describe('terminal session projection helpers', () => {
         canonicalTitle: null,
         phase: 'open',
         message: null,
-        snapshot: 'first-frame',
-        snapshotSeq: 3,
-        outputEra: 0,
         controller: { clientId: 'client_a', status: 'connected' },
         canonicalCols: 120,
         canonicalRows: 40,
@@ -228,7 +226,7 @@ describe('terminal session projection helpers', () => {
 
     expect(projected.serverSession).toEqual({
       terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       repoRuntimeId: REPO_RUNTIME_ID,
       repoRoot: REPO_ROOT,
@@ -243,16 +241,9 @@ describe('terminal session projection helpers', () => {
       cols: 120,
       rows: 40,
     })
-    expect(projected.snapshotByTerminalRuntimeSessionId.get('pty_session_123_aaaaaaaaa')).toEqual({
-      terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
-      snapshot: 'first-frame',
-      snapshotSeq: 3,
-    outputEra: 0,
-    })
   })
 
-  test('uses authoritative create first-frame metadata for the projected session', () => {
+  test('uses authoritative create metadata for the projected session', () => {
     const projected = projectCreateResultForClient(
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'main', worktreePath: WORKTREE_PATH },
       {
@@ -266,9 +257,6 @@ describe('terminal session projection helpers', () => {
         canonicalTitle: 'new title',
         phase: 'open',
         message: null,
-        snapshot: '',
-        snapshotSeq: 0,
-        outputEra: 0,
         controller: { clientId: 'client_a', status: 'connected' },
         canonicalCols: 120,
         canonicalRows: 40,
@@ -307,9 +295,6 @@ describe('terminal session projection helpers', () => {
         canonicalTitle: 'new-shell',
         phase: 'open',
         message: null,
-        snapshot: 'restored-frame',
-        snapshotSeq: 4,
-        outputEra: 0,
         controller: { clientId: 'client_a', status: 'connected' },
         canonicalCols: 120,
         canonicalRows: 40,

@@ -54,7 +54,7 @@ describe('terminal realtime broker', () => {
     expect(broker.hasUserSockets(USER_A)).toBe(false)
   })
 
-  test('buffered socket drops output covered by a first-frame flush boundary', () => {
+  test('buffered socket drops output covered by a snapshot flush boundary', () => {
     const rawSocket = { send: vi.fn(), close: vi.fn() }
     const bufferedSocket = new BufferedAppRealtimeSocket(rawSocket)
     bufferedSocket.pause()
@@ -64,7 +64,7 @@ describe('terminal realtime broker', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 's_1',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           data: 'covered',
           outputEra: 0,
@@ -78,7 +78,7 @@ describe('terminal realtime broker', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 's_1',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           data: 'after',
           outputEra: 0,
@@ -92,7 +92,7 @@ describe('terminal realtime broker', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 's_2',
-        terminalRuntimeGeneration: 1,
+          terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-222222222222222222222',
           data: 'other-session',
           outputEra: 0,

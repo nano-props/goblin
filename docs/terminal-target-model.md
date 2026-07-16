@@ -239,10 +239,18 @@ It mainly needs:
 - session summary
 - current control projection for this attachment
 - canonical geometry
-- replay snapshot and its `outputEra` / `snapshotSeq` boundary
+- either a fresh-stream attach handshake or a replay snapshot with its
+  `outputEra` / `snapshotSeq` boundary
 - lifecycle phase
 
 The client should not have to infer hidden lifecycle meaning from missing PTY state.
+
+A prepared session with no PTY is an explicit lifecycle state, not a second
+client authority. The mounted xterm supplies fitted startup geometry; the server
+then starts the PTY and streams sequence 1 into that same xterm. An attachment
+that missed any history receives a server-headless snapshot instead. The server
+decides between those frame protocols from PTY ownership/history, so the client
+never guesses whether recovery is required.
 
 ## Workspace-pane runtime tab projection
 

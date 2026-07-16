@@ -127,11 +127,13 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
       if (
         current.terminalRuntimeSessionId === binding.terminalRuntimeSessionId &&
         current.terminalRuntimeGeneration === binding.terminalRuntimeGeneration
-      ) return 'active'
+      )
+        return 'active'
       if (
         current.terminalRuntimeSessionId === binding.terminalRuntimeSessionId &&
         binding.terminalRuntimeGeneration > current.terminalRuntimeGeneration
-      ) return 'future'
+      )
+        return 'future'
       return 'foreign'
     }
     isVisible(): boolean {
@@ -218,14 +220,11 @@ function makeCreateResult(overrides: Partial<TerminalCreateSuccess> = {}): Termi
     terminalSessionId: 'term-111111111111111111111',
     terminalSessionsRevision: 11,
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+    terminalRuntimeGeneration: 1,
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open' as const,
     message: null,
-    snapshot: '',
-    snapshotSeq: 0,
-    outputEra: 0,
     controller: { clientId: 'client_local', status: 'connected' as const },
     canonicalCols: 101,
     canonicalRows: 31,
@@ -906,7 +905,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
     })
 
@@ -925,7 +924,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
     })
 
@@ -941,7 +940,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_missing_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
     })
 
@@ -966,18 +965,18 @@ describe('TerminalSessionProjection create flow', () => {
       { terminalSessionId: string; terminalRuntimeSessionId: string }
     >
     expect(pendingBells.size).toBe(99)
-    expect(Array.from(pendingBells.values()).some((event) => event.terminalSessionId === 'term-000000000000000000000')).toBe(
-      false,
-    )
-    expect(Array.from(pendingBells.values()).some((event) => event.terminalSessionId === 'term-000000000000000000099')).toBe(
-      true,
-    )
+    expect(
+      Array.from(pendingBells.values()).some((event) => event.terminalSessionId === 'term-000000000000000000000'),
+    ).toBe(false)
+    expect(
+      Array.from(pendingBells.values()).some((event) => event.terminalSessionId === 'term-000000000000000000099'),
+    ).toBe(true)
   })
 
   test('clears pending server bell when an unknown session is closed', () => {
     projection.handleServerBell({
       terminalRuntimeSessionId: 'pty_session_unknown_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-unknownunknownunknown',
       repoRoot: REPO_ROOT,
       worktreePath: WORKTREE_PATH,
@@ -999,7 +998,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_unknown_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-unknownunknownunknown',
     })
 
@@ -1015,7 +1014,7 @@ describe('TerminalSessionProjection create flow', () => {
   test('keeps a pending server bell when a stale runtime close arrives', () => {
     projection.handleServerBell({
       terminalRuntimeSessionId: 'pty_session_current_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-unknownunknownunknown',
       repoRoot: REPO_ROOT,
       worktreePath: WORKTREE_PATH,
@@ -1025,7 +1024,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_stale_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-unknownunknownunknown',
     })
 

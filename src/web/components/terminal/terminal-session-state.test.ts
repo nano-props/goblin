@@ -30,7 +30,7 @@ describe('TerminalSessionState', () => {
         canonicalRows: 40,
       }),
     ).toBe(true)
-    // The default phase is 'open' for a first-frame payload.
+    // The default phase is 'open' for an attach/restart metadata payload.
     expect(state.snapshot(null).phase).toBe('open')
     // The attachment carries identity fields only — no phase.
     expect(state.snapshot('pty_session_1_aaaaaaaaa')).toEqual({
@@ -69,7 +69,7 @@ describe('TerminalSessionState', () => {
     // Identity-only update: phase is unchanged.
     const identityOnly: TerminalIdentityViewModel = {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       role: 'viewer',
       controllerStatus: 'connected',
       canonicalCols: 100,
@@ -82,7 +82,7 @@ describe('TerminalSessionState', () => {
     // Lifecycle-only update: role is unchanged.
     const lifecycleOnly: TerminalLifecycleViewModel = {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'opening',
       message: 'restarting',
       takeoverPending: true,
@@ -114,7 +114,7 @@ describe('TerminalSessionState', () => {
     // Move to a transitional phase but keep the controller role.
     state.applyLifecycle({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'opening',
       message: null,
       takeoverPending: false,
@@ -137,7 +137,7 @@ describe('TerminalSessionState', () => {
     expect(state.canSendInput()).toBe(false)
     state.applyLifecycle({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
       takeoverPending: false,
@@ -147,7 +147,7 @@ describe('TerminalSessionState', () => {
     // Controller can send input only when phase is 'open'.
     state.applyIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       role: 'controller',
       controllerStatus: 'connected',
       canonicalCols: 100,
@@ -157,7 +157,7 @@ describe('TerminalSessionState', () => {
 
     state.applyLifecycle({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'restarting',
       message: null,
       takeoverPending: false,
@@ -172,7 +172,7 @@ describe('TerminalSessionState', () => {
     // contract that the two sub-states do not interact.
     const identity: TerminalIdentityViewModel = {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       role: 'controller',
       controllerStatus: 'connected',
       canonicalCols: 100,
@@ -180,7 +180,7 @@ describe('TerminalSessionState', () => {
     }
     const lifecycle: TerminalLifecycleViewModel = {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       phase: 'open',
       message: null,
       takeoverPending: false,
@@ -234,7 +234,7 @@ describe('TerminalSessionState', () => {
     state.beginReplay({ outputEra: 0, seq: 1 })
     state.captureReplayOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+      terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'live',
       seq: 2,
