@@ -58,7 +58,7 @@ describe('workspace pane tabs coordinator queues', () => {
 
     expect(admitted.admitted).toBe(true)
     if (!admitted.admitted) return
-    expect(events).toEqual(['sample:false', 'publish', 'sample:true'])
+    expect(events).toEqual(['sample:false', 'publish'])
     expect(admitted.value).toMatchObject({
       kind: 'committed',
       snapshot: { entries: [{ tabs: [

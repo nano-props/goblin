@@ -149,9 +149,15 @@ export class WorkspacePaneTabsCoordinator {
         tabs,
       })
       input.onPlacementCommitted?.()
-      const resampled = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
-      const resampledTargets = await this.targetProjection.captureTargets(input.userId, input.repoRoot, input.scope)
-      const snapshot = await layout.snapshot({ scope, validTargets: resampledTargets, providerSnapshots: resampled })
+      const hasEntry = current.entries.some((candidate) => candidate.worktreePath === input.worktreePath)
+      const snapshot = {
+        ...current,
+        entries: hasEntry
+          ? current.entries.map((candidate) =>
+              candidate.worktreePath === input.worktreePath ? { ...candidate, tabs } : candidate,
+            )
+          : [...current.entries, { branchName: input.branchName, worktreePath: input.worktreePath, tabs }],
+      }
       return {
         kind: 'committed',
         snapshot,
