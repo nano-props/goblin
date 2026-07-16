@@ -1313,7 +1313,7 @@ describe('TerminalSessionProjection', () => {
       if (!activeSessionId) throw new Error('missing term-222222222222222222222')
 
       projection.selectTerminal(WORKTREE_KEY, activeSessionId)
-      ;(projection as any).removeSession(activeSessionId, { dispose: false, closeSession: false })
+      ;(projection as any).removeSession(activeSessionId, { dispose: false })
 
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
         'term-111111111111111111111',

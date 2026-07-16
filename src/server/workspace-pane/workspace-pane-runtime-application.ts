@@ -167,6 +167,9 @@ export class WorkspacePaneRuntimeApplication {
       })
     } catch (error) {
       if (runtime.publication.kind === 'prepared' && publishedRevision === null) runtime.publication.retire()
+      if (publishedRevision !== null) {
+        this.deps.broadcastWorkspaceTabsChanged(userId, input.request.repoRoot)
+      }
       workspacePaneRuntimeApplicationLogger.error(
         { error, userId, repoRoot: input.request.repoRoot, worktreePath },
         'terminal open application command failed',

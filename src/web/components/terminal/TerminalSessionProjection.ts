@@ -611,7 +611,7 @@ export class TerminalSessionProjection {
       const session = this.sessions.get(terminalSessionId)
       if (!session) continue
       if (options.evictCommandClosingSessions) {
-        this.removeSession(terminalSessionId, { dispose: true, closeSession: false })
+        this.removeSession(terminalSessionId, { dispose: true })
       } else {
         this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor)
       }
@@ -1133,7 +1133,6 @@ export class TerminalSessionProjection {
         this.pendingServerBellByRuntimeBindingKey.delete(pendingBindingKey)
         this.removeSession(session.descriptor.terminalSessionId, {
           dispose: true,
-          closeSession: false,
           preserveFutureExits: true,
         })
         return false
@@ -1154,7 +1153,6 @@ export class TerminalSessionProjection {
       this.pendingServerBellByRuntimeBindingKey.delete(bindingKey)
       this.removeSession(session.descriptor.terminalSessionId, {
         dispose: true,
-        closeSession: false,
         preserveFutureExits: true,
       })
       return false
@@ -1167,7 +1165,7 @@ export class TerminalSessionProjection {
 
   private removeSession(
     terminalSessionId: string,
-    options: { dispose: boolean; closeSession?: boolean; preserveFutureExits?: boolean },
+    options: { dispose: boolean; preserveFutureExits?: boolean },
   ): boolean {
     const session = this.sessions.get(terminalSessionId)
     if (!session) return false
@@ -1295,7 +1293,7 @@ export class TerminalSessionProjection {
         }),
       )
     }
-    this.removeSession(effect.terminalSessionId, { dispose: true, closeSession: false })
+    this.removeSession(effect.terminalSessionId, { dispose: true })
   }
 
   private runtimeBindingForClose(terminalSessionId: string, base: TerminalSessionBase): TerminalRuntimeBindingIdentity {
@@ -1399,7 +1397,7 @@ export class TerminalSessionProjection {
     const session = this.sessions.get(terminalSessionId)
     const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
     if (!session || session.descriptor.terminalWorktreeKey !== terminalWorktreeKey) return
-    this.removeSession(terminalSessionId, { dispose: true, closeSession: false, preserveFutureExits })
+    this.removeSession(terminalSessionId, { dispose: true, preserveFutureExits })
   }
 
   private pruneSessionsMissingFromRepoIndex(): void {
@@ -1407,7 +1405,7 @@ export class TerminalSessionProjection {
       .filter(([, session]) => !this.sessionBelongsToCurrentRepoIndex(session))
       .map(([terminalSessionId]) => terminalSessionId)
     for (const terminalSessionId of sessionIdsToRemove)
-      this.removeSession(terminalSessionId, { dispose: true, closeSession: false })
+      this.removeSession(terminalSessionId, { dispose: true })
   }
 
   private sessionBelongsToCurrentRepoIndex(session: TerminalSession): boolean {

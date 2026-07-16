@@ -550,8 +550,9 @@ any individual implementation:
 2. **Stream only from complete history.** Only the attach request that starts a
    PTY before any output exists may receive `frame: 'stream'`. Any view that may
    have missed history receives `frame: 'snapshot'`.
-3. **Close is durable.** `dispose()` must not be fire-and-forget on
-   the server side. The projection owns pending close state.
+3. **Close is durable and server-owned.** Client view disposal never closes a
+   PTY. Requested retirement keeps Directory membership until kill/wait
+   succeeds; confirmed exit removes membership before post-exit cleanup.
 4. **Close is a broadcast event.** When the server confirms a user
    close, other windows learn about it through `session-closed`, not
    through a full reconcile.

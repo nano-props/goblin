@@ -296,9 +296,10 @@ The clean flow is:
 1. The user invokes create through a command/open-tab entry point.
 2. The terminal projection admits the create request and publishes
    `createPending` before async startup command resolution begins.
-3. The server application command invokes terminal creation, commits the
-   corresponding runtime tab in server order, and returns the server-allocated
-   `terminalSessionId` plus a revisioned full-scope snapshot.
+3. The server application command prepares terminal creation, records the
+   ordered placement hint, synchronously publishes Directory membership, and
+   returns the server-allocated `terminalSessionId` plus independently
+   revisioned terminal and Workspace effects.
 4. The owning workspace-pane command applies that snapshot through the single
    revision acceptance boundary, verifies the captured `repoRuntimeId`,
    records opener facts, and navigates directly to the canonical terminal

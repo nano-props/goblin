@@ -535,6 +535,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const retire = vi.fn()
     runtime.publication = { kind: 'prepared', publish, retire }
     const close = vi.fn(async () => true)
+    const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
@@ -548,7 +549,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
         reconcileWorktreeAdmitted: vi.fn(),
       } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,
       isCurrentRepoRuntime: () => true,
-      broadcastWorkspaceTabsChanged: vi.fn(),
+      broadcastWorkspaceTabsChanged,
     })
 
     await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual({
@@ -559,6 +560,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(publish).toHaveBeenCalledOnce()
     expect(retire).not.toHaveBeenCalled()
     expect(close).not.toHaveBeenCalled()
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', request.repoRoot)
   })
 })
 
