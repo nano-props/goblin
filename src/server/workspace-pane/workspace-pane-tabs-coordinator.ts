@@ -128,10 +128,10 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
         worktreePath: input.worktreePath,
       }
       const requestedTargetKey = workspacePaneTabsTargetIdentityKey(requestedTarget)
-      const canonicalTarget = capturedTargets.find(
+      const capturedTarget = capturedTargets.find(
         (target) => workspacePaneTabsTargetIdentityKey(target) === requestedTargetKey,
       )
-      if (!canonicalTarget) return { kind: 'runtime-stale' }
+      if (!capturedTarget) return { kind: 'runtime-stale' }
       const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
@@ -139,6 +139,13 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
       const current = await layout.snapshot({ scope, validTargets: capturedTargets, providerSnapshots })
       if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
+      const commitTargets = await this.targetProjection.captureTargets(input.userId, input.repoRoot, input.scope)
+      if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
+      this.worktreeOperations.assertPermit(physicalCapability, input.permit)
+      const commitTarget = commitTargets.find(
+        (target) => workspacePaneTabsTargetIdentityKey(target) === requestedTargetKey,
+      )
+      if (!commitTarget) return { kind: 'runtime-stale' }
       const entry = current.entries.find((candidate) => candidate.worktreePath === input.worktreePath)
       const tabs = workspacePaneTabsWithRuntimeTab(
         entry?.tabs ?? [workspacePaneStaticTabEntry('status')],
@@ -153,7 +160,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
         lease: physicalWorktreeAdmissionLease(physicalCapability),
         tabs,
       })
-      input.commitAdmission?.(canonicalTarget.branchName)
+      input.commitAdmission?.(commitTarget.branchName)
       return { kind: 'committed' }
     })
   }

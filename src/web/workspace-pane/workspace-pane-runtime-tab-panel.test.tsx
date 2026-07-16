@@ -119,7 +119,7 @@ describe('workspace pane runtime tab panel', () => {
     const base: TerminalSessionBase = {
       repoRoot: '/repo',
       repoRuntimeId: 'repo-runtime-1',
-      branch: 'main',
+      branch: 'stale-branch',
       worktreePath: '/repo-worktree',
     }
 
@@ -140,6 +140,7 @@ describe('workspace pane runtime tab panel', () => {
         {
           commitCreatedTerminalTab: (admission: {
             terminalSessionId: string
+            branch: string
             requestRole: 'leader'
             resourceDisposition: 'created'
             runtimeProjectionApplied: boolean
@@ -149,11 +150,18 @@ describe('workspace pane runtime tab panel', () => {
     >
     await commandCalls[0]?.[0].commitCreatedTerminalTab({
       terminalSessionId: 'term-111111111111111111111',
+      branch: 'main',
       requestRole: 'leader',
       resourceDisposition: 'created',
       runtimeProjectionApplied: true,
     })
     expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).toHaveBeenCalledWith('/repo', 'repo-runtime-1')
+    expect(navigation.commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
+      '/repo',
+      'main',
+      { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+      expect.any(Object),
+    )
   })
 })
 
@@ -200,7 +208,7 @@ function navigationWith(): PrimaryWindowNavigationActions {
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
   }
-  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+  navigation.commitRepoBranchWorkspacePaneRoute = vi.fn(observedWorkspacePaneRouteCommitForTest(navigation))
   return navigation
 }
 

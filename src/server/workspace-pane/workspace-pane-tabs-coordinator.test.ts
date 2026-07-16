@@ -78,6 +78,84 @@ describe('workspace pane tabs coordinator queues', () => {
     expect(commitAdmission).toHaveBeenCalledWith('feature/renamed')
   })
 
+  test('does not commit when the target disappears during placement preparation', async () => {
+    const operations = createPhysicalWorktreeOperationCoordinator()
+    const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
+      userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a',
+    })
+    let targets = [{ repoRoot: '/repo', branchName: 'feature/current', worktreePath: '/repo/worktree' }]
+    let releaseProvider!: () => void
+    const providerGate = new Promise<void>((resolve) => { releaseProvider = resolve })
+    let providerStarted = false
+    const commitAdmission = vi.fn()
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      layoutAggregate: aggregateFor(memoryRepository()),
+      runtimeProviders: [{
+        type: 'terminal',
+        async captureSnapshotForUser() {
+          providerStarted = true
+          await providerGate
+          return { revision: 0, liveSessions: [] }
+        },
+      }],
+      worktreeOperations: operations,
+      physicalWorktrees: { capture: async () => capability },
+      targetProjection: { captureTargets: async () => targets },
+    })
+
+    const admitted = operations.runOperation(capability, async (permit) =>
+      await coordinator.ensureRuntimeTabForSession({
+        userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a', branchName: 'feature/current',
+        worktreePath: '/repo/worktree', runtimeType: 'terminal', sessionId: 'term-preparedprepared001',
+        permit, physicalWorktreeCapability: capability, isRuntimeCurrent: () => true, commitAdmission,
+      }))
+    await vi.waitFor(() => expect(providerStarted).toBe(true))
+    targets = []
+    releaseProvider()
+
+    await expect(admitted).resolves.toEqual({ admitted: true, value: { kind: 'runtime-stale' } })
+    expect(commitAdmission).not.toHaveBeenCalled()
+  })
+
+  test('commits the latest canonical branch after placement preparation', async () => {
+    const operations = createPhysicalWorktreeOperationCoordinator()
+    const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
+      userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a',
+    })
+    let targets = [{ repoRoot: '/repo', branchName: 'feature/old', worktreePath: '/repo/worktree' }]
+    let releaseProvider!: () => void
+    const providerGate = new Promise<void>((resolve) => { releaseProvider = resolve })
+    let providerStarted = false
+    const commitAdmission = vi.fn()
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      layoutAggregate: aggregateFor(memoryRepository()),
+      runtimeProviders: [{
+        type: 'terminal',
+        async captureSnapshotForUser() {
+          providerStarted = true
+          await providerGate
+          return { revision: 0, liveSessions: [] }
+        },
+      }],
+      worktreeOperations: operations,
+      physicalWorktrees: { capture: async () => capability },
+      targetProjection: { captureTargets: async () => targets },
+    })
+
+    const admitted = operations.runOperation(capability, async (permit) =>
+      await coordinator.ensureRuntimeTabForSession({
+        userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a', branchName: 'feature/old',
+        worktreePath: '/repo/worktree', runtimeType: 'terminal', sessionId: 'term-preparedprepared001',
+        permit, physicalWorktreeCapability: capability, isRuntimeCurrent: () => true, commitAdmission,
+      }))
+    await vi.waitFor(() => expect(providerStarted).toBe(true))
+    targets = [{ repoRoot: '/repo', branchName: 'feature/renamed', worktreePath: '/repo/worktree' }]
+    releaseProvider()
+
+    await expect(admitted).resolves.toEqual({ admitted: true, value: { kind: 'committed' } })
+    expect(commitAdmission).toHaveBeenCalledWith('feature/renamed')
+  })
+
   test('serializes repository reads with a later durable command', async () => {
     let layout: WorkspacePaneDurableLayout = { entries: [{
       repoRoot: '/repo', branchName: 'main', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')],
