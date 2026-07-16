@@ -48,11 +48,9 @@ import type {
   WorkspacePaneRuntimeCloseResult,
   WorkspacePaneRuntimeTabPlacement,
 } from '#/shared/workspace-pane-runtime.ts'
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { workspacePaneRuntimeClient } from '#/web/workspace-pane/workspace-pane-runtime-client.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
-import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import { refreshWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { refreshWorkspacePaneTabsQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { FutureExitLedger } from '#/web/components/terminal/future-exit-ledger.ts'
 import { createTerminalWriteFailureReporter } from '#/web/components/terminal/terminal-write-failure-feedback.ts'
 
@@ -740,7 +738,6 @@ export class TerminalSessionProjection {
     return {
       terminalSessionId: result.terminalSessionId,
       resourceDisposition: result.action,
-      workspacePaneTabs: openResult.workspacePaneTabs,
       runtimeProjectionApplied,
     }
   }
@@ -1232,7 +1229,16 @@ export class TerminalSessionProjection {
       return false
     }
     if (!result.ok) return false
-    await this.applyWorkspacePaneRuntimeSnapshot(base, result.workspacePaneTabs)
+    try {
+      await refreshWorkspacePaneTabsQueryData(base.repoRoot, repoRuntimeId)
+    } catch (err) {
+      terminalSessionProviderLog.warn('terminal closed but workspace pane tabs refresh failed', {
+        terminalSessionId,
+        repoRoot: base.repoRoot,
+        repoRuntimeId,
+        err,
+      })
+    }
     this.applyClosedServerSessionEffect(base, result.runtime, requestedBinding)
     return true
   }
@@ -1350,25 +1356,6 @@ export class TerminalSessionProjection {
       }
     }
     return false
-  }
-
-  private async applyWorkspacePaneRuntimeSnapshot(
-    base: TerminalSessionBase,
-    snapshot: WorkspacePaneTabsSnapshot,
-  ): Promise<boolean> {
-    const repoRuntimeId = requireRepoRuntimeId(base)
-    try {
-      return writeCanonicalWorkspacePaneTabsSnapshot(base.repoRoot, repoRuntimeId, snapshot)
-    } catch (err) {
-      terminalSessionProviderLog.warn('failed to apply workspace pane runtime snapshot', {
-        repoRoot: base.repoRoot,
-        repoRuntimeId,
-        worktreePath: base.worktreePath,
-        err,
-      })
-      refreshWorkspacePaneTabs(base.repoRoot, repoRuntimeId)
-      return false
-    }
   }
 
   private discardLocalSessionAndDismissDetailIfLast(

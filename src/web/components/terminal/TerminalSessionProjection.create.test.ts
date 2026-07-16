@@ -487,34 +487,12 @@ describe('TerminalSessionProjection create flow', () => {
       terminalSessionId: 'term-111111111111111111111',
       requestRole: 'leader',
       resourceDisposition: 'created',
-      workspacePaneTabs: {
-        revision: 1,
-        entries: [
-          {
-            repoRoot: REPO_ROOT,
-            branchName: BRANCH,
-            worktreePath: WORKTREE_PATH,
-            tabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
-          },
-        ],
-      },
       runtimeProjectionApplied: true,
     })
     await expect(secondCreate).resolves.toEqual({
       terminalSessionId: 'term-111111111111111111111',
       requestRole: 'observer',
       resourceDisposition: 'created',
-      workspacePaneTabs: {
-        revision: 1,
-        entries: [
-          {
-            repoRoot: REPO_ROOT,
-            branchName: BRANCH,
-            worktreePath: WORKTREE_PATH,
-            tabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
-          },
-        ],
-      },
       runtimeProjectionApplied: true,
     })
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
@@ -530,17 +508,6 @@ describe('TerminalSessionProjection create flow', () => {
         terminalSessionId: 'term-111111111111111111111',
         requestRole: 'leader',
         resourceDisposition,
-        workspacePaneTabs: {
-          revision: 1,
-          entries: [
-            {
-              repoRoot: REPO_ROOT,
-              branchName: BRANCH,
-              worktreePath: WORKTREE_PATH,
-              tabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
-            },
-          ],
-        },
         runtimeProjectionApplied: true,
       })
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)

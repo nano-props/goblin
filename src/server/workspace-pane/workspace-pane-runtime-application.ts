@@ -182,13 +182,11 @@ export class WorkspacePaneRuntimeApplication {
 
     if (admittedRevision === null) throw new Error('terminal admission did not produce a catalog revision')
     const { admission: _admission, ...runtimeResult } = runtime
-    const workspacePaneTabs = paneCommit.snapshot
     this.deps.broadcastWorkspaceTabsChanged(userId, input.request.repoRoot)
     return {
       ok: true,
       runtimeType: 'terminal',
       runtime: { ...runtimeResult, terminalSessionsRevision: admittedRevision },
-      workspacePaneTabs,
     }
   }
 
@@ -212,7 +210,7 @@ export class WorkspacePaneRuntimeApplication {
       })
       if (!closed) return runtimeFailure('terminal', 'error.unavailable')
     }
-    const workspacePaneTabs = await this.reconcileTarget(userId, target, scope, physicalWorktreeCapability, permit)
+    await this.reconcileTarget(userId, target, scope, physicalWorktreeCapability, permit)
     return {
       ok: true,
       runtimeType: 'terminal',
@@ -222,7 +220,6 @@ export class WorkspacePaneRuntimeApplication {
         terminalRuntimeSessionId: session?.terminalRuntimeSessionId ?? null,
         terminalRuntimeGeneration: session?.terminalRuntimeGeneration ?? null,
       },
-      workspacePaneTabs,
     }
   }
 

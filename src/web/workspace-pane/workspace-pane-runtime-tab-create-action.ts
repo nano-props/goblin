@@ -14,8 +14,7 @@ import {
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import { refreshWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { refreshWorkspacePaneTabsQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { goblinLog } from '#/web/logger.ts'
 import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -181,12 +180,8 @@ async function applyCreatedTerminalWorkspacePaneRuntimeTabs(
   const repoRuntimeId = options.base.repoRuntimeId
   if (!repoRuntimeId) return 'superseded'
   try {
-    const accepted = await writeCanonicalWorkspacePaneTabsSnapshot(
-      options.base.repoRoot,
-      repoRuntimeId,
-      options.admission.workspacePaneTabs,
-    )
-    return accepted ? 'accepted' : 'superseded'
+    await refreshWorkspacePaneTabsQueryData(options.base.repoRoot, repoRuntimeId)
+    return terminalCreateTargetRuntimeIsCurrent(options.base) ? 'accepted' : 'superseded'
   } catch (err) {
     goblinLog.warn('failed to apply application-returned workspace pane tabs', {
       repoRoot: options.base.repoRoot,
@@ -195,7 +190,6 @@ async function applyCreatedTerminalWorkspacePaneRuntimeTabs(
       worktreePath: options.base.worktreePath,
       err,
     })
-    refreshWorkspacePaneTabs(options.base.repoRoot, repoRuntimeId)
     return 'projection-failed'
   }
 }

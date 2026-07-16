@@ -15,7 +15,6 @@ import { resetReposStore } from '#/web/test-utils/bridge.ts'
 
 const workspacePaneRuntimeMocks = vi.hoisted(() => ({
   close: vi.fn(),
-  writeSnapshot: vi.fn(),
   refreshTabs: vi.fn(),
 }))
 
@@ -25,12 +24,8 @@ vi.mock('#/web/workspace-pane/workspace-pane-runtime-client.ts', () => ({
   },
 }))
 
-vi.mock('#/web/workspace-pane/workspace-pane-tabs-commit.ts', () => ({
-  writeCanonicalWorkspacePaneTabsSnapshot: workspacePaneRuntimeMocks.writeSnapshot,
-}))
-
 vi.mock('#/web/workspace-pane/workspace-pane-tabs-query.ts', () => ({
-  refreshWorkspacePaneTabs: workspacePaneRuntimeMocks.refreshTabs,
+  refreshWorkspacePaneTabsQueryData: workspacePaneRuntimeMocks.refreshTabs,
 }))
 
 const REPO_ROOT = '/repo'
@@ -119,9 +114,8 @@ describe('TerminalSessionProjection', () => {
     resetReposStore()
     workspacePaneRuntimeMocks.close.mockReset()
     workspacePaneRuntimeMocks.close.mockResolvedValue(successfulRuntimeCloseSnapshot())
-    workspacePaneRuntimeMocks.writeSnapshot.mockReset()
-    workspacePaneRuntimeMocks.writeSnapshot.mockResolvedValue(true)
     workspacePaneRuntimeMocks.refreshTabs.mockReset()
+    workspacePaneRuntimeMocks.refreshTabs.mockResolvedValue(undefined)
     selectedChanges = []
     projection = new TerminalSessionProjection((terminalWorktreeKey, terminalSessionId) =>
       selectedChanges.push({ terminalWorktreeKey, terminalSessionId }),
@@ -1003,7 +997,7 @@ describe('TerminalSessionProjection', () => {
       expect(closedSnapshot.selectedDescriptor?.terminalSessionId).toBe('term-333333333333333333333')
     })
 
-    test('applies the exact close effect even when the workspace tabs snapshot is stale', async () => {
+    test('applies the exact close effect after refreshing workspace tabs', async () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
@@ -1013,7 +1007,6 @@ describe('TerminalSessionProjection', () => {
         ],
         'client_local',
       )
-      workspacePaneRuntimeMocks.writeSnapshot.mockResolvedValueOnce(false)
       workspacePaneRuntimeMocks.close.mockResolvedValueOnce(
         successfulRuntimeCloseSnapshot('term-111111111111111111111', 'pty_session_1_aaaaaaaaa'),
       )
@@ -1123,7 +1116,7 @@ describe('TerminalSessionProjection', () => {
       expect(dispose).not.toHaveBeenCalled()
     })
 
-    test('completes a successful server close when local snapshot projection throws', async () => {
+    test('completes a successful server close when projection refresh fails', async () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
@@ -1131,9 +1124,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      workspacePaneRuntimeMocks.writeSnapshot.mockImplementationOnce(() => {
-        throw new Error('local cache unavailable')
-      })
+      workspacePaneRuntimeMocks.refreshTabs.mockRejectedValueOnce(new Error('projection unavailable'))
 
       await expect(
         projection.closeTerminalByDescriptor(terminalSessionId, {

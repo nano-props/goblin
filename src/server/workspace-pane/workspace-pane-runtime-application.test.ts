@@ -34,7 +34,7 @@ const request = {
 }
 
 describe('WorkspacePaneRuntimeApplication', () => {
-  test('returns the provider result and canonical tabs as one application outcome', async () => {
+  test('returns the provider result and broadcasts workspace invalidation', async () => {
     const runtime = terminalCreateSuccess()
     const create = vi.fn(async () => runtime)
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(request.worktreePath)
@@ -84,7 +84,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
       ok: true,
       runtimeType: 'terminal',
       runtime: publishedTerminalResult(runtime),
-      workspacePaneTabs,
     })
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', '/repo')
   })
@@ -247,7 +246,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     },
   )
 
-  test('closes a terminal by durable session id and returns the canonical scope snapshot', async () => {
+  test('closes a terminal by durable session id and broadcasts workspace invalidation', async () => {
     const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
     const close = vi.fn(() => true)
     const workspacePaneTabs = snapshot([{ type: 'status', tabId: 'workspace-pane:status' }])
@@ -287,7 +286,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
         terminalRuntimeSessionId: session.terminalRuntimeSessionId,
         terminalRuntimeGeneration: session.terminalRuntimeGeneration,
       },
-      workspacePaneTabs,
     })
     expect(close).toHaveBeenCalledWith('client-test', 'user-test', {
       terminalRuntimeSessionId: session.terminalRuntimeSessionId,
@@ -342,7 +340,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
         terminalRuntimeSessionId: null,
         terminalRuntimeGeneration: null,
       },
-      workspacePaneTabs,
     })
     expect(close).not.toHaveBeenCalled()
     expect(reconcileWorktree).toHaveBeenCalledOnce()

@@ -221,7 +221,22 @@ export function installWorkspacePaneTabsTestBridge(
     ) => WorkspacePaneTabsEntry[] | Promise<WorkspacePaneTabsEntry[]>
     onEffectIntent?: ClientBridge['onEffectIntent']
   } = {},
-): void {
+): {
+  addRuntimeTab: (input: {
+    repoRoot: string
+    repoRuntimeId: string
+    branchName: string
+    worktreePath: string | null
+    terminalSessionId: string
+  }) => void
+  removeRuntimeTab: (input: {
+    repoRoot: string
+    repoRuntimeId: string
+    branchName: string
+    worktreePath: string | null
+    terminalSessionId: string
+  }) => void
+} {
   let serverEntries: WorkspacePaneTabsEntry[] = []
   let serverRevision = 0
   const targetKey = (input: { repoRoot: string; branchName: string; worktreePath: string | null }) =>
@@ -402,7 +417,6 @@ export function installWorkspacePaneTabsTestBridge(
             canonicalCols: input.request.cols ?? 80,
             canonicalRows: input.request.rows ?? 24,
           },
-          workspacePaneTabs: commitServerSnapshot(),
         } as const
       },
       close: async (input) => {
@@ -423,11 +437,28 @@ export function installWorkspacePaneTabsTestBridge(
             terminalRuntimeSessionId: wasOpen ? 'pty_test_aaaaaaaaa' : null,
             terminalRuntimeGeneration: wasOpen ? 1 : null,
           },
-          workspacePaneTabs: commitServerSnapshot(),
         }
       },
     }),
   } satisfies ClientBridge)
+  return {
+    addRuntimeTab: (input) => {
+      replaceServerTarget(
+        input,
+        workspacePaneTabsWithRuntimeTab(serverTabsForTarget(input), 'terminal', input.terminalSessionId),
+      )
+      commitServerSnapshot()
+    },
+    removeRuntimeTab: (input) => {
+      replaceServerTarget(
+        input,
+        serverTabsForTarget(input).filter(
+          (tab) => tab.type !== 'terminal' || tab.runtimeSessionId !== input.terminalSessionId,
+        ),
+      )
+      commitServerSnapshot()
+    },
+  }
 }
 
 function defaultWorkspacePaneTabsOperationResult(
@@ -731,7 +762,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
               terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
               terminalRuntimeGeneration: 1,
             },
-            workspacePaneTabs: { revision: 1, entries: [] },
           }
         }
         case 'terminal.recoverSessions':

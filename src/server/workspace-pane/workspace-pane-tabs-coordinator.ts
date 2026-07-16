@@ -156,7 +156,10 @@ export class WorkspacePaneTabsCoordinator {
           ? current.entries.map((candidate) =>
               candidate.worktreePath === input.worktreePath ? { ...candidate, tabs } : candidate,
             )
-          : [...current.entries, { branchName: input.branchName, worktreePath: input.worktreePath, tabs }],
+          : [
+              ...current.entries,
+              { repoRoot: input.repoRoot, branchName: input.branchName, worktreePath: input.worktreePath, tabs },
+            ],
       }
       return {
         kind: 'committed',
