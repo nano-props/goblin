@@ -17,11 +17,13 @@ import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/bran
 import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
 import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
+import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { useWorkspacePaneRouteController } from '#/web/components/repo-workspace/workspace-pane-route-controller.ts'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
+import { refreshVisibleStatusCache } from '#/web/stores/repos/visible-status-refresh.ts'
 
 export type RepoWorkspacePaneRouteContext =
   { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null } | { kind: 'inactive' }
@@ -146,6 +148,24 @@ function RepoWorkspaceLoaded({
   const projection = projectionReadModel.data
   const statusReadModel = useRepoWorktreeStatusReadModel(repoShell.id, repoShell.repoRuntimeId, true)
   const statusSnapshot = statusReadModel.data
+  if (projection?.snapshot && !statusSnapshot && statusReadModel.isError) {
+    const message = statusReadModel.error instanceof Error ? statusReadModel.error.message : String(statusReadModel.error)
+    return (
+      <section className="flex min-h-0 flex-1 flex-col bg-background">
+        <RepoStatusFailureView
+          message={message}
+          retrying={statusReadModel.isFetching}
+          onRetry={() => {
+            void refreshVisibleStatusCache(
+              { get: useReposStore.getState, set: useReposStore.setState },
+              repoShell.id,
+              repoShell.repoRuntimeId,
+            )
+          }}
+        />
+      </section>
+    )
+  }
   const branchReadModel =
     projection?.snapshot && statusSnapshot
       ? repoBranchReadModelFromSnapshot(projection.snapshot, statusSnapshot.status)

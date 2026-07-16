@@ -4,7 +4,7 @@ import { appendRepoEvent, errorEvent } from '#/web/stores/repos/repo-state-facto
 import { updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import { persistRepoSnapshotCacheEntry } from '#/web/stores/repos/persistence.ts'
 import { applyRepoSnapshotShellState } from '#/web/stores/repos/refresh-state.ts'
-import { finishDataLoadError, finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
+import { finishDataLoadError } from '#/web/stores/repos/repo-data-load-state.ts'
 import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 
@@ -18,7 +18,6 @@ type AcceptRepoProjectionReadModelScope = 'query-cache' | 'repo-read-model'
 
 interface AcceptRepoProjectionReadModelOptions {
   scope: AcceptRepoProjectionReadModelScope
-  settleVisibleStatus?: boolean
 }
 
 interface CoreRepoProjectionAcceptanceSignature {
@@ -63,7 +62,9 @@ function sameCoreProjectionAcceptanceSignature(
   )
 }
 
-function markCoreProjectionAccepted(input: AcceptedRepoProjectionReadModel & { projection: RepoRuntimeProjection }): boolean {
+function markCoreProjectionAccepted(
+  input: AcceptedRepoProjectionReadModel & { projection: RepoRuntimeProjection },
+): boolean {
   const key = acceptedProjectionKey(input)
   const signature = coreProjectionAcceptanceSignature(input.projection)
   const previous = acceptedCoreRepoProjectionSignaturesByKey.get(key)
@@ -89,16 +90,8 @@ export function acceptRepoProjectionReadModel(
   if (!authoritativeProjection(projection)) return
   const coreProjection = projection.requested.branch === null && projection.requested.pullRequestMode === 'full'
   const acceptCoreReadModel = options.scope === 'repo-read-model' && coreProjection
-  const settleVisibleStatus =
-    options.settleVisibleStatus ?? acceptCoreReadModel
   const repoBefore = get().repos[repoRoot]
   if (!repoBefore || repoBefore.repoRuntimeId !== repoRuntimeId) return
-  if (settleVisibleStatus) {
-    updateIfFresh(set, repoRoot, repoRuntimeId, (repo) => {
-      if (projection.snapshot) finishDataLoadSuccess(repo.dataLoads.visibleStatus, projection.loadedAt)
-      else finishDataLoadError(repo.dataLoads.visibleStatus, 'error.failed-read-repo')
-    })
-  }
   if (!acceptCoreReadModel) return
   if (!markCoreProjectionAccepted({ repoRoot, repoRuntimeId, projection })) return
 

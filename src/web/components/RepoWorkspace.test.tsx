@@ -120,6 +120,44 @@ afterEach(() => {
 })
 
 describe('RepoWorkspace', () => {
+  test('shows a retryable error when the initial worktree status read fails', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main')],
+      currentBranchName: 'main',
+    })
+    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId) })
+    await expect(
+      primaryWindowQueryClient.fetchQuery({
+        queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId),
+        queryFn: async () => {
+          throw new Error('status failed')
+        },
+        retry: false,
+      }),
+    ).rejects.toThrow('status failed')
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName="main"
+                workspacePaneRouteContext={{ kind: 'routed', route: null }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText('error.failed-read-repo')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'error.try-again' })).toBeTruthy()
+    expect(screen.queryByTestId('repo-workspace-skeleton')).toBeNull()
+  })
+
   test('can render after the repo appears without changing hook order', () => {
     const { container } = render(
       <QueryClientProvider client={primaryWindowQueryClient}>

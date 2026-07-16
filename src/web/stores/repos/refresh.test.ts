@@ -508,13 +508,14 @@ describe('projection refresh request ordering', () => {
       loadedAt: 123,
     }
     ipcHandlers['repo.projection'] = async () => projection
-    ipcHandlers['repo.worktreeStatus'] = () => ({ repoRuntimeId, status, loadedAt: 123 })
+    ipcHandlers['repo.worktreeStatus'] = () => ({ repoRuntimeId, status, loadedAt: 456 })
 
     await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { repoRuntimeId })
 
     expect(primaryWindowQueryClient.getQueryData(repoProjectionQueryKey(REPO_ID, repoRuntimeId, null, 'full'))).toEqual(
       projection,
     )
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus.loadedAt).toBe(456)
   })
 
   test('projection read-model refresh drops stale results when the repo is reopened during a projection read', async () => {
@@ -556,6 +557,36 @@ describe('projection refresh request ordering', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.availability).toMatchObject({ phase: 'unavailable', reason: 'error.not-git-repo' })
     expect(repo?.dataLoads.repoReadModel.error).toBe('error.not-git-repo')
+  })
+
+  test('projection and status refreshes settle independently when projection fails', async () => {
+    const repoRuntimeId = seedRepo([branch('main')])
+    ipcHandlers['repo.projection'] = async () => {
+      throw new Error('projection failed')
+    }
+    ipcHandlers['repo.worktreeStatus'] = () => ({ repoRuntimeId, status: [], loadedAt: 456 })
+
+    await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { repoRuntimeId })
+
+    const repo = useReposStore.getState().repos[REPO_ID]!
+    expect(repo.dataLoads.repoReadModel).toMatchObject({ phase: 'idle', error: 'projection failed' })
+    expect(repo.dataLoads.visibleStatus).toMatchObject({ phase: 'idle', error: null, loadedAt: 456 })
+  })
+
+  test('projection and status refreshes settle independently when status fails', async () => {
+    const repoRuntimeId = seedRepo([branch('old')])
+    ipcHandlers['repo.projection'] = async () =>
+      repoProjection({ branches: [branch('main')], current: 'main' }, { loadedAt: 123 })
+    ipcHandlers['repo.worktreeStatus'] = async () => {
+      throw new Error('status failed')
+    }
+
+    await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { repoRuntimeId })
+
+    const repo = useReposStore.getState().repos[REPO_ID]!
+    expect(repo.dataLoads.repoReadModel).toMatchObject({ phase: 'idle', error: null, loadedAt: 123 })
+    expect(repo.dataLoads.visibleStatus).toMatchObject({ phase: 'idle', error: 'status failed' })
+    expect(cachedRepoProjection(repoRuntimeId)?.snapshot?.current).toBe('main')
   })
 
   test('repo read-model projection refresh restores an unavailable repo when the path is a git repo again', async () => {
@@ -754,9 +785,12 @@ describe('projection refresh request ordering', () => {
       repoRuntimeId,
       'feature/a',
       'full',
-      repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }, {
-        requested: { branch: 'feature/a', pullRequestMode: 'full' },
-      }),
+      repoProjection(
+        { branches: [branch('feature/a')], current: 'feature/a' },
+        {
+          requested: { branch: 'feature/a', pullRequestMode: 'full' },
+        },
+      ),
     )
     setRepoProjectionQueryData(
       REPO_ID,
@@ -767,9 +801,12 @@ describe('projection refresh request ordering', () => {
     )
     ipcHandlers['repo.projection'] = async (input) => {
       expect(input).toMatchObject({ cwd: REPO_ID, branch: 'feature/a', mode: 'full' })
-      return repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }, {
-        requested: { branch: 'feature/a', pullRequestMode: 'full' },
-      })
+      return repoProjection(
+        { branches: [branch('feature/a')], current: 'feature/a' },
+        {
+          requested: { branch: 'feature/a', pullRequestMode: 'full' },
+        },
+      )
     }
     ipcHandlers['repo.worktreeStatus'] = () => ({ repoRuntimeId, status: freshStatus, loadedAt: Date.now() })
 
@@ -797,9 +834,12 @@ describe('projection refresh request ordering', () => {
       repoRuntimeId,
       'feature/a',
       'full',
-      repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }, {
-        requested: { branch: 'feature/a', pullRequestMode: 'full' },
-      }),
+      repoProjection(
+        { branches: [branch('feature/a')], current: 'feature/a' },
+        {
+          requested: { branch: 'feature/a', pullRequestMode: 'full' },
+        },
+      ),
     )
     ipcHandlers['repo.worktreeStatus'] = () => ({ repoRuntimeId, status: freshStatus, loadedAt: Date.now() })
 
@@ -962,22 +1002,20 @@ describe('projection refresh request ordering', () => {
       },
     )
     ipcHandlers['repo.projection'] = async () =>
-      repoProjection(
-        {
-          branches: [
-            branch('feature/a', undefined, {
-              worktree: {
-                path: '/tmp/worktree-a',
-                summary: {
-                  dirty: true,
-                  changeCount: 4,
-                },
+      repoProjection({
+        branches: [
+          branch('feature/a', undefined, {
+            worktree: {
+              path: '/tmp/worktree-a',
+              summary: {
+                dirty: true,
+                changeCount: 4,
               },
-            }),
-          ],
-          current: 'feature/a',
-        },
-      )
+            },
+          }),
+        ],
+        current: 'feature/a',
+      })
 
     await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { repoRuntimeId })
 

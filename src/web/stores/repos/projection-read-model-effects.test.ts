@@ -44,11 +44,16 @@ describe('repo projection read-model effects', () => {
       currentBranch: 'feature/a',
     })
 
-    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
-      repoRoot: '/repo',
-      repoRuntimeId: repo.repoRuntimeId,
-      projection: acceptedProjection(),
-    }, { scope: 'repo-read-model' })
+    acceptRepoProjectionReadModel(
+      useReposStore.setState,
+      useReposStore.getState,
+      {
+        repoRoot: '/repo',
+        repoRuntimeId: repo.repoRuntimeId,
+        projection: acceptedProjection(),
+      },
+      { scope: 'repo-read-model' },
+    )
 
     expect(useReposStore.getState().repoSnapshotCache['/repo']).toMatchObject({
       data: {
@@ -76,11 +81,16 @@ describe('repo projection read-model effects', () => {
     })
 
     expect(() => {
-      acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
-        repoRoot: '/repo',
-        repoRuntimeId: repo.repoRuntimeId,
-        projection: acceptedProjection(),
-      }, { scope: 'repo-read-model' })
+      acceptRepoProjectionReadModel(
+        useReposStore.setState,
+        useReposStore.getState,
+        {
+          repoRoot: '/repo',
+          repoRuntimeId: repo.repoRuntimeId,
+          projection: acceptedProjection(),
+        },
+        { scope: 'repo-read-model' },
+      )
     }).not.toThrow()
   })
 
@@ -99,11 +109,16 @@ describe('repo projection read-model effects', () => {
       currentBranch: 'feature/a',
     })
 
-    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
-      repoRoot: '/repo',
-      repoRuntimeId: 'repo-runtime-stale',
-      projection: acceptedProjection(),
-    }, { scope: 'repo-read-model' })
+    acceptRepoProjectionReadModel(
+      useReposStore.setState,
+      useReposStore.getState,
+      {
+        repoRoot: '/repo',
+        repoRuntimeId: 'repo-runtime-stale',
+        projection: acceptedProjection(),
+      },
+      { scope: 'repo-read-model' },
+    )
 
     expect(pruneTerminals).not.toHaveBeenCalled()
     expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
@@ -135,18 +150,28 @@ describe('repo projection read-model effects', () => {
     }
 
     setRepoProjectionQueryData('/repo', repo.repoRuntimeId, null, 'full', firstProjection)
-    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
-      repoRoot: '/repo',
-      repoRuntimeId: repo.repoRuntimeId,
-      projection: firstProjection,
-    }, { scope: 'repo-read-model' })
+    acceptRepoProjectionReadModel(
+      useReposStore.setState,
+      useReposStore.getState,
+      {
+        repoRoot: '/repo',
+        repoRuntimeId: repo.repoRuntimeId,
+        projection: firstProjection,
+      },
+      { scope: 'repo-read-model' },
+    )
 
     setRepoProjectionQueryData('/repo', repo.repoRuntimeId, null, 'full', secondProjection)
-    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
-      repoRoot: '/repo',
-      repoRuntimeId: repo.repoRuntimeId,
-      projection: secondProjection,
-    }, { scope: 'repo-read-model' })
+    acceptRepoProjectionReadModel(
+      useReposStore.setState,
+      useReposStore.getState,
+      {
+        repoRoot: '/repo',
+        repoRuntimeId: repo.repoRuntimeId,
+        projection: secondProjection,
+      },
+      { scope: 'repo-read-model' },
+    )
 
     expect(useReposStore.getState().repoSnapshotCache['/repo']).toMatchObject({
       data: {
@@ -156,7 +181,7 @@ describe('repo projection read-model effects', () => {
     })
   })
 
-  test('branch-scoped query-cache acceptance does not settle the visible status load', () => {
+  test('projection acceptance does not settle the independently owned visible status load', () => {
     const repo = seedRepoShellForTest({
       id: '/repo',
       repoRuntimeId: 'repo-runtime-test-2',
@@ -176,59 +201,19 @@ describe('repo projection read-model effects', () => {
           },
         },
       }
-    })
-    const projection = acceptedProjection('feature/a')
-
-    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
-      repoRoot: '/repo',
-      repoRuntimeId: repo.repoRuntimeId,
-      projection,
-    }, { scope: 'query-cache' })
-
-    expect(useReposStore.getState().repos['/repo']?.dataLoads.visibleStatus).toMatchObject({
-      phase: 'loading',
-      loadedAt: null,
-    })
-
-  })
-
-  test('duplicate core projection acceptance from operations-only rewrites does not settle visible status', () => {
-    const repo = seedRepoShellForTest({
-      id: '/repo',
-      repoRuntimeId: 'repo-runtime-test-2',
-      currentBranchName: 'feature/a',
     })
     const projection = acceptedProjection()
 
-    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
-      repoRoot: '/repo',
-      repoRuntimeId: repo.repoRuntimeId,
-      projection,
-    }, { scope: 'repo-read-model' })
-    useReposStore.setState((state) => {
-      const current = state.repos['/repo']!
-      return {
-        repos: {
-          ...state.repos,
-          '/repo': {
-            ...current,
-            dataLoads: {
-              ...current.dataLoads,
-              visibleStatus: { phase: 'loading', loadedAt: null, error: null, stale: false },
-            },
-          },
-        },
-      }
-    })
-
-    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
-      repoRoot: '/repo',
-      repoRuntimeId: repo.repoRuntimeId,
-      projection: {
-        ...projection,
-        operations: { operations: [], loadedAt: projection.operations.loadedAt + 1 },
+    acceptRepoProjectionReadModel(
+      useReposStore.setState,
+      useReposStore.getState,
+      {
+        repoRoot: '/repo',
+        repoRuntimeId: repo.repoRuntimeId,
+        projection,
       },
-    }, { scope: 'query-cache' })
+      { scope: 'repo-read-model' },
+    )
 
     expect(useReposStore.getState().repos['/repo']?.dataLoads.visibleStatus).toMatchObject({
       phase: 'loading',
@@ -262,11 +247,16 @@ describe('repo projection read-model effects', () => {
       }
     })
 
-    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
-      repoRoot: '/repo',
-      repoRuntimeId: repo.repoRuntimeId,
-      projection: acceptedProjection(null, 'summary'),
-    }, { scope: 'query-cache' })
+    acceptRepoProjectionReadModel(
+      useReposStore.setState,
+      useReposStore.getState,
+      {
+        repoRoot: '/repo',
+        repoRuntimeId: repo.repoRuntimeId,
+        projection: acceptedProjection(null, 'summary'),
+      },
+      { scope: 'query-cache' },
+    )
 
     expect(useReposStore.getState().repos['/repo']?.dataLoads.repoReadModel).toMatchObject({
       phase: 'loading',

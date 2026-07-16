@@ -23,6 +23,8 @@ import { repoBranchReadModelFromSnapshot, type RepoBranchReadModelData } from '#
 import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
 import type { PullRequestEntry } from '#/shared/api-types.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
+import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
+import { refreshVisibleStatusCache } from '#/web/stores/repos/visible-status-refresh.ts'
 
 type DashboardTone = 'default' | 'attention' | 'success'
 
@@ -94,6 +96,8 @@ export function RepoDashboardPane({
     [branchModel, pullRequestEntries],
   )
   const hasAttentionBranches = !!summary?.attentionBranches.length
+  const statusError = statusReadModel.error
+  const statusErrorMessage = statusError instanceof Error ? statusError.message : String(statusError)
 
   return (
     <RepoPagePane
@@ -105,7 +109,19 @@ export function RepoDashboardPane({
     >
       <ScrollArea className="min-h-0 flex-1 bg-background">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-5">
-          {repo && branchModel && summary ? (
+          {repo && projection?.snapshot && !statusReadModel.data && statusReadModel.isError ? (
+            <RepoStatusFailureView
+              message={statusErrorMessage}
+              retrying={statusReadModel.isFetching}
+              onRetry={() => {
+                void refreshVisibleStatusCache(
+                  { get: useReposStore.getState, set: useReposStore.setState },
+                  repo.id,
+                  repo.repoRuntimeId,
+                )
+              }}
+            />
+          ) : repo && branchModel && summary ? (
             <>
               <DashboardHeader repo={repo} currentBranch={branchModel.currentBranch} lang={lang} />
               <DashboardStats compact={compact} summary={summary} />
