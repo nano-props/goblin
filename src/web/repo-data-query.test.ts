@@ -838,7 +838,11 @@ describe('repo worktree status query data', () => {
 
     await expect(
       refreshRepoWorktreeStatusReadModel('/tmp/repo', 'repo-runtime-current', { queryClient }),
-    ).rejects.toThrow('Mismatched repo runtime read')
+    ).rejects.toMatchObject({
+      name: 'MismatchedRepoRuntimeReadError',
+      message: 'error.failed-read-repo',
+      cause: expect.objectContaining({ message: 'Mismatched repo runtime read' }),
+    })
     expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce()
     expect(getRepoWorktreeStatusQueryData('/tmp/repo', 'repo-runtime-current', queryClient)).toBeUndefined()
   })

@@ -215,6 +215,21 @@ describe('repo-client', () => {
     )
   })
 
+  test('maps worktree status transport failures to a stable display key while preserving the cause', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    mockFetch(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' }),
+    }))
+    const { getRepoWorktreeStatus } = await import('#/web/repo-client.ts')
+
+    await expect(getRepoWorktreeStatus('/tmp/repo', repoRuntimeId)).rejects.toMatchObject({
+      message: 'error.failed-read-repo',
+      cause: expect.objectContaining({ message: 'Server request failed (BAD_REQUEST: error.failed-read-repo)' }),
+    })
+  })
+
   test('times out long-running fetch requests with a stable error key', async () => {
     vi.useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))

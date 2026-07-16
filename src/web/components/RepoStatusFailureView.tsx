@@ -13,6 +13,7 @@ export function RepoStatusFailureView({
   onRetry: () => void
 }) {
   const t = useT()
+  const showDetail = messageKey !== 'error.failed-read-repo'
   return (
     <div role="alert" className="flex min-h-0 flex-1">
       <EmptyState
@@ -20,7 +21,7 @@ export function RepoStatusFailureView({
         title={t('error.failed-read-repo')}
         body={
           <div className="space-y-3">
-            <div className="break-words">{t(messageKey)}</div>
+            {showDetail && <div className="break-words">{t(messageKey)}</div>}
             <Button type="button" variant="default" disabled={retrying} onClick={onRetry}>
               <RefreshCw className={retrying ? 'animate-spin' : undefined} />
               {t('error.try-again')}

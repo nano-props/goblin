@@ -586,7 +586,10 @@ describe('projection refresh request ordering', () => {
     const repo = useReposStore.getState().repos[REPO_ID]!
     expect(repo.dataLoads.repoReadModel).toMatchObject({ phase: 'idle', error: null, loadedAt: 123 })
     expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repoRuntimeId))?.error).toEqual(
-      expect.objectContaining({ message: 'status failed' }),
+      expect.objectContaining({
+        message: 'error.failed-read-repo',
+        cause: expect.objectContaining({ message: 'status failed' }),
+      }),
     )
     expect(cachedRepoProjection(repoRuntimeId)?.snapshot?.current).toBe('main')
   })
@@ -617,7 +620,12 @@ describe('projection refresh request ordering', () => {
         await vi.waitFor(() => {
           expect(
             primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repoRuntimeId))?.error,
-          ).toEqual(expect.objectContaining({ message: 'error.path-not-found' }))
+          ).toEqual(
+            expect.objectContaining({
+              message: 'error.failed-read-repo',
+              cause: expect.objectContaining({ message: 'error.path-not-found' }),
+            }),
+          )
         })
         resolveProjection(repoProjection({ branches: [branch('main')], current: 'main' }))
       } else {
@@ -631,7 +639,10 @@ describe('projection refresh request ordering', () => {
 
       expect(useReposStore.getState().repos[REPO_ID]?.availability).toEqual({ phase: 'available' })
       expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repoRuntimeId))?.error).toEqual(
-        expect.objectContaining({ message: 'error.path-not-found' }),
+        expect.objectContaining({
+          message: 'error.failed-read-repo',
+          cause: expect.objectContaining({ message: 'error.path-not-found' }),
+        }),
       )
     },
   )
@@ -646,7 +657,10 @@ describe('projection refresh request ordering', () => {
 
     expect(useReposStore.getState().repos[REPO_ID]?.availability).toEqual({ phase: 'available' })
     expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repoRuntimeId))?.error).toEqual(
-      expect.objectContaining({ message: 'error.not-git-repo' }),
+      expect.objectContaining({
+        message: 'error.failed-read-repo',
+        cause: expect.objectContaining({ message: 'error.not-git-repo' }),
+      }),
     )
   })
 
@@ -1153,7 +1167,10 @@ describe('projection refresh request ordering', () => {
 
     expect(getRepoWorktreeStatusQueryData(REPO_ID, repoRuntimeId)?.loadedAt).toBe(loadedAt)
     expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repoRuntimeId))?.error).toEqual(
-      expect.objectContaining({ message: 'status failed' }),
+      expect.objectContaining({
+        message: 'error.failed-read-repo',
+        cause: expect.objectContaining({ message: 'status failed' }),
+      }),
     )
   })
 

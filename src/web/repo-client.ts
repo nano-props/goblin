@@ -27,6 +27,16 @@ const REPO_REQUEST_TIMEOUT_MS = {
   patch: 15 * 60_000,
 } as const
 
+async function runRepoReadWithStableErrorKey<T>(read: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+  try {
+    return await read()
+  } catch (err) {
+    if (signal?.aborted) throw err
+    if (err instanceof Error && err.message === SERVER_REQUEST_TIMEOUT_ERROR) throw err
+    throw new Error('error.failed-read-repo', { cause: err })
+  }
+}
+
 export async function probeRepo(cwd: string, signal?: AbortSignal): Promise<ProbeResult> {
   return await postServerJson('/api/repo/probe', { cwd }, { signal })
 }
@@ -95,7 +105,10 @@ export async function getRepoWorktreeStatus(
   repoRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<RepoWorktreeStatusSnapshot> {
-  return await postServerJson('/api/repo/worktree-status', { cwd, repoRuntimeId }, { signal })
+  return await runRepoReadWithStableErrorKey(
+    async () => await postServerJson('/api/repo/worktree-status', { cwd, repoRuntimeId }, { signal }),
+    signal,
+  )
 }
 
 export async function getRepoOperations(

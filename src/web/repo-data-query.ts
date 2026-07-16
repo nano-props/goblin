@@ -25,7 +25,7 @@ class StaleRepoRuntimeReadError extends Error {
 
 class MismatchedRepoRuntimeReadError extends Error {
   constructor() {
-    super('Mismatched repo runtime read')
+    super('error.failed-read-repo', { cause: new Error('Mismatched repo runtime read') })
     this.name = 'MismatchedRepoRuntimeReadError'
   }
 }
