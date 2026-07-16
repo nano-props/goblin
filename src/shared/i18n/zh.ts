@@ -240,6 +240,8 @@ export const zh: Record<DictKey, string> = {
   'tab.fetch-failed-title': '最近一次后台 fetch 失败 — 请检查网络或远程仓库。',
   // ---- Branches list -----------------------------------------------------
   'branches.empty': '该仓库暂无分支。',
+  'branches.missing': '找不到此分支。',
+  'branches.back-to-list': '返回分支列表',
   'branches.filter-empty': '没有匹配当前筛选的分支。',
   'branches.filter-label': '筛选分支',
   'branches.selected': '选中的分支',

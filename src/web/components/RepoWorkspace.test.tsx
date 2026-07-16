@@ -54,6 +54,11 @@ import {
   seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 
+const responsiveMocks = vi.hoisted(() => ({ compact: false }))
+vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
+  useIsCompactUi: () => responsiveMocks.compact,
+}))
+
 const REPO_ID = '/tmp/repo-workspace-container-repo'
 const presentationOptions = (options: { replace?: boolean } = {}) =>
   expect.objectContaining({ ...options, presentationToken: expect.any(Object) })
@@ -107,6 +112,7 @@ const navigation: PrimaryWindowNavigationActions = {
 let workspacePaneTabsTestBridge: ReturnType<typeof installWorkspacePaneTabsTestBridge>
 
 beforeEach(() => {
+  responsiveMocks.compact = false
   resetWorkspacePaneActionQueueForTest()
   primaryWindowQueryClient.clear()
   resetReposStore()
@@ -120,6 +126,36 @@ afterEach(() => {
 })
 
 describe('RepoWorkspace', () => {
+  test('forwards compact missing-branch recovery to the workspace navigation callback', () => {
+    responsiveMocks.compact = true
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [],
+      currentBranchName: null,
+    })
+    const onBackToBranchNavigator = vi.fn()
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName="feature/removed"
+                workspacePaneRouteContext={{ kind: 'routed', route: null }}
+                onBackToBranchNavigator={onBackToBranchNavigator}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    screen.getByRole('button', { name: 'branches.back-to-list' }).click()
+    expect(onBackToBranchNavigator).toHaveBeenCalledOnce()
+  })
+
   test('shows a retryable error when the initial worktree status read fails', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,

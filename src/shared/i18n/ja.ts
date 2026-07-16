@@ -255,6 +255,8 @@ export const ja: Record<DictKey, string> = {
   'tab.fetch-failed-title': '直近のバックグラウンド fetch が失敗しました — ネットワークやリモートを確認してください。',
   // ---- Branches list -----------------------------------------------------
   'branches.empty': 'このリポジトリにブランチがありません。',
+  'branches.missing': 'このブランチが見つかりません。',
+  'branches.back-to-list': 'ブランチ一覧に戻る',
   'branches.filter-empty': '現在のフィルターに一致するブランチはありません。',
   'branches.filter-label': 'ブランチをフィルター',
   'branches.selected': '選択中のブランチ',

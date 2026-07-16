@@ -73,6 +73,10 @@ const filetreeClientMocks = vi.hoisted(() => ({
   getRepositoryTree: vi.fn(),
   getRepositoryFileViewer: vi.fn(),
 }))
+const responsiveMocks = vi.hoisted(() => ({ compact: false }))
+vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
+  useIsCompactUi: () => responsiveMocks.compact,
+}))
 vi.mock('#/web/repo-client.ts', () => ({
   getRepoLog: repoClientMocks.getRepoLog,
   openRepoUrl: repoClientMocks.openRepoUrl,
@@ -161,6 +165,7 @@ function preferenceBackedWorkspacePaneTabModel(repoId: string, branchName: strin
 }
 
 beforeEach(() => {
+  responsiveMocks.compact = false
   primaryWindowQueryClient.clear()
   resetReposStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
@@ -201,6 +206,45 @@ describe('RepoWorkspaceContent', () => {
       onSelect: () => false,
     })
   }
+
+  test('offers a compact return to the branch list when the last routed branch no longer exists', () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [],
+      currentBranchName: null,
+    })
+    const existingPresentationRepo = repoWorkspaceRepo(repo)
+    const presentationRepo = {
+      ...existingPresentationRepo,
+      ui: { ...existingPresentationRepo.ui, currentBranchName: 'feature/removed' },
+    }
+    const detail = getTestRepoWorkspacePresentation(presentationRepo)
+    const onBackToBranchNavigator = vi.fn()
+
+    const renderMissingBranch = () =>
+      renderInJsdom(
+        <TerminalSessionReadContext value={emptyTerminalReadContext}>
+          <RepoWorkspaceContentHarness
+            repo={presentationRepo}
+            detail={detail}
+            workspacePaneId="workspace"
+            onBackToBranchNavigator={onBackToBranchNavigator}
+          />
+        </TerminalSessionReadContext>,
+      )
+
+    const desktop = renderMissingBranch()
+    expect(screen.queryByRole('button', { name: 'branches.back-to-list' })).toBeNull()
+    desktop.unmount()
+
+    responsiveMocks.compact = true
+    renderMissingBranch()
+
+    expect(document.body.textContent).toContain('branches.missing')
+    expect(document.body.textContent).not.toContain('branches.filter-empty')
+    screen.getByRole('button', { name: 'branches.back-to-list' }).click()
+    expect(onBackToBranchNavigator).toHaveBeenCalledOnce()
+  })
 
   test('renders the changes row with the copy patch action in the status tab when the worktree is dirty', () => {
     const onCopyPatch = vi.fn()

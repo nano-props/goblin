@@ -248,6 +248,8 @@ export const ko: Record<DictKey, string> = {
   'tab.fetch-failed-title': '최근 백그라운드 fetch 가 실패했습니다 — 네트워크 또는 원격 저장소를 확인하세요.',
   // ---- Branches list -----------------------------------------------------
   'branches.empty': '이 리포지토리에 브랜치가 없습니다.',
+  'branches.missing': '이 브랜치를 찾을 수 없습니다.',
+  'branches.back-to-list': '브랜치 목록으로 돌아가기',
   'branches.filter-empty': '현재 필터와 일치하는 브랜치가 없습니다.',
   'branches.filter-label': '브랜치 필터',
   'branches.selected': '선택한 브랜치',

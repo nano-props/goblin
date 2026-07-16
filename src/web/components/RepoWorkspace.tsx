@@ -280,6 +280,7 @@ function RepoWorkspacePane({
         detail={detail}
         workspacePaneId={workspacePaneId}
         workspacePaneTabModel={workspacePaneTabModel}
+        onBackToBranchNavigator={onBackToBranchNavigator}
         onRetryStatus={() => {
           void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repo.id, repo.repoRuntimeId)
         }}

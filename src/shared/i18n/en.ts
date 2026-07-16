@@ -257,6 +257,8 @@ export const en = {
   'tab.fetch-failed-title': 'Most recent background fetch failed — check network or remote.',
   // ---- Branches list ------------------------------------------------------
   'branches.empty': 'No branches found in this repository.',
+  'branches.missing': 'This branch could not be found.',
+  'branches.back-to-list': 'Back to branch list',
   'branches.filter-empty': 'No branches match the current filter.',
   'branches.filter-label': 'Filter branches',
   'branches.selected': 'Selected branch',

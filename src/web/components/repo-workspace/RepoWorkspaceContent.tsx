@@ -15,6 +15,7 @@ import {
 } from '#/web/workspace-pane/tab-providers.ts'
 import { renderRepoWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
 import { RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
+import { Button } from '#/web/components/ui/button.tsx'
 
 interface Props {
   repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'branchModel' | 'ui'>
@@ -22,6 +23,7 @@ interface Props {
   workspacePaneId: string
   workspacePaneTabModel: RepoWorkspaceTabModel
   onRetryStatus?: () => void
+  onBackToBranchNavigator?: () => void
 }
 
 // Pure view: the workspace pane body is derived from the repos store's
@@ -29,7 +31,14 @@ interface Props {
 // never re-projects on snapshot refresh, branch switch, or session restore.
 // The tab model keeps the body render target separate from the active
 // materialized tab.
-export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspacePaneTabModel, onRetryStatus }: Props) {
+export function RepoWorkspaceContent({
+  repo,
+  detail,
+  workspacePaneId,
+  workspacePaneTabModel,
+  onRetryStatus,
+  onBackToBranchNavigator,
+}: Props) {
   const t = useT()
   const compact = useIsCompactUi()
   const { branch } = detail
@@ -43,8 +52,21 @@ export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspaceP
     t,
     runtimeTabStateByType: workspacePaneTabModel.runtimeTabStateByType,
   })
-  const noBranchTitleKey = repo.branchModel.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty'
-  if (!branch) return <EmptyState title={t(noBranchTitleKey)} />
+  if (!branch) {
+    const missingRoutedBranch = repo.ui.currentBranchName !== null
+    return (
+      <EmptyState
+        title={t(missingRoutedBranch ? 'branches.missing' : 'branches.empty')}
+        body={
+          compact && missingRoutedBranch && onBackToBranchNavigator ? (
+            <Button type="button" variant="outline" size="sm" onClick={onBackToBranchNavigator}>
+              {t('branches.back-to-list')}
+            </Button>
+          ) : undefined
+        }
+      />
+    )
+  }
 
   if (!selection) {
     return (
