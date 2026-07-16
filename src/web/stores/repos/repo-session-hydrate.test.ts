@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { localRepoSessionEntry, normalizeRemoteTarget, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
+import { localWorkspaceSessionEntry, normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
@@ -34,7 +34,7 @@ describe('repo session hydration', () => {
       {
         repos: [
           {
-            entry: localRepoSessionEntry(REPO_A),
+            entry: localWorkspaceSessionEntry(REPO_A),
             repoRoot: REPO_A,
             repoRuntimeId: 'repo-runtime-server-a',
             name: 'server-a',
@@ -94,7 +94,7 @@ describe('repo session hydration', () => {
     const runtime: WorkspaceRuntimeRestoreSnapshot = {
       repos: [
         {
-          entry: localRepoSessionEntry(REPO_A),
+          entry: localWorkspaceSessionEntry(REPO_A),
           repoRoot: REPO_A,
           repoRuntimeId: 'repo-runtime-server-a',
           name: 'server-a',
@@ -118,7 +118,7 @@ describe('repo session hydration', () => {
     const repo = useReposStore.getState().repos[REPO_A]
     expect(repo?.repoRuntimeId).toBe('repo-runtime-server-a')
     expect(repo?.session).toEqual({
-      entry: localRepoSessionEntry(REPO_A),
+      entry: localWorkspaceSessionEntry(REPO_A),
       projectionState: 'projected',
     })
     expect(useReposStore.getState().order).toEqual([REPO_A])
@@ -167,7 +167,7 @@ describe('repo session hydration', () => {
     await useReposStore.getState().hydrateRestoredWorkspaceRuntime({
       repos: [
         {
-          entry: localRepoSessionEntry(REPO_A),
+          entry: localWorkspaceSessionEntry(REPO_A),
           repoRoot: REPO_A,
           repoRuntimeId: 'repo-runtime-server-a',
           name: 'server-a',
@@ -180,7 +180,7 @@ describe('repo session hydration', () => {
 
     const repo = useReposStore.getState().repos[REPO_A]
     expect(repo?.session).toEqual({
-      entry: localRepoSessionEntry(REPO_A),
+      entry: localWorkspaceSessionEntry(REPO_A),
       projectionState: 'stub',
     })
     expect(repo?.dataLoads.repoReadModel.loadedAt).toBe(savedAt)
@@ -190,7 +190,7 @@ describe('repo session hydration', () => {
     await useReposStore.getState().hydrateRestoredWorkspaceRuntime({
       repos: [
         {
-          entry: localRepoSessionEntry(REPO_A),
+          entry: localWorkspaceSessionEntry(REPO_A),
           repoRoot: REPO_A,
           repoRuntimeId: 'repo-runtime-server-a',
           name: 'server-a',
@@ -211,7 +211,7 @@ describe('repo session hydration', () => {
     expect(
       useReposStore.getState().promoteRestoredWorkspaceRepo({
         repo: {
-          entry: localRepoSessionEntry(REPO_A),
+          entry: localWorkspaceSessionEntry(REPO_A),
           repoRoot: REPO_A,
           repoRuntimeId: 'repo-runtime-server-a',
           name: 'server-a',
@@ -242,7 +242,7 @@ describe('repo session hydration', () => {
       {
         repos: [
           {
-            entry: localRepoSessionEntry(REPO_A),
+            entry: localWorkspaceSessionEntry(REPO_A),
             repoRoot: REPO_A,
             repoRuntimeId: 'repo-runtime-server-a',
             name: 'server-a',
@@ -262,7 +262,7 @@ describe('repo session hydration', () => {
 
     useReposStore.getState().promoteRestoredWorkspaceRepo({
       repo: {
-        entry: localRepoSessionEntry(REPO_A),
+        entry: localWorkspaceSessionEntry(REPO_A),
         repoRoot: REPO_A,
         repoRuntimeId: 'repo-runtime-server-a',
         name: 'server-a',
@@ -299,7 +299,7 @@ describe('repo session hydration', () => {
     await useReposStore.getState().hydrateRestoredWorkspaceRuntime({
       repos: [
         {
-          entry: localRepoSessionEntry(REPO_A),
+          entry: localWorkspaceSessionEntry(REPO_A),
           repoRoot: REPO_A,
           repoRuntimeId: 'repo-runtime-old',
           name: 'server-a',
@@ -311,7 +311,7 @@ describe('repo session hydration', () => {
     })
     const result = {
       repo: {
-        entry: localRepoSessionEntry(REPO_A),
+        entry: localWorkspaceSessionEntry(REPO_A),
         repoRoot: REPO_A,
         repoRuntimeId: 'repo-runtime-old',
         name: 'server-a',
@@ -349,7 +349,7 @@ describe('repo session hydration', () => {
       port: 22,
       remotePath: '/repo',
     })!
-    const entry = remoteRepoSessionEntry(target)
+    const entry = remoteWorkspaceSessionEntry(target)
     const repoRuntimeId = 'repo-runtime-remote'
     await useReposStore.getState().hydrateRestoredWorkspaceRuntime({
       repos: [

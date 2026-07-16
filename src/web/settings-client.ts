@@ -10,7 +10,7 @@ import type {
   LanInfo,
   RepoSettingsState,
   RepoWorkspaceTabsRestoreResult,
-  RuntimeRecentReposState,
+  RuntimeRecentWorkspacesState,
   WorkspaceRestoreResult,
   UserSettings,
   UserSettingsUpdateResponse,
@@ -19,14 +19,14 @@ import type {
   ThemeState,
 } from '#/shared/api-types.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import {
   nativeSettingsProjectionStateFromSettings,
   pickNativeSettingsProjectionPatch,
 } from '#/shared/native-host-projection.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 
-type RecentReposUpdateResponse = { ok: boolean; addedRepo?: RepoSessionEntry | null } & RuntimeRecentReposState
+type RecentWorkspacesUpdateResponse = { ok: boolean; addedRepo?: WorkspaceSessionEntry | null } & RuntimeRecentWorkspacesState
 
 export async function getSettingsSnapshot(options?: { signal?: AbortSignal }): Promise<SettingsSnapshot> {
   return await fetchServerJson<SettingsSnapshot>('/api/settings', { signal: options?.signal })
@@ -113,23 +113,23 @@ export async function refreshExternalAppsSnapshot(): Promise<ExternalAppsSnapsho
   return await postServerJson('/api/settings/external-apps/refresh', {})
 }
 
-export async function addRecentRepo(repo: RepoSessionEntry): Promise<RecentReposUpdateResponse> {
-  const result = await postServerJson<{ repo: RepoSessionEntry }, RecentReposUpdateResponse>(
-    '/api/settings/recent-repos/add',
+export async function addRecentWorkspace(repo: WorkspaceSessionEntry): Promise<RecentWorkspacesUpdateResponse> {
+  const result = await postServerJson<{ repo: WorkspaceSessionEntry }, RecentWorkspacesUpdateResponse>(
+    '/api/settings/recent-workspaces/add',
     { repo },
   )
   if (!canUseNativeIpcBridge()) return result
   await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
-    recentRepos: { recentRepos: result.recentRepos },
+    recentWorkspaces: { recentWorkspaces: result.recentWorkspaces },
   })
   return result
 }
 
-export async function clearRecentRepos(): Promise<void> {
-  await postServerJson<{}, { ok: boolean }>('/api/settings/recent-repos/clear', {})
+export async function clearRecentWorkspaces(): Promise<void> {
+  await postServerJson<{}, { ok: boolean }>('/api/settings/recent-workspaces/clear', {})
   if (!canUseNativeIpcBridge()) return
   await invokeNativeIpcPath<void>('settings.applyNativeHostProjection', {
-    recentRepos: { recentRepos: [] },
+    recentWorkspaces: { recentWorkspaces: [] },
   })
 }
 
@@ -164,7 +164,7 @@ export async function restoreServerWorkspace(
   )
 }
 
-export async function addWorkspaceRepo(entry: RepoSessionEntry): Promise<void> {
+export async function addWorkspaceRepo(entry: WorkspaceSessionEntry): Promise<void> {
   await postServerJson('/api/settings/workspace/repos/add', { entry })
 }
 

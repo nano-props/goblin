@@ -1,7 +1,7 @@
 import * as v from 'valibot'
 import { COLOR_THEMES } from '#/shared/color-theme.ts'
-import { RepoSessionEntrySchema } from '#/shared/remote-repo-schema.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { WorkspaceSessionEntrySchema } from '#/shared/remote-repo-schema.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { UserSettings } from '#/shared/settings.ts'
 
 export const LANG_PREF_VALUES = ['auto', 'en', 'zh', 'ko', 'ja'] as const
@@ -24,8 +24,8 @@ export interface NativeSettingsProjectionState {
   globalShortcut: UserSettings['globalShortcut']
 }
 
-export interface NativeRecentReposProjection {
-  recentRepos: RepoSessionEntry[]
+export interface NativeRecentWorkspacesProjection {
+  recentWorkspaces: WorkspaceSessionEntry[]
 }
 
 export interface NativeHostProjection {
@@ -33,7 +33,7 @@ export interface NativeHostProjection {
     patch: NativeSettingsProjectionPatch
     settings: NativeSettingsProjectionState
   }
-  recentRepos?: NativeRecentReposProjection
+  recentWorkspaces?: NativeRecentWorkspacesProjection
 }
 
 export const NATIVE_SETTINGS_PROJECTION_KEYS = [
@@ -61,8 +61,8 @@ export const NativeSettingsProjectionStateSchema = v.object({
   globalShortcut: v.string(),
 })
 
-export const NativeRecentReposProjectionSchema = v.object({
-  recentRepos: v.array(RepoSessionEntrySchema),
+export const NativeRecentWorkspacesProjectionSchema = v.object({
+  recentWorkspaces: v.array(WorkspaceSessionEntrySchema),
 })
 
 export const NativeHostProjectionSchema = v.pipe(
@@ -73,10 +73,10 @@ export const NativeHostProjectionSchema = v.pipe(
         settings: NativeSettingsProjectionStateSchema,
       }),
     ),
-    recentRepos: v.optional(NativeRecentReposProjectionSchema),
+    recentWorkspaces: v.optional(NativeRecentWorkspacesProjectionSchema),
   }),
   v.check(
-    (input) => input.prefs !== undefined || input.recentRepos !== undefined,
+    (input) => input.prefs !== undefined || input.recentWorkspaces !== undefined,
     'Missing native host projection payload',
   ),
 )

@@ -321,7 +321,7 @@ async function probeGitRepo(cwd: string): Promise<ProbeAvailability> {
   if (ok) return { ok: true }
   const readable = await probeReadableDirectory(cwd)
   if (!readable.ok) return readable
-  return { ok: false, message: 'error.not-git-repo' }
+  return { ok: false, message: 'error.workspace-git-unavailable' }
 }
 
 function createLocalRepoSource(
@@ -394,7 +394,7 @@ function createLocalRepoSource(
       const readable = await probeReadableDirectory(repoId)
       if (!readable.ok) return readable
       const ok = await isGitRepo(repoId)
-      if (!ok) return { ok: false, message: 'error.not-git-repo' }
+      if (!ok) return { ok: false, message: 'error.workspace-git-unavailable' }
       const root = await getRepoRoot(repoId)
       if (!root) return { ok: false, message: 'error.failed-read-repo' }
       const name = await getRepoName(repoId)

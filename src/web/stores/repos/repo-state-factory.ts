@@ -1,5 +1,5 @@
 import { produce, type Draft } from 'immer'
-import { isRemoteRepoId, localRepoSessionEntry } from '#/shared/remote-repo.ts'
+import { isRemoteRepoId, localWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { emptyRepoOperations } from '#/web/stores/repos/operations.ts'
 import { emptyRepoDataLoadBundle } from '#/web/stores/repos/repo-data-load-state.ts'
 import type { ExecResult } from '#/web/types.ts'
@@ -28,7 +28,7 @@ export function emptyRepo(id: string, name: string, repoRuntimeId: string): Repo
       savedAt: null,
     },
     session: {
-      entry: isRemoteRepoId(id) ? null : localRepoSessionEntry(id),
+      entry: isRemoteRepoId(id) ? null : localWorkspaceSessionEntry(id),
       projectionState: 'projected',
     },
     remote: {

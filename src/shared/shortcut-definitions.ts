@@ -11,10 +11,10 @@ export type ClientMenuCommandId =
   | 'app-settings'
   | 'file-new-terminal-tab'
   | 'file-create-worktree'
-  | 'file-open-local-repo'
-  | 'file-open-local-repo-path'
+  | 'file-open-local-workspace'
+  | 'file-open-local-workspace-path'
   | 'file-clone-repo'
-  | 'file-open-remote-repo'
+  | 'file-open-remote-workspace'
   | 'file-close-workspace-tab-or-window'
   | 'file-close-tab'
   | 'file-settings'
@@ -126,15 +126,15 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
     },
   ),
   clientMenuCommand(
-    'file-open-local-repo',
-    'menu.file.open-local-repo',
+    'file-open-local-workspace',
+    'menu.file.open-local-workspace',
     { type: 'open-repo-requested' },
     {
-      helpLabelKey: 'help.row.open-local-repo',
+      helpLabelKey: 'help.row.open-local-workspace',
       accelerator: 'CmdOrCtrl+O',
     },
   ),
-  clientMenuCommand('file-open-local-repo-path', 'menu.file.open-local-repo-path', {
+  clientMenuCommand('file-open-local-workspace-path', 'menu.file.open-local-workspace-path', {
     type: 'open-repo-path-requested',
   }),
   clientMenuCommand(
@@ -147,9 +147,9 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
     },
   ),
   clientMenuCommand(
-    'file-open-remote-repo',
-    'menu.file.open-remote-repo',
-    { type: 'open-remote-repo-requested' },
+    'file-open-remote-workspace',
+    'menu.file.open-remote-workspace',
+    { type: 'open-remote-workspace-requested' },
     {
       accelerator: 'CmdOrCtrl+Shift+R',
     },
@@ -256,7 +256,7 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
 export const APP_SHORTCUTS: AcceleratorShortcutDefinition[] = clientMenuAcceleratorShortcuts([
   'file-new-terminal-tab',
   'file-create-worktree',
-  'file-open-local-repo',
+  'file-open-local-workspace',
   'file-clone-repo',
   'view-refresh',
 ]).concat([{ accelerator: 'CmdOrCtrl+R', labelKey: 'help.row.reload-page' }])

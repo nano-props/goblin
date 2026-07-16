@@ -3,7 +3,7 @@ import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -58,14 +58,14 @@ describe('restoreServerWorkspace', () => {
       loadedAt: 1,
     })
     mocks.compareAndReplaceServerWorkspaceRepos.mockImplementation(
-      async (_expected: RepoSessionEntry[], replacement: RepoSessionEntry[]) => {
+      async (_expected: WorkspaceSessionEntry[], replacement: WorkspaceSessionEntry[]) => {
         const workspace = await mocks.getServerWorkspaceState.mock.results.at(-1)?.value
-        return { matched: true, workspace: { ...workspace, openRepoEntries: replacement } }
+        return { matched: true, workspace: { ...workspace, openWorkspaceEntries: replacement } }
       },
     )
-    mocks.confirmServerWorkspaceRepoEntry.mockImplementation(async (entry: RepoSessionEntry) => ({
+    mocks.confirmServerWorkspaceRepoEntry.mockImplementation(async (entry: WorkspaceSessionEntry) => ({
       matched: true,
-      workspace: { openRepoEntries: [entry], workspacePaneTabsByTargetByRepo: {} },
+      workspace: { openWorkspaceEntries: [entry], workspacePaneTabsByTargetByWorkspace: {} },
     }))
     mocks.runRemoteLifecycleWrite.mockResolvedValue({
       kind: 'settled',
@@ -79,8 +79,8 @@ describe('restoreServerWorkspace', () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      workspacePaneTabsByTargetByRepo: {
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      workspacePaneTabsByTargetByWorkspace: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
@@ -124,7 +124,7 @@ describe('restoreServerWorkspace', () => {
   test('repairs instead of migrating non-canonical local workspace entries', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo/src' }],
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo/src' }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.probeRepo.mockResolvedValue({ ok: true, root: '/repo', name: 'repo' })
@@ -147,7 +147,7 @@ describe('restoreServerWorkspace', () => {
     })
 
     expect(result.status).toBe('repaired')
-    expect(result.openRepoEntries).toEqual([])
+    expect(result.openWorkspaceEntries).toEqual([])
     expect(result.runtime.repos).toEqual([])
   })
 
@@ -155,8 +155,8 @@ describe('restoreServerWorkspace', () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      workspacePaneTabsByTargetByRepo: {
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      workspacePaneTabsByTargetByWorkspace: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
@@ -195,7 +195,7 @@ describe('restoreServerWorkspace', () => {
   test('keeps a canonical active local repo as a stub when projection is temporarily unavailable', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
@@ -218,7 +218,7 @@ describe('restoreServerWorkspace', () => {
     })
 
     expect(result.status).toBe('restored')
-    expect(result.openRepoEntries).toEqual(workspace.openRepoEntries)
+    expect(result.openWorkspaceEntries).toEqual(workspace.openWorkspaceEntries)
     expect(result.runtime.repos).toEqual([
       expect.objectContaining({ repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', projection: null }),
     ])
@@ -229,7 +229,7 @@ describe('restoreServerWorkspace', () => {
     const entry = { kind: 'local' as const, id: '/repo' }
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [entry],
+      openWorkspaceEntries: [entry],
     })
     mocks.probeRepo.mockResolvedValue({ ok: false, message: 'error.path-permission-denied' })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
@@ -242,7 +242,7 @@ describe('restoreServerWorkspace', () => {
     })
 
     expect(result.status).toBe('restored')
-    expect(result.openRepoEntries).toEqual([entry])
+    expect(result.openWorkspaceEntries).toEqual([entry])
     expect(result.runtime.repos).toEqual([
       expect.objectContaining({ entry, repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', projection: null }),
     ])
@@ -257,7 +257,7 @@ describe('restoreServerWorkspace', () => {
     }
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [remoteEntry],
+      openWorkspaceEntries: [remoteEntry],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.runRemoteLifecycleWrite.mockResolvedValue({
@@ -284,7 +284,7 @@ describe('restoreServerWorkspace', () => {
     })
 
     expect(result.status).toBe('restored')
-    expect(result.openRepoEntries).toEqual(workspace.openRepoEntries)
+    expect(result.openWorkspaceEntries).toEqual(workspace.openWorkspaceEntries)
     expect(result.runtime.repos).toEqual([expect.not.objectContaining({ target: expect.anything() })])
     expect(result.runtime.repos[0]).toMatchObject({
       repoRoot: remoteEntry.id,
@@ -298,8 +298,8 @@ describe('restoreServerWorkspace', () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      workspacePaneTabsByTargetByRepo: {
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      workspacePaneTabsByTargetByWorkspace: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
@@ -334,8 +334,8 @@ describe('restoreServerWorkspace', () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      workspacePaneTabsByTargetByRepo: {
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      workspacePaneTabsByTargetByWorkspace: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
@@ -390,7 +390,7 @@ describe('restoreServerWorkspace', () => {
     }
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [remoteEntry],
+      openWorkspaceEntries: [remoteEntry],
     }
     const controller = new AbortController()
     const abortReason = new Error('remote restore aborted')
@@ -434,8 +434,8 @@ describe('restoreServerWorkspace', () => {
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      workspacePaneTabsByTargetByRepo: {
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      workspacePaneTabsByTargetByWorkspace: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('files')] },
       },
     }
@@ -479,15 +479,15 @@ describe('restoreServerWorkspace', () => {
     })
     const invalidWorkspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      workspacePaneTabsByTargetByRepo: {
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      workspacePaneTabsByTargetByWorkspace: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('files')] },
         '/other': { [otherTargetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
     const currentWorkspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
     }
     mocks.getServerWorkspaceState.mockResolvedValueOnce(invalidWorkspace).mockResolvedValueOnce(currentWorkspace)
     mocks.compareAndReplaceServerWorkspaceRepos

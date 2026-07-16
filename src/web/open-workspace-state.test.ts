@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { normalizeRemoteTarget, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
+import { normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import {
   restoredRepoIdAfterWorkspaceHydration,
   nextRestoredRepoIdAfterWorkspaceClose,
@@ -53,7 +53,7 @@ describe('persistedOpenWorkspaceEntries', () => {
       displayName: 'example:repo',
     })
     expect(target).not.toBeNull()
-    const entry = remoteRepoSessionEntry(target!)
+    const entry = remoteWorkspaceSessionEntry(target!)
 
     expect(
       persistedOpenWorkspaceEntries([target!.id], {

@@ -1,6 +1,6 @@
 import type { StoreApi } from 'zustand'
 import type { BranchSnapshotInfo, BrowserRemoteProvider, ExecResult, GitRemoteInfo } from '#/web/types.ts'
-import type { RemoteRepoConnectionLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { RemoteRepoConnectionLifecycle, WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type {
   ClientWorkspaceState,
   RepoWorkspaceTabsRestoreResult,
@@ -102,7 +102,7 @@ export type RepoSessionProjectionState = 'projected' | 'stub'
 export interface RepoSessionState {
   /** Canonical session entry for the workspace shell. Remote stubs only know a
    *  ref, not a resolved target, so the entry must be preserved directly. */
-  entry: RepoSessionEntry | null
+  entry: WorkspaceSessionEntry | null
   /** Whether target-scoped session state is client-owned yet. Stub repos keep
    *  the server baseline until the repo is projected on view. */
   projectionState: RepoSessionProjectionState
@@ -261,7 +261,7 @@ interface RestorableWorkspaceActions {
 interface RuntimeCoherentRepoProjectionActions {
   /** Ensure a repo belongs to the open workspace set without implying
    *  anything about the current active selection. */
-  ensureWorkspaceOpen: (path: string | RepoSessionEntry) => Promise<OpenRepoResult>
+  ensureWorkspaceOpen: (path: string | WorkspaceSessionEntry) => Promise<OpenRepoResult>
   closeRepo: (id: string) => Promise<CloseRepoResult>
   /**
    * Re-probe a remote repo's lifecycle. The single user-facing

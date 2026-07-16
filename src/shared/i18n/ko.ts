@@ -24,9 +24,9 @@ export const ko: Record<DictKey, string> = {
   'menu.window.zoom': '확대/축소',
   'menu.window.front': '모두 앞으로 가져오기',
 
-  'menu.file.open-local-repo': '로컬 리포지토리 열기…',
-  'menu.file.open-local-repo-path': '경로로 로컬 리포지토리 열기…',
-  'menu.file.open-remote-repo': '원격 리포지토리 열기…',
+  'menu.file.open-local-workspace': '작업 공간 열기…',
+  'menu.file.open-local-workspace-path': '경로로 작업 공간 열기…',
+  'menu.file.open-remote-workspace': '원격 작업 공간 열기…',
   'menu.file.clone-repo': '리포지토리 클론…',
   'menu.file.create-worktree': '새 워크트리…',
   'menu.file.open-recent': '최근 항목 열기',
@@ -78,14 +78,14 @@ export const ko: Record<DictKey, string> = {
   'repo-picker.repos': '리포지토리',
   'repo-picker.close-named': '{name} 닫기',
   'repo-picker.placeholder': '저장소 선택',
-  'repo-picker.open-local': '로컬 리포지토리 열기…',
-  'repo-picker.open-remote': '원격 리포지토리 열기…',
-  'repo-picker.open-title': '로컬 리포지토리 열기',
-  'repo-picker.open-description': '로컬 경로를 입력하거나 폴더를 선택해 Git 리포지토리를 엽니다.',
-  'repo-picker.open-path-label': '리포지토리 경로',
+  'repo-picker.open-local': '작업 공간 열기…',
+  'repo-picker.open-remote': '원격 작업 공간 열기…',
+  'repo-picker.open-title': '작업 공간 열기',
+  'repo-picker.open-description': '로컬 경로를 입력하거나 폴더를 선택하세요.',
+  'repo-picker.open-path-label': '폴더 경로',
   'repo-picker.open-path-placeholder': '~/Developer/repo',
   'repo-picker.open-path-choose': '선택…',
-  'repo-picker.open-local-confirm': '로컬 리포지토리 열기',
+  'repo-picker.open-local-confirm': '작업 공간 열기',
   'repo-picker.open-opening': '여는 중…',
   'repo-picker.clone': '리포지토리 클론…',
   'repo-picker.clone-title': '리포지토리 클론',
@@ -101,8 +101,8 @@ export const ko: Record<DictKey, string> = {
   'repo-picker.clone-confirm': '클론 후 열기',
   'repo-picker.clone-cloning': '클론 중…',
   'repo-picker.clone-opened': '리포지토리를 클론했습니다',
-  'repo-picker.open-remote-title': '원격 리포지토리 열기',
-  'repo-picker.open-remote-description': 'SSH 별칭을 고르고 리포지토리 경로를 입력하세요.',
+  'repo-picker.open-remote-title': '원격 작업 공간 열기',
+  'repo-picker.open-remote-description': 'SSH 별칭을 고르고 작업 공간 경로를 입력하세요.',
   'repo-picker.open-remote-host-label': '호스트',
   'repo-picker.open-remote-host-alias-label': 'SSH 별칭',
   'repo-picker.open-remote-host-placeholder': 'example.com',
@@ -113,7 +113,7 @@ export const ko: Record<DictKey, string> = {
   'repo-picker.open-remote-path-label': '원격 경로',
   'repo-picker.open-remote-path-placeholder': '/home/user/repo 또는 ~/repo',
   'repo-picker.open-remote-test-connection': '연결 테스트',
-  'repo-picker.open-remote-confirm': '원격 리포지토리 열기',
+  'repo-picker.open-remote-confirm': '원격 작업 공간 열기',
   'repo-picker.open-remote-diagnostics-title': '연결 테스트',
   'repo-picker.open-remote-diagnostics-retry': '다시 시도',
   'repo-picker.open-remote-diagnostics-testing': '연결을 테스트하는 중…',
@@ -139,11 +139,11 @@ export const ko: Record<DictKey, string> = {
   'repo-picker.open-remote-diagnostics-copy-details': '세부 정보 복사',
   'repo-picker.open-remote-connect-via-ssh': '시스템 SSH 로 연결',
   'repo-picker.open-remote-config-only-hint':
-    'Goblin 은 ~/.ssh/config 에 정의된 별칭으로만 SSH 원격 리포지토리를 엽니다.',
+    'Goblin 은 ~/.ssh/config 에 정의된 별칭으로만 SSH 원격 작업 공간을 엽니다.',
   'repo-picker.open-remote-include-manual-hint':
     'Include 지시어가 감지되어 별칭 목록이 불완전할 수 있습니다. SSH 별칭을 직접 입력하세요. 제안은 현재 파일 기준입니다.',
   'repo-picker.open-remote-config-required':
-    '~/.ssh/config 에 구체적인 Host 항목을 추가한 뒤 원격 리포지토리를 여세요.',
+    '~/.ssh/config 에 구체적인 Host 항목을 추가한 뒤 원격 작업 공간을 여세요.',
   'repo-picker.open-remote-config-drift-hint':
     'Goblin 은 매번 ~/.ssh/config 를 다시 읽습니다. 별칭이 삭제되었거나 더 이상 해석되지 않으면 설정 표류로 표시합니다.',
   'repo-picker.open-remote-open-ssh-settings': 'SSH 설정 열기',
@@ -185,14 +185,14 @@ export const ko: Record<DictKey, string> = {
   'repo-unavailable.close': '리포지토리 닫기',
 
   // ---- Empty state -------------------------------------------------------
-  'empty.title': '열린 리포지토리가 없습니다',
+  'empty.title': '열린 작업 공간이 없습니다',
   'empty.body': '사이드바에서 저장소를 선택하거나 Git 폴더를 이 창으로 드래그하세요.',
   'repo-route.not-found-title': '리포지토리를 찾을 수 없음',
 
   // ---- Drag and drop -----------------------------------------------------
-  'drop.title': '놓아서 로컬 리포지토리 열기',
+  'drop.title': '놓아서 작업 공간 열기',
   'drop.body': 'Git 리포지토리 폴더를 Goblin 어디에나 놓으세요.',
-  'drop.open-failed': '로컬 리포지토리를 열 수 없음',
+  'drop.open-failed': '작업 공간을 열 수 없음',
   'repo-picker.recent-save-failed': '리포지토리는 열렸지만 최근 기록은 업데이트되지 않았습니다',
 
   // ---- Workspace pane tabs ------------------------------------------------
@@ -494,7 +494,7 @@ export const ko: Record<DictKey, string> = {
   'action.refresh-title': 'git branch · git status · git log',
 
   // ---- Errors / banners --------------------------------------------------
-  'error.not-git-repo': 'git 리포지토리가 아닙니다',
+  'error.workspace-git-unavailable': '이 작업 공간에서는 Git 기능을 사용할 수 없습니다',
   'error.failed-read-repo': '리포지토리 읽기 실패',
   'error.ssh-config-changed': 'SSH 설정이 변경됨',
   'error.git-not-found': 'Git을 찾을 수 없습니다',
@@ -669,7 +669,7 @@ export const ko: Record<DictKey, string> = {
   'settings.fetch.5m': '5 분',
   'settings.fetch.15m': '15 분',
   'settings.ssh.title': 'SSH',
-  'settings.ssh.body': '~/.ssh/config 의 Host 별칭으로 원격 리포지토리를 엽니다.',
+  'settings.ssh.body': '~/.ssh/config 의 Host 별칭으로 원격 작업 공간을 엽니다.',
   'settings.ssh.config-file-label': '구성 파일',
   'settings.ssh.config-file-hint': 'Goblin 은 여기서 SSH 별칭을 읽습니다.',
   'settings.ssh.path-format-label': '경로 형식',
@@ -720,7 +720,7 @@ export const ko: Record<DictKey, string> = {
   'help.row.create-worktree': '새 워크트리',
   'help.row.select-workspace-tab': '탭 선택',
   'help.row.switch-workspace-pane-tab': '이전 / 다음 워크스페이스 탭',
-  'help.row.open-local-repo': '로컬 리포지토리 열기',
+  'help.row.open-local-workspace': '작업 공간 열기',
   'help.row.clone-repo': '리포지토리 클론',
   'help.row.activate-window': 'Goblin 창 보이기',
   'help.row.close-repo': '현재 리포지토리 닫기',
@@ -762,6 +762,6 @@ export const ko: Record<DictKey, string> = {
   'auth.gate.signing-in': '로그인 중…',
   'auth.gate.error-empty': '접근 토큰을 입력하세요',
   'auth.gate.error-failed': '로그인 실패',
-  'lazy-restore.failed': '저장소를 열 수 없습니다',
+  'lazy-restore.failed': '작업 공간을 열 수 없습니다',
   'workspace-restore.failed': '작업 공간을 복원할 수 없습니다',
 }

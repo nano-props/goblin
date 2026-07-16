@@ -3,7 +3,7 @@ import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -58,9 +58,9 @@ describe('restoreServerWorkspace — active-only restore', () => {
       loadedAt: 1,
     }))
     mocks.compareAndReplaceServerWorkspaceRepos.mockImplementation(
-      async (_expected: RepoSessionEntry[], replacement: RepoSessionEntry[]) => {
+      async (_expected: WorkspaceSessionEntry[], replacement: WorkspaceSessionEntry[]) => {
         const workspace = await mocks.getServerWorkspaceState.mock.results.at(-1)?.value
-        return { matched: true, workspace: { ...workspace, openRepoEntries: replacement } }
+        return { matched: true, workspace: { ...workspace, openWorkspaceEntries: replacement } }
       },
     )
   })
@@ -68,7 +68,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
   test('non-active repos are validated stubs — no projection read, projection: null', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [
+      openWorkspaceEntries: [
         { kind: 'local', id: '/repo-active' },
         { kind: 'local', id: '/repo-stub' },
       ],
@@ -119,8 +119,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
   test('converges to a repo added while restore is opening the original membership', async () => {
     const repoA = { kind: 'local' as const, id: '/repo-a' }
     const repoB = { kind: 'local' as const, id: '/repo-b' }
-    const initial = { ...defaultServerWorkspaceState(), openRepoEntries: [repoA] }
-    const latest = { ...defaultServerWorkspaceState(), openRepoEntries: [repoA, repoB] }
+    const initial = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA] }
+    const latest = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA, repoB] }
     mocks.getServerWorkspaceState.mockResolvedValue(initial)
     mocks.compareAndReplaceServerWorkspaceRepos
       .mockResolvedValueOnce({ matched: false, latestWorkspace: latest })
@@ -135,7 +135,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.openRepoEntries).toEqual([repoA, repoB])
+    expect(result.openWorkspaceEntries).toEqual([repoA, repoB])
     expect(mocks.acquireRepoRuntimeLease).toHaveBeenCalledTimes(2)
     expect(mocks.acquireRepoRuntimeLease).toHaveBeenCalledWith('user-test', '/repo-a', 'client_test000000000000')
     expect(mocks.acquireRepoRuntimeLease).toHaveBeenCalledWith('user-test', '/repo-b', 'client_test000000000000')
@@ -145,8 +145,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
   test('releases only a repo removed while restore is in flight', async () => {
     const repoA = { kind: 'local' as const, id: '/repo-a' }
     const repoB = { kind: 'local' as const, id: '/repo-b' }
-    const initial = { ...defaultServerWorkspaceState(), openRepoEntries: [repoA, repoB] }
-    const latest = { ...defaultServerWorkspaceState(), openRepoEntries: [repoB] }
+    const initial = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA, repoB] }
+    const latest = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoB] }
     mocks.getServerWorkspaceState.mockResolvedValue(initial)
     mocks.compareAndReplaceServerWorkspaceRepos
       .mockResolvedValueOnce({ matched: false, latestWorkspace: latest })
@@ -161,7 +161,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.openRepoEntries).toEqual([repoB])
+    expect(result.openWorkspaceEntries).toEqual([repoB])
     expect(mocks.acquireRepoRuntimeLease).toHaveBeenCalledTimes(2)
     expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledTimes(1)
     expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith(
@@ -174,8 +174,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
   test('converges when workspace membership changes during pane projection', async () => {
     const repoA = { kind: 'local' as const, id: '/repo-a' }
     const repoB = { kind: 'local' as const, id: '/repo-b' }
-    const initial = { ...defaultServerWorkspaceState(), openRepoEntries: [repoA] }
-    const latest = { ...defaultServerWorkspaceState(), openRepoEntries: [repoA, repoB] }
+    const initial = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA] }
+    const latest = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA, repoB] }
     mocks.getServerWorkspaceState.mockResolvedValue(initial)
     mocks.compareAndReplaceServerWorkspaceRepos
       .mockResolvedValueOnce({ matched: true, workspace: initial })
@@ -191,13 +191,13 @@ describe('restoreServerWorkspace — active-only restore', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.openRepoEntries).toEqual([repoA, repoB])
+    expect(result.openWorkspaceEntries).toEqual([repoA, repoB])
     expect(mocks.acquireRepoRuntimeLease).toHaveBeenCalledTimes(2)
   })
 
   test('releases every attempt lease after persistent membership conflicts', async () => {
     const repo = { kind: 'local' as const, id: '/repo' }
-    const workspace = { ...defaultServerWorkspaceState(), openRepoEntries: [repo] }
+    const workspace = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repo] }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.compareAndReplaceServerWorkspaceRepos.mockResolvedValue({
       matched: false,
@@ -221,7 +221,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
   test('uses activeRepoRoot instead of restoredRepoId to choose the eager restore repo', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [
+      openWorkspaceEntries: [
         { kind: 'local', id: '/repo-a' },
         { kind: 'local', id: '/repo-b' },
       ],
@@ -257,7 +257,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
   test('rebuilds when a non-active local entry is not canonical', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [
+      openWorkspaceEntries: [
         { kind: 'local', id: '/repo-active' },
         { kind: 'local', id: '/repo-stub/src' },
       ],
@@ -287,7 +287,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     })
 
     expect(result.status).toBe('repaired')
-    expect(result.openRepoEntries).toEqual([{ kind: 'local', id: '/repo-active' }])
+    expect(result.openWorkspaceEntries).toEqual([{ kind: 'local', id: '/repo-active' }])
     expect(result.runtime.repos).toHaveLength(1)
     expect(result.runtime.repos[0]).toMatchObject({ repoRoot: '/repo-active' })
     expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
@@ -306,7 +306,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo-active' }, remoteEntry],
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo-active' }, remoteEntry],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
@@ -345,11 +345,11 @@ describe('restoreServerWorkspace — active-only restore', () => {
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [
+      openWorkspaceEntries: [
         { kind: 'local', id: '/repo-active' },
         { kind: 'local', id: '/repo-stub' },
       ],
-      workspacePaneTabsByTargetByRepo: {
+      workspacePaneTabsByTargetByWorkspace: {
         // Stale tab entry for the stub repo that would normally force a
         // rebuild — but plan B skips validation for stubs.
         '/repo-stub': { [staleTargetKey]: [workspacePaneStaticTabEntry('history')] },

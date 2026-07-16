@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
-  buildRuntimeRecentReposState,
+  buildRuntimeRecentWorkspacesState,
   buildRuntimeSettingsSnapshot,
   buildSettingsSnapshot,
   runtimeSettingsSnapshotFromSettingsSnapshot,
@@ -27,8 +27,8 @@ describe('settings snapshot partitions', () => {
   })
 
   test('builds runtime recent repos separately from settings prefs', () => {
-    expect(buildRuntimeRecentReposState({ recentRepos: [{ kind: 'local', id: '/tmp/repo-a' }] })).toEqual({
-      recentRepos: [{ kind: 'local', id: '/tmp/repo-a' }],
+    expect(buildRuntimeRecentWorkspacesState({ recentWorkspaces: [{ kind: 'local', id: '/tmp/repo-a' }] })).toEqual({
+      recentWorkspaces: [{ kind: 'local', id: '/tmp/repo-a' }],
     })
   })
 
@@ -36,7 +36,7 @@ describe('settings snapshot partitions', () => {
     const snapshot = buildSettingsSnapshot({
       prefs,
       globalShortcutRegistered: false,
-      recentRepos: [{ kind: 'local', id: '/tmp/repo-b' }],
+      recentWorkspaces: [{ kind: 'local', id: '/tmp/repo-b' }],
       repoSettings: [],
     })
 

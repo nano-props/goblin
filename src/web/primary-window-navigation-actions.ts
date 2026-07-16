@@ -31,6 +31,7 @@ export interface PrimaryWindowPresentationNavigationOptions {
 
 export interface PrimaryWindowNavigationActions {
   activateRepo: (repoId: string) => void
+  showWorkspaceFiles?: (repoId: string, options?: { replace?: boolean }) => void
   closeRepo: (repoId: string) => Promise<CloseRepoResult>
   cycleRepo: (direction: 1 | -1) => void
   selectRepoBranch: (repoId: string, branch: string, options?: { replace?: boolean }) => boolean
@@ -87,6 +88,9 @@ export function createPrimaryWindowNavigationActions({
     activateRepo(repoId) {
       const presentationToken = beginPrimaryWindowPresentation()
       restoreRepoPresentationOrOpenDashboard(repoId, routeNavigation, presentationToken, { onBlocked: 'stay' })
+    },
+    showWorkspaceFiles(repoId, options) {
+      routeNavigation.openRepoRoot(repoId, options)
     },
     async closeRepo(repoId) {
       const nextRepoId = repoId === currentRepoId ? nextNavigationRepoIdAfterClose(order, repoId) : null

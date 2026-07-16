@@ -51,7 +51,7 @@ const RemoteRepoRefSchema = v.object({
   displayName: v.string(),
 })
 
-const RepoSessionEntrySchema = v.variant('kind', [
+const WorkspaceSessionEntrySchema = v.variant('kind', [
   v.object({ kind: v.literal('local'), id: v.string() }),
   v.object({ kind: v.literal('remote'), id: v.string(), ref: RemoteRepoRefSchema }),
 ])
@@ -238,7 +238,7 @@ export const GITHUB_CLI_REFRESH_SCHEMA = v.object({
 export const SETTINGS_PROCEDURE_SCHEMAS = {
   fetchInterval: v.object({ sec: v.number() }),
   globalShortcutState: v.object({ registered: v.boolean() }),
-  recentReposAdd: v.object({ repo: RepoSessionEntrySchema }),
+  recentWorkspacesAdd: v.object({ repo: WorkspaceSessionEntrySchema }),
   // Body for `POST /api/settings/repo-external-app-recent`. The
   // server-side mutator still re-validates repoId, worktreePath and
   // itemId, including path and NUL checks, before touching disk; this
@@ -253,7 +253,7 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
     clientId: ClientIdSchema,
     activeRepoRoot: v.optional(v.nullable(RepoRootSchema)),
   }),
-  workspaceRepoAdd: v.object({ entry: RepoSessionEntrySchema }),
+  workspaceRepoAdd: v.object({ entry: WorkspaceSessionEntrySchema }),
   workspaceRepoRemove: v.object({ repoRoot: RepoRootSchema }),
   // Lazy per-repo restore endpoint — fires when the user navigates to a
   // non-active repo that was hydrated as a stub at cold start.

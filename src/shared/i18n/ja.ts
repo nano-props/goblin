@@ -27,9 +27,9 @@ export const ja: Record<DictKey, string> = {
   'menu.window.front': 'すべてを手前に移動',
 
   // ---- Menu — File -------------------------------------------------------
-  'menu.file.open-local-repo': 'ローカルリポジトリを開く…',
-  'menu.file.open-local-repo-path': 'パスでローカルリポジトリを開く…',
-  'menu.file.open-remote-repo': 'リモートリポジトリを開く…',
+  'menu.file.open-local-workspace': 'ワークスペースを開く…',
+  'menu.file.open-local-workspace-path': 'パスでワークスペースを開く…',
+  'menu.file.open-remote-workspace': 'リモートワークスペースを開く…',
   'menu.file.clone-repo': 'リポジトリをクローン…',
   'menu.file.create-worktree': '新しいワークツリー…',
   'menu.file.open-recent': '最近使った項目を開く',
@@ -85,14 +85,14 @@ export const ja: Record<DictKey, string> = {
   'repo-picker.repos': 'リポジトリ',
   'repo-picker.close-named': '{name} を閉じる',
   'repo-picker.placeholder': 'リポジトリを選択',
-  'repo-picker.open-local': 'ローカルリポジトリを開く…',
-  'repo-picker.open-remote': 'リモートリポジトリを開く…',
-  'repo-picker.open-title': 'ローカルリポジトリを開く',
-  'repo-picker.open-description': 'ローカルパスを入力するかフォルダを選択して、Git リポジトリを開きます。',
-  'repo-picker.open-path-label': 'リポジトリのパス',
+  'repo-picker.open-local': 'ワークスペースを開く…',
+  'repo-picker.open-remote': 'リモートワークスペースを開く…',
+  'repo-picker.open-title': 'ワークスペースを開く',
+  'repo-picker.open-description': 'ローカルパスを入力するか、フォルダを選択します。',
+  'repo-picker.open-path-label': 'フォルダのパス',
   'repo-picker.open-path-placeholder': '~/Developer/repo',
   'repo-picker.open-path-choose': '選択…',
-  'repo-picker.open-local-confirm': 'ローカルリポジトリを開く',
+  'repo-picker.open-local-confirm': 'ワークスペースを開く',
   'repo-picker.open-opening': '開いています…',
   'repo-picker.clone': 'リポジトリをクローン…',
   'repo-picker.clone-title': 'リポジトリをクローン',
@@ -108,8 +108,8 @@ export const ja: Record<DictKey, string> = {
   'repo-picker.clone-confirm': 'クローンして開く',
   'repo-picker.clone-cloning': 'クローン中…',
   'repo-picker.clone-opened': 'リポジトリをクローンしました',
-  'repo-picker.open-remote-title': 'リモートリポジトリを開く',
-  'repo-picker.open-remote-description': 'SSH エイリアスを選び、リポジトリのパスを入力します。',
+  'repo-picker.open-remote-title': 'リモートワークスペースを開く',
+  'repo-picker.open-remote-description': 'SSH エイリアスを選び、ワークスペースのパスを入力します。',
   'repo-picker.open-remote-host-label': 'ホスト',
   'repo-picker.open-remote-host-alias-label': 'SSH エイリアス',
   'repo-picker.open-remote-host-placeholder': 'example.com',
@@ -120,7 +120,7 @@ export const ja: Record<DictKey, string> = {
   'repo-picker.open-remote-path-label': 'リモートパス',
   'repo-picker.open-remote-path-placeholder': '/home/user/repo または ~/repo',
   'repo-picker.open-remote-test-connection': '接続をテスト',
-  'repo-picker.open-remote-confirm': 'リモートリポジトリを開く',
+  'repo-picker.open-remote-confirm': 'リモートワークスペースを開く',
   'repo-picker.open-remote-diagnostics-title': '接続テスト',
   'repo-picker.open-remote-diagnostics-retry': '再試行',
   'repo-picker.open-remote-diagnostics-testing': '接続をテスト中…',
@@ -150,7 +150,7 @@ export const ja: Record<DictKey, string> = {
   'repo-picker.open-remote-include-manual-hint':
     'Include ディレクティブが見つかったため、別名一覧は不完全な可能性があります。SSH エイリアスを手動で入力してください。候補は現在のファイルだけを元にしています。',
   'repo-picker.open-remote-config-required':
-    '~/.ssh/config に具体的な Host エントリを追加してからリモートリポジトリを開いてください。',
+    '~/.ssh/config に具体的な Host エントリを追加してからリモートワークスペースを開いてください。',
   'repo-picker.open-remote-config-drift-hint':
     'Goblin は接続のたびに ~/.ssh/config を再解決します。別名が削除されたり解決できなくなった場合は設定ドリフトとして扱います。',
   'repo-picker.open-remote-open-ssh-settings': 'SSH 設定を開く',
@@ -192,14 +192,14 @@ export const ja: Record<DictKey, string> = {
   'repo-unavailable.close': 'リポジトリを閉じる',
 
   // ---- Empty state -------------------------------------------------------
-  'empty.title': 'リポジトリが開かれていません',
+  'empty.title': 'ワークスペースが開かれていません',
   'empty.body': 'サイドバーからリポジトリを選択するか、Git フォルダをドラッグしてください。',
   'repo-route.not-found-title': 'リポジトリが見つかりません',
 
   // ---- Drag and drop -----------------------------------------------------
-  'drop.title': 'ドロップしてローカルリポジトリを開く',
+  'drop.title': 'ドロップしてワークスペースを開く',
   'drop.body': 'Git リポジトリフォルダを Goblin のどこにでもドロップできます。',
-  'drop.open-failed': 'ローカルリポジトリを開けませんでした',
+  'drop.open-failed': 'ワークスペースを開けませんでした',
   'repo-picker.recent-save-failed': 'リポジトリは開きましたが、最近使った項目は更新されませんでした',
 
   // ---- Workspace pane tabs ------------------------------------------------
@@ -502,7 +502,7 @@ export const ja: Record<DictKey, string> = {
   'action.refresh-title': 'git branch · git status · git log',
 
   // ---- Errors / banners --------------------------------------------------
-  'error.not-git-repo': 'git リポジトリではありません',
+  'error.workspace-git-unavailable': 'このワークスペースでは Git 機能を利用できません',
   'error.failed-read-repo': 'リポジトリの読み込みに失敗しました',
   'error.ssh-config-changed': 'SSH 設定が変更されました',
   'error.git-not-found': 'Git が見つかりません',
@@ -677,7 +677,7 @@ export const ja: Record<DictKey, string> = {
   'settings.fetch.5m': '5 分',
   'settings.fetch.15m': '15 分',
   'settings.ssh.title': 'SSH',
-  'settings.ssh.body': '~/.ssh/config の Host 別名でリモートリポジトリを開きます。',
+  'settings.ssh.body': '~/.ssh/config の Host 別名でリモートワークスペースを開きます。',
   'settings.ssh.config-file-label': '設定ファイル',
   'settings.ssh.config-file-hint': 'Goblin はこのファイルから SSH 別名を読み取ります。',
   'settings.ssh.path-format-label': 'パス形式',
@@ -728,7 +728,7 @@ export const ja: Record<DictKey, string> = {
   'help.row.create-worktree': '新しいワークツリー',
   'help.row.select-workspace-tab': 'タブを選択',
   'help.row.switch-workspace-pane-tab': '前 / 次のワークスペースタブ',
-  'help.row.open-local-repo': 'ローカルリポジトリを開く',
+  'help.row.open-local-workspace': 'ワークスペースを開く',
   'help.row.clone-repo': 'リポジトリをクローン',
   'help.row.activate-window': 'Goblin ウィンドウを表示',
   'help.row.close-repo': '現在のリポジトリを閉じる',
@@ -770,6 +770,6 @@ export const ja: Record<DictKey, string> = {
   'auth.gate.signing-in': 'サインイン中…',
   'auth.gate.error-empty': 'アクセストークンを入力してください',
   'auth.gate.error-failed': 'ログインに失敗しました',
-  'lazy-restore.failed': 'リポジトリを開けません',
+  'lazy-restore.failed': 'ワークスペースを開けません',
   'workspace-restore.failed': 'ワークスペースを復元できません',
 }

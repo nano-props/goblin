@@ -13,7 +13,7 @@ import {
   handleWorkspaceClientIntent,
 } from '#/web/hooks/client-effect-intent-handlers.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { clientEffectIntentStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
@@ -90,7 +90,7 @@ export function useClientEffectIntentRouter({
       openCreateWorktree,
       isOverlayOpen: () => isOverlayOpenRef.current(),
       isWorkspaceShortcutSuppressed: () => isWorkspaceShortcutSuppressedRef.current(),
-      ensureWorkspaceOpen: async (input: string | RepoSessionEntry) => await ensureWorkspaceOpenRef.current(input),
+      ensureWorkspaceOpen: async (input: string | WorkspaceSessionEntry) => await ensureWorkspaceOpenRef.current(input),
       resetLayout,
       toggleZenMode,
       t: (key: string) => tRef.current(key),

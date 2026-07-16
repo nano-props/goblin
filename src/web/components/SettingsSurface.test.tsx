@@ -42,12 +42,12 @@ function defaultIpcResult(path: string, input?: unknown) {
       globalShortcutRegistered: true,
       lanEnabled: false,
       session: {
-        openRepoEntries: [],
+        openWorkspaceEntries: [],
         restoredRepoId: null,
         zenMode: true,
         workspacePaneSize: 50,
       },
-      recentRepos: [],
+      recentWorkspaces: [],
     }
   }
   if (path === 'externalApps.get' || path === 'externalApps.refresh') {

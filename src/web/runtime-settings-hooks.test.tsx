@@ -10,7 +10,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { useFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { useLanSettings } from '#/web/runtime-settings-lan.ts'
-import { useRuntimeRecentRepos } from '#/web/settings-read-projection.ts'
+import { useRuntimeRecentWorkspaces } from '#/web/settings-read-projection.ts'
 import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
@@ -116,16 +116,16 @@ describe('runtime settings hooks', () => {
     primaryWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({
-        recentRepos: [
+        recentWorkspaces: [
           { kind: 'local', id: '/tmp/repo-a' },
           { kind: 'local', id: '/tmp/repo-b' },
         ],
       }),
     )
-    let result: ReturnType<typeof useRuntimeRecentRepos> | undefined
+    let result: ReturnType<typeof useRuntimeRecentWorkspaces> | undefined
 
     function HookHost() {
-      result = useRuntimeRecentRepos()
+      result = useRuntimeRecentWorkspaces()
       return null
     }
 

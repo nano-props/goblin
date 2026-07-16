@@ -113,8 +113,8 @@ vi.mock('#/main/menu-state.ts', () => ({
   applyMenuRuntimeState: vi.fn(),
 }))
 
-vi.mock('#/main/recent-repos.ts', () => ({
-  syncRecentRepos: vi.fn(),
+vi.mock('#/main/recent-workspaces.ts', () => ({
+  syncRecentWorkspaces: vi.fn(),
 }))
 
 vi.mock('#/main/i18n/index.ts', () => ({

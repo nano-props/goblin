@@ -3,6 +3,7 @@ import {
   buildRemoteConnectionInput,
   canSubmitRemoteRepository,
   formatRemoteDialogError,
+  remoteDiagnosticsAllowWorkspaceOpen,
   remotePathError,
 } from '#/web/components/OpenRemoteRepositoryDialog.tsx'
 
@@ -33,6 +34,12 @@ describe('OpenRemoteRepositoryDialog helpers', () => {
   test('rejects non-absolute remote paths', () => {
     expect(remotePathError('repo').errorKey).toBe('repo-picker.open-remote-path-absolute')
     expect(remotePathError('~/repo').errorKey).toBeNull()
+  })
+
+  test('allows a reachable non-Git SSH directory to open as a workspace', () => {
+    expect(remoteDiagnosticsAllowWorkspaceOpen({ ok: false, category: 'not-a-repo' })).toBe(true)
+    expect(remoteDiagnosticsAllowWorkspaceOpen({ ok: false, category: 'git-missing' })).toBe(true)
+    expect(remoteDiagnosticsAllowWorkspaceOpen({ ok: false, category: 'auth-failed' })).toBe(false)
   })
 
   test('keeps raw dialog errors as-is instead of leaking a missing i18n lookup', () => {

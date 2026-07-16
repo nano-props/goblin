@@ -17,7 +17,7 @@ import { useThemeStore } from '#/web/stores/theme.ts'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { readClientWorkspaceState } from '#/web/client-workspace-state.ts'
-import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { workspaceSessionEntryId, type WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 
 export type AuthenticatedAppBootstrapState =
   { status: 'restoring-workspace' } | { status: 'ready' } | { status: 'failed'; message: string }
@@ -137,7 +137,7 @@ async function restoreBootSession(
       bootstrapLog.warn('workspace restore dropped invalid or unavailable state')
     }
     const clientWorkspace = composeRestoredClientWorkspace(
-      restored.openRepoEntries,
+      restored.openWorkspaceEntries,
       presentation,
       restored.runtime.restoredRepoId,
     )
@@ -202,11 +202,11 @@ function blockSessionPersistenceAfterRestoreFailure(message: string): void {
 }
 
 function composeRestoredClientWorkspace(
-  openRepoEntries: RepoSessionEntry[],
+  openWorkspaceEntries: WorkspaceSessionEntry[],
   presentation: ClientWorkspaceState,
   serverRestoredRepoId: string | null,
 ): ClientWorkspaceState {
-  const openRepoIds = new Set(openRepoEntries.map(repoSessionEntryId))
+  const openRepoIds = new Set(openWorkspaceEntries.map(workspaceSessionEntryId))
   return {
     ...presentation,
     restoredRepoId:

@@ -1,6 +1,6 @@
 import { tildifyPath } from '#/shared/paths.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import type { RemoteRepoRef, RemoteRepoTarget, RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { RemoteRepoRef, RemoteRepoTarget, WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 
 export type RemoteRepoRefLocatorInput = Pick<RemoteRepoRef, 'alias' | 'remotePath'>
 export type RemoteRepoTargetLocatorInput = Pick<RemoteRepoTarget, 'host' | 'user' | 'remotePath'>
@@ -33,7 +33,7 @@ export function formatRepoLocator(
   return remoteTarget ? formatRemoteRepoTargetLocator(remoteTarget) : formatLocalRepoLocator(repoId, home)
 }
 
-export function formatRepoSessionEntryLocator(entry: RepoSessionEntry, home: string): string {
+export function formatWorkspaceSessionEntryLocator(entry: WorkspaceSessionEntry, home: string): string {
   return entry.kind === 'local' ? formatLocalRepoLocator(entry.id, home) : formatRemoteRepoRefLocator(entry.ref)
 }
 

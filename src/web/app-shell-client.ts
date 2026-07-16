@@ -119,8 +119,8 @@ export async function openExternalUrl(url: string): Promise<ExecResult> {
   return await openExternalUrlWithPolicy(url, true)
 }
 
-export async function chooseLocalRepositoryPath(): Promise<string | null> {
-  return (await nativeHost()?.openDirectoryDialog?.({ title: 'Open Git Repository' })) ?? null
+export async function chooseLocalWorkspacePath(): Promise<string | null> {
+  return (await nativeHost()?.openDirectoryDialog?.({ title: 'Open Workspace' })) ?? null
 }
 
 export async function chooseCloneParentPath(): Promise<string | null> {

@@ -435,7 +435,7 @@ describe('main repo ipc cancellation', () => {
   test('projects recent repos into native host state, syncing both menu and Dock recents', async () => {
     const repo = { kind: 'local' as const, id: '/repo' }
 
-    const result = await invokeIpc('settings.applyNativeHostProjection', { recentRepos: { recentRepos: [repo] } })
+    const result = await invokeIpc('settings.applyNativeHostProjection', { recentWorkspaces: { recentWorkspaces: [repo] } })
 
     expect(result).toEqual({ ok: true, data: undefined })
     expect(app.clearRecentDocuments).toHaveBeenCalledTimes(1)
@@ -451,7 +451,7 @@ describe('main repo ipc cancellation', () => {
     }
 
     const result = await invokeIpc('settings.applyNativeHostProjection', {
-      recentRepos: { recentRepos: [localRepo, remoteRepo] },
+      recentWorkspaces: { recentWorkspaces: [localRepo, remoteRepo] },
     })
 
     expect(result).toEqual({ ok: true, data: undefined })
@@ -507,8 +507,8 @@ describe('main repo ipc cancellation', () => {
 
   test('rejects recent repo projections with invalid remote paths', async () => {
     const result = await invokeIpc('settings.applyNativeHostProjection', {
-      recentRepos: {
-        recentRepos: [
+      recentWorkspaces: {
+        recentWorkspaces: [
           {
             kind: 'remote',
             id: 'goblin+ssh://prodrepo',

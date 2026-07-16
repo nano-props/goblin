@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { localRepoSessionEntry } from '#/shared/remote-repo.ts'
+import { localWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import {
   restoreRestorableWorkspaceStateFromClientWorkspace,
   clientWorkspaceStateFromRestorableWorkspaceState,
@@ -92,7 +92,7 @@ describe('restorable-workspace-state', () => {
     })
     const stubRepo = emptyRepo('/tmp/repo-b', 'repo-b', 'repo-runtime-b')
     stubRepo.session = {
-      entry: localRepoSessionEntry(stubRepo.id),
+      entry: localWorkspaceSessionEntry(stubRepo.id),
       projectionState: 'stub',
     }
 

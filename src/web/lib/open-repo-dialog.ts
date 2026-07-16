@@ -1,5 +1,5 @@
 import { toast } from 'sonner'
-import { chooseLocalRepositoryPath, hasNativeDirectoryPicker } from '#/web/app-shell-client.ts'
+import { chooseLocalWorkspacePath, hasNativeDirectoryPicker } from '#/web/app-shell-client.ts'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 import { reportOpenRepoPostOpenEffects } from '#/web/lib/open-repo-result-feedback.ts'
 interface Options {
@@ -19,7 +19,7 @@ export async function openRepoFromDialog({
     openRepoPathDialog?.()
     return
   }
-  const path = await chooseLocalRepositoryPath()
+  const path = await chooseLocalWorkspacePath()
   if (!path) return
   const result = await ensureWorkspaceOpen(path)
   if (!result.ok) {

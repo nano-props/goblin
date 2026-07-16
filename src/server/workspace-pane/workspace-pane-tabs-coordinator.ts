@@ -13,7 +13,7 @@ import {
   workspacePaneTabsTargetIdentityKey,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
   PhysicalWorktreeOperationPermit,
@@ -210,7 +210,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
     repoRoot: string
     scope: string
     targets: readonly WorkspacePaneTabsTarget[]
-    expectedRepoEntry: RepoSessionEntry
+    expectedRepoEntry: WorkspaceSessionEntry
     assertCurrent: () => void
   }): Promise<WorkspacePaneLayoutValidationResult> {
     const worktreeTargets = input.targets.filter(isWorkspacePaneWorktreeTarget)

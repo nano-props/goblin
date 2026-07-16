@@ -115,7 +115,7 @@ describe('OpenRepositoryDialog', () => {
 
   test('can fill the path from the native picker and keeps the dialog open on failure', async () => {
     const onClose = vi.fn()
-    const onOpen = vi.fn(async (): Promise<OpenRepoResult> => ({ ok: false, message: 'error.not-git-repo' }))
+    const onOpen = vi.fn(async (): Promise<OpenRepoResult> => ({ ok: false, message: 'error.workspace-git-unavailable' }))
 
     render(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
 
@@ -132,7 +132,7 @@ describe('OpenRepositoryDialog', () => {
     await flush()
 
     expect(onClose).not.toHaveBeenCalled()
-    expect(document.body.textContent).toContain('error.not-git-repo')
+    expect(document.body.textContent).toContain('error.workspace-git-unavailable')
   })
 
   test('allows retry after an unexpected open error', async () => {

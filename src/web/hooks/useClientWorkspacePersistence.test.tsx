@@ -46,8 +46,8 @@ describe('useClientWorkspacePersistence', () => {
       expect.objectContaining({ restoredRepoId: repo.id, zenMode: true, workspacePaneSize: 55 }),
     )
     const saved = writePresentationMock.mock.calls[0]?.[0]
-    expect(saved).not.toHaveProperty('openRepoEntries')
-    expect(saved).not.toHaveProperty('workspacePaneTabsByTargetByRepo')
+    expect(saved).not.toHaveProperty('openWorkspaceEntries')
+    expect(saved).not.toHaveProperty('workspacePaneTabsByTargetByWorkspace')
   })
 
   test('persists terminal selection, preferred tab, and filetree presentation', () => {

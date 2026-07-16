@@ -65,14 +65,14 @@ describe('settings-client', () => {
           globalShortcutRegistered: false,
           lanEnabled: false,
           session: {
-            openRepoEntries: [],
+            openWorkspaceEntries: [],
             restoredRepoId: null,
             zenMode: true,
             workspacePaneSize: 50,
             selectedTerminalSessionIdByTerminalWorktree: {},
-            workspacePaneTabsByTargetByRepo: {},
+            workspacePaneTabsByTargetByWorkspace: {},
           },
-          recentRepos: [],
+          recentWorkspaces: [],
         }),
       })),
     )
@@ -152,7 +152,7 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         status: 'restored',
-        openRepoEntries: [],
+        openWorkspaceEntries: [],
         workspace,
         runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
       }),
@@ -163,7 +163,7 @@ describe('settings-client', () => {
       restoreServerWorkspace('client_test000000000000', { activeRepoRoot: '/tmp/routed-repo' }),
     ).resolves.toEqual({
       status: 'restored',
-      openRepoEntries: [],
+      openWorkspaceEntries: [],
       workspace,
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
     })
@@ -378,17 +378,17 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
+        recentWorkspaces: [{ kind: 'local', id: '/tmp/repo' }],
         addedRepo: { kind: 'local', id: '/tmp/repo' },
       }),
     }))
-    const { addRecentRepo } = await import('#/web/settings-client.ts')
-    await expect(addRecentRepo({ kind: 'local', id: '/tmp/../tmp/repo' })).resolves.toMatchObject({
-      recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
+    const { addRecentWorkspace } = await import('#/web/settings-client.ts')
+    await expect(addRecentWorkspace({ kind: 'local', id: '/tmp/../tmp/repo' })).resolves.toMatchObject({
+      recentWorkspaces: [{ kind: 'local', id: '/tmp/repo' }],
       addedRepo: { kind: 'local', id: '/tmp/repo' },
     })
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:32100/api/settings/recent-repos/add',
+      'http://127.0.0.1:32100/api/settings/recent-workspaces/add',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
@@ -399,8 +399,8 @@ describe('settings-client', () => {
       expect.objectContaining({
         path: 'settings.applyNativeHostProjection',
         input: {
-          recentRepos: {
-            recentRepos: [{ kind: 'local', id: '/tmp/repo' }],
+          recentWorkspaces: {
+            recentWorkspaces: [{ kind: 'local', id: '/tmp/repo' }],
           },
         },
       }),
@@ -439,10 +439,10 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({ ok: true }),
     }))
-    const { clearRecentRepos } = await import('#/web/settings-client.ts')
-    await expect(clearRecentRepos()).resolves.toBeUndefined()
+    const { clearRecentWorkspaces } = await import('#/web/settings-client.ts')
+    await expect(clearRecentWorkspaces()).resolves.toBeUndefined()
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:32100/api/settings/recent-repos/clear',
+      'http://127.0.0.1:32100/api/settings/recent-workspaces/clear',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
@@ -452,7 +452,7 @@ describe('settings-client', () => {
     expect(invokeIpc).toHaveBeenCalledWith(
       expect.objectContaining({
         path: 'settings.applyNativeHostProjection',
-        input: { recentRepos: { recentRepos: [] } },
+        input: { recentWorkspaces: { recentWorkspaces: [] } },
       }),
     )
   })
@@ -488,23 +488,23 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        recentRepos: [{ kind: 'local', id: '/existing' }],
+        recentWorkspaces: [{ kind: 'local', id: '/existing' }],
         addedRepo: null,
       }),
     }))
-    const { addRecentRepo } = await import('#/web/settings-client.ts')
+    const { addRecentWorkspace } = await import('#/web/settings-client.ts')
     await expect(
-      addRecentRepo({ kind: 'local', id: '/bad\0repo' } as unknown as { kind: 'local'; id: string }),
+      addRecentWorkspace({ kind: 'local', id: '/bad\0repo' } as unknown as { kind: 'local'; id: string }),
     ).resolves.toMatchObject({
-      recentRepos: [{ kind: 'local', id: '/existing' }],
+      recentWorkspaces: [{ kind: 'local', id: '/existing' }],
       addedRepo: null,
     })
     expect(invokeIpc).toHaveBeenCalledWith(
       expect.objectContaining({
         path: 'settings.applyNativeHostProjection',
         input: {
-          recentRepos: {
-            recentRepos: [{ kind: 'local', id: '/existing' }],
+          recentWorkspaces: {
+            recentWorkspaces: [{ kind: 'local', id: '/existing' }],
           },
         },
       }),
@@ -591,12 +591,12 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        recentRepos: [{ kind: 'local', id: '/persisted' }],
+        recentWorkspaces: [{ kind: 'local', id: '/persisted' }],
         addedRepo: { kind: 'local', id: '/persisted' },
       }),
     }))
-    const { addRecentRepo } = await import('#/web/settings-client.ts')
-    await expect(addRecentRepo({ kind: 'local', id: '/persisted' })).rejects.toThrow('projection IPC rejected')
+    const { addRecentWorkspace } = await import('#/web/settings-client.ts')
+    await expect(addRecentWorkspace({ kind: 'local', id: '/persisted' })).rejects.toThrow('projection IPC rejected')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
@@ -630,8 +630,8 @@ describe('settings-client', () => {
       },
     })
     const fetchMock = mockFetch(async () => ({ ok: true, json: async () => ({ ok: true }) }))
-    const { clearRecentRepos } = await import('#/web/settings-client.ts')
-    await expect(clearRecentRepos()).rejects.toThrow('projection IPC rejected')
+    const { clearRecentWorkspaces } = await import('#/web/settings-client.ts')
+    await expect(clearRecentWorkspaces()).rejects.toThrow('projection IPC rejected')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

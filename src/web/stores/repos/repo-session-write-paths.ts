@@ -17,7 +17,7 @@ import {
   reconcileRepoRuntimeMemberships,
 } from '#/web/repo-client.ts'
 import { resolveRemoteRepositoryTarget } from '#/web/remote-client.ts'
-import { addRepoToWorkspace, recordRecentRepo, removeRepoFromWorkspace } from '#/web/settings-actions.ts'
+import { addRepoToWorkspace, recordRecentWorkspace, removeRepoFromWorkspace } from '#/web/settings-actions.ts'
 import {
   invalidateRepoRuntimes,
   removeRepoRuntimeFromCache,
@@ -45,14 +45,14 @@ import type {
 import { nextRestoredRepoIdAfterWorkspaceClose } from '#/web/open-workspace-state.ts'
 import {
   isRemoteRepoId,
-  localRepoSessionEntry,
+  localWorkspaceSessionEntry,
   normalizeRemoteRepoRef,
   parseRemoteRepoId,
   remoteRepoConnectionTarget,
-  remoteRepoSessionEntry,
-  sameRepoSessionEntry,
+  remoteWorkspaceSessionEntry,
+  sameWorkspaceSessionEntry,
   type RemoteRepoTarget,
-  type RepoSessionEntry,
+  type WorkspaceSessionEntry,
 } from '#/shared/remote-repo.ts'
 import { sameWorkspaceProbeState, type WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 
@@ -62,7 +62,7 @@ interface ResolvedRepo {
   target?: RemoteRepoTarget
   workspaceProbe?: WorkspaceProbeState
   session?: {
-    entry: RepoSessionEntry
+    entry: WorkspaceSessionEntry
     projectionState: RepoSessionProjectionState
   }
 }
@@ -92,16 +92,16 @@ export interface InitialRepoRefresh {
   repoRuntimeId: string
 }
 
-function sessionEntryFromInput(input: string | RepoSessionEntry): RepoSessionEntry {
+function sessionEntryFromInput(input: string | WorkspaceSessionEntry): WorkspaceSessionEntry {
   if (typeof input !== 'string') return input
-  if (!isRemoteRepoId(input)) return localRepoSessionEntry(input)
+  if (!isRemoteRepoId(input)) return localWorkspaceSessionEntry(input)
   const parsed = parseRemoteRepoId(input)
   const ref = parsed ? normalizeRemoteRepoRef(parsed) : null
-  return ref ? { kind: 'remote', id: ref.id, ref } : localRepoSessionEntry(input)
+  return ref ? { kind: 'remote', id: ref.id, ref } : localWorkspaceSessionEntry(input)
 }
 
 export async function resolveRepoPath(
-  input: string | RepoSessionEntry,
+  input: string | WorkspaceSessionEntry,
   onError?: (err: unknown) => void,
   fallbackError = 'error.failed-read-repo',
 ): Promise<ProbeResult> {
@@ -113,7 +113,7 @@ export async function resolveRepoPath(
     if (!probe?.ok || !probe.root) {
       return {
         input: entry.id,
-        reason: probe?.message ?? 'error.not-git-repo',
+        reason: probe?.message ?? 'error.workspace-git-unavailable',
         repo: null,
         target,
       }
@@ -139,7 +139,7 @@ export async function resolveRepoPath(
 }
 
 export async function openLocalRepoRuntimeForInput(
-  input: string | RepoSessionEntry,
+  input: string | WorkspaceSessionEntry,
   onOpened?: (opened: RuntimeOpenResolvedRepo) => void | Promise<void>,
 ): Promise<RuntimeOpenResolvedRepo> {
   const entry = sessionEntryFromInput(input)
@@ -150,7 +150,7 @@ export async function openLocalRepoRuntimeForInput(
   })
 }
 
-async function openLocalRepoRuntimeForEntry(entry: RepoSessionEntry): Promise<RuntimeOpenResolvedRepo> {
+async function openLocalRepoRuntimeForEntry(entry: WorkspaceSessionEntry): Promise<RuntimeOpenResolvedRepo> {
   const opened = await openRepoRuntimeForInput(entry.id)
   if (!opened.ok) {
     return {
@@ -508,7 +508,7 @@ async function rollbackNewWorkspaceRepo(
 
 type WorkspaceMembershipWriteResult = { ok: true } | { ok: false; error: unknown }
 
-async function addWorkspaceRepoResult(entry: RepoSessionEntry): Promise<WorkspaceMembershipWriteResult> {
+async function addWorkspaceRepoResult(entry: WorkspaceSessionEntry): Promise<WorkspaceMembershipWriteResult> {
   try {
     await addRepoToWorkspace(entry)
     return { ok: true }
@@ -534,9 +534,9 @@ async function releaseUncommittedRepoRuntime(repoRoot: string, repoRuntimeId: st
   }
 }
 
-async function recordRecentRepoPostOpen(repo: RepoSessionEntry): Promise<OpenRepoPostOpenError[]> {
+async function recordRecentWorkspacePostOpen(repo: WorkspaceSessionEntry): Promise<OpenRepoPostOpenError[]> {
   try {
-    await recordRecentRepo(repo)
+    await recordRecentWorkspace(repo)
     return []
   } catch (err) {
     reposLog.warn('failed to record recent repo after opening workspace', { repo, err })
@@ -575,10 +575,10 @@ function remoteTargetsEqual(a: RemoteRepoTarget | undefined | null, b: RemoteRep
   )
 }
 
-function sessionEntryForResolvedRepo(resolvedRepo: ResolvedRepo): RepoSessionEntry {
+function sessionEntryForResolvedRepo(resolvedRepo: ResolvedRepo): WorkspaceSessionEntry {
   return (
     resolvedRepo.session?.entry ??
-    (resolvedRepo.target ? remoteRepoSessionEntry(resolvedRepo.target) : localRepoSessionEntry(resolvedRepo.id))
+    (resolvedRepo.target ? remoteWorkspaceSessionEntry(resolvedRepo.target) : localWorkspaceSessionEntry(resolvedRepo.id))
   )
 }
 
@@ -655,7 +655,7 @@ export function addResolvedRepo(
       const sessionProjectionState = sessionProjectionStateForResolvedRepo(resolvedRepo)
       const sessionChanged =
         existing.session.projectionState !== sessionProjectionState ||
-        !sameRepoSessionEntry(existing.session.entry, sessionEntry)
+        !sameWorkspaceSessionEntry(existing.session.entry, sessionEntry)
       const workspaceProbeChanged =
         !!resolvedRepo.workspaceProbe && !sameWorkspaceProbeState(existing.workspaceProbe, resolvedRepo.workspaceProbe)
       if (!resolvedRepo.target) {
@@ -721,7 +721,7 @@ export function addUnavailableRepo(
     create: () => {
       const repo = buildNewRepo(s, id, [target?.displayName], repoRuntimeId)
       repo.session = {
-        entry: target ? remoteRepoSessionEntry(target) : repo.session.entry,
+        entry: target ? remoteWorkspaceSessionEntry(target) : repo.session.entry,
         projectionState: 'projected',
       }
       // New repo: write the failed lifecycle (with last-known target
@@ -743,7 +743,7 @@ export function addUnavailableRepo(
         ...existing,
         repoRuntimeId: runtimeChanged ? repoRuntimeId : existing.repoRuntimeId,
         session: {
-          entry: target ? remoteRepoSessionEntry(target) : existing.session.entry,
+          entry: target ? remoteWorkspaceSessionEntry(target) : existing.session.entry,
           projectionState: 'projected',
         },
         remote: { ...existing.remote },
@@ -772,7 +772,7 @@ export function addUnavailableRepo(
  */
 export function insertPlaceholderRepo(
   s: Pick<ReposStore, 'repos' | 'repoSnapshotCache' | 'order'>,
-  entry: RepoSessionEntry,
+  entry: WorkspaceSessionEntry,
   repoRuntimeId: string,
   rankById?: ReadonlyMap<string, number>,
 ): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean; id: string } {
@@ -821,7 +821,7 @@ export function createRuntimeRepoSessionActions(
   get: ReposGet,
 ): Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo' | 'retryRemoteRepoConnection'> {
   return {
-    async ensureWorkspaceOpen(pathOrEntry: string | RepoSessionEntry): Promise<OpenRepoResult> {
+    async ensureWorkspaceOpen(pathOrEntry: string | WorkspaceSessionEntry): Promise<OpenRepoResult> {
       const entry = sessionEntryFromInput(pathOrEntry)
       if (isRemoteRepoId(entry.id)) return await openRemoteWorkspaceRepo(set, get, entry)
       return await runWorkspaceRepoCommand(entry.id, async () => await openLocalWorkspaceRepo(set, get, entry))
@@ -843,14 +843,14 @@ export function createRuntimeRepoSessionActions(
   }
 }
 
-async function openLocalWorkspaceRepo(set: ReposSet, get: ReposGet, entry: RepoSessionEntry): Promise<OpenRepoResult> {
+async function openLocalWorkspaceRepo(set: ReposSet, get: ReposGet, entry: WorkspaceSessionEntry): Promise<OpenRepoResult> {
   const initialRefreshRef: { current: InitialRepoRefresh | null } = { current: null }
   const resolved = await runRepoRuntimeMembershipCommand(entry.id, async () => {
     const opened = await openLocalRepoRuntimeForEntry(entry)
     if (!opened.repo || !opened.repoRuntimeId) return opened
     const repo = opened.repo
     const repoRuntimeId = opened.repoRuntimeId
-    const workspaceEntry = repo.target ? remoteRepoSessionEntry(repo.target) : { kind: 'local' as const, id: repo.id }
+    const workspaceEntry = repo.target ? remoteWorkspaceSessionEntry(repo.target) : { kind: 'local' as const, id: repo.id }
     const membership = await addWorkspaceRepoResult(workspaceEntry)
     if (!membership.ok) {
       reposLog.warn('failed to add local repo to server workspace', { repoRoot: repo.id, err: membership.error })
@@ -865,16 +865,16 @@ async function openLocalWorkspaceRepo(set: ReposSet, get: ReposGet, entry: RepoS
     return opened
   })
   if (!resolved.repo || !resolved.repoRuntimeId) {
-    return { ok: false, message: resolved.reason ?? 'error.not-git-repo' }
+    return { ok: false, message: resolved.reason ?? 'error.workspace-git-unavailable' }
   }
   if (initialRefreshRef.current) refreshInitialRepoState(set, get, initialRefreshRef.current)
   const recentEntry = resolved.repo.target
-    ? remoteRepoSessionEntry(resolved.repo.target)
+    ? remoteWorkspaceSessionEntry(resolved.repo.target)
     : { kind: 'local' as const, id: resolved.repo.id }
-  return { ok: true, id: resolved.repo.id, postOpenEffects: recordRecentRepoPostOpen(recentEntry) }
+  return { ok: true, id: resolved.repo.id, postOpenEffects: recordRecentWorkspacePostOpen(recentEntry) }
 }
 
-async function openRemoteWorkspaceRepo(set: ReposSet, get: ReposGet, entry: RepoSessionEntry): Promise<OpenRepoResult> {
+async function openRemoteWorkspaceRepo(set: ReposSet, get: ReposGet, entry: WorkspaceSessionEntry): Promise<OpenRepoResult> {
   const prepared = await runWorkspaceRepoCommand(entry.id, async () => {
     let openedRepoRuntimeId: string | null = null
     if (!get().repos[entry.id]) {
@@ -906,8 +906,8 @@ async function openRemoteWorkspaceRepo(set: ReposSet, get: ReposGet, entry: Repo
   if (get().repos[entry.id]?.repoRuntimeId !== prepared.repoRuntimeId) {
     return { ok: false, message: 'error.failed-read-repo' }
   }
-  const recentEntry = outcome?.kind === 'ready' ? remoteRepoSessionEntry(outcome.target) : entry
-  return { ok: true, id: entry.id, postOpenEffects: recordRecentRepoPostOpen(recentEntry) }
+  const recentEntry = outcome?.kind === 'ready' ? remoteWorkspaceSessionEntry(outcome.target) : entry
+  return { ok: true, id: entry.id, postOpenEffects: recordRecentWorkspacePostOpen(recentEntry) }
 }
 
 async function closeWorkspaceRepo(set: ReposSet, get: ReposGet, id: string): Promise<CloseRepoResult> {

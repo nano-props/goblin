@@ -5,7 +5,7 @@ import { runManualRepoSync } from '#/web/stores/repos/refresh.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
-import { clearRecentRepoHistory } from '#/web/settings-actions.ts'
+import { clearRecentWorkspaceHistory } from '#/web/settings-actions.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { reportOpenRepoPostOpenEffects } from '#/web/lib/open-repo-result-feedback.ts'
 import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
@@ -23,7 +23,7 @@ import {
   createTerminalBellIntentPlan,
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
@@ -50,7 +50,7 @@ interface SharedClientIntentDeps {
   openCreateWorktree: () => void
   isOverlayOpen: () => boolean
   isWorkspaceShortcutSuppressed: () => boolean
-  ensureWorkspaceOpen: (input: string | RepoSessionEntry) => Promise<OpenRepoResult>
+  ensureWorkspaceOpen: (input: string | WorkspaceSessionEntry) => Promise<OpenRepoResult>
   resetLayout: () => void
   toggleZenMode: () => void
   t: (key: string) => string
@@ -104,8 +104,8 @@ export async function handleAppLevelClientIntent(
     case 'set-lang-pref':
       await useI18nStore.getState().setPref(plan.pref)
       return true
-    case 'clear-recent-repos':
-      await clearRecentRepoHistory()
+    case 'clear-recent-workspaces':
+      await clearRecentWorkspaceHistory()
       return true
     case 'ensure-recent-repo-open': {
       const result = await deps.ensureWorkspaceOpen(plan.entry)
@@ -153,7 +153,7 @@ export async function handleWorkspaceClientIntent(
     case 'open-clone-repo':
       deps.openCloneRepo()
       return true
-    case 'open-remote-repo':
+    case 'open-remote-workspace':
       deps.openRemoteRepo()
       return true
     case 'create-worktree': {

@@ -1,7 +1,7 @@
 import { parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
@@ -11,7 +11,7 @@ type ClientWorkspaceIntent = Extract<
   ClientEffectIntent,
   | { type: 'open-repo-requested' }
   | { type: 'open-repo-path-requested' }
-  | { type: 'open-remote-repo-requested' }
+  | { type: 'open-remote-workspace-requested' }
   | { type: 'clone-repo-requested' }
   | { type: 'create-worktree-requested' }
   | { type: 'terminal-new-tab-requested' }
@@ -41,15 +41,15 @@ export type AppLevelIntentPlan =
   | { kind: 'open-settings'; page: SettingsPage }
   | { kind: 'set-theme-pref'; pref: ThemePref }
   | { kind: 'set-lang-pref'; pref: LangPref }
-  | { kind: 'clear-recent-repos' }
-  | { kind: 'ensure-recent-repo-open'; entry: RepoSessionEntry }
+  | { kind: 'clear-recent-workspaces' }
+  | { kind: 'ensure-recent-repo-open'; entry: WorkspaceSessionEntry }
 
 export type WorkspaceIntentPlan =
   | { kind: 'noop' }
   | { kind: 'open-repo' }
   | { kind: 'open-repo-path' }
   | { kind: 'open-clone-repo' }
-  | { kind: 'open-remote-repo' }
+  | { kind: 'open-remote-workspace' }
   | { kind: 'create-worktree' }
   | { kind: 'new-terminal-tab'; repoId: string }
   | { kind: 'close-workspace-pane-tab-or-window'; repoId: string | null }
@@ -111,8 +111,8 @@ export function createAppLevelIntentPlan(
       return { kind: 'set-theme-pref', pref: event.pref }
     case 'lang-pref-set-requested':
       return { kind: 'set-lang-pref', pref: event.pref }
-    case 'clear-recent-repos-requested':
-      return context.overlayBlocked ? { kind: 'noop' } : { kind: 'clear-recent-repos' }
+    case 'clear-recent-workspaces-requested':
+      return context.overlayBlocked ? { kind: 'noop' } : { kind: 'clear-recent-workspaces' }
     case 'open-recent-repo-requested':
       return context.overlayBlocked ? { kind: 'noop' } : { kind: 'ensure-recent-repo-open', entry: event.entry }
   }
@@ -140,8 +140,8 @@ export function createWorkspaceIntentPlan(
     case 'create-worktree-requested':
       if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
       return { kind: 'create-worktree' }
-    case 'open-remote-repo-requested':
-      return { kind: 'open-remote-repo' }
+    case 'open-remote-workspace-requested':
+      return { kind: 'open-remote-workspace' }
     case 'terminal-new-tab-requested':
       if (!context.currentRepoId) return { kind: 'noop' }
       return { kind: 'new-terminal-tab', repoId: context.currentRepoId }
@@ -180,7 +180,7 @@ function isClientWorkspaceIntent(event: ClientEffectIntent): event is ClientWork
   return (
     event.type === 'open-repo-requested' ||
     event.type === 'open-repo-path-requested' ||
-    event.type === 'open-remote-repo-requested' ||
+    event.type === 'open-remote-workspace-requested' ||
     event.type === 'clone-repo-requested' ||
     event.type === 'create-worktree-requested' ||
     event.type === 'terminal-new-tab-requested' ||

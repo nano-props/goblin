@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useEffect, useId } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
@@ -28,6 +28,7 @@ import { FolderTree } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
 import { FiletreeTab } from '#/web/components/repo-workspace/panels.tsx'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 
 export type RepoWorkspacePaneRouteContext =
   { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null } | { kind: 'inactive' }
@@ -137,7 +138,13 @@ function RepoWorkspaceLoaded(props: {
     props.repoShell.workspaceProbe.status === 'ready' &&
     props.repoShell.workspaceProbe.capabilities.git.status === 'unavailable'
   ) {
-    return <PlainWorkspaceFiles repo={props.repoShell} workspacePaneId={props.workspacePaneId} />
+    return (
+      <PlainWorkspaceFiles
+        repo={props.repoShell}
+        workspacePaneId={props.workspacePaneId}
+        routeContext={props.workspacePaneRouteContext}
+      />
+    )
   }
   return <GitRepoWorkspaceLoaded {...props} />
 }
@@ -252,11 +259,19 @@ function GitRepoWorkspaceLoaded({
 function PlainWorkspaceFiles({
   repo,
   workspacePaneId,
+  routeContext,
 }: {
   repo: Pick<RepoWorkspaceRepoShell, 'id' | 'repoRuntimeId'>
   workspacePaneId: string
+  routeContext: RepoWorkspacePaneRouteContext
 }) {
   const t = useT()
+  const navigation = usePrimaryWindowNavigation()
+  useEffect(() => {
+    if (routeContext.kind === 'routed' && routeContext.route !== null) {
+      navigation.showWorkspaceFiles?.(repo.id, { replace: true })
+    }
+  }, [navigation, repo.id, routeContext])
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border/70 px-3">

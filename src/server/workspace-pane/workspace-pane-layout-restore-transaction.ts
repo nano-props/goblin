@@ -1,4 +1,4 @@
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneLayoutRepositorySnapshot } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 
 export type WorkspacePaneLayoutRestoreTransactionOutcome =
@@ -7,6 +7,6 @@ export type WorkspacePaneLayoutRestoreTransactionOutcome =
 
 export interface WorkspacePaneLayoutRestoreTransaction {
   validateMembershipAndLoad(
-    input: { repoRoot: string; expectedRepoEntry: RepoSessionEntry },
+    input: { repoRoot: string; expectedRepoEntry: WorkspaceSessionEntry },
   ): Promise<WorkspacePaneLayoutRestoreTransactionOutcome>
 }

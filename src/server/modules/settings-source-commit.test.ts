@@ -32,13 +32,13 @@ afterEach(async () => {
 test('does not expose failed settings writes through the in-memory cache', async () => {
   const mod = await import('#/server/modules/settings-source.ts')
 
-  await mod.addServerRecentRepo({ kind: 'local', id: REPO_A })
+  await mod.addServerRecentWorkspace({ kind: 'local', id: REPO_A })
   persistence.failNextWrite = true
 
-  await expect(mod.addServerRecentRepo({ kind: 'local', id: REPO_B })).rejects.toThrow('disk full')
+  await expect(mod.addServerRecentWorkspace({ kind: 'local', id: REPO_B })).rejects.toThrow('disk full')
 
-  expect(await mod.getServerRecentRepos()).toEqual([{ kind: 'local', id: REPO_A }])
-  await expect(mod.addServerRecentRepo({ kind: 'local', id: REPO_C })).resolves.toEqual([
+  expect(await mod.getServerRecentWorkspaces()).toEqual([{ kind: 'local', id: REPO_A }])
+  await expect(mod.addServerRecentWorkspace({ kind: 'local', id: REPO_C })).resolves.toEqual([
     { kind: 'local', id: REPO_C },
     { kind: 'local', id: REPO_A },
   ])

@@ -27,9 +27,9 @@ export const en = {
   'menu.window.front': 'Bring All to Front',
 
   // ---- Menu — File --------------------------------------------------------
-  'menu.file.open-local-repo': 'Open Local Repository…',
-  'menu.file.open-local-repo-path': 'Open Local Repository by Path…',
-  'menu.file.open-remote-repo': 'Open Remote Repository…',
+  'menu.file.open-local-workspace': 'Open Workspace…',
+  'menu.file.open-local-workspace-path': 'Open Workspace by Path…',
+  'menu.file.open-remote-workspace': 'Open Remote Workspace…',
   'menu.file.clone-repo': 'Clone Repository…',
   'menu.file.create-worktree': 'New Worktree…',
   'menu.file.open-recent': 'Open Recent',
@@ -88,14 +88,14 @@ export const en = {
   'repo-picker.repos': 'Repositories',
   'repo-picker.close-named': 'Close {name}',
   'repo-picker.placeholder': 'Select repository',
-  'repo-picker.open-local': 'Open local repository…',
-  'repo-picker.open-remote': 'Open remote repository…',
-  'repo-picker.open-title': 'Open local repository',
-  'repo-picker.open-description': 'Enter a local path or choose a folder to open a Git repository.',
-  'repo-picker.open-path-label': 'Repository path',
+  'repo-picker.open-local': 'Open Workspace…',
+  'repo-picker.open-remote': 'Open Remote Workspace…',
+  'repo-picker.open-title': 'Open Workspace',
+  'repo-picker.open-description': 'Enter a local path or choose a folder.',
+  'repo-picker.open-path-label': 'Folder path',
   'repo-picker.open-path-placeholder': '~/Developer/repo',
   'repo-picker.open-path-choose': 'Choose…',
-  'repo-picker.open-local-confirm': 'Open local repository',
+  'repo-picker.open-local-confirm': 'Open Workspace',
   'repo-picker.open-opening': 'Opening…',
   'repo-picker.clone': 'Clone repository…',
   'repo-picker.clone-title': 'Clone repository',
@@ -111,8 +111,8 @@ export const en = {
   'repo-picker.clone-confirm': 'Clone and open',
   'repo-picker.clone-cloning': 'Cloning…',
   'repo-picker.clone-opened': 'Repository cloned',
-  'repo-picker.open-remote-title': 'Open remote repository',
-  'repo-picker.open-remote-description': 'Select an SSH alias and enter the repository path.',
+  'repo-picker.open-remote-title': 'Open Remote Workspace',
+  'repo-picker.open-remote-description': 'Select an SSH alias and enter the workspace path.',
   'repo-picker.open-remote-host-label': 'Host',
   'repo-picker.open-remote-host-alias-label': 'SSH alias',
   'repo-picker.open-remote-host-placeholder': 'example.com',
@@ -123,7 +123,7 @@ export const en = {
   'repo-picker.open-remote-path-label': 'Remote path',
   'repo-picker.open-remote-path-placeholder': '/home/user/repo or ~/repo',
   'repo-picker.open-remote-test-connection': 'Test connection',
-  'repo-picker.open-remote-confirm': 'Open remote repository',
+  'repo-picker.open-remote-confirm': 'Open Remote Workspace',
   'repo-picker.open-remote-diagnostics-title': 'Connection test',
   'repo-picker.open-remote-diagnostics-retry': 'Retry',
   'repo-picker.open-remote-diagnostics-testing': 'Testing connection…',
@@ -152,7 +152,7 @@ export const en = {
   'repo-picker.open-remote-include-manual-hint':
     'An Include directive was detected, so the alias list may be incomplete. Enter an SSH alias manually; suggestions only come from the current file.',
   'repo-picker.open-remote-config-required':
-    'Add a concrete Host entry to ~/.ssh/config before opening a remote repository.',
+    'Add a concrete Host entry to ~/.ssh/config before opening a remote workspace.',
   'repo-picker.open-remote-config-drift-hint':
     'Goblin follows ~/.ssh/config on every open and reconnect. If the alias is removed or can no longer be resolved, the repo is marked as config drifted.',
   'repo-picker.open-remote-open-ssh-settings': 'Open SSH settings',
@@ -194,14 +194,14 @@ export const en = {
   'repo-unavailable.close': 'Close repository',
 
   // ---- Empty state --------------------------------------------------------
-  'empty.title': 'No repository open',
+  'empty.title': 'No workspace open',
   'empty.body': 'Choose a repository from the sidebar, or drop a Git folder here.',
   'repo-route.not-found-title': 'Repository not found',
 
   // ---- Drag and drop ------------------------------------------------------
-  'drop.title': 'Drop to open local repository',
+  'drop.title': 'Drop to open workspace',
   'drop.body': 'Drop a Git repository folder anywhere in Goblin.',
-  'drop.open-failed': 'Could not open local repository',
+  'drop.open-failed': 'Could not open workspace',
   'repo-picker.recent-save-failed': 'Repository opened, but recent history was not updated',
 
   // ---- Workspace pane tabs -----------------------------------------------
@@ -506,7 +506,7 @@ export const en = {
   'action.refresh-title': 'git branch · git status · git log',
 
   // ---- Errors / banners ---------------------------------------------------
-  'error.not-git-repo': 'Not a git repository',
+  'error.workspace-git-unavailable': 'Git features are unavailable for this workspace',
   'error.failed-read-repo': 'Failed to read repository',
   'error.ssh-config-changed': 'SSH config changed',
   'error.git-not-found': 'Git not found',
@@ -684,7 +684,7 @@ export const en = {
   'settings.fetch.5m': '5 min',
   'settings.fetch.15m': '15 min',
   'settings.ssh.title': 'SSH',
-  'settings.ssh.body': 'Use Host aliases from ~/.ssh/config to open remote repositories.',
+  'settings.ssh.body': 'Use Host aliases from ~/.ssh/config to open remote workspaces.',
   'settings.ssh.config-file-label': 'Configuration file',
   'settings.ssh.config-file-hint': 'Goblin reads SSH aliases from this file.',
   'settings.ssh.path-format-label': 'Path format',
@@ -735,7 +735,7 @@ export const en = {
   'help.row.create-worktree': 'New worktree',
   'help.row.select-workspace-tab': 'Select tab',
   'help.row.switch-workspace-pane-tab': 'Previous / next workspace tab',
-  'help.row.open-local-repo': 'Open local repository',
+  'help.row.open-local-workspace': 'Open workspace',
   'help.row.clone-repo': 'Clone repository',
   'help.row.activate-window': 'Show Goblin window',
   'help.row.close-repo': 'Close current repository',
@@ -776,7 +776,7 @@ export const en = {
   'auth.gate.signing-in': 'Signing in…',
   'auth.gate.error-empty': 'Enter your access token',
   'auth.gate.error-failed': 'Login failed',
-  'lazy-restore.failed': 'Could not open repository',
+  'lazy-restore.failed': 'Could not open workspace',
   'workspace-restore.failed': 'Could not restore workspace',
 } as const
 

@@ -38,7 +38,7 @@ import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
 const appDataClientMocks = vi.hoisted(() => ({
-  clearRecentRepoHistory: vi.fn(async () => {}),
+  clearRecentWorkspaceHistory: vi.fn(async () => {}),
   removeRepoFromWorkspace: vi.fn(async () => {}),
 }))
 
@@ -46,7 +46,7 @@ vi.mock('#/web/settings-actions.ts', async () => {
   const actual = await vi.importActual<typeof import('#/web/settings-actions.ts')>('#/web/settings-actions.ts')
   return {
     ...actual,
-    clearRecentRepoHistory: appDataClientMocks.clearRecentRepoHistory,
+    clearRecentWorkspaceHistory: appDataClientMocks.clearRecentWorkspaceHistory,
     removeRepoFromWorkspace: appDataClientMocks.removeRepoFromWorkspace,
   }
 })
@@ -74,7 +74,7 @@ beforeEach(() => {
   closeRepoSpy.mockClear()
   showRepoBranchWorkspacePaneTabSpy.mockClear()
   showRepoBranchTerminalSessionSpy.mockClear()
-  appDataClientMocks.clearRecentRepoHistory.mockClear()
+  appDataClientMocks.clearRecentWorkspaceHistory.mockClear()
   appDataClientMocks.removeRepoFromWorkspace.mockClear()
   consumeExternalOpenPathsSpy.mockReset()
   consumeExternalOpenPathsSpy.mockResolvedValue([])
@@ -581,11 +581,11 @@ describe('useClientEffectIntentRouter', () => {
     await renderHookHost()
 
     await act(async () => {
-      for (const listener of intentListeners) listener({ type: 'clear-recent-repos-requested' })
+      for (const listener of intentListeners) listener({ type: 'clear-recent-workspaces-requested' })
       await Promise.resolve()
     })
 
-    expect(appDataClientMocks.clearRecentRepoHistory).toHaveBeenCalledTimes(1)
+    expect(appDataClientMocks.clearRecentWorkspaceHistory).toHaveBeenCalledTimes(1)
   })
 })
 

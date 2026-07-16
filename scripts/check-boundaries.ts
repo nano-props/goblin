@@ -68,9 +68,9 @@ const RULES: Rule[] = [
     allowedImportsByFile: {
       '/src/web/hooks/useAuthenticatedAppBootstrap.ts': ['getExternalAppsSnapshot', 'getSettingsSnapshot'],
       '/src/web/settings-actions.ts': [
-        'addRecentRepo',
+        'addRecentWorkspace',
         'addWorkspaceRepo',
-        'clearRecentRepos',
+        'clearRecentWorkspaces',
         'refreshExternalAppsSnapshot',
         'refreshGitHubCliState',
         'restoreRepoWorkspaceTabs',

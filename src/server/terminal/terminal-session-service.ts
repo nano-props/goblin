@@ -20,7 +20,7 @@ import {
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneTabsRestoreResult } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
 import {
@@ -174,7 +174,7 @@ class TerminalSessionService {
       repoRoot: string
       repoRuntimeId: string
       targets: WorkspacePaneTabsTarget[]
-      expectedRepoEntry: RepoSessionEntry
+      expectedRepoEntry: WorkspaceSessionEntry
     },
   ): Promise<WorkspacePaneTabsRestoreResult> {
     if (!isValidRepoLocator(input.repoRoot)) {

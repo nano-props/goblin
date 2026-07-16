@@ -1,12 +1,12 @@
 import { isSettingsPage, type SettingsPage } from '#/shared/settings-pages.ts'
-import { normalizeRepoSessionEntry, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { normalizeWorkspaceSessionEntry, type WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import { isWorkspacePaneTabType, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 
 export type ClientEffectIntent =
   | { type: 'open-repo-requested' }
   | { type: 'open-repo-path-requested' }
-  | { type: 'open-remote-repo-requested' }
+  | { type: 'open-remote-workspace-requested' }
   | { type: 'clone-repo-requested' }
   | { type: 'create-worktree-requested' }
   | { type: 'app-quitting' }
@@ -22,8 +22,8 @@ export type ClientEffectIntent =
   | { type: 'open-settings-requested'; page: SettingsPage }
   | { type: 'theme-pref-set-requested'; pref: ThemePref }
   | { type: 'lang-pref-set-requested'; pref: LangPref }
-  | { type: 'clear-recent-repos-requested' }
-  | { type: 'open-recent-repo-requested'; entry: RepoSessionEntry }
+  | { type: 'clear-recent-workspaces-requested' }
+  | { type: 'open-recent-repo-requested'; entry: WorkspaceSessionEntry }
   | { type: 'terminal-bell-click'; repoRoot: string; terminalSessionId?: string; terminalWorktreeKey?: string }
   | { type: 'external-open-enqueued' }
 
@@ -34,7 +34,7 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
   switch (event.type) {
     case 'open-repo-requested':
     case 'open-repo-path-requested':
-    case 'open-remote-repo-requested':
+    case 'open-remote-workspace-requested':
     case 'clone-repo-requested':
     case 'create-worktree-requested':
     case 'app-quitting':
@@ -45,7 +45,7 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
     case 'terminal-primary-action-requested':
     case 'workspace-zen-mode-toggle-requested':
     case 'layout-reset-requested':
-    case 'clear-recent-repos-requested':
+    case 'clear-recent-workspaces-requested':
     case 'external-open-enqueued':
       return true
     case 'cycle-repo-requested':
@@ -59,7 +59,7 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
     case 'lang-pref-set-requested':
       return isLangPref(event.pref)
     case 'open-recent-repo-requested':
-      return isRepoSessionEntry(event.entry)
+      return isWorkspaceSessionEntry(event.entry)
     case 'terminal-bell-click':
       return (
         typeof event.repoRoot === 'string' &&
@@ -85,8 +85,8 @@ function isLangPref(value: unknown): value is LangPref {
   return value === 'auto' || value === 'en' || value === 'zh' || value === 'ko' || value === 'ja'
 }
 
-function isRepoSessionEntry(value: unknown): value is RepoSessionEntry {
+function isWorkspaceSessionEntry(value: unknown): value is WorkspaceSessionEntry {
   if (!isRecord(value)) return false
   if (value.kind === 'local') return typeof value.id === 'string' && value.id.length > 0
-  return value.kind === 'remote' && isRecord(value.ref) && normalizeRepoSessionEntry(value) !== null
+  return value.kind === 'remote' && isRecord(value.ref) && normalizeWorkspaceSessionEntry(value) !== null
 }

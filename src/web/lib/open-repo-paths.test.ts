@@ -5,7 +5,7 @@ describe('openRepoPaths', () => {
   test('opens paths without per-item activation and focuses the first success', async () => {
     const ensureWorkspaceOpen = vi
       .fn()
-      .mockResolvedValueOnce({ ok: false, message: 'error.not-git-repo' })
+      .mockResolvedValueOnce({ ok: false, message: 'error.workspace-git-unavailable' })
       .mockResolvedValueOnce({ ok: true, id: '/tmp/repo-b' })
       .mockResolvedValueOnce({ ok: true, id: '/tmp/repo-c' })
     const activateRepo = vi.fn()
@@ -21,13 +21,13 @@ describe('openRepoPaths', () => {
     expect(ensureWorkspaceOpen).toHaveBeenNthCalledWith(1, '/tmp/a')
     expect(ensureWorkspaceOpen).toHaveBeenNthCalledWith(2, '/tmp/b')
     expect(ensureWorkspaceOpen).toHaveBeenNthCalledWith(3, '/tmp/c')
-    expect(onOpenFailed).toHaveBeenCalledWith('/tmp/a', 'error.not-git-repo')
+    expect(onOpenFailed).toHaveBeenCalledWith('/tmp/a', 'error.workspace-git-unavailable')
     expect(activateRepo).toHaveBeenCalledTimes(1)
     expect(activateRepo).toHaveBeenCalledWith('/tmp/repo-b')
   })
 
   test('does not activate anything when every path fails', async () => {
-    const ensureWorkspaceOpen = vi.fn().mockResolvedValue({ ok: false, message: 'error.not-git-repo' })
+    const ensureWorkspaceOpen = vi.fn().mockResolvedValue({ ok: false, message: 'error.workspace-git-unavailable' })
     const activateRepo = vi.fn()
 
     const firstId = await openRepoPaths(['/tmp/a'], {

@@ -12,7 +12,7 @@ export const RemoteRepoRefSchema = v.object({
   displayName: v.string(),
 })
 
-export const RepoSessionEntrySchema = v.union([
+export const WorkspaceSessionEntrySchema = v.union([
   v.object({
     kind: v.literal('local'),
     id: v.string(),

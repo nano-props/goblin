@@ -11,8 +11,8 @@ const mocks = vi.hoisted(() => ({
   getUserSettings: vi.fn(),
   handleSetFetchInterval: vi.fn(),
   handleSetGlobalShortcutRegistered: vi.fn(),
-  handleAddRecentRepo: vi.fn(),
-  handleClearRecentRepos: vi.fn(),
+  handleAddRecentWorkspace: vi.fn(),
+  handleClearRecentWorkspaces: vi.fn(),
   handleUpdateUserSettings: vi.fn(),
   restoreServerWorkspace: vi.fn(),
   restoreRepoTabsForRepo: vi.fn(),
@@ -41,8 +41,8 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
 vi.mock('#/server/modules/settings-write-paths.ts', () => ({
   handleSetFetchInterval: mocks.handleSetFetchInterval,
   handleSetGlobalShortcutRegistered: mocks.handleSetGlobalShortcutRegistered,
-  handleAddRecentRepo: mocks.handleAddRecentRepo,
-  handleClearRecentRepos: mocks.handleClearRecentRepos,
+  handleAddRecentWorkspace: mocks.handleAddRecentWorkspace,
+  handleClearRecentWorkspaces: mocks.handleClearRecentWorkspaces,
   handleUpdateUserSettings: mocks.handleUpdateUserSettings,
 }))
 
@@ -107,7 +107,7 @@ describe('settings routes', () => {
   test('delegates session restore to the server restore coordinator', async () => {
     const restored = {
       status: 'restored' as const,
-      openRepoEntries: [],
+      openWorkspaceEntries: [],
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
     }
     mocks.restoreServerWorkspace.mockResolvedValue(restored)
@@ -142,11 +142,11 @@ describe('settings routes', () => {
 
   test('delegates authenticated workspace membership commands', async () => {
     const workspace = {
-      openRepoEntries: [{ kind: 'local' as const, id: '/repo-a' }],
-      workspacePaneTabsByTargetByRepo: {},
+      openWorkspaceEntries: [{ kind: 'local' as const, id: '/repo-a' }],
+      workspacePaneTabsByTargetByWorkspace: {},
     }
     mocks.addServerWorkspaceRepo.mockResolvedValue(workspace)
-    mocks.removeServerWorkspaceRepo.mockResolvedValue({ ...workspace, openRepoEntries: [] })
+    mocks.removeServerWorkspaceRepo.mockResolvedValue({ ...workspace, openWorkspaceEntries: [] })
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
     const app = new Hono<{ Variables: { userId: string } }>()
     app.use('*', async (c, next) => {
@@ -167,7 +167,7 @@ describe('settings routes', () => {
     })
 
     await expect(addResponse.json()).resolves.toEqual(workspace)
-    await expect(removeResponse.json()).resolves.toEqual({ ...workspace, openRepoEntries: [] })
+    await expect(removeResponse.json()).resolves.toEqual({ ...workspace, openWorkspaceEntries: [] })
     expect(mocks.addServerWorkspaceRepo).toHaveBeenCalledWith({ kind: 'local', id: '/repo-a' })
     expect(mocks.removeServerWorkspaceRepo).toHaveBeenCalledWith('/repo-a')
   })
@@ -263,13 +263,13 @@ describe('settings routes', () => {
 
   test('delegates recent-repo writes to the settings command handler layer', async () => {
     const repo = { kind: 'local', id: '/tmp/repo-a' } as const
-    mocks.handleAddRecentRepo.mockResolvedValue({ ok: true, recentRepos: [repo], addedRepo: repo })
-    mocks.handleClearRecentRepos.mockResolvedValue({ ok: true })
+    mocks.handleAddRecentWorkspace.mockResolvedValue({ ok: true, recentWorkspaces: [repo], addedRepo: repo })
+    mocks.handleClearRecentWorkspaces.mockResolvedValue({ ok: true })
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
     const app = createSettingsRoutes(settingsRouteOptions())
 
     const addResponse = await app.request(
-      new Request('http://127.0.0.1:32100/recent-repos/add', {
+      new Request('http://127.0.0.1:32100/recent-workspaces/add', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ repo }),
@@ -277,20 +277,20 @@ describe('settings routes', () => {
     )
     await expect(addResponse.json()).resolves.toEqual({
       ok: true,
-      recentRepos: [repo],
+      recentWorkspaces: [repo],
       addedRepo: repo,
     })
-    expect(mocks.handleAddRecentRepo).toHaveBeenCalledWith({ repo })
+    expect(mocks.handleAddRecentWorkspace).toHaveBeenCalledWith({ repo })
 
     const clearResponse = await app.request(
-      new Request('http://127.0.0.1:32100/recent-repos/clear', {
+      new Request('http://127.0.0.1:32100/recent-workspaces/clear', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({}),
       }),
     )
     await expect(clearResponse.json()).resolves.toEqual({ ok: true })
-    expect(mocks.handleClearRecentRepos).toHaveBeenCalled()
+    expect(mocks.handleClearRecentWorkspaces).toHaveBeenCalled()
   })
 
   test('returns 400 BAD_REQUEST when the body is missing required fields', async () => {

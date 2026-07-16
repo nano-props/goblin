@@ -1,11 +1,11 @@
 // Actions are the write boundary that commits to the server transport and
 // projects server-returned values into React Query.
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { settingsLog } from '#/web/logger.ts'
 import type { GlobalShortcutState, I18nSnapshot, ThemeState, WorkspaceRestoreResult } from '#/shared/api-types.ts'
 import {
-  addRecentRepo,
-  clearRecentRepos,
+  addRecentWorkspace,
+  clearRecentWorkspaces,
   refreshExternalAppsSnapshot,
   refreshGitHubCliState,
   restoreRepoWorkspaceTabs,
@@ -31,20 +31,20 @@ import {
   lanInfoQueryKey,
   updateGitHubCliCache,
   updateRepoSettingsStateCache,
-  updateRuntimeRecentReposStateCache,
+  updateRuntimeRecentWorkspacesStateCache,
   updateRuntimeSettingsSnapshotCache,
 } from '#/web/settings-query-cache.ts'
 
 // Settings actions commit to the embedded server first. React Query is the
 // window-local projection of that server result, never an independent source.
-export async function recordRecentRepo(repo: RepoSessionEntry): Promise<void> {
-  const result = await addRecentRepo(repo)
-  updateRuntimeRecentReposStateCache(primaryWindowQueryClient, { recentRepos: result.recentRepos })
+export async function recordRecentWorkspace(repo: WorkspaceSessionEntry): Promise<void> {
+  const result = await addRecentWorkspace(repo)
+  updateRuntimeRecentWorkspacesStateCache(primaryWindowQueryClient, { recentWorkspaces: result.recentWorkspaces })
 }
 
-export async function clearRecentRepoHistory(): Promise<void> {
-  await clearRecentRepos()
-  updateRuntimeRecentReposStateCache(primaryWindowQueryClient, { recentRepos: [] })
+export async function clearRecentWorkspaceHistory(): Promise<void> {
+  await clearRecentWorkspaces()
+  updateRuntimeRecentWorkspacesStateCache(primaryWindowQueryClient, { recentWorkspaces: [] })
 }
 
 export async function restoreWorkspaceAtBoot(
@@ -55,7 +55,7 @@ export async function restoreWorkspaceAtBoot(
   return restored
 }
 
-export async function addRepoToWorkspace(entry: RepoSessionEntry): Promise<void> {
+export async function addRepoToWorkspace(entry: WorkspaceSessionEntry): Promise<void> {
   await addWorkspaceRepo(entry)
 }
 

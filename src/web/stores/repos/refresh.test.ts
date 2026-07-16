@@ -621,20 +621,20 @@ describe('projection refresh request ordering', () => {
     expect(repo ? readRepoBranchQueryProjection(repo)?.branches.map((b) => b.name) : null).toEqual(['reopened'])
   })
 
-  test('projection read-model refresh marks deleted or non-git paths unavailable and skips follow-up reads', async () => {
+  test('projection read-model refresh keeps the workspace available when Git capability is unavailable', async () => {
     const repoRuntimeId = seedRepo([branch('main')])
     let projectionCalls = 0
     ipcHandlers['repo.projection'] = async () => {
       projectionCalls += 1
-      throw new Error('error.not-git-repo')
+      throw new Error('error.workspace-git-unavailable')
     }
 
     await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { repoRuntimeId })
 
     expect(projectionCalls).toBe(1)
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.availability).toMatchObject({ phase: 'unavailable', reason: 'error.not-git-repo' })
-    expect(repo?.dataLoads.repoReadModel.error).toBe('error.not-git-repo')
+    expect(repo?.availability).toEqual({ phase: 'available' })
+    expect(repo?.dataLoads.repoReadModel.error).toBe('error.workspace-git-unavailable')
   })
 
   test('projection and status refreshes settle independently when projection fails', async () => {
@@ -728,7 +728,7 @@ describe('projection refresh request ordering', () => {
   test('standalone status availability errors remain query-local', async () => {
     const repoRuntimeId = seedRepo([branch('main')])
     ipcHandlers['repo.worktreeStatus'] = async () => {
-      throw new Error('error.not-git-repo')
+      throw new Error('error.workspace-git-unavailable')
     }
 
     await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
@@ -737,7 +737,7 @@ describe('projection refresh request ordering', () => {
     expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repoRuntimeId))?.error).toEqual(
       expect.objectContaining({
         message: 'error.failed-read-repo',
-        cause: expect.objectContaining({ message: 'error.not-git-repo' }),
+        cause: expect.objectContaining({ message: 'error.workspace-git-unavailable' }),
       }),
     )
   })

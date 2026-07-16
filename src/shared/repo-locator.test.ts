@@ -5,7 +5,7 @@ import {
   formatRemoteRepoTargetLocator,
   formatRemoteWorktreeLocator,
   formatRepoLocator,
-  formatRepoSessionEntryLocator,
+  formatWorkspaceSessionEntryLocator,
   toSafeCanonicalRepoLocator,
 } from '#/shared/repo-locator.ts'
 
@@ -47,9 +47,9 @@ describe('repo locators', () => {
   })
 
   test('formats recent repo session entry locators', () => {
-    expect(formatRepoSessionEntryLocator({ kind: 'local', id: '/Users/example/repo' }, '/Users/example')).toBe('~/repo')
+    expect(formatWorkspaceSessionEntryLocator({ kind: 'local', id: '/Users/example/repo' }, '/Users/example')).toBe('~/repo')
     expect(
-      formatRepoSessionEntryLocator(
+      formatWorkspaceSessionEntryLocator(
         {
           kind: 'remote',
           id: 'goblin+ssh://prod/srv/repo',

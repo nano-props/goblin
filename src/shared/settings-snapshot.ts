@@ -1,7 +1,7 @@
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
 import type {
-  RuntimeRecentReposState,
+  RuntimeRecentWorkspacesState,
   RuntimeSettingsSnapshot,
   UserSettings,
   SettingsSnapshot,
@@ -25,16 +25,16 @@ export function buildRuntimeSettingsSnapshot(input: {
   }
 }
 
-export function buildRuntimeRecentReposState(input: { recentRepos: RepoSessionEntry[] }): RuntimeRecentReposState {
+export function buildRuntimeRecentWorkspacesState(input: { recentWorkspaces: WorkspaceSessionEntry[] }): RuntimeRecentWorkspacesState {
   return {
-    recentRepos: input.recentRepos,
+    recentWorkspaces: input.recentWorkspaces,
   }
 }
 
 export function buildSettingsSnapshot(input: {
   prefs: UserSettings
   globalShortcutRegistered: boolean
-  recentRepos: RepoSessionEntry[]
+  recentWorkspaces: WorkspaceSessionEntry[]
   repoSettings: RepoSettingsEntry[]
 }): SettingsSnapshot {
   return {
@@ -42,7 +42,7 @@ export function buildSettingsSnapshot(input: {
       prefs: input.prefs,
       globalShortcutRegistered: input.globalShortcutRegistered,
     }),
-    ...buildRuntimeRecentReposState({ recentRepos: input.recentRepos }),
+    ...buildRuntimeRecentWorkspacesState({ recentWorkspaces: input.recentWorkspaces }),
     repoSettings: input.repoSettings,
   }
 }

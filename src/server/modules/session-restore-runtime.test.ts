@@ -21,7 +21,7 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
   compareAndReplaceServerWorkspaceRepos: vi.fn(),
   confirmServerWorkspaceRepoEntry: vi.fn(async (entry) => ({
     matched: true,
-    workspace: { openRepoEntries: [entry], workspacePaneTabsByTargetByRepo: {} },
+    workspace: { openWorkspaceEntries: [entry], workspacePaneTabsByTargetByWorkspace: {} },
   })),
 }))
 
@@ -43,7 +43,7 @@ describe('session restore runtime ownership', () => {
     clearRepoRuntimesForUser(USER_ID)
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: REPO_ROOT }],
+      openWorkspaceEntries: [{ kind: 'local', id: REPO_ROOT }],
     })
     mocks.probeRepo.mockResolvedValue({ ok: true, root: REPO_ROOT, name: 'repo' })
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })

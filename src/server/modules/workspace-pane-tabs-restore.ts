@@ -1,5 +1,5 @@
 import type { ProjectedRestoredWorkspaceRepoRuntime, ServerWorkspaceState } from '#/shared/api-types.ts'
-import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { workspaceSessionEntryId, type WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { ServerWorkspaceMatchOutcome } from '#/server/modules/settings-source.ts'
 import type {
@@ -71,5 +71,5 @@ async function restoreWorkspacePaneTabsForRepos(
 }
 
 export function workspaceRepoEntry(workspace: ServerWorkspaceState, repoRoot: string) {
-  return workspace.openRepoEntries.find((entry) => repoSessionEntryId(entry) === repoRoot) ?? null
+  return workspace.openWorkspaceEntries.find((entry) => workspaceSessionEntryId(entry) === repoRoot) ?? null
 }

@@ -20,13 +20,13 @@ export interface RemoteRepoTarget extends RemoteRepoRef {
   }
 }
 
-export type LocalRepoSessionEntry = { kind: 'local'; id: string }
-export type RemoteRepoSessionEntry = { kind: 'remote'; id: string; ref: RemoteRepoRef }
-export type RepoSessionEntry = LocalRepoSessionEntry | RemoteRepoSessionEntry
+export type LocalWorkspaceSessionEntry = { kind: 'local'; id: string }
+export type RemoteWorkspaceSessionEntry = { kind: 'remote'; id: string; ref: RemoteRepoRef }
+export type WorkspaceSessionEntry = LocalWorkspaceSessionEntry | RemoteWorkspaceSessionEntry
 
-export function sameRepoSessionEntry(
-  a: RepoSessionEntry | null | undefined,
-  b: RepoSessionEntry | null | undefined,
+export function sameWorkspaceSessionEntry(
+  a: WorkspaceSessionEntry | null | undefined,
+  b: WorkspaceSessionEntry | null | undefined,
 ): boolean {
   if (!a || !b || a.kind !== b.kind || a.id !== b.id) return false
   if (a.kind === 'local' || b.kind === 'local') return true
@@ -180,7 +180,7 @@ export function toRemoteRepoFailureReason(reason: string): RemoteRepoFailureReas
       return 'path-missing'
     case 'not-a-repo':
     case 'git-missing':
-    case 'error.not-git-repo':
+    case 'error.workspace-git-unavailable':
       return 'not-a-repo'
     case 'timeout':
       return 'timeout'
@@ -343,23 +343,23 @@ export function isRemoteRepoTarget(value: unknown): value is RemoteRepoTarget {
   return !!normalized && normalized.id === target.id && normalized.displayName === target.displayName
 }
 
-export function repoSessionEntryId(entry: RepoSessionEntry): string {
+export function workspaceSessionEntryId(entry: WorkspaceSessionEntry): string {
   return entry.id
 }
 
-export function localRepoSessionEntry(id: string): LocalRepoSessionEntry {
+export function localWorkspaceSessionEntry(id: string): LocalWorkspaceSessionEntry {
   return { kind: 'local', id }
 }
 
-export function remoteRepoSessionEntry(ref: RemoteRepoRef | RemoteRepoTarget): RemoteRepoSessionEntry {
+export function remoteWorkspaceSessionEntry(ref: RemoteRepoRef | RemoteRepoTarget): RemoteWorkspaceSessionEntry {
   const normalized = normalizeRemoteRepoRef(ref)
   if (!normalized) throw new TypeError('Invalid remote repository reference')
   return { kind: 'remote', id: normalized.id, ref: normalized }
 }
 
-export function normalizeRepoSessionEntry(input: unknown): RepoSessionEntry | null {
+export function normalizeWorkspaceSessionEntry(input: unknown): WorkspaceSessionEntry | null {
   if (!input || typeof input !== 'object') return null
-  const entry = input as Partial<RepoSessionEntry> & { ref?: unknown }
+  const entry = input as Partial<WorkspaceSessionEntry> & { ref?: unknown }
   if (entry.kind === 'local') {
     if (typeof entry.id !== 'string') return null
     const parsed = parseWorkspaceLocator(entry.id, 'posix') ?? parseWorkspaceLocator(entry.id, 'win32')

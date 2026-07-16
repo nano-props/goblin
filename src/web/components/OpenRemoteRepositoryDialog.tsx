@@ -13,7 +13,7 @@ import { getRemoteSshHosts, resolveRemoteRepositoryTarget, testRemoteRepoConnect
 import { useT } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { RemoteDiagnosticsPanel } from '#/web/components/RemoteDiagnosticsPanel.tsx'
-import { isResolvableRemotePathInput, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
+import { isResolvableRemotePathInput, remoteWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { reportOpenRepoPostOpenEffects } from '#/web/lib/open-repo-result-feedback.ts'
 import type { RemoteDiagnosticsResult, RemoteRepoTarget, SshConfigHost } from '#/shared/remote-repo.ts'
@@ -129,13 +129,13 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
       const needsTest = !diagnostics?.ok || diagnostics.target.id !== nextTarget.id
       if (needsTest) {
         const result = await testRemoteRepoConnection(nextTarget)
-        if (!result.ok) {
+        if (!remoteDiagnosticsAllowWorkspaceOpen(result)) {
           setDiagnostics(result)
           setLoading(false)
           return
         }
       }
-      const openResult = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(nextTarget))
+      const openResult = await useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(nextTarget))
       if (!openResult.ok) {
         setActionError(formatRemoteDialogError(t, openResult.message))
         setLoading(false)
@@ -300,6 +300,12 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
       </form>
     </FormDialog>
   )
+}
+
+export function remoteDiagnosticsAllowWorkspaceOpen(
+  result: Pick<RemoteDiagnosticsResult, 'ok' | 'category'>,
+): boolean {
+  return result.ok || result.category === 'not-a-repo' || result.category === 'git-missing'
 }
 
 export function remotePathError(value: string): { errorKey: string | null } {

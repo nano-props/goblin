@@ -1,9 +1,9 @@
 import { app } from 'electron'
 import { applyMenuRuntimeState } from '#/main/menu-state.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 
 /**
- * Single authority for syncing the recent-repos list into every macOS
+ * Single authority for syncing the recent-workspaces list into every macOS
  * surface that displays it:
  *   - File → Open Recent        (via menu-state)
  *   - Dock → Recent Documents   (via app.addRecentDocument)
@@ -15,14 +15,14 @@ import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
  * buildAppMenu() themselves so that language / theme / layout state
  * is settled before the menu is rendered.
  */
-export function syncRecentRepos(recentRepos: RepoSessionEntry[]): void {
-  applyMenuRuntimeState({ recentRepos })
-  syncDockRecentDocuments(recentRepos)
+export function syncRecentWorkspaces(recentWorkspaces: WorkspaceSessionEntry[]): void {
+  applyMenuRuntimeState({ recentWorkspaces })
+  syncDockRecentDocuments(recentWorkspaces)
 }
 
-function syncDockRecentDocuments(recentRepos: RepoSessionEntry[]): void {
+function syncDockRecentDocuments(recentWorkspaces: WorkspaceSessionEntry[]): void {
   app.clearRecentDocuments()
-  for (const repo of recentRepos) {
+  for (const repo of recentWorkspaces) {
     if (repo.kind === 'local') {
       app.addRecentDocument(repo.id)
     }

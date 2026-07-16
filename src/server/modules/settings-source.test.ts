@@ -5,7 +5,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import { WORKSPACE_PANE_STATIC_TAB_IDS, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import { restorableWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-target.ts'
+import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 
@@ -59,7 +60,7 @@ test('initializes user-settings.json with defaults when no persisted settings ex
     lanEnabled: false,
   })
   expect(await mod.getServerWorkspaceState()).toEqual(defaultServerWorkspaceState())
-  expect(await mod.getServerRecentRepos()).toEqual([])
+  expect(await mod.getServerRecentWorkspaces()).toEqual([])
   expect(await mod.getServerRepoSettings()).toEqual([])
   mod.resetServerSettingsSourceForTests()
   vi.resetModules()
@@ -90,7 +91,7 @@ test('persists updates and notifies subscribers from the server settings store',
   await writeWorkspacePaneLayout(mod, REPO_B, {
     entries: [{ repoRoot: REPO_B, branchName: 'main', worktreePath: null, tabs: [] }],
   })
-  await mod.addServerRecentRepo({ kind: 'local', id: REPO_B })
+  await mod.addServerRecentWorkspace({ kind: 'local', id: REPO_B })
   await mod.trustServerRepoWorktreeBootstrapConfig({
     repoId: REPO_B,
     configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -115,13 +116,13 @@ test('persists updates and notifies subscribers from the server settings store',
     lanEnabled: false,
   })
   expect(await reloaded.getServerWorkspaceState()).toMatchObject({
-    workspacePaneTabsByTargetByRepo: {
+    workspacePaneTabsByTargetByWorkspace: {
       [REPO_B]: {
         [branchTargetKey(REPO_B, 'main')]: [],
       },
     },
   })
-  expect(await reloaded.getServerRecentRepos()).toEqual([{ kind: 'local', id: REPO_B }])
+  expect(await reloaded.getServerRecentWorkspaces()).toEqual([{ kind: 'local', id: REPO_B }])
   expect(await reloaded.getServerRepoSettings()).toEqual([
     {
       repoId: REPO_B,
@@ -168,12 +169,12 @@ test('serializes concurrent settings mutations without dropping updates', async 
   const mod = await import('#/server/modules/settings-source.ts')
 
   await Promise.all([
-    mod.addServerRecentRepo({ kind: 'local', id: REPO_A }),
-    mod.addServerRecentRepo({ kind: 'local', id: REPO_B }),
-    mod.addServerRecentRepo({ kind: 'local', id: REPO_C }),
+    mod.addServerRecentWorkspace({ kind: 'local', id: REPO_A }),
+    mod.addServerRecentWorkspace({ kind: 'local', id: REPO_B }),
+    mod.addServerRecentWorkspace({ kind: 'local', id: REPO_C }),
   ])
 
-  expect(await mod.getServerRecentRepos()).toEqual([
+  expect(await mod.getServerRecentWorkspaces()).toEqual([
     { kind: 'local', id: REPO_C },
     { kind: 'local', id: REPO_B },
     { kind: 'local', id: REPO_A },
@@ -194,7 +195,7 @@ test('stores the shared open repo order without applying the recent-repo limit',
   for (const entry of entries) await mod.addServerWorkspaceRepo(entry)
   await mod.addServerWorkspaceRepo(entries[3]!)
 
-  expect((await mod.getServerWorkspaceState()).openRepoEntries).toEqual(entries)
+  expect((await mod.getServerWorkspaceState()).openWorkspaceEntries).toEqual(entries)
 })
 
 test('repairs open repos only when the source membership is unchanged', async () => {
@@ -210,12 +211,12 @@ test('repairs open repos only when the source membership is unchanged', async ()
 
   await expect(mod.compareAndReplaceServerWorkspaceRepos([repoA, repoB], [repoA])).resolves.toMatchObject({
     matched: true,
-    workspace: { openRepoEntries: [repoA] },
+    workspace: { openWorkspaceEntries: [repoA] },
   })
   await mod.addServerWorkspaceRepo(repoC)
   await expect(mod.compareAndReplaceServerWorkspaceRepos([repoA], [])).resolves.toMatchObject({
     matched: false,
-    latestWorkspace: { openRepoEntries: [repoA, repoC] },
+    latestWorkspace: { openWorkspaceEntries: [repoA, repoC] },
   })
 })
 
@@ -231,7 +232,7 @@ test('confirms one canonical workspace repo entry without writing settings', asy
   await mod.removeServerWorkspaceRepo(entry.id)
   await expect(mod.confirmServerWorkspaceRepoEntry(entry)).resolves.toMatchObject({
     matched: false,
-    latestWorkspace: { openRepoEntries: [] },
+    latestWorkspace: { openWorkspaceEntries: [] },
   })
 })
 
@@ -252,7 +253,7 @@ test('persists durable tabs independently of runtime membership', async () => {
   })
 
   await expect(mod.getServerWorkspaceState()).resolves.toMatchObject({
-    workspacePaneTabsByTargetByRepo: {
+    workspacePaneTabsByTargetByWorkspace: {
       [REPO_A]: { [branchTargetKey(REPO_A, 'main')]: [workspacePaneStaticTabEntry('history')] },
     },
   })
@@ -260,7 +261,7 @@ test('persists durable tabs independently of runtime membership', async () => {
   vi.resetModules()
   const reloaded = await import('#/server/modules/settings-source.ts')
   await expect(reloaded.getServerWorkspaceState()).resolves.toMatchObject({
-    workspacePaneTabsByTargetByRepo: {
+    workspacePaneTabsByTargetByWorkspace: {
       [REPO_A]: { [branchTargetKey(REPO_A, 'main')]: [workspacePaneStaticTabEntry('history')] },
     },
   })
@@ -521,7 +522,7 @@ test('normalizes workspace pane tab list in server sessions', async () => {
   })
 
   expect(await mod.getServerWorkspaceState()).toMatchObject({
-    workspacePaneTabsByTargetByRepo: {
+    workspacePaneTabsByTargetByWorkspace: {
       [REPO_B]: {
         [mainTargetKey]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
         [worktreeTargetKeyValue]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')],
@@ -675,12 +676,13 @@ test('rejects invalid workspace external app recent input without touching disk'
   expect(await mod.getServerRepoSettings()).toEqual([])
 })
 
-function branchTargetKey(repoRoot: string, branchName: string): string {
-  return workspacePaneTabsTargetIdentityKey({ repoRoot, branchName, worktreePath: null })
+function branchTargetKey(_repoRoot: string, branchName: string): string {
+  return restorableWorkspacePaneTargetKey({ kind: 'git-branch', branch: branchName })
 }
 
-function worktreeTargetKey(repoRoot: string, branchName: string, worktreePath: string): string {
-  return workspacePaneTabsTargetIdentityKey({ repoRoot, branchName, worktreePath })
+function worktreeTargetKey(_repoRoot: string, _branchName: string, worktreePath: string): string {
+  const root = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: worktreePath }, 'posix')!
+  return restorableWorkspacePaneTargetKey({ kind: 'git-worktree', root })
 }
 
 test('normalizer drops malformed workspace external app recent entries on load', async () => {

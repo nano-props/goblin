@@ -65,7 +65,7 @@ describe('openRepoFromDialog', () => {
     })
     const ensureWorkspaceOpen = vi.fn(async (): Promise<OpenRepoResult> => ({
       ok: false,
-      message: 'error.not-git-repo',
+      message: 'error.workspace-git-unavailable',
     }))
     const activateRepo = vi.fn()
 
@@ -78,7 +78,7 @@ describe('openRepoFromDialog', () => {
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/repo')
     expect(activateRepo).not.toHaveBeenCalled()
     expect(mocks.toastError).toHaveBeenCalledWith('drop.open-failed', {
-      description: 'error.not-git-repo',
+      description: 'error.workspace-git-unavailable',
     })
   })
 

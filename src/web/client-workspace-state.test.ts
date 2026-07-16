@@ -45,15 +45,15 @@ describe('client workspace persistence', () => {
           '/worktree': { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 7 },
         },
       },
-      workspacePaneTabsByTargetByRepo: { '/must-not-persist': {} },
+      workspacePaneTabsByTargetByWorkspace: { '/must-not-persist': {} },
     })
 
     await writeClientWorkspaceState(presentation)
 
     expect(await readClientWorkspaceState()).toEqual(presentation)
     const raw = JSON.parse(localStorage.getItem('goblin.workspace') ?? '{}')
-    expect(raw).not.toHaveProperty('openRepoEntries')
-    expect(raw).not.toHaveProperty('workspacePaneTabsByTargetByRepo')
+    expect(raw).not.toHaveProperty('openWorkspaceEntries')
+    expect(raw).not.toHaveProperty('workspacePaneTabsByTargetByWorkspace')
   })
 
   test('normalizes malformed local presentation to safe defaults', async () => {

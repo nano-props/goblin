@@ -1,4 +1,4 @@
-import type { RepoSessionEntry, RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry, RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import { resolveServerRemoteRepoConnection, type RemoteRepoConnectionDeps } from '#/server/modules/remote.ts'
 import { createBranchSnapshot, installGoblinTestBridge, resetReposStore } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -12,8 +12,8 @@ export async function flushIpc(): Promise<void> {
 
 export function installGoblin(overrides: Record<string, (input: any) => unknown> = {}) {
   const calls = {
-    recent: [] as RepoSessionEntry[],
-    workspaceRepos: [] as RepoSessionEntry[],
+    recent: [] as WorkspaceSessionEntry[],
+    workspaceRepos: [] as WorkspaceSessionEntry[],
     projection: [] as string[],
     resolveTarget: [] as Array<{ alias: string; remotePath: string }>,
   }
@@ -46,11 +46,11 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
         },
       }
     },
-    'settings.addRecentRepo': ({ repo }: { repo: RepoSessionEntry }) => {
+    'settings.addRecentWorkspace': ({ repo }: { repo: WorkspaceSessionEntry }) => {
       calls.recent.push(repo)
       return calls.recent
     },
-    'settings.addWorkspaceRepo': ({ entry }: { entry: RepoSessionEntry }) => {
+    'settings.addWorkspaceRepo': ({ entry }: { entry: WorkspaceSessionEntry }) => {
       const existingIndex = calls.workspaceRepos.findIndex((candidate) => candidate.id === entry.id)
       if (existingIndex === -1) calls.workspaceRepos.push(entry)
       else calls.workspaceRepos[existingIndex] = entry

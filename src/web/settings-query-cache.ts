@@ -3,7 +3,7 @@ import type {
   ExternalAppsSnapshot,
   GitHubCliState,
   RepoSettingsState,
-  RuntimeRecentReposState,
+  RuntimeRecentWorkspacesState,
   RuntimeSettingsSnapshot,
   SettingsSnapshot,
 } from '#/shared/api-types.ts'
@@ -44,10 +44,10 @@ export function updateRuntimeSettingsSnapshotCache(
   }))
 }
 
-export function updateRuntimeRecentReposStateCache(queryClient: QueryClient, next: RuntimeRecentReposState): void {
+export function updateRuntimeRecentWorkspacesStateCache(queryClient: QueryClient, next: RuntimeRecentWorkspacesState): void {
   updateSettingsSnapshotCache(queryClient, (current) => ({
     ...current,
-    recentRepos: next.recentRepos,
+    recentWorkspaces: next.recentWorkspaces,
   }))
 }
 

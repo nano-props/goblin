@@ -9,8 +9,8 @@ import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/worksp
 import {
   handleSetFetchInterval,
   handleSetGlobalShortcutRegistered,
-  handleAddRecentRepo,
-  handleClearRecentRepos,
+  handleAddRecentWorkspace,
+  handleClearRecentWorkspaces,
   handleSetRepoWorkspaceExternalAppRecent,
   handleUpdateUserSettings,
 } from '#/server/modules/settings-write-paths.ts'
@@ -109,11 +109,11 @@ export function createSettingsRoutes(options: {
       }),
     )
   })
-  app.post('/recent-repos/add', async (c) => {
-    const { repo } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.recentReposAdd, c)
-    return c.json(await handleAddRecentRepo({ repo }))
+  app.post('/recent-workspaces/add', async (c) => {
+    const { repo } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.recentWorkspacesAdd, c)
+    return c.json(await handleAddRecentWorkspace({ repo }))
   })
-  app.post('/recent-repos/clear', async (c) => c.json(await handleClearRecentRepos()))
+  app.post('/recent-workspaces/clear', async (c) => c.json(await handleClearRecentWorkspaces()))
   app.post('/repo-external-app-recent', async (c) => {
     const { repoId, worktreePath, itemId } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.repoExternalAppRecentSet, c)
     return c.json(await handleSetRepoWorkspaceExternalAppRecent({ repoId, worktreePath, itemId }))

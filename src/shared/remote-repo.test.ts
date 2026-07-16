@@ -2,38 +2,38 @@ import { describe, expect, test } from 'vitest'
 import {
   isRemoteRepoTarget,
   normalizeRemoteRepoRef,
-  normalizeRepoSessionEntry,
+  normalizeWorkspaceSessionEntry,
   normalizeRemoteTarget,
   remoteRepoRefFromTarget,
-  remoteRepoSessionEntry,
-  sameRepoSessionEntry,
+  remoteWorkspaceSessionEntry,
+  sameWorkspaceSessionEntry,
 } from '#/shared/remote-repo.ts'
 
 describe('remote repository normalization', () => {
   test('compares complete persisted repo entry identity', () => {
-    const entry = remoteRepoSessionEntry({
+    const entry = remoteWorkspaceSessionEntry({
       id: 'goblin+ssh://host/repo',
       alias: 'host',
       remotePath: '/repo',
       displayName: 'host:repo',
     })
-    expect(sameRepoSessionEntry(entry, { ...entry, ref: { ...entry.ref } })).toBe(true)
-    expect(sameRepoSessionEntry(entry, { ...entry, ref: { ...entry.ref, displayName: 'host:renamed' } })).toBe(false)
-    expect(sameRepoSessionEntry({ kind: 'local', id: '/repo' }, { kind: 'local', id: '/repo' })).toBe(true)
-    expect(sameRepoSessionEntry(null, entry)).toBe(false)
+    expect(sameWorkspaceSessionEntry(entry, { ...entry, ref: { ...entry.ref } })).toBe(true)
+    expect(sameWorkspaceSessionEntry(entry, { ...entry, ref: { ...entry.ref, displayName: 'host:renamed' } })).toBe(false)
+    expect(sameWorkspaceSessionEntry({ kind: 'local', id: '/repo' }, { kind: 'local', id: '/repo' })).toBe(true)
+    expect(sameWorkspaceSessionEntry(null, entry)).toBe(false)
   })
 
   test('rejects legacy, raw-path, and mismatched persisted identities without repairing them', () => {
-    expect(normalizeRepoSessionEntry({ kind: 'local', id: '/repo' })).toBeNull()
+    expect(normalizeWorkspaceSessionEntry({ kind: 'local', id: '/repo' })).toBeNull()
     expect(
-      normalizeRepoSessionEntry({
+      normalizeWorkspaceSessionEntry({
         kind: 'remote',
         id: 'goblin+ssh://other/srv/repo',
         ref: { alias: 'prod', remotePath: '/srv/repo', displayName: 'prod:repo' },
       }),
     ).toBeNull()
     expect(
-      normalizeRepoSessionEntry({
+      normalizeWorkspaceSessionEntry({
         kind: 'remote',
         id: 'goblin+ssh://prod/srv/repo',
         target: { alias: 'prod', remotePath: '/srv/repo' },
@@ -75,7 +75,7 @@ describe('remote repository normalization', () => {
 
   test('normalizes persisted remote session entries before reuse', () => {
     expect(
-      remoteRepoSessionEntry({
+      remoteWorkspaceSessionEntry({
         id: 'goblin+ssh://prod/',
         alias: 'prod',
         remotePath: '/srv/repo',

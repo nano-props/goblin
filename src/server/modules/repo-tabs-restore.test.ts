@@ -3,7 +3,7 @@ import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -67,8 +67,8 @@ describe('restoreRepoTabsForRepo', () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      workspacePaneTabsByTargetByRepo: {
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      workspacePaneTabsByTargetByWorkspace: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
@@ -120,8 +120,8 @@ describe('restoreRepoTabsForRepo', () => {
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      workspacePaneTabsByTargetByRepo: {
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
+      workspacePaneTabsByTargetByWorkspace: {
         '/repo': { [staleTargetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
@@ -160,7 +160,7 @@ describe('restoreRepoTabsForRepo', () => {
   test('throws repo-runtime-stale when clientId/repoRuntimeId does not match the active lease', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.isCurrentRepoRuntimeMembership.mockReturnValue(false)
@@ -182,7 +182,7 @@ describe('restoreRepoTabsForRepo', () => {
   test('rejects lazy restore when the repo is absent from server workspace membership', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/other' }],
+      openWorkspaceEntries: [{ kind: 'local', id: '/other' }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
@@ -203,7 +203,7 @@ describe('restoreRepoTabsForRepo', () => {
   test('rejects lazy restore when the repo is closed during projection', async () => {
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
     })
     mocks.confirmServerWorkspaceRepoEntry.mockResolvedValue({
       matched: false,
@@ -227,7 +227,7 @@ describe('restoreRepoTabsForRepo', () => {
 
   test('rejects lazy restore when aggregate validation observes removed membership', async () => {
     const entry = { kind: 'local' as const, id: '/repo' }
-    const workspace = { ...defaultServerWorkspaceState(), openRepoEntries: [entry] }
+    const workspace = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [entry] }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.confirmServerWorkspaceRepoEntry.mockResolvedValue({
       matched: false,
@@ -257,8 +257,8 @@ describe('restoreRepoTabsForRepo', () => {
     })
     const workspace = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local' as const, id: '/repo' }],
-      workspacePaneTabsByTargetByRepo: {
+      openWorkspaceEntries: [{ kind: 'local' as const, id: '/repo' }],
+      workspacePaneTabsByTargetByWorkspace: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
@@ -286,7 +286,7 @@ describe('restoreRepoTabsForRepo', () => {
   test('keeps the existing membership when lazy local projection fails', async () => {
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
     })
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
@@ -313,7 +313,7 @@ describe('restoreRepoTabsForRepo', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [remoteEntry],
+      openWorkspaceEntries: [remoteEntry],
     })
     mocks.runRemoteLifecycleWrite.mockResolvedValue({
       kind: 'settled',
@@ -339,7 +339,7 @@ describe('restoreRepoTabsForRepo', () => {
   test('rejects a projection if the membership becomes stale while reading', async () => {
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: '/repo' }],
     })
     mocks.isCurrentRepoRuntimeMembership
       .mockReturnValueOnce(true)

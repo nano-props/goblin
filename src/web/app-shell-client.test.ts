@@ -125,7 +125,7 @@ describe('app shell client', () => {
   test('chooses repository paths through the client bridge host', async () => {
     const bridgeModule = await import('#/web/client-bridge.ts')
     const openDirectoryDialog = vi.fn(async (input?: { title?: string }) =>
-      input?.title === 'Open Git Repository' ? '/tmp/repo' : '/tmp',
+      input?.title === 'Open Workspace' ? '/tmp/repo' : '/tmp',
     )
     bridgeModule.setClientBridgeForTests(
       testBridge({
@@ -138,10 +138,10 @@ describe('app shell client', () => {
       }),
     )
 
-    const { chooseCloneParentPath, chooseLocalRepositoryPath, hasNativeDirectoryPicker } =
+    const { chooseCloneParentPath, chooseLocalWorkspacePath, hasNativeDirectoryPicker } =
       await import('#/web/app-shell-client.ts')
     expect(hasNativeDirectoryPicker()).toBe(true)
-    await expect(chooseLocalRepositoryPath()).resolves.toBe('/tmp/repo')
+    await expect(chooseLocalWorkspacePath()).resolves.toBe('/tmp/repo')
     await expect(chooseCloneParentPath()).resolves.toBe('/tmp')
   })
 

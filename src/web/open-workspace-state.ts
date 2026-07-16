@@ -2,9 +2,9 @@ import {
   isRemoteRepoId,
   remoteRepoConnectionTarget,
   remoteRepoRefFromTarget,
-  remoteRepoSessionEntry,
+  remoteWorkspaceSessionEntry,
   type RemoteRepoConnectionLifecycle,
-  type RepoSessionEntry,
+  type WorkspaceSessionEntry,
 } from '#/shared/remote-repo.ts'
 
 /** Minimal shape this helper needs from a `RepoState`. Defined
@@ -13,7 +13,7 @@ import {
 interface OpenWorkspaceRepoLike {
   id: string
   session?: {
-    entry: RepoSessionEntry | null
+    entry: WorkspaceSessionEntry | null
   }
   remote: {
     lifecycle: RemoteRepoConnectionLifecycle | null
@@ -23,8 +23,8 @@ interface OpenWorkspaceRepoLike {
 export function persistedOpenWorkspaceEntries(
   order: string[],
   repos: Record<string, OpenWorkspaceRepoLike | undefined>,
-): RepoSessionEntry[] {
-  return order.flatMap<RepoSessionEntry>((id) => {
+): WorkspaceSessionEntry[] {
+  return order.flatMap<WorkspaceSessionEntry>((id) => {
     const repo = repos[id]
     if (!repo) return []
     if (repo.session?.entry) return [repo.session.entry]
@@ -38,7 +38,7 @@ export function persistedOpenWorkspaceEntries(
     // connecting spinner, not a repo the user explicitly opened.
     const target = remoteRepoConnectionTarget(repo.remote.lifecycle)
     if (!target) return []
-    return [remoteRepoSessionEntry(remoteRepoRefFromTarget(target))]
+    return [remoteWorkspaceSessionEntry(remoteRepoRefFromTarget(target))]
   })
 }
 

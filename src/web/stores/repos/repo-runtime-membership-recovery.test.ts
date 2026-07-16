@@ -155,8 +155,8 @@ describe('repo runtime membership recovery', () => {
       }),
       'repo.runtimeReconcile': reconcile,
       'settings.addWorkspaceRepo': async () => ({
-        openRepoEntries: [{ kind: 'local', id: REPO_ROOT }],
-        workspacePaneTabsByTargetByRepo: {},
+        openWorkspaceEntries: [{ kind: 'local', id: REPO_ROOT }],
+        workspacePaneTabsByTargetByWorkspace: {},
       }),
     })
 

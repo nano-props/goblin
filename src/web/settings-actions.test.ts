@@ -4,12 +4,12 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultServerWorkspaceState, defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { githubCliQueryKey, lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { GitHubCliState, RepoSettingsState, WorkspaceRestoreResult } from '#/shared/api-types.ts'
 
-type AddRecentRepoResult = {
-  recentRepos: RepoSessionEntry[]
-  addedRepo: RepoSessionEntry | null
+type AddRecentWorkspaceResult = {
+  recentWorkspaces: WorkspaceSessionEntry[]
+  addedRepo: WorkspaceSessionEntry | null
 }
 
 type RestoreServerWorkspaceMock = (
@@ -18,8 +18,8 @@ type RestoreServerWorkspaceMock = (
 ) => Promise<WorkspaceRestoreResult>
 
 const appDataClientMocks = vi.hoisted(() => ({
-  addRecentRepo: vi.fn<() => Promise<AddRecentRepoResult>>(async () => ({ recentRepos: [], addedRepo: null })),
-  clearRecentRepos: vi.fn(async () => {}),
+  addRecentWorkspace: vi.fn<() => Promise<AddRecentWorkspaceResult>>(async () => ({ recentWorkspaces: [], addedRepo: null })),
+  clearRecentWorkspaces: vi.fn(async () => {}),
   getSettingsSnapshot: vi.fn(),
   refreshExternalAppsSnapshot: vi.fn(async () => ({
     terminal: {
@@ -41,7 +41,7 @@ const appDataClientMocks = vi.hoisted(() => ({
   })),
   restoreServerWorkspace: vi.fn<RestoreServerWorkspaceMock>(async () => ({
     status: 'restored' as const,
-    openRepoEntries: [],
+    openWorkspaceEntries: [],
     runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
   })),
   restoreRepoWorkspaceTabs: vi.fn(async () => ({
@@ -70,8 +70,8 @@ const appDataClientMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#/web/settings-client.ts', () => ({
-  addRecentRepo: appDataClientMocks.addRecentRepo,
-  clearRecentRepos: appDataClientMocks.clearRecentRepos,
+  addRecentWorkspace: appDataClientMocks.addRecentWorkspace,
+  clearRecentWorkspaces: appDataClientMocks.clearRecentWorkspaces,
   getSettingsSnapshot: appDataClientMocks.getSettingsSnapshot,
   refreshExternalAppsSnapshot: appDataClientMocks.refreshExternalAppsSnapshot,
   refreshGitHubCliState: appDataClientMocks.refreshGitHubCliState,
@@ -89,10 +89,10 @@ vi.mock('#/web/settings-client.ts', () => ({
 describe('settings actions', () => {
   beforeEach(() => {
     primaryWindowQueryClient.clear()
-    appDataClientMocks.addRecentRepo.mockReset()
-    appDataClientMocks.addRecentRepo.mockResolvedValue({ recentRepos: [], addedRepo: null })
-    appDataClientMocks.clearRecentRepos.mockReset()
-    appDataClientMocks.clearRecentRepos.mockResolvedValue(undefined)
+    appDataClientMocks.addRecentWorkspace.mockReset()
+    appDataClientMocks.addRecentWorkspace.mockResolvedValue({ recentWorkspaces: [], addedRepo: null })
+    appDataClientMocks.clearRecentWorkspaces.mockReset()
+    appDataClientMocks.clearRecentWorkspaces.mockResolvedValue(undefined)
     appDataClientMocks.getSettingsSnapshot.mockReset()
     appDataClientMocks.getSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     appDataClientMocks.refreshExternalAppsSnapshot.mockReset()
@@ -118,7 +118,7 @@ describe('settings actions', () => {
     appDataClientMocks.restoreServerWorkspace.mockReset()
     appDataClientMocks.restoreServerWorkspace.mockResolvedValue({
       status: 'restored',
-      openRepoEntries: [],
+      openWorkspaceEntries: [],
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
     })
     appDataClientMocks.restoreRepoWorkspaceTabs.mockReset()
@@ -154,32 +154,32 @@ describe('settings actions', () => {
     appDataClientMocks.setTerminalNotificationsEnabled.mockImplementation(async (enabled) => enabled)
   })
 
-  test('recordRecentRepo syncs recent repos into the settings snapshot cache', async () => {
+  test('recordRecentWorkspace syncs recent repos into the settings snapshot cache', async () => {
     primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
-    appDataClientMocks.addRecentRepo.mockResolvedValue({
-      recentRepos: [{ kind: 'local', id: '/tmp/repo-a' }],
+    appDataClientMocks.addRecentWorkspace.mockResolvedValue({
+      recentWorkspaces: [{ kind: 'local', id: '/tmp/repo-a' }],
       addedRepo: { kind: 'local', id: '/tmp/repo-a' },
     })
-    const { recordRecentRepo } = await import('#/web/settings-actions.ts')
+    const { recordRecentWorkspace } = await import('#/web/settings-actions.ts')
 
-    await recordRecentRepo({ kind: 'local', id: '/tmp/repo-a' })
+    await recordRecentWorkspace({ kind: 'local', id: '/tmp/repo-a' })
 
     expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
-      recentRepos: [{ kind: 'local', id: '/tmp/repo-a' }],
+      recentWorkspaces: [{ kind: 'local', id: '/tmp/repo-a' }],
     })
   })
 
-  test('clearRecentRepoHistory clears recent repos from the settings snapshot cache', async () => {
+  test('clearRecentWorkspaceHistory clears recent repos from the settings snapshot cache', async () => {
     primaryWindowQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
-      defaultSettingsSnapshot({ recentRepos: [{ kind: 'local', id: '/tmp/repo-a' }] }),
+      defaultSettingsSnapshot({ recentWorkspaces: [{ kind: 'local', id: '/tmp/repo-a' }] }),
     )
-    const { clearRecentRepoHistory } = await import('#/web/settings-actions.ts')
+    const { clearRecentWorkspaceHistory } = await import('#/web/settings-actions.ts')
 
-    await clearRecentRepoHistory()
+    await clearRecentWorkspaceHistory()
 
     expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
-      recentRepos: [],
+      recentWorkspaces: [],
     })
   })
 
@@ -187,13 +187,13 @@ describe('settings actions', () => {
     primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const session = {
       ...defaultServerWorkspaceState(),
-      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo-a' }],
+      openWorkspaceEntries: [{ kind: 'local' as const, id: '/tmp/repo-a' }],
       restoredRepoId: '/tmp/repo-a',
       workspacePaneSize: 333,
     }
     appDataClientMocks.restoreServerWorkspace.mockResolvedValue({
       status: 'repaired',
-      openRepoEntries: session.openRepoEntries,
+      openWorkspaceEntries: session.openWorkspaceEntries,
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
     })
     const { restoreWorkspaceAtBoot } = await import('#/web/settings-actions.ts')
@@ -202,7 +202,7 @@ describe('settings actions', () => {
 
     expect(result).toEqual({
       status: 'repaired',
-      openRepoEntries: session.openRepoEntries,
+      openWorkspaceEntries: session.openWorkspaceEntries,
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
     })
     expect(appDataClientMocks.restoreServerWorkspace).toHaveBeenCalledWith('client_test000000000000', undefined)

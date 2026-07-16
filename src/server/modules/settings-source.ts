@@ -13,7 +13,7 @@ import {
   writeUserSettingsJson,
 } from '#/server/modules/settings-persistence.ts'
 import type { LangPref, ServerWorkspaceState, UserSettings, ThemePref } from '#/shared/api-types.ts'
-import { repoSessionEntryId, sameRepoSessionEntry, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { workspaceSessionEntryId, sameWorkspaceSessionEntry, type WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { recordWithoutKey } from '#/shared/record.ts'
 import {
   isKnownWorkspaceExternalAppItemId,
@@ -32,10 +32,12 @@ import {
   workspacePaneTabRequiresWorktree,
 } from '#/shared/workspace-pane.ts'
 import {
-  parseWorkspacePaneTabsTargetIdentityKey,
-  workspacePaneTabsTargetIdentityKey,
-  type WorkspacePaneTabsTargetIdentity,
+  parseRestorableWorkspacePaneTargetKey,
+  restorableWorkspacePaneTarget,
+  restorableWorkspacePaneTargetKey,
+  workspacePaneTabsTargetFromRestorable,
 } from '#/shared/workspace-pane-tabs-target.ts'
+import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import {
   normalizeWorkspacePaneDurableLayout,
@@ -73,7 +75,7 @@ interface UserSettingsData {
   globalShortcut: string
   lanEnabled: boolean
   workspace: ServerWorkspaceState
-  recentRepos: RepoSessionEntry[]
+  recentWorkspaces: WorkspaceSessionEntry[]
   repoSettings: RepoSettingsEntry[]
 }
 
@@ -130,11 +132,11 @@ function userSettingsFromData(data: UserSettingsData): UserSettings {
   }
 }
 
-function dedupeRepoEntries(entries: RepoSessionEntry[]): RepoSessionEntry[] {
+function dedupeRepoEntries(entries: WorkspaceSessionEntry[]): WorkspaceSessionEntry[] {
   const seen = new Set<string>()
-  const normalized: RepoSessionEntry[] = []
+  const normalized: WorkspaceSessionEntry[] = []
   for (const entry of entries) {
-    const id = repoSessionEntryId(entry)
+    const id = workspaceSessionEntryId(entry)
     if (seen.has(id)) continue
     seen.add(id)
     normalized.push(entry)
@@ -163,7 +165,7 @@ function normalizeWorkspacePaneTabsByTargetByRepo(
       for (const raw of rawTabs) {
         const entry = workspacePaneTabEntryFromUnknown(raw)
         if (!entry || isWorkspacePaneRuntimeTabEntry(entry)) continue
-        if (target.kind === 'branch' && workspacePaneTabRequiresWorktree(entry.type)) continue
+        if (target.kind === 'git-branch' && workspacePaneTabRequiresWorktree(entry.type)) continue
         const identity = workspacePaneTabEntryIdentity(entry)
         if (seen.has(identity)) continue
         seen.add(identity)
@@ -179,30 +181,33 @@ function normalizeWorkspacePaneTabsByTargetByRepo(
 function safeWorkspacePaneTabsTargetIdentity(
   repoId: string,
   targetKey: string,
-): WorkspacePaneTabsTargetIdentity | null {
-  const parsed = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
-  if (!parsed || parsed.repoRoot !== repoId) return null
-  if (parsed.kind === 'branch') return isSafeBranchName(parsed.branchName) ? parsed : null
-  return toSafeSessionPath(parsed.worktreePath) === parsed.worktreePath ? parsed : null
+): RestorableWorkspacePaneTarget | null {
+  const parsed = parseRestorableWorkspacePaneTargetKey(targetKey)
+  if (!parsed) return null
+  if (parsed.kind === 'git-branch') return isSafeBranchName(parsed.branch) ? parsed : null
+  if (parsed.kind === 'git-worktree' && !workspacePaneTabsTargetFromRestorable(repoId, parsed)) return null
+  return parsed
 }
 
 function normalizeWorkspace(value: unknown): ServerWorkspaceState {
   if (!value || typeof value !== 'object') return defaultWorkspace()
   const partial = value as Partial<ServerWorkspaceState>
   return {
-    openRepoEntries: normalizeRepoEntries(partial.openRepoEntries),
-    workspacePaneTabsByTargetByRepo: normalizeWorkspacePaneTabsByTargetByRepo(partial.workspacePaneTabsByTargetByRepo),
+    openWorkspaceEntries: normalizeRepoEntries(partial.openWorkspaceEntries),
+    workspacePaneTabsByTargetByWorkspace: normalizeWorkspacePaneTabsByTargetByRepo(
+      partial.workspacePaneTabsByTargetByWorkspace,
+    ),
   }
 }
 
-function normalizeRecentRepos(value: unknown): RepoSessionEntry[] {
+function normalizeRecentWorkspaces(value: unknown): WorkspaceSessionEntry[] {
   return normalizeRepoEntries(value).slice(0, MAX_RECENT_REPOS)
 }
 
-function normalizeRepoEntries(value: unknown): RepoSessionEntry[] {
+function normalizeRepoEntries(value: unknown): WorkspaceSessionEntry[] {
   if (!Array.isArray(value)) return []
   return dedupeRepoEntries(
-    value.map(toSafeSessionRepoEntry).filter((entry): entry is RepoSessionEntry => entry !== null),
+    value.map(toSafeSessionRepoEntry).filter((entry): entry is WorkspaceSessionEntry => entry !== null),
   )
 }
 
@@ -290,7 +295,7 @@ async function readUserSettingsFile(): Promise<UserSettingsData | null> {
     globalShortcut: normalizeGlobalShortcut(parsed.globalShortcut),
     lanEnabled: normalizeLanEnabled(parsed.lanEnabled),
     workspace: normalizeWorkspace(parsed.workspace),
-    recentRepos: normalizeRecentRepos(parsed.recentRepos),
+    recentWorkspaces: normalizeRecentWorkspaces(parsed.recentWorkspaces),
     repoSettings: normalizeRepoSettings(parsed.repoSettings),
   }
 }
@@ -310,7 +315,7 @@ async function loadUserSettings(): Promise<UserSettingsData> {
       data = {
         ...defaultUserSettings(),
         workspace: defaultWorkspace(),
-        recentRepos: [],
+        recentWorkspaces: [],
         repoSettings: [],
       }
       await writeUserSettingsFile(data)
@@ -464,25 +469,25 @@ export async function getServerWorkspaceState(): Promise<ServerWorkspaceState> {
   return cloneWorkspace((await loadUserSettings()).workspace)
 }
 
-export async function addServerWorkspaceRepo(entry: RepoSessionEntry): Promise<ServerWorkspaceState> {
+export async function addServerWorkspaceRepo(entry: WorkspaceSessionEntry): Promise<ServerWorkspaceState> {
   return await mutateUserSettings(async (data) => {
-    const id = repoSessionEntryId(entry)
-    const existingIndex = data.workspace.openRepoEntries.findIndex((candidate) => repoSessionEntryId(candidate) === id)
-    const openRepoEntries = [...data.workspace.openRepoEntries]
-    if (existingIndex === -1) openRepoEntries.push(entry)
-    else openRepoEntries[existingIndex] = entry
-    const workspace = { ...data.workspace, openRepoEntries }
+    const id = workspaceSessionEntryId(entry)
+    const existingIndex = data.workspace.openWorkspaceEntries.findIndex((candidate) => workspaceSessionEntryId(candidate) === id)
+    const openWorkspaceEntries = [...data.workspace.openWorkspaceEntries]
+    if (existingIndex === -1) openWorkspaceEntries.push(entry)
+    else openWorkspaceEntries[existingIndex] = entry
+    const workspace = { ...data.workspace, openWorkspaceEntries }
     return { next: { ...data, workspace }, result: cloneWorkspace(workspace) }
   })
 }
 
 export async function removeServerWorkspaceRepo(repoRoot: string): Promise<ServerWorkspaceState> {
   return await mutateUserSettings(async (data) => {
-    const openRepoEntries = data.workspace.openRepoEntries.filter((entry) => repoSessionEntryId(entry) !== repoRoot)
-    if (openRepoEntries.length === data.workspace.openRepoEntries.length) {
+    const openWorkspaceEntries = data.workspace.openWorkspaceEntries.filter((entry) => workspaceSessionEntryId(entry) !== repoRoot)
+    if (openWorkspaceEntries.length === data.workspace.openWorkspaceEntries.length) {
       return unchangedUserSettings(data, cloneWorkspace(data.workspace))
     }
-    const workspace = { ...data.workspace, openRepoEntries }
+    const workspace = { ...data.workspace, openWorkspaceEntries }
     return { next: { ...data, workspace }, result: cloneWorkspace(workspace) }
   })
 }
@@ -491,17 +496,17 @@ export type ServerWorkspaceMatchOutcome =
   { matched: true; workspace: ServerWorkspaceState } | { matched: false; latestWorkspace: ServerWorkspaceState }
 
 export async function compareAndReplaceServerWorkspaceRepos(
-  expected: RepoSessionEntry[],
-  replacement: RepoSessionEntry[],
+  expected: WorkspaceSessionEntry[],
+  replacement: WorkspaceSessionEntry[],
 ): Promise<ServerWorkspaceMatchOutcome> {
   return await mutateUserSettings<ServerWorkspaceMatchOutcome>(async (data) => {
-    if (!sameRepoEntries(data.workspace.openRepoEntries, expected)) {
+    if (!sameRepoEntries(data.workspace.openWorkspaceEntries, expected)) {
       return unchangedUserSettings(data, { matched: false, latestWorkspace: cloneWorkspace(data.workspace) })
     }
     if (sameRepoEntries(expected, replacement)) {
       return unchangedUserSettings(data, { matched: true, workspace: cloneWorkspace(data.workspace) })
     }
-    const workspace = { ...data.workspace, openRepoEntries: replacement }
+    const workspace = { ...data.workspace, openWorkspaceEntries: replacement }
     return {
       next: { ...data, workspace },
       result: { matched: true, workspace: cloneWorkspace(workspace) },
@@ -510,33 +515,32 @@ export async function compareAndReplaceServerWorkspaceRepos(
 }
 
 export async function confirmServerWorkspaceRepoEntry(
-  expected: RepoSessionEntry,
+  expected: WorkspaceSessionEntry,
 ): Promise<ServerWorkspaceMatchOutcome> {
   return await mutateUserSettings<ServerWorkspaceMatchOutcome>(async (data) => {
-    const current = data.workspace.openRepoEntries.find(
-      (entry) => repoSessionEntryId(entry) === repoSessionEntryId(expected),
+    const current = data.workspace.openWorkspaceEntries.find(
+      (entry) => workspaceSessionEntryId(entry) === workspaceSessionEntryId(expected),
     )
     return unchangedUserSettings(
       data,
-      sameRepoSessionEntry(current, expected)
+      sameWorkspaceSessionEntry(current, expected)
         ? { matched: true, workspace: cloneWorkspace(data.workspace) }
         : { matched: false, latestWorkspace: cloneWorkspace(data.workspace) },
     )
   })
 }
 
-function sameRepoEntries(a: RepoSessionEntry[], b: RepoSessionEntry[]): boolean {
-  return a.length === b.length && a.every((entry, index) => sameRepoSessionEntry(entry, b[index]))
+function sameRepoEntries(a: WorkspaceSessionEntry[], b: WorkspaceSessionEntry[]): boolean {
+  return a.length === b.length && a.every((entry, index) => sameWorkspaceSessionEntry(entry, b[index]))
 }
 
 function workspacePaneLayoutFromWorkspace(workspace: ServerWorkspaceState, repoRoot: string): WorkspacePaneDurableLayout {
   const entries: WorkspacePaneDurableLayout['entries'] = []
-  for (const [targetKey, tabs] of Object.entries(workspace.workspacePaneTabsByTargetByRepo[repoRoot] ?? {})) {
-    const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
-    if (!target || target.repoRoot !== repoRoot) continue
-    entries.push(target.kind === 'branch'
-      ? { repoRoot, branchName: target.branchName, worktreePath: null, tabs }
-      : { repoRoot, branchName: '', worktreePath: target.worktreePath, tabs })
+  for (const [targetKey, tabs] of Object.entries(workspace.workspacePaneTabsByTargetByWorkspace[repoRoot] ?? {})) {
+    const target = parseRestorableWorkspacePaneTargetKey(targetKey)
+    const runtimeTarget = target ? workspacePaneTabsTargetFromRestorable(repoRoot, target) : null
+    if (!runtimeTarget) continue
+    entries.push({ ...runtimeTarget, tabs })
   }
   return normalizeWorkspacePaneDurableLayout(repoRoot, { entries })
 }
@@ -557,10 +561,10 @@ export const serverWorkspacePaneLayoutRestoreTransaction: WorkspacePaneLayoutRes
     return await mutateUserSettings<WorkspacePaneLayoutRestoreTransactionOutcome>(async (data) => {
       const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
       const snapshot = { layout: currentLayout }
-      const currentRepoEntry = data.workspace.openRepoEntries.find(
-        (entry) => repoSessionEntryId(entry) === input.repoRoot,
+      const currentRepoEntry = data.workspace.openWorkspaceEntries.find(
+        (entry) => workspaceSessionEntryId(entry) === input.repoRoot,
       )
-      if (!sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry)) {
+      if (!sameWorkspaceSessionEntry(currentRepoEntry, input.expectedRepoEntry)) {
         return unchangedUserSettings(data, { kind: 'membership-conflict', snapshot })
       }
       return unchangedUserSettings(data, { kind: 'accepted' as const, snapshot })
@@ -610,20 +614,23 @@ function workspacePaneLayoutMutation(
     return unchangedUserSettings(data, { kind: 'accepted', snapshot, changed: false })
   }
   const byTarget = Object.fromEntries(
-    replacement.entries.map((entry) => [workspacePaneTabsTargetIdentityKey(entry), entry.tabs]),
+    replacement.entries.flatMap((entry) => {
+      const target = restorableWorkspacePaneTarget(entry)
+      return target ? [[restorableWorkspacePaneTargetKey(target), entry.tabs] as const] : []
+    }),
   )
-  const workspacePaneTabsByTargetByRepo = Object.keys(byTarget).length === 0
-    ? recordWithoutKey(data.workspace.workspacePaneTabsByTargetByRepo, repoRoot)
-    : { ...data.workspace.workspacePaneTabsByTargetByRepo, [repoRoot]: byTarget }
-  const workspace = normalizeWorkspace({ ...data.workspace, workspacePaneTabsByTargetByRepo })
+  const workspacePaneTabsByTargetByWorkspace = Object.keys(byTarget).length === 0
+    ? recordWithoutKey(data.workspace.workspacePaneTabsByTargetByWorkspace, repoRoot)
+    : { ...data.workspace.workspacePaneTabsByTargetByWorkspace, [repoRoot]: byTarget }
+  const workspace = normalizeWorkspace({ ...data.workspace, workspacePaneTabsByTargetByWorkspace })
   return {
     next: { ...data, workspace },
     result: { kind: 'accepted', snapshot: { layout: workspacePaneLayoutFromWorkspace(workspace, repoRoot) }, changed: true },
   }
 }
 
-export async function getServerRecentRepos(): Promise<RepoSessionEntry[]> {
-  return [...(await loadUserSettings()).recentRepos]
+export async function getServerRecentWorkspaces(): Promise<WorkspaceSessionEntry[]> {
+  return [...(await loadUserSettings()).recentWorkspaces]
 }
 
 export async function getServerRepoSettings(): Promise<RepoSettingsEntry[]> {
@@ -766,23 +773,23 @@ export async function pruneServerRepoSettingsForRemovedWorktree(input: {
   })
 }
 
-export async function addServerRecentRepo(repo: RepoSessionEntry): Promise<RepoSessionEntry[]> {
+export async function addServerRecentWorkspace(repo: WorkspaceSessionEntry): Promise<WorkspaceSessionEntry[]> {
   return await mutateUserSettings(async (data) => {
     const safeRepo = toSafeSessionRepoEntry(repo)
-    if (!safeRepo) return unchangedUserSettings(data, [...data.recentRepos])
-    const safeId = repoSessionEntryId(safeRepo)
-    const recentRepos = [safeRepo, ...data.recentRepos.filter((entry) => repoSessionEntryId(entry) !== safeId)].slice(
+    if (!safeRepo) return unchangedUserSettings(data, [...data.recentWorkspaces])
+    const safeId = workspaceSessionEntryId(safeRepo)
+    const recentWorkspaces = [safeRepo, ...data.recentWorkspaces.filter((entry) => workspaceSessionEntryId(entry) !== safeId)].slice(
       0,
       MAX_RECENT_REPOS,
     )
-    return { next: { ...data, recentRepos }, result: [...recentRepos] }
+    return { next: { ...data, recentWorkspaces }, result: [...recentWorkspaces] }
   })
 }
 
-export async function clearServerRecentRepos(): Promise<void> {
+export async function clearServerRecentWorkspaces(): Promise<void> {
   await mutateUserSettings(async (data) => {
-    if (data.recentRepos.length === 0) return { next: data, result: undefined, changed: false }
-    return { next: { ...data, recentRepos: [] }, result: undefined }
+    if (data.recentWorkspaces.length === 0) return { next: data, result: undefined, changed: false }
+    return { next: { ...data, recentWorkspaces: [] }, result: undefined }
   })
 }
 

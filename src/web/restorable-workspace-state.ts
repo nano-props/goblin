@@ -56,7 +56,7 @@ export function clientWorkspaceStateFromRestorableWorkspaceState(input: {
   // is different; it references branch/worktree identities and is only
   // persisted for repos whose branch read model can validate those targets.
   const projectedRepos = clientWorkspaceRepoProjections(repos, restorableWorkspaceState.order)
-  const workspacePaneTabsByTargetByRepo = workspacePaneTabsByTargetByRepoFromQueryCache(
+  const workspacePaneTabsByTargetByWorkspace = workspacePaneTabsByTargetByWorkspaceFromQueryCache(
     repos,
     restorableWorkspaceState.order,
   )
@@ -71,7 +71,7 @@ export function clientWorkspaceStateFromRestorableWorkspaceState(input: {
     preferredWorkspacePaneTabByTargetByRepo: preferredWorkspacePaneTabsForClientWorkspace(
       projectedRepos,
       restorableWorkspaceState.order,
-      workspacePaneTabsByTargetByRepo,
+      workspacePaneTabsByTargetByWorkspace,
     ),
     filetreeViewStateByWorktreeByRepo: persistedFiletreeViewStateByWorktreeByRepoForSession(
       input.filetreeInteractionByScope ?? {},
@@ -110,7 +110,7 @@ function clientWorkspaceRepoProjections(
   return projectedRepos
 }
 
-function workspacePaneTabsByTargetByRepoFromQueryCache(
+function workspacePaneTabsByTargetByWorkspaceFromQueryCache(
   repos: Record<string, Pick<ReposStore['repos'][string], 'repoRuntimeId' | 'session'> | undefined>,
   order: readonly string[],
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
@@ -200,7 +200,7 @@ function preferredWorkspacePaneTabsForClientWorkspace(
     (ClientWorkspaceRepoTargetProjection & Required<Pick<ClientWorkspaceRepoTargetProjection, 'ui'>>) | undefined
   >,
   order: readonly string[],
-  workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
+  workspacePaneTabsByTargetByWorkspace: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
 ): Record<string, Record<string, WorkspacePaneSessionTabType | null>> {
   const byRepo: Record<string, Record<string, WorkspacePaneSessionTabType | null>> = {}
   for (const id of order) {
@@ -212,7 +212,7 @@ function preferredWorkspacePaneTabsForClientWorkspace(
       if (!target) continue
       if (tab !== null && !isWorkspacePaneSessionTabType(tab)) continue
       if (tab !== null && target.kind === 'branch' && workspacePaneTabRequiresWorktree(tab)) continue
-      const targetTabs = workspacePaneTabsByTargetByRepo[id]?.[targetKey] ?? defaultWorkspacePaneTabs()
+      const targetTabs = workspacePaneTabsByTargetByWorkspace[id]?.[targetKey] ?? defaultWorkspacePaneTabs()
       if (
         tab !== null &&
         isWorkspacePaneStaticTabType(tab) &&

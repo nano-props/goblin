@@ -3,8 +3,8 @@ import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 
 const mocks = vi.hoisted(() => ({
   publishSettingsInvalidation: vi.fn(),
-  addServerRecentRepo: vi.fn(),
-  clearServerRecentRepos: vi.fn(),
+  addServerRecentWorkspace: vi.fn(),
+  clearServerRecentWorkspaces: vi.fn(),
   setServerFetchIntervalSec: vi.fn(),
   updateUserSettings: vi.fn(),
   settingsInvalidationScopesForPrefsPatch: vi.fn(),
@@ -15,8 +15,8 @@ vi.mock('#/server/modules/invalidation-broker.ts', () => ({
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
-  addServerRecentRepo: mocks.addServerRecentRepo,
-  clearServerRecentRepos: mocks.clearServerRecentRepos,
+  addServerRecentWorkspace: mocks.addServerRecentWorkspace,
+  clearServerRecentWorkspaces: mocks.clearServerRecentWorkspaces,
   setServerFetchIntervalSec: mocks.setServerFetchIntervalSec,
   updateUserSettings: mocks.updateUserSettings,
 }))
@@ -68,12 +68,12 @@ describe('settings command handlers', () => {
 
   test('adds recent repos and publishes settings snapshot invalidation', async () => {
     const repo = { kind: 'local', id: 'goblin+file:///tmp/repo-a' } as const
-    mocks.addServerRecentRepo.mockResolvedValue([repo])
-    const { handleAddRecentRepo } = await import('#/server/modules/settings-write-paths.ts')
+    mocks.addServerRecentWorkspace.mockResolvedValue([repo])
+    const { handleAddRecentWorkspace } = await import('#/server/modules/settings-write-paths.ts')
 
-    await expect(handleAddRecentRepo({ repo })).resolves.toEqual({
+    await expect(handleAddRecentWorkspace({ repo })).resolves.toEqual({
       ok: true,
-      recentRepos: [repo],
+      recentWorkspaces: [repo],
       addedRepo: repo,
     })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])

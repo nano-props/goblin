@@ -4,9 +4,9 @@ import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
   isRemoteRepoId,
   normalizeRemoteRepoRef,
-  normalizeRepoSessionEntry,
+  normalizeWorkspaceSessionEntry,
   parseRemoteRepoId,
-  type RepoSessionEntry,
+  type WorkspaceSessionEntry,
 } from '#/shared/remote-repo.ts'
 import { parseWorkspaceLocator, type WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
 
@@ -50,8 +50,8 @@ export function toSafeRepoLocator(value: unknown): string | null {
   return parseWorkspaceLocator(value, currentPlatform()) ? value : null
 }
 
-export function toSafeSessionRepoEntry(value: unknown): RepoSessionEntry | null {
-  const entry = normalizeRepoSessionEntry(value)
+export function toSafeSessionRepoEntry(value: unknown): WorkspaceSessionEntry | null {
+  const entry = normalizeWorkspaceSessionEntry(value)
   const id = toSafeRepoLocator(entry?.id ?? value)
   if (!id) return null
   if (!isRemoteRepoId(id)) return entry?.kind === 'local' ? { kind: 'local', id } : null

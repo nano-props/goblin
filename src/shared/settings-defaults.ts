@@ -20,7 +20,7 @@ export const DEFAULT_GLOBAL_SHORTCUT_DISABLED = false
 export const DEFAULT_LAN_ENABLED = false
 
 export function defaultServerWorkspaceState(): ServerWorkspaceState {
-  return { openRepoEntries: [], workspacePaneTabsByTargetByRepo: {} }
+  return { openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} }
 }
 
 export function defaultClientWorkspaceState(): ClientWorkspaceState {
@@ -53,7 +53,7 @@ export function defaultSettingsSnapshot(overrides: Partial<SettingsSnapshot> = {
   return {
     ...prefs,
     globalShortcutRegistered: overrides.globalShortcutRegistered ?? false,
-    recentRepos: overrides.recentRepos ?? [],
+    recentWorkspaces: overrides.recentWorkspaces ?? [],
     repoSettings: overrides.repoSettings ?? [],
   }
 }

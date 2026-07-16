@@ -64,8 +64,8 @@ export function resetRefreshTest(): void {
   ipcHandlers['repo.abort'] = async () => false
   ipcHandlers['repo.fetch'] = async () => ({ ok: true, message: 'ok' })
   ipcHandlers['settings.removeWorkspaceRepo'] = async () => ({
-    openRepoEntries: [],
-    workspacePaneTabsByTargetByRepo: {},
+    openWorkspaceEntries: [],
+    workspacePaneTabsByTargetByWorkspace: {},
   })
   ipcHandlers['repo.worktreeStatus'] = ({ repoRuntimeId }: { repoRuntimeId: string }) => ({
     repoRuntimeId,

@@ -6,7 +6,7 @@ import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { Field, FieldLabel } from '#/web/components/ui/field.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
 import { tildify, untildify } from '#/web/lib/paths.ts'
-import { chooseLocalRepositoryPath, hasNativeDirectoryPicker } from '#/web/app-shell-client.ts'
+import { chooseLocalWorkspacePath, hasNativeDirectoryPicker } from '#/web/app-shell-client.ts'
 import { useLatestAsyncTask } from '#/web/hooks/useLatestAsyncTask.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useT } from '#/web/stores/i18n.ts'
@@ -42,7 +42,7 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
   async function choosePath() {
     if (pending || !canChoosePath) return
     try {
-      const selected = await chooseLocalRepositoryPath()
+      const selected = await chooseLocalWorkspacePath()
       if (selected) {
         setPath(tildify(selected))
         setError(null)

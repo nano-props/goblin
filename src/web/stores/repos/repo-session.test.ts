@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { normalizeRemoteTarget, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
+import { normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
@@ -91,13 +91,13 @@ describe('repo lifecycle', () => {
     const removeWorkspaceRepo = vi.fn(({ repoRoot }: { repoRoot: string }) => {
       const index = workspaceRepos.indexOf(repoRoot)
       if (index !== -1) workspaceRepos.splice(index, 1)
-      return { openRepoEntries: [], workspacePaneTabsByTargetByRepo: {} }
+      return { openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} }
     })
     installGoblin({
       'settings.addWorkspaceRepo': async ({ entry }: { entry: { id: string } }) => {
         await releaseAdd.promise
         workspaceRepos.push(entry.id)
-        return { openRepoEntries: [], workspacePaneTabsByTargetByRepo: {} }
+        return { openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} }
       },
       'settings.removeWorkspaceRepo': removeWorkspaceRepo,
     })
@@ -121,13 +121,13 @@ describe('repo lifecycle', () => {
     installGoblin({
       'settings.addWorkspaceRepo': ({ entry }: { entry: { id: string } }) => {
         if (!workspaceRepos.includes(entry.id)) workspaceRepos.push(entry.id)
-        return { openRepoEntries: [], workspacePaneTabsByTargetByRepo: {} }
+        return { openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} }
       },
       'settings.removeWorkspaceRepo': async ({ repoRoot }: { repoRoot: string }) => {
         if (blockRemove) await releaseRemove.promise
         const index = workspaceRepos.indexOf(repoRoot)
         if (index !== -1) workspaceRepos.splice(index, 1)
-        return { openRepoEntries: [], workspacePaneTabsByTargetByRepo: {} }
+        return { openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} }
       },
     })
     await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
@@ -145,7 +145,7 @@ describe('repo lifecycle', () => {
 
   test('ensureWorkspaceOpen reports recent-history write failures without rolling back the opened repo', async () => {
     installGoblin({
-      'settings.addRecentRepo': () => {
+      'settings.addRecentWorkspace': () => {
         throw new Error('recent write failed')
       },
     })
@@ -321,12 +321,12 @@ describe('repo lifecycle', () => {
       probe: (cwd: string) => ({ ok: true, root: cwd, name: 'repo' }),
     })
 
-    const result = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!))
+    const result = await useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))
     if (result.ok) await result.postOpenEffects
 
     expect(result).toMatchObject({ ok: true, id: target!.id })
     expect(useReposStore.getState().repos[target!.id]?.remote.lifecycle).toEqual({ kind: 'ready', target })
-    expect(calls.recent).toEqual([remoteRepoSessionEntry(target!)])
+    expect(calls.recent).toEqual([remoteWorkspaceSessionEntry(target!)])
   })
 
   test('keeps a remote workspace open when lifecycle transport is temporarily unavailable', async () => {
@@ -344,11 +344,11 @@ describe('repo lifecycle', () => {
       },
     })
 
-    await expect(useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!))).resolves.toMatchObject({
+    await expect(useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))).resolves.toMatchObject({
       ok: true,
       id: target!.id,
     })
-    expect(calls.workspaceRepos).toEqual([remoteRepoSessionEntry(target!)])
+    expect(calls.workspaceRepos).toEqual([remoteWorkspaceSessionEntry(target!)])
     expect(useReposStore.getState().repos[target!.id]).toBeDefined()
   })
 
@@ -369,8 +369,8 @@ describe('repo lifecycle', () => {
     }>()
     const calls = installGoblin({ 'remote.lifecycle': () => lifecycle.promise })
 
-    const opening = useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!))
-    await vi.waitFor(() => expect(calls.workspaceRepos).toEqual([remoteRepoSessionEntry(target!)]))
+    const opening = useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))
+    await vi.waitFor(() => expect(calls.workspaceRepos).toEqual([remoteWorkspaceSessionEntry(target!)]))
     await expect(useReposStore.getState().closeRepo(target!.id)).resolves.toEqual({ ok: true })
     lifecycle.resolve({
       kind: 'settled',
@@ -398,7 +398,7 @@ describe('repo lifecycle', () => {
         throw new Error('offline')
       },
     })
-    await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!))
+    await useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))
 
     await expect(useReposStore.getState().retryRemoteRepoConnection(target!.id)).resolves.toEqual({
       ok: false,
@@ -433,7 +433,7 @@ describe('repo lifecycle', () => {
     })
     installGoblin()
 
-    const result = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!))
+    const result = await useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))
 
     expect(result).toMatchObject({ ok: true, id: target!.id })
     expect(useReposStore.getState().repos[target!.id]?.name).toBe('example:repo')
@@ -473,7 +473,7 @@ describe('repo lifecycle', () => {
       },
     })
 
-    const first = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(oldTarget!))
+    const first = await useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(oldTarget!))
     expect(first).toMatchObject({ ok: true, id: oldTarget!.id })
     expect(useReposStore.getState().repos[oldTarget!.id]?.remote.lifecycle).toEqual({
       kind: 'ready',
@@ -487,7 +487,7 @@ describe('repo lifecycle', () => {
       probe: (cwd: string) => ({ ok: true, root: cwd, name: 'repo' }),
       'remote.resolveTarget': () => ({ target: newTarget }),
     })
-    const second = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(newTarget!))
+    const second = await useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(newTarget!))
     expect(second).toMatchObject({ ok: true, id: newTarget!.id })
     expect(useReposStore.getState().repos[newTarget!.id]?.remote.lifecycle).toEqual({
       kind: 'ready',

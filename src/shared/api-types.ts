@@ -32,7 +32,7 @@ import type {
   RemoteConnectionInput,
   RemoteDiagnosticsResult,
   RemotePathSuggestionsInput,
-  RepoSessionEntry,
+  WorkspaceSessionEntry,
   RemoteRepoTarget,
   RemoteRepoRuntimeLifecycle,
   ResolvedRemoteTarget,
@@ -59,7 +59,7 @@ export type {
   ThemePref,
 } from '#/shared/settings.ts'
 export type {
-  NativeRecentReposProjection,
+  NativeRecentWorkspacesProjection,
   NativeSettingsProjectionPatch,
   NativeSettingsProjectionState,
   NativeHostProjection,
@@ -82,9 +82,9 @@ export interface ThemeState {
 
 export interface ServerWorkspaceState {
   /** User-level repository membership, in picker order. */
-  openRepoEntries: RepoSessionEntry[]
+  openWorkspaceEntries: WorkspaceSessionEntry[]
   /** Per-repo, per-target workspace pane layout that survives a server restart. */
-  workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneStaticTabEntry[]>>
+  workspacePaneTabsByTargetByWorkspace: Record<string, Record<string, WorkspacePaneStaticTabEntry[]>>
 }
 
 export interface ClientWorkspaceState {
@@ -113,8 +113,8 @@ export interface RuntimeSettingsSnapshot extends UserSettings {
 
 export type RepoLogResponse = LogEntry[] | { ok: false; message: string }
 
-export interface RuntimeRecentReposState {
-  recentRepos: RepoSessionEntry[]
+export interface RuntimeRecentWorkspacesState {
+  recentWorkspaces: WorkspaceSessionEntry[]
 }
 
 export interface RepoRuntimeEntry {
@@ -133,7 +133,7 @@ export interface RepoRuntimeMembershipReconcileResult {
 }
 
 interface RestoredWorkspaceRepoRuntimeBase {
-  entry: RepoSessionEntry
+  entry: WorkspaceSessionEntry
   repoRoot: string
   repoRuntimeId: string
   name: string
@@ -166,7 +166,7 @@ export interface WorkspaceRuntimeRestoreSnapshot {
 
 export interface WorkspaceRestoreResult {
   status: 'restored' | 'repaired'
-  openRepoEntries: RepoSessionEntry[]
+  openWorkspaceEntries: WorkspaceSessionEntry[]
   runtime: WorkspaceRuntimeRestoreSnapshot
 }
 
@@ -179,7 +179,7 @@ export interface RepoSettingsState {
   repoSettings: RepoSettingsEntry[]
 }
 
-export interface SettingsSnapshot extends RuntimeSettingsSnapshot, RuntimeRecentReposState, RepoSettingsState {}
+export interface SettingsSnapshot extends RuntimeSettingsSnapshot, RuntimeRecentWorkspacesState, RepoSettingsState {}
 
 export interface GlobalShortcutState {
   accelerator: string
@@ -487,8 +487,8 @@ export interface AppIpcHandlers {
     setGlobalShortcutDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     applyNativeHostProjection: (input: NativeHostProjection) => Promise<void>
-    addRecentRepo: (input: { repo: RepoSessionEntry }) => Promise<RepoSessionEntry[]>
-    clearRecentRepos: () => Promise<void>
+    addRecentWorkspace: (input: { repo: WorkspaceSessionEntry }) => Promise<WorkspaceSessionEntry[]>
+    clearRecentWorkspaces: () => Promise<void>
   }
   externalApps: {
     get: () => Promise<ExternalAppsSnapshot>

@@ -30,14 +30,14 @@ describe('i18n dictionaries', () => {
     }
   })
 
-  test('localizes menu and remote repository copy for non-English dictionaries', () => {
-    expect(zh['menu.file.open-remote-repo']).toBe('打开远程仓库…')
-    expect(ko['menu.file.open-remote-repo']).toBe('원격 리포지토리 열기…')
-    expect(ja['menu.file.open-remote-repo']).toBe('リモートリポジトリを開く…')
+  test('localizes menu and remote workspace copy for non-English dictionaries', () => {
+    expect(zh['menu.file.open-remote-workspace']).toBe('打开远程工作区…')
+    expect(ko['menu.file.open-remote-workspace']).toBe('원격 작업 공간 열기…')
+    expect(ja['menu.file.open-remote-workspace']).toBe('リモートワークスペースを開く…')
 
-    expect(zh['repo-picker.open-remote']).toBe('打开远程仓库…')
-    expect(ko['repo-picker.open-remote']).toBe('원격 리포지토리 열기…')
-    expect(ja['repo-picker.open-remote']).toBe('リモートリポジトリを開く…')
+    expect(zh['repo-picker.open-remote']).toBe('打开远程工作区…')
+    expect(ko['repo-picker.open-remote']).toBe('원격 작업 공간 열기…')
+    expect(ja['repo-picker.open-remote']).toBe('リモートワークスペースを開く…')
 
     expect(ko['repo-picker.open-remote-host-label']).toBe('호스트')
     expect(ja['repo-picker.open-remote-host-label']).toBe('ホスト')

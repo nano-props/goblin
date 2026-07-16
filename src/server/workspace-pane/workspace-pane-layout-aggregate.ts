@@ -28,7 +28,7 @@ import {
   type WorkspacePaneLayoutRepository,
 } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import type { WorkspacePaneRuntimeTabsProviderSnapshot } from '#/server/workspace-pane/workspace-pane-runtime-tabs-projection.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { PhysicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
@@ -84,7 +84,7 @@ export interface WorkspacePaneLayoutSnapshotInput {
 export type WorkspacePaneLayoutValidationInput = WorkspacePaneEpochScope & {
   validTargets: readonly WorkspacePaneTabsTarget[]
   physicalTargets: readonly { target: WorkspacePaneTabsTargetIdentity; lease: PhysicalWorktreeAdmissionLease }[]
-  expectedRepoEntry: RepoSessionEntry
+  expectedRepoEntry: WorkspaceSessionEntry
   providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
   assertCurrent?: () => void
 }

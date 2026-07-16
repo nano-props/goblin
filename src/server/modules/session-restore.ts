@@ -9,11 +9,11 @@ import {
   type ServerWorkspaceState,
 } from '#/shared/api-types.ts'
 import {
-  repoSessionEntryId,
-  sameRepoSessionEntry,
-  type RemoteRepoSessionEntry,
+  workspaceSessionEntryId,
+  sameWorkspaceSessionEntry,
+  type RemoteWorkspaceSessionEntry,
   type RemoteRepoTarget,
-  type RepoSessionEntry,
+  type WorkspaceSessionEntry,
 } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { probeRepo, readRepoProjection } from '#/server/modules/repo-read-paths.ts'
@@ -63,7 +63,7 @@ export async function restoreServerWorkspace(input: RestoreServerWorkspaceInput)
       let workspace = await getServerWorkspaceState()
       const restoreInput = {
         ...input,
-        activeRepoRoot: input.activeRepoRoot ?? workspace.openRepoEntries[0]?.id ?? null,
+        activeRepoRoot: input.activeRepoRoot ?? workspace.openWorkspaceEntries[0]?.id ?? null,
       }
       const openedByRoot = new Map<string, OpenedWorkspaceRepo>()
       let repaired = false
@@ -120,11 +120,11 @@ async function restoreServerWorkspaceSnapshot(
   input.signal?.throwIfAborted()
   let repoRestoreFailed = false
   const activeRepoRoot = input.activeRepoRoot ?? null
-  reconcileOpenedRepoMemberships(input, source.openRepoEntries, openedByRoot)
-  for (const entry of source.openRepoEntries) {
-    if (openedByRoot.has(repoSessionEntryId(entry))) continue
+  reconcileOpenedRepoMemberships(input, source.openWorkspaceEntries, openedByRoot)
+  for (const entry of source.openWorkspaceEntries) {
+    if (openedByRoot.has(workspaceSessionEntryId(entry))) continue
     const result = await openWorkspaceRepo(input, entry, {
-      active: repoSessionEntryId(entry) === activeRepoRoot,
+      active: workspaceSessionEntryId(entry) === activeRepoRoot,
     })
     if (result.kind === 'invalid') {
       repoRestoreFailed = true
@@ -134,12 +134,12 @@ async function restoreServerWorkspaceSnapshot(
   }
 
   input.signal?.throwIfAborted()
-  const opened = source.openRepoEntries.flatMap((entry) => {
-    const repo = openedByRoot.get(repoSessionEntryId(entry))
+  const opened = source.openWorkspaceEntries.flatMap((entry) => {
+    const repo = openedByRoot.get(workspaceSessionEntryId(entry))
     return repo ? [repo] : []
   })
   const membership = await compareAndReplaceServerWorkspaceRepos(
-    source.openRepoEntries,
+    source.openWorkspaceEntries,
     opened.map((repo) => repo.entry),
   )
   if (!membership.matched) {
@@ -149,7 +149,7 @@ async function restoreServerWorkspaceSnapshot(
   // Only the active repo's tabs are validated and restored at startup.
   // Non-active repos carry `projection: null` and are restored lazily.
   const openedActive = opened.filter(isOpenedProjectedRepo)
-  const expectedMembership = membership.workspace.openRepoEntries
+  const expectedMembership = membership.workspace.openWorkspaceEntries
   const projectedTabs = await projectWorkspacePaneTabsWithMembershipGuard({
     restoreInput: input,
     repos: openedActive,
@@ -167,7 +167,7 @@ async function restoreServerWorkspaceSnapshot(
     kind: 'restored',
     value: {
       status: repoRestoreFailed || projectedTabs.repaired ? 'repaired' : 'restored',
-      openRepoEntries: opened.map((repo) => repo.entry),
+      openWorkspaceEntries: opened.map((repo) => repo.entry),
       runtime: runtimeSnapshotFromOpened(
         opened,
         activeRepoRootForOpened(input.activeRepoRoot, opened),
@@ -179,13 +179,13 @@ async function restoreServerWorkspaceSnapshot(
 
 function reconcileOpenedRepoMemberships(
   input: RestoreServerWorkspaceInput,
-  entries: readonly RepoSessionEntry[],
+  entries: readonly WorkspaceSessionEntry[],
   openedByRoot: Map<string, OpenedWorkspaceRepo>,
 ): void {
-  const expectedByRoot = new Map(entries.map((entry) => [repoSessionEntryId(entry), entry]))
+  const expectedByRoot = new Map(entries.map((entry) => [workspaceSessionEntryId(entry), entry]))
   for (const [repoRoot, opened] of openedByRoot) {
     const expected = expectedByRoot.get(repoRoot)
-    if (sameRepoSessionEntry(opened.entry, expected)) continue
+    if (sameWorkspaceSessionEntry(opened.entry, expected)) continue
     releaseWorkspaceRepoRuntime(input, opened.lease)
     openedByRoot.delete(repoRoot)
   }
@@ -193,7 +193,7 @@ function reconcileOpenedRepoMemberships(
 
 async function openWorkspaceRepo(
   input: RestoreServerWorkspaceInput,
-  entry: RepoSessionEntry,
+  entry: WorkspaceSessionEntry,
   options: { active: boolean },
 ): Promise<OpenWorkspaceRepoResult> {
   input.signal?.throwIfAborted()
@@ -259,7 +259,7 @@ async function openWorkspaceRepo(
 
 async function openRemoteWorkspaceRepo(
   input: RestoreServerWorkspaceInput,
-  entry: RemoteRepoSessionEntry,
+  entry: RemoteWorkspaceSessionEntry,
   options: { active: boolean },
 ): Promise<OpenWorkspaceRepoResult> {
   return await withAcquiredWorkspaceRepoLease(input, entry.id, async (lease) => {
@@ -334,7 +334,7 @@ async function withAcquiredWorkspaceRepoLease<T>(
 }
 
 interface OpenedWorkspaceRepoInput {
-  entry: RepoSessionEntry
+  entry: WorkspaceSessionEntry
   repoRoot: string
   name: string
   target?: RemoteRepoTarget

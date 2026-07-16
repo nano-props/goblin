@@ -3,7 +3,7 @@ import {
   type ProjectedRestoredWorkspaceRepoRuntime,
   type RepoWorkspaceTabsRestoreResult,
 } from '#/shared/api-types.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { probeRepo, readRepoProjection } from '#/server/modules/repo-read-paths.ts'
 import { isCurrentRepoRuntimeMembership } from '#/server/modules/repo-runtimes.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
@@ -47,7 +47,7 @@ export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promi
 
 async function projectWorkspaceRepo(
   input: RestoreRepoTabsInput,
-  entry: RepoSessionEntry,
+  entry: WorkspaceSessionEntry,
 ): Promise<ProjectedRestoredWorkspaceRepoRuntime | null> {
   if (entry.kind === 'remote') {
     const lifecycle = await abortableWorkspaceRestore(

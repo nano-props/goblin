@@ -91,8 +91,8 @@ describe('app bootstrap hooks', () => {
     const targetKey = branchTargetKey('/tmp/repo', 'main')
     const session = workspaceRestoreFixture(
       {
-        openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
-        workspacePaneTabsByTargetByRepo: {
+        openWorkspaceEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+        workspacePaneTabsByTargetByWorkspace: {
           '/tmp/repo': {
             [targetKey]: [],
           },
@@ -175,7 +175,7 @@ describe('app bootstrap hooks', () => {
   test('restores the boot session when non-critical authenticated hydrates fail', async () => {
     const session = workspaceRestoreFixture(
       {
-        openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
       },
       {
         restoredRepoId: '/tmp/repo',
@@ -215,7 +215,7 @@ describe('app bootstrap hooks', () => {
   test('blocks persistence when server workspace restore fails', async () => {
     const session = workspaceRestoreFixture(
       {
-        openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
       },
       {
         restoredRepoId: '/tmp/repo',
@@ -249,7 +249,7 @@ describe('app bootstrap hooks', () => {
   test('continues with a repaired session returned by server restore', async () => {
     const persistedSession = workspaceRestoreFixture(
       {
-        openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
       },
       {
         restoredRepoId: '/tmp/repo',
@@ -271,7 +271,7 @@ describe('app bootstrap hooks', () => {
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     mockedRestoreWorkspaceAtBoot.mockResolvedValue({
       status: 'repaired',
-      openRepoEntries: rebuiltSession.serverWorkspace.openRepoEntries,
+      openWorkspaceEntries: rebuiltSession.serverWorkspace.openWorkspaceEntries,
       runtime: restoredRuntimeForWorkspace(
         rebuiltSession.serverWorkspace,
         rebuiltSession.clientWorkspace.restoredRepoId,
@@ -304,7 +304,7 @@ describe('app bootstrap hooks', () => {
   test('blocks persistence when repo session hydration fails', async () => {
     const session = workspaceRestoreFixture(
       {
-        openRepoEntries: [{ kind: 'local' as const, id: '/tmp/missing-repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: '/tmp/missing-repo' }],
       },
       {
         restoredRepoId: '/tmp/missing-repo',
@@ -406,7 +406,7 @@ describe('app bootstrap hooks', () => {
     vi.useFakeTimers()
     const session = workspaceRestoreFixture(
       {
-        openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
       },
       {
         restoredRepoId: '/tmp/repo',
@@ -551,7 +551,7 @@ function mockServerRestore(fixture: WorkspaceRestoreFixture): void {
   const { serverWorkspace, clientWorkspace } = fixture
   mockedRestoreWorkspaceAtBoot.mockResolvedValue({
     status: 'restored',
-    openRepoEntries: serverWorkspace.openRepoEntries,
+    openWorkspaceEntries: serverWorkspace.openWorkspaceEntries,
     runtime: restoredRuntimeForWorkspace(serverWorkspace, clientWorkspace.restoredRepoId),
   })
   mockClientPresentation(clientWorkspace)
@@ -566,7 +566,7 @@ function restoredRuntimeForWorkspace(
   restoredRepoId: string | null,
 ): WorkspaceRuntimeRestoreSnapshot {
   return {
-    repos: serverWorkspace.openRepoEntries.map((entry) => ({
+    repos: serverWorkspace.openWorkspaceEntries.map((entry) => ({
       entry,
       repoRoot: entry.id,
       repoRuntimeId: `repo-runtime-${entry.id}`,

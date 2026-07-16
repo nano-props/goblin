@@ -944,7 +944,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             message?: string
           }
           if (!probe.ok || !probe.root) {
-            return { ok: false as const, input: repoInput, reason: probe.message ?? 'error.not-git-repo' }
+            return { ok: false as const, input: repoInput, reason: probe.message ?? 'error.workspace-git-unavailable' }
           }
           const state = repoRuntimeState.get(probe.root) ?? { currentRepoRuntimeId: null, members: new Set<string>() }
           if (!state.currentRepoRuntimeId) state.currentRepoRuntimeId = createOpaqueId('repo-runtime')
@@ -1047,7 +1047,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/settings/external-apps') {
           return init?.method === 'POST' ? call('externalApps.refresh', body) : call('externalApps.get', undefined)
         }
-        if (url.pathname === '/api/settings/recent-repos/add') return call('settings.addRecentRepo', body)
+        if (url.pathname === '/api/settings/recent-workspaces/add') return call('settings.addRecentWorkspace', body)
         if (url.pathname === '/api/settings/workspace/restore') return call('settings.restoreWorkspace', body)
         if (url.pathname === '/api/settings/workspace/repos/add') return call('settings.addWorkspaceRepo', body)
         if (url.pathname === '/api/settings/workspace/repos/remove') return call('settings.removeWorkspaceRepo', body)

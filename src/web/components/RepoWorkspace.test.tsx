@@ -94,6 +94,7 @@ const terminalCommandContext: TerminalSessionContextValue = terminalSessionConte
 })
 
 const navigation: PrimaryWindowNavigationActions = {
+  showWorkspaceFiles: vi.fn(),
   currentRepoBranchWorkspacePaneRoute: () => undefined,
   activateRepo: vi.fn(),
   closeRepo: vi.fn(),
@@ -153,7 +154,10 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace repoId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
+              <RepoWorkspace
+                repoId={workspaceId}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'history' } }}
+              />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -162,6 +166,9 @@ describe('RepoWorkspace', () => {
 
     expect(screen.getByText('tab.files')).toBeTruthy()
     expect(screen.queryByText('branches.empty')).toBeNull()
+    await waitFor(() => {
+      expect(navigation.showWorkspaceFiles).toHaveBeenCalledWith(workspaceId, { replace: true })
+    })
   })
 
   test('forwards compact missing-branch recovery to the workspace navigation callback', () => {
