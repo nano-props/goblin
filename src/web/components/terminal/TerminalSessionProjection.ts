@@ -447,7 +447,6 @@ export class TerminalSessionProjection {
     scope: { repoRoot: string; repoRuntimeId: string },
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
-    options: { evictCommandClosingSessions?: boolean } = {},
   ): boolean {
     if (this.repoIndex[scope.repoRoot]?.repoRuntimeId !== scope.repoRuntimeId) return false
 
@@ -458,7 +457,7 @@ export class TerminalSessionProjection {
       (session) => session.repoRoot === scope.repoRoot && session.repoRuntimeId === scope.repoRuntimeId,
     )
     const serverTerminalSessionIds = new Set(authoritativeServerSessions.map((session) => session.terminalSessionId))
-    this.evictOrphanedLocalSessions(scope, serverTerminalSessionIds, options)
+    this.evictOrphanedLocalSessions(scope, serverTerminalSessionIds)
     this.futureExitOrphans.confirmAuthoritativeSnapshot(
       terminalRepoEpochKey(scope.repoRoot, scope.repoRuntimeId),
       authoritativeServerSessions.map((session) => ({
@@ -590,7 +589,6 @@ export class TerminalSessionProjection {
   private evictOrphanedLocalSessions(
     scope: { repoRoot: string; repoRuntimeId: string },
     serverTerminalSessionIds: Set<string>,
-    options: { evictCommandClosingSessions?: boolean },
   ): number {
     const orphanedTerminalSessionIds = Array.from(this.sessions.values())
       .filter(
@@ -603,11 +601,7 @@ export class TerminalSessionProjection {
     for (const terminalSessionId of orphanedTerminalSessionIds) {
       const session = this.sessions.get(terminalSessionId)
       if (!session) continue
-      if (options.evictCommandClosingSessions) {
-        this.removeSession(terminalSessionId, { dispose: true })
-      } else {
-        this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor)
-      }
+      this.discardLocalSessionAndDismissDetailIfLast(terminalSessionId, session.descriptor)
     }
     return orphanedTerminalSessionIds.length
   }
