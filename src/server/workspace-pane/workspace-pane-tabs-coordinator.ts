@@ -71,7 +71,7 @@ export interface WorkspacePaneTabsCommandResult extends WorkspacePaneLayoutCommi
 }
 
 export type WorkspacePaneRuntimeTabCommitResult =
-  | { kind: 'committed'; snapshot: WorkspacePaneTabsSnapshot; terminalSessionsRevision: number | null }
+  | { kind: 'committed'; snapshot: WorkspacePaneTabsSnapshot }
   | { kind: 'runtime-stale' }
 
 export interface WorkspacePaneTabsCoordinatorOptions {
@@ -110,7 +110,7 @@ export class WorkspacePaneTabsCoordinator {
     permit: PhysicalWorktreeOperationPermit
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
     isRuntimeCurrent: () => boolean
-    commitRuntime?: () => number
+    onPlacementCommitted?: () => void
   }): Promise<WorkspacePaneRuntimeTabCommitResult> {
     const physicalCapability = input.physicalWorktreeCapability
     return await this.runWorkspaceTabsRepoOperation(input.repoRoot, async (layout) => {
@@ -132,6 +132,8 @@ export class WorkspacePaneTabsCoordinator {
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
       const scope = aggregateScope(input.userId, input.repoRoot, input.scope)
       const current = await layout.snapshot({ scope, validTargets, providerSnapshots })
+      if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
+      this.worktreeOperations.assertPermit(physicalCapability, input.permit)
       const entry = current.entries.find((candidate) => candidate.worktreePath === input.worktreePath)
       const tabs = workspacePaneTabsWithRuntimeTab(
         entry?.tabs ?? [workspacePaneStaticTabEntry('status')],
@@ -146,14 +148,13 @@ export class WorkspacePaneTabsCoordinator {
         lease: physicalWorktreeAdmissionLease(physicalCapability),
         tabs,
       })
-      const terminalSessionsRevision = input.commitRuntime?.() ?? null
+      input.onPlacementCommitted?.()
       const resampled = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       const resampledTargets = await this.targetProjection.captureTargets(input.userId, input.repoRoot, input.scope)
       const snapshot = await layout.snapshot({ scope, validTargets: resampledTargets, providerSnapshots: resampled })
       return {
         kind: 'committed',
         snapshot,
-        terminalSessionsRevision,
       }
     })
   }

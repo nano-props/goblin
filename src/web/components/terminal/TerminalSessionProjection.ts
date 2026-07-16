@@ -225,7 +225,19 @@ export class TerminalSessionProjection {
       this.futureExitOrphans.retireSnapshotScope(retiredScopeKey)
     }
     this.repoIndex = repoIndex
+    this.syncDescriptorsFromRepoIndex()
     this.pruneSessionsMissingFromRepoIndex()
+  }
+
+  private syncDescriptorsFromRepoIndex(): void {
+    for (const session of this.sessions.values()) {
+      const repo = this.repoIndex[session.descriptor.repoRoot]
+      const branch = repo?.branchByWorktreePath[session.descriptor.worktreePath]
+      if (!branch || branch === session.descriptor.branch) continue
+      session.updateDescriptor({ ...session.descriptor, branch })
+      this.notifySession(session.descriptor.terminalSessionId)
+      this.notifyWorktree(session.descriptor.terminalWorktreeKey)
+    }
   }
 
   /**

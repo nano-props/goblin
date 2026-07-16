@@ -7,7 +7,6 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { useTerminalSessionProjection } from '#/web/components/terminal/use-terminal-session-projection.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
-import type { TerminalHydrationSnapshot } from '#/shared/terminal-types.ts'
 import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import {
   createRuntimeProjectionScopeRegistry,
@@ -207,12 +206,6 @@ function currentScopeForRepo(
 
 function repoRuntimeIdForRoot(repoRoot: string): string | null {
   return useReposStore.getState().repos[repoRoot]?.repoRuntimeId ?? null
-}
-
-function terminalHydrationSnapshotMap(
-  snapshots: readonly TerminalHydrationSnapshot[],
-): Map<string, TerminalHydrationSnapshot> {
-  return new Map(snapshots.map((snapshot) => [snapshot.terminalRuntimeSessionId, snapshot]))
 }
 
 function projectionHydrationFailureMessage(error: unknown): string {

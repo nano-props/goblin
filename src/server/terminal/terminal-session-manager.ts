@@ -229,11 +229,14 @@ export class TerminalSessionManager<TUser extends string | number> {
       // write path on the others without an identity round-trip.
       takeoverPending: false,
     }
-    const reservation = this.directory.reserve(session)
+    const reservation = this.directory.reserve({ id, userId, scope: input.scope, terminalSessionId: input.terminalSessionId })
     if (!reservation) return { ok: false, message: 'error.unavailable' }
     if (input.clientId) {
       registerTerminalClient(session, input.clientId, size.cols, size.rows)
-      this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId, this.sessionPresence(session)))
+      // Update the local authoritative controller projection now so the
+      // admission response is complete, but defer realtime emission until
+      // Directory commit makes the session visible.
+      attachTerminalClient(session, input.clientId, this.sessionPresence(session))
     }
     // Logical creation stops here. The selected client mounts and fits its
     // single xterm before `attachSession` starts the PTY with exact geometry.
@@ -244,8 +247,11 @@ export class TerminalSessionManager<TUser extends string | number> {
       kind: 'prepared',
       commit: () => {
         if (settled) throw new Error('error.unavailable')
-        if (!reservation.commit()) throw new Error('error.unavailable')
+        if (!reservation.commit(session)) throw new Error('error.unavailable')
         settled = true
+        if (input.clientId) {
+          this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId, this.sessionPresence(session)))
+        }
         this.sink.onSessionsProjectionChanged?.(session.userId, session.repoRoot)
         return this.projectionRevision(userId, input.scope)
       },
@@ -303,7 +309,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     registerTerminalClient(session, clientId, size.cols, size.rows)
     if (session.ptyBinding.hasPendingSpawn()) {
       const pending = await session.ptyBinding.waitForPendingSpawn(session)
-      if (pending) return pending
+      if (pending && !pending.ok) return pending
     }
     if (!this.isLiveSession(session)) return { ok: false, message: 'error.unavailable' }
     const identityEffect = attachTerminalClient(session, clientId, this.sessionPresence(session))
