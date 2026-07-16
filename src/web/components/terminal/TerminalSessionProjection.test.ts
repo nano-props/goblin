@@ -155,7 +155,6 @@ describe('TerminalSessionProjection', () => {
         }),
       ],
       'client_local',
-      new Map(),
     )
 
     expect(reconciled).toBe(false)
@@ -338,7 +337,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
 
       const terminalWorktreeSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
@@ -369,57 +367,6 @@ describe('TerminalSessionProjection', () => {
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)
     })
 
-    test('recovers output that arrived before the pty index through the next server snapshot', () => {
-      projection.setRepoIndex(makeRepoIndex())
-      const terminalRuntimeSessionId = 'pty_session_late_aaaaaaaaa'
-      const hydrateSpy = vi.spyOn(TerminalSession.prototype, 'hydrate')
-
-      try {
-        projection.handleOutput({
-          terminalRuntimeSessionId,
-          terminalRuntimeGeneration: 1,
-          terminalSessionId: 'term-111111111111111111111',
-          data: 'before-index',
-          seq: 1,
-          outputEra: 0,
-          processName: 'bash',
-        })
-        expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions).toEqual([])
-
-        projection.reconcileServerSessions(
-          { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
-          [
-            makeServerSession(terminalRuntimeSessionId, 'term-111111111111111111111', {
-              controller: { clientId: 'client_local', status: 'connected' },
-            }),
-          ],
-          'client_local',
-          new Map([
-            [
-              terminalRuntimeSessionId,
-              {
-                terminalRuntimeSessionId,
-                terminalRuntimeGeneration: 1,
-                snapshot: 'before-index',
-                snapshotSeq: 1,
-                outputEra: 0,
-              },
-            ],
-          ]),
-        )
-
-        expect(hydrateSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ terminalRuntimeSessionId, snapshot: 'before-index', snapshotSeq: 1, outputEra: 0 }),
-          'snapshot',
-        )
-        expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]?.terminalSessionId).toBe(
-          'term-111111111111111111111',
-        )
-      } finally {
-        hydrateSpy.mockRestore()
-      }
-    })
-
     test('does not mark empty output payloads as terminal output activity', () => {
       vi.useFakeTimers()
       vi.setSystemTime(new Date('2026-06-30T00:00:00.000Z'))
@@ -428,7 +375,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
 
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
@@ -465,7 +411,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
 
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
@@ -492,7 +437,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
 
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
@@ -532,7 +476,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
 
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
@@ -557,7 +500,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
 
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
@@ -581,7 +523,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
 
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
@@ -620,7 +561,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
 
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
@@ -681,7 +621,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
 
       const listener = vi.fn()
@@ -708,7 +647,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
 
       const snapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
@@ -720,21 +658,15 @@ describe('TerminalSessionProjection', () => {
       })
     })
 
-    test('removes orphaned local sessions', () => {
+    test('removes local sessions absent from the authoritative catalog', () => {
       projection.setRepoIndex(makeRepoIndex())
-      projection.reconcileServerSessions(
-        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
-        'client_local',
-        new Map(),
-      )
+      ;(projection as any).ensureSession(makeDescriptor('term-111111111111111111111', 1))
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
 
-      const terminalSessionIdBefore = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [],
         'client_local',
-        new Map(),
       )
 
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
@@ -746,7 +678,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
@@ -784,7 +715,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
@@ -806,7 +736,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [],
         'client_local',
-        new Map(),
       )
 
       expect(
@@ -824,7 +753,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
@@ -859,7 +787,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_2_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
 
       projection.handleSessionClosed({
@@ -883,7 +810,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
       ;(projection as any).terminalSessionIdByTerminalRuntimeSessionId.clear()
 
@@ -917,7 +843,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_2_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
 
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]?.hasBell).toBe(true)
@@ -944,7 +869,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
 
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]?.hasBell).toBe(false)
@@ -957,7 +881,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', terminalSessionId)],
         'client_local',
-        new Map(),
       )
       const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
       workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
@@ -973,7 +896,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_2_aaaaaaaaa', terminalSessionId)],
         'client_local',
-        new Map(),
       )
       serverClose.resolve(successfulRuntimeCloseSnapshot(terminalSessionId, 'pty_session_1_aaaaaaaaa'))
 
@@ -992,7 +914,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', terminalSessionId)],
         'client_local',
-        new Map(),
       )
       const firstServerClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
       const secondServerClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
@@ -1017,7 +938,6 @@ describe('TerminalSessionProjection', () => {
           }),
         ],
         'client_local',
-        new Map(),
       )
       const secondClose = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
@@ -1047,7 +967,6 @@ describe('TerminalSessionProjection', () => {
           makeServerSession('pty_session_3_aaaaaaaaa', 'term-333333333333333333333'),
         ],
         'client_local',
-        new Map(),
       )
 
       const activeSessionId = projection
@@ -1093,7 +1012,6 @@ describe('TerminalSessionProjection', () => {
           makeServerSession('pty_session_2_aaaaaaaaa', 'term-222222222222222222222'),
         ],
         'client_local',
-        new Map(),
       )
       workspacePaneRuntimeMocks.writeSnapshot.mockResolvedValueOnce(false)
       workspacePaneRuntimeMocks.close.mockResolvedValueOnce(
@@ -1120,7 +1038,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_new_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
       workspacePaneRuntimeMocks.close.mockResolvedValueOnce(
         successfulRuntimeCloseSnapshot('term-111111111111111111111', 'pty_session_old_aaaaaaaaa'),
@@ -1144,7 +1061,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
@@ -1179,7 +1095,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const session = (projection as any).sessions.get(terminalSessionId)
@@ -1214,7 +1129,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       workspacePaneRuntimeMocks.writeSnapshot.mockImplementationOnce(() => {
@@ -1240,7 +1154,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       workspacePaneRuntimeMocks.close.mockResolvedValueOnce({
@@ -1270,7 +1183,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
         'term-111111111111111111111',
@@ -1285,7 +1197,6 @@ describe('TerminalSessionProjection', () => {
           }),
         ],
         'client_local',
-        new Map(),
       )
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
         'term-222222222222222222222',
@@ -1303,7 +1214,6 @@ describe('TerminalSessionProjection', () => {
           makeServerSession('pty_session_3_aaaaaaaaa', 'term-333333333333333333333'),
         ],
         'client_local',
-        new Map(),
       )
 
       const snapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
@@ -1329,7 +1239,6 @@ describe('TerminalSessionProjection', () => {
           makeServerSession('pty_session_2_aaaaaaaaa', 'term-222222222222222222222'),
         ],
         'client_local',
-        new Map(),
       )
 
       const firstSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
@@ -1345,7 +1254,6 @@ describe('TerminalSessionProjection', () => {
           makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111'),
         ],
         'client_local',
-        new Map(),
       )
 
       const secondSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
@@ -1363,7 +1271,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
 
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
@@ -1385,7 +1292,6 @@ describe('TerminalSessionProjection', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
-        new Map(),
       )
 
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
@@ -1480,7 +1386,6 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
         }),
       ],
       'client_local',
-      new Map(),
     )
     const session = (localProjection as any).sessions.get('term-111111111111111111111')
     session.restart()
@@ -1518,7 +1423,6 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
         }),
       ],
       'client_local',
-      new Map(),
     )
 
     expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).bellCount).toBe(1)
@@ -1545,7 +1449,6 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
         }),
       ],
       'client_local',
-      new Map(),
     )
 
     expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
@@ -1561,7 +1464,6 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       [makeServerSession(terminalRuntimeSessionId, terminalSessionId, { terminalRuntimeGeneration: 1 })],
       'client_local',
-      new Map(),
     )
 
     localProjection.handleExit({
@@ -1575,7 +1477,6 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       [makeServerSession(terminalRuntimeSessionId, terminalSessionId, { terminalRuntimeGeneration: 2 })],
       'client_local',
-      new Map(),
     )
 
     expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
@@ -1591,7 +1492,6 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       [makeServerSession(terminalRuntimeSessionId, terminalSessionId, { terminalRuntimeGeneration: 1 })],
       'client_local',
-      new Map(),
     )
     const session = (localProjection as any).sessions.get(terminalSessionId)
     session.runtime.failRuntime('error.restart-failed')
@@ -1607,7 +1507,6 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       [makeServerSession(terminalRuntimeSessionId, terminalSessionId, { terminalRuntimeGeneration: 2 })],
       'client_local',
-      new Map(),
     )
 
     expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
@@ -1627,7 +1526,6 @@ describe('TerminalSessionProjection direct runtime activation barrier', () => {
         }),
       ],
       'client_local',
-      new Map(),
     )
     const session = (localProjection as any).sessions.get('term-111111111111111111111')
     const bellBase = {
@@ -1683,7 +1581,6 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 1 })],
       'client_local',
-      new Map(),
     )
     const session = (projection as any).sessions.get(terminalSessionId)
     session.restart()
@@ -1721,7 +1618,6 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 2 })],
       'client_local',
-      new Map(),
     )
 
     ;(projection as any).applyServerSessionEffect(
@@ -1729,14 +1625,12 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       1,
       makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 1 }),
       'client_local',
-      new Map(),
     )
     ;(projection as any).applyServerSessionEffect(
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       1,
       makeServerSession(lineageB, terminalSessionId, { terminalRuntimeGeneration: 0 }),
       'client_local',
-      new Map(),
     )
 
     const session = (projection as any).sessions.get(terminalSessionId)
@@ -1755,7 +1649,6 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       [makeServerSession(lineageB, terminalSessionId, { terminalRuntimeGeneration: 0 })],
       'client_local',
-      new Map(),
     )
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
@@ -1794,7 +1687,6 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 1 })],
       'client_local',
-      new Map(),
     )
     projection.handleExit(exitFor(lineageB))
 
@@ -1802,7 +1694,6 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       [makeServerSession(lineageB, terminalSessionId, { terminalRuntimeGeneration: 0 })],
       'client_local',
-      new Map(),
     )
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
@@ -1817,7 +1708,6 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 2 })],
       'client_local',
-      new Map(),
     )
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
 
@@ -1825,7 +1715,6 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 3 })],
       'client_local',
-      new Map(),
     )
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
     projection.destroy()
@@ -1840,7 +1729,6 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 2 })],
       'client_local',
-      new Map(),
     )
     expect((projection as any).futureExitOrphans.size()).toBe(2)
 
@@ -1848,7 +1736,6 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 3 })],
       'client_local',
-      new Map(),
     )
     expect((projection as any).futureExitOrphans.size()).toBe(1)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
@@ -1878,7 +1765,6 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       [makeServerSession(lineageB, terminalSessionId, { terminalRuntimeGeneration: 0 })],
       'client_local',
-      new Map(),
     )
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)

@@ -118,13 +118,6 @@ export const TerminalSessionSummarySchema = v.object({
   cols: v.number(),
   rows: v.number(),
 })
-const TerminalHydrationSnapshotSchema = v.object({
-  terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
-  terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
-  snapshot: v.string(),
-  snapshotSeq: v.number(),
-  outputEra: v.number(),
-})
 export const TerminalSessionsSnapshotSchema = v.object({
   revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
   sessions: v.array(TerminalSessionSummarySchema),

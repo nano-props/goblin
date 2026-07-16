@@ -9,7 +9,6 @@ import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import type {
   TerminalBellRealtimeEvent,
   TerminalExitEvent,
-  TerminalHydrationSnapshot,
   TerminalOutputEvent,
   TerminalSessionSummary as ServerTerminalSessionSummary,
   TerminalSessionsSnapshot,
@@ -29,10 +28,7 @@ import {
   type TerminalCreateQueueEntry,
 } from '#/web/components/terminal/terminal-session-lifecycle-queues.ts'
 import { DEFAULT_TERMINAL_COLS, DEFAULT_TERMINAL_ROWS } from '#/web/components/terminal/terminal-geometry.ts'
-import {
-  countOrphanedTerminalSessionIds,
-  resolveAdjacentTerminalSelectionAfterRemoval,
-} from '#/web/components/terminal/terminal-session-eviction.ts'
+import { resolveAdjacentTerminalSelectionAfterRemoval } from '#/web/components/terminal/terminal-session-eviction.ts'
 import { syncTerminalRuntimeSessionIdIndex } from '#/web/components/terminal/terminal-session-index.ts'
 import { resolveSelectedTerminalSessionId } from '#/web/components/terminal/terminal-session-selection.ts'
 import { buildTerminalWorktreeSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
@@ -66,7 +62,6 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   processName: 'terminal',
   canonicalTitle: null,
 }
-const EMPTY_SERVER_SNAPSHOTS = new Map<string, TerminalHydrationSnapshot>()
 const MAX_PENDING_SERVER_BELLS = 99
 
 interface TerminalCreateQueueRequest {
@@ -452,13 +447,12 @@ export class TerminalSessionProjection {
     scope: { repoRoot: string; repoRuntimeId: string },
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
-    snapshotsByTerminalRuntimeSessionId: ReadonlyMap<string, TerminalHydrationSnapshot> = EMPTY_SERVER_SNAPSHOTS,
     options: { evictCommandClosingSessions?: boolean } = {},
   ): boolean {
     if (this.repoIndex[scope.repoRoot]?.repoRuntimeId !== scope.repoRuntimeId) return false
 
     const { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees } =
-      this.materializeServerSessions(scope, serverSessions, clientId, snapshotsByTerminalRuntimeSessionId)
+      this.materializeServerSessions(scope, serverSessions, clientId)
 
     const authoritativeServerSessions = serverSessions.filter(
       (session) => session.repoRoot === scope.repoRoot && session.repoRuntimeId === scope.repoRuntimeId,
@@ -487,12 +481,10 @@ export class TerminalSessionProjection {
     scope: { repoRoot: string; repoRuntimeId: string },
     snapshot: TerminalSessionsSnapshot,
     clientId: string,
-    snapshotsByTerminalRuntimeSessionId: ReadonlyMap<string, TerminalHydrationSnapshot> = EMPTY_SERVER_SNAPSHOTS,
   ): boolean {
     const current = this.terminalSessionsProjectionRevisionByRepoRoot.get(scope.repoRoot)
     if (current?.repoRuntimeId === scope.repoRuntimeId && snapshot.revision < current.revision) return false
-    if (!this.reconcileServerSessions(scope, snapshot.sessions, clientId, snapshotsByTerminalRuntimeSessionId))
-      return false
+    if (!this.reconcileServerSessions(scope, snapshot.sessions, clientId)) return false
     this.terminalSessionsProjectionRevisionByRepoRoot.set(scope.repoRoot, {
       repoRuntimeId: scope.repoRuntimeId,
       revision: snapshot.revision,
@@ -505,13 +497,12 @@ export class TerminalSessionProjection {
     revision: number,
     serverSession: ServerTerminalSessionSummary,
     clientId: string,
-    snapshotsByTerminalRuntimeSessionId: ReadonlyMap<string, TerminalHydrationSnapshot>,
   ): boolean {
     if (this.repoIndex[scope.repoRoot]?.repoRuntimeId !== scope.repoRuntimeId) return false
     const current = this.terminalSessionsProjectionRevisionByRepoRoot.get(scope.repoRoot)
     if (current?.repoRuntimeId === scope.repoRuntimeId && revision < current.revision) return false
     const { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees } =
-      this.materializeServerSessions(scope, [serverSession], clientId, snapshotsByTerminalRuntimeSessionId, {
+      this.materializeServerSessions(scope, [serverSession], clientId, {
         mergeIntoExisting: true,
         hydrationSource: 'partial-effect',
       })
@@ -532,7 +523,6 @@ export class TerminalSessionProjection {
     scope: { repoRoot: string; repoRuntimeId: string },
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
-    snapshotsByTerminalRuntimeSessionId: ReadonlyMap<string, TerminalHydrationSnapshot>,
     options: {
       mergeIntoExisting?: boolean
       hydrationSource?: 'snapshot' | 'partial-effect'
@@ -564,7 +554,6 @@ export class TerminalSessionProjection {
         serverSession,
         clientId,
         index,
-        serverSnapshot: snapshotsByTerminalRuntimeSessionId.get(serverSession.terminalRuntimeSessionId) ?? null,
       })
       if (!projected) continue
       touchedWorktrees.add(projected.terminalWorktreeKey)
@@ -596,28 +585,21 @@ export class TerminalSessionProjection {
     return { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees }
   }
 
-  // Phase 2: drop local sessions that have a serverId but no longer
-  // appear on the server. Only sessions that have ever been attached
-  // (i.e. have a terminalRuntimeSessionId in our index) are eligible for eviction;
-  // never-attached local shells (purely UI placeholders) are left
-  // alone. Returns the count for the debug log.
+  // Phase 2: the accepted catalog is the complete membership authority for
+  // this repo runtime. Pending creates live in lifecycle queues, not sessions.
   private evictOrphanedLocalSessions(
     scope: { repoRoot: string; repoRuntimeId: string },
     serverTerminalSessionIds: Set<string>,
     options: { evictCommandClosingSessions?: boolean },
   ): number {
-    const orphanedTerminalSessionIds = countOrphanedTerminalSessionIds({
-      repoRoot: scope.repoRoot,
-      repoRuntimeId: scope.repoRuntimeId,
-      localTerminalSessionIds: Array.from(this.sessions.keys()),
-      getRepoRootForTerminalSessionId: (terminalSessionId) =>
-        this.sessions.get(terminalSessionId)?.descriptor.repoRoot ?? null,
-      getRepoRuntimeIdForTerminalSessionId: (terminalSessionId) =>
-        this.sessions.get(terminalSessionId)?.descriptor.repoRuntimeId ?? null,
-      hasTerminalRuntimeSessionIdForTerminalSessionId: (terminalSessionId) =>
-        this.terminalRuntimeBindingByTerminalSessionId.has(terminalSessionId),
-      serverTerminalSessionIds,
-    })
+    const orphanedTerminalSessionIds = Array.from(this.sessions.values())
+      .filter(
+        (session) =>
+          session.descriptor.repoRoot === scope.repoRoot &&
+          session.descriptor.repoRuntimeId === scope.repoRuntimeId &&
+          !serverTerminalSessionIds.has(session.descriptor.terminalSessionId),
+      )
+      .map((session) => session.descriptor.terminalSessionId)
     for (const terminalSessionId of orphanedTerminalSessionIds) {
       const session = this.sessions.get(terminalSessionId)
       if (!session) continue
@@ -755,7 +737,6 @@ export class TerminalSessionProjection {
           result.terminalSessionsRevision,
           projectedCreate.serverSession,
           clientId,
-          EMPTY_SERVER_SNAPSHOTS,
         )
         if (runtimeProjectionApplied) {
           this.setPreferredSelectedTerminalSessionId(terminalWorktreeKey, result.terminalSessionId)

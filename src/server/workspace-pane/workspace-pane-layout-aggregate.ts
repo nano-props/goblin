@@ -5,7 +5,6 @@ import {
   workspacePaneStaticTabEntry,
   type WorkspacePaneStaticTabEntry,
   type WorkspacePaneTabEntry,
-  type WorkspacePaneRuntimeTabType,
 } from '#/shared/workspace-pane.ts'
 import type {
   WorkspacePaneDurableLayout,
@@ -234,13 +233,6 @@ export class WorkspacePaneLayoutAggregate {
 
   epochsForUser(userId: string): WorkspacePaneEpochScope[] {
     return this.overlay.epochsForUser(userId)
-  }
-
-  runtimeSessionIds(input: WorkspacePaneEpochScope & {
-    worktreePath: string
-    type: WorkspacePaneRuntimeTabType
-  }): string[] {
-    return this.overlay.runtimeSessionIds(input)
   }
 
   private async mutate(

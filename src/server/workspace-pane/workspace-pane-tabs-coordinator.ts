@@ -328,7 +328,6 @@ export class WorkspacePaneTabsCoordinator {
     return await this.runWorkspaceTabsRepoOperation(input.repoRoot, async (layout) => {
       const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       const validTargets = await this.targetProjection.captureTargets(input.userId, input.repoRoot, input.scope)
-      input.assertCurrent?.()
       this.worktreeOperations.assertPermit(input.physicalWorktreeCapability, input.permit)
       input.assertCurrent?.()
       return await layout.snapshot({

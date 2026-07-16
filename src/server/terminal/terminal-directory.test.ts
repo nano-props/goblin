@@ -16,9 +16,9 @@ describe('TerminalDirectory', () => {
     const directory = new TerminalDirectory<string, Entry>()
     const first = entry('pty_first', 'term_durable', 'scope_a')
 
-    expect(directory.publish(first)).toBe(true)
-    expect(directory.publish(first)).toBe(false)
-    expect(directory.publish(entry('pty_conflict', 'term_durable', 'scope_b'))).toBe(false)
+    expect(commit(directory, first)).toBe(true)
+    expect(commit(directory, first)).toBe(false)
+    expect(commit(directory, entry('pty_conflict', 'term_durable', 'scope_b'))).toBe(false)
     expect(directory.get('pty_first')).toBe(first)
     expect(directory.getByDurableId('user_a', 'term_durable')).toBe(first)
     expect(directory.catalogRevision('user_a', 'scope_a')).toBe(1)
@@ -28,7 +28,7 @@ describe('TerminalDirectory', () => {
   test('orders only membership changes and ignores mutable entry metadata', () => {
     const directory = new TerminalDirectory<string, Entry>()
     const member = entry('pty_first', 'term_first', 'scope_a')
-    directory.publish(member)
+    expect(commit(directory, member)).toBe(true)
 
     member.mutableTitle = 'new title'
     expect(directory.catalogRevision('user_a', 'scope_a')).toBe(1)
@@ -41,7 +41,7 @@ describe('TerminalDirectory', () => {
   test('releases a scope clock only after membership is empty', () => {
     const directory = new TerminalDirectory<string, Entry>()
     const member = entry('pty_first', 'term_first', 'scope_a')
-    directory.publish(member)
+    expect(commit(directory, member)).toBe(true)
 
     expect(() => directory.releaseScope('user_a', 'scope_a')).toThrow(
       'cannot release terminal catalog revision with live sessions',
@@ -93,4 +93,9 @@ describe('TerminalDirectory', () => {
 
 function entry(id: string, terminalSessionId: string, scope: string): Entry {
   return { id, userId: 'user_a', scope, terminalSessionId, mutableTitle: null }
+}
+
+function commit(directory: TerminalDirectory<string, Entry>, value: Entry): boolean {
+  const admission = directory.reserve(value)
+  return admission?.commit(value) ?? false
 }

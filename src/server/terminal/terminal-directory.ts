@@ -22,7 +22,7 @@ export class TerminalDirectory<
   private readonly reservedRuntimeIdByUserSession = new Map<string, string>()
   private readonly catalogRevisionByScope = new Map<string, number>()
 
-  publish(entry: TEntry): boolean {
+  private publish(entry: TEntry): boolean {
     if (this.entriesByRuntimeId.has(entry.id)) return false
     const durableKey = this.userSessionKey(entry.userId, entry.terminalSessionId)
     if (this.runtimeIdByUserSession.has(durableKey)) return false

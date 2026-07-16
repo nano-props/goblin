@@ -44,13 +44,6 @@ describe('terminal session projection helpers', () => {
         cols: 120,
         rows: 40,
       },
-      serverSnapshot: {
-        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
-        snapshot: 'server-snap',
-        snapshotSeq: 9,
-        outputEra: 0,
-      },
     })
 
     expect(projected).toEqual({
@@ -75,8 +68,8 @@ describe('terminal session projection helpers', () => {
         controllerStatus: 'connected',
         canonicalCols: 120,
         canonicalRows: 40,
-        snapshot: 'server-snap',
-        snapshotSeq: 9,
+        snapshot: null,
+        snapshotSeq: 0,
         outputEra: 0,
       },
       controlsTerminal: true,

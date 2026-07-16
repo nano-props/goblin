@@ -2,7 +2,6 @@ import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type {
   TerminalAttachResult,
   TerminalCreateResult,
-  TerminalHydrationSnapshot,
   TerminalSessionBase,
   TerminalSessionSummary as ServerTerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
@@ -58,7 +57,6 @@ export function projectServerTerminalSession(input: {
   serverSession: ServerTerminalSessionSummary
   clientId: string
   index: number
-  serverSnapshot?: TerminalHydrationSnapshot | null
 }): ProjectedServerTerminalSession | null {
   if (input.serverSession.repoRoot !== input.repoRoot) return null
   if (input.serverSession.repoRuntimeId !== input.repoRuntimeId) return null
@@ -92,9 +90,9 @@ export function projectServerTerminalSession(input: {
       controllerStatus: controller.controllerStatus,
       canonicalCols: input.serverSession.cols,
       canonicalRows: input.serverSession.rows,
-      snapshot: input.serverSnapshot?.snapshot ?? null,
-      snapshotSeq: input.serverSnapshot?.snapshotSeq ?? 0,
-      outputEra: input.serverSnapshot?.outputEra ?? 0,
+      snapshot: null,
+      snapshotSeq: 0,
+      outputEra: 0,
     },
     controlsTerminal: input.serverSession.controller?.clientId === input.clientId,
   }

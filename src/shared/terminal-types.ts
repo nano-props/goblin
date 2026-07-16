@@ -233,14 +233,6 @@ export interface TerminalSessionSummary {
   rows: number
 }
 
-export interface TerminalHydrationSnapshot {
-  terminalRuntimeSessionId: string
-  terminalRuntimeGeneration: TerminalRuntimeGeneration
-  snapshot: string
-  snapshotSeq: number
-  outputEra: number
-}
-
 /**
  * Versioned full terminal projection for one user/repo-runtime scope.
  *

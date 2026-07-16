@@ -999,39 +999,6 @@ describe('TerminalSessionManager membership catalog', () => {
     expect(closedSnapshot.sessions).toEqual([])
   })
 
-  test('returns hydration snapshots paired with the visible terminal collection revision', async () => {
-    const supervisor = createDeferredPtySupervisor()
-    const manager = createManager(supervisor)
-    const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
-    const pending = ensureSession(manager, {
-      userId: USER_ID,
-      scope,
-      repoRoot: '/repo',
-      repoRuntimeId: 'repo-runtime-test',
-      branch: BRANCH_NAME,
-      terminalSessionId: TERMINAL_SESSION_ID,
-      worktreePath: WORKTREE_PATH,
-      cwd: WORKTREE_PATH,
-      cols: 80,
-      rows: 24,
-      clientId: CLIENT_ID,
-    })
-    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_recovery_123456'))
-    await pending
-    supervisor.emitData('pty_recovery_123456', 'recoverable output')
-
-    const recovery = await manager.recoverSessionsForUser(USER_ID, scope)
-
-    expect(recovery.terminalSessions).toEqual(manager.terminalSessionsSnapshotForUser(USER_ID, scope))
-    expect(recovery.snapshots).toEqual([
-      expect.objectContaining({
-        terminalRuntimeSessionId: recovery.terminalSessions.sessions[0]?.terminalRuntimeSessionId,
-        terminalRuntimeGeneration: 1,
-        snapshotSeq: expect.any(Number),
-        outputEra: expect.any(Number),
-      }),
-    ])
-  })
 })
 
 describe('TerminalSessionManager runtime binding generations', () => {

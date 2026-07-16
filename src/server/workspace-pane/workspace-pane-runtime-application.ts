@@ -1,6 +1,5 @@
 import type {
   TerminalCreateInput,
-  TerminalCreateResult,
   TerminalSessionInput,
   TerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
