@@ -139,8 +139,8 @@ export class WorkspacePaneRuntimeApplication {
     if (!runtime.ok) return { ok: false, runtimeType: 'terminal', message: runtime.message }
 
     const worktreePath = requestedWorktreePath
-    let publishedRevision =
-      runtime.publication.kind === 'existing' ? runtime.publication.terminalSessionsRevision : null
+    let admittedRevision =
+      runtime.admission.kind === 'existing' ? runtime.admission.terminalSessionsRevision : null
     let paneCommit
     try {
       paneCommit = await this.deps.workspaceTabsCoordinator.ensureRuntimeTabForSession({
@@ -156,18 +156,18 @@ export class WorkspacePaneRuntimeApplication {
         physicalWorktreeCapability,
         isRuntimeCurrent: () =>
           this.deps.isCurrentRepoRuntime(userId, input.request.repoRoot, input.request.repoRuntimeId),
-        publishRuntime:
-          runtime.publication.kind === 'prepared'
+        commitRuntime:
+          runtime.admission.kind === 'prepared'
             ? () => {
-                publishedRevision = runtime.publication.kind === 'prepared' ? runtime.publication.publish() : null
-                if (publishedRevision === null) throw new Error('error.unavailable')
-                return publishedRevision
+                admittedRevision = runtime.admission.kind === 'prepared' ? runtime.admission.commit() : null
+                if (admittedRevision === null) throw new Error('error.unavailable')
+                return admittedRevision
               }
             : undefined,
       })
     } catch (error) {
-      if (runtime.publication.kind === 'prepared' && publishedRevision === null) runtime.publication.retire()
-      if (publishedRevision !== null) {
+      if (runtime.admission.kind === 'prepared' && admittedRevision === null) runtime.admission.abort()
+      if (admittedRevision !== null) {
         this.deps.broadcastWorkspaceTabsChanged(userId, input.request.repoRoot)
       }
       workspacePaneRuntimeApplicationLogger.error(
@@ -177,19 +177,19 @@ export class WorkspacePaneRuntimeApplication {
       return runtimeFailure('terminal', 'error.unavailable')
     }
     if (paneCommit.kind === 'runtime-stale') {
-      if (runtime.publication.kind === 'prepared') runtime.publication.retire()
+      if (runtime.admission.kind === 'prepared') runtime.admission.abort()
       return runtimeFailure('terminal', 'error.repo-runtime-stale')
     }
 
-    publishedRevision ??= paneCommit.terminalSessionsRevision
-    if (publishedRevision === null) throw new Error('terminal publication did not produce a catalog revision')
-    const { publication: _publication, ...runtimeResult } = runtime
+    admittedRevision ??= paneCommit.terminalSessionsRevision
+    if (admittedRevision === null) throw new Error('terminal admission did not produce a catalog revision')
+    const { admission: _admission, ...runtimeResult } = runtime
     const workspacePaneTabs = paneCommit.snapshot
     this.deps.broadcastWorkspaceTabsChanged(userId, input.request.repoRoot)
     return {
       ok: true,
       runtimeType: 'terminal',
-      runtime: { ...runtimeResult, terminalSessionsRevision: publishedRevision },
+      runtime: { ...runtimeResult, terminalSessionsRevision: admittedRevision },
       workspacePaneTabs,
     }
   }

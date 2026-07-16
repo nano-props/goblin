@@ -58,7 +58,7 @@ describe('terminal session creator', () => {
     )
     expect(result).toMatchObject({
       terminalSessionId: 'term-createdcreatedcreated',
-      publication: { kind: 'existing', terminalSessionsRevision: 7 },
+      admission: { kind: 'existing', terminalSessionsRevision: 7 },
       terminalRuntimeSessionId: 'pty_term-createdcreatedcreated',
       terminalRuntimeGeneration: 1,
     })
@@ -159,7 +159,7 @@ function terminalSession(terminalSessionId: string): TerminalSessionSummary {
 function ensureResult(terminalSessionId: string): Extract<TerminalSessionEnsureResult, { ok: true }> {
   return {
     ok: true,
-    publication: { kind: 'existing', terminalSessionsRevision: 7 },
+    admission: { kind: 'existing', terminalSessionsRevision: 7 },
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalRuntimeGeneration: 1,
     terminalSessionId,

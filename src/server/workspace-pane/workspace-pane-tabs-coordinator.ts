@@ -110,7 +110,7 @@ export class WorkspacePaneTabsCoordinator {
     permit: PhysicalWorktreeOperationPermit
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
     isRuntimeCurrent: () => boolean
-    publishRuntime?: () => number
+    commitRuntime?: () => number
   }): Promise<WorkspacePaneRuntimeTabCommitResult> {
     const physicalCapability = input.physicalWorktreeCapability
     return await this.runWorkspaceTabsRepoOperation(input.repoRoot, async (layout) => {
@@ -146,7 +146,7 @@ export class WorkspacePaneTabsCoordinator {
         lease: physicalWorktreeAdmissionLease(physicalCapability),
         tabs,
       })
-      const terminalSessionsRevision = input.publishRuntime?.() ?? null
+      const terminalSessionsRevision = input.commitRuntime?.() ?? null
       const resampled = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       const resampledTargets = await this.targetProjection.captureTargets(input.userId, input.repoRoot, input.scope)
       const snapshot = await layout.snapshot({ scope, validTargets: resampledTargets, providerSnapshots: resampled })

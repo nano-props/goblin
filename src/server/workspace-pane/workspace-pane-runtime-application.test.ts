@@ -198,9 +198,9 @@ describe('WorkspacePaneRuntimeApplication', () => {
       const runtime = terminalCreateSuccess()
       runtime.action = action
       const retire = vi.fn()
-      runtime.publication =
+      runtime.admission =
         action === 'created'
-          ? { kind: 'prepared', publish: () => 1, retire }
+          ? { kind: 'prepared', commit: () => 1, abort: retire }
           : { kind: 'existing', terminalSessionsRevision: 1 }
       const close = vi.fn(() => true)
       const reconcileWorktree = vi.fn(async () => snapshot([]))
@@ -499,7 +499,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
   test('retires an unpublished terminal if placement preparation throws', async () => {
     const runtime = terminalCreateSuccess()
     const retire = vi.fn()
-    runtime.publication = { kind: 'prepared', publish: () => 1, retire }
+    runtime.admission = { kind: 'prepared', commit: () => 1, abort: retire }
     const close = vi.fn(async () => true)
     const reconcileWorktree = vi.fn(async () => snapshot([]))
     const broadcastWorkspaceTabsChanged = vi.fn()
@@ -529,11 +529,11 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
 
-  test('does not roll back membership when projection fails after publication', async () => {
+  test('does not roll back membership when projection fails after admission', async () => {
     const runtime = terminalCreateSuccess()
     const publish = vi.fn(() => 1)
     const retire = vi.fn()
-    runtime.publication = { kind: 'prepared', publish, retire }
+    runtime.admission = { kind: 'prepared', commit: publish, abort: retire }
     const close = vi.fn(async () => true)
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
@@ -542,9 +542,9 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: async () => runtime, close },
       workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: async (input: { publishRuntime?: () => number }) => {
-          input.publishRuntime?.()
-          throw new Error('projection failed after publication')
+        ensureRuntimeTabForSession: async (input: { commitRuntime?: () => number }) => {
+          input.commitRuntime?.()
+          throw new Error('projection failed after admission')
         },
         reconcileWorktreeAdmitted: vi.fn(),
       } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,
@@ -585,7 +585,7 @@ function terminalCreateSuccess(): Extract<ServerTerminalCreateResult, { ok: true
     ok: true,
     action: 'created',
     terminalSessionId,
-    publication: { kind: 'existing', terminalSessionsRevision: 1 },
+    admission: { kind: 'existing', terminalSessionsRevision: 1 },
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 1,
     processName: 'zsh',
@@ -601,11 +601,11 @@ function terminalCreateSuccess(): Extract<ServerTerminalCreateResult, { ok: true
 function publishedTerminalResult(
   runtime: Extract<ServerTerminalCreateResult, { ok: true }>,
 ): Extract<TerminalCreateResult, { ok: true }> {
-  const { publication, ...result } = runtime
+  const { admission, ...result } = runtime
   return {
     ...result,
     terminalSessionsRevision:
-      publication.kind === 'existing' ? publication.terminalSessionsRevision : publication.publish(),
+      admission.kind === 'existing' ? admission.terminalSessionsRevision : admission.commit(),
   }
 }
 

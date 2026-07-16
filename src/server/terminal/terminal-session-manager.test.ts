@@ -152,7 +152,7 @@ function ensureSession(
     physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(input.worktreePath),
   })
   if (!prepared.ok) return Promise.resolve(prepared)
-  if (prepared.publication.kind === 'prepared') prepared.publication.publish()
+  if (prepared.admission.kind === 'prepared') prepared.admission.commit()
   return manager.attachSession(
     input.userId,
     prepared.terminalRuntimeSessionId,
@@ -181,8 +181,8 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     })
     if (!prepared.ok) throw new Error(prepared.message)
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toHaveLength(0)
-    expect(prepared.publication.kind).toBe('prepared')
-    if (prepared.publication.kind === 'prepared') prepared.publication.retire()
+    expect(prepared.admission.kind).toBe('prepared')
+    if (prepared.admission.kind === 'prepared') prepared.admission.abort()
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
   })
 
@@ -213,7 +213,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(supervisor.spawn).not.toHaveBeenCalled()
     if (!prepared.ok) return
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
-    if (prepared.publication.kind === 'prepared') prepared.publication.publish()
+    if (prepared.admission.kind === 'prepared') prepared.admission.commit()
 
     const freshAttach = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 123, 41, CLIENT_ID)
     expect(supervisor.spawn).toHaveBeenCalledWith(
@@ -238,7 +238,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(onSessionsProjectionChanged).toHaveBeenCalledOnce()
     expect(onSessionsProjectionChanged).toHaveBeenCalledWith(USER_ID, SCOPE)
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)).toMatchObject({
-      revision: prepared.publication.kind === 'existing' ? prepared.publication.terminalSessionsRevision : 1,
+      revision: prepared.admission.kind === 'existing' ? prepared.admission.terminalSessionsRevision : 1,
       sessions: [{ terminalRuntimeGeneration: 1, phase: 'open' }],
     })
 
@@ -276,7 +276,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       clientId: CLIENT_ID,
     })
     if (!prepared.ok) throw new Error(prepared.message)
-    if (prepared.publication.kind === 'prepared') prepared.publication.publish()
+    if (prepared.admission.kind === 'prepared') prepared.admission.commit()
 
     const first = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
     const second = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 120, 40, 'client-test-2')
@@ -313,7 +313,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     if (!prepared.ok) throw new Error(prepared.message)
 
     await expect(manager.closeSessionForUser(USER_ID, prepared.terminalRuntimeSessionId)).resolves.toBe(false)
-    if (prepared.publication.kind === 'prepared') prepared.publication.retire()
+    if (prepared.admission.kind === 'prepared') prepared.admission.abort()
     expect(supervisor.spawn).not.toHaveBeenCalled()
     expect(supervisor.killed).toEqual([])
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])

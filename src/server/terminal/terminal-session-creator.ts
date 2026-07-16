@@ -11,7 +11,7 @@ type TerminalSessionCreateCoordinator = ReturnType<typeof createTerminalSessionC
 type TerminalCreateFailure = Extract<TerminalCreateResult, { ok: false }>
 export type ServerTerminalCreateResult =
   | (Omit<Extract<TerminalCreateResult, { ok: true }>, 'terminalSessionsRevision'> & {
-      publication: Extract<TerminalSessionEnsureResult, { ok: true }>['publication']
+      admission: Extract<TerminalSessionEnsureResult, { ok: true }>['admission']
     })
   | TerminalCreateFailure
 
@@ -69,14 +69,14 @@ class TerminalSessionCreator {
         )
         if (!createResult.ok) return { ok: false, message: createResult.message }
         if (!this.options.isCurrentRepoRuntime(input.userId, input.request.repoRoot, input.request.repoRuntimeId)) {
-          if (createResult.publication.kind === 'prepared') createResult.publication.retire()
+          if (createResult.admission.kind === 'prepared') createResult.admission.abort()
           return { ok: false, message: 'error.repo-runtime-stale' }
         }
         return {
           ok: true,
           action: createResult.action,
           terminalSessionId: createResult.terminalSessionId,
-          publication: createResult.publication,
+          admission: createResult.admission,
           terminalRuntimeSessionId: createResult.terminalRuntimeSessionId,
           terminalRuntimeGeneration: createResult.terminalRuntimeGeneration,
           processName: createResult.processName,

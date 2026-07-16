@@ -49,7 +49,7 @@ describe('workspace pane tabs coordinator queues', () => {
         worktreePath: '/repo/worktree', runtimeType: 'terminal', sessionId: 'term-preparedprepared001',
         insertAfterIdentity: 'workspace-pane:status', permit, physicalWorktreeCapability: capability,
         isRuntimeCurrent: () => true,
-        publishRuntime: () => {
+        commitRuntime: () => {
           events.push('publish')
           published = true
           return 1

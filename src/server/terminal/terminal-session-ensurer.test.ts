@@ -129,7 +129,7 @@ describe('terminal session ensurer', () => {
 
     expect(result).toMatchObject({
       ok: true,
-      publication: { kind: 'existing', terminalSessionsRevision: 7 },
+      admission: { kind: 'existing', terminalSessionsRevision: 7 },
       terminalSessionId: 'term-locallocallocallocal1',
       canonicalCols: 100,
       canonicalRows: 40,
@@ -256,7 +256,7 @@ function preparedResult(
   return {
     ok: true,
     action: 'created',
-    publication: { kind: 'existing', terminalSessionsRevision: 7 },
+    admission: { kind: 'existing', terminalSessionsRevision: 7 },
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalRuntimeGeneration: 1,
     processName: 'zsh',

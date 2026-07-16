@@ -41,7 +41,7 @@ import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { physicalWorktreeIdentityKey } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { TerminalDirectory } from '#/server/terminal/terminal-directory.ts'
-import type { TerminalSessionPublication } from '#/server/terminal/terminal-session-ensurer.ts'
+import type { TerminalSessionAdmission } from '#/server/terminal/terminal-session-ensurer.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 
@@ -56,7 +56,7 @@ export type TerminalSessionPrepareResult =
   | ({
       ok: true
       action: TerminalCreateAction
-      publication: TerminalSessionPublication
+      admission: TerminalSessionAdmission
     } & TerminalRuntimeMetadata)
   | { ok: false; message: string }
 
@@ -193,7 +193,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       return {
         ...this.prepareResult(existing),
         action,
-        publication: { kind: 'existing', terminalSessionsRevision: this.projectionRevision(userId, input.scope) },
+        admission: { kind: 'existing', terminalSessionsRevision: this.projectionRevision(userId, input.scope) },
       }
     }
 
@@ -229,8 +229,8 @@ export class TerminalSessionManager<TUser extends string | number> {
       // write path on the others without an identity round-trip.
       takeoverPending: false,
     }
-    const admission = this.directory.reserve(session)
-    if (!admission) return { ok: false, message: 'error.unavailable' }
+    const reservation = this.directory.reserve(session)
+    if (!reservation) return { ok: false, message: 'error.unavailable' }
     if (input.clientId) {
       registerTerminalClient(session, input.clientId, size.cols, size.rows)
       this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId, this.sessionPresence(session)))
@@ -240,19 +240,19 @@ export class TerminalSessionManager<TUser extends string | number> {
     // Until then this server-owned session is intentionally addressable but
     // has no process and no output history.
     let settled = false
-    const publication: TerminalSessionPublication = {
+    const admission: TerminalSessionAdmission = {
       kind: 'prepared',
-      publish: () => {
+      commit: () => {
         if (settled) throw new Error('error.unavailable')
-        if (!admission.commit()) throw new Error('error.unavailable')
+        if (!reservation.commit()) throw new Error('error.unavailable')
         settled = true
         this.sink.onSessionsProjectionChanged?.(session.userId, session.repoRoot)
         return this.projectionRevision(userId, input.scope)
       },
-      retire: () => {
+      abort: () => {
         if (settled) return
         settled = true
-        admission.abort()
+        reservation.abort()
         session.ptyBinding.invalidateOwnership()
         session.ptyBinding.dispose(session)
       },
@@ -260,7 +260,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     return {
       ...this.prepareResult(session),
       action: 'created',
-      publication,
+      admission,
     }
   }
 

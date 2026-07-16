@@ -28,17 +28,17 @@ export type TerminalSessionEnsureResult =
       ok: true
       terminalSessionId: string
       action: TerminalCreateAction
-      publication: TerminalSessionPublication
+      admission: TerminalSessionAdmission
     } & TerminalRuntimeMetadata)
   | { ok: false; message: string }
 
 export type TerminalSessionPrepareManagerResult =
-  | ({ ok: true; action: TerminalCreateAction; publication: TerminalSessionPublication } & TerminalRuntimeMetadata)
+  | ({ ok: true; action: TerminalCreateAction; admission: TerminalSessionAdmission } & TerminalRuntimeMetadata)
   | { ok: false; message: string }
 
-export type TerminalSessionPublication =
+export type TerminalSessionAdmission =
   | { kind: 'existing'; terminalSessionsRevision: number }
-  | { kind: 'prepared'; publish(): number; retire(): void }
+  | { kind: 'prepared'; commit(): number; abort(): void }
 
 export interface TerminalSessionEnsureManagerInput {
   userId: string
@@ -186,7 +186,7 @@ function toEnsureResult(
     terminalRuntimeGeneration: prepared.terminalRuntimeGeneration,
     terminalSessionId,
     action: prepared.action,
-    publication: prepared.publication,
+    admission: prepared.admission,
     processName: prepared.processName,
     canonicalTitle: prepared.canonicalTitle,
     phase: prepared.phase,
