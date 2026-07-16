@@ -38,11 +38,13 @@ export async function getRepoStatus(
   options: { signal?: AbortSignal; repoRuntimeId?: string } = {},
 ): Promise<WorktreeStatus[]> {
   options.signal?.throwIfAborted()
-  return await runWithRepoSource(
+  const status = await runWithRepoSource(
     cwd,
     async (source) => await source.getStatus(options.signal),
     repoReadRuntime(options),
   )
+  options.signal?.throwIfAborted()
+  return status
 }
 
 export async function getRepoPullRequests(

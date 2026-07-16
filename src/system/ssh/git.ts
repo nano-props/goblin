@@ -128,12 +128,9 @@ export async function getRemoteStatus(
  * read path from (1 worktree-list + N statuses + 1 redundant
  * worktree-list + 1 walk) to (1 batched call + 1 walk) = 2 calls.
  *
- * This is a display read model, not a membership authority. Remote
- * command failures intentionally soft-fail to empty arrays so status
- * refresh can mark data unavailable without throwing through broad
- * refresh workflows. Callers that must authorize a worktree-scoped
- * operation should use `resolveRemoteWorktree` instead, where a remote
- * read failure is distinct from a real unknown worktree.
+ * This is a complete status read model, not a membership authority.
+ * Command failures and incomplete non-bare worktree status data reject the
+ * read so callers cannot accept a partial collection as authoritative clean.
  */
 export async function getRemoteStatusAndWorktrees(
   target: RemoteRepoTarget,
@@ -143,28 +140,24 @@ export async function getRemoteStatusAndWorktrees(
   const result = await run({ type: 'gitWorktreeListAndStatus', path: target.remotePath }, target, {
     signal: options.signal,
   })
-  if (options.signal?.aborted) return { statuses: [], worktrees: [] }
-  if (!result.ok) return { statuses: [], worktrees: [] }
+  options.signal?.throwIfAborted()
+  if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
 
   const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(result.stdout)
   const worktrees = parseWorktrees(worktreeListOutput)
-  if (options.signal?.aborted) return { statuses: [], worktrees }
+  options.signal?.throwIfAborted()
   const statusByPath = parseWorktreeStatusBatch(statusStream)
 
   const statuses: WorktreeStatus[] = []
   for (const worktree of worktrees) {
     if (worktree.isBare) continue
     const entries = statusByPath.get(worktree.path)
-    // A worktree that the remote script could not enter (cd failed
-    // or rev-parse failed) is absent from the status stream. Treat
-    // it as clean rather than dropping the worktree silently -- the
-    // Status tab will still show the worktree, just without changes.
-    const safeEntries = entries ? [...entries] : []
+    if (!entries) throw new Error('error.failed-read-repo')
     statuses.push({
       path: worktree.path,
       branch: worktree.branch,
       isMain: worktree.isPrimary,
-      entries: safeEntries,
+      entries: [...entries],
     })
   }
   return { statuses, worktrees }

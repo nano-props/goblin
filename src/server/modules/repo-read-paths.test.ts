@@ -311,6 +311,31 @@ describe('repo projection section deadlines', () => {
     await rejected
   })
 
+  test('does not accept an empty status result resolved after its deadline', async () => {
+    vi.useFakeTimers()
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
+      task(
+        asRepoSource(
+          makeSource({
+            getStatus: (signal?: AbortSignal) =>
+              new Promise<WorktreeStatus[]>((resolve) => {
+                signal?.addEventListener('abort', () => resolve([]))
+              }),
+          }),
+        ),
+      ),
+    )
+    const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
+    const promise = readRepoWorktreeStatus('/tmp/repo', {
+      repoRuntimeId: 'repo-runtime-test',
+      timeoutMs: 50,
+    })
+
+    const rejected = expect(promise).rejects.toThrow('repository read timeout')
+    await vi.advanceTimersByTimeAsync(75)
+    await rejected
+  })
+
   test('returns successful results when sections finish before the deadline', async () => {
     const snapshot: RepoSnapshot = {
       branches: [],

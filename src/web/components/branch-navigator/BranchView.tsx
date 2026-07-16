@@ -12,6 +12,10 @@ import { EmptyState } from '#/web/components/Layout.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { BranchNavigatorSkeleton } from '#/web/components/Skeleton.tsx'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
+import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
+import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
 
 interface Props {
   repoId: string
@@ -27,6 +31,8 @@ interface Props {
 export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterSelect, onAfterOpenStatus }: Props) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
+  const repoRuntimeId = useReposStore((state) => state.repos[repoId]?.repoRuntimeId ?? null)
+  const statusReadModel = useRepoWorktreeStatusReadModel(repoId, repoRuntimeId ?? '', repoRuntimeId !== null)
   const repo = useBranchListRepo(repoId)
 
   const branches = useMemo(
@@ -65,6 +71,19 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
 
   const highlightedBranch = currentBranchName ?? null
 
+  if (!repo && !statusReadModel.data && statusReadModel.isError && repoRuntimeId) {
+    const messageKey =
+      statusReadModel.error instanceof Error ? statusReadModel.error.message : String(statusReadModel.error)
+    return (
+      <RepoStatusFailureView
+        messageKey={messageKey}
+        retrying={statusReadModel.isFetching}
+        onRetry={() => {
+          void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repoId, repoRuntimeId)
+        }}
+      />
+    )
+  }
   if (!repo) return <BranchNavigatorSkeleton />
 
   return (

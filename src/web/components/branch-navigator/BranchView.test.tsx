@@ -13,10 +13,12 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   createBranchSnapshot,
   createRepoBranch,
+  installGoblinTestBridge,
   resetReposStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
+import { repoWorktreeStatusQueryKey } from '#/web/repo-data-query.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 
@@ -163,6 +165,33 @@ describe('BranchView', () => {
     renderBranchView()
 
     expect(screen.getByLabelText('branches.dirty')).toBeTruthy()
+  })
+
+  test('shows a retryable failure when the initial status read fails', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main')],
+      currentBranchName: 'main',
+    })
+    seedRepoReadModelQueryData(repo, {
+      branches: [createRepoBranch('main')],
+      currentBranch: 'main',
+    })
+    primaryWindowQueryClient.removeQueries({
+      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId),
+    })
+    const readStatus = vi.fn(async () => {
+      throw new Error('status failed')
+    })
+    installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
+
+    renderBranchView()
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    const retry = screen.getByRole('button', { name: 'error.try-again' })
+    expect(retry).toBeTruthy()
+    fireEvent.click(retry)
+    await vi.waitFor(() => expect(readStatus).toHaveBeenCalledTimes(2))
   })
 })
 

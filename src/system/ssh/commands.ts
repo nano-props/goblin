@@ -547,16 +547,18 @@ function scriptForCommand(command: RemoteCommandKind): string {
         `    pending=$((pending - 1))`,
         `  done`,
         `  (`,
-        // Each worker writes its NUL section to <tmpdir>/<idx>.out.
-        // `cd` may fail for a worktree the script cannot enter;
-        // treat that as a no-op (no file written) so the parser
-        // simply omits this section from the result.
+        // Each worker builds its NUL section in <tmpdir>/<idx>.tmp and
+        // publishes <idx>.out only after `git status` succeeds.
+        // A worktree the script cannot enter also produces no published
+        // section, so the complete-read parser rejects the response.
         `    if ! cd "$wt" 2>/dev/null; then exit 0; fi`,
         `    abs=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0`,
+        `    tmp="$WT_TMPDIR/$idx.tmp"`,
         `    out="$WT_TMPDIR/$idx.out"`,
-        `    printf "%s\\0" "$abs" > "$out"`,
-        `    git -C "$abs" status --porcelain -z -uall 2>/dev/null >> "$out" || true`,
-        `    printf "\\0" >> "$out"`,
+        `    printf "%s\\0" "$abs" > "$tmp"`,
+        `    if ! git -C "$abs" status --porcelain -z -uall 2>/dev/null >> "$tmp"; then rm -f "$tmp"; exit 0; fi`,
+        `    printf "\\0" >> "$tmp"`,
+        `    mv "$tmp" "$out"`,
         `  ) &`,
         `  pid=$!`,
         `  if [ -n "$pids" ]; then`,
@@ -569,9 +571,8 @@ function scriptForCommand(command: RemoteCommandKind): string {
         `for pid in $pids; do`,
         `  wait "$pid" 2>/dev/null || true`,
         `done`,
-        // Concatenate in index order. If a worker skipped its
-        // worktree (cd/rev-parse failure) no .out file is written;
-        // the parser will simply not see a section for it.
+        // Concatenate in index order. Any worker failure leaves no .out
+        // file, which the complete-read parser rejects as a missing section.
         `for f in "$WT_TMPDIR"/*.out; do`,
         `  [ -f "$f" ] && cat "$f"`,
         `done`,

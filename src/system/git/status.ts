@@ -10,47 +10,39 @@ const WORKTREE_STATUS_CONCURRENCY = 16
  *  main worktree (the one matching `cwd`) sorts first.
  *
  *  We list worktrees with `git worktree list` and run `git status` in
- *  each in parallel. Bare worktrees and worktrees that fail to status
- *  (drive unmounted, permissions) are skipped silently. */
+ *  each in parallel. Bare worktrees are omitted. Any other read failure
+ *  rejects the complete status read so callers cannot mistake partial data
+ *  for an authoritative clean snapshot. */
 export async function getWorkingStatus(cwd: string, options?: { signal?: AbortSignal }): Promise<WorktreeStatus[]> {
-  let worktrees
-  try {
-    const out = await git(cwd, ['worktree', 'list', '--porcelain'], { signal: options?.signal })
-    if (options?.signal?.aborted) return []
-    worktrees = parseWorktrees(out)
-  } catch {
-    if (options?.signal?.aborted) return []
-    return []
-  }
+  options?.signal?.throwIfAborted()
+  const out = await git(cwd, ['worktree', 'list', '--porcelain'], { signal: options?.signal })
+  options?.signal?.throwIfAborted()
+  const worktrees = parseWorktrees(out)
 
   const results = await mapWithConcurrency(
     worktrees,
     WORKTREE_STATUS_CONCURRENCY,
     async (wt): Promise<WorktreeStatus | null> => {
       if (wt.isBare) return null
-      try {
-        // -z: NUL-terminated entries with quoting disabled. Without this,
-        // filenames containing spaces, quotes, or unicode get backslash-
-        // escaped and double-quoted (e.g. `"file name.txt"`), which the LF
-        // parser leaves as literal quotes in the output. -z gives us the
-        // raw bytes and uses NUL between entries.
-        const output = await git(wt.path, ['status', '--porcelain', '-z'], { signal: options?.signal })
-        if (options?.signal?.aborted) return null
-        const entries = parseStatus(output)
-        return {
-          path: wt.path,
-          branch: wt.branch,
-          isMain: wt.isPrimary,
-          entries,
-        }
-      } catch {
-        return null
+      // -z: NUL-terminated entries with quoting disabled. Without this,
+      // filenames containing spaces, quotes, or unicode get backslash-
+      // escaped and double-quoted (e.g. `"file name.txt"`), which the LF
+      // parser leaves as literal quotes in the output. -z gives us the
+      // raw bytes and uses NUL between entries.
+      const output = await git(wt.path, ['status', '--porcelain', '-z'], { signal: options?.signal })
+      options?.signal?.throwIfAborted()
+      const entries = parseStatus(output)
+      return {
+        path: wt.path,
+        branch: wt.branch,
+        isMain: wt.isPrimary,
+        entries,
       }
     },
     { signal: options?.signal },
   )
 
-  if (options?.signal?.aborted) return []
+  options?.signal?.throwIfAborted()
   const filtered = results.filter((x): x is WorktreeStatus => x !== null)
   // Main worktree first; the rest keep `git worktree list`'s order
   // (creation order — stable and matches what `git worktree list` shows

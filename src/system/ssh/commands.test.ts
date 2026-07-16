@@ -459,6 +459,8 @@ describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
     expect(invocation.script).toMatch(/wait "\$first_pid"/)
     expect(invocation.script).toMatch(/max_in_flight=8/)
     expect(invocation.script).toMatch(/mktemp -d/)
+    expect(invocation.script).toContain('mv "$tmp" "$out"')
+    expect(invocation.script).not.toMatch(/status --porcelain -z -uall[^\n]*\|\| true/)
     expect(invocation.script).not.toMatch(/wait -n/)
     expect(invocation.script).not.toMatch(/\$'\\t'/)
     // The previous serial-loop shape must NOT have crept back in.
