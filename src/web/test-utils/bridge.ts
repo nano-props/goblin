@@ -28,9 +28,9 @@ import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { resetAcceptedRepoProjectionReadModelState } from '#/web/stores/repos/projection-read-model-effects.ts'
+import { setRepoProjectionQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-data-query.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
-import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import {
   workspacePaneTabsWithStaticTab,
   workspacePaneTabsWithoutStaticTab,
@@ -906,7 +906,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           }
           return {
             snapshot: projection.snapshot ?? null,
-            status: Array.isArray(projection.status) ? projection.status : [],
             pullRequests: projection.pullRequests ?? null,
             operations:
               projection.operations && typeof projection.operations === 'object'
@@ -1025,6 +1024,11 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/repo/log') return call('repo.log', body)
         if (url.pathname === '/api/repo/remote-branches') return call('repo.remoteBranches', body)
         if (url.pathname === '/api/repo/projection') return readRepoProjection(body)
+        if (url.pathname === '/api/repo/worktree-status') {
+          return handlers['repo.worktreeStatus']
+            ? call('repo.worktreeStatus', body)
+            : { repoRuntimeId: body.repoRuntimeId, status: [], loadedAt: Date.now() }
+        }
         if (url.pathname === '/api/repo/operations') {
           return handlers['repo.operations'] ? call('repo.operations', body) : { operations: [], loadedAt: Date.now() }
         }
@@ -1164,7 +1168,6 @@ export function seedRepoReadModelQueryData(
       branches: readModel.branches,
       current: readModel.currentBranch,
     },
-    status: readModel.status ?? [],
     pullRequests: null,
     operations: { operations: [], loadedAt: 0 },
     requested: {
@@ -1174,6 +1177,11 @@ export function seedRepoReadModelQueryData(
     loadedAt: 0,
   }
   setRepoProjectionQueryData(repo.id, repo.repoRuntimeId, null, 'full', projection)
+  setRepoWorktreeStatusQueryData(repo.id, repo.repoRuntimeId, {
+    repoRuntimeId: repo.repoRuntimeId,
+    status: readModel.status ?? [],
+    loadedAt: 0,
+  })
   if (readModel.currentBranch) {
     setRepoProjectionQueryData(repo.id, repo.repoRuntimeId, readModel.currentBranch, 'full', {
       ...projection,

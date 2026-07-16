@@ -181,7 +181,6 @@ describe('settings routes', () => {
         name: 'repo-active',
         projection: {
           snapshot: { current: 'main', branches: [] },
-          status: [],
           pullRequests: null,
           operations: { operations: [], loadedAt: 0 },
           requested: { branch: null, pullRequestMode: 'full' as const },

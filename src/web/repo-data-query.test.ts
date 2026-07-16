@@ -6,14 +6,17 @@ import {
   getRepoOperationsQueryData,
   getRepoProjectionPlaceholderData,
   getRepoProjectionQueryData,
+  getRepoWorktreeStatusQueryData,
   invalidateRepoRuntimeProjectionQueries,
   repoOperationsQueryKey,
   repoProjectionQueryOptions,
   repoProjectionQueryKey,
   refreshRepoProjectionReadModel,
+  refreshRepoWorktreeStatusReadModel,
   seedRepoProjectionQueryData,
   setRepoOperationsQueryData,
   setRepoProjectionQueryData,
+  setRepoWorktreeStatusQueryData,
   useRepoOperationsReadModel,
 } from '#/web/repo-data-query.ts'
 import type { PullRequestEntry, RepoOperationsSnapshot, RepoRuntimeProjection } from '#/shared/api-types.ts'
@@ -24,6 +27,7 @@ const repoClientMocks = vi.hoisted(() => ({
   getRepoOperations: vi.fn(),
   getRepoProjection: vi.fn(),
   getRepoRemoteBranches: vi.fn(),
+  getRepoWorktreeStatus: vi.fn(),
 }))
 
 vi.mock('#/web/repo-client.ts', () => repoClientMocks)
@@ -33,6 +37,7 @@ beforeEach(() => {
   repoClientMocks.getRepoOperations.mockReset()
   repoClientMocks.getRepoProjection.mockReset()
   repoClientMocks.getRepoRemoteBranches.mockReset()
+  repoClientMocks.getRepoWorktreeStatus.mockReset()
 })
 
 describe('repo data query keys', () => {
@@ -55,10 +60,8 @@ describe('repo data query keys', () => {
 describe('repo projection query data', () => {
   test('builds projection placeholder data from cached runtime projection', () => {
     const queryClient = new QueryClient()
-    const status: WorktreeStatus[] = [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [] }]
     const cachedProjection: RepoRuntimeProjection = {
       snapshot: { branches: [], current: 'main' },
-      status,
       pullRequests: [
         {
           branch: 'feature/a',
@@ -79,7 +82,6 @@ describe('repo projection query data', () => {
 
     expect(getRepoProjectionPlaceholderData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', queryClient)).toEqual({
       snapshot: cachedProjection.snapshot,
-      status,
       pullRequests: null,
       operations: { operations: [], loadedAt: 123 },
       requested: { branch: 'feature/a', pullRequestMode: 'full' },
@@ -91,7 +93,6 @@ describe('repo projection query data', () => {
     const queryClient = new QueryClient()
     const branchProjection: RepoRuntimeProjection = {
       snapshot: { branches: [], current: 'feature/other' },
-      status: [],
       pullRequests: null,
       operations: { operations: [], loadedAt: 101 },
       requested: { branch: 'feature/other', pullRequestMode: 'summary' },
@@ -99,7 +100,6 @@ describe('repo projection query data', () => {
     }
     const repoProjection: RepoRuntimeProjection = {
       snapshot: { branches: [], current: 'main' },
-      status: [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [] }],
       pullRequests: null,
       operations: { operations: [], loadedAt: 202 },
       requested: { branch: null, pullRequestMode: 'full' },
@@ -113,7 +113,6 @@ describe('repo projection query data', () => {
       getRepoProjectionPlaceholderData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', queryClient),
     ).toMatchObject({
       snapshot: repoProjection.snapshot,
-      status: repoProjection.status,
       requested: { branch: 'feature/a', pullRequestMode: 'full' },
       loadedAt: 0,
     })
@@ -122,7 +121,6 @@ describe('repo projection query data', () => {
   test('writes server projection and active operations cache', () => {
     const queryClient = new QueryClient()
     const snapshot = { branches: [], current: 'main' }
-    const status: WorktreeStatus[] = [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [] }]
     const pullRequests: PullRequestEntry[] = [
       {
         branch: 'feature/a',
@@ -136,7 +134,6 @@ describe('repo projection query data', () => {
     ]
     const projection: RepoRuntimeProjection = {
       snapshot,
-      status,
       pullRequests,
       operations: { operations: [], loadedAt: 123 },
       requested: { branch: 'feature/a', pullRequestMode: 'full' },
@@ -158,7 +155,6 @@ describe('repo projection query data', () => {
     const queryClient = new QueryClient()
     const projection: RepoRuntimeProjection = {
       snapshot: { branches: [], current: 'main' },
-      status: [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [] }],
       pullRequests: null,
       operations: { operations: [], loadedAt: 123 },
       requested: { branch: 'feature/a', pullRequestMode: 'summary' },
@@ -177,7 +173,6 @@ describe('repo projection query data', () => {
     const queryClient = new QueryClient()
     const projection: RepoRuntimeProjection = {
       snapshot: { branches: [], current: 'main' },
-      status: [],
       pullRequests: null,
       operations: { operations: [], loadedAt: 123 },
       requested: { branch: 'feature/a', pullRequestMode: 'full' },
@@ -246,7 +241,7 @@ describe('repo projection query data', () => {
 
     invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-runtime-1', queryClient)
 
-    expect(invalidateQueries).toHaveBeenCalledTimes(2)
+    expect(invalidateQueries).toHaveBeenCalledTimes(3)
     expect(invalidateQueries).toHaveBeenNthCalledWith(
       1,
       {
@@ -263,6 +258,15 @@ describe('repo projection query data', () => {
       },
       { cancelRefetch: false },
     )
+    expect(invalidateQueries).toHaveBeenNthCalledWith(
+      3,
+      {
+        queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-1', 'worktree-status'],
+        exact: true,
+        refetchType: 'active',
+      },
+      { cancelRefetch: false },
+    )
     invalidateQueries.mockRestore()
   })
 
@@ -270,7 +274,14 @@ describe('repo projection query data', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const signals: AbortSignal[] = []
     const releases: Array<(projection: RepoRuntimeProjection) => void> = []
-    setRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', repoProjectionForTest(0), queryClient)
+    setRepoProjectionQueryData(
+      '/tmp/repo',
+      'repo-runtime-1',
+      'feature/a',
+      'full',
+      repoProjectionForTest(0),
+      queryClient,
+    )
     repoClientMocks.getRepoProjection.mockImplementation(
       (
         _repoRoot: string,
@@ -438,7 +449,14 @@ describe('repo projection query data', () => {
     const signals: AbortSignal[] = []
     const releases: Array<(projection: RepoRuntimeProjection) => void> = []
     const queryKey = repoProjectionQueryKey('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full')
-    setRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', repoProjectionForTest(0), queryClient)
+    setRepoProjectionQueryData(
+      '/tmp/repo',
+      'repo-runtime-1',
+      'feature/a',
+      'full',
+      repoProjectionForTest(0),
+      queryClient,
+    )
     repoClientMocks.getRepoProjection.mockImplementation(
       (
         _repoRoot: string,
@@ -467,7 +485,9 @@ describe('repo projection query data', () => {
       expect(queryClient.getQueryData(queryKey)).toMatchObject({ loadedAt: 0 })
       expect(repoClientMocks.getRepoProjection).not.toHaveBeenCalled()
 
-      const refresh = refreshRepoProjectionReadModel('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', { queryClient })
+      const refresh = refreshRepoProjectionReadModel('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', {
+        queryClient,
+      })
       await vi.waitFor(() => {
         expect(signals).toHaveLength(1)
       })
@@ -552,7 +572,9 @@ describe('repo projection query data', () => {
         expect(signals).toHaveLength(1)
       })
 
-      const refresh = refreshRepoProjectionReadModel('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', { queryClient })
+      const refresh = refreshRepoProjectionReadModel('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', {
+        queryClient,
+      })
 
       expect(signals).toHaveLength(1)
       expect(signals[0]?.aborted).toBe(false)
@@ -581,7 +603,9 @@ describe('repo projection query data', () => {
     )
 
     try {
-      const refresh = refreshRepoProjectionReadModel('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', { queryClient })
+      const refresh = refreshRepoProjectionReadModel('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', {
+        queryClient,
+      })
       await vi.waitFor(() => {
         expect(releases).toHaveLength(1)
       })
@@ -603,7 +627,14 @@ describe('repo projection query data', () => {
   test('imperative projection refresh reruns after invalidation of an already invalidated cached query', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const releases: Array<(projection: RepoRuntimeProjection) => void> = []
-    setRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', repoProjectionForTest(0), queryClient)
+    setRepoProjectionQueryData(
+      '/tmp/repo',
+      'repo-runtime-1',
+      'feature/a',
+      'full',
+      repoProjectionForTest(0),
+      queryClient,
+    )
     repoClientMocks.getRepoProjection.mockImplementation(
       () =>
         new Promise<RepoRuntimeProjection>((resolve) => {
@@ -612,7 +643,9 @@ describe('repo projection query data', () => {
     )
 
     try {
-      const refresh = refreshRepoProjectionReadModel('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', { queryClient })
+      const refresh = refreshRepoProjectionReadModel('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', {
+        queryClient,
+      })
       await vi.waitFor(() => {
         expect(releases).toHaveLength(1)
       })
@@ -699,6 +732,52 @@ describe('repo projection query data', () => {
   })
 })
 
+describe('repo worktree status query data', () => {
+  test('preserves the last accepted status when refresh fails', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const accepted = {
+      repoRuntimeId: 'repo-runtime-1',
+      status: [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [{ x: 'M', y: ' ', path: 'a.ts' }] }],
+      loadedAt: 1,
+    }
+    setRepoWorktreeStatusQueryData('/tmp/repo', 'repo-runtime-1', accepted, queryClient)
+    repoClientMocks.getRepoWorktreeStatus.mockRejectedValue(new Error('transport failed'))
+
+    await expect(refreshRepoWorktreeStatusReadModel('/tmp/repo', 'repo-runtime-1', { queryClient })).rejects.toThrow(
+      'transport failed',
+    )
+    expect(getRepoWorktreeStatusQueryData('/tmp/repo', 'repo-runtime-1', queryClient)).toEqual(accepted)
+  })
+
+  test('accepts a successful empty collection as clean', async () => {
+    const queryClient = new QueryClient()
+    repoClientMocks.getRepoWorktreeStatus.mockResolvedValue({
+      repoRuntimeId: 'repo-runtime-1',
+      status: [],
+      loadedAt: 2,
+    })
+
+    await refreshRepoWorktreeStatusReadModel('/tmp/repo', 'repo-runtime-1', { queryClient })
+
+    expect(getRepoWorktreeStatusQueryData('/tmp/repo', 'repo-runtime-1', queryClient)?.status).toEqual([])
+  })
+
+  test('rejects a response belonging to a replaced repo runtime', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    repoClientMocks.getRepoWorktreeStatus.mockResolvedValue({
+      repoRuntimeId: 'repo-runtime-old',
+      status: [],
+      loadedAt: 2,
+    })
+
+    await expect(
+      refreshRepoWorktreeStatusReadModel('/tmp/repo', 'repo-runtime-current', { queryClient }),
+    ).rejects.toThrow('Mismatched repo runtime read')
+    expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce()
+    expect(getRepoWorktreeStatusQueryData('/tmp/repo', 'repo-runtime-current', queryClient)).toBeUndefined()
+  })
+})
+
 function repoProjectionForTest(
   loadedAt: number,
   branch: string | null = 'feature/a',
@@ -706,7 +785,6 @@ function repoProjectionForTest(
 ): RepoRuntimeProjection {
   return {
     snapshot: { branches: [], current: 'main' },
-    status: [],
     pullRequests: null,
     operations: { operations: [], loadedAt },
     requested: { branch, pullRequestMode: mode },

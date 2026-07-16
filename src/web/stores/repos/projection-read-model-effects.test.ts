@@ -25,7 +25,6 @@ describe('repo projection read-model effects', () => {
         branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
         current: 'feature/a',
       },
-      status: [],
       pullRequests: null,
       operations: { operations: [], loadedAt },
       requested: { branch, pullRequestMode: mode },
@@ -191,21 +190,6 @@ describe('repo projection read-model effects', () => {
       loadedAt: null,
     })
 
-    acceptRepoProjectionReadModel(
-      useReposStore.setState,
-      useReposStore.getState,
-      {
-        repoRoot: '/repo',
-        repoRuntimeId: repo.repoRuntimeId,
-        projection,
-      },
-      { scope: 'visible-status' },
-    )
-
-    expect(useReposStore.getState().repos['/repo']?.dataLoads.visibleStatus).toMatchObject({
-      phase: 'idle',
-      loadedAt: projection.loadedAt,
-    })
   })
 
   test('duplicate core projection acceptance from operations-only rewrites does not settle visible status', () => {

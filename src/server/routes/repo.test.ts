@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getRepoLog: vi.fn(),
   getRepoPatch: vi.fn(),
   readRepoProjection: vi.fn(),
+  readRepoWorktreeStatus: vi.fn(),
   readRepoOperationsSnapshot: vi.fn(),
   fetchRepo: vi.fn(),
   cloneRepo: vi.fn(),
@@ -44,6 +45,7 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   getRepoLog: mocks.getRepoLog,
   getRepoPatch: mocks.getRepoPatch,
   readRepoProjection: mocks.readRepoProjection,
+  readRepoWorktreeStatus: mocks.readRepoWorktreeStatus,
   readRepoOperationsSnapshot: mocks.readRepoOperationsSnapshot,
   getRepoWorktreeBootstrapPreview: mocks.getRepoWorktreeBootstrapPreview,
 }))
@@ -423,7 +425,6 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   test('passes projection body through to the module layer', async () => {
     mocks.readRepoProjection.mockResolvedValue({
       snapshot: { branches: [], current: 'main' },
-      status: [],
       pullRequests: [],
       operations: { operations: [], loadedAt: 123 },
       requested: { branch: 'feature/a', pullRequestMode: 'full' },
@@ -447,6 +448,31 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       repoRuntimeId,
     })
     expect(await response.json()).toMatchObject({ requested: { branch: 'feature/a', pullRequestMode: 'full' } })
+  })
+
+  test('returns a complete repo-runtime-scoped worktree status snapshot', async () => {
+    const app = createTestRepoRoutes()
+    const repoRuntimeId = await openTestRepoRuntime(app)
+    mocks.readRepoWorktreeStatus.mockResolvedValue({
+      repoRuntimeId,
+      status: [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [] }],
+      loadedAt: 123,
+    })
+
+    const response = await app.request(
+      new Request('http://localhost/worktree-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.readRepoWorktreeStatus).toHaveBeenCalledWith('/tmp/repo', {
+      signal: expect.any(AbortSignal),
+      repoRuntimeId,
+    })
+    expect(await response.json()).toMatchObject({ repoRuntimeId, status: [{ path: '/tmp/repo' }] })
   })
 
   test('returns repo operation state snapshots', async () => {
@@ -523,7 +549,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, branch: 'feature/work' }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, branch: 'feature/work', count: 50 }),
       }),
     )
 

@@ -5,7 +5,7 @@ import {
   nextRepoOperationId,
   repoOperation,
 } from '#/web/stores/repos/repo-operation-scheduler.ts'
-import { requestRepoRuntimeProjectionRefresh, runManualRepoSync } from '#/web/stores/repos/refresh.ts'
+import { requestRepoProjectionReadModelRefresh, runManualRepoSync } from '#/web/stores/repos/refresh.ts'
 import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
 import { getBranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
@@ -423,10 +423,7 @@ describe('runBranchAction', () => {
       },
     })
 
-    const statusWork = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
-      scope: 'visible-status',
-      branchName: null,
-    })
+    const statusWork = requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID)
     await flushAsyncWork()
     const deleteWork = useReposStore.getState().runBranchAction(REPO_ID, {
       kind: 'deleteBranch',
@@ -470,7 +467,7 @@ describe('runBranchAction', () => {
       },
     })
 
-    void requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, { scope: 'visible-status', branchName: null })
+    void requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID)
     await flushAsyncWork()
     const result = await useReposStore.getState().runBranchAction(
       REPO_ID,
@@ -566,10 +563,7 @@ describe('runBranchAction', () => {
       },
     })
 
-    const statusWork = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
-      scope: 'visible-status',
-      branchName: null,
-    })
+    const statusWork = requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID)
     await flushAsyncWork()
     const pullWork = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
     await flushAsyncWork()
@@ -626,10 +620,7 @@ describe('runBranchAction', () => {
         },
       })
 
-      const statusWork = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
-        scope: 'visible-status',
-        branchName: null,
-      })
+      const statusWork = requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID)
       await flushAsyncWork()
       const actionWork = useReposStore.getState().runBranchAction(REPO_ID, action)
       await flushAsyncWork()

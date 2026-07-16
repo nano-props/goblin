@@ -16,7 +16,7 @@ import { seedRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { acceptRepoProjectionReadModel } from '#/web/stores/repos/projection-read-model-effects.ts'
 import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneTabsByTargetFromQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { restoredPreferredWorkspacePaneTabByTarget } from '#/web/restorable-workspace-state.ts'
 import { recordWithoutKey } from '#/shared/record.ts'
 
@@ -164,7 +164,7 @@ function applyRestoredPreferredWorkspacePaneTabs(
 ): void {
   const state = get()
   const repo = state.repos[repoRoot]
-  const branches = repo ? readRepoBranchQueryProjection(repo)?.branches : null
+  const branches = repo ? readRepoBranchSnapshotQueryProjection(repo)?.branches : null
   const restoredPreferred = state.restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByRepo[repoRoot]
   if (!repo || !branches || !restoredPreferred) return
   const preferredWorkspacePaneTabByTarget = restoredPreferredWorkspacePaneTabByTarget(

@@ -66,7 +66,7 @@ describe('RepoActivityControl', () => {
     ).toMatchObject({ kind: 'refresh-button', manualSyncBusy: true })
   })
 
-  test('keeps the primary refresh button idle during contextual visible projection refreshes', () => {
+  test('keeps the primary refresh button idle during contextual visible status refreshes', () => {
     resetReposStore()
     seedRepoShellForTest({ id: REPO_ID })
     markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'visibleStatus', reason: 'visible-status' }], 'running')

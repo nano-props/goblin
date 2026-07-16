@@ -49,7 +49,7 @@ describe('repo refresh actions', () => {
 
   afterEach(() => primaryWindowQueryClient.clear())
 
-  test('requests a visible projection only for the current idle runtime with a branch', () => {
+  test('requests visible status only for the current idle runtime with a branch', () => {
     const store = repoRefreshStoreAccess()
 
     expect(requestVisibleWorkspaceStatusRefresh(store, '/repo', 'repo-runtime-test-9', 'feature/query')).toBe(true)

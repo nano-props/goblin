@@ -225,10 +225,9 @@ describe('repo lifecycle', () => {
       projection: () =>
         new Promise<{
           snapshot: { branches: BranchSnapshotInfo[]; current: string }
-          status: never[]
           pullRequests: null
         }>((resolve) => {
-          snapshotResolvers.push((value) => resolve({ snapshot: value, status: [], pullRequests: null }))
+          snapshotResolvers.push((value) => resolve({ snapshot: value, pullRequests: null }))
         }),
     })
 

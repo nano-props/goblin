@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import { localRepoSessionEntry, normalizeRemoteTarget, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { repoRuntimesQueryKey } from '#/web/repo-runtime-query.ts'
 import {
   workspacePaneTabsQueryKey,
@@ -40,7 +40,6 @@ describe('repo session hydration', () => {
             name: 'server-a',
             projection: {
               snapshot: { branches: [branchSnapshot('main')], current: 'main' },
-              status: [],
               pullRequests: null,
               operations: { operations: [], loadedAt: 0 },
               requested: { branch: null, pullRequestMode: 'full' },
@@ -99,7 +98,6 @@ describe('repo session hydration', () => {
           name: 'server-a',
           projection: {
             snapshot: { branches: [branchSnapshot('server-main')], current: 'server-main' },
-            status: [],
             pullRequests: null,
             operations: { operations: [], loadedAt: 0 },
             requested: { branch: null, pullRequestMode: 'full' },
@@ -124,7 +122,7 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().order).toEqual([REPO_A])
     expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
-    expect(readRepoBranchQueryProjection(repo!)?.currentBranch).toBe('server-main')
+    expect(readRepoBranchSnapshotQueryProjection(repo!)?.currentBranch).toBe('server-main')
     expect(primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())).toEqual({
       runtimes: [
         { repoRoot: REPO_B, repoRuntimeId: 'repo-runtime-other-window' },
@@ -202,7 +200,6 @@ describe('repo session hydration', () => {
     })
     const projection = {
       snapshot: { branches: [branchSnapshot('main')], current: 'main' },
-      status: [],
       pullRequests: null,
       operations: { operations: [], loadedAt: 0 },
       requested: { branch: null, pullRequestMode: 'full' as const },
@@ -226,7 +223,7 @@ describe('repo session hydration', () => {
     expect(state.order).toEqual([REPO_A])
     expect(state.restoredRepoId).toBe(REPO_A)
     expect(state.repos[REPO_A]?.session.projectionState).toBe('projected')
-    expect(readRepoBranchQueryProjection(state.repos[REPO_A]!)?.currentBranch).toBe('main')
+    expect(readRepoBranchSnapshotQueryProjection(state.repos[REPO_A]!)?.currentBranch).toBe('main')
     expect(primaryWindowQueryClient.getQueryData(workspacePaneTabsQueryKey(REPO_A, 'repo-runtime-server-a'))).toEqual({
       revision: 3,
       entries: [],
@@ -269,7 +266,6 @@ describe('repo session hydration', () => {
         name: 'server-a',
         projection: {
           snapshot: { branches: [branchSnapshot('main')], current: 'main' },
-          status: [],
           pullRequests: null,
           operations: { operations: [], loadedAt: 0 },
           requested: { branch: null, pullRequestMode: 'full' },
@@ -319,7 +315,6 @@ describe('repo session hydration', () => {
         name: 'server-a',
         projection: {
           snapshot: { branches: [branchSnapshot('main')], current: 'main' },
-          status: [],
           pullRequests: null,
           operations: { operations: [], loadedAt: 0 },
           requested: { branch: null, pullRequestMode: 'full' as const },
@@ -385,7 +380,6 @@ describe('repo session hydration', () => {
           target,
           projection: {
             snapshot: { branches: [branchSnapshot('main')], current: 'main' },
-            status: [],
             pullRequests: null,
             operations: { operations: [], loadedAt: 0 },
             requested: { branch: null, pullRequestMode: 'full' },

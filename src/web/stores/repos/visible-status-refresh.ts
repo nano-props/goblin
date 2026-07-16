@@ -1,38 +1,21 @@
-import { getRepoProjection } from '#/web/repo-client.ts'
 import {
-  getRepoRuntimeProjectionInvalidationVersion,
-  repoProjectionQueryKey,
-  setRepoProjectionQueryData,
+  getRepoWorktreeStatusQueryData,
+  refreshRepoWorktreeStatusReadModel,
 } from '#/web/repo-data-query.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { refreshStatusLog } from '#/web/logger.ts'
 import { isRepoUnavailableReason, markRepoUnavailable } from '#/web/stores/repos/availability.ts'
-import { cancelDataLoad, finishDataLoadError, startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
+import { finishDataLoadError, finishDataLoadSuccess, startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
 import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { acceptRepoProjectionReadModel } from '#/web/stores/repos/projection-read-model-effects.ts'
 import type { RepoRefreshStoreAccess } from '#/web/stores/repos/refresh.ts'
 
-// Why this lives next to `requestRepoRuntimeProjectionRefresh` instead of
-// sharing its lane: the latter routes through `runRuntimeProjectionRefresh`
-// / `runLatestOperation`, which is the right home for branch-action and
-// read-model refreshes, but tab-open and visibility-driven refreshes are
-// user-initiated and must not be deduped or stalled behind that lane. So
-// this module calls `getRepoProjection` directly, and uses the local
-// `visibleStatusRefreshesInFlight` set (plus `matchingProjectionFetchInProgress`)
-// to dedupe, and the `startedInvalidationVersion` check below to discard
-// stale results if a server-pushed invalidation bumps the version while
-// the fetch is still in flight.
+// Tab-open and visibility refreshes stay outside the operation lane so they
+// cannot be stalled behind branch actions. React Query owns transport
+// deduplication and stale-result rejection; this set only coalesces the
+// matching presentation load state.
 const visibleStatusRefreshesInFlight = new Set<string>()
 
-function visibleStatusRefreshKey(repoRoot: string, repoRuntimeId: string, branchName: string): string {
-  return [repoRoot, repoRuntimeId, branchName].join('\0')
-}
-
-function matchingProjectionFetchInProgress(repoRoot: string, repoRuntimeId: string, branchName: string): boolean {
-  const queryKey = repoProjectionQueryKey(repoRoot, repoRuntimeId, branchName, 'full')
-  const fetchStatus = primaryWindowQueryClient.getQueryState(queryKey)?.fetchStatus
-  return fetchStatus === 'fetching' || fetchStatus === 'paused'
+function visibleStatusRefreshKey(repoRoot: string, repoRuntimeId: string): string {
+  return [repoRoot, repoRuntimeId].join('\0')
 }
 
 function visibleStatusRefreshable(store: RepoRefreshStoreAccess, repoRoot: string, repoRuntimeId: string): boolean {
@@ -53,55 +36,25 @@ export async function refreshVisibleStatusCache(
   store: RepoRefreshStoreAccess,
   repoRoot: string,
   repoRuntimeId: string,
-  branchName: string,
+  _branchName: string,
 ): Promise<void> {
   if (!visibleStatusRefreshable(store, repoRoot, repoRuntimeId)) return
-  const key = visibleStatusRefreshKey(repoRoot, repoRuntimeId, branchName)
-  if (
-    visibleStatusRefreshesInFlight.has(key) ||
-    matchingProjectionFetchInProgress(repoRoot, repoRuntimeId, branchName)
-  ) {
-    return
-  }
+  const key = visibleStatusRefreshKey(repoRoot, repoRuntimeId)
+  if (visibleStatusRefreshesInFlight.has(key)) return
   visibleStatusRefreshesInFlight.add(key)
-  const startedInvalidationVersion = getRepoRuntimeProjectionInvalidationVersion(
-    repoRoot,
-    repoRuntimeId,
-    primaryWindowQueryClient,
-  )
-  const refreshAttemptStale = () =>
-    startedInvalidationVersion <
-    getRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, primaryWindowQueryClient)
-  const cancelStaleRefresh = () => {
-    updateIfFresh(store.set, repoRoot, repoRuntimeId, (repo) => {
-      cancelDataLoad(repo.dataLoads.visibleStatus)
-    })
-  }
   updateIfFresh(store.set, repoRoot, repoRuntimeId, (repo) => {
     startDataLoad(repo.dataLoads.visibleStatus, {
-      hasData: (readRepoBranchQueryProjection(repo)?.status.length ?? 0) > 0,
+      hasData: !!getRepoWorktreeStatusQueryData(repoRoot, repoRuntimeId),
     })
   })
   try {
-    const projection = await getRepoProjection(repoRoot, repoRuntimeId, branchName, { mode: 'full' })
+    const snapshot = await refreshRepoWorktreeStatusReadModel(repoRoot, repoRuntimeId)
     const repo = store.get().repos[repoRoot]
     if (!repo || repo.repoRuntimeId !== repoRuntimeId) return
-    if (refreshAttemptStale()) {
-      cancelStaleRefresh()
-      return
-    }
-    setRepoProjectionQueryData(repoRoot, repoRuntimeId, branchName, 'full', projection)
-    acceptRepoProjectionReadModel(
-      store.set,
-      store.get,
-      { repoRoot, repoRuntimeId, projection },
-      { scope: 'visible-status', settleVisibleStatus: true },
-    )
+    updateIfFresh(store.set, repoRoot, repoRuntimeId, (current) => {
+      finishDataLoadSuccess(current.dataLoads.visibleStatus, snapshot.loadedAt)
+    })
   } catch (err) {
-    if (refreshAttemptStale()) {
-      cancelStaleRefresh()
-      return
-    }
     const message = err instanceof Error ? err.message : String(err)
     refreshStatusLog.warn('failed', { err: new Error(message) })
     updateIfFresh(store.set, repoRoot, repoRuntimeId, (repo) => {

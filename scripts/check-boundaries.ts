@@ -113,9 +113,9 @@ const SOURCE_PATTERN_RULES: SourcePatternRule[] = [
         label: 'legacy repo procedure schema key',
         pattern: /\b(?:REPO_QUERY_SCHEMAS|REPO_PROCEDURE_SCHEMAS)\.(?:snapshot|status|composite)\b/,
       },
+      { label: 'projection-owned worktree status', pattern: /\bprojection\.status\b/ },
     ],
-    reason:
-      'web repo reads must flow through the runtime projection and React Query read-model surfaces, not legacy direct snapshot/status/composite reads',
+    reason: 'web repo reads must compose runtime projections with the independent worktree-status React Query surface',
   },
 ]
 

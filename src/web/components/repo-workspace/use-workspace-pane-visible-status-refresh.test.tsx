@@ -5,13 +5,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { useWorkspacePaneVisibleStatusRefresh } from '#/web/components/repo-workspace/use-workspace-pane-visible-status-refresh.ts'
 import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
-import { requestRepoRuntimeProjectionRefresh } from '#/web/stores/repos/refresh.ts'
 
 vi.mock('#/web/stores/repos/repo-refresh-actions.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('#/web/stores/repos/repo-refresh-actions.ts')>()
   return { ...actual, requestVisibleWorkspaceStatusRefresh: vi.fn(() => true) }
 })
-vi.mock('#/web/stores/repos/refresh.ts', () => ({ requestRepoRuntimeProjectionRefresh: vi.fn(async () => {}) }))
 
 const REPO_ID = '/tmp/visible-status-refresh-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-visible-status-refresh'
@@ -51,8 +49,6 @@ describe('useWorkspacePaneVisibleStatusRefresh', () => {
     root = createRoot(container)
     vi.mocked(requestVisibleWorkspaceStatusRefresh).mockReset()
     vi.mocked(requestVisibleWorkspaceStatusRefresh).mockReturnValue(true)
-    vi.mocked(requestRepoRuntimeProjectionRefresh).mockReset()
-    vi.mocked(requestRepoRuntimeProjectionRefresh).mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -73,7 +69,6 @@ describe('useWorkspacePaneVisibleStatusRefresh', () => {
       REPO_RUNTIME_ID,
       'main',
     )
-    expect(requestRepoRuntimeProjectionRefresh).not.toHaveBeenCalled()
   })
 
   test.each(['files', 'history', 'terminal'] satisfies WorkspacePaneTabType[])('does not refresh for rendered %s', async (renderedTab) => {
@@ -82,7 +77,6 @@ describe('useWorkspacePaneVisibleStatusRefresh', () => {
     })
 
     expect(requestVisibleWorkspaceStatusRefresh).not.toHaveBeenCalled()
-    expect(requestRepoRuntimeProjectionRefresh).not.toHaveBeenCalled()
   })
 
   test('refreshes again when the visible branch changes', async () => {

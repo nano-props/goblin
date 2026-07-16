@@ -14,7 +14,7 @@ import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
-import { useRepoProjectionReadModel } from '#/web/repo-data-query.ts'
+import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
 import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
@@ -24,8 +24,7 @@ import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 
 export type RepoWorkspacePaneRouteContext =
-  | { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null }
-  | { kind: 'inactive' }
+  { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null } | { kind: 'inactive' }
 
 interface Props {
   repoId: string
@@ -145,16 +144,20 @@ function RepoWorkspaceLoaded({
     true,
   )
   const projection = projectionReadModel.data
-  const branchReadModel = projection?.snapshot
-    ? repoBranchReadModelFromSnapshot(projection.snapshot, projection.status)
-    : null
+  const statusReadModel = useRepoWorktreeStatusReadModel(repoShell.id, repoShell.repoRuntimeId, true)
+  const branchReadModel =
+    projection?.snapshot && statusReadModel.data
+      ? repoBranchReadModelFromSnapshot(projection.snapshot, statusReadModel.data.status)
+      : null
   if (!branchReadModel || !projection) {
     return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }
+  const statusSnapshot = statusReadModel.data
+  if (!statusSnapshot) return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   let presentationBranchModel: RepoWorkspaceRepo['branchModel'] = {
     ...branchReadModel,
-    status: projection.status,
-    statusReady: projectionReadModel.isSuccess,
+    status: statusSnapshot.status,
+    statusReady: true,
   }
   if (currentBranchName && Array.isArray(projection.pullRequests)) {
     const pullRequest = projection.pullRequests.find((entry) => entry.branch === currentBranchName)?.pullRequest

@@ -4,6 +4,7 @@ import type {
   CloneRepoResult,
   RepoOperationsSnapshot,
   RepoRuntimeProjection,
+  RepoWorktreeStatusSnapshot,
   RepoRuntimesSnapshot,
   RepoRuntimeOpenResult,
   RepoRuntimeMembershipReconcileResult,
@@ -87,6 +88,14 @@ export async function getRepoProjection(
     { cwd, repoRuntimeId, branch: branch || undefined, mode: options?.mode },
     { signal },
   )
+}
+
+export async function getRepoWorktreeStatus(
+  cwd: string,
+  repoRuntimeId: string,
+  signal?: AbortSignal,
+): Promise<RepoWorktreeStatusSnapshot> {
+  return await postServerJson('/api/repo/worktree-status', { cwd, repoRuntimeId }, { signal })
 }
 
 export async function getRepoOperations(

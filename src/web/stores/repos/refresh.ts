@@ -1,18 +1,19 @@
 import { appendRepoEvent, errorEvent } from '#/web/stores/repos/repo-state-factory.ts'
 import { updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
-import { refreshStatusLog } from '#/web/logger.ts'
 import { isRepoUnavailableReason, markRepoUnavailable } from '#/web/stores/repos/availability.ts'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
 import { resolveActionRepoRuntimeId } from '#/web/stores/repos/refresh-state.ts'
 import { createRefreshSyncHelpers } from '#/web/stores/repos/refresh-sync.ts'
 import { cancelDataLoad, finishDataLoadError, startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
-import { refreshRepoProjectionReadModel } from '#/web/repo-data-query.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import {
+  getRepoWorktreeStatusQueryData,
+  refreshRepoProjectionReadModel,
+  refreshRepoWorktreeStatusReadModel,
+} from '#/web/repo-data-query.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { acceptRepoProjectionReadModel } from '#/web/stores/repos/projection-read-model-effects.ts'
 import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 import type {
-  RepoRuntimeProjectionRefreshOptions,
-  RepoRuntimeProjectionRefreshScope,
   ReposGet,
   ReposSet,
 } from '#/web/stores/repos/types.ts'
@@ -22,67 +23,18 @@ export interface RepoRefreshStoreAccess {
   get: ReposGet
 }
 
-type ProjectionRefreshTarget =
-  | { key: 'repoReadModel'; reason: 'repo-read-model' }
-  | { key: 'visibleStatus'; reason: 'visible-status' }
-
-interface ProjectionRefreshPlan {
-  wantsReadModelLoad: boolean
-  wantsVisibleStatusLoad: boolean
-  operationKey: string
-  priority: number
-  targets: [ProjectionRefreshTarget, ...ProjectionRefreshTarget[]]
-}
-
-function projectionRefreshPlan(scope: RepoRuntimeProjectionRefreshScope): ProjectionRefreshPlan {
-  switch (scope) {
-    case 'repo-read-model':
-      return {
-        wantsReadModelLoad: true,
-        wantsVisibleStatusLoad: true,
-        operationKey: 'repo-read-model',
-        priority: 50,
-        targets: [
-          { key: 'repoReadModel', reason: 'repo-read-model' },
-          { key: 'visibleStatus', reason: 'visible-status' },
-        ],
-      }
-    case 'visible-status':
-      // Workspace open/visible refresh uses requestVisibleWorkspaceStatusRefresh instead
-      // of this operation-backed scope so it will not invalidate or cancel active projection queries.
-      return {
-        wantsReadModelLoad: false,
-        wantsVisibleStatusLoad: true,
-        operationKey: 'visible-status',
-        priority: 40,
-        targets: [{ key: 'visibleStatus', reason: 'visible-status' }],
-      }
-  }
-  const exhaustive: never = scope
-  return exhaustive
-}
-
-async function runRuntimeProjectionRefresh(
+async function runRepoProjectionReadModelRefresh(
   store: RepoRefreshStoreAccess,
   id: string,
   repoRuntimeId: string,
-  options: RepoRuntimeProjectionRefreshOptions,
 ): Promise<void> {
-  const { scope } = options
-  const { wantsReadModelLoad, wantsVisibleStatusLoad, operationKey, priority, targets } = projectionRefreshPlan(scope)
-  const branchName = scope === 'visible-status' ? options.branchName : null
-
   updateIfFresh(store.set, id, repoRuntimeId, (r) => {
-    if (wantsReadModelLoad) {
-      startDataLoad(r.dataLoads.repoReadModel, {
-        hasData: (readRepoBranchQueryProjection(r)?.branches.length ?? 0) > 0,
-      })
-    }
-    if (wantsVisibleStatusLoad) {
-      startDataLoad(r.dataLoads.visibleStatus, {
-        hasData: (readRepoBranchQueryProjection(r)?.status.length ?? 0) > 0,
-      })
-    }
+    startDataLoad(r.dataLoads.repoReadModel, {
+      hasData: (readRepoBranchSnapshotQueryProjection(r)?.branches.length ?? 0) > 0,
+    })
+    startDataLoad(r.dataLoads.visibleStatus, {
+      hasData: !!getRepoWorktreeStatusQueryData(r.id, r.repoRuntimeId),
+    })
   })
   await runLatestOperation({
     set: store.set,
@@ -90,10 +42,17 @@ async function runRuntimeProjectionRefresh(
     id,
     repoRuntimeId,
     lane: 'read',
-    operationKey,
-    priority,
-    targets,
-    task: (signal) => refreshRepoProjectionReadModel(id, repoRuntimeId, branchName, 'full', { signal }),
+    operationKey: 'repo-read-model',
+    priority: 50,
+    targets: [
+      { key: 'repoReadModel', reason: 'repo-read-model' },
+      { key: 'visibleStatus', reason: 'visible-status' },
+    ],
+    task: async (signal) => {
+      const projection = await refreshRepoProjectionReadModel(id, repoRuntimeId, null, 'full', { signal })
+      await refreshRepoWorktreeStatusReadModel(id, repoRuntimeId, { signal })
+      return projection
+    },
     errorFromResult: (projection) => (projection.snapshot ? null : 'error.failed-read-repo'),
     onResult: (projection: RepoRuntimeProjection, ctx) => {
       if (!ctx.isCurrent()) return
@@ -101,13 +60,12 @@ async function runRuntimeProjectionRefresh(
         store.set,
         store.get,
         { repoRoot: id, repoRuntimeId, projection },
-        { scope, settleVisibleStatus: ctx.ownsTarget('visibleStatus') },
+        { scope: 'repo-read-model', settleVisibleStatus: ctx.ownsTarget('visibleStatus') },
       )
     },
     onError: (message, ctx) => {
-      const ownsReadModelLoad = wantsReadModelLoad && ctx.ownsTarget('repoReadModel')
-      const ownsVisibleStatusLoad = wantsVisibleStatusLoad && ctx.ownsTarget('visibleStatus')
-      if (ownsVisibleStatusLoad && !ownsReadModelLoad) refreshStatusLog.warn('failed', { err: new Error(message) })
+      const ownsReadModelLoad = ctx.ownsTarget('repoReadModel')
+      const ownsVisibleStatusLoad = ctx.ownsTarget('visibleStatus')
       updateIfFresh(store.set, id, repoRuntimeId, (r) => {
         if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
         if (ownsReadModelLoad) finishDataLoadError(r.dataLoads.repoReadModel, message)
@@ -116,8 +74,8 @@ async function runRuntimeProjectionRefresh(
       })
     },
     onStale: (ctx) => {
-      const ownsReadModelLoad = wantsReadModelLoad && ctx.ownsTarget('repoReadModel')
-      const ownsVisibleStatusLoad = wantsVisibleStatusLoad && ctx.ownsTarget('visibleStatus')
+      const ownsReadModelLoad = ctx.ownsTarget('repoReadModel')
+      const ownsVisibleStatusLoad = ctx.ownsTarget('visibleStatus')
       if (!ownsReadModelLoad && !ownsVisibleStatusLoad) return
       updateIfFresh(store.set, id, repoRuntimeId, (r) => {
         if (ownsReadModelLoad) cancelDataLoad(r.dataLoads.repoReadModel)
@@ -135,18 +93,7 @@ export async function requestRepoProjectionReadModelRefresh(
   const resolved = resolveActionRepoRuntimeId(store.get, id, options?.repoRuntimeId)
   if (!resolved) return
   const { repoRuntimeId } = resolved
-  await runRuntimeProjectionRefresh(store, id, repoRuntimeId, { repoRuntimeId, scope: 'repo-read-model' })
-}
-
-export async function requestRepoRuntimeProjectionRefresh(
-  store: RepoRefreshStoreAccess,
-  id: string,
-  options: RepoRuntimeProjectionRefreshOptions,
-): Promise<void> {
-  const resolved = resolveActionRepoRuntimeId(store.get, id, options.repoRuntimeId)
-  if (!resolved) return
-  const { repoRuntimeId } = resolved
-  await runRuntimeProjectionRefresh(store, id, repoRuntimeId, options)
+  await runRepoProjectionReadModelRefresh(store, id, repoRuntimeId)
 }
 
 /** Unified sync pipeline — local and remote repos follow the same path.

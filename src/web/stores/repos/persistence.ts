@@ -5,7 +5,7 @@ import type { RepoSnapshotCacheEntry, RepoState } from '#/web/stores/repos/types
 import { finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
 import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
 import { seedRepoProjectionQueryData } from '#/web/repo-data-query.ts'
-import { readRepoBranchQueryProjection, type RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchSnapshotQueryProjection, type RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
 const MAX_REPOS = 50
 const FiniteNumber = v.pipe(v.number(), v.finite())
@@ -90,7 +90,6 @@ export function seedRepoProjectionQueryFromCacheEntry(
   }
   const cachedProjection = {
     snapshot: cachedSnapshot,
-    status: [],
     pullRequests: null,
     operations: { operations: [], loadedAt: 0 },
     loadedAt: 0,
@@ -105,14 +104,10 @@ export function seedRepoProjectionQueryFromCacheEntry(
   })
 }
 
-export function persistRepoSnapshotCacheEntry(
-  set: ReposSet,
-  repo: RepoState | undefined,
-  repoRuntimeId: string,
-): void {
+export function persistRepoSnapshotCacheEntry(set: ReposSet, repo: RepoState | undefined, repoRuntimeId: string): void {
   if (!repo) return
   if (repo.repoRuntimeId !== repoRuntimeId) return
-  const branchModel = readRepoBranchQueryProjection(repo)
+  const branchModel = readRepoBranchSnapshotQueryProjection(repo)
   const entry = branchModel ? repoSnapshotCacheEntryFromRepo(repo, branchModel) : null
   if (!entry) return
   set((s) => {

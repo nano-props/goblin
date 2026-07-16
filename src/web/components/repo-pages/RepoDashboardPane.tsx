@@ -19,11 +19,8 @@ import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { tildify } from '#/web/lib/paths.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import {
-  repoBranchReadModelFromSnapshot,
-  type RepoBranchReadModelData,
-} from '#/web/repo-branch-read-model.ts'
-import { useRepoProjectionReadModel } from '#/web/repo-data-query.ts'
+import { repoBranchReadModelFromSnapshot, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
 import type { PullRequestEntry } from '#/shared/api-types.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 
@@ -83,9 +80,13 @@ export function RepoDashboardPane({
   )
   const projectionReadModel = useRepoProjectionReadModel(repoId, repo?.repoRuntimeId ?? '', null, 'summary', !!repo)
   const projection = projectionReadModel.data
+  const statusReadModel = useRepoWorktreeStatusReadModel(repoId, repo?.repoRuntimeId ?? '', !!repo)
   const branchModel = useMemo(
-    () => (projection?.snapshot ? repoBranchReadModelFromSnapshot(projection.snapshot, projection.status) : null),
-    [projection?.snapshot, projection?.status],
+    () =>
+      projection?.snapshot && statusReadModel.data
+        ? repoBranchReadModelFromSnapshot(projection.snapshot, statusReadModel.data.status)
+        : null,
+    [projection?.snapshot, statusReadModel.data],
   )
   const pullRequestEntries = projection?.pullRequests ?? null
   const summary = useMemo(

@@ -144,7 +144,6 @@ describe('readRepoProjection', () => {
       branches: [],
       current: 'main',
     }
-    const status: WorktreeStatus[] = [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [] }]
     const pullRequests: PullRequestEntry[] = [
       {
         branch: 'feature/a',
@@ -157,7 +156,7 @@ describe('readRepoProjection', () => {
       },
     ]
     const getSnapshot = vi.fn(() => Promise.resolve(snapshot))
-    const getStatus = vi.fn(() => Promise.resolve(status))
+    const getStatus = vi.fn(() => Promise.resolve<WorktreeStatus[]>([]))
     const getPullRequests = vi.fn(() => Promise.resolve(pullRequests))
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(asRepoSource(makeSource({ getSnapshot, getStatus, getPullRequests }))),
@@ -169,13 +168,12 @@ describe('readRepoProjection', () => {
 
     expect(result).toMatchObject({
       snapshot,
-      status,
       pullRequests,
       requested: { branch: 'feature/a', pullRequestMode: 'full' },
     })
     expect(result.loadedAt).toEqual(expect.any(Number))
     expect(getSnapshot).toHaveBeenCalledWith(expect.any(AbortSignal))
-    expect(getStatus).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(getStatus).not.toHaveBeenCalled()
     expect(getPullRequests).toHaveBeenCalledWith(['feature/a'], {
       mode: 'full',
       signal: expect.any(AbortSignal),
@@ -224,11 +222,36 @@ describe('readRepoProjection', () => {
 
     expect(result).toMatchObject({
       snapshot: null,
-      status: [],
       pullRequests: null,
       requested: { branch: null, pullRequestMode: 'full' },
     })
     expect(getPullRequests).not.toHaveBeenCalled()
+  })
+
+  test('reads one complete repo-runtime-scoped worktree status snapshot', async () => {
+    const status: WorktreeStatus[] = [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [] }]
+    const getStatus = vi.fn(() => Promise.resolve(status))
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
+      task(asRepoSource(makeSource({ getStatus }))),
+    )
+    const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
+
+    const result = await readRepoWorktreeStatus('/tmp/repo', { repoRuntimeId: 'repo-runtime-test' })
+
+    expect(result).toMatchObject({ repoRuntimeId: 'repo-runtime-test', status })
+    expect(result.loadedAt).toEqual(expect.any(Number))
+    expect(getStatus).toHaveBeenCalledWith(expect.any(AbortSignal))
+  })
+
+  test('does not turn an aborted status read into an empty clean snapshot', async () => {
+    const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(
+      readRepoWorktreeStatus('/tmp/repo', { repoRuntimeId: 'repo-runtime-test', signal: controller.signal }),
+    ).rejects.toMatchObject({ name: 'AbortError' })
+    expect(mocks.runWithRepoSource).not.toHaveBeenCalled()
   })
 
   test('reads all pull request summaries when the dashboard projection asks for summary mode', async () => {
@@ -262,60 +285,72 @@ describe('readRepoProjection', () => {
   })
 })
 
-describe('readRepoBulk timeout', () => {
+describe('repo projection section deadlines', () => {
+  test('rejects a worktree status snapshot when its status read times out', async () => {
+    vi.useFakeTimers()
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
+      task(
+        asRepoSource(
+          makeSource({
+            getStatus: (signal?: AbortSignal) =>
+              new Promise<WorktreeStatus[]>((_resolve, reject) => {
+                signal?.addEventListener('abort', () => reject(signal.reason))
+              }),
+          }),
+        ),
+      ),
+    )
+    const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
+    const promise = readRepoWorktreeStatus('/tmp/repo', {
+      repoRuntimeId: 'repo-runtime-test',
+      timeoutMs: 50,
+    })
+
+    const rejected = expect(promise).rejects.toThrow('composite section timeout')
+    await vi.advanceTimersByTimeAsync(75)
+    await rejected
+  })
+
   test('returns successful results when sections finish before the deadline', async () => {
     const snapshot: RepoSnapshot = {
       branches: [],
       current: 'main',
     }
-    const status: WorktreeStatus[] = []
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(
         asRepoSource(
           makeSource({
             getSnapshot: () => Promise.resolve(snapshot),
-            getStatus: () => Promise.resolve(status),
             getPullRequests: () => Promise.resolve(null),
           }),
         ),
       ),
     )
-    const { readRepoBulk } = await import('#/server/modules/repo-read-paths.ts')
-    const result = await readRepoBulk('/tmp/repo', ['snapshot', 'status', 'pullRequests'], {
-      timeoutMs: 5_000,
-    })
-    expect(result).toEqual({ snapshot, status, pullRequests: null })
+    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
+    const result = await readRepoProjection('/tmp/repo', { branch: 'feature/a', timeoutMs: 5_000 })
+    expect(result).toMatchObject({ snapshot, pullRequests: null })
   })
 
   test('rejects when a requested section times out', async () => {
     vi.useFakeTimers()
-    // Snapshot returns immediately; status hangs until aborted; PRs
-    // returns null after a short delay.
+    // Snapshot hangs until aborted; PRs returns immediately.
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(
         asRepoSource(
           makeSource({
-            getSnapshot: () =>
-              Promise.resolve<RepoSnapshot | null>({
-                branches: [],
-                current: 'main',
-              }),
-            getStatus: (_signal?: AbortSignal) =>
-              new Promise<WorktreeStatus[]>((_resolve, reject) => {
-                _signal?.addEventListener('abort', () => reject(new Error('aborted')))
+            getSnapshot: (signal?: AbortSignal) =>
+              new Promise<RepoSnapshot | null>((_resolve, reject) => {
+                signal?.addEventListener('abort', () => reject(new Error('aborted')))
               }),
             getPullRequests: () => Promise.resolve<PullRequestEntry[] | null>(null),
           }),
         ),
       ),
     )
-    const { readRepoBulk } = await import('#/server/modules/repo-read-paths.ts')
-    const promise = readRepoBulk('/tmp/repo', ['snapshot', 'status', 'pullRequests'], {
-      timeoutMs: 50,
-    })
+    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
+    const promise = readRepoProjection('/tmp/repo', { branch: 'feature/a', timeoutMs: 50 })
     const rejected = expect(promise).rejects.toThrow('aborted')
-    // Advance the fake clock past the section deadline so the status
-    // signal aborts and its promise rejects.
+    // Advance the fake clock past the section deadline.
     await vi.advanceTimersByTimeAsync(75)
     await rejected
   })
@@ -326,18 +361,18 @@ describe('readRepoBulk timeout', () => {
       task(
         asRepoSource(
           makeSource({
-            getStatus: (signal?: AbortSignal) => {
+            getSnapshot: (signal?: AbortSignal) => {
               observedSignal = signal
-              return new Promise<WorktreeStatus[]>((resolve) => {
-                signal?.addEventListener('abort', () => resolve([]))
+              return new Promise<RepoSnapshot | null>((resolve) => {
+                signal?.addEventListener('abort', () => resolve(null))
               })
             },
           }),
         ),
       ),
     )
-    const { readRepoBulk } = await import('#/server/modules/repo-read-paths.ts')
-    const promise = readRepoBulk('/tmp/repo', ['status'], { timeoutMs: 0 })
+    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
+    const promise = readRepoProjection('/tmp/repo', { timeoutMs: 0 })
     // Give the microtask queue a chance to wire up.
     await Promise.resolve()
     // A fresh, never-aborting signal is still wired through to the
@@ -356,7 +391,6 @@ describe('readRepoBulk timeout', () => {
 
   test('cancels every section when the caller signal fires', async () => {
     let snapshotSignal: AbortSignal | undefined
-    let statusSignal: AbortSignal | undefined
     let prsSignal: AbortSignal | undefined
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(
@@ -365,12 +399,6 @@ describe('readRepoBulk timeout', () => {
             getSnapshot: (signal?: AbortSignal) => {
               snapshotSignal = signal
               return new Promise<RepoSnapshot | null>((_resolve, reject) => {
-                signal?.addEventListener('abort', () => reject(new Error('aborted')))
-              })
-            },
-            getStatus: (signal?: AbortSignal) => {
-              statusSignal = signal
-              return new Promise<WorktreeStatus[]>((_resolve, reject) => {
                 signal?.addEventListener('abort', () => reject(new Error('aborted')))
               })
             },
@@ -384,9 +412,10 @@ describe('readRepoBulk timeout', () => {
         ),
       ),
     )
-    const { readRepoBulk } = await import('#/server/modules/repo-read-paths.ts')
+    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
     const controller = new AbortController()
-    const promise = readRepoBulk('/tmp/repo', ['snapshot', 'status', 'pullRequests'], {
+    const promise = readRepoProjection('/tmp/repo', {
+      branch: 'feature/a',
       signal: controller.signal,
     })
     const rejected = expect(promise).rejects.toThrow('aborted')
@@ -395,7 +424,6 @@ describe('readRepoBulk timeout', () => {
     controller.abort()
     await rejected
     expect(snapshotSignal?.aborted).toBe(true)
-    expect(statusSignal?.aborted).toBe(true)
     expect(prsSignal?.aborted).toBe(true)
   })
 })
