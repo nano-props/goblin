@@ -166,6 +166,7 @@ const TerminalAttachResultSchema = v.variant('ok', [
       ok: v.literal(true),
       frame: v.literal('stream'),
       ...TerminalRuntimeMetadataSchemaEntries,
+      phase: v.literal('open'),
     }),
     v.object({
       ok: v.literal(true),

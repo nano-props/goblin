@@ -1386,6 +1386,7 @@ describe('server terminal runtime', () => {
         message: 'pty spawn failed',
       }),
     ])
+    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(2)
 
     // A never-spawned session has no exit event — lock in that
     // semantic so we don't regress to broadcasting a phantom exit.

@@ -92,7 +92,7 @@ export function projectServerTerminalSession(input: {
       controllerStatus: controller.controllerStatus,
       canonicalCols: input.serverSession.cols,
       canonicalRows: input.serverSession.rows,
-      snapshot: input.serverSnapshot?.snapshot ?? '',
+      snapshot: input.serverSnapshot?.snapshot ?? null,
       snapshotSeq: input.serverSnapshot?.snapshotSeq ?? 0,
       outputEra: input.serverSnapshot?.outputEra ?? 0,
     },

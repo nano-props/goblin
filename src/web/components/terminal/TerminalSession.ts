@@ -94,11 +94,11 @@ export class TerminalSession {
   private externalCommandGateTerminalRuntimeSessionId: string | null = null
   private hasObservedOutputForExternalCommandGate = false
   private queuedExternalCommandInput = ''
-  // An empty snapshot string is the "no preload" sentinel — the hydration
-  // input always carries the field, so the runtime type can stay
-  // non-nullable and consumers branch on `.snapshot.length`.
-  private hydratedSnapshot: { snapshot: string; snapshotSeq: number; outputEra: number } = {
-    snapshot: '',
+  // Snapshot presence is explicit: null means no recovery frame was supplied,
+  // while an empty string is an authoritative blank screen that must reset a
+  // previous generation's xterm.
+  private hydratedSnapshot: { snapshot: string | null; snapshotSeq: number; outputEra: number } = {
+    snapshot: null,
     snapshotSeq: 0,
     outputEra: 0,
   }
@@ -478,7 +478,7 @@ export class TerminalSession {
     }
     if (
       forceSnapshot
-        ? this.view.currentTerminal() !== null && input.snapshot.length > 0
+        ? this.view.currentTerminal() !== null && input.snapshot !== null
         : this.shouldApplyHydratedSnapshotToActiveView(previousTerminalRuntimeSessionId)
     )
       this.applyHydratedSnapshotToActiveView()
@@ -959,11 +959,7 @@ export class TerminalSession {
 
   private async preloadHydratedSnapshot(epoch: number, term: XTermTerminal): Promise<number | null> {
     const hydratedSnapshot = this.hydratedSnapshot
-    // An empty snapshot is the "no preload" sentinel — the hydration
-    // input always carries the field, but producers use '' when they
-    // have no buffer to seed. Resetting/writing on empty would clobber
-    // the term for nothing.
-    if (hydratedSnapshot.snapshot.length === 0 || !this.isCurrentStart(epoch, term)) return null
+    if (hydratedSnapshot.snapshot === null || !this.isCurrentStart(epoch, term)) return null
     // Open the replay window — see state.beginReplay for the preload+post-attach contract.
     const replayCheckpoint = this.checkpointFromHydratedSnapshot(hydratedSnapshot)
     const replayGeneration = this.runtime.beginReplay(replayCheckpoint)
@@ -989,7 +985,7 @@ export class TerminalSession {
       // with a fresher value. Clearing in that case would discard it;
       // we leave the new value for its own write path to clear.
       if (stillCurrent && this.hydratedSnapshot === hydratedSnapshot) {
-        this.hydratedSnapshot = { snapshot: '', snapshotSeq: 0, outputEra: 0 }
+        this.hydratedSnapshot = { snapshot: null, snapshotSeq: 0, outputEra: 0 }
       }
       if (!stillCurrent) {
         this.runtime.drainReplay(replayGeneration)
@@ -1007,7 +1003,7 @@ export class TerminalSession {
   private applyHydratedSnapshotToActiveView(): void {
     const term = this.view.currentTerminal()
     const hydratedSnapshot = this.hydratedSnapshot
-    if (!term) return
+    if (!term || hydratedSnapshot.snapshot === null) return
     this.clearPendingOutput()
     const replayCheckpoint = this.checkpointFromHydratedSnapshot(hydratedSnapshot)
     const replayGeneration = this.runtime.beginReplay(replayCheckpoint)
@@ -1041,7 +1037,7 @@ export class TerminalSession {
   private shouldApplyHydratedSnapshotToActiveView(previousTerminalRuntimeSessionId: string | null): boolean {
     const term = this.view.currentTerminal()
     if (!term) return false
-    if (this.hydratedSnapshot.snapshot.length === 0) return false
+    if (this.hydratedSnapshot.snapshot === null) return false
     const currentTerminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
     if (!currentTerminalRuntimeSessionId) return false
     if (previousTerminalRuntimeSessionId && previousTerminalRuntimeSessionId !== currentTerminalRuntimeSessionId) {
@@ -1052,7 +1048,7 @@ export class TerminalSession {
 
   private finishActiveHydratedSnapshotReplay(
     term: XTermTerminal,
-    hydratedSnapshot: { snapshot: string; snapshotSeq: number; outputEra: number },
+    hydratedSnapshot: { snapshot: string | null; snapshotSeq: number; outputEra: number },
     replayCheckpoint: RenderedOutputCheckpoint,
     replayGeneration: number,
   ): void {
@@ -1069,7 +1065,7 @@ export class TerminalSession {
     // captured the local reference; only clear if it still points
     // at the snapshot we just wrote.
     if (this.hydratedSnapshot === hydratedSnapshot) {
-      this.hydratedSnapshot = { snapshot: '', snapshotSeq: 0, outputEra: 0 }
+      this.hydratedSnapshot = { snapshot: null, snapshotSeq: 0, outputEra: 0 }
     }
   }
 
@@ -1321,8 +1317,8 @@ function cancelScheduledAnimationFrame(frame: number): void {
   else clearTimeout(frame)
 }
 
-function terminalSnapshotHasOutput(snapshot: string, snapshotSeq: number): boolean {
-  return snapshot.length > 0 || snapshotSeq > 0
+function terminalSnapshotHasOutput(snapshot: string | null, snapshotSeq: number): boolean {
+  return (snapshot !== null && snapshot.length > 0) || snapshotSeq > 0
 }
 
 function latestCheckpoint(checkpoints: RenderedOutputCheckpoint[]): RenderedOutputCheckpoint | null {

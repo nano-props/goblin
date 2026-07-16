@@ -83,7 +83,7 @@ describe('terminal session projection helpers', () => {
     })
   })
 
-  test('uses an empty snapshot when the server snapshot is missing', () => {
+  test('uses null when the server snapshot is missing', () => {
     const projected = projectServerTerminalSession({
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,
@@ -109,7 +109,7 @@ describe('terminal session projection helpers', () => {
       },
     })
 
-    expect(projected?.hydrateInput.snapshot).toBe('')
+    expect(projected?.hydrateInput.snapshot).toBeNull()
     expect(projected?.hydrateInput.snapshotSeq).toBe(0)
     expect(projected?.hydrateInput.role).toBe('viewer')
     expect(projected?.hydrateInput.controllerStatus).toBe('connected')

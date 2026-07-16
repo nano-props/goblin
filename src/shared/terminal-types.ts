@@ -130,6 +130,7 @@ export interface TerminalRuntimeMetadata {
  */
 export interface TerminalStreamFrame {
   frame: 'stream'
+  phase: 'open'
 }
 
 /**

@@ -95,7 +95,8 @@ export interface TerminalSessionHydrationInput extends TerminalIdentityViewModel
   message: string | null
   processName: string
   canonicalTitle?: string | null
-  snapshot: string
+  /** `null` means no snapshot was supplied; `''` is an authoritative blank screen. */
+  snapshot: string | null
   snapshotSeq: number
   outputEra: number
 }

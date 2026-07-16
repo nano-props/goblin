@@ -299,7 +299,8 @@ describe('TerminalSessionManager fresh stream boundary', () => {
 describe('TerminalSessionManager PTY spawn ownership', () => {
   test('waits for an in-flight fresh attach before reusing the same terminalSessionId', async () => {
     const supervisor = createDeferredPtySupervisor()
-    const manager = createManager(supervisor)
+    const onSessionsProjectionChanged = vi.fn()
+    const manager = createManager(supervisor, { onSessionsProjectionChanged })
 
     const first = ensureSession(manager, {
       userId: USER_ID,
@@ -336,6 +337,8 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([
       expect.objectContaining({ phase: 'error', message: 'spawn failed' }),
     ])
+    expect(onSessionsProjectionChanged).toHaveBeenCalledOnce()
+    expect(onSessionsProjectionChanged).toHaveBeenCalledWith(USER_ID, SCOPE)
   })
 
   test('kills a PTY that resolves after its session was closed before binding', async () => {

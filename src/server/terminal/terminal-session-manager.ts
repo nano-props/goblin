@@ -289,9 +289,6 @@ export class TerminalSessionManager<TUser extends string | number> {
     const controllerSize = controller ? session.attachments.get(controller.clientId) : undefined
     const spawnSize = controllerSize ?? size
     const spawn = await this.spawnFreshSession(session, spawnSize.cols, spawnSize.rows, signal)
-    if (!spawn.result.ok && session.ptyBinding.isCurrentSpawn(session, spawn.generation)) {
-      if (markTerminalSessionError(session, spawn.result.message)) this.emitLifecycle(session)
-    }
     return spawn.result
   }
 
@@ -689,10 +686,12 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 
   private streamAttachResult(session: TerminalSessionView<TUser>): TerminalAttachResult {
+    if (session.phase !== 'open') return { ok: false, message: 'error.unavailable' }
     return {
       ok: true,
       frame: 'stream',
       ...this.runtimeMetadata(session),
+      phase: 'open',
     }
   }
 
@@ -808,17 +807,21 @@ export class TerminalSessionManager<TUser extends string | number> {
     signal?: AbortSignal,
   ): Promise<{ generation: number; result: TerminalAttachResult }> {
     const spawn = await session.ptyBinding.spawn(session, cols, rows, signal)
-    if (!spawn.result.ok) return { generation: spawn.generation, result: spawn.result }
     if (!session.ptyBinding.isCurrentSpawn(session, spawn.generation)) {
       return { generation: spawn.generation, result: { ok: false, message: 'error.unavailable' } }
     }
-    this.projectedProcessNameByTerminalRuntimeSessionId.set(session.id, session.ptyBinding.processName())
-    this.emitIdentity(session)
+    if (!spawn.result.ok) {
+      if (markTerminalSessionError(session, spawn.result.message)) this.emitLifecycle(session)
+    } else {
+      this.projectedProcessNameByTerminalRuntimeSessionId.set(session.id, session.ptyBinding.processName())
+      this.emitIdentity(session)
+    }
     // Prepared sessions are published at generation 0. Incremental generation
-    // 1 events cannot safely activate sibling clients because they may already
-    // have missed output. Invalidate the complete sessions projection so those
-    // clients recover the new binding through its authoritative snapshot.
+    // 1 events cannot safely activate sibling clients. Publish one complete
+    // projection invalidation for every current fresh-generation outcome,
+    // including spawn failure, so success and error converge identically.
     this.sink.onSessionsProjectionChanged?.(session.userId, session.repoRoot)
+    if (!spawn.result.ok) return { generation: spawn.generation, result: spawn.result }
     return { generation: spawn.generation, result: this.streamAttachResult(session) }
   }
 

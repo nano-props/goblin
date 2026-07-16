@@ -1279,7 +1279,7 @@ describe('TerminalSessionProvider', () => {
           controllerStatus: 'connected',
           canonicalCols: 120,
           canonicalRows: 40,
-          snapshot: '',
+          snapshot: null,
           snapshotSeq: 0,
           outputEra: 0,
         }),
@@ -1592,7 +1592,7 @@ describe('TerminalSessionProvider', () => {
 
       expect(session.hydrate).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          snapshot: '',
+          snapshot: null,
           snapshotSeq: 0,
           outputEra: 0,
         }),

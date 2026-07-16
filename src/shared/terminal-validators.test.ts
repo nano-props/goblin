@@ -691,7 +691,7 @@ describe('shared terminal validators', () => {
           terminalRuntimeGeneration: 1,
           processName: 'zsh',
           canonicalTitle: null,
-          phase: 'opening',
+          phase: 'open',
           message: null,
           controller: { clientId: 'client_a', status: 'connected' },
           canonicalCols: 120,
@@ -702,6 +702,34 @@ describe('shared terminal validators', () => {
       type: 'response',
       action: 'attach',
       payload: { ok: true, frame: 'stream' },
+    })
+
+    expect(
+      normalizeAppRealtimeSocketServerMessage({
+        type: 'response',
+        requestId: 'req_unready_stream_attach',
+        ok: true,
+        action: 'attach',
+        payload: {
+          ok: true,
+          frame: 'stream',
+          terminalRuntimeSessionId: 'pty_1234567890abcdef',
+          terminalRuntimeGeneration: 1,
+          processName: 'zsh',
+          canonicalTitle: null,
+          phase: 'opening',
+          message: null,
+          controller: { clientId: 'client_a', status: 'connected' },
+          canonicalCols: 120,
+          canonicalRows: 40,
+        },
+      }),
+    ).toMatchObject({
+      type: 'response',
+      requestId: 'req_unready_stream_attach',
+      ok: false,
+      action: 'attach',
+      error: 'Invalid terminal socket response payload',
     })
 
     expect(

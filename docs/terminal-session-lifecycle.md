@@ -141,6 +141,14 @@ and broadcasts `sessions-changed`. Other clients may still hold the prepared
 generation 0 binding; generation 1 identity, lifecycle, and output events are
 intentionally insufficient to activate them because they may have missed
 history. They reconcile the complete projection and recover through a snapshot.
+The invalidation applies equally when fresh spawn fails: generation 1 plus its
+error lifecycle is still a new authoritative projection that generation 0
+siblings cannot reconstruct from incremental events.
+
+Snapshot presence is explicit in the client projection. `null` means recovery
+did not supply a snapshot; an empty string is a supplied authoritative blank
+screen and must reset any previous binding's xterm. String length is never used
+to decide whether a recovery frame exists.
 
 
 ### Transport ordering
