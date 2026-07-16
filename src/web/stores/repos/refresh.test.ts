@@ -591,6 +591,65 @@ describe('projection refresh request ordering', () => {
     expect(cachedRepoProjection(repoRuntimeId)?.snapshot?.current).toBe('main')
   })
 
+  test.each(['status-first', 'projection-first'] as const)(
+    'status availability errors do not race projection ownership when %s completes',
+    async (completionOrder) => {
+      const repoRuntimeId = seedRepo([branch('old')])
+      let resolveProjection!: (projection: RepoRuntimeProjection) => void
+      let rejectStatus!: (error: Error) => void
+      ipcHandlers['repo.projection'] = () =>
+        new Promise((resolve) => {
+          resolveProjection = resolve
+        })
+      ipcHandlers['repo.worktreeStatus'] = () =>
+        new Promise((_resolve, reject) => {
+          rejectStatus = reject
+        })
+
+      const refresh = requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { repoRuntimeId })
+      await vi.waitFor(() => {
+        expect(resolveProjection).toEqual(expect.any(Function))
+        expect(rejectStatus).toEqual(expect.any(Function))
+      })
+
+      if (completionOrder === 'status-first') {
+        rejectStatus(new Error('error.path-not-found'))
+        await vi.waitFor(() => {
+          expect(
+            primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repoRuntimeId))?.error,
+          ).toEqual(expect.objectContaining({ message: 'error.path-not-found' }))
+        })
+        resolveProjection(repoProjection({ branches: [branch('main')], current: 'main' }))
+      } else {
+        resolveProjection(repoProjection({ branches: [branch('main')], current: 'main' }))
+        await vi.waitFor(() => {
+          expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.repoReadModel.phase).toBe('idle')
+        })
+        rejectStatus(new Error('error.path-not-found'))
+      }
+      await refresh
+
+      expect(useReposStore.getState().repos[REPO_ID]?.availability).toEqual({ phase: 'available' })
+      expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repoRuntimeId))?.error).toEqual(
+        expect.objectContaining({ message: 'error.path-not-found' }),
+      )
+    },
+  )
+
+  test('standalone status availability errors remain query-local', async () => {
+    const repoRuntimeId = seedRepo([branch('main')])
+    ipcHandlers['repo.worktreeStatus'] = async () => {
+      throw new Error('error.not-git-repo')
+    }
+
+    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
+
+    expect(useReposStore.getState().repos[REPO_ID]?.availability).toEqual({ phase: 'available' })
+    expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repoRuntimeId))?.error).toEqual(
+      expect.objectContaining({ message: 'error.not-git-repo' }),
+    )
+  })
+
   test('repo read-model projection refresh restores an unavailable repo when the path is a git repo again', async () => {
     const repoRuntimeId = seedRepo([branch('old')])
     updateRepoForTest((repo) => {

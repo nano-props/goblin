@@ -101,11 +101,7 @@ export function RepoDashboardPane({
   const statusStale = !!statusReadModel.data && statusReadModel.isError
   const retryStatus = () => {
     if (!repo) return
-    void refreshRepoWorktreeStatus(
-      { get: useReposStore.getState, set: useReposStore.setState },
-      repo.id,
-      repo.repoRuntimeId,
-    )
+    void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repo.id, repo.repoRuntimeId)
   }
 
   return (

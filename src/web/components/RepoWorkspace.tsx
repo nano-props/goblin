@@ -153,11 +153,7 @@ function RepoWorkspaceLoaded({
           messageKey={statusErrorKey}
           retrying={statusReadModel.isFetching}
           onRetry={() => {
-            void refreshRepoWorktreeStatus(
-              { get: useReposStore.getState, set: useReposStore.setState },
-              repoShell.id,
-              repoShell.repoRuntimeId,
-            )
+            void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repoShell.id, repoShell.repoRuntimeId)
           }}
         />
       </section>
@@ -285,11 +281,7 @@ function RepoWorkspacePane({
         workspacePaneId={workspacePaneId}
         workspacePaneTabModel={workspacePaneTabModel}
         onRetryStatus={() => {
-          void refreshRepoWorktreeStatus(
-            { get: useReposStore.getState, set: useReposStore.setState },
-            repo.id,
-            repo.repoRuntimeId,
-          )
+          void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repo.id, repo.repoRuntimeId)
         }}
       />
     </>
