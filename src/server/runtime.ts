@@ -7,10 +7,16 @@ import { WorkerBackedPtySupervisor } from '#/server/terminal/pty-supervisor-work
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 
 interface ServerRuntimeBaseOptions extends Omit<
   ServerAppOptions,
-  'appRealtimeHost' | 'workspacePaneTabsHost' | 'worktreeRemovalApplication' | 'serverHost' | 'serverPort'
+  | 'appRealtimeHost'
+  | 'workspacePaneTabsHost'
+  | 'worktreeRemovalApplication'
+  | 'workspaceCapabilityTransitionHost'
+  | 'serverHost'
+  | 'serverPort'
 > {
   /**
    * On-disk path of the bundled PTY worker entry. When provided, the
@@ -30,6 +36,7 @@ interface ServerRuntimeInjectedHosts {
   appRealtimeHost: ServerAppRealtimeHost
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   worktreeRemovalApplication: ServerWorktreeRemovalHost
+  workspaceCapabilityTransitionHost?: WorkspaceCapabilityTransitionHost
 }
 
 type ServerRuntimeManagedHosts = Partial<Record<keyof ServerRuntimeInjectedHosts, never>>
@@ -63,6 +70,7 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
     appRealtimeHost: _appRealtimeHost,
     workspacePaneTabsHost: _workspacePaneTabsHost,
     worktreeRemovalApplication: _worktreeRemovalApplication,
+    workspaceCapabilityTransitionHost: _workspaceCapabilityTransitionHost,
     ptyWorkerEntry,
     gCommandEntry,
     gCommandBinDir,
@@ -76,6 +84,7 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
         appRealtimeHost: options.appRealtimeHost,
         workspacePaneTabsHost: options.workspacePaneTabsHost,
         worktreeRemovalApplication: options.worktreeRemovalApplication,
+        workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
       }
     : null
   if (!injectedHosts && hasAnyServerRuntimeInjectedHost(options)) {
@@ -102,6 +111,7 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
       appRealtimeHost: terminalRuntime.host as ServerAppRealtimeHost,
       workspacePaneTabsHost: terminalRuntime.workspacePaneTabsHost,
       worktreeRemovalApplication: terminalRuntime.worktreeRemovalApplication,
+      workspaceCapabilityTransitionHost: terminalRuntime.workspaceCapabilityTransitionHost,
     }
   })()
 

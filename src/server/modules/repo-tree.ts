@@ -23,6 +23,7 @@ import {
   getRepoTreeSourceRemote,
 } from '#/server/modules/repo-tree-source.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
+import { parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 export interface RepositoryTreeReadOptions extends RepoTreeSourceOptions {
   /** Optional worktree list from callers that already have one. */
@@ -53,6 +54,15 @@ export async function getRepositoryTree(
   // enumerator. Filetree is a display read, so it intentionally does
   // not depend on repo status, pull request state, or branch refresh.
   const isRemote = isRemoteRepoId(cwd)
+  const platform = process.platform === 'win32' ? 'win32' : 'posix'
+  const locator = parseWorkspaceLocator(cwd, platform)
+  if (!locator) throw new Error('error.workspace-locator-malformed')
+  const workspaceScoped = worktreePath === cwd
+  const resolvedWorktreePath = workspaceScoped
+    ? locator.transport === 'file'
+      ? locator.path
+      : locator.path
+    : worktreePath
 
   // When the cwd is remote, resolve the SSH target once before
   // handing the worktree path to the remote source.
@@ -65,7 +75,12 @@ export async function getRepositoryTree(
   }
 
   const worktrees =
-    options.precomputedWorktrees ?? (isRemote ? undefined : await getWorktrees(cwd, { includeStatus: false }))
+    options.precomputedWorktrees ??
+    (workspaceScoped
+      ? [{ path: resolvedWorktreePath, branch: '', isBare: false, isPrimary: true }]
+      : isRemote
+        ? undefined
+        : await getWorktrees(locator.transport === 'file' ? locator.path : cwd, { includeStatus: false }))
 
   // F2 (membership): validate that `worktreePath` is a known worktree
   // of this repo before we hand it to the source layer. The remote
@@ -77,14 +92,14 @@ export async function getRepositoryTree(
   // Bare worktrees are excluded because they have no working tree to
   // walk. Remote validation lives in `getRemoteTreeWalk`; local
   // validation is performed here using `git worktree list`.
-  if (!isRemote && !matchesKnownWorktree(worktrees, worktreePath)) {
+  if (!isRemote && !matchesKnownWorktree(worktrees, resolvedWorktreePath)) {
     throw new Error('unknown worktree path')
   }
 
   const source = isRemote
     ? await getRepoTreeSourceRemote({
         target: remoteTarget as Awaited<ReturnType<typeof resolveRemoteRepoTarget>>,
-        worktreePath,
+        worktreePath: resolvedWorktreePath,
         options,
         signal: undefined,
         ...(options.repoRuntimeId
@@ -92,7 +107,7 @@ export async function getRepositoryTree(
           : {}),
         ...(worktrees ? { knownWorktrees: worktrees } : {}),
       })
-    : await getRepoTreeSourceLocal(worktreePath, options, undefined)
+    : await getRepoTreeSourceLocal(resolvedWorktreePath, options, undefined)
   return { nodes: source.nodes, truncated: source.truncated }
 }
 

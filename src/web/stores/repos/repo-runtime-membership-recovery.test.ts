@@ -112,7 +112,13 @@ describe('repo runtime membership recovery', () => {
   test('observes the local repo commit that follows a queued runtime open', async () => {
     resetReposStore()
     const reconcile = vi.fn(async () => ({
-      runtimes: [{ repoRoot: REPO_ROOT, repoRuntimeId: 'repo-runtime-123456789012345678901' }],
+      runtimes: [
+        {
+          repoRoot: REPO_ROOT,
+          repoRuntimeId: 'repo-runtime-123456789012345678901',
+          workspaceProbe: { status: 'probing' as const },
+        },
+      ],
     }))
     installGoblinTestBridge({
       'repo.runtimeOpen': async () => ({ ok: true, repoRuntimeId: 'repo-runtime-123456789012345678901' }),
@@ -140,6 +146,12 @@ describe('repo runtime membership recovery', () => {
         ok: true,
         repo: { id: REPO_ROOT, name: 'runtime-membership-recovery' },
         repoRuntimeId: 'repo-runtime-123456789012345678901',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        },
+        diagnostics: [],
       }),
       'repo.runtimeReconcile': reconcile,
       'settings.addWorkspaceRepo': async () => ({

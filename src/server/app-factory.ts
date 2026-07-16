@@ -25,6 +25,7 @@ import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import { createRepoMutationApplication } from '#/server/repo-mutation/repo-mutation-application.ts'
+import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 
 export interface ServerAppOptions {
   version: string
@@ -39,6 +40,7 @@ export interface ServerAppOptions {
   appRealtimeHost: ServerAppRealtimeHost
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   worktreeRemovalApplication: ServerWorktreeRemovalHost
+  workspaceCapabilityTransitionHost?: WorkspaceCapabilityTransitionHost
   /**
    * The actual host the server is listening on. Used by the CORS
    * origin predicate to allow same-machine browsers. Defaults to
@@ -229,6 +231,7 @@ export function createApp(options: ServerAppOptions): Hono {
     createRepoRoutes({
       worktreeRemovalApplication: options.worktreeRemovalApplication,
       repoMutationApplication: createRepoMutationApplication(),
+      workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
     }),
   )
   app.route('/api/repo', createRepoViewRoutes())

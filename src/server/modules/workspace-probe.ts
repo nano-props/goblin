@@ -8,6 +8,7 @@ import {
   type WorkspaceSettledProbeState,
   type WorkspaceUnavailableReason,
 } from '#/shared/workspace-runtime.ts'
+import { resolveServerRemoteRepoConnection } from '#/server/modules/remote.ts'
 
 export interface LocalWorkspaceProbeDependencies {
   stat(path: string): Promise<{ isDirectory(): boolean }>
@@ -56,6 +57,40 @@ export async function probeLocalWorkspace(
     name: workspaceName(locator.path, platform),
     capabilities: capabilitiesFromGitProbe(gitProbe, { write, terminal: true }),
     diagnostics,
+  }
+}
+
+/** Probe the transport named by the canonical workspace locator. */
+export async function probeWorkspace(
+  input: string,
+  platform: WorkspaceLocatorPlatform,
+  options: { signal?: AbortSignal } = {},
+): Promise<WorkspaceSettledProbeState> {
+  const locator = parseWorkspaceLocator(input, platform)
+  if (!locator) return { status: 'unavailable', reason: 'error.workspace-locator-malformed' }
+  if (locator.transport === 'file') return await probeLocalWorkspace(input, platform, options)
+
+  const resolved = await resolveServerRemoteRepoConnection({ repoId: input }, options.signal)
+  if (resolved.kind === 'failed') {
+    return {
+      status: 'unavailable',
+      reason:
+        resolved.lifecycle.reason === 'path-missing'
+          ? 'error.workspace-path-not-found'
+          : 'error.workspace-transport-unavailable',
+    }
+  }
+  return {
+    status: 'ready',
+    name: resolved.name,
+    capabilities: {
+      files: { read: true, write: true },
+      terminal: { available: true },
+      git: resolved.gitAvailable
+        ? { status: 'available', worktrees: true, pullRequests: { provider: 'none' } }
+        : { status: 'unavailable' },
+    },
+    diagnostics: resolved.gitDiagnostic ? [{ scope: 'git', message: resolved.gitDiagnostic }] : [],
   }
 }
 

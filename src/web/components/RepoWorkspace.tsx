@@ -24,6 +24,10 @@ import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
+import { FolderTree } from 'lucide-react'
+import { useT } from '#/web/stores/i18n.ts'
+import { FiletreeTab } from '#/web/components/repo-workspace/panels.tsx'
+import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 
 export type RepoWorkspacePaneRouteContext =
   { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null } | { kind: 'inactive' }
@@ -40,6 +44,7 @@ interface Props {
 // Keep this equality in sync with fields read by RepoWorkspace children.
 type RepoWorkspaceRepoShell = Omit<RepoWorkspaceRepo, 'branchModel' | 'branchAction'> & {
   operations: Pick<RepoState['operations'], 'branchAction'>
+  workspaceProbe: RepoState['workspaceProbe']
 }
 
 function repoWorkspaceRepoShellEqual(
@@ -55,6 +60,7 @@ function repoWorkspaceRepoShellEqual(
       a.ui.currentBranchName === b.ui.currentBranchName &&
       a.ui.preferredWorkspacePaneTabByTarget === b.ui.preferredWorkspacePaneTabByTarget &&
       a.unavailable === b.unavailable &&
+      a.workspaceProbe === b.workspaceProbe &&
       a.operations.branchAction === b.operations.branchAction &&
       a.remote.lifecycle === b.remote.lifecycle &&
       a.remote.hasRemotes === b.remote.hasRemotes &&
@@ -88,6 +94,7 @@ export function RepoWorkspace({
               preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
             },
             unavailable: isRepoUnavailable(repo),
+            workspaceProbe: repo.workspaceProbe,
             operations: {
               branchAction: repo.operations.branchAction,
             },
@@ -118,7 +125,24 @@ export function RepoWorkspace({
   )
 }
 
-function RepoWorkspaceLoaded({
+function RepoWorkspaceLoaded(props: {
+  repoShell: RepoWorkspaceRepoShell
+  workspacePaneRouteContext: RepoWorkspacePaneRouteContext
+  workspacePaneId: string
+  shortcutsEnabled: boolean
+  toolbarTrafficLightOffset: boolean
+  onBackToBranchNavigator?: () => void
+}) {
+  if (
+    props.repoShell.workspaceProbe.status === 'ready' &&
+    props.repoShell.workspaceProbe.capabilities.git.status === 'unavailable'
+  ) {
+    return <PlainWorkspaceFiles repo={props.repoShell} workspacePaneId={props.workspacePaneId} />
+  }
+  return <GitRepoWorkspaceLoaded {...props} />
+}
+
+function GitRepoWorkspaceLoaded({
   repoShell,
   workspacePaneRouteContext,
   workspacePaneId,
@@ -221,6 +245,32 @@ function RepoWorkspaceLoaded({
           onBackToBranchNavigator={onBackToBranchNavigator}
         />
       )}
+    </section>
+  )
+}
+
+function PlainWorkspaceFiles({
+  repo,
+  workspacePaneId,
+}: {
+  repo: Pick<RepoWorkspaceRepoShell, 'id' | 'repoRuntimeId'>
+  workspacePaneId: string
+}) {
+  const t = useT()
+  return (
+    <section className="flex min-h-0 flex-1 flex-col bg-background">
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border/70 px-3">
+        <FolderTree className="size-4 text-muted-foreground" aria-hidden />
+        <span className="text-sm font-medium">{t('tab.files')}</span>
+      </div>
+      <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} label={t('tab.files')}>
+        <FiletreeTab
+          repoId={repo.id}
+          repoRuntimeId={repo.repoRuntimeId}
+          branchName={null}
+          worktreePath={repo.id}
+        />
+      </WorkspacePanePanelFrame>
     </section>
   )
 }

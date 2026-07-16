@@ -260,6 +260,21 @@ export async function remoteCommandExists(
   return !options.signal?.aborted && result.ok
 }
 
+/** Probe a command at a path already authorized by the workspace locator boundary. */
+export async function remoteCommandExistsAtWorkspaceRoot(
+  target: RemoteRepoTarget,
+  workspacePath: string,
+  commandName: string,
+  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+): Promise<boolean> {
+  if (!REMOTE_COMMAND_NAME_RE.test(commandName) || !workspacePath.startsWith('/')) return false
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const result = await run({ type: 'commandExists', path: workspacePath, commandName }, target, {
+    signal: options.signal,
+  })
+  return !options.signal?.aborted && result.ok
+}
+
 /** Resolve a remote worktree path against the remote repo's worktree
  *  list. This membership authority distinguishes remote list failures
  *  from a successful list that lacks the target path, which throws

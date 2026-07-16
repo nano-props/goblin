@@ -5,9 +5,11 @@ import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resolveRemoteRepoConnection } from '#/web/remote-client.ts'
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/repos/refresh.ts'
+import { refreshRepoRuntimes } from '#/web/repo-runtime-query.ts'
 
 vi.mock('#/web/remote-client.ts', () => ({ resolveRemoteRepoConnection: vi.fn() }))
 vi.mock('#/web/stores/repos/refresh.ts', () => ({ requestRepoProjectionReadModelRefresh: vi.fn(async () => {}) }))
+vi.mock('#/web/repo-runtime-query.ts', () => ({ refreshRepoRuntimes: vi.fn() }))
 
 const repoId = 'goblin+ssh://example/repo'
 const runtimeId = 'repo-runtime-test-1'
@@ -25,6 +27,25 @@ describe('remote lifecycle command client', () => {
     const repo = emptyRepo(repoId, 'repo', runtimeId)
     repo.remote.lifecycle = { kind: 'failed', reason: 'unreachable' }
     useReposStore.setState({ repos: { [repoId]: repo }, order: [repoId] })
+    vi.mocked(refreshRepoRuntimes).mockResolvedValue({
+      runtimes: [
+        {
+          repoRoot: repoId,
+          repoRuntimeId: runtimeId,
+          remoteLifecycle: { kind: 'ready', attemptId: 3, target },
+          workspaceProbe: {
+            status: 'ready',
+            name: 'repo',
+            capabilities: {
+              files: { read: true, write: true },
+              terminal: { available: true },
+              git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+            },
+            diagnostics: [],
+          },
+        },
+      ],
+    })
   })
 
   test('sends the runtime generation and does not manufacture connecting', async () => {

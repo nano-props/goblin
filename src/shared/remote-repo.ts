@@ -263,6 +263,8 @@ export type RemoteRepoConnectionResult =
       kind: 'ready'
       repoId: string
       name: string
+      gitAvailable: boolean
+      gitDiagnostic?: string
       lifecycle: { kind: 'ready'; target: RemoteRepoTarget }
     }
   | {

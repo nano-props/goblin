@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
-import { clearRepoRuntimesForUser } from '#/server/modules/repo-runtimes.ts'
+import { clearRepoRuntimesForUser, commitWorkspaceProbeState } from '#/server/modules/repo-runtimes.ts'
 import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 
 const mocks = vi.hoisted(() => ({
   probeRepo: vi.fn(),
   probeLocalWorkspace: vi.fn(),
+  probeWorkspace: vi.fn(),
   getRepoLog: vi.fn(),
   getRepoPatch: vi.fn(),
   readRepoProjection: vi.fn(),
@@ -52,6 +53,7 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
 }))
 vi.mock('#/server/modules/workspace-probe.ts', () => ({
   probeLocalWorkspace: mocks.probeLocalWorkspace,
+  probeWorkspace: mocks.probeWorkspace,
 }))
 vi.mock('#/server/modules/repo-tree.ts', () => ({
   getRepositoryTree: mocks.getRepositoryTree,
@@ -100,6 +102,7 @@ beforeEach(() => {
     },
     diagnostics: [],
   })
+  mocks.probeWorkspace.mockImplementation(mocks.probeLocalWorkspace)
 })
 
 function createTestRepoRoutes(
@@ -119,10 +122,12 @@ function createTestRepoRoutes(
   repoMutationApplication: Parameters<typeof createRepoRoutes>[0]['repoMutationApplication'] = {
     deleteBranch: async (_userId, input) => await input.deleteBranch(),
   },
+  workspaceCapabilityTransitionHost?: Parameters<typeof createRepoRoutes>[0]['workspaceCapabilityTransitionHost'],
 ) {
   return createRepoRoutes({
     worktreeRemovalApplication,
     repoMutationApplication,
+    workspaceCapabilityTransitionHost,
   })
 }
 
@@ -138,6 +143,21 @@ async function openTestRepoRuntime(
     }),
   )
   const json = (await response.json()) as { ok: true; repoRuntimeId: string }
+  commitWorkspaceProbeState({
+    userId: 'user-test',
+    repoRoot,
+    repoRuntimeId: json.repoRuntimeId,
+    probe: {
+      status: 'ready',
+      name: 'repo',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
+      diagnostics: [],
+    },
+  })
   return json.repoRuntimeId
 }
 
@@ -317,6 +337,74 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       remoteLifecycle: null,
       workspaceProbe: { status: 'probing' },
     })
+  })
+
+  test('workspace-refresh commits a conclusive capability result for the current runtime', async () => {
+    const removeGitScopedResources = vi.fn(async () => undefined)
+    const app = createTestRepoRoutes(undefined, undefined, { removeGitScopedResources })
+    const workspaceId = 'goblin+file:///tmp/workspace-refresh'
+    const workspaceRuntimeId = await openTestRepoRuntime(app, workspaceId)
+    mocks.probeLocalWorkspace.mockResolvedValue({
+      status: 'ready',
+      name: 'workspace-refresh',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [],
+    })
+
+    const response = await app.request(
+      new Request('http://localhost/workspace-refresh', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId, workspaceRuntimeId }),
+      }),
+    )
+
+    await expect(response.json()).resolves.toMatchObject({
+      kind: 'committed',
+      probe: { status: 'ready', capabilities: { git: { status: 'unavailable' } } },
+    })
+    expect(removeGitScopedResources).toHaveBeenCalledWith({
+      userId: 'user-test',
+      workspaceId,
+      workspaceRuntimeId,
+    })
+  })
+
+  test('rejects Git reads after the server commits Git unavailable', async () => {
+    const app = createTestRepoRoutes()
+    const workspaceId = 'goblin+file:///tmp/plain-workspace'
+    const workspaceRuntimeId = await openTestRepoRuntime(app, workspaceId)
+    commitWorkspaceProbeState({
+      userId: 'user-test',
+      repoRoot: workspaceId,
+      repoRuntimeId: workspaceRuntimeId,
+      probe: {
+        status: 'ready',
+        name: 'plain-workspace',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'unavailable' },
+        },
+        diagnostics: [],
+      },
+    })
+
+    const response = await app.request(
+      new Request('http://localhost/projection', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: workspaceId, repoRuntimeId: workspaceRuntimeId }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ message: 'error.workspace-git-unavailable' })
+    expect(mocks.readRepoProjection).not.toHaveBeenCalled()
   })
 
   test('keeps one shared runtime until the last client membership closes', async () => {
@@ -1094,13 +1182,14 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       return prepared.ok ? { ok: true, message: 'removed' } : prepared
     })
     const app = createTestRepoRoutes(worktreeRemovalApplication)
+    const repoRuntimeId = await openTestRepoRuntime(app, '/tmp/repo')
     const response = await app.request(
       new Request('http://localhost/remove-worktree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           cwd: '/tmp/repo',
-          repoRuntimeId: 'repo-runtime-test',
+          repoRuntimeId,
           branch: 'feature/remove',
           worktreePath: '/tmp/repo-remove',
           deleteBranch: false,
@@ -1114,7 +1203,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       'user-test',
       expect.objectContaining({
         repoRoot: '/tmp/repo',
-        repoRuntimeId: 'repo-runtime-test',
+        repoRuntimeId,
         worktreePath: '/tmp/repo-remove',
       }),
     )
@@ -1140,7 +1229,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         }),
       }),
       expect.any(AbortSignal),
-      { repoRuntimeId: 'repo-runtime-test' },
+      { repoRuntimeId },
     )
   })
 

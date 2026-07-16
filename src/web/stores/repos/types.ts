@@ -11,6 +11,7 @@ import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-targe
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoDataLoadBundle } from '#/web/stores/repos/repo-data-load-state.ts'
+import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 export type BranchViewMode = 'all' | 'worktrees'
 type RepoDataSource = 'cache' | 'fresh'
 export type RepoBranchState = Omit<BranchSnapshotInfo, 'worktree'> & {
@@ -132,6 +133,7 @@ export interface RepoState {
   session: RepoSessionState
   remote: RepoRemoteState
   availability: RepoAvailabilityState
+  workspaceProbe: WorkspaceProbeState
   events: RepoEvent[]
 }
 

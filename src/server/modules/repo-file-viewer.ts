@@ -4,8 +4,13 @@ import type { WorktreeInfo } from '#/shared/git-types.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { remoteRuntimeAwareGitRunner, resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
-import { remoteCommandExists, resolveRemoteWorktree } from '#/system/ssh/git.ts'
+import {
+  remoteCommandExists,
+  remoteCommandExistsAtWorkspaceRoot,
+  resolveRemoteWorktree,
+} from '#/system/ssh/git.ts'
 import { userShellCommandExists } from '#/system/user-shell.ts'
+import { resolveWorkspaceScopedPath } from '#/server/modules/workspace-path.ts'
 
 const BAT_VIEWERS = ['bat', 'batcat'] as const
 const POSIX_CAT_VIEWER: RepoFileViewerResult = { viewer: 'cat', shell: 'posix' }
@@ -20,6 +25,8 @@ export async function getRepositoryFileViewer(
   const fallbackViewer = localFallbackViewer()
   if (signal?.aborted) throw new Error('aborted')
   if (!hasUsableWorktreePath(worktreePath)) throw new Error('invalid worktree path')
+  const workspacePath = resolveWorkspaceScopedPath(cwd, worktreePath)
+  const executionPath = workspacePath ?? worktreePath
 
   if (isRemoteRepoId(cwd)) {
     const target = await resolveRemoteRepoTarget(
@@ -27,24 +34,32 @@ export async function getRepositoryFileViewer(
       options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
     )
     const run = options.repoRuntimeId ? remoteRuntimeAwareGitRunner(cwd, options.repoRuntimeId, target) : undefined
-    const worktree = await resolveRemoteWorktree(target, worktreePath, { signal, ...(run ? { run } : {}) })
-    const knownWorktrees = [worktree]
+    const worktree = workspacePath
+      ? null
+      : await resolveRemoteWorktree(target, executionPath, { signal, ...(run ? { run } : {}) })
     for (const viewer of BAT_VIEWERS) {
-      const exists = await remoteCommandExists(target, worktree.path, viewer, {
-        signal,
-        knownWorktrees,
-        ...(run ? { run } : {}),
-      })
+      const exists = workspacePath
+        ? await remoteCommandExistsAtWorkspaceRoot(target, executionPath, viewer, {
+            signal,
+            ...(run ? { run } : {}),
+          })
+        : await remoteCommandExists(target, worktree!.path, viewer, {
+            signal,
+            knownWorktrees: [worktree!],
+            ...(run ? { run } : {}),
+          })
       if (exists) return { viewer, shell: 'posix' }
     }
     return POSIX_CAT_VIEWER
   }
 
-  const worktrees = await getWorktrees(cwd, { includeStatus: false, signal })
-  if (!matchesKnownWorktree(worktrees, worktreePath)) throw new Error('unknown worktree path')
+  if (!workspacePath) {
+    const worktrees = await getWorktrees(cwd, { includeStatus: false, signal })
+    if (!matchesKnownWorktree(worktrees, executionPath)) throw new Error('unknown worktree path')
+  }
 
   for (const viewer of BAT_VIEWERS) {
-    const exists = await userShellCommandExists(viewer, worktreePath, signal)
+    const exists = await userShellCommandExists(viewer, executionPath, signal)
     if (exists) return { viewer, shell: localShellDialect() }
   }
   return fallbackViewer

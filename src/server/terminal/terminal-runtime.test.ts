@@ -30,6 +30,8 @@ import {
   type WorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime.ts'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
+import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 // Under method 2 the host threads `userId` (derived from the
 // access token) alongside `clientId` (per-tab routing). Tests use
@@ -191,6 +193,7 @@ vi.mock('node-pty', () => ({
 
 interface RuntimeHandle {
   host: ServerTerminalHost
+  workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
   shutdown: () => void
   isClientOnline: (clientId: string) => boolean
 }
@@ -238,6 +241,7 @@ function buildRuntime(): RuntimeHandle {
   activeRuntimeShutdowns.add(shutdown)
   return {
     host: runtime.host,
+    workspaceCapabilityTransitionHost: runtime.workspaceCapabilityTransitionHost,
     shutdown,
     isClientOnline: (clientId: string) => runtime.host.isClientOnline(USER_1, clientId),
   }
@@ -1235,6 +1239,43 @@ describe('server terminal runtime', () => {
     expect(second.terminalSessionId).not.toBe(first.terminalSessionId)
 
     host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
+  test('Git capability removal clears Git-scoped sessions and durable layout without replacing the runtime', async () => {
+    const { host, workspaceCapabilityTransitionHost, shutdown } = buildRuntime()
+    const created = await createAdmittedTerminal(host, 'client_a', USER_1, {
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    testWorkspacePaneLayout = {
+      entries: [
+        {
+          repoRoot: REPO_ROOT,
+          branchName: 'feature',
+          worktreePath: '/repo-linked',
+          tabs: [workspacePaneStaticTabEntry('files')],
+        },
+      ],
+    }
+
+    await workspaceCapabilityTransitionHost.removeGitScopedResources({
+      userId: USER_1,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: REPO_RUNTIME_ID,
+    })
+
+    await expect(
+      host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
+    ).resolves.toEqual([])
+    expect(testWorkspacePaneLayout).toEqual({ entries: [] })
     shutdown()
   })
 

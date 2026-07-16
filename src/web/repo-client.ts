@@ -16,6 +16,7 @@ import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { ProbeResult } from '#/shared/api-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
+import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 
 const REPO_REQUEST_TIMEOUT_MS = {
@@ -39,6 +40,18 @@ async function runRepoReadWithStableErrorKey<T>(read: () => Promise<T>, signal?:
 
 export async function probeRepo(cwd: string, signal?: AbortSignal): Promise<ProbeResult> {
   return await postServerJson('/api/repo/probe', { cwd }, { signal })
+}
+
+export async function refreshWorkspace(
+  workspaceId: string,
+  workspaceRuntimeId: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceRefreshResult> {
+  return await postServerJson(
+    '/api/repo/workspace-refresh',
+    { workspaceId, workspaceRuntimeId },
+    { signal },
+  )
 }
 
 export async function cloneRepository(

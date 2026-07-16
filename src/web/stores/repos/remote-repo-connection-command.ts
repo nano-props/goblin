@@ -5,7 +5,9 @@ import {
   type RemoteRepoTarget,
 } from '#/shared/remote-repo.ts'
 import { resolveRemoteRepoConnection } from '#/web/remote-client.ts'
-import { acceptRemoteLifecycleProjection } from '#/web/stores/repos/remote-lifecycle-projection.ts'
+import { acceptRemoteLifecycleSnapshot } from '#/web/stores/repos/remote-lifecycle-projection.ts'
+import { acceptWorkspaceProbeSnapshot } from '#/web/stores/repos/workspace-probe-projection.ts'
+import { refreshRepoRuntimes } from '#/web/repo-runtime-query.ts'
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/repos/refresh.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 
@@ -61,14 +63,18 @@ export async function runRemoteRepoConnection(
     return { kind: 'transport-failed', repoId, reason: 'unknown' }
   }
   if (result.kind === 'settled') {
-    const accepted = acceptRemoteLifecycleProjection(
-      set,
-      get,
-      { repoRoot: repoId, repoRuntimeId, remoteLifecycle: result.lifecycle },
-      { name: result.name },
+    const snapshot = await refreshRepoRuntimes()
+    acceptRemoteLifecycleSnapshot(set, get, snapshot)
+    acceptWorkspaceProbeSnapshot(set, get, snapshot)
+    const runtime = snapshot.runtimes.find(
+      (entry) => entry.repoRoot === repoId && entry.repoRuntimeId === repoRuntimeId,
     )
-    if (!accepted) return { kind: 'stale-runtime', repoId }
-    if (result.lifecycle.kind === 'ready') {
+    if (!runtime || get().repos[repoId]?.repoRuntimeId !== repoRuntimeId) return { kind: 'stale-runtime', repoId }
+    if (
+      result.lifecycle.kind === 'ready' &&
+      runtime.workspaceProbe.status === 'ready' &&
+      runtime.workspaceProbe.capabilities.git.status === 'available'
+    ) {
       void requestRepoProjectionReadModelRefresh({ get, set }, repoId, { repoRuntimeId })
     }
   }

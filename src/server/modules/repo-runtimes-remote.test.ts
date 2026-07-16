@@ -24,6 +24,7 @@ const ready: RemoteRepoConnectionResult = {
   kind: 'ready',
   repoId: repoRoot,
   name: 'repo',
+  gitAvailable: true,
   lifecycle: { kind: 'ready', target },
 }
 const clientId = 'client-test'

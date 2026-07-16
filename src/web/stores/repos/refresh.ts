@@ -11,6 +11,7 @@ import { acceptRepoProjectionReadModel } from '#/web/stores/repos/projection-rea
 import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
 import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
+import { refreshWorkspace } from '#/web/repo-client.ts'
 
 export interface RepoRefreshStoreAccess {
   set: ReposSet
@@ -105,6 +106,28 @@ export async function runManualRepoSync(
     lane: 'read',
     priority: 100,
     targets: [{ key: 'manualRefresh', reason: 'manual-refresh' }],
-    task: async () => await runManualSyncPipeline(id, repoRuntimeId),
+    task: async (signal) => {
+      const refreshed = await refreshWorkspace(id, repoRuntimeId, signal)
+      if (refreshed.kind === 'stale-runtime') throw new Error('error.repo-runtime-stale')
+      if (refreshed.kind === 'failed') {
+        const diagnostic = refreshed.probe.status === 'ready' ? refreshed.probe.diagnostics[0]?.message : undefined
+        throw new Error(diagnostic ?? 'error.failed-read-repo')
+      }
+      updateIfFresh(store.set, id, repoRuntimeId, (repo) => {
+        repo.workspaceProbe = refreshed.probe
+      })
+      if (
+        refreshed.probe.status === 'ready' &&
+        refreshed.probe.capabilities.git.status === 'unavailable'
+      ) {
+        return
+      }
+      await runManualSyncPipeline(id, repoRuntimeId)
+    },
+    onError: (message) => {
+      updateIfFresh(store.set, id, repoRuntimeId, (repo) => {
+        repo.events = appendRepoEvent(repo.events, errorEvent(message))
+      })
+    },
   })
 }

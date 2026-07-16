@@ -65,4 +65,32 @@ describe('server remote target resolution', () => {
     })
     expect(result.target.displayName).not.toBe('prod:/')
   })
+
+  test('opens a readable SSH directory when Git is not available there', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'prod',
+      host: 'example.test',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/workspace',
+    })!
+    const { resolveServerRemoteRepoConnection } = await import('#/server/modules/remote.ts')
+
+    await expect(
+      resolveServerRemoteRepoConnection(
+        { repoId: target.id },
+        undefined,
+        {
+          resolveTarget: async () => ({ target }),
+          probeRemote: async () => ({ ok: false, category: 'not-a-repo' }),
+        },
+      ),
+    ).resolves.toEqual({
+      kind: 'ready',
+      repoId: target.id,
+      name: 'prod:workspace',
+      gitAvailable: false,
+      lifecycle: { kind: 'ready', target },
+    })
+  })
 })

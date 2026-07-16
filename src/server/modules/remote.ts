@@ -181,6 +181,16 @@ export async function resolveServerRemoteRepoConnection(
   })
   if (!probe.ok) {
     const reason = toRemoteRepoFailureReason(probe.category ?? probe.message ?? 'unknown')
+    if (reason === 'not-a-repo') {
+      return {
+        kind: 'ready',
+        repoId,
+        name: ref.displayName,
+        gitAvailable: false,
+        ...(probe.category === 'git-missing' ? { gitDiagnostic: probe.message ?? 'git-missing' } : {}),
+        lifecycle: { kind: 'ready', target },
+      }
+    }
     return {
       kind: 'failed',
       repoId,
@@ -194,6 +204,7 @@ export async function resolveServerRemoteRepoConnection(
     kind: 'ready',
     repoId,
     name: ref.displayName,
+    gitAvailable: true,
     lifecycle: { kind: 'ready', target },
   }
 }

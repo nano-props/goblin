@@ -54,11 +54,13 @@ import {
   type RemoteRepoTarget,
   type RepoSessionEntry,
 } from '#/shared/remote-repo.ts'
+import { sameWorkspaceProbeState, type WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 
 interface ResolvedRepo {
   id: string
   name: string
   target?: RemoteRepoTarget
+  workspaceProbe?: WorkspaceProbeState
   session?: {
     entry: RepoSessionEntry
     projectionState: RepoSessionProjectionState
@@ -77,6 +79,7 @@ export interface RuntimeOpenResolvedRepo {
   reason: string | null
   repo: ResolvedRepo | null
   repoRuntimeId: string | null
+  workspaceProbe?: WorkspaceProbeState
 }
 
 const repoRuntimeMembershipQueues = new Map<string, PQueue>()
@@ -157,12 +160,19 @@ async function openLocalRepoRuntimeForEntry(entry: RepoSessionEntry): Promise<Ru
       repoRuntimeId: null,
     }
   }
-  await updateRepoRuntimeCache({ repoRoot: opened.repo.id, repoRuntimeId: opened.repoRuntimeId })
+  const workspaceProbe: WorkspaceProbeState = {
+    status: 'ready',
+    name: opened.repo.name,
+    capabilities: opened.capabilities,
+    diagnostics: opened.diagnostics,
+  }
+  await updateRepoRuntimeCache({ repoRoot: opened.repo.id, repoRuntimeId: opened.repoRuntimeId, workspaceProbe })
   return {
     input: entry.id,
     reason: null,
-    repo: opened.repo,
+    repo: { ...opened.repo, workspaceProbe },
     repoRuntimeId: opened.repoRuntimeId,
+    workspaceProbe,
   }
 }
 
@@ -635,6 +645,7 @@ export function addResolvedRepo(
       // reached for a remote entry with a target — the failure
       // branch in resolveRepoPath calls addUnavailableRepo instead.
       if (resolvedRepo.target) markRemoteLifecycleReady(repo, resolvedRepo.target)
+      if (resolvedRepo.workspaceProbe) repo.workspaceProbe = resolvedRepo.workspaceProbe
       return repo
     },
     update: (existing) => {
@@ -645,8 +656,10 @@ export function addResolvedRepo(
       const sessionChanged =
         existing.session.projectionState !== sessionProjectionState ||
         !sameRepoSessionEntry(existing.session.entry, sessionEntry)
+      const workspaceProbeChanged =
+        !!resolvedRepo.workspaceProbe && !sameWorkspaceProbeState(existing.workspaceProbe, resolvedRepo.workspaceProbe)
       if (!resolvedRepo.target) {
-        if (!runtimeChanged && !nameChanged && !sessionChanged) return null
+        if (!runtimeChanged && !nameChanged && !sessionChanged && !workspaceProbeChanged) return null
         return {
           ...existing,
           repoRuntimeId: runtimeChanged ? repoRuntimeId : existing.repoRuntimeId,
@@ -655,6 +668,7 @@ export function addResolvedRepo(
             entry: sessionEntry,
             projectionState: sessionProjectionState,
           },
+          workspaceProbe: resolvedRepo.workspaceProbe ?? existing.workspaceProbe,
         }
       }
       const lifecycleReady = existing.remote.lifecycle?.kind === 'ready'
@@ -798,6 +812,7 @@ export function insertPlaceholderRepo(
 export function refreshInitialRepoState(set: ReposSet, get: ReposGet, refresh: InitialRepoRefresh) {
   const repo = get().repos[refresh.id]
   if (!repo || repo.repoRuntimeId !== refresh.repoRuntimeId) return
+  if (repo.workspaceProbe.status === 'ready' && repo.workspaceProbe.capabilities.git.status === 'unavailable') return
   void requestRepoProjectionReadModelRefresh({ get, set }, refresh.id, { repoRuntimeId: refresh.repoRuntimeId })
 }
 

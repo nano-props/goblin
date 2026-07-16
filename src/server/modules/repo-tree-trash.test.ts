@@ -45,6 +45,18 @@ beforeEach(() => {
 })
 
 describe('repo-tree trash write layer', () => {
+  test('resolves a local workspace locator without requiring Git worktree membership', async () => {
+    const result = await trashRepositoryFile(
+      'goblin+file:///tmp/plain-workspace',
+      'goblin+file:///tmp/plain-workspace',
+      'notes.txt',
+    )
+
+    expect(result.ok).toBe(true)
+    expect(mocks.getWorktrees).not.toHaveBeenCalled()
+    expect(mocks.lstat).toHaveBeenCalledWith('/tmp/plain-workspace/notes.txt')
+  })
+
   test('moves a local worktree file to the system trash', async () => {
     const result = await trashRepositoryFile('/tmp/repo', '/tmp/repo-feature', 'src/index.ts')
 
@@ -90,6 +102,26 @@ describe('repo-tree trash write layer', () => {
     expect(result).toEqual({ ok: true, message: 'ok', repositoryStateChanged: true })
     expect(mocks.trashRemoteFile).toHaveBeenCalledWith(target, '/srv/repo-feature', 'README.md', { signal: undefined })
     expect(mocks.getWorktrees).not.toHaveBeenCalled()
+  })
+
+  test('resolves an SSH workspace locator before trashing a file', async () => {
+    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/plain-workspace' })
+    const target = {
+      id: repoId,
+      alias: 'prod',
+      remotePath: '/srv/plain-workspace',
+      displayName: 'prod:plain-workspace',
+      host: 'example.com',
+      user: 'tester',
+      port: 22,
+    }
+    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok' })
+
+    await trashRepositoryFile(repoId, repoId, 'notes.txt')
+    expect(mocks.trashRemoteFile).toHaveBeenCalledWith(target, '/srv/plain-workspace', 'notes.txt', {
+      signal: undefined,
+    })
   })
 
   test('uses the runtime-aware runner for remote trash when provided', async () => {

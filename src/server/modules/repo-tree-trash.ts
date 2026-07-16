@@ -6,6 +6,7 @@ import { remoteRuntimeAwareGitRunner, resolveRemoteRepoTarget } from '#/server/m
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { trashRemoteFile } from '#/system/ssh/git.ts'
 import { movePathToTrash } from '#/system/trash.ts'
+import { resolveWorkspaceScopedPath } from '#/server/modules/workspace-path.ts'
 
 export async function trashRepositoryFile(
   cwd: string,
@@ -16,6 +17,8 @@ export async function trashRepositoryFile(
 ): Promise<ExecResult> {
   if (signal?.aborted) return { ok: false, message: 'cancelled' }
   if (!hasUsableWorktreePath(worktreePath)) return { ok: false, message: 'error.invalid-worktree-path' }
+  const workspacePath = resolveWorkspaceScopedPath(cwd, worktreePath)
+  const executionPath = workspacePath ?? worktreePath
 
   if (isRemoteRepoId(cwd)) {
     const target = await resolveRemoteRepoTarget(
@@ -23,13 +26,15 @@ export async function trashRepositoryFile(
       options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
     )
     const run = options.repoRuntimeId ? remoteRuntimeAwareGitRunner(cwd, options.repoRuntimeId, target) : undefined
-    return await trashRemoteFile(target, worktreePath, filePath, { signal, ...(run ? { run } : {}) })
+    return await trashRemoteFile(target, executionPath, filePath, { signal, ...(run ? { run } : {}) })
   }
 
-  const worktrees = await getWorktrees(cwd, { includeStatus: false, signal })
-  if (!matchesKnownWorktree(worktrees, worktreePath)) return { ok: false, message: 'error.invalid-worktree-path' }
+  if (!workspacePath) {
+    const worktrees = await getWorktrees(cwd, { includeStatus: false, signal })
+    if (!matchesKnownWorktree(worktrees, executionPath)) return { ok: false, message: 'error.invalid-worktree-path' }
+  }
 
-  const absolutePath = resolveWorktreeRelativePath(worktreePath, filePath)
+  const absolutePath = resolveWorktreeRelativePath(executionPath, filePath)
   if (!absolutePath) return { ok: false, message: 'error.invalid-path' }
 
   try {

@@ -136,6 +136,38 @@ describe('repo runtimes', () => {
     })
   })
 
+  test('does not commit a capability transition when transactional cleanup fails', async () => {
+    const runtimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    const available = {
+      status: 'ready' as const,
+      name: 'repo',
+      capabilities: {
+        files: { read: true as const, write: true },
+        terminal: { available: true },
+        git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+      },
+      diagnostics: [],
+    }
+    commitWorkspaceProbeState({ userId: USER_ID, repoRoot: REPO_ROOT, repoRuntimeId: runtimeId, probe: available })
+    const unavailable = {
+      ...available,
+      capabilities: { ...available.capabilities, git: { status: 'unavailable' as const } },
+    }
+
+    await expect(
+      runSerializedWorkspaceRefresh({
+        userId: USER_ID,
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: runtimeId,
+        probe: async () => unavailable,
+        beforeCommit: async () => {
+          throw new Error('cleanup failed')
+        },
+      }),
+    ).rejects.toThrow('cleanup failed')
+    expect(listRepoRuntimes(USER_ID)[0]?.workspaceProbe).toEqual(available)
+  })
+
   test('makes repeated acquire and release idempotent per client', () => {
     const runtimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
     expect(acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')).toBe(runtimeId)
@@ -216,6 +248,7 @@ describe('repo runtimes', () => {
       kind: 'ready' as const,
       repoId: repoRoot,
       name: 'repo',
+      gitAvailable: true,
       lifecycle: {
         kind: 'ready' as const,
         target: {

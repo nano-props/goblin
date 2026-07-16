@@ -85,6 +85,78 @@ function createWorktreeAction(): TestCreateWorktreeAction {
 }
 
 describe('remote fetch timestamps', () => {
+  test('commits a non-Git capability transition without changing the runtime or reading Git state', async () => {
+    const repoRuntimeId = seedRepo([branch('main')])
+    const fetch = vi.fn()
+    const projection = vi.fn()
+    ipcHandlers['repo.fetch'] = fetch
+    ipcHandlers['repo.projection'] = projection
+    ipcHandlers['workspace.refresh'] = () => ({
+      kind: 'committed',
+      probe: {
+        status: 'ready',
+        name: 'workspace',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'unavailable' },
+        },
+        diagnostics: [],
+      },
+    })
+
+    await runManualRepoSync(refreshStoreAccess, REPO_ID, { repoRuntimeId })
+
+    const repo = useReposStore.getState().repos[REPO_ID]
+    expect(repo?.repoRuntimeId).toBe(repoRuntimeId)
+    expect(repo?.workspaceProbe).toMatchObject({
+      status: 'ready',
+      capabilities: { git: { status: 'unavailable' } },
+    })
+    expect(fetch).not.toHaveBeenCalled()
+    expect(projection).not.toHaveBeenCalled()
+  })
+
+  test('failed Refresh Workspace preserves the last committed capability and Git projection', async () => {
+    const repoRuntimeId = seedRepo([branch('main')])
+    updateRepoForTest((repo) => {
+      repo.workspaceProbe = {
+        status: 'ready',
+        name: 'workspace',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        },
+        diagnostics: [],
+      }
+    })
+    const before = useReposStore.getState().repos[REPO_ID]!.workspaceProbe
+    const fetch = vi.fn()
+    const projection = vi.fn()
+    ipcHandlers['repo.fetch'] = fetch
+    ipcHandlers['repo.projection'] = projection
+    ipcHandlers['workspace.refresh'] = () => ({
+      kind: 'failed',
+      probe: {
+        status: 'ready',
+        name: 'workspace',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'unavailable' },
+        },
+        diagnostics: [{ scope: 'git', message: 'git timed out' }],
+      },
+    })
+
+    await runManualRepoSync(refreshStoreAccess, REPO_ID, { repoRuntimeId })
+
+    expect(useReposStore.getState().repos[REPO_ID]!.workspaceProbe).toBe(before)
+    expect(fetch).not.toHaveBeenCalled()
+    expect(projection).not.toHaveBeenCalled()
+  })
+
   test('repo read-model projection refresh treats query projection branches as existing data while loading', async () => {
     const repoRuntimeId = seedRepo([])
     seedRepoReadModelQueryData(
@@ -175,6 +247,9 @@ describe('remote fetch timestamps', () => {
       })
 
     const work = runManualRepoSync(refreshStoreAccess, REPO_ID, { repoRuntimeId })
+    await vi.waitFor(() => {
+      expect(resolveFetch).toEqual(expect.any(Function))
+    })
     seedRepo([branch('main')], 'repo-runtime-test-2')
     resolveFetch({ ok: true, message: 'ok' })
     await work
@@ -195,6 +270,9 @@ describe('remote fetch timestamps', () => {
 
     const work = runManualRepoSync(refreshStoreAccess, REPO_ID, { repoRuntimeId })
 
+    await vi.waitFor(() => {
+      expect(resolveNetwork).toEqual(expect.any(Function))
+    })
     const runningRepo = useReposStore.getState().repos[REPO_ID]
     expect(runningRepo?.dataLoads.fetch.phase).toBe('loading')
     expect(canStartRemoteFetch(runningRepo)).toBe(false)

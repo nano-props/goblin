@@ -13,6 +13,7 @@ import {
   pullRemoteBranch,
   fetchRemoteRepo,
   remoteCommandExists,
+  remoteCommandExistsAtWorkspaceRoot,
   pushRemoteBranch,
   remoteExecResult,
   removeRemoteWorktree,
@@ -1148,6 +1149,19 @@ describe('resolveRemoteWorktree', () => {
 })
 
 describe('remoteCommandExists', () => {
+  test('checks an explicitly authorized workspace root without inventing a worktree', async () => {
+    const run = vi.fn(async () => okRemoteResult(''))
+
+    await expect(
+      remoteCommandExistsAtWorkspaceRoot(TARGET, '/srv/plain-workspace', 'bat', { run: run as any }),
+    ).resolves.toBe(true)
+    expect(run).toHaveBeenCalledWith(
+      { type: 'commandExists', path: '/srv/plain-workspace', commandName: 'bat' },
+      TARGET,
+      { signal: undefined },
+    )
+  })
+
   test('validates the remote worktree before checking the command', async () => {
     const knownWorktrees: WorktreeInfo[] = [
       { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },

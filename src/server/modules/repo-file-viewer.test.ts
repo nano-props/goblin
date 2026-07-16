@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   resolveRemoteRepoTarget: vi.fn(),
   remoteRuntimeAwareGitRunner: vi.fn(),
   remoteCommandExists: vi.fn(),
+  remoteCommandExistsAtWorkspaceRoot: vi.fn(),
   resolveRemoteWorktree: vi.fn(),
 }))
 
@@ -24,6 +25,7 @@ vi.mock('#/server/modules/repo-source.ts', () => ({
 
 vi.mock('#/system/ssh/git.ts', () => ({
   remoteCommandExists: mocks.remoteCommandExists,
+  remoteCommandExistsAtWorkspaceRoot: mocks.remoteCommandExistsAtWorkspaceRoot,
   resolveRemoteWorktree: mocks.resolveRemoteWorktree,
 }))
 
@@ -46,6 +48,20 @@ beforeEach(() => {
 })
 
 describe('repo file viewer read layer', () => {
+  test('resolves a local workspace locator without requiring Git worktree membership', async () => {
+    const platformSpy = mockPlatform('linux')
+    mocks.userShellCommandExists.mockResolvedValue(false)
+    try {
+      await expect(
+        getRepositoryFileViewer('goblin+file:///tmp/plain-workspace', 'goblin+file:///tmp/plain-workspace'),
+      ).resolves.toEqual({ viewer: 'cat', shell: 'posix' })
+      expect(mocks.getWorktrees).not.toHaveBeenCalled()
+      expect(mocks.userShellCommandExists).toHaveBeenCalledWith('bat', '/tmp/plain-workspace', undefined)
+    } finally {
+      platformSpy.mockRestore()
+    }
+  })
+
   test('uses bat for local worktrees when the user shell can resolve it', async () => {
     const platformSpy = mockPlatform('linux')
     mocks.userShellCommandExists.mockResolvedValueOnce(true)
@@ -128,6 +144,27 @@ describe('repo file viewer read layer', () => {
       signal: undefined,
     })
     expect(mocks.getWorktrees).not.toHaveBeenCalled()
+  })
+
+  test('resolves an SSH workspace locator without a Git worktree lookup', async () => {
+    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/plain-workspace' })
+    const target = {
+      id: repoId,
+      alias: 'prod',
+      remotePath: '/srv/plain-workspace',
+      displayName: 'prod:plain-workspace',
+      host: 'example.com',
+      user: 'tester',
+      port: 22,
+    }
+    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.remoteCommandExistsAtWorkspaceRoot.mockResolvedValueOnce(true)
+
+    await expect(getRepositoryFileViewer(repoId, repoId)).resolves.toEqual({ viewer: 'bat', shell: 'posix' })
+    expect(mocks.resolveRemoteWorktree).not.toHaveBeenCalled()
+    expect(mocks.remoteCommandExistsAtWorkspaceRoot).toHaveBeenCalledWith(target, '/srv/plain-workspace', 'bat', {
+      signal: undefined,
+    })
   })
 
   test('matches remote worktree paths after POSIX normalization', async () => {

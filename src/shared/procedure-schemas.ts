@@ -70,6 +70,10 @@ const EmptyBodySchema = v.optional(v.object({}))
 
 export const REPO_PROCEDURE_SCHEMAS = {
   // Action endpoints — POST with a JSON body.
+  workspaceRefresh: v.object({
+    workspaceId: RepoRootSchema,
+    workspaceRuntimeId: RepoRuntimeIdSchema,
+  }),
   fetch: v.strictObject({
     cwd: v.string(),
     repoRuntimeId: RepoRuntimeIdSchema,

@@ -47,7 +47,7 @@ describe('repo lifecycle', () => {
       {
         repoRoot: REPO_A,
         repoRuntimeId: useReposStore.getState().repos[REPO_A]!.repoRuntimeId,
-        workspaceProbe: { status: 'probing' },
+        workspaceProbe: expect.objectContaining({ status: 'ready' }),
       },
     ])
   })
@@ -162,7 +162,7 @@ describe('repo lifecycle', () => {
       {
         repoRoot: REPO_A,
         repoRuntimeId: useReposStore.getState().repos[REPO_A]!.repoRuntimeId,
-        workspaceProbe: { status: 'probing' },
+        workspaceProbe: expect.objectContaining({ status: 'ready' }),
       },
     ])
   })
@@ -303,7 +303,9 @@ describe('repo lifecycle', () => {
     })
 
     const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())
-    expect(cached?.runtimes).toEqual([{ repoRoot: REPO_A, repoRuntimeId }])
+    expect(cached?.runtimes).toEqual([
+      { repoRoot: REPO_A, repoRuntimeId, workspaceProbe: expect.objectContaining({ status: 'ready' }) },
+    ])
   })
 
   test('ensureWorkspaceOpen preserves remote target metadata for recent repos and later actions', async () => {

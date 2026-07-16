@@ -47,6 +47,7 @@ export function emptyRepo(id: string, name: string, repoRuntimeId: string): Repo
       fetchError: null,
     },
     availability: { phase: 'available' },
+    workspaceProbe: { status: 'probing' },
     events: [],
   }
 }

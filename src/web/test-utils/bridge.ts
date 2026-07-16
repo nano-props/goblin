@@ -552,7 +552,15 @@ export function resetReposStore(): void {
 }
 
 export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>): void {
-  const repoRuntimeState = new Map<string, { currentRepoRuntimeId: string | null; members: Set<string> }>()
+  const repoRuntimeState = new Map<
+    string,
+    {
+      currentRepoRuntimeId: string | null
+      members: Set<string>
+      workspaceProbe?: import('#/shared/workspace-runtime.ts').WorkspaceProbeState
+      remoteLifecycle?: import('#/shared/remote-repo.ts').RemoteRepoRuntimeLifecycle
+    }
+  >()
   const sessionStorageValues = new Map<string, string>()
   const hostOpenExternalUrl = handlers['app.openExternalUrl']
   const hostOpenDirectoryDialog = handlers['repo.openDialog']
@@ -941,11 +949,27 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           const state = repoRuntimeState.get(probe.root) ?? { currentRepoRuntimeId: null, members: new Set<string>() }
           if (!state.currentRepoRuntimeId) state.currentRepoRuntimeId = createOpaqueId('repo-runtime')
           state.members.add(clientId)
+          state.workspaceProbe = {
+            status: 'ready',
+            name: probe.name ?? probe.root.split('/').at(-1) ?? probe.root,
+            capabilities: {
+              files: { read: true, write: true },
+              terminal: { available: true },
+              git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+            },
+            diagnostics: [],
+          }
           repoRuntimeState.set(probe.root, state)
           return {
             ok: true as const,
             repo: { id: probe.root, name: probe.name ?? probe.root.split('/').at(-1) ?? probe.root },
             repoRuntimeId: state.currentRepoRuntimeId,
+            capabilities: {
+              files: { read: true as const, write: true },
+              terminal: { available: true },
+              git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+            },
+            diagnostics: [],
           }
         }
         if (typeof repoRoot !== 'string' || repoRoot.length === 0) throw new Error('runtime-open requires repoRoot')
@@ -992,13 +1016,27 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             state.currentRepoRuntimeId ??= createOpaqueId('repo-runtime')
             state.members.add(clientId)
             repoRuntimeState.set(repoRoot, state)
-            return { repoRoot, repoRuntimeId: state.currentRepoRuntimeId }
+            return {
+              repoRoot,
+              repoRuntimeId: state.currentRepoRuntimeId,
+              workspaceProbe: state.workspaceProbe ?? { status: 'probing' },
+              ...(state.remoteLifecycle ? { remoteLifecycle: state.remoteLifecycle } : {}),
+            }
           }),
         }
       }
       const listRepoRuntime = () => ({
         runtimes: Array.from(repoRuntimeState.entries()).flatMap(([repoRoot, state]) =>
-          state.currentRepoRuntimeId ? [{ repoRoot, repoRuntimeId: state.currentRepoRuntimeId }] : [],
+          state.currentRepoRuntimeId
+            ? [
+                {
+                  repoRoot,
+                  repoRuntimeId: state.currentRepoRuntimeId,
+                  workspaceProbe: state.workspaceProbe ?? { status: 'probing' },
+                  ...(state.remoteLifecycle ? { remoteLifecycle: state.remoteLifecycle } : {}),
+                },
+              ]
+            : [],
         ),
       })
       const result = (() => {
@@ -1017,7 +1055,41 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/settings/prefs') return call('settings.updateUserSettings', body)
         if (url.pathname === '/api/remote/ssh-hosts') return call('remote.listSshHosts', undefined)
         if (url.pathname === '/api/remote/resolve-target') return call('remote.resolveTarget', body)
-        if (url.pathname === '/api/remote/lifecycle') return call('remote.lifecycle', body)
+        if (url.pathname === '/api/remote/lifecycle') {
+          return Promise.resolve(call('remote.lifecycle', body)).then((result) => {
+            const value = result as {
+              kind?: string
+              repoId?: string
+              name?: string
+              lifecycle?: import('#/shared/remote-repo.ts').RemoteRepoRuntimeLifecycle
+            }
+            if (value.kind === 'settled' && value.repoId && value.lifecycle) {
+              const requestedRuntimeId =
+                typeof body.repoRuntimeId === 'string' ? body.repoRuntimeId : createOpaqueId('repo-runtime')
+              const state = repoRuntimeState.get(value.repoId) ?? {
+                currentRepoRuntimeId: requestedRuntimeId,
+                members: new Set<string>(),
+              }
+              repoRuntimeState.set(value.repoId, state)
+              if (state.currentRepoRuntimeId === requestedRuntimeId) {
+                state.remoteLifecycle = value.lifecycle
+                if (value.lifecycle.kind === 'ready') {
+                  state.workspaceProbe = {
+                    status: 'ready',
+                    name: value.name ?? value.repoId,
+                    capabilities: {
+                      files: { read: true, write: true },
+                      terminal: { available: true },
+                      git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+                    },
+                    diagnostics: [],
+                  }
+                }
+              }
+            }
+            return result
+          })
+        }
         if (url.pathname === '/api/remote/path-suggestions') return call('remote.listPathSuggestions', body)
         if (url.pathname === '/api/remote/test-repo') return call('remote.testRepo', body)
         if (url.pathname === '/api/repo/probe') return call('repo.probe', body)
@@ -1058,6 +1130,23 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         }
         if (url.pathname === '/api/repo/runtime-close') {
           return handlers['repo.runtimeClose'] ? call('repo.runtimeClose', body) : closeRepoRuntime(body)
+        }
+        if (url.pathname === '/api/repo/workspace-refresh') {
+          return handlers['workspace.refresh']
+            ? call('workspace.refresh', body)
+            : {
+                kind: 'committed',
+                probe: {
+                  status: 'ready',
+                  name: 'workspace',
+                  capabilities: {
+                    files: { read: true, write: true },
+                    terminal: { available: true },
+                    git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+                  },
+                  diagnostics: [],
+                },
+              }
         }
         if (url.pathname === '/api/repo/abort') return call('repo.abort', body)
         throw new Error(`Unhandled fetch URL: ${url.pathname}`)

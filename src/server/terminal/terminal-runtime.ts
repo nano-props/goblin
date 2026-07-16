@@ -33,6 +33,7 @@ import { createWorkspacePaneRuntimeApplication } from '#/server/workspace-pane/w
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { createWorkspacePaneRuntimeRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-runtime-realtime.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
+import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import {
   serverWorkspacePaneLayoutRepository,
@@ -97,13 +98,15 @@ export interface ServerTerminalRuntime {
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   workspacePaneRuntimeApplication: ReturnType<typeof createWorkspacePaneRuntimeApplication>
   worktreeRemovalApplication: ReturnType<typeof createWorktreeRemovalApplication>
+  workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
   shutdown(): void
 }
 
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
   const { ptySupervisor } = options
+  const workspacePaneLayoutRepository = options.workspacePaneLayoutRepository ?? serverWorkspacePaneLayoutRepository
   const workspacePaneLayout = new WorkspacePaneLayoutAggregate({
-    repository: options.workspacePaneLayoutRepository ?? serverWorkspacePaneLayoutRepository,
+    repository: workspacePaneLayoutRepository,
     restoreTransaction: options.workspacePaneLayoutRestoreTransaction ?? serverWorkspacePaneLayoutRestoreTransaction,
   })
   const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
@@ -326,12 +329,26 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 
   terminalRuntimeLogger.info({ ptyMode: ptySupervisor.getDiagnostics().mode }, 'server terminal runtime created')
 
+  const workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost = {
+    async removeGitScopedResources({ userId, workspaceId, workspaceRuntimeId }) {
+      const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
+      const retirement = await manager.closeSessionsForRepo(userId, scope)
+      if (retirement.failures.length > 0) throw new Error('terminal session cleanup failed')
+      manager.releaseProjectionRevisionForScope(userId, scope)
+      await workspaceTabsCoordinator.closeInvalidatedScope({ userId, scope })
+      await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, workspaceId)
+      broadcastRepoSessionsChanged(userId, workspaceId)
+      broadcastRepoWorkspaceTabsChanged(userId, workspaceId)
+    },
+  }
+
   return {
     host,
     workspacePaneRuntimeHost,
     workspacePaneTabsHost,
     workspacePaneRuntimeApplication,
     worktreeRemovalApplication,
+    workspaceCapabilityTransitionHost,
     shutdown() {
       host.shutdown()
     },
@@ -364,4 +381,22 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         )
       })
   }
+}
+
+async function clearWorkspacePaneDurableLayout(
+  repository: WorkspacePaneLayoutRepository,
+  workspaceId: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const current = await repository.load(workspaceId)
+    if (current.layout.entries.length === 0) return
+    const outcome = await repository.compareAndSwap({
+      repoRoot: workspaceId,
+      expected: current.layout,
+      replacement: { entries: [] },
+    })
+    if (outcome.kind === 'accepted') return
+    if (outcome.kind === 'write-failure') throw outcome.error
+  }
+  throw new Error('workspace pane layout cleanup was superseded')
 }

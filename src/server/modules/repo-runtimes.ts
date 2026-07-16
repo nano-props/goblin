@@ -7,7 +7,11 @@ import type {
   RemoteRepoTarget,
 } from '#/shared/remote-repo.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
+import type {
+  WorkspaceProbeState,
+  WorkspaceRefreshResult,
+  WorkspaceSettledProbeState,
+} from '#/shared/workspace-runtime.ts'
 
 interface RepoRuntimeState {
   currentRepoRuntimeId: string | null
@@ -274,6 +278,19 @@ export function isCurrentRepoRuntime(userId: string, repoRoot: string, repoRunti
   return repoRuntimesByUser.get(userId)?.get(repoRoot)?.currentRepoRuntimeId === repoRuntimeId
 }
 
+export function workspaceRuntimeHasGitCapability(
+  userId: string,
+  repoRoot: string,
+  repoRuntimeId: string,
+): boolean {
+  const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
+  return (
+    state?.currentRepoRuntimeId === repoRuntimeId &&
+    state.workspaceProbe.status === 'ready' &&
+    state.workspaceProbe.capabilities.git.status === 'available'
+  )
+}
+
 export function commitWorkspaceProbeState(input: {
   userId: string
   repoRoot: string
@@ -286,17 +303,16 @@ export function commitWorkspaceProbeState(input: {
   return true
 }
 
-export type WorkspaceRefreshRunResult =
-  | { kind: 'committed'; probe: WorkspaceSettledProbeState }
-  | { kind: 'failed'; probe: WorkspaceSettledProbeState }
-  | { kind: 'stale-runtime' }
-
 export async function runSerializedWorkspaceRefresh(input: {
   userId: string
   repoRoot: string
   repoRuntimeId: string
   probe: () => Promise<WorkspaceSettledProbeState>
-}): Promise<WorkspaceRefreshRunResult> {
+  beforeCommit?: (input: {
+    before: WorkspaceProbeState
+    after: WorkspaceSettledProbeState
+  }) => Promise<void>
+}): Promise<WorkspaceRefreshResult> {
   const state = repoRuntimesByUser.get(input.userId)?.get(input.repoRoot)
   if (!state || state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
 
@@ -312,6 +328,8 @@ export async function runSerializedWorkspaceRefresh(input: {
     const probe = await input.probe()
     if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
     if (workspaceRefreshMayCommit(probe)) {
+      await input.beforeCommit?.({ before: state.workspaceProbe, after: probe })
+      if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
       state.workspaceProbe = probe
       return { kind: 'committed', probe }
     }

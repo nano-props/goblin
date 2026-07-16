@@ -126,6 +126,44 @@ afterEach(() => {
 })
 
 describe('RepoWorkspace', () => {
+  test('renders a non-Git workspace directly as a Files surface', async () => {
+    const workspaceId = 'goblin+file:///tmp/plain-workspace'
+    seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
+    useReposStore.setState((state) => ({
+      repos: {
+        ...state.repos,
+        [workspaceId]: {
+          ...state.repos[workspaceId]!,
+          workspaceProbe: {
+            status: 'ready',
+            name: 'plain-workspace',
+            capabilities: {
+              files: { read: true, write: true },
+              terminal: { available: true },
+              git: { status: 'unavailable' },
+            },
+            diagnostics: [],
+          },
+        },
+      },
+    }))
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace repoId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByText('tab.files')).toBeTruthy()
+    expect(screen.queryByText('branches.empty')).toBeNull()
+  })
+
   test('forwards compact missing-branch recovery to the workspace navigation callback', () => {
     responsiveMocks.compact = true
     seedRepoWithReadModelForTest({

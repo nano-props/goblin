@@ -158,7 +158,7 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
   )
 }
 
-function FiletreeTab({
+export function FiletreeTab({
   repoId,
   repoRuntimeId,
   branchName,
@@ -166,7 +166,7 @@ function FiletreeTab({
 }: {
   repoId: string
   repoRuntimeId: string
-  branchName: string
+  branchName: string | null
   worktreePath: string
 }) {
   const t = useT()
@@ -240,7 +240,7 @@ function FiletreeTab({
 
   const openFileInTerminal = useCallback(
     async (node: RepoTreeNode) => {
-      if (node.kind !== 'file') return
+      if (node.kind !== 'file' || branchName === null) return
       const openingFileKey = `${openingFileKeyPrefix}${node.id}`
       if (!beginOpeningFile(openingFileKey)) return
       try {
@@ -308,11 +308,15 @@ function FiletreeTab({
       scrollRestoreKey={interactionScopeKey}
       scrollRestoreReady={scrollRestoreReady}
       onTopVisibleRowIndexChange={handleTopVisibleRowIndexChange}
-      onOpenFile={(node) => {
-        void openFileInTerminal(node).catch((err) => {
-          toast.error(t(err instanceof Error ? err.message : 'error.terminal-create-failed'))
-        })
-      }}
+      onOpenFile={
+        branchName === null
+          ? undefined
+          : (node) => {
+              void openFileInTerminal(node).catch((err) => {
+                toast.error(t(err instanceof Error ? err.message : 'error.terminal-create-failed'))
+              })
+            }
+      }
       onRequestTrashFile={requestTrashFile}
     />
   )

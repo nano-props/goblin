@@ -26,6 +26,7 @@ import { getRepositoryTree } from '#/server/modules/repo-tree.ts'
 import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 
+const LOCAL_REPO_ID = 'goblin+file:///tmp/repo'
 const remoteRepoId = normalizeRemoteRepoId({ alias: 'mybox', remotePath: '/srv/repos/myrepo' })
 const remoteTarget: RemoteRepoTarget = {
   id: remoteRepoId,
@@ -51,13 +52,22 @@ afterEach(() => {
 })
 
 describe('repo-tree — read layer', () => {
+  test('reads the exact workspace root without requiring Git worktree membership', async () => {
+    mocks.getRepoTreeSourceLocal.mockResolvedValueOnce({ nodes: [], truncated: false })
+
+    await expect(getRepositoryTree(LOCAL_REPO_ID, LOCAL_REPO_ID)).resolves.toEqual({ nodes: [], truncated: false })
+
+    expect(mocks.getWorktrees).not.toHaveBeenCalled()
+    expect(mocks.getRepoTreeSourceLocal).toHaveBeenCalledWith('/tmp/repo', expect.any(Object), undefined)
+  })
+
   test('validates a local worktree and forwards to the local source', async () => {
     mocks.getRepoTreeSourceLocal.mockResolvedValueOnce({
       nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
       truncated: false,
     })
 
-    const result = await getRepositoryTree('/tmp/repo', '/tmp/repo/.worktrees/feature', { prefix: 'src' })
+    const result = await getRepositoryTree(LOCAL_REPO_ID, '/tmp/repo/.worktrees/feature', { prefix: 'src' })
 
     expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', {
       includeStatus: false,
@@ -73,7 +83,7 @@ describe('repo-tree — read layer', () => {
   test('keeps transport cancellation out of the tree read boundary', async () => {
     mocks.getRepoTreeSourceLocal.mockResolvedValueOnce({ nodes: [], truncated: false })
 
-    await getRepositoryTree('/tmp/repo', '/tmp/repo/.worktrees/feature')
+    await getRepositoryTree(LOCAL_REPO_ID, '/tmp/repo/.worktrees/feature')
 
     expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false })
     expect(mocks.getRepoTreeSourceLocal).toHaveBeenCalledWith(
@@ -89,14 +99,14 @@ describe('repo-tree — read layer', () => {
     ]
     mocks.getRepoTreeSourceLocal.mockResolvedValueOnce({ nodes: [], truncated: false })
 
-    await getRepositoryTree('/tmp/repo', '/tmp/repo/.worktrees/feature', { precomputedWorktrees })
+    await getRepositoryTree(LOCAL_REPO_ID, '/tmp/repo/.worktrees/feature', { precomputedWorktrees })
 
     expect(mocks.getWorktrees).not.toHaveBeenCalled()
     expect(mocks.getRepoTreeSourceLocal).toHaveBeenCalled()
   })
 
   test('rejects an unknown local worktree path before invoking the source', async () => {
-    await expect(getRepositoryTree('/tmp/repo', '/etc/passwd')).rejects.toThrow('unknown worktree path')
+    await expect(getRepositoryTree(LOCAL_REPO_ID, '/etc/passwd')).rejects.toThrow('unknown worktree path')
 
     expect(mocks.getRepoTreeSourceLocal).not.toHaveBeenCalled()
   })
@@ -104,7 +114,7 @@ describe('repo-tree — read layer', () => {
   test('rejects when the local source throws', async () => {
     mocks.getRepoTreeSourceLocal.mockRejectedValueOnce(new Error('boom'))
 
-    await expect(getRepositoryTree('/tmp/repo', '/tmp/repo/.worktrees/feature')).rejects.toThrow('boom')
+    await expect(getRepositoryTree(LOCAL_REPO_ID, '/tmp/repo/.worktrees/feature')).rejects.toThrow('boom')
   })
 
   test('resolves a remote target and forwards to the remote source', async () => {
@@ -173,8 +183,8 @@ describe('repo-tree — read layer', () => {
   })
 
   test('rejects malformed worktree paths before any source call', async () => {
-    await expect(getRepositoryTree('/tmp/repo', '')).rejects.toThrow('invalid worktree path')
-    await expect(getRepositoryTree('/tmp/repo', '/tmp/repo/.worktrees/feature\0/etc/passwd')).rejects.toThrow(
+    await expect(getRepositoryTree(LOCAL_REPO_ID, '')).rejects.toThrow('invalid worktree path')
+    await expect(getRepositoryTree(LOCAL_REPO_ID, '/tmp/repo/.worktrees/feature\0/etc/passwd')).rejects.toThrow(
       'invalid worktree path',
     )
     expect(mocks.getRepoTreeSourceLocal).not.toHaveBeenCalled()
