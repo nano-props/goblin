@@ -114,6 +114,10 @@ const SOURCE_PATTERN_RULES: SourcePatternRule[] = [
         pattern: /\b(?:REPO_QUERY_SCHEMAS|REPO_PROCEDURE_SCHEMAS)\.(?:snapshot|status|composite)\b/,
       },
       { label: 'projection-owned worktree status', pattern: /\bprojection\.status\b/ },
+      {
+        label: 'store-owned worktree status lifecycle',
+        pattern: /\b(?:dataLoads|operations)\.visibleStatus\b/,
+      },
     ],
     reason: 'web repo reads must compose runtime projections with the independent worktree-status React Query surface',
   },

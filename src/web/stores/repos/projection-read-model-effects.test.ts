@@ -181,46 +181,6 @@ describe('repo projection read-model effects', () => {
     })
   })
 
-  test('projection acceptance does not settle the independently owned visible status load', () => {
-    const repo = seedRepoShellForTest({
-      id: '/repo',
-      repoRuntimeId: 'repo-runtime-test-2',
-      currentBranchName: 'feature/a',
-    })
-    useReposStore.setState((state) => {
-      const current = state.repos['/repo']!
-      return {
-        repos: {
-          ...state.repos,
-          '/repo': {
-            ...current,
-            dataLoads: {
-              ...current.dataLoads,
-              visibleStatus: { phase: 'loading', loadedAt: null, error: null, stale: false },
-            },
-          },
-        },
-      }
-    })
-    const projection = acceptedProjection()
-
-    acceptRepoProjectionReadModel(
-      useReposStore.setState,
-      useReposStore.getState,
-      {
-        repoRoot: '/repo',
-        repoRuntimeId: repo.repoRuntimeId,
-        projection,
-      },
-      { scope: 'repo-read-model' },
-    )
-
-    expect(useReposStore.getState().repos['/repo']?.dataLoads.visibleStatus).toMatchObject({
-      phase: 'loading',
-      loadedAt: null,
-    })
-  })
-
   test('summary projections do not update the core read model cache', () => {
     const pruneTerminals = vi.fn(() => Promise.resolve({ pruned: 0, remaining: 0 }))
     installGoblinTestBridge({

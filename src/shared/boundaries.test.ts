@@ -212,6 +212,10 @@ describe('architecture boundary rules', () => {
           relativeFilePath: '/src/web/repo-branch-read-model.ts',
           source: 'repoBranchReadModelFromSnapshot(projection.snapshot, projection.status)\n',
         },
+        {
+          relativeFilePath: '/src/web/stores/repos/refresh.ts',
+          source: 'repo.dataLoads.visibleStatus.error = message\n',
+        },
       ]),
     ).toEqual([
       expect.stringContaining('legacy repo IPC read route'),
@@ -219,6 +223,7 @@ describe('architecture boundary rules', () => {
       expect.stringContaining('legacy repo read helper'),
       expect.stringContaining('legacy repo procedure schema key'),
       expect.stringContaining('projection-owned worktree status'),
+      expect.stringContaining('store-owned worktree status lifecycle'),
     ])
   })
 

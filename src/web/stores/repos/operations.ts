@@ -1,18 +1,10 @@
 import type { RepoBranchActionKind } from '#/web/stores/repos/branch-action-types.ts'
 export type RepoOperationPhase = 'idle' | 'queued' | 'running'
-export type RepoOperationKey = 'fetch' | 'manualRefresh' | 'repoReadModel' | 'visibleStatus' | 'branchAction'
+export type RepoOperationKey = 'fetch' | 'manualRefresh' | 'repoReadModel' | 'branchAction'
 export type RepoBranchActionReason =
   'branch:pull' | 'branch:push' | 'branch:createWorktree' | 'branch:deleteBranch' | 'branch:removeWorktree'
 export type RepoOperationReason =
-  | 'fetch'
-  | 'network'
-  | 'pull'
-  | 'push'
-  | 'repo-read-model'
-  | 'visible-status'
-  | 'user-fetch'
-  | 'manual-refresh'
-  | RepoBranchActionReason
+  'fetch' | 'network' | 'pull' | 'push' | 'repo-read-model' | 'user-fetch' | 'manual-refresh' | RepoBranchActionReason
 
 export interface RepoOperationState {
   operationId: number
@@ -34,7 +26,6 @@ export interface RepoOperationsState {
   fetch: RepoOperationState
   manualRefresh: RepoOperationState
   repoReadModel: RepoOperationState
-  visibleStatus: RepoOperationState
   branchAction: RepoOperationState
 }
 
@@ -63,7 +54,6 @@ export function emptyRepoOperations(): RepoOperationsState {
     fetch: idleOperation(),
     manualRefresh: idleOperation(),
     repoReadModel: idleOperation(),
-    visibleStatus: idleOperation(),
     branchAction: idleOperation(),
   }
 }
@@ -76,8 +66,6 @@ function operationForKey(operations: RepoOperationsState, key: string): RepoOper
       return operations.manualRefresh
     case 'repoReadModel':
       return operations.repoReadModel
-    case 'visibleStatus':
-      return operations.visibleStatus
     case 'branchAction':
       return operations.branchAction
   }
@@ -92,8 +80,6 @@ function readOperationForKey(operations: RepoOperationsState, key: string): Repo
       return operations.manualRefresh
     case 'repoReadModel':
       return operations.repoReadModel
-    case 'visibleStatus':
-      return operations.visibleStatus
     case 'branchAction':
       return operations.branchAction
   }

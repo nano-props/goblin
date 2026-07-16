@@ -34,7 +34,7 @@ import {
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
-import { refreshVisibleStatusCache } from '#/web/stores/repos/visible-status-refresh.ts'
+import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
 beforeEach(resetRefreshTest)
 
 type TestRepo = NonNullable<ReturnType<typeof useReposStore.getState>['repos'][string]>
@@ -515,7 +515,7 @@ describe('projection refresh request ordering', () => {
     expect(primaryWindowQueryClient.getQueryData(repoProjectionQueryKey(REPO_ID, repoRuntimeId, null, 'full'))).toEqual(
       projection,
     )
-    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus.loadedAt).toBe(456)
+    expect(getRepoWorktreeStatusQueryData(REPO_ID, repoRuntimeId)?.loadedAt).toBe(456)
   })
 
   test('projection read-model refresh drops stale results when the repo is reopened during a projection read', async () => {
@@ -570,7 +570,7 @@ describe('projection refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]!
     expect(repo.dataLoads.repoReadModel).toMatchObject({ phase: 'idle', error: 'projection failed' })
-    expect(repo.dataLoads.visibleStatus).toMatchObject({ phase: 'idle', error: null, loadedAt: 456 })
+    expect(getRepoWorktreeStatusQueryData(REPO_ID, repoRuntimeId)?.loadedAt).toBe(456)
   })
 
   test('projection and status refreshes settle independently when status fails', async () => {
@@ -585,7 +585,9 @@ describe('projection refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]!
     expect(repo.dataLoads.repoReadModel).toMatchObject({ phase: 'idle', error: null, loadedAt: 123 })
-    expect(repo.dataLoads.visibleStatus).toMatchObject({ phase: 'idle', error: 'status failed' })
+    expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repoRuntimeId))?.error).toEqual(
+      expect.objectContaining({ message: 'status failed' }),
+    )
     expect(cachedRepoProjection(repoRuntimeId)?.snapshot?.current).toBe('main')
   })
 
@@ -643,8 +645,8 @@ describe('projection refresh request ordering', () => {
       })
     }
 
-    const first = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
-    const second = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
+    const first = refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
+    const second = refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
     let secondSettled = false
     void second.then(() => {
       secondSettled = true
@@ -741,7 +743,7 @@ describe('projection refresh request ordering', () => {
       loadedAt: Date.now(),
     })
 
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
+    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
     const repo = useReposStore.getState().repos[REPO_ID]!
     const worktreesByPath = readRepoBranchQueryProjection(repo)?.worktreesByPath
@@ -768,7 +770,7 @@ describe('projection refresh request ordering', () => {
       repoProjection({ branches: [branch('feature/a')], current: 'feature/a' })
     ipcHandlers['repo.worktreeStatus'] = () => ({ repoRuntimeId, status, loadedAt: Date.now() })
 
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
+    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
     expect(cachedRepoStatus(repoRuntimeId)).toEqual(status)
   })
@@ -816,7 +818,7 @@ describe('projection refresh request ordering', () => {
     }
     ipcHandlers['repo.worktreeStatus'] = () => ({ repoRuntimeId, status: freshStatus, loadedAt: Date.now() })
 
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
+    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
     expect(cachedRepoStatus(repoRuntimeId)).toEqual(freshStatus)
   })
@@ -849,7 +851,7 @@ describe('projection refresh request ordering', () => {
     )
     ipcHandlers['repo.worktreeStatus'] = () => ({ repoRuntimeId, status: freshStatus, loadedAt: Date.now() })
 
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
+    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
     expect(invalidateSpy).toHaveBeenCalledWith(
       { queryKey: repoWorktreeStatusQueryKey(REPO_ID, repoRuntimeId), exact: true, refetchType: 'none' },
@@ -876,7 +878,7 @@ describe('projection refresh request ordering', () => {
       })
     }
 
-    const refresh = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
+    const refresh = refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
     await vi.waitFor(() => {
       expect(statusCalls).toBe(1)
     })
@@ -885,7 +887,6 @@ describe('projection refresh request ordering', () => {
     await refresh
 
     expect(cachedRepoStatus(repoRuntimeId)).toEqual(newerStatus)
-    expect(useReposStore.getState().repos[REPO_ID]!.dataLoads.visibleStatus.phase).toBe('idle')
   })
 
   test('workspace visible status cache refresh drops stale errors after projection invalidation', async () => {
@@ -900,7 +901,7 @@ describe('projection refresh request ordering', () => {
       })
     }
 
-    const refresh = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
+    const refresh = refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
     await vi.waitFor(() => {
       expect(statusCalls).toBe(1)
     })
@@ -911,29 +912,25 @@ describe('projection refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]!
     expect(repo.availability.phase).toBe('available')
-    expect(repo.dataLoads.visibleStatus).toMatchObject({ phase: 'idle', error: null })
+    expect(cachedRepoStatus(repoRuntimeId)).toEqual([])
   })
 
-  test('workspace visible status cache refresh guards stale runtimes and busy or unavailable repos', async () => {
+  test('workspace status refresh guards stale runtimes and unavailable repos', async () => {
     const repoRuntimeId = seedRepo([branch('feature/a')])
-    let projectionCalls = 0
-    ipcHandlers['repo.projection'] = async () => {
-      projectionCalls += 1
-      return repoProjection({ branches: [branch('feature/a')], current: 'feature/a' })
+    let statusCalls = 0
+    ipcHandlers['repo.worktreeStatus'] = ({ repoRuntimeId }: { repoRuntimeId: string }) => {
+      statusCalls += 1
+      return { repoRuntimeId, status: [], loadedAt: Date.now() }
     }
 
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, 'repo-runtime-stale')
+    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, 'repo-runtime-stale')
+    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
     updateRepoForTest((repo) => {
-      repo.dataLoads.visibleStatus.phase = 'loading'
-    })
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
-    updateRepoForTest((repo) => {
-      repo.dataLoads.visibleStatus.phase = 'idle'
       repo.availability = { phase: 'unavailable', reason: 'error.path-not-found', checkedAt: 1 }
     })
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
+    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
-    expect(projectionCalls).toBe(0)
+    expect(statusCalls).toBe(1)
   })
 
   test('workspace visible status cache refresh joins an active matching status fetch', async () => {
@@ -957,7 +954,7 @@ describe('projection refresh request ordering', () => {
       expect(statusCalls).toBe(1)
     })
 
-    const visibleRefresh = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
+    const visibleRefresh = refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
     expect(statusCalls).toBe(1)
     expect(invalidateSpy).toHaveBeenCalledWith(
@@ -971,7 +968,6 @@ describe('projection refresh request ordering', () => {
     resolveStatus({ repoRuntimeId, status: activeStatus, loadedAt: Date.now() })
     await Promise.all([activeFetch, visibleRefresh])
     expect(cachedRepoStatus(repoRuntimeId)).toEqual(activeStatus)
-    expect(useReposStore.getState().repos[REPO_ID]!.dataLoads.visibleStatus.phase).toBe('idle')
   })
 
   test('repo read-model projection refresh keeps status-derived worktree dirtiness authoritative', async () => {
@@ -1061,7 +1057,7 @@ describe('projection refresh request ordering', () => {
     })
   })
 
-  test('status refresh records data-load refreshing, success, and stale error state', async () => {
+  test('status query records fetching, success, and stale error state', async () => {
     const repoRuntimeId = seedRepo([branch('feature/a')])
     let resolveStatus!: (value: WorktreeStatus[]) => void
     const status: WorktreeStatus[] = [{ path: '/tmp/goblin-test-repo', branch: 'feature/a', isMain: true, entries: [] }]
@@ -1071,41 +1067,35 @@ describe('projection refresh request ordering', () => {
         resolveStatus = (status) => resolve({ repoRuntimeId, status, loadedAt: Date.now() })
       })
 
-    const work = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
-
-    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
-      phase: 'refreshing',
-      loadedAt: null,
-      error: null,
-      stale: false,
-    })
+    const work = refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
     await vi.waitFor(() => {
       expect(resolveStatus).toEqual(expect.any(Function))
     })
+    expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repoRuntimeId))).toMatchObject({
+      fetchStatus: 'fetching',
+      error: null,
+    })
     resolveStatus(status)
     await work
 
-    const loadedAt = useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus.loadedAt
+    const loadedAt = getRepoWorktreeStatusQueryData(REPO_ID, repoRuntimeId)?.loadedAt
     expect(loadedAt).toEqual(expect.any(Number))
-    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
-      phase: 'idle',
+    expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repoRuntimeId))).toMatchObject({
+      fetchStatus: 'idle',
       error: null,
-      stale: false,
     })
 
     ipcHandlers['repo.worktreeStatus'] = async () => {
       throw new Error('status failed')
     }
 
-    await refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId)
+    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
 
-    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
-      phase: 'idle',
-      loadedAt,
-      error: 'status failed',
-      stale: true,
-    })
+    expect(getRepoWorktreeStatusQueryData(REPO_ID, repoRuntimeId)?.loadedAt).toBe(loadedAt)
+    expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repoRuntimeId))?.error).toEqual(
+      expect.objectContaining({ message: 'status failed' }),
+    )
   })
 
   test('cancels projection data-load state when a read is cancelled without a successor', async () => {
@@ -1117,10 +1107,6 @@ describe('projection refresh request ordering', () => {
     await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { repoRuntimeId })
 
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.repoReadModel).toMatchObject({
-      phase: 'idle',
-      error: null,
-    })
-    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
       phase: 'idle',
       error: null,
     })

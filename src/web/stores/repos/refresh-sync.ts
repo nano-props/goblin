@@ -64,7 +64,7 @@ export function createRefreshSyncHelpers(
     if (!repo || !shouldAttemptFetch(repo, repoRuntimeId)) return null
     if (!canStartRemoteFetch(repo)) {
       try {
-        await waitForRepoOperationsIdle(id, ['repoReadModel', 'visibleStatus'])
+        await waitForRepoOperationsIdle(id, ['repoReadModel'])
       } catch {
         return null
       }

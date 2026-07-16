@@ -1,5 +1,5 @@
 import type { RepoState } from '#/web/stores/repos/types.ts'
-import { dataLoadBusy, dataLoadInitialLoading } from '#/web/stores/repos/repo-data-load-state.ts'
+import { dataLoadInitialLoading } from '#/web/stores/repos/repo-data-load-state.ts'
 import { deriveConnectivity } from '#/web/stores/repos/repo-guards.ts'
 import { getBranchWorktreeState, selectedBranchStatus } from '#/web/stores/repos/worktree-state.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
@@ -33,7 +33,6 @@ export type CurrentRepoWorkspacePresentation = ReturnType<typeof getCurrentRepoW
 export interface RepoWorkspaceRepo extends BranchActionRepo {
   branchModel: RepoBranchReadModelData
   ui: Pick<RepoState['ui'], 'preferredWorkspacePaneTabByTarget'> & { currentBranchName: string | null }
-  dataLoads: Pick<RepoState['dataLoads'], 'visibleStatus'>
   unavailable: boolean
   remote: BranchActionRepo['remote'] & Pick<RepoState['remote'], 'lifecycle'>
 }
@@ -54,21 +53,23 @@ export function getCurrentRepoWorkspace(repo: RepoWorkspaceRepo) {
   return { repoId: repo.id, branch, currentBranchStatus, statusCount, worktreeState }
 }
 
-export function getCurrentRepoWorkspacePresentation(repo: RepoWorkspaceRepo) {
+export function getCurrentRepoWorkspacePresentation(
+  repo: RepoWorkspaceRepo,
+  status: { loading: boolean; error: string | null; stale: boolean },
+) {
   const detail = getCurrentRepoWorkspace(repo)
-  const statusLoading = dataLoadBusy(repo.dataLoads.visibleStatus)
 
   return {
     ...detail,
     loading: {
-      status: statusLoading,
+      status: status.loading,
       pullRequests: false,
     },
     errors: {
-      status: repo.dataLoads.visibleStatus.error,
+      status: status.error,
     },
     stale: {
-      status: repo.dataLoads.visibleStatus.stale,
+      status: status.stale,
     },
   }
 }

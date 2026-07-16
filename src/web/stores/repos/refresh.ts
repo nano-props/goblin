@@ -8,7 +8,7 @@ import { cancelDataLoad, finishDataLoadError, startDataLoad } from '#/web/stores
 import { refreshRepoProjectionReadModel } from '#/web/repo-data-query.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { acceptRepoProjectionReadModel } from '#/web/stores/repos/projection-read-model-effects.ts'
-import { refreshVisibleStatusCache } from '#/web/stores/repos/visible-status-refresh.ts'
+import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
 import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 
@@ -75,7 +75,7 @@ export async function requestRepoProjectionReadModelRefresh(
   const { repoRuntimeId } = resolved
   await Promise.all([
     runRepoProjectionReadModelRefresh(store, id, repoRuntimeId),
-    refreshVisibleStatusCache(store, id, repoRuntimeId),
+    refreshRepoWorktreeStatus(store, id, repoRuntimeId),
   ])
 }
 

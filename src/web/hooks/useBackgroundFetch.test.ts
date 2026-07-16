@@ -11,9 +11,7 @@ describe('backgroundSyncRepoIdsFromStore', () => {
       availability: { phase: 'available' },
     })
     repo.dataLoads.repoReadModel.phase = 'refreshing'
-    repo.dataLoads.visibleStatus.phase = 'refreshing'
     repo.operations.repoReadModel.phase = 'running'
-    repo.operations.visibleStatus.phase = 'running'
 
     expect(backgroundSyncRepoIdsFromStore({ repos: { '/repo': repo } }, '/repo')).toEqual(['/repo'])
   })

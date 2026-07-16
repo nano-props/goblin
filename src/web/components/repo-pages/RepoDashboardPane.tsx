@@ -24,7 +24,7 @@ import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/we
 import type { PullRequestEntry } from '#/shared/api-types.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
-import { refreshVisibleStatusCache } from '#/web/stores/repos/visible-status-refresh.ts'
+import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
 
 type DashboardTone = 'default' | 'attention' | 'success'
 
@@ -101,7 +101,7 @@ export function RepoDashboardPane({
   const statusStale = !!statusReadModel.data && statusReadModel.isError
   const retryStatus = () => {
     if (!repo) return
-    void refreshVisibleStatusCache(
+    void refreshRepoWorktreeStatus(
       { get: useReposStore.getState, set: useReposStore.setState },
       repo.id,
       repo.repoRuntimeId,

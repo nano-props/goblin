@@ -23,7 +23,7 @@ import { useWorkspacePaneRouteController } from '#/web/components/repo-workspace
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
-import { refreshVisibleStatusCache } from '#/web/stores/repos/visible-status-refresh.ts'
+import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
 
 export type RepoWorkspacePaneRouteContext =
   { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null } | { kind: 'inactive' }
@@ -54,7 +54,6 @@ function repoWorkspaceRepoShellEqual(
       a.repoRuntimeId === b.repoRuntimeId &&
       a.ui.currentBranchName === b.ui.currentBranchName &&
       a.ui.preferredWorkspacePaneTabByTarget === b.ui.preferredWorkspacePaneTabByTarget &&
-      a.dataLoads.visibleStatus === b.dataLoads.visibleStatus &&
       a.unavailable === b.unavailable &&
       a.operations.branchAction === b.operations.branchAction &&
       a.remote.lifecycle === b.remote.lifecycle &&
@@ -87,9 +86,6 @@ export function RepoWorkspace({
             ui: {
               currentBranchName: currentBranch,
               preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
-            },
-            dataLoads: {
-              visibleStatus: repo.dataLoads.visibleStatus,
             },
             unavailable: isRepoUnavailable(repo),
             operations: {
@@ -149,14 +145,15 @@ function RepoWorkspaceLoaded({
   const statusReadModel = useRepoWorktreeStatusReadModel(repoShell.id, repoShell.repoRuntimeId, true)
   const statusSnapshot = statusReadModel.data
   if (projection?.snapshot && !statusSnapshot && statusReadModel.isError) {
-    const message = statusReadModel.error instanceof Error ? statusReadModel.error.message : String(statusReadModel.error)
+    const message =
+      statusReadModel.error instanceof Error ? statusReadModel.error.message : String(statusReadModel.error)
     return (
       <section className="flex min-h-0 flex-1 flex-col bg-background">
         <RepoStatusFailureView
           message={message}
           retrying={statusReadModel.isFetching}
           onRetry={() => {
-            void refreshVisibleStatusCache(
+            void refreshRepoWorktreeStatus(
               { get: useReposStore.getState, set: useReposStore.setState },
               repoShell.id,
               repoShell.repoRuntimeId,
@@ -190,7 +187,14 @@ function RepoWorkspaceLoaded({
     ...projectBranchActionRepo(repoShell, projection.operations.operations, currentBranchName),
     branchModel: presentationBranchModel,
   }
-  const detailBase = getCurrentRepoWorkspacePresentation(presentationRepo)
+  const statusError = statusReadModel.error
+  const statusErrorMessage =
+    statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
+  const detailBase = getCurrentRepoWorkspacePresentation(presentationRepo, {
+    loading: statusReadModel.isFetching,
+    error: statusErrorMessage,
+    stale: !!statusSnapshot && statusReadModel.isError,
+  })
   const detail: CurrentRepoWorkspacePresentation = {
     ...detailBase,
     loading: {
@@ -253,7 +257,6 @@ function RepoWorkspacePane({
     repoRuntimeId: repo.repoRuntimeId,
     branchName: workspacePaneTabModel.branchName,
     renderedTab: workspacePaneTabModel.renderedTab,
-    visibleStatusPhase: repo.dataLoads.visibleStatus.phase,
     unavailable: repo.unavailable,
   })
   useWorkspacePaneRouteController({
@@ -282,6 +285,13 @@ function RepoWorkspacePane({
         detail={detail}
         workspacePaneId={workspacePaneId}
         workspacePaneTabModel={workspacePaneTabModel}
+        onRetryStatus={() => {
+          void refreshRepoWorktreeStatus(
+            { get: useReposStore.getState, set: useReposStore.setState },
+            repo.id,
+            repo.repoRuntimeId,
+          )
+        }}
       />
     </>
   )

@@ -5,7 +5,6 @@ import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
-import { RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 import { useRepoLogQuery } from '#/web/repo-data-query.ts'
 import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
 import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
@@ -129,8 +128,6 @@ function ChangesWorkspacePanePanel({ detail, workspacePaneId, panelLabel }: Work
       branch={branch}
       currentBranchStatus={detail.currentBranchStatus}
       statusLoading={detail.loading.status}
-      statusError={detail.errors.status}
-      statusStale={detail.stale.status}
     />
   )
 }
@@ -389,16 +386,12 @@ function BranchChangesTab({
   branch,
   currentBranchStatus,
   statusLoading,
-  statusError,
-  statusStale,
 }: {
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
   branch: RepoWorkspaceBranch
   currentBranchStatus: CurrentRepoWorkspacePresentation['currentBranchStatus']
   statusLoading: boolean
-  statusError: string | null
-  statusStale: boolean
 }) {
   const t = useT()
   const totalEntries = currentBranchStatus.reduce((n, wt) => n + wt.entries.length, 0)
@@ -407,7 +400,6 @@ function BranchChangesTab({
     <WorkspacePanePanelFrame id={`${workspacePaneId}-changes-panel`} {...panelLabel} busy={statusLoading}>
       {branch.worktree?.path ? (
         <div className="relative flex min-h-0 flex-1 flex-col">
-          {statusStale && statusError && <RepoStatusStaleNotice message={statusError} />}
           {totalEntries > 0 ? (
             <ScrollPane>
               <StatusList status={currentBranchStatus} />

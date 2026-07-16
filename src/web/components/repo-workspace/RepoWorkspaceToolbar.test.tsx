@@ -6,7 +6,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspaceToolbar } from '#/web/components/repo-workspace/RepoWorkspaceToolbar.tsx'
 import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/WorkspaceOpenExternallyMenu.tsx'
-import { getCurrentRepoWorkspacePresentation, type RepoWorkspaceRepo } from '#/web/components/repo-workspace/model.ts'
+import {
+  getCurrentRepoWorkspacePresentation as buildRepoWorkspacePresentation,
+  type RepoWorkspaceRepo,
+} from '#/web/components/repo-workspace/model.ts'
 import { useRepoWorkspaceTabModel } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import {
@@ -138,6 +141,10 @@ function RepoWorkspaceToolbarHarness(props: RepoWorkspaceToolbarHarnessProps) {
   const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail, props.workspacePaneRoute)
   const branchActions = useBranchActions(props.repo, props.detail.branch!)
   return <RepoWorkspaceToolbar {...props} workspacePaneTabModel={workspacePaneTabModel} branchActions={branchActions} />
+}
+
+function getTestRepoWorkspacePresentation(repo: RepoWorkspaceRepo) {
+  return buildRepoWorkspacePresentation(repo, { loading: false, error: null, stale: false })
 }
 
 function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
@@ -1301,7 +1308,7 @@ function renderToolbar(options: {
   if (!options.loading) {
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
   }
-  const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+  const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
   const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
     type: 'terminal',
     terminalSessionId: `term-${String(index + 1).repeat(21)}`,

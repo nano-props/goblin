@@ -312,7 +312,12 @@ describe('RepoWorkspace', () => {
         'feature/stale': [workspacePaneStaticTabEntry('changes')],
       },
       status: [
-        { path: worktreePath, branch: 'feature/stale', isMain: false, entries: [{ x: 'M', y: ' ', path: 'changed.ts' }] },
+        {
+          path: worktreePath,
+          branch: 'feature/stale',
+          isMain: false,
+          entries: [{ x: 'M', y: ' ', path: 'changed.ts' }],
+        },
       ],
     })
     const statusQuery = primaryWindowQueryClient.getQueryCache().find({
@@ -320,18 +325,6 @@ describe('RepoWorkspace', () => {
       exact: true,
     })!
     statusQuery.setState({ ...statusQuery.state, status: 'error', error: new Error('status failed') })
-    useReposStore.setState((state) => ({
-      repos: {
-        ...state.repos,
-        [REPO_ID]: {
-          ...state.repos[REPO_ID]!,
-          dataLoads: {
-            ...state.repos[REPO_ID]!.dataLoads,
-            visibleStatus: { phase: 'refreshing', loadedAt: 1, error: 'status failed', stale: true },
-          },
-        },
-      },
-    }))
 
     render(
       <QueryClientProvider client={primaryWindowQueryClient}>
@@ -390,16 +383,11 @@ describe('RepoWorkspace', () => {
     }
     let terminalCreated = false
     const terminalListeners = new Set<() => void>()
-    const createdTerminalReadContext = terminalReadContextWithSession(
-      terminalWorktreeKey,
-      'term-111111111111111111111',
-    )
+    const createdTerminalReadContext = terminalReadContextWithSession(terminalWorktreeKey, 'term-111111111111111111111')
     const readContext: TerminalSessionReadContextValue = {
       ...terminalReadContext,
       terminalWorktreeSnapshot: (key) =>
-        terminalCreated
-          ? createdTerminalReadContext.terminalWorktreeSnapshot(key)
-          : EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
+        terminalCreated ? createdTerminalReadContext.terminalWorktreeSnapshot(key) : EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
       subscribeTerminalWorktree: (_key, listener) => {
         terminalListeners.add(listener)
         return () => terminalListeners.delete(listener)

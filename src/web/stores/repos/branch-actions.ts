@@ -335,7 +335,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
           if (repoLocalProjectionReadBusy(id)) {
             ctx.setPhase('queued')
             signal.throwIfAborted()
-            await waitForBranchActionIdle(id, ['repoReadModel', 'visibleStatus'], signal, options?.waitTimeoutMs)
+            await waitForBranchActionIdle(id, ['repoReadModel'], signal, options?.waitTimeoutMs)
           }
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err)
