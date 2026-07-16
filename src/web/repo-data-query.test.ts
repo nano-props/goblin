@@ -733,6 +733,40 @@ describe('repo projection query data', () => {
 })
 
 describe('repo worktree status query data', () => {
+  test('does not create status data when the first refresh fails', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    repoClientMocks.getRepoWorktreeStatus.mockRejectedValue(new Error('transport failed'))
+
+    await expect(refreshRepoWorktreeStatusReadModel('/tmp/repo', 'repo-runtime-1', { queryClient })).rejects.toThrow(
+      'transport failed',
+    )
+    expect(getRepoWorktreeStatusQueryData('/tmp/repo', 'repo-runtime-1', queryClient)).toBeUndefined()
+  })
+
+  test('shares a failing in-flight status read between concurrent refreshes', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    let rejectRead!: (error: Error) => void
+    repoClientMocks.getRepoWorktreeStatus.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectRead = reject
+        }),
+    )
+
+    const first = refreshRepoWorktreeStatusReadModel('/tmp/repo', 'repo-runtime-1', { queryClient })
+    await vi.waitFor(() => expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce())
+    const second = refreshRepoWorktreeStatusReadModel('/tmp/repo', 'repo-runtime-1', { queryClient })
+    rejectRead(new Error('transport failed'))
+
+    const results = await Promise.allSettled([first, second])
+    expect(results).toEqual([
+      expect.objectContaining({ status: 'rejected', reason: expect.objectContaining({ message: 'transport failed' }) }),
+      expect.objectContaining({ status: 'rejected', reason: expect.objectContaining({ message: 'transport failed' }) }),
+    ])
+    expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce()
+    expect(getRepoWorktreeStatusQueryData('/tmp/repo', 'repo-runtime-1', queryClient)).toBeUndefined()
+  })
+
   test('preserves the last accepted status when refresh fails', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const accepted = {

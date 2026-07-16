@@ -247,19 +247,6 @@ function hasRepoProjectionFetchInProgress(queryClient: QueryClient, queryKey: re
   return status === 'fetching' || status === 'paused'
 }
 
-function abortSignalAny(signals: AbortSignal[]): AbortSignal {
-  const aborted = signals.find((signal) => signal.aborted)
-  if (aborted) return aborted
-  const ctrl = new AbortController()
-  const abort = (event: Event) => {
-    const signal = event.target as AbortSignal
-    for (const current of signals) current.removeEventListener('abort', abort)
-    ctrl.abort(signal.reason)
-  }
-  for (const signal of signals) signal.addEventListener('abort', abort, { once: true })
-  return ctrl.signal
-}
-
 async function abortablePromise<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
   if (!signal) return await promise
   signal.throwIfAborted()
@@ -662,7 +649,7 @@ async function fetchRepoProjectionReadModelOnce(input: RepoProjectionRefreshRead
         input.repoRuntimeId,
         input.branch,
         input.mode,
-        input.signal && !hasSharedFetchInProgress ? abortSignalAny([signal, input.signal]) : signal,
+        input.signal && !hasSharedFetchInProgress ? AbortSignal.any([signal, input.signal]) : signal,
         input.queryClient,
       ),
   })
@@ -752,7 +739,7 @@ export async function refreshRepoWorktreeStatusReadModel(
             fetchRepoWorktreeStatusReadModel(
               repoRoot,
               repoRuntimeId,
-              options.signal && !hasSharedFetchInProgress ? abortSignalAny([signal, options.signal]) : signal,
+              options.signal && !hasSharedFetchInProgress ? AbortSignal.any([signal, options.signal]) : signal,
               queryClient,
             ),
         }),
