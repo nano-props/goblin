@@ -1,4 +1,5 @@
 import type { Configuration } from 'electron-builder'
+import { ELECTRON_ASAR_UNPACK_PATTERNS } from '#scripts/electron-packaging.ts'
 
 const config: Configuration = {
   appId: 'goblin.app',
@@ -27,7 +28,10 @@ const config: Configuration = {
     '!**/*.map',
   ],
   extraResources: [{ from: 'resources/terminal-bin', to: 'terminal-bin' }],
-  asarUnpack: ['node_modules/node-pty/prebuilds/**/*'],
+  // The embedded server runs with Electron's ASAR filesystem disabled so
+  // workspace paths always have native OS semantics. Keep its complete
+  // runtime dependency closure on the real filesystem.
+  asarUnpack: [...ELECTRON_ASAR_UNPACK_PATTERNS],
   win: {
     // Windows requires a multi-resolution .ico for proper taskbar and
     // file explorer rendering (16/32/48/256 frames embedded).

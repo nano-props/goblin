@@ -54,9 +54,19 @@ function embeddedServerEnabled(): boolean {
 }
 
 function serverEntryPath(): string {
-  return app.isPackaged
-    ? path.join(app.getAppPath(), 'dist/server/main.js')
-    : path.join(app.getAppPath(), 'src/server/entrypoints/main.ts')
+  return path.join(serverRuntimeRoot(), app.isPackaged ? 'main.js' : 'main.ts')
+}
+
+function serverRuntimeRoot(): string {
+  return resolveEmbeddedServerRuntimeRoot(app.getAppPath(), app.isPackaged)
+}
+
+export function resolveEmbeddedServerRuntimeRoot(appPath: string, isPackaged: boolean): string {
+  if (!isPackaged) return path.join(appPath, 'src/server/entrypoints')
+  if (path.extname(appPath) !== '.asar') {
+    throw new Error(`Packaged app path must be an ASAR archive: ${appPath}`)
+  }
+  return path.join(`${appPath}.unpacked`, 'dist/server')
 }
 
 function serverWorkingDirectory(): string {
@@ -66,22 +76,17 @@ function serverWorkingDirectory(): string {
 
 function serverCommand(): { bin: string; args: string[]; env: NodeJS.ProcessEnv } {
   const entry = serverEntryPath()
-  if (app.isPackaged || existsSync(path.join(app.getAppPath(), 'dist/server/main.js'))) {
-    return {
-      bin: process.execPath,
-      args: [entry],
-      env: {
-        ...process.env,
-        ELECTRON_RUN_AS_NODE: '1',
-      },
-    }
-  }
+  if (!existsSync(entry)) throw new Error(`Embedded server entry not found: ${entry}`)
   return {
     bin: process.execPath,
     args: [entry],
     env: {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '1',
+      // The server owns user workspace paths, not application resources.
+      // Disable Electron's transparent .asar interpretation for this process
+      // and every server worker it spawns.
+      ELECTRON_NO_ASAR: '1',
     },
   }
 }

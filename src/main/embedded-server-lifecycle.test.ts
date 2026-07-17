@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { createServer } from 'node:net'
+import path from 'node:path'
 import { PassThrough } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
@@ -15,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 // app exit and the fatal dialog are the product outcomes asserted below.
 vi.mock('electron', () => ({
   app: {
-    getAppPath: () => '/tmp',
+    getAppPath: () => process.cwd(),
     isPackaged: false,
     getPath: () => '/tmp',
     exit: mocks.appExit,
@@ -34,6 +35,7 @@ const {
   getEmbeddedServerRuntime,
   parseServerPort,
   reserveEmbeddedServerPort,
+  resolveEmbeddedServerRuntimeRoot,
   startEmbeddedServer,
   stopEmbeddedServer,
 } = await import('#/main/embedded-server-lifecycle.ts')
@@ -124,6 +126,34 @@ describe('embedded server port selection', () => {
 })
 
 describe('embedded server process lifecycle', () => {
+  test('uses an ASAR-unaware Node runtime for the embedded server process', async () => {
+    const child = createServerChild()
+    mocks.spawn.mockReturnValue(child)
+    mockFetch(() => ({ ok: true }))
+
+    await startEmbeddedServer()
+
+    expect(mocks.spawn).toHaveBeenCalledWith(
+      process.execPath,
+      [path.join(process.cwd(), 'src/server/entrypoints/main.ts')],
+      expect.objectContaining({
+        env: expect.objectContaining({
+          ELECTRON_RUN_AS_NODE: '1',
+          ELECTRON_NO_ASAR: '1',
+        }),
+      }),
+    )
+  })
+
+  test('resolves packaged server entries exclusively from app.asar.unpacked', () => {
+    expect(resolveEmbeddedServerRuntimeRoot('/Applications/Goblin.app/Contents/Resources/app.asar', true)).toBe(
+      path.join('/Applications/Goblin.app/Contents/Resources/app.asar.unpacked', 'dist/server'),
+    )
+    expect(() => resolveEmbeddedServerRuntimeRoot('/Applications/Goblin.app/Contents/Resources/app', true)).toThrow(
+      'Packaged app path must be an ASAR archive',
+    )
+  })
+
   test('fails the native host when a ready server exits unexpectedly', async () => {
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
     const child = createServerChild()

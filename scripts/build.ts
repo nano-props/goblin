@@ -142,6 +142,8 @@ interface PlatformPlan {
   releaseArgsByArch: Record<'arm64' | 'x64', string[]>
   /** Resolver from `release/<dir>` to the unpacked-app path for this platform. */
   findBuiltApp(hostArch: 'arm64' | 'x64'): string | null
+  /** Resources directory inside an unpacked application artifact. */
+  resourcesDir(builtApp: string): string
   /** Where `install` mode places the unpacked app. */
   installDestination(hostArch: 'arm64' | 'x64'): string
   /** What install mode does after copying — signing, registry registration, etc. */
@@ -168,6 +170,9 @@ function planDarwin(): PlatformPlan {
       const hostDir = hostArch === 'arm64' ? 'mac-arm64' : 'mac'
       const candidate = path.join(repoRoot, 'release', hostDir, `${APP_NAME}.app`)
       return existsSync(candidate) ? candidate : null
+    },
+    resourcesDir(builtApp) {
+      return path.join(builtApp, 'Contents', 'Resources')
     },
     installDestination(_hostArch) {
       const appsDir = path.join(os.homedir(), 'Applications')
@@ -246,6 +251,9 @@ function planWindows(): PlatformPlan {
       const hostDir = hostArch === 'arm64' ? 'win-arm64-unpacked' : 'win-unpacked'
       const candidate = path.join(repoRoot, 'release', hostDir)
       return existsSync(candidate) ? candidate : null
+    },
+    resourcesDir(builtApp) {
+      return path.join(builtApp, 'resources')
     },
     installDestination(hostArch) {
       // Default NSIS per-user install path. Matches what the NSIS
@@ -394,9 +402,19 @@ if (shouldInstall) {
 }
 
 const hostArch: 'arm64' | 'x64' = process.arch === 'arm64' ? 'arm64' : 'x64'
-const srcApp = plan.findBuiltApp(hostArch)
+const builtArches = shouldInstall ? [hostArch] : (['arm64', 'x64'] as const)
+const builtApps = builtArches.map((arch) => {
+  const app = plan.findBuiltApp(arch)
+  if (!app) {
+    console.error(`Error: could not find built ${APP_NAME} ${arch} app under release/`)
+    process.exit(1)
+  }
+  verifyPackagedServerRuntime(plan.resourcesDir(app), arch)
+  return { arch, app }
+})
+const srcApp = builtApps.find(({ arch }) => arch === hostArch)?.app
 if (!srcApp) {
-  console.error(`Error: could not find built ${APP_NAME} app under release/`)
+  console.error(`Error: could not select built ${APP_NAME} ${hostArch} app`)
   process.exit(1)
 }
 console.log(`Built: ${path.relative(repoRoot, srcApp)}`)
@@ -416,4 +434,25 @@ if (shouldInstall) {
 
   rmSync(path.join(repoRoot, 'release'), { recursive: true, force: true })
   console.log('Done.')
+}
+
+function verifyPackagedServerRuntime(resourcesDir: string, arch: 'arm64' | 'x64'): void {
+  const unpackedRoot = path.join(resourcesDir, 'app.asar.unpacked')
+  const platformPrebuild = process.platform === 'darwin' ? `darwin-${arch}` : `win32-${arch}`
+  const requiredArtifacts = [
+    'dist/server/main.js',
+    'dist/server/pty-worker.js',
+    'dist/server/g-command.js',
+    'dist/web/index.html',
+    'dist/web/boot.js',
+    'node_modules/node-pty/package.json',
+    'node_modules/node-pty/lib/index.js',
+    `node_modules/node-pty/prebuilds/${platformPrebuild}/pty.node`,
+    ...(process.platform === 'darwin' ? [`node_modules/node-pty/prebuilds/${platformPrebuild}/spawn-helper`] : []),
+  ]
+  const missing = requiredArtifacts.filter((artifact) => !existsSync(path.join(unpackedRoot, artifact)))
+  if (missing.length > 0) {
+    console.error(`Error: packaged server runtime is incomplete: ${missing.join(', ')}`)
+    process.exit(1)
+  }
 }

@@ -18,12 +18,13 @@ describe('workspace directory overview', () => {
     roots.push(root)
     await mkdir(path.join(root, 'src', 'nested'), { recursive: true })
     await writeFile(path.join(root, 'README.md'), 'abc')
+    await writeFile(path.join(root, 'invalid-fixture.asar'), 'not an Electron archive')
     await writeFile(path.join(root, 'src', 'index.ts'), '12345')
     await writeFile(path.join(root, 'src', 'nested', 'data'), '1234567')
     await expect(readLocalDirectoryOverview(root)).resolves.toEqual({
-      topLevelFileCount: 1,
+      topLevelFileCount: 2,
       topLevelDirectoryCount: 1,
-      totalSizeBytes: 15,
+      totalSizeBytes: 38,
     })
   })
 

@@ -200,6 +200,8 @@ describe('spawnTerminalPtyRuntime', () => {
         PATH: '/g/bin:/usr/bin',
         GOBLIN_TERMINAL: '1',
         TERM: 'bad-term',
+        ELECTRON_RUN_AS_NODE: '1',
+        ELECTRON_NO_ASAR: '1',
       },
     })
 
@@ -214,6 +216,9 @@ describe('spawnTerminalPtyRuntime', () => {
         }),
       }),
     )
+    const spawnOptions = spawnMock.mock.calls[0]![2]
+    expect(spawnOptions.env).not.toHaveProperty('ELECTRON_RUN_AS_NODE')
+    expect(spawnOptions.env).not.toHaveProperty('ELECTRON_NO_ASAR')
   })
 
   test('falls back to os.userInfo().shell when SHELL is not set (CI / devcontainer)', () => {

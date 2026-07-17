@@ -7,4 +7,4 @@ if [ -z "$GOBLIN_CLI_ENTRY" ]; then
   echo "g: GOBLIN_CLI_ENTRY is not set" >&2
   exit 127
 fi
-exec "$GOBLIN_NODE" "$GOBLIN_CLI_ENTRY" "$@"
+ELECTRON_RUN_AS_NODE=1 ELECTRON_NO_ASAR=1 exec "$GOBLIN_NODE" "$GOBLIN_CLI_ENTRY" "$@"

@@ -31,7 +31,7 @@ export function spawnTerminalPtyRuntime(input: SpawnTerminalPtyRuntimeInput): Sp
     const shell = input.startupShellCommand
       ? resolveLocalShellWithStartupShellCommand(input.startupShellCommand)
       : resolveLocalShell(input)
-    const env = { ...process.env, ...input.env, TERM: 'xterm-256color' }
+    const env = userShellEnvironment(input.env)
     // Bun/npm installs can leave node-pty's macOS spawn-helper without
     // executable bits. Repair it at the runtime boundary so dev and packaged
     // terminal creation do not depend on the current node_modules mode.
@@ -47,6 +47,13 @@ export function spawnTerminalPtyRuntime(input: SpawnTerminalPtyRuntimeInput): Sp
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'error.unknown' }
   }
+}
+
+function userShellEnvironment(overrides: Record<string, string> | undefined): NodeJS.ProcessEnv {
+  const environment = { ...process.env, ...overrides, TERM: 'xterm-256color' }
+  return Object.fromEntries(
+    Object.entries(environment).filter(([name]) => name !== 'ELECTRON_RUN_AS_NODE' && name !== 'ELECTRON_NO_ASAR'),
+  )
 }
 
 class NodePtyTerminalRuntime implements TerminalPtyRuntime {
