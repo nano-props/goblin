@@ -1,5 +1,7 @@
-import type { Configuration } from 'electron-builder'
+import { Arch, type Configuration } from 'electron-builder'
+import path from 'node:path'
 import { ELECTRON_SERVER_EXTRA_RESOURCES } from '#scripts/electron-packaging.ts'
+import { prepareNodePtyDarwinRuntime } from '#/system/node-pty-runtime.ts'
 
 const config: Configuration = {
   appId: 'goblin.app',
@@ -29,6 +31,12 @@ const config: Configuration = {
   // The embedded server is an independent ASAR-unaware runtime. Deploy its
   // code, web assets, and native dependency closure as ordinary resources.
   extraResources: [{ from: 'resources/terminal-bin', to: 'terminal-bin' }, ...ELECTRON_SERVER_EXTRA_RESOURCES],
+  beforePack(context) {
+    if (context.electronPlatformName !== 'darwin') return
+    const arch = context.arch === Arch.arm64 ? 'arm64' : context.arch === Arch.x64 ? 'x64' : null
+    if (!arch) throw new Error(`Unsupported macOS node-pty architecture: ${Arch[context.arch]}`)
+    prepareNodePtyDarwinRuntime({ packageRoot: path.join(context.appDir, 'node_modules/node-pty'), arch })
+  },
   win: {
     // Windows requires a multi-resolution .ico for proper taskbar and
     // file explorer rendering (16/32/48/256 frames embedded).

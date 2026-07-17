@@ -15,7 +15,7 @@
   },
   "scripts": {
     "dev": "bun scripts/dev.ts",
-    "start": "bun run build:web && electron .",
+    "start": "bun run build:web && bun scripts/start-electron.ts",
     "build": "bun scripts/build.ts",
     "build:preload": "bun scripts/build-preload.ts",
     "build:web": "vite build",

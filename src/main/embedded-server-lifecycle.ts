@@ -7,7 +7,6 @@ import { failNativeHostForUnexpectedServerExit } from '#/main/embedded-server-fa
 import { readOrCreateAccessToken } from '#/shared/access-token-file.ts'
 import { serverNodeLog } from '#/node/logger.ts'
 import { reserveAvailablePort } from '#/system/port-allocation.ts'
-import { prepareNodePtyDarwinRuntime } from '#/system/node-pty-runtime.ts'
 
 const DEFAULT_HOST = '127.0.0.1'
 const DEFAULT_PORT = 32100
@@ -76,11 +75,6 @@ function serverWorkingDirectory(): string {
 }
 
 function serverCommand(): { bin: string; args: string[]; env: NodeJS.ProcessEnv } {
-  if (!app.isPackaged) {
-    prepareNodePtyDarwinRuntime({
-      packageRoot: path.join(app.getAppPath(), 'node_modules/node-pty'),
-    })
-  }
   const entry = serverEntryPath()
   if (!existsSync(entry)) throw new Error(`Embedded server entry not found: ${entry}`)
   return {

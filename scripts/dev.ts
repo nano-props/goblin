@@ -3,8 +3,10 @@ import { watch } from 'node:fs'
 import path from 'node:path'
 import { omit } from 'es-toolkit'
 import { reserveAvailablePort } from '#/system/port-allocation.ts'
+import { prepareNodePtyDarwinRuntime } from '#/system/node-pty-runtime.ts'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
+prepareNodePtyDarwinRuntime({ packageRoot: path.join(repoRoot, 'node_modules/node-pty') })
 const webDevHost = process.env.GOBLIN_WEB_DEV_HOST?.trim() || '127.0.0.1'
 const webDevPort = parsePort(process.env.GOBLIN_WEB_DEV_PORT) ?? 5173
 const webDevUrl = `http://${webDevHost}:${webDevPort}/`
