@@ -6,7 +6,6 @@ import {
   workspacePaneTabsTargetIdentityKey,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import { formatWorkspaceLocator, parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   type WorkspacePaneTabsQueryData,
@@ -76,7 +75,8 @@ export function runtimeWorkspacePaneTargetForTest(input: {
   worktreePath: string | null
 }) {
   const parsed = parseWorkspaceLocator(input.repoRoot, 'posix')
-  const workspaceId = (parsed ? formatWorkspaceLocator(parsed, 'posix')! : input.repoRoot) as WorkspaceId
+  const workspaceId = parsed ? formatWorkspaceLocator(parsed, 'posix') : null
+  if (!workspaceId) throw new Error('workspace pane test target requires a canonical workspace id')
   if (input.worktreePath === input.repoRoot) {
     return { kind: 'workspace' as const, workspaceId, workspaceRuntimeId: input.repoRuntimeId }
   }
@@ -88,8 +88,7 @@ export function runtimeWorkspacePaneTargetForTest(input: {
       branch: input.branchName,
     }
   }
-  const root = (parsed
-    ? formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: input.worktreePath }, 'posix')!
-    : input.worktreePath) as WorkspaceId
+  const root = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: input.worktreePath }, 'posix')
+  if (!root) throw new Error('workspace pane test target requires an absolute worktree path')
   return { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: input.repoRuntimeId, root }
 }

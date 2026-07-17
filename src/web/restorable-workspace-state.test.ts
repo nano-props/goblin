@@ -79,10 +79,10 @@ describe('restorable-workspace-state', () => {
   })
 
   test('preserves target-scoped baseline state for restore stub repos', () => {
-    const activeTargetKey = worktreeTargetKey('/tmp/repo-a', 'feature/active', '/tmp/active-worktree')
-    const stubTargetKey = worktreeTargetKey('/tmp/repo-b', 'feature/stub', '/tmp/stub-worktree')
+    const activeTargetKey = worktreeTargetKey('goblin+file:///tmp/repo-a', 'feature/active', '/tmp/active-worktree')
+    const stubTargetKey = worktreeTargetKey('goblin+file:///tmp/repo-b', 'feature/stub', '/tmp/stub-worktree')
     const activeRepo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo-a',
+      id: 'goblin+file:///tmp/repo-a',
       branchSnapshots: [createBranchSnapshot('feature/active', { worktree: { path: '/tmp/active-worktree' } })],
       currentBranchName: 'feature/active',
       preferredWorkspacePaneTab: 'status',
@@ -90,7 +90,7 @@ describe('restorable-workspace-state', () => {
         'feature/active': [workspacePaneStaticTabEntry('status')],
       },
     })
-    const stubRepo = emptyRepo('/tmp/repo-b', 'repo-b', 'repo-runtime-b')
+    const stubRepo = emptyRepo('goblin+file:///tmp/repo-b', 'repo-b', 'repo-runtime-b')
     stubRepo.session = {
       entry: localWorkspaceSessionEntry(stubRepo.id),
       projectionState: 'stub',
@@ -105,8 +105,8 @@ describe('restorable-workspace-state', () => {
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {
-            '/tmp/repo-a\0/tmp/active-worktree': 'term-active0000000000000',
-            '/tmp/repo-b\0/tmp/stub-worktree': 'term-stub00000000000000',
+            'goblin+file:///tmp/repo-a\0/tmp/active-worktree': 'term-active0000000000000',
+            'goblin+file:///tmp/repo-b\0/tmp/stub-worktree': 'term-stub00000000000000',
           },
         },
         restoredClientWorkspaceBaseline: {
@@ -114,7 +114,7 @@ describe('restorable-workspace-state', () => {
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {
-            '/tmp/repo-b\0/tmp/stub-worktree': 'term-stub00000000000000',
+            'goblin+file:///tmp/repo-b\0/tmp/stub-worktree': 'term-stub00000000000000',
           },
           preferredWorkspacePaneTabByTargetByRepo: {
             [stubRepo.id]: { [stubTargetKey]: 'files' },
@@ -135,8 +135,8 @@ describe('restorable-workspace-state', () => {
       zenMode: false,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {
-        '/tmp/repo-a\0/tmp/active-worktree': 'term-active0000000000000',
-        '/tmp/repo-b\0/tmp/stub-worktree': 'term-stub00000000000000',
+        'goblin+file:///tmp/repo-a\0/tmp/active-worktree': 'term-active0000000000000',
+        'goblin+file:///tmp/repo-b\0/tmp/stub-worktree': 'term-stub00000000000000',
       },
       preferredWorkspacePaneTabByTargetByRepo: {
         [activeRepo.id]: { [activeTargetKey]: 'status' },

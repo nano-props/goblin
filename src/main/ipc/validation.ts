@@ -35,8 +35,8 @@ export function toSafeSessionPath(value: unknown): string | null {
     !path.isAbsolute(value)
   )
     return null
-  // Session/recent-repo entries are persisted local paths, not a sandbox
-  // boundary. Repo probes still decide whether the normalized path is usable.
+  // Native execution and worktree presentation boundaries still carry paths.
+  // Workspace identity is validated separately as a canonical locator.
   return path.normalize(value)
 }
 

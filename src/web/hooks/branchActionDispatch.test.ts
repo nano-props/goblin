@@ -12,7 +12,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 
-const REPO_ID = '/tmp/goblin-branch-action-dispatch-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-branch-action-dispatch-repo'
 const WORKTREE_PATH = '/tmp/goblin-branch-action-dispatch-worktree'
 
 beforeEach(() => {

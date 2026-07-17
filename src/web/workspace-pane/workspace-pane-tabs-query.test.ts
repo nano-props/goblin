@@ -34,6 +34,17 @@ beforeEach(() => {
   vi.mocked(workspacePaneTabsClient.list).mockReset()
 })
 
+test('test target construction rejects legacy raw workspace ids', () => {
+  expect(() =>
+    runtimeWorkspacePaneTargetForTest({
+      repoRoot: '/tmp/legacy-workspace-id',
+      repoRuntimeId: REPO_RUNTIME_ID,
+      branchName: 'main',
+      worktreePath: '/tmp/legacy-workspace-id',
+    }),
+  ).toThrow('workspace pane test target requires a canonical workspace id')
+})
+
 describe('workspace pane tabs revisioned query cache', () => {
   test('accepts an identical same-revision snapshot as current', () => {
     const queryClient = new QueryClient()

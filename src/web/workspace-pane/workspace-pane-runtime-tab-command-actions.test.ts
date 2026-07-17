@@ -13,7 +13,7 @@ import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/work
 import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 const terminalBase: TerminalSessionBase & { repoRuntimeId: string } = {
-  repoRoot: '/repo',
+  repoRoot: 'goblin+file:///repo',
   repoRuntimeId: 'repo-runtime-1',
   branch: 'main',
   worktreePath: '/repo-worktree',
