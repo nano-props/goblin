@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ git: vi.fn() }))
+const mocks = vi.hoisted(() => ({ git: vi.fn(), stat: vi.fn() }))
 
 vi.mock('#/system/git/git-exec.ts', () => ({ git: mocks.git }))
+vi.mock('node:fs/promises', () => ({ stat: mocks.stat }))
 
 beforeEach(() => {
   mocks.git.mockReset()
+  mocks.stat.mockReset()
 })
 
 describe('getWorkingStatus', () => {
@@ -31,9 +33,56 @@ describe('getWorkingStatus', () => {
       )
       .mockResolvedValueOnce('')
       .mockRejectedValueOnce(new Error('status failed'))
+    mocks.stat.mockResolvedValueOnce({})
     const { getWorkingStatus } = await import('#/system/git/status.ts')
 
     await expect(getWorkingStatus('/tmp/repo')).rejects.toThrow('status failed')
+  })
+
+  test('drops a worktree that disappears after the list read', async () => {
+    mocks.git
+      .mockResolvedValueOnce(
+        [
+          'worktree /tmp/repo',
+          'HEAD f00ba4',
+          'branch refs/heads/main',
+          '',
+          'worktree /tmp/worktree-a',
+          'HEAD ba5eba1',
+          'branch refs/heads/feature/a',
+        ].join('\n'),
+      )
+      .mockResolvedValueOnce('')
+      .mockRejectedValueOnce(new Error('cwd disappeared'))
+    mocks.stat.mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }))
+    const { getWorkingStatus } = await import('#/system/git/status.ts')
+
+    await expect(getWorkingStatus('/tmp/repo')).resolves.toEqual([
+      { path: '/tmp/repo', branch: 'main', isMain: true, entries: [] },
+    ])
+  })
+
+  test('does not run status for a prunable worktree with a missing path', async () => {
+    mocks.git
+      .mockResolvedValueOnce(
+        [
+          'worktree /tmp/repo',
+          'HEAD f00ba4',
+          'branch refs/heads/main',
+          '',
+          'worktree /tmp/missing-worktree',
+          'HEAD ba5eba1',
+          'branch refs/heads/stale',
+          'prunable gitdir file points to non-existent location',
+        ].join('\n'),
+      )
+      .mockResolvedValueOnce('')
+    const { getWorkingStatus } = await import('#/system/git/status.ts')
+
+    await expect(getWorkingStatus('/tmp/repo')).resolves.toEqual([
+      { path: '/tmp/repo', branch: 'main', isMain: true, entries: [] },
+    ])
+    expect(mocks.git).toHaveBeenCalledTimes(2)
   })
 
   test('rejects when the signal aborts before a command result is accepted', async () => {

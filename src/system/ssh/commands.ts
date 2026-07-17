@@ -493,7 +493,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
         //
         // The awk splits the porcelain output on blank-line blocks
         // (RS="") so we can inspect each worktree block as a single
-        // record and skip blocks containing a bare marker. Paths
+        // record and skip blocks containing a bare or prunable marker. Paths
         // registered with relative arguments are passed through
         // verbatim; the worker resolves them via
         // `git rev-parse --show-toplevel`.
@@ -507,6 +507,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
         // system treats them as opaque strings.
         `awk -v RS= 'BEGIN { idx = 0 }`,
         `  /(^|\\n)bare(\\n|$)/ { next }`,
+        `  /(^|\\n)prunable([ \\t]|\\n|$)/ { next }`,
         `  match($0, /^worktree[ \\t]+/) {`,
         `    p = substr($0, RSTART + RLENGTH); sub(/\\n.*/, "", p);`,
         `    if (p != "") { idx++; printf "%05d\\t%s\\n", idx, p }`,

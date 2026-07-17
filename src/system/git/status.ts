@@ -1,3 +1,4 @@
+import { stat } from 'node:fs/promises'
 import { git } from '#/system/git/git-exec.ts'
 import { parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
 import { mapWithConcurrency } from '#/system/git/concurrency.ts'
@@ -29,7 +30,18 @@ export async function getWorkingStatus(cwd: string, options?: { signal?: AbortSi
       // escaped and double-quoted (e.g. `"file name.txt"`), which the LF
       // parser leaves as literal quotes in the output. -z gives us the
       // raw bytes and uses NUL between entries.
-      const output = await git(wt.path, ['status', '--porcelain', '-z'], { signal: options?.signal })
+      let output: string
+      try {
+        output = await git(wt.path, ['status', '--porcelain', '-z'], { signal: options?.signal })
+      } catch (error) {
+        options?.signal?.throwIfAborted()
+        // The worktree can disappear after the authoritative list read. Only
+        // suppress the command failure after independently confirming that
+        // its physical directory is gone; Git/process/permission failures for
+        // an existing member must still reject the complete status snapshot.
+        if (await pathIsMissing(wt.path)) return null
+        throw error
+      }
       options?.signal?.throwIfAborted()
       const entries = parseStatus(output)
       return {
@@ -49,4 +61,17 @@ export async function getWorkingStatus(cwd: string, options?: { signal?: AbortSi
   // in the terminal).
   filtered.sort((a, b) => Number(b.isMain) - Number(a.isMain))
   return filtered
+}
+
+async function pathIsMissing(worktreePath: string): Promise<boolean> {
+  try {
+    await stat(worktreePath)
+    return false
+  } catch (error) {
+    return errorCode(error) === 'ENOENT' || errorCode(error) === 'ENOTDIR'
+  }
+}
+
+function errorCode(error: unknown): string {
+  return error && typeof error === 'object' && 'code' in error ? String(error.code) : ''
 }

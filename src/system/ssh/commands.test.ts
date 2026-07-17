@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -456,6 +457,30 @@ describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
       expect.objectContaining({ path: realpathSync(repoDir), isBare: true }),
     ])
     expect(parseWorktreeStatusBatch(statusStream).size).toBe(0)
+  })
+
+  testPosix('skips prunable worktrees before running remote status jobs', async () => {
+    const repoDir = await initRepoWithWorktrees([
+      { branch: 'main', files: [['README.md', 'root\n']] },
+      { branch: 'stale', files: [] },
+    ])
+    const stalePath = path.join(repoDir, '.worktrees', 'stale')
+    renameSync(stalePath, path.join(repoDir, 'removed-stale-worktree'))
+    const invocation = buildRemoteCommandInvocation(targetWithPath(repoDir), {
+      type: 'gitWorktreeListAndStatus',
+      path: repoDir,
+    })
+
+    const result = await execa('sh', ['-lc', invocation.script])
+    const { parseWorktreeStatusBatch, parseWorktrees, splitWorktreeStatusBatch } =
+      await import('#/system/git/parsers.ts')
+    const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(result.stdout)
+
+    expect(worktreeListOutput).toContain('prunable ')
+    expect(parseWorktrees(worktreeListOutput)).toEqual([
+      expect.objectContaining({ path: realpathSync(repoDir), isPrimary: true }),
+    ])
+    expect([...parseWorktreeStatusBatch(statusStream).keys()]).toEqual([realpathSync(repoDir)])
   })
 
   testPosix('runs per-worktree status work in parallel via POSIX background jobs (F5 regression check)', async () => {

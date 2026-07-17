@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { constants as fsConstants } from 'node:fs'
+import { access, realpath, stat } from 'node:fs/promises'
 import { git } from '#/system/git/git-exec.ts'
 import { parseWorkspaceLocator, type WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
 import {
@@ -24,9 +25,9 @@ export type LocalGitRootProbe =
   | { status: 'inconclusive'; diagnostic: string }
 
 const defaultDependencies: LocalWorkspaceProbeDependencies = {
-  stat: async (workspacePath) => await (await import('node:fs/promises')).stat(workspacePath),
-  access: async (workspacePath, mode) => await (await import('node:fs/promises')).access(workspacePath, mode),
-  realpath: async (workspacePath) => await (await import('node:fs/promises')).realpath(workspacePath),
+  stat: async (workspacePath) => await stat(workspacePath),
+  access: async (workspacePath, mode) => await access(workspacePath, mode),
+  realpath: async (workspacePath) => await realpath(workspacePath),
   gitRoot: probeLocalGitRoot,
 }
 
