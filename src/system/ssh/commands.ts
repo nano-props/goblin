@@ -60,6 +60,7 @@ export type RemoteCommandKind =
   | { type: 'checkGit' }
   | { type: 'testDirectory'; path: string }
   | { type: 'listDirectories'; path: string; limit?: number }
+  | { type: 'directoryOverview'; path: string }
   | { type: 'gitTreeWalk'; path: string; prefix?: string }
   | { type: 'revParseTopLevel'; path: string }
   | { type: 'resolvePhysicalWorktreeIdentity'; path: string }
@@ -375,6 +376,20 @@ function scriptForCommand(command: RemoteCommandKind): string {
       return `find ${shellQuote(
         command.path,
       )} -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | LC_ALL=C sort | head -n ${limit}`
+    }
+    case 'directoryOverview': {
+      const root = shellQuote(command.path)
+      return [
+        `cd ${root} || exit $?`,
+        `files=0; directories=0`,
+        `for entry in ./* ./.[!.]* ./..?*; do`,
+        `  if [ ! -e "$entry" ] || [ -L "$entry" ]; then continue; fi`,
+        `  if [ -f "$entry" ]; then files=$((files + 1)); elif [ -d "$entry" ]; then directories=$((directories + 1)); fi`,
+        `done`,
+        `file_sizes=$(find . -type f -exec sh -c 'total=0; for file do size=$(wc -c < "$file") || exit $?; total=$((total + size)); done; printf "%s\\n" "$total"' sh {} +) || exit $?`,
+        `bytes=$(printf '%s\\n' "$file_sizes" | awk '{sum += $1} END {printf "%.0f", sum}')`,
+        `printf '%s\\t%s\\t%s\\n' "$files" "$directories" "$bytes"`,
+      ].join('\n')
     }
     case 'gitTreeWalk': {
       return remoteTreeChildrenScript(command.path, command.prefix)

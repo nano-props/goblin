@@ -17,7 +17,11 @@ import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
-import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
+import {
+  useRepoProjectionReadModel,
+  useRepoWorktreeStatusReadModel,
+  useWorkspaceDirectoryOverview,
+} from '#/web/repo-data-query.ts'
 import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
@@ -50,6 +54,8 @@ import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-comman
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import { DirectoryOverviewContent } from '#/web/components/repo-pages/DirectoryOverviewContent.tsx'
+import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 
 export type RepoWorkspacePaneRouteContext =
   { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null } | { kind: 'inactive' }
@@ -300,13 +306,21 @@ function PlainWorkspaceFiles({
       navigation.showWorkspaceFiles?.(repo.id, { replace: true })
     }
   }, [navigation, repo.id, routeContext])
-  const activePanel = model.selection?.tab === 'terminal' && terminalAvailable ? 'terminal' : 'files'
+  const activePanel =
+    model.selection?.tab === 'terminal' && terminalAvailable
+      ? 'terminal'
+      : model.selection?.tab === 'status'
+        ? 'status'
+        : 'files'
+  const overviewReadModel = useWorkspaceDirectoryOverview(repo.id, repo.repoRuntimeId, activePanel === 'status')
   const selectedTerminalSessionId =
     model.selection?.kind === 'materialized-tab' && model.selection.materializedTab.kind === 'runtime'
       ? model.selection.materializedTab.sessionId
       : null
   const items = useMemo<WorkspacePaneTabItem[]>(() => {
-    const workspaceTabs = model.tabs.filter((tab) => tab.kind !== 'static' || tab.type === 'files')
+    const workspaceTabs = model.tabs.filter(
+      (tab) => tab.kind !== 'static' || tab.type === 'status' || tab.type === 'files',
+    )
     return workspaceTabs.flatMap<WorkspacePaneTabItem>((tab) => {
       if (tab.type === 'terminal' && !terminalAvailable) return []
       if (tab.kind === 'static') {
@@ -412,7 +426,25 @@ function PlainWorkspaceFiles({
           activateKeyboardNavigationSelection
         />
       </div>
-      {activePanel === 'files' ? (
+      {activePanel === 'status' ? (
+        <WorkspacePanePanelFrame id={`${workspacePaneId}-status-panel`} label={t('tab.status')}>
+          <ScrollArea className="min-h-0 flex-1 bg-background">
+            <div className="p-4">
+              {overviewReadModel.data ? (
+                <DirectoryOverviewContent overview={overviewReadModel.data} />
+              ) : overviewReadModel.isError ? (
+                <div className="rounded-lg border border-border/60 bg-card p-4 text-sm text-destructive">
+                  {t('dashboard.directory.read-failed')}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-border/60 bg-card p-4 text-sm text-muted-foreground">
+                  {t('dashboard.loading')}
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </WorkspacePanePanelFrame>
+      ) : activePanel === 'files' ? (
         <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} label={t('tab.files')}>
           <FiletreeTab repoId={repo.id} repoRuntimeId={repo.repoRuntimeId} branchName={null} worktreePath={repo.id} />
         </WorkspacePanePanelFrame>

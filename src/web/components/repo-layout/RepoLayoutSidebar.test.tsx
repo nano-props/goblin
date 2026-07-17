@@ -75,16 +75,51 @@ describe('RepoLayoutSidebar', () => {
     expect(settings).not.toBeNull()
   })
 
-  test('keeps workspace and settings navigation but does not mount Git controls when Git is unavailable', () => {
+  test('keeps the shared dashboard and navigator layout without Git-only controls when Git is unavailable', () => {
+    const onOpenDashboard = vi.fn()
+    const onSelectWorkspaceRoot = vi.fn()
+    const onOpenWorkspaceStatus = vi.fn()
+    const onOpenWorkspaceFiles = vi.fn()
     const { container } = renderSidebar(
-      <RepoLayoutSidebar repoId={REPO_ID} compact={false} gitAvailable={false} />,
+      <RepoLayoutSidebar
+        repoId={REPO_ID}
+        compact={false}
+        gitAvailable={false}
+        onOpenDashboard={onOpenDashboard}
+        onSelectWorkspaceRoot={onSelectWorkspaceRoot}
+        onOpenWorkspaceStatus={onOpenWorkspaceStatus}
+        onOpenWorkspaceFiles={onOpenWorkspaceFiles}
+      />,
     )
 
     expect(container.querySelector('[data-testid="repo-picker-host"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="create-worktree-button"]')).toBeNull()
-    expect(container.querySelector('[data-testid="branch-navigator"]')).toBeNull()
-    expect(container.textContent).not.toContain('tab.branches')
+    expect(container.querySelector('[data-testid="workspace-root-navigator"]')).not.toBeNull()
+    expect(container.textContent).toContain('tab.branches')
+    expect(container.textContent).toContain('repo.dashboard')
     expect(container.querySelector('button[aria-label="app-chrome.settings"]')).not.toBeNull()
+
+    const workspaceRow = container.querySelector('[data-testid="workspace-root-row"]')
+    if (!(workspaceRow instanceof HTMLElement)) throw new Error('missing workspace root row')
+    fireEvent.click(workspaceRow)
+    expect(onSelectWorkspaceRoot).toHaveBeenCalledOnce()
+
+    const menuTrigger = workspaceRow.querySelector('button[aria-label="action.menu"]')
+    if (!(menuTrigger instanceof HTMLButtonElement)) throw new Error('missing workspace root action menu')
+    fireEvent.click(menuTrigger)
+    const statusAction = [...document.querySelectorAll('button')].find((button) => button.textContent === 'tab.status')
+    const filesAction = [...document.querySelectorAll('button')].find((button) => button.textContent === 'tab.files')
+    if (!(statusAction instanceof HTMLButtonElement) || !(filesAction instanceof HTMLButtonElement)) {
+      throw new Error('missing workspace root actions')
+    }
+    fireEvent.click(statusAction)
+    expect(onOpenWorkspaceStatus).toHaveBeenCalledOnce()
+
+    fireEvent.click(menuTrigger)
+    const reopenedFilesAction = [...document.querySelectorAll('button')].find((button) => button.textContent === 'tab.files')
+    if (!(reopenedFilesAction instanceof HTMLButtonElement)) throw new Error('missing reopened Files action')
+    fireEvent.click(reopenedFilesAction)
+    expect(onOpenWorkspaceFiles).toHaveBeenCalledOnce()
   })
 
   test('opens create-worktree from the row action', () => {

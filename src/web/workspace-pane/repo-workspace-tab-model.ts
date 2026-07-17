@@ -163,10 +163,12 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
   const normalizedTabEntries = hasPaneTarget
     ? normalizeWorkspacePaneTabs(input.tabEntries, { hasWorktree: worktreePath !== null })
     : []
-  const tabEntries =
-    hasWorkspaceTarget && !normalizedTabEntries.some((entry) => entry.type === 'files')
-      ? [workspacePaneStaticTabEntry('files'), ...normalizedTabEntries]
-      : normalizedTabEntries
+  const workspaceTabs = hasWorkspaceTarget
+    ? (['status', 'files'] as const)
+        .filter((type) => !normalizedTabEntries.some((entry) => entry.type === type))
+        .map(workspacePaneStaticTabEntry)
+    : []
+  const tabEntries = [...workspaceTabs, ...normalizedTabEntries]
   const runtimeTabTargetKeyByType = workspacePaneRuntimeTabTargetKeyByType({ repoRoot: input.repoId, worktreePath })
   const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ repoRoot: input.repoId, worktreePath })
   const hasWorktree = !!worktreePath

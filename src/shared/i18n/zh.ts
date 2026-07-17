@@ -190,6 +190,12 @@ export const zh: Record<DictKey, string> = {
   // ---- Workspace pane tabs ------------------------------------------------
   'repo.dashboard': '仪表盘',
   'dashboard.loading': '正在加载仪表盘...',
+  'dashboard.directory.files': '文件',
+  'dashboard.directory.folders': '文件夹',
+  'dashboard.directory.size': '文件夹大小',
+  'dashboard.directory.top-level': '最高层',
+  'dashboard.directory.total-size': '包含所有下级文件',
+  'dashboard.directory.read-failed': '无法读取文件夹概况。',
   'dashboard.no-current-branch': '无当前分支',
   'dashboard.updated': '更新于 {time}',
   'dashboard.remote.connected': '已连接远端',

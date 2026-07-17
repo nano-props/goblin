@@ -42,6 +42,7 @@ interface Props {
   routeView?: RepoRouteView | null
   onOpenSettings?: () => void
   onOpenRepoRoot?: (repoId: string) => void
+  onOpenRepoWorkspace?: (repoId: string) => void
   onOpenRepoDashboard?: (repoId: string) => void
   onOpenRepoBranch?: (repoId: string, branchName: string) => void
   onOpenRepoNewWorktree?: (repoId: string) => void
@@ -54,6 +55,7 @@ export function RepoView({
   routeView = null,
   onOpenSettings,
   onOpenRepoRoot,
+  onOpenRepoWorkspace,
   onOpenRepoDashboard,
   onOpenRepoBranch,
   onOpenRepoNewWorktree,
@@ -84,9 +86,10 @@ export function RepoView({
   const routeBranchName = routeView?.kind === 'branch' ? routeView.branchName : null
 
   const currentBranchName = routeView?.kind === 'branch' ? routeView.branchName : null
-  const routeWorkspacePageActive = routeView?.kind === 'dashboard' || routeView?.kind === 'newWorktree'
-  const repoWorkspaceActive = gitUnavailable || currentBranchName !== null || routeWorkspacePageActive
-  const singlePane = gitUnavailable || currentBranchName || routeWorkspacePageActive ? 'workspace' : 'navigator'
+  const routeWorkspacePageActive =
+    routeView?.kind === 'workspace' || routeView?.kind === 'dashboard' || routeView?.kind === 'newWorktree'
+  const repoWorkspaceActive = currentBranchName !== null || routeWorkspacePageActive
+  const singlePane = currentBranchName || routeWorkspacePageActive ? 'workspace' : 'navigator'
   const compactWorkspaceCurrentBranchName = useRetainedValueDuringExit({
     value: currentBranchName,
     active: compact && singlePane === 'workspace',
@@ -138,6 +141,13 @@ export function RepoView({
   const sidebarOpenDashboard = routeView ? () => onOpenRepoDashboard?.(repo.id) : undefined
   const dashboardSelected = routeView?.kind === 'dashboard'
   const newWorktreeSelected = routeView?.kind === 'newWorktree'
+  const openWorkspaceTab = (type: 'status' | 'files') => {
+    useReposStore.getState().setWorkspacePaneTabForTarget(
+      { repoRoot: repo.id, branchName: '', worktreePath: repo.id },
+      type,
+    )
+    onOpenRepoWorkspace?.(repo.id)
+  }
   const renderSidebarPane = (
     branchContent?: ReactNode,
     chromeRegion: 'drag' | 'none' = zenModeCollapsed ? 'none' : 'drag',
@@ -156,6 +166,10 @@ export function RepoView({
         newWorktreeSelected={newWorktreeSelected}
         currentBranchName={routeBranchName}
         gitAvailable={!gitUnavailable}
+        workspaceRootSelected={gitUnavailable && routeView?.kind === 'workspace'}
+        onSelectWorkspaceRoot={gitUnavailable ? () => onOpenRepoWorkspace?.(repo.id) : undefined}
+        onOpenWorkspaceStatus={gitUnavailable ? () => openWorkspaceTab('status') : undefined}
+        onOpenWorkspaceFiles={gitUnavailable ? () => openWorkspaceTab('files') : undefined}
       />
     </RepoWorkspacePane>
   )
@@ -257,21 +271,21 @@ export function RepoView({
       zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
       repoWorkspacePane={
         <RepoWorkspacePane>
-          {gitUnavailable ? (
-            <RepoWorkspace
-              repoId={repoId}
-              currentBranchName={null}
-              workspacePaneRouteContext={{ kind: 'routed', route: null }}
-              shortcutsEnabled={!compact || singlePane === 'workspace'}
-              toolbarTrafficLightOffset={workspaceTrafficLightOffset}
-            />
-          ) : routeView?.kind === 'dashboard' ? (
+          {routeView?.kind === 'dashboard' ? (
             <RepoDashboardPane
               repoId={repoId}
               compact={compact}
               trafficLightOffset={workspaceTrafficLightOffset}
               onBack={() => onOpenRepoRoot?.(repo.id)}
               onSelectBranch={(branchName) => onOpenRepoBranch?.(repo.id, branchName)}
+            />
+          ) : routeView?.kind === 'workspace' ? (
+            <RepoWorkspace
+              repoId={repoId}
+              currentBranchName={null}
+              workspacePaneRouteContext={{ kind: 'routed', route: null }}
+              shortcutsEnabled={!compact || singlePane === 'workspace'}
+              toolbarTrafficLightOffset={workspaceTrafficLightOffset}
             />
           ) : routeView?.kind === 'newWorktree' ? (
             <CreateWorktreePagePane

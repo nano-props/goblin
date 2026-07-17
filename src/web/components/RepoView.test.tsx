@@ -269,7 +269,7 @@ describe('RepoView workspace navigation', () => {
     expect(container.querySelector('[data-testid="repo-dashboard-page"]')).toBeNull()
   })
 
-  test('renders a non-Git workspace as a Files workspace without mounting Git surfaces', () => {
+  test('renders a non-Git workspace in the shared shell without mounting Git-only actions', () => {
     useReposStore.setState((state) => ({
       repos: {
         ...state.repos,
@@ -289,18 +289,19 @@ describe('RepoView workspace navigation', () => {
       },
     }))
 
-    const { container } = render(<RepoView repoId={REPO_ID} routeView={{ kind: 'empty', repoId: REPO_ID }} />)
+    const { container } = render(<RepoView repoId={REPO_ID} routeView={{ kind: 'workspace', repoId: REPO_ID }} />)
 
     expect(repoWorkspace(container)?.dataset.currentBranchName).toBe('')
     expect(repoWorkspace(container)?.dataset.workspacePaneRouteKind).toBe('bare')
     expect(branchNavigator(container)).toBeNull()
-    expect(container.querySelector('[data-testid="dashboard-row-action"]')).toBeNull()
+    expect(container.querySelector('[data-testid="dashboard-row-action"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-root-row"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="create-worktree-row-action"]')).toBeNull()
     expect(container.querySelector('[data-testid="branch-filter-action"]')).toBeNull()
     expect(container.querySelector('[data-testid="repo-sync-action"]')).toBeNull()
   })
 
-  test('does not mount stale Git routes for a non-Git workspace while navigation converges to root', () => {
+  test('renders the directory Dashboard for a non-Git dashboard route without Git navigation', () => {
     useReposStore.setState((state) => ({
       repos: {
         ...state.repos,
@@ -324,8 +325,8 @@ describe('RepoView workspace navigation', () => {
       <RepoView repoId={REPO_ID} routeView={{ kind: 'dashboard', repoId: REPO_ID }} />,
     )
 
-    expect(container.querySelector('[data-testid="repo-dashboard-page"]')).toBeNull()
-    expect(repoWorkspace(container)).not.toBeNull()
+    expect(container.querySelector('[data-testid="repo-dashboard-page"]')).not.toBeNull()
+    expect(repoWorkspace(container)).toBeNull()
     expect(branchNavigator(container)).toBeNull()
   })
 

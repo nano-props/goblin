@@ -60,6 +60,7 @@ import {
 import path from 'node:path'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
+import { readWorkspaceDirectoryOverview } from '#/server/modules/workspace-directory-overview.ts'
 
 // Soft-fail envelope returned by `jsonOr` for every repo action that
 // doesn't have a more specific success shape. Keep this in one place
@@ -258,6 +259,18 @@ export function createRepoRoutes(options: {
         userId,
         () => readRepoWorktreeStatus(cwd, { signal: c.req.raw.signal, repoRuntimeId }),
         'worktree-status',
+      ),
+    )
+  })
+  app.post('/workspace-overview', async (c) => {
+    const { cwd, repoRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.workspaceOverview, c)
+    const userId = userIdFromContext(c)
+    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
+    return c.json(
+      await runtimeReadJsonOrThrow(
+        userId,
+        () => readWorkspaceDirectoryOverview(cwd, { repoRuntimeId, signal: c.req.raw.signal }),
+        'workspace-overview',
       ),
     )
   })

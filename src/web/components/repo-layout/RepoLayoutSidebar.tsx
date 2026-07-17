@@ -1,6 +1,7 @@
 import { useContext, type ReactNode } from 'react'
 import { Settings } from 'lucide-react'
 import { BranchNavigator } from '#/web/components/BranchNavigator.tsx'
+import { WorkspaceRootNavigator } from '#/web/components/branch-navigator/WorkspaceRootNavigator.tsx'
 import { RepoPickerHost } from '#/web/components/RepoPickerHost.tsx'
 import {
   BranchFilterAction,
@@ -31,6 +32,10 @@ interface RepoShellSidebarProps {
   newWorktreeSelected?: boolean
   currentBranchName?: string | null
   gitAvailable?: boolean
+  workspaceRootSelected?: boolean
+  onSelectWorkspaceRoot?: () => void
+  onOpenWorkspaceStatus?: () => void
+  onOpenWorkspaceFiles?: () => void
 }
 
 export function RepoLayoutSidebar({
@@ -46,6 +51,10 @@ export function RepoLayoutSidebar({
   newWorktreeSelected = false,
   currentBranchName,
   gitAvailable = true,
+  workspaceRootSelected = false,
+  onSelectWorkspaceRoot,
+  onOpenWorkspaceStatus,
+  onOpenWorkspaceFiles,
 }: RepoShellSidebarProps) {
   const t = useT()
   return (
@@ -72,13 +81,26 @@ export function RepoLayoutSidebar({
         newWorktreeSelected={newWorktreeSelected}
         gitAvailable={gitAvailable}
       />
-      {repoId && gitAvailable ? (
+      {repoId ? (
         <>
-          <RepoShellBranchHeader repoId={repoId} title={t('tab.branches')} />
+          <RepoShellBranchHeader repoId={repoId} title={t('tab.branches')} gitAvailable={gitAvailable} />
           <div className="flex min-h-0 flex-1 bg-card">
-            {branchContent ?? (
-              <BranchNavigator repoId={repoId} onSelectBranch={onSelectBranch} currentBranchName={currentBranchName} />
-            )}
+            {branchContent ??
+              (gitAvailable ? (
+                <BranchNavigator
+                  repoId={repoId}
+                  onSelectBranch={onSelectBranch}
+                  currentBranchName={currentBranchName}
+                />
+              ) : (
+                <WorkspaceRootNavigator
+                  repoId={repoId}
+                  selected={workspaceRootSelected}
+                  onSelect={onSelectWorkspaceRoot}
+                  onOpenStatus={onOpenWorkspaceStatus}
+                  onOpenFiles={onOpenWorkspaceFiles}
+                />
+              ))}
           </div>
         </>
       ) : (
@@ -108,14 +130,16 @@ function RepoShellPrimaryActions({
     <div className="shrink-0 px-3 pt-4">
       <div className="flex min-w-0 flex-col gap-1">
         <RepoPickerRow repoId={repoId} />
-        {repoId && gitAvailable ? (
+        {repoId ? (
           <>
             <DashboardRowAction repoId={repoId} selected={dashboardSelected} onOpenDashboard={onOpenDashboard} />
-            <CreateWorktreeRowAction
-              repoId={repoId}
-              selected={newWorktreeSelected}
-              onCreateWorktree={onCreateWorktree}
-            />
+            {gitAvailable ? (
+              <CreateWorktreeRowAction
+                repoId={repoId}
+                selected={newWorktreeSelected}
+                onCreateWorktree={onCreateWorktree}
+              />
+            ) : null}
           </>
         ) : null}
       </div>
@@ -138,13 +162,13 @@ function RepoPickerRow({ repoId }: { repoId?: string }) {
   )
 }
 
-function RepoShellBranchHeader({ repoId, title }: { repoId: string; title: string }) {
+function RepoShellBranchHeader({ repoId, title, gitAvailable }: { repoId: string; title: string; gitAvailable: boolean }) {
   return (
     <div className="shrink-0 px-3 pb-2 pt-3">
       <div className="flex h-8 min-w-0 items-center gap-2 px-3">
         <div className="min-w-0 flex-1 truncate text-[13px] font-semibold text-muted-foreground">{title}</div>
-        <BranchFilterAction repoId={repoId} />
-        <RepoSyncAction repoId={repoId} />
+        {gitAvailable ? <BranchFilterAction repoId={repoId} /> : null}
+        {gitAvailable ? <RepoSyncAction repoId={repoId} /> : null}
       </div>
     </div>
   )

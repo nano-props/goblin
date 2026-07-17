@@ -196,6 +196,12 @@ export const ko: Record<DictKey, string> = {
   // ---- Workspace pane tabs ------------------------------------------------
   'repo.dashboard': '대시보드',
   'dashboard.loading': '대시보드 로딩 중...',
+  'dashboard.directory.files': '파일',
+  'dashboard.directory.folders': '폴더',
+  'dashboard.directory.size': '폴더 크기',
+  'dashboard.directory.top-level': '최상위',
+  'dashboard.directory.total-size': '모든 하위 파일',
+  'dashboard.directory.read-failed': '폴더 개요를 읽을 수 없습니다.',
   'dashboard.no-current-branch': '현재 브랜치 없음',
   'dashboard.updated': '{time}에 업데이트됨',
   'dashboard.remote.connected': '원격 연결됨',

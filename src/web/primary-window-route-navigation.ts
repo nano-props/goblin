@@ -31,6 +31,7 @@ export interface PrimaryWindowRouteNavigation {
   openSettings: (page: SettingsPage, options?: PrimaryWindowRouteNavigationOptions) => void
   closeSettings: (options?: PrimaryWindowRouteNavigationOptions) => void
   openRepoRoot: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => void
+  openRepoWorkspace: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => void
   openRepoDashboard: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => void
   openRepoBranch: (repoId: string, branchName: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
   openRepoBranchTab: (
@@ -161,6 +162,23 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           navigate: async (navigationId) => {
             await router.navigate({
               to: '/repo/$repoSlug/dashboard',
+              params: { repoSlug },
+              state: (state) => primaryWindowNavigationState(state, navigationId),
+            })
+          },
+        })
+      },
+      openRepoWorkspace(repoId, options) {
+        const repoSlug = repoSlugForId(repoId)
+        if (!repoSlug || !router) return
+        const target = router.buildLocation({ to: '/repo/$repoSlug/workspace', params: { repoSlug } })
+        void runOwnedPrimaryWindowNavigation({
+          token: options?.presentationToken,
+          commitEffect: options?.onCommit,
+          targetHref: target.href,
+          navigate: async (navigationId) => {
+            await router.navigate({
+              to: '/repo/$repoSlug/workspace',
               params: { repoSlug },
               state: (state) => primaryWindowNavigationState(state, navigationId),
             })

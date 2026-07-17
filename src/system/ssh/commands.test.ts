@@ -33,6 +33,23 @@ afterEach(() => {
 })
 
 describe('remote ssh command builders', () => {
+  testPosix('reads a directory overview with spaces and hidden entries', async () => {
+    const root = path.join(os.tmpdir(), `goblin-directory-overview-${process.pid}-${Date.now()}`)
+    tempDirs.push(root)
+    mkdirSync(path.join(root, 'nested folder'), { recursive: true })
+    writeFileSync(path.join(root, 'visible file'), 'abc')
+    writeFileSync(path.join(root, '.hidden'), '12345')
+    writeFileSync(path.join(root, 'nested folder', 'child'), '1234567')
+    const invocation = buildRemoteCommandInvocation(targetWithPath(root), {
+      type: 'directoryOverview',
+      path: root,
+    })
+
+    const result = await execa('sh', ['-lc', invocation.script])
+
+    expect(result.stdout.trim().split('\n').at(-1)).toBe('2\t1\t15')
+  })
+
   test('uses an ssh executable discovered on PATH', () => {
     const dir = path.join(os.tmpdir(), `goblin-ssh-test-${Date.now()}-${process.pid}`)
     tempDirs.push(dir)

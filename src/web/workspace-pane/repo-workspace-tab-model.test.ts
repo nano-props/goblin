@@ -33,7 +33,7 @@ describe('repo workspace pane tab model', () => {
     })
 
     expect(model.worktreePath).toBe(repoId)
-    expect(model.tabs.map((tab) => tab.type)).toEqual(['files'])
+    expect(model.tabs.map((tab) => tab.type)).toEqual(['status', 'files'])
     expect(model.renderedTab).toBe('files')
   })
 
@@ -60,6 +60,7 @@ describe('repo workspace pane tab model', () => {
     })
 
     expect(model.tabs.map((tab) => tab.identity)).toEqual([
+      'workspace-pane:status',
       'workspace-pane:files',
       'terminal:term-111111111111111111111',
       'terminal:term-222222222222222222222',

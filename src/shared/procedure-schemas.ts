@@ -187,6 +187,10 @@ export const REPO_PROCEDURE_SCHEMAS = {
     cwd: WorkspaceIdSchema,
     repoRuntimeId: RepoRuntimeIdSchema,
   }),
+  workspaceOverview: v.object({
+    cwd: WorkspaceIdSchema,
+    repoRuntimeId: RepoRuntimeIdSchema,
+  }),
   operations: v.object({
     cwd: v.optional(WorkspaceIdSchema),
     repoRuntimeId: v.optional(RepoRuntimeIdSchema),

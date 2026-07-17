@@ -17,6 +17,7 @@ import type { ProbeResult } from '#/shared/api-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 
 const REPO_REQUEST_TIMEOUT_MS = {
@@ -47,11 +48,7 @@ export async function refreshWorkspace(
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<WorkspaceRefreshResult> {
-  return await postServerJson(
-    '/api/repo/workspace-refresh',
-    { workspaceId, workspaceRuntimeId },
-    { signal },
-  )
+  return await postServerJson('/api/repo/workspace-refresh', { workspaceId, workspaceRuntimeId }, { signal })
 }
 
 export async function cloneRepository(
@@ -122,6 +119,14 @@ export async function getRepoWorktreeStatus(
     async () => await postServerJson('/api/repo/worktree-status', { cwd, repoRuntimeId }, { signal }),
     signal,
   )
+}
+
+export async function getWorkspaceDirectoryOverview(
+  cwd: string,
+  repoRuntimeId: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceDirectoryOverview> {
+  return await postServerJson('/api/repo/workspace-overview', { cwd, repoRuntimeId }, { signal })
 }
 
 export async function getRepoOperations(

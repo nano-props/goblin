@@ -5,7 +5,11 @@ import { cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoDashboardPane } from '#/web/components/repo-pages/RepoDashboardPane.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { repoWorktreeStatusQueryKey, setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
+import {
+  repoWorktreeStatusQueryKey,
+  setRepoProjectionQueryData,
+  workspaceDirectoryOverviewQueryKey,
+} from '#/web/repo-data-query.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   createPullRequest,
@@ -13,6 +17,7 @@ import {
   resetReposStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 
 const REPO_ID = 'goblin+file:///tmp/repo-dashboard-pane-test'
 
@@ -26,6 +31,46 @@ afterEach(() => {
 })
 
 describe('RepoDashboardPane', () => {
+  test('shows directory metrics without mounting Git reads for a non-Git workspace', () => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, name: 'notes' })
+    useReposStore.setState((state) => ({
+      repos: {
+        ...state.repos,
+        [REPO_ID]: {
+          ...state.repos[REPO_ID]!,
+          workspaceProbe: {
+            status: 'ready',
+            name: 'notes',
+            capabilities: {
+              files: { read: true, write: true },
+              terminal: { available: true },
+              git: { status: 'unavailable' },
+            },
+            diagnostics: [],
+          },
+        },
+      },
+    }))
+    primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(REPO_ID, repo.repoRuntimeId), {
+      topLevelFileCount: 4,
+      topLevelDirectoryCount: 2,
+      totalSizeBytes: 2048,
+    })
+
+    const { container } = renderInJsdom(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <RepoDashboardPane repoId={REPO_ID} />
+      </QueryClientProvider>,
+    )
+
+    expect(container.textContent).toContain('dashboard.directory.files4')
+    expect(container.textContent).toContain('dashboard.directory.folders2')
+    expect(container.textContent).toContain('2.0 KB')
+    expect(
+      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId))?.fetchStatus,
+    ).not.toBe('fetching')
+  })
+
   test('shows a retryable error when worktree status is unavailable', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,

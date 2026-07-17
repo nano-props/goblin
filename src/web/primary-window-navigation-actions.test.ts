@@ -26,7 +26,7 @@ beforeEach(() => {
 })
 
 describe('createPrimaryWindowNavigationActions', () => {
-  test('activates a non-Git workspace at its Files root without restoring Git navigation history', () => {
+  test('activates a non-Git workspace at its Dashboard without restoring Git navigation history', () => {
     seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     useReposStore.setState((state) => ({
       repos: {
@@ -64,9 +64,12 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     actions.activateRepo(REPO_ID)
 
-    expect(navigation.openRepoRoot).toHaveBeenCalledWith(REPO_ID, presentationOptions())
-    expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
+    expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
+    expect(navigation.openRepoRoot).not.toHaveBeenCalled()
     expect(navigation.openRepoBranch).not.toHaveBeenCalled()
+
+    actions.showWorkspaceFiles?.(REPO_ID)
+    expect(navigation.openRepoWorkspace).toHaveBeenCalledWith(REPO_ID, undefined)
   })
 
   test('selects branches by resolving the branch workspace pane route', () => {
@@ -915,6 +918,7 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
     closeSettings: vi.fn(),
     openRepoRoot: vi.fn(),
     openRepoDashboard: vi.fn(),
+    openRepoWorkspace: vi.fn(),
     openRepoBranch: vi.fn((_repoId, _branchName, options) => {
       options?.onCommit?.()
       return true

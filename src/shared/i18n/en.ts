@@ -206,6 +206,12 @@ export const en = {
   // ---- Workspace pane tabs -----------------------------------------------
   'repo.dashboard': 'Dashboard',
   'dashboard.loading': 'Loading dashboard...',
+  'dashboard.directory.files': 'Files',
+  'dashboard.directory.folders': 'Folders',
+  'dashboard.directory.size': 'Folder size',
+  'dashboard.directory.top-level': 'At the top level',
+  'dashboard.directory.total-size': 'All nested files',
+  'dashboard.directory.read-failed': 'Could not read the folder overview.',
   'dashboard.no-current-branch': 'no current branch',
   'dashboard.updated': 'updated {time}',
   'dashboard.remote.connected': 'remote connected',

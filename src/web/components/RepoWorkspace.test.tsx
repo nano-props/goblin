@@ -34,7 +34,11 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { repoWorktreeStatusQueryKey, setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
+import {
+  repoWorktreeStatusQueryKey,
+  setRepoProjectionQueryData,
+  workspaceDirectoryOverviewQueryKey,
+} from '#/web/repo-data-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { nextRepoWorkspaceTabAfterClose } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
@@ -127,7 +131,7 @@ afterEach(() => {
 })
 
 describe('RepoWorkspace', () => {
-  test('renders a non-Git workspace directly as a Files surface', async () => {
+  test('renders a non-Git workspace with workspace-scoped Status and Files tabs', async () => {
     const workspaceId = 'goblin+file:///tmp/plain-workspace'
     seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
     useReposStore.setState((state) => ({
@@ -165,10 +169,60 @@ describe('RepoWorkspace', () => {
     )
 
     expect(screen.getByText('tab.files')).toBeTruthy()
+    expect(screen.getByText('tab.status')).toBeTruthy()
     expect(screen.queryByText('branches.empty')).toBeNull()
     await waitFor(() => {
       expect(navigation.showWorkspaceFiles).toHaveBeenCalledWith(workspaceId, { replace: true })
     })
+  })
+
+  test('renders directory overview data in the non-Git Status tab without a Git projection', () => {
+    const workspaceId = 'goblin+file:///tmp/plain-status-workspace'
+    seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
+    useReposStore.setState((state) => ({
+      repos: {
+        ...state.repos,
+        [workspaceId]: {
+          ...state.repos[workspaceId]!,
+          workspaceProbe: {
+            status: 'ready',
+            name: 'plain-status-workspace',
+            capabilities: {
+              files: { read: true, write: true },
+              terminal: { available: true },
+              git: { status: 'unavailable' },
+            },
+            diagnostics: [],
+          },
+        },
+      },
+    }))
+    const repo = useReposStore.getState().repos[workspaceId]!
+    useReposStore.getState().setWorkspacePaneTabForTarget(
+      { repoRoot: workspaceId, branchName: '', worktreePath: workspaceId },
+      'status',
+    )
+    primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.repoRuntimeId), {
+      topLevelFileCount: 7,
+      topLevelDirectoryCount: 3,
+      totalSizeBytes: 2048,
+    })
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace repoId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByRole('tab', { name: 'tab.status' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByText('7')).toBeTruthy()
+    expect(screen.getByText('2.0 KB')).toBeTruthy()
   })
 
   test('does not expose a terminal surface when the workspace capability is unavailable', () => {
@@ -1569,6 +1623,7 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
     closeSettings: vi.fn(),
     openRepoRoot: vi.fn(),
     openRepoDashboard: vi.fn(),
+    openRepoWorkspace: vi.fn(),
     openRepoBranch: vi.fn((_repoId, _branchName, options) => {
       options?.onCommit?.()
       return true

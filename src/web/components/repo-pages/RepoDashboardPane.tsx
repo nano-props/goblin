@@ -20,11 +20,17 @@ import { cn } from '#/web/lib/cn.ts'
 import { tildify } from '#/web/lib/paths.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { repoBranchReadModelFromSnapshot, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
-import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
+import {
+  useRepoProjectionReadModel,
+  useRepoWorktreeStatusReadModel,
+  useWorkspaceDirectoryOverview,
+} from '#/web/repo-data-query.ts'
 import type { PullRequestEntry } from '#/shared/api-types.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
+import { workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
+import { DirectoryOverviewContent } from '#/web/components/repo-pages/DirectoryOverviewContent.tsx'
 
 type DashboardTone = 'default' | 'attention' | 'success'
 
@@ -76,13 +82,27 @@ export function RepoDashboardPane({
             repoRuntimeId: state.repoRuntimeId,
             projection: state.projection,
             remote: state.remote,
+            workspaceProbe: state.workspaceProbe,
           }
         : null
     }),
   )
-  const projectionReadModel = useRepoProjectionReadModel(repoId, repo?.repoRuntimeId ?? '', null, 'summary', !!repo)
+  const directoryWorkspace = workspaceGitUnavailable(repo?.workspaceProbe)
+  const gitQueriesEnabled = !!repo && !directoryWorkspace
+  const projectionReadModel = useRepoProjectionReadModel(
+    repoId,
+    repo?.repoRuntimeId ?? '',
+    null,
+    'summary',
+    gitQueriesEnabled,
+  )
   const projection = projectionReadModel.data
-  const statusReadModel = useRepoWorktreeStatusReadModel(repoId, repo?.repoRuntimeId ?? '', !!repo)
+  const statusReadModel = useRepoWorktreeStatusReadModel(repoId, repo?.repoRuntimeId ?? '', gitQueriesEnabled)
+  const overviewReadModel = useWorkspaceDirectoryOverview(
+    repoId,
+    repo?.repoRuntimeId ?? '',
+    !!repo && directoryWorkspace,
+  )
   const branchModel = useMemo(
     () =>
       projection?.snapshot && statusReadModel.data
@@ -114,7 +134,13 @@ export function RepoDashboardPane({
     >
       <ScrollArea className="min-h-0 flex-1 bg-background">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-5">
-          {repo && projection?.snapshot && !statusReadModel.data && statusReadModel.isError ? (
+          {repo && directoryWorkspace && overviewReadModel.data ? (
+            <DirectoryDashboard repo={repo} overview={overviewReadModel.data} compact={compact} />
+          ) : repo && directoryWorkspace && overviewReadModel.isError ? (
+            <div className={cn(DASHBOARD_CARD_CLASS_NAME, 'p-4 text-sm text-destructive')}>
+              {t('dashboard.directory.read-failed')}
+            </div>
+          ) : repo && projection?.snapshot && !statusReadModel.data && statusReadModel.isError ? (
             <RepoStatusFailureView
               messageKey={statusErrorKey}
               retrying={statusReadModel.isFetching}
@@ -155,6 +181,29 @@ export function RepoDashboardPane({
         </div>
       </ScrollArea>
     </RepoPagePane>
+  )
+}
+
+function DirectoryDashboard({
+  repo,
+  overview,
+  compact,
+}: {
+  repo: { name: string; id: string }
+  overview: { topLevelFileCount: number; topLevelDirectoryCount: number; totalSizeBytes: number }
+  compact: boolean
+}) {
+  const t = useT()
+  return (
+    <>
+      <div className={cn(DASHBOARD_CARD_CLASS_NAME, 'p-4')}>
+        <h1 className="truncate text-base font-semibold text-foreground">{repo.name}</h1>
+        <div className="mt-1 truncate text-xs text-muted-foreground" title={repo.id}>
+          {tildify(repo.id)}
+        </div>
+      </div>
+      <DirectoryOverviewContent overview={overview} compact={compact} />
+    </>
   )
 }
 

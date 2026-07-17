@@ -91,7 +91,7 @@ export function createPrimaryWindowNavigationActions({
       restoreRepoPresentationOrOpenDashboard(repoId, routeNavigation, presentationToken, { onBlocked: 'stay' })
     },
     showWorkspaceFiles(repoId, options) {
-      routeNavigation.openRepoRoot(repoId, options)
+      routeNavigation.openRepoWorkspace(repoId, options)
     },
     async closeRepo(repoId) {
       const nextRepoId = repoId === currentRepoId ? nextNavigationRepoIdAfterClose(order, repoId) : null
@@ -241,7 +241,7 @@ function restoreRepoPresentationOrOpenDashboard(
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
   if (workspaceGitUnavailable(repo?.workspaceProbe)) {
-    routeNavigation.openRepoRoot(repoId, { presentationToken })
+    routeNavigation.openRepoDashboard(repoId, { presentationToken })
     return
   }
   const entry = state.navigationHistoryByRepo[repoId]?.current ?? null

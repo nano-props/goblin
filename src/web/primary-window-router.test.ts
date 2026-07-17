@@ -92,6 +92,14 @@ describe('repo route view derivation', () => {
       kind: 'dashboard',
       repoId: '/repo',
     })
+    expect(
+      repoRouteViewFromChildRoute('/repo', {
+        dashboard: false,
+        workspace: true,
+        branchSlug: null,
+        newWorktree: false,
+      }),
+    ).toEqual({ kind: 'workspace', repoId: '/repo' })
     expect(repoRouteViewFromChildRoute('/repo', { dashboard: false, branchSlug: null, newWorktree: true })).toEqual({
       kind: 'newWorktree',
       repoId: '/repo',
@@ -167,6 +175,7 @@ describe('primary window route callback facades', () => {
       closeSettings: vi.fn(),
       openRepoRoot: vi.fn(),
       openRepoDashboard: vi.fn(),
+      openRepoWorkspace: vi.fn(),
       openRepoBranch: vi.fn(() => true),
       openRepoBranchTab: vi.fn(() => true),
       openRepoBranchTerminal: vi.fn(() => true),

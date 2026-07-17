@@ -3,6 +3,7 @@ export const EMBEDDED_SERVER_IPC_ROUTES = {
   'repo.clone': { route: '/api/repo/clone', method: 'POST' },
   'repo.projection': { route: '/api/repo/projection', method: 'POST' },
   'repo.worktreeStatus': { route: '/api/repo/worktree-status', method: 'POST' },
+  'repo.workspaceOverview': { route: '/api/repo/workspace-overview', method: 'POST' },
   'repo.operations': { route: '/api/repo/operations', method: 'POST' },
   'repo.patch': { route: '/api/repo/patch', method: 'POST' },
   'repo.deleteBranch': { route: '/api/repo/delete-branch', method: 'POST' },

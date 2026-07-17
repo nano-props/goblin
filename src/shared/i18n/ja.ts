@@ -205,6 +205,12 @@ export const ja: Record<DictKey, string> = {
   // ---- Workspace pane tabs ------------------------------------------------
   'repo.dashboard': 'ダッシュボード',
   'dashboard.loading': 'ダッシュボードを読み込み中...',
+  'dashboard.directory.files': 'ファイル',
+  'dashboard.directory.folders': 'フォルダ',
+  'dashboard.directory.size': 'フォルダサイズ',
+  'dashboard.directory.top-level': 'トップレベル',
+  'dashboard.directory.total-size': 'すべての配下ファイル',
+  'dashboard.directory.read-failed': 'フォルダの概要を読み込めませんでした。',
   'dashboard.no-current-branch': '現在のブランチなし',
   'dashboard.updated': '{time} に更新',
   'dashboard.remote.connected': 'リモート接続済み',
