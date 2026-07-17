@@ -36,8 +36,7 @@ const workspacePaneRuntimeApplicationLogger = serverLogger.child({ module: 'work
 interface WorkspacePaneRuntimeApplicationDependencies {
   workspaceTabsCoordinator: WorkspaceRuntimeTabPlacement
   worktreeOperations: PhysicalWorktreeOperationCoordinator
-  physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'> &
-    Partial<Pick<PhysicalWorktreeIdentityResolver, 'captureWorkspace'>>
+  physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
   terminal: ServerTerminalCreateProvider & {
     close(clientId: string, userId: string, input: TerminalSessionInput): MaybePromise<boolean>
   }
@@ -87,7 +86,6 @@ export class WorkspacePaneRuntimeApplication {
         userId,
         input.request,
         worktreePath,
-        runtimeTarget?.kind === 'workspace',
       )
     } catch (error) {
       failRemoteRuntimeIfNeeded(userId, error)
@@ -167,7 +165,7 @@ export class WorkspacePaneRuntimeApplication {
     const runtime = await this.deps.terminal.createAdmitted(
       clientId,
       userId,
-      { ...input.request, target },
+      { ...input.request, target, worktreePath: requestedWorktreePath },
       {
         physicalWorktreeCapability,
         permit,
@@ -263,7 +261,6 @@ export class WorkspacePaneRuntimeApplication {
     userId: string,
     target: { repoRoot: string; repoRuntimeId: string },
     worktreePath: string,
-    workspaceScoped = false,
   ): Promise<PhysicalWorktreeExecutionCapability> {
     const input = {
       userId,
@@ -271,9 +268,7 @@ export class WorkspacePaneRuntimeApplication {
       repoRuntimeId: target.repoRuntimeId,
       worktreePath,
     }
-    return workspaceScoped
-      ? await (this.deps.physicalWorktrees.captureWorkspace?.(input) ?? this.deps.physicalWorktrees.capture(input))
-      : await this.deps.physicalWorktrees.capture(input)
+    return await this.deps.physicalWorktrees.capture(input)
   }
 }
 

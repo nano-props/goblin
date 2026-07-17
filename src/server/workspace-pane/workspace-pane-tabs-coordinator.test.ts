@@ -158,6 +158,47 @@ describe('workspace pane tabs coordinator queues', () => {
     expect(commitAdmission).toHaveBeenCalledWith(null)
   })
 
+  test('keeps logical workspace membership independent from its physical realpath identity', async () => {
+    const operations = createPhysicalWorktreeOperationCoordinator()
+    const capability = testPhysicalWorktreeExecutionCapability('/private/repo', {
+      userId: 'user-a',
+      repoRoot: 'goblin+file:///repo',
+      repoRuntimeId: 'runtime-a',
+      worktreePath: '/repo',
+    })
+    const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')!
+    const projection: WorkspacePaneTargetProjection = {
+      target: { kind: 'workspace', workspaceId, workspaceRuntimeId: 'runtime-a' },
+      nativeWorktreePath: '/repo',
+      canonicalBranch: null,
+    }
+    const commitAdmission = vi.fn()
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      layoutAggregate: aggregateFor(memoryRepository()),
+      runtimeProviders: [],
+      worktreeOperations: operations,
+      physicalWorktrees: { capture: async () => capability },
+      targetProjection: { captureTargets: async () => [projection] },
+    })
+
+    const admitted = await operations.runOperation(capability, async (permit) =>
+      await coordinator.ensureRuntimeTabForSession({
+        userId: 'user-a',
+        target: projection.target,
+        worktreePath: '/repo',
+        runtimeType: 'terminal',
+        sessionId: 'term-workspaceworkspace002',
+        permit,
+        physicalWorktreeCapability: capability,
+        isRuntimeCurrent: () => true,
+        commitAdmission,
+      }),
+    )
+
+    expect(admitted).toEqual({ admitted: true, value: { kind: 'committed' } })
+    expect(commitAdmission).toHaveBeenCalledWith(null)
+  })
+
   test('rejects placement metadata that does not belong to the runtime target', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/other', {

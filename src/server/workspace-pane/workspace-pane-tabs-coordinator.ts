@@ -18,7 +18,6 @@ import {
   type PhysicalWorktreeIdentity,
 } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import {
-  physicalWorktreeExecutionBinding,
   physicalWorktreeExecutionScope,
   physicalWorktreeAdmissionLease,
   physicalWorktreeAdmissionLeaseKey,
@@ -112,10 +111,8 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
     input: WorkspaceRuntimeTabPlacementInput,
   ): Promise<WorkspacePaneRuntimeTabCommitResult> {
     const physicalCapability = input.physicalWorktreeCapability
-    const physicalWorktreePath = physicalWorktreeExecutionBinding(physicalCapability).canonicalWorktreePath
     const physicalScope = physicalWorktreeExecutionScope(physicalCapability)
     if (
-      physicalWorktreePath !== input.worktreePath ||
       physicalScope.worktreePath !== input.worktreePath ||
       physicalScope.userId !== input.userId ||
       physicalScope.repoRoot !== input.target.workspaceId ||

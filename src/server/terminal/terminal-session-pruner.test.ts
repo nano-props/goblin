@@ -55,7 +55,7 @@ describe('terminal session pruner', () => {
         assertCurrent: vi.fn(),
       }),
     ).resolves.toEqual({ pruned: 1, remaining: 2 })
-    expect(getWorktrees).toHaveBeenCalledWith(REPO_ROOT, { includeStatus: false })
+    expect(getWorktrees).toHaveBeenCalledWith('/repo', { includeStatus: false })
     expect(closeSession).toHaveBeenCalledTimes(1)
     expect(closeSession).toHaveBeenCalledWith('pty_term-stalestalestalestale1')
   })
@@ -109,7 +109,7 @@ describe('terminal session pruner', () => {
         assertCurrent,
       }),
     ).rejects.toThrow('error.repo-runtime-stale')
-    expect(getWorktrees).toHaveBeenCalledWith(REPO_ROOT, { includeStatus: false })
+    expect(getWorktrees).toHaveBeenCalledWith('/repo', { includeStatus: false })
     expect(assertCurrent).toHaveBeenCalledTimes(1)
     expect(closeSession).not.toHaveBeenCalled()
   })

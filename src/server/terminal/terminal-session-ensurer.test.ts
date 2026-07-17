@@ -165,6 +165,46 @@ describe('terminal session ensurer', () => {
     })
   })
 
+  test('stores the logical workspace path while executing in its physical realpath', async () => {
+    const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId, input.cols, input.rows))
+    const ensurer = createTerminalSessionEnsurer({ manager: { prepareSession } })
+    const logicalPath = '/tmp/workspace'
+    const physicalPath = '/private/tmp/workspace'
+    const capability = testPhysicalWorktreeExecutionCapability(physicalPath, {
+      userId: USER_ID,
+      repoRoot: 'goblin+file:///tmp/workspace',
+      repoRuntimeId: REPO_RUNTIME_ID,
+      worktreePath: logicalPath,
+    })
+
+    await ensurer.ensure(
+      USER_ID,
+      {
+        repoRoot: 'goblin+file:///tmp/workspace',
+        repoRuntimeId: REPO_RUNTIME_ID,
+        target: {
+          kind: 'workspace',
+          workspaceId: canonicalWorkspaceLocator('goblin+file:///tmp/workspace')!,
+          workspaceRuntimeId: REPO_RUNTIME_ID,
+        },
+        branch: '',
+        worktreePath: logicalPath,
+        clientId: 'client_terminal_ensurer',
+      },
+      ensureContext({
+        terminalSessionId: 'term-logicalphysical001',
+        cols: 80,
+        rows: 24,
+        scopedWorktreePath: logicalPath,
+        physicalWorktreeCapability: capability,
+      }),
+    )
+
+    expect(prepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ worktreePath: logicalPath, cwd: physicalPath }),
+    )
+  })
+
   test('ensures remote terminal sessions through an SSH invocation', async () => {
     const prepareSession = vi.fn(async (input) => preparedResult(input.terminalSessionId, input.cols, input.rows))
     const ensurer = createTerminalSessionEnsurer({

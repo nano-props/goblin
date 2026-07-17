@@ -23,6 +23,7 @@ import {
   physicalWorktreeIdentityKey,
   type PhysicalWorktreeIdentity,
 } from '#/server/worktree-removal/physical-worktree-identity.ts'
+import { localWorkspaceNativePath } from '#/server/modules/workspace-path.ts'
 
 export interface ResolvePhysicalWorktreeIdentityInput {
   userId: string
@@ -159,8 +160,16 @@ export class PhysicalWorktreeIdentityResolver {
 
   async capture(input: ResolvePhysicalWorktreeIdentityInput): Promise<PhysicalWorktreeExecutionCapability> {
     if (!input.userId || !input.repoRoot || !input.repoRuntimeId) throw new Error('error.invalid-worktree-identity')
+    const platform = process.platform === 'win32' ? 'win32' : 'posix'
+    const workspace = parseWorkspaceLocator(input.repoRoot, platform)
+    if (!workspace) throw new Error('error.workspace-locator-malformed')
+    const targetsWorkspaceRoot =
+      workspace.transport === 'file'
+        ? path.resolve(input.worktreePath) === path.resolve(workspace.path)
+        : path.posix.resolve(input.worktreePath) === path.posix.resolve(workspace.path)
+    if (targetsWorkspaceRoot) return await this.captureWorkspace(input)
     const epoch = this.activeEpoch(input)
-    const remote = isRemoteRepoId(input.repoRoot)
+    const remote = workspace.transport === 'ssh'
     const targetPath = remote ? normalizedRemoteWorktreePath(input) : path.resolve(input.worktreePath)
     const targetKey = `${remote ? 'remote' : 'local'}\0${targetPath}`
     let operation = epoch.inFlightByTarget.get(targetKey)
@@ -303,7 +312,9 @@ export class PhysicalWorktreeIdentityResolver {
     worktreePath: string,
     signal: AbortSignal,
   ): Promise<{ identity: PhysicalWorktreeIdentity; execution: PhysicalWorktreeExecutionBinding }> {
-    const worktrees = await this.deps.getLocalWorktrees(input.repoRoot, { includeStatus: false, signal })
+    const workspacePath = localWorkspaceNativePath(input.repoRoot)
+    if (!workspacePath) throw new Error('error.workspace-locator-malformed')
+    const worktrees = await this.deps.getLocalWorktrees(workspacePath, { includeStatus: false, signal })
     this.assertEpochActive(epoch)
     const known = resolveKnownWorktree(worktrees, worktreePath)
     if (!known.ok) throw new Error(known.message)

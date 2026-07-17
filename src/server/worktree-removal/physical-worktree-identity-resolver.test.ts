@@ -9,20 +9,42 @@ import {
 
 const LOCAL_INPUT = {
   userId: 'user-1',
-  repoRoot: '/repos/main',
+  repoRoot: 'goblin+file:///repos/main',
   repoRuntimeId: 'repo-runtime-1',
   worktreePath: '/worktrees/alias',
 }
 const LOCAL_MARKER = { deviceId: '10', inode: '20' }
 
 describe('PhysicalWorktreeIdentityResolver', () => {
+  test('captures the local workspace root without requiring Git worktree membership', async () => {
+    const getLocalWorktrees = vi.fn()
+    const resolver = new PhysicalWorktreeIdentityResolver({
+      getLocalWorktrees,
+      async nativeRealpath(input) {
+        return input
+      },
+      async nativeStat() {
+        return LOCAL_MARKER
+      },
+      isCurrentRepoRuntime: () => true,
+      onRepoRuntimeClosed: () => () => undefined,
+    })
+
+    await expect(
+      resolver.capture({ ...LOCAL_INPUT, worktreePath: '/repos/main' }),
+    ).resolves.toMatchObject({ identity: { kind: 'local', endpoint: '/repos/main' } })
+    expect(getLocalWorktrees).not.toHaveBeenCalled()
+    resolver.dispose()
+  })
+
   test('freshly validates and canonicalizes every local operation while binding one runtime identity', async () => {
     let worktreeReads = 0
+    const getLocalWorktrees = vi.fn(async () => {
+      worktreeReads += 1
+      return [{ path: LOCAL_INPUT.worktreePath } as WorktreeInfo]
+    })
     const resolver = new PhysicalWorktreeIdentityResolver({
-      async getLocalWorktrees() {
-        worktreeReads += 1
-        return [{ path: LOCAL_INPUT.worktreePath } as WorktreeInfo]
-      },
+      getLocalWorktrees,
       async nativeRealpath() {
         return '/volumes/repo/worktrees/feature'
       },
@@ -42,6 +64,10 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       identity: { endpoint: '/volumes/repo/worktrees/feature' },
     })
     expect(worktreeReads).toBe(2)
+    expect(getLocalWorktrees).toHaveBeenCalledWith('/repos/main', {
+      includeStatus: false,
+      signal: expect.any(AbortSignal),
+    })
     resolver.dispose()
   })
 

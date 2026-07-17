@@ -10,7 +10,7 @@ import {
   parseLog,
   parseStatus,
   parseWorktreeStatusBatch,
-  parseWorktrees,
+  parseUsableWorktrees,
   splitWorktreeStatusBatch,
 } from '#/system/git/parsers.ts'
 import { markDefaultBranch, prioritizeDefaultBranch } from '#/system/git/branches.ts'
@@ -144,7 +144,7 @@ export async function getRemoteStatusAndWorktrees(
   if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
 
   const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(result.stdout)
-  const worktrees = parseWorktrees(worktreeListOutput)
+  const worktrees = parseUsableWorktrees(worktreeListOutput)
   options.signal?.throwIfAborted()
   const statusByPath = parseWorktreeStatusBatch(statusStream)
 
@@ -618,7 +618,7 @@ async function readRemoteWorktreeList(
     signal: options.signal,
   })
   if (options.signal?.aborted || !result.ok) return []
-  return parseWorktrees(result.stdout)
+  return parseUsableWorktrees(result.stdout)
 }
 
 export async function getRemoteRepoWorktreePaths(
@@ -661,7 +661,7 @@ export async function removeRemoteWorktree(
   const listResult = await run({ type: 'gitWorktreeList', path: target.remotePath }, target, { signal: input.signal })
   if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
   if (!listResult.ok) return remoteExecResult(listResult)
-  const worktrees = parseWorktrees(listResult.stdout)
+  const worktrees = parseUsableWorktrees(listResult.stdout)
   const affectedWorktreePaths = worktrees.filter((worktree) => !worktree.isBare).map((worktree) => worktree.path)
 
   const mainWorktreePath = worktrees.find((worktree) => worktree.isPrimary)?.path ?? worktrees[0]?.path ?? ''
@@ -845,7 +845,7 @@ async function getRemoteWorktrees(
     signal: options.signal,
   })
   if (!result.ok || options.signal?.aborted) return []
-  const worktrees = parseWorktrees(result.stdout)
+  const worktrees = parseUsableWorktrees(result.stdout)
   await mapWithConcurrency(
     worktrees,
     REMOTE_WORKTREE_STATUS_CONCURRENCY,
@@ -912,7 +912,7 @@ async function resolveKnownRemoteWorktree(
     })
     if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
     if (!result.ok) return remoteExecResult(result)
-    worktrees = parseWorktrees(result.stdout)
+    worktrees = parseUsableWorktrees(result.stdout)
   }
   const resolvedPath = path.posix.resolve(worktreePath)
   const worktree = worktrees.find((item) => path.posix.resolve(item.path) === resolvedPath && !item.isBare)

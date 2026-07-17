@@ -1,8 +1,9 @@
 import { git, gitResultWithOptions } from '#/system/git/git-exec.ts'
-import { parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
+import { parseStatus, parseUsableWorktrees } from '#/system/git/parsers.ts'
 import { mapWithConcurrency } from '#/system/git/concurrency.ts'
 import type { ExecResult, WorktreeInfo } from '#/shared/git-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
+import { worktreePathIsMissing } from '#/system/git/worktree-path.ts'
 
 const WORKTREE_STATUS_CONCURRENCY = 16
 
@@ -12,38 +13,38 @@ interface GetWorktreesOptions {
 }
 
 export async function getWorktrees(cwd: string, options?: GetWorktreesOptions): Promise<WorktreeInfo[]> {
-  try {
-    const output = await git(cwd, ['worktree', 'list', '--porcelain'], { signal: options?.signal })
-    const worktrees = parseWorktrees(output)
-    if (options?.includeStatus === false) return worktrees
+  options?.signal?.throwIfAborted()
+  const output = await git(cwd, ['worktree', 'list', '--porcelain'], { signal: options?.signal })
+  options?.signal?.throwIfAborted()
+  const worktrees = parseUsableWorktrees(output)
+  if (options?.includeStatus === false) return worktrees
 
-    await mapWithConcurrency(
-      worktrees,
-      WORKTREE_STATUS_CONCURRENCY,
-      async (wt) => {
-        if (wt.isBare) return
-        try {
-          // -z so a filename containing a literal newline doesn't get
-          // counted as two changes. Reuse parseStatus so rename / copy
-          // pairs (R/C take TWO records under -z) collapse into one
-          // entry — matching what `git status` shows the user.
-          const out = await git(wt.path, ['status', '--porcelain', '-z'], { signal: options?.signal })
-          const entries = parseStatus(out)
-          wt.isDirty = entries.length > 0
-          wt.changeCount = entries.length
-        } catch {
-          if (options?.signal?.aborted) throw new Error('cancelled')
-          wt.isDirty = undefined
-        }
-      },
-      { signal: options?.signal, abort: 'throw' },
-    )
+  const sampled = await mapWithConcurrency(
+    worktrees,
+    WORKTREE_STATUS_CONCURRENCY,
+    async (wt): Promise<WorktreeInfo | null> => {
+      if (wt.isBare) return wt
+      try {
+        // -z so a filename containing a literal newline doesn't get
+        // counted as two changes. Reuse parseStatus so rename / copy
+        // pairs (R/C take TWO records under -z) collapse into one
+        // entry — matching what `git status` shows the user.
+        const out = await git(wt.path, ['status', '--porcelain', '-z'], { signal: options?.signal })
+        const entries = parseStatus(out)
+        wt.isDirty = entries.length > 0
+        wt.changeCount = entries.length
+        return wt
+      } catch (error) {
+        options?.signal?.throwIfAborted()
+        if (await worktreePathIsMissing(wt.path)) return null
+        throw error
+      }
+    },
+    { signal: options?.signal, abort: 'throw' },
+  )
 
-    return worktrees
-  } catch {
-    if (options?.signal?.aborted) throw new Error('cancelled')
-    return []
-  }
+  options?.signal?.throwIfAborted()
+  return sampled.filter((worktree): worktree is WorktreeInfo => worktree !== null)
 }
 
 /** Worktree create/remove can both touch tens of thousands of files

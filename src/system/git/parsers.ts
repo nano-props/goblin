@@ -266,12 +266,24 @@ export function parseWorktrees(output: string): WorktreeInfo[] {
       }
     }
 
-    // A prunable entry is stale Git administrative metadata, not a usable
-    // physical worktree. Exclude it at the porcelain decoding boundary so
-    // every consumer shares the same authoritative set and none attempts
-    // filesystem or Git operations with its missing path.
-    if (path && !isPrunable) worktrees.push({ path, branch, isBare, isPrimary: blockIndex === 0, isLocked })
+    if (path) {
+      worktrees.push({
+        path,
+        branch,
+        isBare,
+        isPrimary: blockIndex === 0,
+        isLocked,
+        ...(isPrunable ? { isPrunable: true } : {}),
+      })
+    }
   }
 
   return worktrees
+}
+
+/** Physical worktree projection used by every execution consumer. The raw
+ * parser deliberately retains prunable Git metadata for diagnostics and
+ * future cleanup, while this single boundary defines usable membership. */
+export function parseUsableWorktrees(output: string): WorktreeInfo[] {
+  return parseWorktrees(output).filter((worktree) => worktree.isPrunable !== true)
 }

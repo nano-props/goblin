@@ -472,12 +472,16 @@ describe('remote gitWorktreeListAndStatus script (F5 end-to-end)', () => {
     })
 
     const result = await execa('sh', ['-lc', invocation.script])
-    const { parseWorktreeStatusBatch, parseWorktrees, splitWorktreeStatusBatch } =
+    const { parseUsableWorktrees, parseWorktreeStatusBatch, parseWorktrees, splitWorktreeStatusBatch } =
       await import('#/system/git/parsers.ts')
     const { worktreeListOutput, statusStream } = splitWorktreeStatusBatch(result.stdout)
 
     expect(worktreeListOutput).toContain('prunable ')
     expect(parseWorktrees(worktreeListOutput)).toEqual([
+      expect.objectContaining({ path: realpathSync(repoDir), isPrimary: true }),
+      expect.objectContaining({ isPrunable: true }),
+    ])
+    expect(parseUsableWorktrees(worktreeListOutput)).toEqual([
       expect.objectContaining({ path: realpathSync(repoDir), isPrimary: true }),
     ])
     expect([...parseWorktreeStatusBatch(statusStream).keys()]).toEqual([realpathSync(repoDir)])

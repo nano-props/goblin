@@ -1,8 +1,8 @@
-import { stat } from 'node:fs/promises'
 import { git } from '#/system/git/git-exec.ts'
-import { parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
+import { parseStatus, parseUsableWorktrees } from '#/system/git/parsers.ts'
 import { mapWithConcurrency } from '#/system/git/concurrency.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
+import { worktreePathIsMissing } from '#/system/git/worktree-path.ts'
 
 const WORKTREE_STATUS_CONCURRENCY = 16
 
@@ -18,7 +18,7 @@ export async function getWorkingStatus(cwd: string, options?: { signal?: AbortSi
   options?.signal?.throwIfAborted()
   const out = await git(cwd, ['worktree', 'list', '--porcelain'], { signal: options?.signal })
   options?.signal?.throwIfAborted()
-  const worktrees = parseWorktrees(out)
+  const worktrees = parseUsableWorktrees(out)
 
   const results = await mapWithConcurrency(
     worktrees,
@@ -39,7 +39,7 @@ export async function getWorkingStatus(cwd: string, options?: { signal?: AbortSi
         // suppress the command failure after independently confirming that
         // its physical directory is gone; Git/process/permission failures for
         // an existing member must still reject the complete status snapshot.
-        if (await pathIsMissing(wt.path)) return null
+        if (await worktreePathIsMissing(wt.path)) return null
         throw error
       }
       options?.signal?.throwIfAborted()
@@ -61,17 +61,4 @@ export async function getWorkingStatus(cwd: string, options?: { signal?: AbortSi
   // in the terminal).
   filtered.sort((a, b) => Number(b.isMain) - Number(a.isMain))
   return filtered
-}
-
-async function pathIsMissing(worktreePath: string): Promise<boolean> {
-  try {
-    await stat(worktreePath)
-    return false
-  } catch (error) {
-    return errorCode(error) === 'ENOENT' || errorCode(error) === 'ENOTDIR'
-  }
-}
-
-function errorCode(error: unknown): string {
-  return error && typeof error === 'object' && 'code' in error ? String(error.code) : ''
 }

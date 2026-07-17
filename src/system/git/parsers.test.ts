@@ -11,6 +11,7 @@ import {
   parseBranches,
   parseLog,
   parseStatus,
+  parseUsableWorktrees,
   parseWorktreeStatusBatch,
   parseWorktrees,
   splitWorktreeStatusBatch,
@@ -238,7 +239,7 @@ describe('parseWorktrees', () => {
     expect(parseWorktrees(bare)[0]?.isLocked).toBe(true)
   })
 
-  test('drops prunable worktrees at the porcelain decoding boundary', () => {
+  test('models prunable metadata while excluding it from the usable projection', () => {
     const out = [
       'worktree /repo',
       'HEAD a',
@@ -256,8 +257,17 @@ describe('parseWorktrees', () => {
 
     expect(parseWorktrees(out)).toEqual([
       { path: '/repo', branch: 'main', isBare: false, isPrimary: true, isLocked: false },
+      {
+        path: '/repo/missing',
+        branch: 'stale',
+        isBare: false,
+        isPrimary: false,
+        isLocked: false,
+        isPrunable: true,
+      },
       { path: '/repo/live', branch: 'live', isBare: false, isPrimary: false, isLocked: false },
     ])
+    expect(parseUsableWorktrees(out).map((worktree) => worktree.path)).toEqual(['/repo', '/repo/live'])
   })
 
   test('detached HEAD has no branch line — branch left undefined', () => {

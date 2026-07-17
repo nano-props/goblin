@@ -113,6 +113,38 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
 
+  test('passes the native workspace root through terminal admission', async () => {
+    const target = {
+      kind: 'workspace' as const,
+      workspaceId,
+      workspaceRuntimeId: request.repoRuntimeId,
+    }
+    const workspaceRequest = { ...request, worktreePath: workspaceId, target }
+    const createAdmitted = vi.fn(async () => ({ ok: false as const, message: 'expected-stop' }))
+    const capture = vi.fn(async () => testPhysicalWorktreeExecutionCapability('/repo'))
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: { capture },
+      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminal: { createAdmitted, close: () => false },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged: vi.fn(),
+    })
+
+    await application.open('client-test', 'user-test', { runtimeType: 'terminal', request: workspaceRequest })
+
+    expect(capture).toHaveBeenCalledWith(
+      expect.objectContaining({ repoRoot: workspaceId, worktreePath: '/repo' }),
+    )
+    expect(createAdmitted).toHaveBeenCalledWith(
+      'client-test',
+      'user-test',
+      expect.objectContaining({ repoRoot: workspaceId, worktreePath: '/repo', target }),
+      expect.any(Object),
+    )
+  })
+
   test('rejects native execution metadata that does not match the runtime target', async () => {
     const capture = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
@@ -154,7 +186,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: {
-        captureWorkspace: async () => testPhysicalWorktreeExecutionCapability('/repo'),
         capture: async () => testPhysicalWorktreeExecutionCapability('/repo'),
       },
       terminalWorktree: {
