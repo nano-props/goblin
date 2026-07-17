@@ -9,7 +9,7 @@ import {
   validatePhysicalWorktreeExecution,
   type PhysicalWorktreeAdmissionLease,
   type PhysicalWorktreeExecutionCapability,
-} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+} from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 export type PhysicalWorktreeAdmissionTarget =
   | PhysicalWorktreeAdmissionLease

@@ -13,7 +13,7 @@ import {
 import {
   physicalWorktreeAdmissionLeaseKey,
   type PhysicalWorktreeAdmissionLease,
-} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+} from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 export interface WorkspacePaneEpochScope {
   userId: string

@@ -23,8 +23,8 @@ import {
   physicalWorktreeAdmissionLeaseKey,
   type PhysicalWorktreeAdmissionLease,
   type PhysicalWorktreeExecutionCapability,
-  type PhysicalWorktreeIdentityResolver,
-} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+} from '#/server/worktree-removal/physical-worktree-capability.ts'
+import type { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 import {
   type WorkspacePaneRuntimeTabsProviderSnapshot,

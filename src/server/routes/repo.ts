@@ -48,7 +48,7 @@ import { settleRemoteRuntimeFailure } from '#/server/modules/remote-runtime-fail
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { ServerRepoMutationHost } from '#/server/repo-mutation/repo-mutation-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
-import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { probeLocalWorkspace, probeWorkspace } from '#/server/modules/workspace-probe.ts'

@@ -3,7 +3,7 @@ import type { ServerTerminalCreateResult } from '#/server/terminal/terminal-sess
 import {
   assertPhysicalWorktreeExecutionCapability,
   type PhysicalWorktreeExecutionCapability,
-} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+} from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
   PhysicalWorktreeOperationPermit,

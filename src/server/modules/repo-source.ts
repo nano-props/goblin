@@ -1,5 +1,6 @@
 import path from 'node:path'
-import { realpath, stat } from 'node:fs/promises'
+import { constants as fsConstants } from 'node:fs'
+import { access, realpath, stat } from 'node:fs/promises'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { checkGitAvailable } from '#/system/git/git-exec.ts'
 import {
@@ -90,7 +91,11 @@ import {
   parseWorkspaceLocator,
   type WorkspaceLocatorPlatform,
 } from '#/shared/workspace-locator.ts'
-import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import {
+  physicalWorktreeExecutionBinding,
+  validatePhysicalWorktreeExecution,
+  type PhysicalWorktreeExecutionCapability,
+} from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
@@ -188,8 +193,6 @@ export async function runWithCapturedRepoSource<T>(
   task: (source: Awaited<ReturnType<typeof resolveRepoSource>>) => Promise<T>,
   runtime?: RepoSourceRuntimeContext,
 ): Promise<T> {
-  const { physicalWorktreeExecutionBinding } =
-    await import('#/server/worktree-removal/physical-worktree-identity-resolver.ts')
   const execution = physicalWorktreeExecutionBinding(physicalWorktreeCapability)
   return await task(
     execution.kind === 'remote'
@@ -299,10 +302,9 @@ async function readRemoteAffectedRepoIds(
 
 async function probeReadableDirectory(cwd: string): Promise<ProbeAvailability> {
   try {
-    const { constants: fsConstants, promises: fs } = await import('node:fs')
-    const stat = await fs.stat(cwd)
-    if (!stat.isDirectory()) return { ok: false, message: 'error.path-not-directory' }
-    await fs.access(cwd, fsConstants.R_OK)
+    const value = await stat(cwd)
+    if (!value.isDirectory()) return { ok: false, message: 'error.path-not-directory' }
+    await access(cwd, fsConstants.R_OK)
     return { ok: true }
   } catch (err) {
     return { ok: false, message: classifyPathProbeError(err) }
@@ -513,9 +515,7 @@ function createLocalRepoSource(
       const affectedRepoIds = localWorktreeRepoIds(worktrees)
       const mainWorktreePath = worktrees.find((wt) => wt.isPrimary)?.path ?? worktrees[0]?.path ?? ''
       const exactExecution = physicalWorktreeCapability
-        ? (
-            await import('#/server/worktree-removal/physical-worktree-identity-resolver.ts')
-          ).physicalWorktreeExecutionBinding(physicalWorktreeCapability)
+        ? physicalWorktreeExecutionBinding(physicalWorktreeCapability)
         : null
       const requestedPath = exactExecution?.kind === 'local' ? exactExecution.canonicalWorktreePath : input.worktreePath
       const removable = resolveRemovableWorktree(worktrees, input.branch, requestedPath, mainWorktreePath)
@@ -539,8 +539,6 @@ function createLocalRepoSource(
       if (!prepared.ok) return prepared
       if (physicalWorktreeCapability) {
         try {
-          const { validatePhysicalWorktreeExecution } =
-            await import('#/server/worktree-removal/physical-worktree-identity-resolver.ts')
           await validatePhysicalWorktreeExecution(physicalWorktreeCapability, signal)
           const currentPath = await realpath(removable.target.path)
           const currentStat = await stat(currentPath, { bigint: true })
@@ -695,9 +693,7 @@ async function createRemoteRepoSource(
     },
     async removeWorktree(input, signal, lifecycle) {
       const exactExecution = physicalWorktreeCapability
-        ? (
-            await import('#/server/worktree-removal/physical-worktree-identity-resolver.ts')
-          ).physicalWorktreeExecutionBinding(physicalWorktreeCapability)
+        ? physicalWorktreeExecutionBinding(physicalWorktreeCapability)
         : null
       const result = await removeRemoteWorktree(target, {
         ...input,
@@ -710,8 +706,6 @@ async function createRemoteRepoSource(
         validateBeforeRemove: physicalWorktreeCapability
           ? async () => {
               try {
-                const { validatePhysicalWorktreeExecution } =
-                  await import('#/server/worktree-removal/physical-worktree-identity-resolver.ts')
                 await validatePhysicalWorktreeExecution(physicalWorktreeCapability, signal)
                 return { ok: true, message: '' }
               } catch (error) {

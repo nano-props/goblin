@@ -37,7 +37,7 @@ import {
   createTerminalSessionCreator,
   type ServerTerminalCreateResult,
 } from '#/server/terminal/terminal-session-creator.ts'
-import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 interface TerminalSessionServiceManager extends TerminalSessionEnsureManager {
   listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>

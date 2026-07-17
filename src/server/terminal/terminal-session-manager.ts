@@ -38,7 +38,7 @@ import {
 } from '#/server/terminal/terminal-session-pty-lifecycle.ts'
 import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { physicalWorktreeIdentityKey } from '#/server/worktree-removal/physical-worktree-identity.ts'
-import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import { TerminalDirectory } from '#/server/terminal/terminal-directory.ts'
 import type { TerminalSessionAdmission } from '#/server/terminal/terminal-session-ensurer.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'

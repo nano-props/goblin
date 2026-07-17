@@ -2,10 +2,8 @@ import { describe, expect, test, vi } from 'vitest'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
 import type { RepoRuntimeClosedEvent } from '#/server/modules/repo-runtimes.ts'
-import {
-  PhysicalWorktreeIdentityResolver,
-  validatePhysicalWorktreeExecution,
-} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import { validatePhysicalWorktreeExecution } from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 const LOCAL_INPUT = {
   userId: 'user-1',

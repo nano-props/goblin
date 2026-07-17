@@ -20,7 +20,7 @@ import {
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
-import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const scope = { userId: 'user-a', repoRoot: 'goblin+file:///repo', repoRuntimeId: 'runtime-a' }

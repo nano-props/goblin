@@ -9,7 +9,7 @@ import {
 import {
   physicalWorktreeExecutionBinding,
   type PhysicalWorktreeExecutionCapability,
-} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+} from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 
 export interface TerminalSessionEnsureInput {

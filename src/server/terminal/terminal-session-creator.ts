@@ -5,7 +5,7 @@ import type {
   TerminalSessionEnsureResult,
 } from '#/server/terminal/terminal-session-ensurer.ts'
 import type { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
-import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 type TerminalSessionCreateCoordinator = ReturnType<typeof createTerminalSessionCreateCoordinator>
 type TerminalCreateFailure = Extract<TerminalCreateResult, { ok: false }>

@@ -1,10 +1,12 @@
 import path from 'node:path'
 import {
   PhysicalWorktreeIdentityResolver,
-  type PhysicalWorktreeExecutionCapability,
-  type PhysicalWorktreeExecutionBinding,
   type ResolvePhysicalWorktreeIdentityInput,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type {
+  PhysicalWorktreeExecutionBinding,
+  PhysicalWorktreeExecutionCapability,
+} from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 
 export function testPhysicalWorktreeIdentity(endpoint: string): PhysicalWorktreeIdentity {

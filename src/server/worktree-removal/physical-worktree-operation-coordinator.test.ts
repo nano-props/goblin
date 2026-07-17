@@ -4,7 +4,7 @@ import {
   issueTestPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeIdentity,
 } from '#/server/test-utils/physical-worktree-identity.ts'
-import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 describe('physical worktree operation coordinator', () => {
   test('admits one queue for multiple generations of the same identity', async () => {

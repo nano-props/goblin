@@ -12,7 +12,7 @@ import {
   testPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeIdentity,
 } from '#/server/test-utils/physical-worktree-identity.ts'
-import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import {
   workspacePaneRuntimeTabEntry,
   workspacePaneStaticTabEntry,

@@ -32,7 +32,7 @@ import {
 import type { WorkspacePaneRuntimeTabsProviderSnapshot } from '#/server/workspace-pane/workspace-pane-runtime-tabs-projection.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
-import type { PhysicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 

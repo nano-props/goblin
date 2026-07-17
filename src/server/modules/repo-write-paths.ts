@@ -14,7 +14,7 @@ import {
   runWithRepoSource,
   type RepoMutationResult,
 } from '#/server/modules/repo-source.ts'
-import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import {
   abortRepoWriteNetworkOperation,
   enqueueRepoWriteOperation,

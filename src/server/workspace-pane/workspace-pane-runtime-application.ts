@@ -22,10 +22,8 @@ import {
   terminalSessionTargetWorktreePath,
 } from '#/server/terminal/terminal-session-scope.ts'
 import { serverLogger } from '#/server/logger.ts'
-import type {
-  PhysicalWorktreeExecutionCapability,
-  PhysicalWorktreeIdentityResolver,
-} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
+import type { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { ServerTerminalCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure-settlement.ts'
 import { restorableWorkspacePaneTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
