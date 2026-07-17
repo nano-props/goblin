@@ -1,6 +1,7 @@
 import { File, Folder, HardDrive, type LucideIcon } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
+import { formatByteSize } from '#/web/lib/format-byte-size.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 
 const CARD_CLASS_NAME = 'rounded-lg border border-border/60 bg-card shadow-[var(--shadow-inset-highlight)]'
@@ -60,16 +61,4 @@ function OverviewMetric({
       </div>
     </div>
   )
-}
-
-function formatByteSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  const units = ['KB', 'MB', 'GB', 'TB'] as const
-  let value = bytes / 1024
-  let unitIndex = 0
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024
-    unitIndex += 1
-  }
-  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unitIndex]}`
 }

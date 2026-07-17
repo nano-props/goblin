@@ -56,7 +56,7 @@ import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/
 import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import { DirectoryOverviewContent } from '#/web/components/repo-pages/DirectoryOverviewContent.tsx'
+import { WorkspaceDirectoryStatus } from '#/web/components/repo-workspace/WorkspaceDirectoryStatus.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { workspaceGitAvailable, workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 
@@ -453,7 +453,7 @@ function WorkspaceRootPane({
           <ScrollArea className="min-h-0 flex-1 bg-background">
             <div className="p-4">
               {overviewReadModel.data ? (
-                <DirectoryOverviewContent overview={overviewReadModel.data} />
+                <WorkspaceDirectoryStatus overview={overviewReadModel.data} />
               ) : overviewReadModel.isError ? (
                 <div className="rounded-lg border border-border/60 bg-card p-4 text-sm text-destructive">
                   {t('dashboard.directory.read-failed')}

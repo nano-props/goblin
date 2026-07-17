@@ -246,7 +246,10 @@ describe('RepoWorkspace', () => {
     )
 
     expect(screen.getByRole('tab', { name: 'tab.status' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('list')).toBeTruthy()
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
     expect(screen.getByText('7')).toBeTruthy()
+    expect(screen.getByText('3')).toBeTruthy()
     expect(screen.getByText('2.0 KB')).toBeTruthy()
   })
 
