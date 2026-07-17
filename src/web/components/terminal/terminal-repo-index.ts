@@ -6,10 +6,12 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { repoProjectionQueryOptions } from '#/web/repo-data-query.ts'
 import { repoBranchSnapshotDataFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
+import { workspaceGitAvailable } from '#/shared/workspace-runtime.ts'
 
 export interface TerminalRepoIndexEntry {
   id: string
   repoRuntimeId: string
+  gitAvailable: boolean
 }
 
 export function useTerminalRepoIndex(): TerminalRepoIndex {
@@ -17,8 +19,8 @@ export function useTerminalRepoIndex(): TerminalRepoIndex {
   const projectionQueries = useQueries({
     queries: entries.map((entry) => ({
       ...repoProjectionQueryOptions(entry.id, entry.repoRuntimeId, null, 'full'),
-      enabled: true,
-      subscribed: true,
+      enabled: entry.gitAvailable,
+      subscribed: entry.gitAvailable,
     })),
   })
   return repoIndexFromEntries(
@@ -81,6 +83,7 @@ function terminalRepoIndexEntriesFromRepos(repos: ReposStore['repos']): Terminal
   return Object.values(repos).map((repo) => ({
     id: repo.id,
     repoRuntimeId: repo.repoRuntimeId,
+    gitAvailable: workspaceGitAvailable(repo.workspaceProbe),
   }))
 }
 
@@ -93,6 +96,7 @@ function entriesEqual(a: readonly TerminalRepoIndexEntry[], b: readonly Terminal
     if (!current || !next) return false
     if (current.id !== next.id) return false
     if (current.repoRuntimeId !== next.repoRuntimeId) return false
+    if (current.gitAvailable !== next.gitAvailable) return false
   }
   return true
 }

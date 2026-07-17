@@ -75,6 +75,18 @@ describe('RepoLayoutSidebar', () => {
     expect(settings).not.toBeNull()
   })
 
+  test('keeps workspace and settings navigation but does not mount Git controls when Git is unavailable', () => {
+    const { container } = renderSidebar(
+      <RepoLayoutSidebar repoId={REPO_ID} compact={false} gitAvailable={false} />,
+    )
+
+    expect(container.querySelector('[data-testid="repo-picker-host"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="create-worktree-button"]')).toBeNull()
+    expect(container.querySelector('[data-testid="branch-navigator"]')).toBeNull()
+    expect(container.textContent).not.toContain('tab.branches')
+    expect(container.querySelector('button[aria-label="app-chrome.settings"]')).not.toBeNull()
+  })
+
   test('opens create-worktree from the row action', () => {
     const onCreateWorktree = vi.fn()
     const { container } = renderSidebar(

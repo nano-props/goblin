@@ -259,6 +259,66 @@ afterEach(() => {
 })
 
 describe('RepoView workspace navigation', () => {
+  test('renders a non-Git workspace as a Files workspace without mounting Git surfaces', () => {
+    useReposStore.setState((state) => ({
+      repos: {
+        ...state.repos,
+        [REPO_ID]: {
+          ...state.repos[REPO_ID]!,
+          workspaceProbe: {
+            status: 'ready',
+            name: 'workspace',
+            capabilities: {
+              files: { read: true, write: true },
+              terminal: { available: true },
+              git: { status: 'unavailable' },
+            },
+            diagnostics: [],
+          },
+        },
+      },
+    }))
+
+    const { container } = render(<RepoView repoId={REPO_ID} routeView={{ kind: 'empty', repoId: REPO_ID }} />)
+
+    expect(repoWorkspace(container)?.dataset.currentBranchName).toBe('')
+    expect(repoWorkspace(container)?.dataset.workspacePaneRouteKind).toBe('bare')
+    expect(branchNavigator(container)).toBeNull()
+    expect(container.querySelector('[data-testid="dashboard-row-action"]')).toBeNull()
+    expect(container.querySelector('[data-testid="create-worktree-row-action"]')).toBeNull()
+    expect(container.querySelector('[data-testid="branch-filter-action"]')).toBeNull()
+    expect(container.querySelector('[data-testid="repo-sync-action"]')).toBeNull()
+  })
+
+  test('does not mount stale Git routes for a non-Git workspace while navigation converges to root', () => {
+    useReposStore.setState((state) => ({
+      repos: {
+        ...state.repos,
+        [REPO_ID]: {
+          ...state.repos[REPO_ID]!,
+          workspaceProbe: {
+            status: 'ready',
+            name: 'workspace',
+            capabilities: {
+              files: { read: true, write: true },
+              terminal: { available: true },
+              git: { status: 'unavailable' },
+            },
+            diagnostics: [],
+          },
+        },
+      },
+    }))
+
+    const { container } = render(
+      <RepoView repoId={REPO_ID} routeView={{ kind: 'dashboard', repoId: REPO_ID }} />,
+    )
+
+    expect(container.querySelector('[data-testid="repo-dashboard-page"]')).toBeNull()
+    expect(repoWorkspace(container)).not.toBeNull()
+    expect(branchNavigator(container)).toBeNull()
+  })
+
   test('keeps a routed repo on the restore skeleton until workspace membership is ready', () => {
     resetReposStore()
 

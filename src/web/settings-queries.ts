@@ -34,7 +34,10 @@ export function settingsSnapshotQueryOptions(options: { signal?: AbortSignal } =
     // No initial data from the bootstrap — the server no longer
     // inlines it. The query starts pending and the authenticated
     // bootstrap pass populates the cache.
-    staleTime: 0,
+    // Settings changes are pushed through the invalidation ingress and local
+    // mutations update this cache directly. Keeping a freshly fetched snapshot
+    // fresh lets bootstrap and mounted consumers share one authoritative read.
+    staleTime: Infinity,
     gcTime: 5 * 60_000,
   })
 }
@@ -50,12 +53,12 @@ function combineAbortSignals(externalSignal: AbortSignal | undefined, querySigna
   return controller.signal
 }
 
-function externalAppsQueryOptions() {
+export function externalAppsQueryOptions(options: { signal?: AbortSignal } = {}) {
   return queryOptions<ExternalAppsSnapshot>({
     queryKey: externalAppsQueryKey(),
-    queryFn: getExternalAppsSnapshot,
+    queryFn: ({ signal }) => getExternalAppsSnapshot({ signal: combineAbortSignals(options.signal, signal) }),
     // See settingsSnapshotQueryOptions — same rationale.
-    staleTime: 0,
+    staleTime: Infinity,
     gcTime: 5 * 60_000,
   })
 }

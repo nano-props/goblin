@@ -30,6 +30,7 @@ interface RepoShellSidebarProps {
   dashboardSelected?: boolean
   newWorktreeSelected?: boolean
   currentBranchName?: string | null
+  gitAvailable?: boolean
 }
 
 export function RepoLayoutSidebar({
@@ -44,6 +45,7 @@ export function RepoLayoutSidebar({
   dashboardSelected = false,
   newWorktreeSelected = false,
   currentBranchName,
+  gitAvailable = true,
 }: RepoShellSidebarProps) {
   const t = useT()
   return (
@@ -68,8 +70,9 @@ export function RepoLayoutSidebar({
         onOpenDashboard={onOpenDashboard}
         dashboardSelected={dashboardSelected}
         newWorktreeSelected={newWorktreeSelected}
+        gitAvailable={gitAvailable}
       />
-      {repoId ? (
+      {repoId && gitAvailable ? (
         <>
           <RepoShellBranchHeader repoId={repoId} title={t('tab.branches')} />
           <div className="flex min-h-0 flex-1 bg-card">
@@ -92,18 +95,20 @@ function RepoShellPrimaryActions({
   onOpenDashboard,
   dashboardSelected,
   newWorktreeSelected,
+  gitAvailable,
 }: {
   repoId?: string
   onCreateWorktree?: () => void
   onOpenDashboard?: () => void
   dashboardSelected?: boolean
   newWorktreeSelected?: boolean
+  gitAvailable: boolean
 }) {
   return (
     <div className="shrink-0 px-3 pt-4">
       <div className="flex min-w-0 flex-col gap-1">
         <RepoPickerRow repoId={repoId} />
-        {repoId ? (
+        {repoId && gitAvailable ? (
           <>
             <DashboardRowAction repoId={repoId} selected={dashboardSelected} onOpenDashboard={onOpenDashboard} />
             <CreateWorktreeRowAction

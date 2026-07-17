@@ -26,6 +26,7 @@ import { RepoDashboardPane } from '#/web/components/repo-pages/RepoDashboardPane
 import { CreateWorktreePagePane } from '#/web/components/repo-pages/CreateWorktreePagePane.tsx'
 import type { RepoRouteView } from '#/web/App.tsx'
 import { useT } from '#/web/stores/i18n.ts'
+import { workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 
 function EmptyRepoWorkspacePane({ trafficLightOffset }: { trafficLightOffset: boolean }) {
   return (
@@ -76,6 +77,7 @@ export function RepoView({
   )
   const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
   const repo = useReposStore((s) => s.repos[repoId])
+  const gitUnavailable = workspaceGitUnavailable(repo?.workspaceProbe)
   useRepoToasts(repoId)
   const projectionRestore = useRestoreRepoTabsOnView({ repoId: repo ? repoId : null })
 
@@ -83,8 +85,8 @@ export function RepoView({
 
   const currentBranchName = routeView?.kind === 'branch' ? routeView.branchName : null
   const routeWorkspacePageActive = routeView?.kind === 'dashboard' || routeView?.kind === 'newWorktree'
-  const repoWorkspaceActive = currentBranchName !== null || routeWorkspacePageActive
-  const singlePane = currentBranchName || routeWorkspacePageActive ? 'workspace' : 'navigator'
+  const repoWorkspaceActive = gitUnavailable || currentBranchName !== null || routeWorkspacePageActive
+  const singlePane = gitUnavailable || currentBranchName || routeWorkspacePageActive ? 'workspace' : 'navigator'
   const compactWorkspaceCurrentBranchName = useRetainedValueDuringExit({
     value: currentBranchName,
     active: compact && singlePane === 'workspace',
@@ -155,6 +157,7 @@ export function RepoView({
         dashboardSelected={dashboardSelected}
         newWorktreeSelected={newWorktreeSelected}
         currentBranchName={routeBranchName}
+        gitAvailable={!gitUnavailable}
       />
     </RepoWorkspacePane>
   )
@@ -256,7 +259,15 @@ export function RepoView({
       zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
       repoWorkspacePane={
         <RepoWorkspacePane>
-          {routeView?.kind === 'dashboard' ? (
+          {gitUnavailable ? (
+            <RepoWorkspace
+              repoId={repoId}
+              currentBranchName={null}
+              workspacePaneRouteContext={{ kind: 'routed', route: null }}
+              shortcutsEnabled={!compact || singlePane === 'workspace'}
+              toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+            />
+          ) : routeView?.kind === 'dashboard' ? (
             <RepoDashboardPane
               repoId={repoId}
               compact={compact}

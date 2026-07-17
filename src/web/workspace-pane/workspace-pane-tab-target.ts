@@ -111,13 +111,13 @@ export function workspacePaneTabTargetForWorkspace(
   repoId: string,
   options: WorkspacePaneTabTargetOptions = workspacePanePreferenceTargetOptions,
 ): RepoWorkspaceTabModel | null {
-  const resolution = resolveWorkspacePaneTabTarget(repoId, '', repoId, options)
+  const resolution = resolveWorkspacePaneTabTarget(repoId, null, repoId, options)
   return resolution.kind === 'ready' ? resolution.target : null
 }
 
 function resolveWorkspacePaneTabTarget(
   repoId: string,
-  branchName: string,
+  branchName: string | null,
   worktreePath: string | null,
   options: WorkspacePaneTabTargetOptions,
 ): WorkspacePaneTabTargetResolution {
@@ -147,7 +147,11 @@ function resolveWorkspacePaneTabTarget(
       repoRuntimeId: repo.repoRuntimeId,
       branchName,
       worktreePath,
-      preferredTab: preferredWorkspacePaneTabForRoute(repo.ui, { repoRoot: repoId, branchName, worktreePath }, options),
+      preferredTab: preferredWorkspacePaneTabForRoute(
+        repo.ui,
+        { repoRoot: repoId, branchName: branchName ?? '', worktreePath },
+        options,
+      ),
       allowPreferredTabFallback: options.workspacePaneRoute === undefined,
       tabEntries: tabEntriesProjection.tabs,
       tabEntriesProjectionPhase: tabEntriesProjection.phase,

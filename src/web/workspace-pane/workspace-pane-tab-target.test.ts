@@ -15,6 +15,7 @@ import {
   workspacePaneTabInteractionBlockedForBranch,
   workspacePaneTabTargetForBranch,
   workspacePaneTabTargetForCreatedRuntime,
+  workspacePaneTabTargetForWorkspace,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
@@ -30,6 +31,21 @@ beforeEach(() => {
 })
 
 describe('workspace pane tab target read model', () => {
+  test('models the workspace root as a workspace target rather than an empty branch', () => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: REPO_ID,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: '',
+      worktreePath: REPO_ID,
+      tabs: [workspacePaneStaticTabEntry('files')],
+    })
+
+    const target = workspacePaneTabTargetForWorkspace(REPO_ID)
+
+    expect(target).toMatchObject({ branchName: null, worktreePath: REPO_ID, renderedTab: 'files' })
+  })
+
   test('marks target resolution unavailable when the repo branch read model is unavailable', () => {
     const repo = emptyRepo(REPO_ID, 'workspace-pane-target-repo', 'repo-runtime-workspace-pane-no-query')
     useReposStore.setState((s) => ({

@@ -7,10 +7,8 @@ import { bootstrapLog } from '#/web/logger.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { restoreFiletreeViewStateFromSession } from '#/web/filetree-session-state.ts'
 import { restoreRestorableWorkspaceStateFromClientWorkspace } from '#/web/restorable-workspace-state.ts'
-import { getExternalAppsSnapshot, getSettingsSnapshot } from '#/web/settings-client.ts'
 import { restoreWorkspaceAtBoot } from '#/web/settings-actions.ts'
-import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
-import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { externalAppsQueryOptions, settingsSnapshotQueryOptions } from '#/web/settings-queries.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
@@ -77,11 +75,10 @@ function startAuthenticatedWorkspaceRestoreRun(
     AUTHENTICATED_WORKSPACE_RESTORE_TIMEOUT_MS,
     `authenticated workspace restore timed out after ${AUTHENTICATED_WORKSPACE_RESTORE_TIMEOUT_MS}ms`,
   )
-  // One settings read fans out to theme and session restore.
-  // Promise.resolve() converts synchronous configuration failures into the same
-  // async failure channel as fetch errors, so restoreBootSession owns the result.
-  const settingsSnapshot = Promise.resolve().then(() => getSettingsSnapshot({ signal: timeout.signal }))
-  void primeExternalAppsQueryCache(timeout.signal).catch((err) => {
+  // QueryClient owns the settings and external-app reads. Mounted consumers
+  // join these in-flight queries and observe the same cached snapshot.
+  const settingsSnapshot = primaryWindowQueryClient.fetchQuery(settingsSnapshotQueryOptions({ signal: timeout.signal }))
+  void primaryWindowQueryClient.fetchQuery(externalAppsQueryOptions({ signal: timeout.signal })).catch((err) => {
     if (!timeout.signal.aborted) bootstrapLog.warn('external apps priming failed', { err })
   })
   void hydrateNonCriticalAuthenticatedState(settingsSnapshot, timeout.signal)
@@ -110,8 +107,7 @@ async function hydrateNonCriticalAuthenticatedState(
       },
       signal,
     ),
-    runOptionalBootstrapTask('i18n hydrate', () => useI18nStore.getState().hydrate({ signal }), signal),
-    runOptionalBootstrapTask('host-info hydrate', () => useHostInfoStore.getState().hydrate({ signal }), signal),
+    Promise.resolve().then(() => useI18nStore.getState().subscribeInvalidation()),
   ])
 }
 
@@ -124,7 +120,6 @@ async function restoreBootSession(
     useReposStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
     const presentation = await readClientWorkspaceState()
     const snapshot = await abortable(settingsSnapshot, signal)
-    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), snapshot)
     if (signal.aborted) throw abortReason(signal)
     const restored = await abortable(
       restoreWorkspaceAtBoot(readOrCreateWebTerminalClientId(), {
@@ -235,20 +230,5 @@ async function runOptionalBootstrapTask(label: string, task: () => Promise<void>
   } catch (err) {
     if (signal.aborted && isAbortReason(err, signal)) return
     bootstrapLog.warn(`${label} failed`, { err })
-  }
-}
-
-/**
- * Prime external-apps query cache from the authenticated endpoint so settings
- * pages render with persisted values on first paint instead of flashing the
- * defaults. Settings snapshot cache is populated by restoreBootSession, which
- * also owns server-repaired session reconciliation.
- */
-async function primeExternalAppsQueryCache(signal: AbortSignal): Promise<void> {
-  try {
-    primaryWindowQueryClient.setQueryData(externalAppsQueryKey(), await getExternalAppsSnapshot({ signal }))
-  } catch (err) {
-    if (signal.aborted && isAbortReason(err, signal)) return
-    bootstrapLog.warn('external apps query prime failed', { err })
   }
 }

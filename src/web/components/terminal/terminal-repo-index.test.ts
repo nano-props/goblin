@@ -15,6 +15,7 @@ describe('terminal repo index', () => {
       {
         id: REPO_ID,
         repoRuntimeId: 'repo-runtime-terminal-index',
+        gitAvailable: true,
       },
     ]
 

@@ -26,6 +26,49 @@ beforeEach(() => {
 })
 
 describe('createPrimaryWindowNavigationActions', () => {
+  test('activates a non-Git workspace at its Files root without restoring Git navigation history', () => {
+    seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    useReposStore.setState((state) => ({
+      repos: {
+        ...state.repos,
+        [REPO_ID]: {
+          ...state.repos[REPO_ID]!,
+          workspaceProbe: {
+            status: 'ready',
+            name: 'workspace',
+            capabilities: {
+              files: { read: true, write: true },
+              terminal: { available: true },
+              git: { status: 'unavailable' },
+            },
+            diagnostics: [],
+          },
+        },
+      },
+      navigationHistoryByRepo: {
+        ...state.navigationHistoryByRepo,
+        [REPO_ID]: {
+          backStack: [],
+          current: { repoId: REPO_ID, route: { kind: 'dashboard' } },
+          forwardStack: [],
+        },
+      },
+    }))
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: null,
+      order: [REPO_ID],
+      closeRepo: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.activateRepo(REPO_ID)
+
+    expect(navigation.openRepoRoot).toHaveBeenCalledWith(REPO_ID, presentationOptions())
+    expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
+    expect(navigation.openRepoBranch).not.toHaveBeenCalled()
+  })
+
   test('selects branches by resolving the branch workspace pane route', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,

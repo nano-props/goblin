@@ -460,26 +460,19 @@ describe('app bootstrap hooks', () => {
     expect(useReposStore.getState().sessionRestoreError).toBeNull()
   })
 
-  test('passes the restore abort signal to non-critical authenticated hydrates', async () => {
-    let i18nSignal: AbortSignal | undefined
-    let hostInfoSignal: AbortSignal | undefined
-    vi.spyOn(useI18nStore.getState(), 'hydrate').mockImplementation((options = {}) => {
-      i18nSignal = options.signal
-      return new Promise(() => {})
-    })
-    vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockImplementation((options = {}) => {
-      hostInfoSignal = options.signal
-      return new Promise(() => {})
-    })
+  test('subscribes i18n invalidation without refetching public bootstrap state', async () => {
+    const hydrateI18n = vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
+    const subscribeI18n = vi.spyOn(useI18nStore.getState(), 'subscribeInvalidation').mockImplementation(() => {})
+    const hydrateHostInfo = vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockResolvedValue(undefined)
 
-    const result = renderInJsdom(<Harness />)
+    renderInJsdom(<Harness />)
     await flushMicrotasks(2)
-    result.unmount()
 
-    expect(i18nSignal?.aborted).toBe(true)
-    expect(hostInfoSignal?.aborted).toBe(true)
+    expect(subscribeI18n).toHaveBeenCalledTimes(1)
+    expect(hydrateI18n).not.toHaveBeenCalled()
+    expect(hydrateHostInfo).not.toHaveBeenCalled()
   })
 
   test('allows a cancelled StrictMode-style first run to restart and finish', async () => {

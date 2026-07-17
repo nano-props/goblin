@@ -18,6 +18,7 @@ import {
   primaryWindowPresentationIsCurrent,
   type PrimaryWindowPresentationToken,
 } from '#/web/primary-window-presentation.ts'
+import { workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -237,7 +238,13 @@ function restoreRepoPresentationOrOpenDashboard(
   presentationToken: PrimaryWindowPresentationToken,
   options: { onBlocked: 'stay' | 'dashboard' },
 ): void {
-  const entry = useReposStore.getState().navigationHistoryByRepo[repoId]?.current ?? null
+  const state = useReposStore.getState()
+  const repo = state.repos[repoId]
+  if (workspaceGitUnavailable(repo?.workspaceProbe)) {
+    routeNavigation.openRepoRoot(repoId, { presentationToken })
+    return
+  }
+  const entry = state.navigationHistoryByRepo[repoId]?.current ?? null
   // Creating a worktree is a transient workflow, not a repo workspace to resume.
   if (entry && entry.route.kind !== 'newWorktree') {
     const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, { presentationToken })

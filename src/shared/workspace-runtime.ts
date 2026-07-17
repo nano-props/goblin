@@ -80,6 +80,14 @@ export function capabilitiesFromGitProbe(
   }
 }
 
+export function workspaceGitAvailable(probe: WorkspaceProbeState | null | undefined): boolean {
+  return probe?.status === 'ready' && probe.capabilities.git.status === 'available'
+}
+
+export function workspaceGitUnavailable(probe: WorkspaceProbeState | null | undefined): boolean {
+  return probe?.status === 'ready' && probe.capabilities.git.status === 'unavailable'
+}
+
 export function bindWorkspacePaneTarget(
   target: RestorableWorkspacePaneTarget,
   workspaceId: WorkspaceId,
