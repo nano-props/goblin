@@ -14,4 +14,9 @@ describe('workspace native execution paths', () => {
     expect(localWorkspaceNativePath('/legacy/native/path')).toBeNull()
     expect(resolveWorkspaceScopedPath('goblin+file:///repo', '/repo')).toBeNull()
   })
+
+  test('decodes an SSH workspace at its remote execution boundary', () => {
+    const workspaceId = 'goblin+ssh://prod/srv/repo'
+    expect(resolveWorkspaceScopedPath(workspaceId, workspaceId)).toBe('/srv/repo')
+  })
 })

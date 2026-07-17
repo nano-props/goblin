@@ -10,5 +10,5 @@ export function localWorkspaceNativePath(workspaceId: string): string | null {
 /** Resolve the workspace-level target at the native execution boundary. */
 export function resolveWorkspaceScopedPath(workspaceId: string, target: string): string | null {
   if (target !== workspaceId) return null
-  return localWorkspaceNativePath(workspaceId)
+  return parseWorkspaceLocator(workspaceId, process.platform === 'win32' ? 'win32' : 'posix')?.path ?? null
 }
