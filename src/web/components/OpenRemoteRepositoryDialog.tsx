@@ -17,6 +17,7 @@ import { isResolvableRemotePathInput, remoteWorkspaceSessionEntry } from '#/shar
 import { cn } from '#/web/lib/cn.ts'
 import { reportOpenRepoPostOpenEffects } from '#/web/lib/open-repo-result-feedback.ts'
 import type { RemoteDiagnosticsResult, RemoteRepoTarget, SshConfigHost } from '#/shared/remote-repo.ts'
+import { isValidSshProfile } from '#/shared/workspace-locator.ts'
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -302,10 +303,8 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
   )
 }
 
-export function remoteDiagnosticsAllowWorkspaceOpen(
-  result: Pick<RemoteDiagnosticsResult, 'ok' | 'category'>,
-): boolean {
-  return result.ok || result.category === 'not-a-repo' || result.category === 'git-missing'
+export function remoteDiagnosticsAllowWorkspaceOpen(result: Pick<RemoteDiagnosticsResult, 'stages'>): boolean {
+  return result.stages.some((stage) => stage.name === 'path' && stage.status === 'passed')
 }
 
 export function remotePathError(value: string): { errorKey: string | null } {
@@ -317,14 +316,13 @@ export function remotePathError(value: string): { errorKey: string | null } {
 
 export function canSubmitRemoteRepository(input: { alias: string; remotePath: string; pending: boolean }): boolean {
   if (input.pending || remotePathError(input.remotePath).errorKey) return false
-  return input.alias.trim().length > 0
+  return isValidSshProfile(input.alias)
 }
 
 export function buildRemoteConnectionInput(alias: string, remotePath: string) {
   const cleanPath = remotePath.trim()
   if (remotePathError(cleanPath).errorKey) return null
-  const cleanAlias = alias.trim()
-  return cleanAlias ? { alias: cleanAlias, remotePath: cleanPath } : null
+  return isValidSshProfile(alias) ? { alias, remotePath: cleanPath } : null
 }
 
 export function formatRemoteDialogError(

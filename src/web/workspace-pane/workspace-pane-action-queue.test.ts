@@ -9,7 +9,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 const TARGET = {
-  repoId: '/repo',
+  repoId: 'goblin+file:///repo',
   repoRuntimeId: 'repo-runtime-1',
   branchName: 'feature/a',
   worktreePath: '/worktree-a',
@@ -36,10 +36,32 @@ describe('workspace pane action queue', () => {
     await vi.waitFor(() => expect(workspacePaneActionQueueStatsForTest().targetQueues).toBe(0))
   })
 
+  test('serializes workspace-scoped actions without inventing a branch', async () => {
+    const workspaceTarget = {
+      repoId: 'goblin+file:///workspace',
+      repoRuntimeId: 'repo-runtime-1',
+      branchName: '',
+      worktreePath: 'goblin+file:///workspace',
+    }
+    const order: string[] = []
+    const release = Promise.withResolvers<void>()
+    const first = runWorkspacePaneAction(workspaceTarget, async () => {
+      order.push('first')
+      await release.promise
+    })
+    const second = runWorkspacePaneAction(workspaceTarget, () => order.push('second'))
+
+    await Promise.resolve()
+    expect(order).toEqual(['first'])
+    release.resolve()
+    await Promise.all([first, second])
+    expect(order).toEqual(['first', 'second'])
+  })
+
   test.each([
     ['runtime', { ...TARGET, repoRuntimeId: 'repo-runtime-2' }],
     ['worktree', { ...TARGET, worktreePath: '/worktree-b' }],
-    ['branch', { ...TARGET, branchName: 'feature/b' }],
+    ['branch', { ...TARGET, branchName: 'feature/b', worktreePath: null }],
   ] as const)('allows a different %s target to progress independently', async (_resource, otherTarget) => {
     const release = Promise.withResolvers<void>()
     const first = runWorkspacePaneAction(TARGET, async () => await release.promise)

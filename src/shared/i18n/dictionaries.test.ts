@@ -52,4 +52,22 @@ describe('i18n dictionaries', () => {
     expect(ko['repo-picker.open-remote-path-label']).toBe('원격 경로')
     expect(ja['repo-picker.open-remote-path-label']).toBe('リモートパス')
   })
+
+  test('keeps top-level workspace copy independent of Git repository terminology', () => {
+    const workspaceKeys = [
+      'repo-picker.repos',
+      'repo-picker.placeholder',
+      'repo-unavailable.title',
+      'repo-unavailable.body',
+      'repo-unavailable.close',
+      'empty.body',
+      'repo-route.not-found-title',
+      'drop.body',
+      'repo-picker.recent-save-failed',
+    ] as const satisfies readonly DictKey[]
+    for (const key of workspaceKeys) {
+      expect(en[key], key).not.toMatch(/\brepositor(?:y|ies)\b/i)
+      expect(en[key], key).not.toContain('.git')
+    }
+  })
 })

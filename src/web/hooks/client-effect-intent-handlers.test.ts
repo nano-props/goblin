@@ -26,7 +26,7 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
-const REPO_ID = '/tmp/goblin-client-intent-handlers-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-client-intent-handlers-repo'
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()

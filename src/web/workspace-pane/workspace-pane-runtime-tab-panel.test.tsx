@@ -68,13 +68,13 @@ beforeEach(() => {
   resetWorkspacePaneActionQueueForTest()
   resetReposStore()
   seedRepoWithReadModelForTest({
-    id: '/repo',
+    id: 'goblin+file:///repo',
     repoRuntimeId: 'repo-runtime-1',
     branches: [createRepoBranch('main', { worktree: { path: '/repo-worktree' } })],
     currentBranchName: 'main',
   })
   observeWorkspacePaneRouteForTest({
-    repoId: '/repo',
+    repoId: 'goblin+file:///repo',
     repoRuntimeId: 'repo-runtime-1',
     branchName: 'main',
     worktreePath: '/repo-worktree',
@@ -99,7 +99,7 @@ describe('workspace pane runtime tab panel', () => {
     expect(panel?.getAttribute('aria-label')).toBe('Terminal')
     expect(container.querySelector('[data-testid="terminal-session-view"]')).not.toBeNull()
     expect(terminalSessionViewMocks.props[0]).toMatchObject({
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-1',
       branch: 'main',
       worktreePath: '/repo-worktree',
@@ -117,7 +117,7 @@ describe('workspace pane runtime tab panel', () => {
     })
 
     const base: TerminalSessionBase = {
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-1',
       branch: 'stale-branch',
       worktreePath: '/repo-worktree',
@@ -155,9 +155,12 @@ describe('workspace pane runtime tab panel', () => {
       resourceDisposition: 'created',
       runtimeProjectionApplied: true,
     })
-    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).toHaveBeenCalledWith('/repo', 'repo-runtime-1')
+    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).toHaveBeenCalledWith(
+      'goblin+file:///repo',
+      'repo-runtime-1',
+    )
     expect(navigation.commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
-      '/repo',
+      'goblin+file:///repo',
       'main',
       { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
       expect.any(Object),
@@ -175,7 +178,7 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
           workspacePaneId: 'workspace',
           panelLabel: { label: 'Terminal' },
           target: {
-            repoRoot: '/repo',
+            repoRoot: 'goblin+file:///repo',
             repoRuntimeId: 'repo-runtime-1',
             branchName: 'main',
             worktreePath: '/repo-worktree',

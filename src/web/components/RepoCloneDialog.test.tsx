@@ -75,7 +75,7 @@ afterEach(() => {
 
 describe('RepoCloneDialog', () => {
   test('ensures the cloned workspace is open before delegating activation to navigation', async () => {
-    const ensureWorkspaceOpen = vi.fn(async () => ({ ok: true as const, id: '/tmp/cloned-repo' }))
+    const ensureWorkspaceOpen = vi.fn(async () => ({ ok: true as const, id: 'goblin+file:///tmp/cloned-repo' }))
     useReposStore.setState({ ensureWorkspaceOpen })
     const activateRepo = vi.fn()
     const onOpenChange = vi.fn()
@@ -92,14 +92,14 @@ describe('RepoCloneDialog', () => {
     await flush()
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo')
-    expect(activateRepo).toHaveBeenCalledWith('/tmp/cloned-repo')
+    expect(activateRepo).toHaveBeenCalledWith('goblin+file:///tmp/cloned-repo')
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
   test('reports post-open effect failures after opening the cloned workspace', async () => {
     const ensureWorkspaceOpen = vi.fn(async () => ({
       ok: true as const,
-      id: '/tmp/cloned-repo',
+      id: 'goblin+file:///tmp/cloned-repo',
       postOpenEffects: Promise.resolve([{ kind: 'recent-repo' as const, message: 'recent write failed' }]),
     }))
     useReposStore.setState({ ensureWorkspaceOpen })

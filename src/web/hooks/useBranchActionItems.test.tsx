@@ -122,7 +122,7 @@ describe('useBranchActionItems', () => {
 
     expect(mocks.dispatchShowWorkspacePaneStaticTabAction).toHaveBeenCalledWith(
       expect.objectContaining({
-        repoId: '/tmp/goblin-action-items',
+        repoId: 'goblin+file:///tmp/goblin-action-items',
         branchName: 'feature/action-order',
         type: 'history',
       }),
@@ -166,7 +166,7 @@ function allVisibleCapabilities(): BranchActionCapabilities {
 
 function repo(): BranchActionRepo {
   return {
-    id: '/tmp/goblin-action-items',
+    id: 'goblin+file:///tmp/goblin-action-items',
     repoRuntimeId: 'repo-runtime-test',
     branchModel: {
       currentBranch: 'main',

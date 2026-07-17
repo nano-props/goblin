@@ -118,7 +118,13 @@ export interface RemoteRepoConnectionDeps {
   probeRemote: (
     target: RemoteRepoTarget,
     options: { signal?: AbortSignal; timeoutMs: number },
-  ) => Promise<{ ok: true } | { ok: false; category?: string; message?: string }>
+  ) => Promise<{
+    ok: boolean
+    category?: string
+    message?: string
+    gitAtWorkspaceRoot?: boolean
+    stages?: Array<{ name: string; status: string; category?: string }>
+  }>
 }
 
 function defaultRemoteRepoConnectionDeps(): RemoteRepoConnectionDeps {
@@ -180,14 +186,32 @@ export async function resolveServerRemoteRepoConnection(
     timeoutMs: SSH_BOOT_PROBE_TIMEOUT_MS,
   })
   if (!probe.ok) {
+    const pathStage = probe.stages?.find((stage) => stage.name === 'path')
+    if (pathStage?.status === 'failed') {
+      return {
+        kind: 'failed',
+        repoId,
+        name: ref.displayName,
+        lifecycle: {
+          kind: 'failed',
+          reason: toRemoteRepoFailureReason(pathStage.category ?? 'path-missing'),
+          target,
+        },
+      }
+    }
     const reason = toRemoteRepoFailureReason(probe.category ?? probe.message ?? 'unknown')
-    if (reason === 'not-a-repo') {
+    const directoryReadable = probe.stages?.some((stage) => stage.name === 'path' && stage.status === 'passed')
+    if (reason === 'not-a-repo' || directoryReadable) {
       return {
         kind: 'ready',
         repoId,
         name: ref.displayName,
         gitAvailable: false,
-        ...(probe.category === 'git-missing' ? { gitDiagnostic: probe.message ?? 'git-missing' } : {}),
+        ...(probe.category === 'git-missing'
+          ? { gitDiagnostic: probe.message ?? 'git-missing' }
+          : reason === 'not-a-repo'
+            ? {}
+            : { gitDiagnostic: probe.message ?? probe.category ?? 'Git probe failed' }),
         lifecycle: { kind: 'ready', target },
       }
     }
@@ -196,6 +220,16 @@ export async function resolveServerRemoteRepoConnection(
       repoId,
       name: ref.displayName,
       lifecycle: { kind: 'failed', reason, target },
+    }
+  }
+
+  if (probe.gitAtWorkspaceRoot === false) {
+    return {
+      kind: 'ready',
+      repoId,
+      name: ref.displayName,
+      gitAvailable: false,
+      lifecycle: { kind: 'ready', target },
     }
   }
 

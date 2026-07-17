@@ -9,7 +9,7 @@ import {
 import { idleOperation } from '#/web/stores/repos/operations.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
-const REPO_ID = '/tmp/goblin-branch-action-state'
+const REPO_ID = 'goblin+file:///tmp/goblin-branch-action-state'
 
 describe('branch action state projection', () => {
   test('maps active server branch operations onto the branch action operation shape', () => {

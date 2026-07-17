@@ -82,9 +82,9 @@ export const ja: Record<DictKey, string> = {
   // ---- Dependencies ------------------------------------------------------
 
   // ---- Repository picker ---------------------------------------------------
-  'repo-picker.repos': 'リポジトリ',
+  'repo-picker.repos': 'ワークスペース',
   'repo-picker.close-named': '{name} を閉じる',
-  'repo-picker.placeholder': 'リポジトリを選択',
+  'repo-picker.placeholder': 'ワークスペースを選択',
   'repo-picker.open-local': 'ワークスペースを開く…',
   'repo-picker.open-remote': 'リモートワークスペースを開く…',
   'repo-picker.open-title': 'ワークスペースを開く',
@@ -171,11 +171,11 @@ export const ja: Record<DictKey, string> = {
   'repo-picker.open-remote-home-unavailable': 'リモートのホームディレクトリを解決できませんでした',
   'repo-picker.tooltip.last-sync-label': '最終同期',
   'repo-picker.connecting-title': 'SSH に接続中…',
-  'repo-unavailable.title': 'リポジトリパスを利用できません',
+  'repo-unavailable.title': 'ワークスペースを利用できません',
   'repo-unavailable.body':
-    'Goblin はこのパスを Git リポジトリとして読み取れません。フォルダを復元するか .git を作り直してから再試行してください。',
+    'Goblin はこのワークスペースを読み取れません。フォルダとアクセス権を復元してから再試行してください。',
   'repo-unavailable.remote-body':
-    'Goblin はこの SSH リポジトリに再接続できませんでした。SSH エイリアス、ネットワーク接続、リモートパスを確認してから再試行してください。',
+    'Goblin はこの SSH ワークスペースに再接続できませんでした。SSH エイリアス、ネットワーク接続、リモートパスを確認してから再試行してください。',
   'repo-unavailable.remote-connect-failed':
     'Goblin はこのリポジトリに使える SSH セッションを確立できませんでした。認証、ホストへの到達性、ホストキーの信頼設定を確認してから再試行してください。',
   'repo-unavailable.remote-config-changed':
@@ -185,22 +185,22 @@ export const ja: Record<DictKey, string> = {
   'repo-unavailable.remote-path-missing':
     'Goblin は SSH 接続先には到達できましたが、保存済みのリモートパスが存在しなくなっています。リモートパスを更新してから再接続してください。',
   'repo-unavailable.remote-not-a-repo':
-    'Goblin は SSH 接続先には到達できましたが、保存済みのパスは Git リポジトリではなくなっています。パスを確認するか、別のリポジトリに再接続してください。',
+    'Goblin は SSH 接続先には到達できましたが、保存済みのワークスペースパスを利用できません。パスを確認するか、別のワークスペースに再接続してください。',
   'repo-unavailable.path': 'パス',
   'repo-unavailable.reason': '理由',
   'repo-unavailable.retry': '再確認',
-  'repo-unavailable.close': 'リポジトリを閉じる',
+  'repo-unavailable.close': 'ワークスペースを閉じる',
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': 'ワークスペースが開かれていません',
-  'empty.body': 'サイドバーからリポジトリを選択するか、Git フォルダをドラッグしてください。',
-  'repo-route.not-found-title': 'リポジトリが見つかりません',
+  'empty.body': 'サイドバーからワークスペースを選択するか、フォルダをドラッグしてください。',
+  'repo-route.not-found-title': 'ワークスペースが見つかりません',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': 'ドロップしてワークスペースを開く',
-  'drop.body': 'Git リポジトリフォルダを Goblin のどこにでもドロップできます。',
+  'drop.body': 'フォルダを Goblin のどこにでもドロップできます。',
   'drop.open-failed': 'ワークスペースを開けませんでした',
-  'repo-picker.recent-save-failed': 'リポジトリは開きましたが、最近使った項目は更新されませんでした',
+  'repo-picker.recent-save-failed': 'ワークスペースは開きましたが、最近使った項目は更新されませんでした',
 
   // ---- Workspace pane tabs ------------------------------------------------
   'repo.dashboard': 'ダッシュボード',

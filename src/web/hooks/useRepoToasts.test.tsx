@@ -44,7 +44,7 @@ vi.mock('sonner', () => ({
   toast: toastMocks,
 }))
 
-const REPO_ID = '/tmp/repo-toasts-test'
+const REPO_ID = 'goblin+file:///tmp/repo-toasts-test'
 
 beforeEach(() => {
   resetReposStore()

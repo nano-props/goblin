@@ -3,5 +3,6 @@ export interface WorkspaceCapabilityTransitionHost {
     userId: string
     workspaceId: string
     workspaceRuntimeId: string
+    assertCurrent: () => void
   }): Promise<void>
 }

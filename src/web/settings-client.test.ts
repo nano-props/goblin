@@ -160,7 +160,7 @@ describe('settings-client', () => {
 
     const { restoreServerWorkspace } = await import('#/web/settings-client.ts')
     await expect(
-      restoreServerWorkspace('client_test000000000000', { activeRepoRoot: '/tmp/routed-repo' }),
+      restoreServerWorkspace('client_test000000000000', { activeRepoRoot: 'goblin+file:///tmp/routed-repo' }),
     ).resolves.toEqual({
       status: 'restored',
       openWorkspaceEntries: [],
@@ -171,7 +171,7 @@ describe('settings-client', () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(JSON.parse(String(init.body))).toEqual({
       clientId: 'client_test000000000000',
-      activeRepoRoot: '/tmp/routed-repo',
+      activeRepoRoot: 'goblin+file:///tmp/routed-repo',
     })
   })
 
@@ -179,8 +179,8 @@ describe('settings-client', () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const restored = {
       repo: {
-        entry: { kind: 'local' as const, id: '/tmp/routed-repo' },
-        repoRoot: '/tmp/routed-repo',
+        entry: { kind: 'local' as const, id: 'goblin+file:///tmp/routed-repo' },
+        repoRoot: 'goblin+file:///tmp/routed-repo',
         repoRuntimeId: 'repo_runtime_test',
         name: 'routed-repo',
         projection: {
@@ -201,13 +201,13 @@ describe('settings-client', () => {
 
     const { restoreRepoWorkspaceTabs } = await import('#/web/settings-client.ts')
     await expect(
-      restoreRepoWorkspaceTabs('client_test000000000000', '/tmp/routed-repo', 'repo_runtime_test'),
+      restoreRepoWorkspaceTabs('client_test000000000000', 'goblin+file:///tmp/routed-repo', 'repo_runtime_test'),
     ).resolves.toEqual(restored)
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(JSON.parse(String(init.body))).toEqual({
       clientId: 'client_test000000000000',
-      repoRoot: '/tmp/routed-repo',
+      repoRoot: 'goblin+file:///tmp/routed-repo',
       repoRuntimeId: 'repo_runtime_test',
     })
   })
@@ -378,21 +378,21 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        recentWorkspaces: [{ kind: 'local', id: '/tmp/repo' }],
-        addedRepo: { kind: 'local', id: '/tmp/repo' },
+        recentWorkspaces: [{ kind: 'local', id: 'goblin+file:///tmp/repo' }],
+        addedRepo: { kind: 'local', id: 'goblin+file:///tmp/repo' },
       }),
     }))
     const { addRecentWorkspace } = await import('#/web/settings-client.ts')
-    await expect(addRecentWorkspace({ kind: 'local', id: '/tmp/../tmp/repo' })).resolves.toMatchObject({
-      recentWorkspaces: [{ kind: 'local', id: '/tmp/repo' }],
-      addedRepo: { kind: 'local', id: '/tmp/repo' },
+    await expect(addRecentWorkspace({ kind: 'local', id: 'goblin+file:///tmp/repo' })).resolves.toMatchObject({
+      recentWorkspaces: [{ kind: 'local', id: 'goblin+file:///tmp/repo' }],
+      addedRepo: { kind: 'local', id: 'goblin+file:///tmp/repo' },
     })
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/settings/recent-workspaces/add',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ repo: { kind: 'local', id: '/tmp/../tmp/repo' } }),
+        body: JSON.stringify({ repo: { kind: 'local', id: 'goblin+file:///tmp/repo' } }),
       }),
     )
     expect(invokeIpc).toHaveBeenCalledWith(
@@ -400,7 +400,7 @@ describe('settings-client', () => {
         path: 'settings.applyNativeHostProjection',
         input: {
           recentWorkspaces: {
-            recentWorkspaces: [{ kind: 'local', id: '/tmp/repo' }],
+            recentWorkspaces: [{ kind: 'local', id: 'goblin+file:///tmp/repo' }],
           },
         },
       }),
@@ -488,7 +488,7 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        recentWorkspaces: [{ kind: 'local', id: '/existing' }],
+        recentWorkspaces: [{ kind: 'local', id: 'goblin+file:///existing' }],
         addedRepo: null,
       }),
     }))
@@ -496,7 +496,7 @@ describe('settings-client', () => {
     await expect(
       addRecentWorkspace({ kind: 'local', id: '/bad\0repo' } as unknown as { kind: 'local'; id: string }),
     ).resolves.toMatchObject({
-      recentWorkspaces: [{ kind: 'local', id: '/existing' }],
+      recentWorkspaces: [{ kind: 'local', id: 'goblin+file:///existing' }],
       addedRepo: null,
     })
     expect(invokeIpc).toHaveBeenCalledWith(
@@ -504,7 +504,7 @@ describe('settings-client', () => {
         path: 'settings.applyNativeHostProjection',
         input: {
           recentWorkspaces: {
-            recentWorkspaces: [{ kind: 'local', id: '/existing' }],
+            recentWorkspaces: [{ kind: 'local', id: 'goblin+file:///existing' }],
           },
         },
       }),
@@ -591,12 +591,14 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({
         ok: true,
-        recentWorkspaces: [{ kind: 'local', id: '/persisted' }],
-        addedRepo: { kind: 'local', id: '/persisted' },
+        recentWorkspaces: [{ kind: 'local', id: 'goblin+file:///persisted' }],
+        addedRepo: { kind: 'local', id: 'goblin+file:///persisted' },
       }),
     }))
     const { addRecentWorkspace } = await import('#/web/settings-client.ts')
-    await expect(addRecentWorkspace({ kind: 'local', id: '/persisted' })).rejects.toThrow('projection IPC rejected')
+    await expect(addRecentWorkspace({ kind: 'local', id: 'goblin+file:///persisted' })).rejects.toThrow(
+      'projection IPC rejected',
+    )
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 

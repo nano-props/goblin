@@ -27,7 +27,15 @@ vi.mock('#/server/modules/repo-runtimes.ts', () => ({
     mocks.workspaceProbes.set(input.repoRoot, input.probe)
     return true
   }),
-  workspaceProbeStateForRuntime: vi.fn((_userId, repoRoot) => mocks.workspaceProbes.get(repoRoot) ?? gitProbe()),
+  commitOrReadInitialWorkspaceProbeState: vi.fn((input) => {
+    const current = mocks.workspaceProbes.get(input.repoRoot)
+    if (current) return current
+    mocks.workspaceProbes.set(input.repoRoot, input.probe)
+    return input.probe
+  }),
+  workspaceProbeStateForRuntime: vi.fn(
+    (_userId, repoRoot) => mocks.workspaceProbes.get(repoRoot) ?? { status: 'probing' },
+  ),
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({

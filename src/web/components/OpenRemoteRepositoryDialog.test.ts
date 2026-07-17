@@ -15,13 +15,10 @@ describe('OpenRemoteRepositoryDialog helpers', () => {
   })
 
   test('allows manual aliases as long as alias and path are valid', () => {
-    expect(
-      canSubmitRemoteRepository({
-        alias: 'prod',
-        remotePath: '/srv/repo',
-        pending: false,
-      }),
-    ).toBe(true)
+    for (const alias of ['-F', '.', '..', 'bad alias', '服务器']) {
+      expect(canSubmitRemoteRepository({ alias, remotePath: '/srv/repo', pending: false })).toBe(false)
+      expect(buildRemoteConnectionInput(alias, '/srv/repo')).toBeNull()
+    }
     expect(
       canSubmitRemoteRepository({
         alias: 'prod',
@@ -36,10 +33,33 @@ describe('OpenRemoteRepositoryDialog helpers', () => {
     expect(remotePathError('~/repo').errorKey).toBeNull()
   })
 
-  test('allows a reachable non-Git SSH directory to open as a workspace', () => {
-    expect(remoteDiagnosticsAllowWorkspaceOpen({ ok: false, category: 'not-a-repo' })).toBe(true)
-    expect(remoteDiagnosticsAllowWorkspaceOpen({ ok: false, category: 'git-missing' })).toBe(true)
-    expect(remoteDiagnosticsAllowWorkspaceOpen({ ok: false, category: 'auth-failed' })).toBe(false)
+  test('uses the passed path stage as the workspace-open admission boundary', () => {
+    expect(
+      remoteDiagnosticsAllowWorkspaceOpen({
+        stages: [
+          { name: 'path', label: 'path', status: 'passed' },
+          { name: 'git', label: 'git', status: 'failed', category: 'timeout' },
+        ],
+      }),
+    ).toBe(true)
+    expect(
+      remoteDiagnosticsAllowWorkspaceOpen({
+        stages: [
+          { name: 'path', label: 'path', status: 'passed' },
+          { name: 'repo', label: 'repo', status: 'failed', category: 'not-a-repo' },
+        ],
+      }),
+    ).toBe(true)
+    expect(
+      remoteDiagnosticsAllowWorkspaceOpen({
+        stages: [{ name: 'path', label: 'path', status: 'failed', category: 'path-missing' }],
+      }),
+    ).toBe(false)
+    expect(
+      remoteDiagnosticsAllowWorkspaceOpen({
+        stages: [{ name: 'ssh', label: 'ssh', status: 'failed', category: 'auth-failed' }],
+      }),
+    ).toBe(false)
   })
 
   test('keeps raw dialog errors as-is instead of leaking a missing i18n lookup', () => {

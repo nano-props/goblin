@@ -28,7 +28,7 @@ vi.mock('#/web/workspace-pane/workspace-pane-tabs-query.ts', () => ({
   refreshWorkspacePaneTabsQueryData: workspacePaneRuntimeMocks.refreshTabs,
 }))
 
-const REPO_ROOT = '/repo'
+const REPO_ROOT = 'goblin+file:///repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/repo'
 const BRANCH = 'main'
@@ -656,11 +656,7 @@ describe('TerminalSessionProjection', () => {
       ;(projection as any).ensureSession(makeDescriptor('term-111111111111111111111', 1))
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
 
-      projection.reconcileServerSessions(
-        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
-        [],
-        'client_local',
-      )
+      projection.reconcileServerSessions({ repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }, [], 'client_local')
 
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
     })
@@ -725,11 +721,7 @@ describe('TerminalSessionProjection', () => {
         projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),
       ).toEqual([terminalSessionId])
 
-      projection.reconcileServerSessions(
-        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
-        [],
-        'client_local',
-      )
+      projection.reconcileServerSessions({ repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }, [], 'client_local')
 
       expect(
         projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),

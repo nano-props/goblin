@@ -19,8 +19,8 @@ describe('persistedOpenWorkspaceEntries', () => {
     expect(target).not.toBeNull()
 
     expect(
-      persistedOpenWorkspaceEntries(['/tmp/repo-a', target!.id, '/tmp/missing'], {
-        '/tmp/repo-a': { id: '/tmp/repo-a', remote: { lifecycle: null } },
+      persistedOpenWorkspaceEntries(['goblin+file:///tmp/repo-a', target!.id, '/tmp/missing'], {
+        'goblin+file:///tmp/repo-a': { id: 'goblin+file:///tmp/repo-a', remote: { lifecycle: null } },
         [target!.id]: {
           id: target!.id,
           remote: {
@@ -29,7 +29,7 @@ describe('persistedOpenWorkspaceEntries', () => {
         },
       }),
     ).toEqual([
-      { kind: 'local', id: '/tmp/repo-a' },
+      { kind: 'local', id: 'goblin+file:///tmp/repo-a' },
       {
         kind: 'remote',
         id: target!.id,
@@ -71,23 +71,37 @@ describe('persistedOpenWorkspaceEntries', () => {
 
 describe('nextRestoredRepoIdAfterWorkspaceClose', () => {
   test('keeps the active selection when closing an inactive workspace', () => {
-    expect(nextRestoredRepoIdAfterWorkspaceClose(['/tmp/repo-a', '/tmp/repo-b'], '/tmp/repo-a', '/tmp/repo-b')).toBe(
-      '/tmp/repo-a',
-    )
+    expect(
+      nextRestoredRepoIdAfterWorkspaceClose(
+        ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
+        'goblin+file:///tmp/repo-a',
+        'goblin+file:///tmp/repo-b',
+      ),
+    ).toBe('goblin+file:///tmp/repo-a')
   })
 
   test('slides to the right neighbor, then the left, then null', () => {
     expect(
       nextRestoredRepoIdAfterWorkspaceClose(
-        ['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'],
-        '/tmp/repo-b',
-        '/tmp/repo-b',
+        ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b', 'goblin+file:///tmp/repo-c'],
+        'goblin+file:///tmp/repo-b',
+        'goblin+file:///tmp/repo-b',
       ),
-    ).toBe('/tmp/repo-c')
-    expect(nextRestoredRepoIdAfterWorkspaceClose(['/tmp/repo-a', '/tmp/repo-b'], '/tmp/repo-b', '/tmp/repo-b')).toBe(
-      '/tmp/repo-a',
-    )
-    expect(nextRestoredRepoIdAfterWorkspaceClose(['/tmp/repo-a'], '/tmp/repo-a', '/tmp/repo-a')).toBeNull()
+    ).toBe('goblin+file:///tmp/repo-c')
+    expect(
+      nextRestoredRepoIdAfterWorkspaceClose(
+        ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
+        'goblin+file:///tmp/repo-b',
+        'goblin+file:///tmp/repo-b',
+      ),
+    ).toBe('goblin+file:///tmp/repo-a')
+    expect(
+      nextRestoredRepoIdAfterWorkspaceClose(
+        ['goblin+file:///tmp/repo-a'],
+        'goblin+file:///tmp/repo-a',
+        'goblin+file:///tmp/repo-a',
+      ),
+    ).toBeNull()
   })
 })
 
@@ -95,33 +109,45 @@ describe('restoredRepoIdAfterWorkspaceHydration', () => {
   test('preserves a user-selected restored repo over the persisted restored repo', () => {
     expect(
       restoredRepoIdAfterWorkspaceHydration(
-        '/tmp/repo-a',
-        { '/tmp/repo-a': {}, '/tmp/repo-b': {} },
-        ['/tmp/repo-a', '/tmp/repo-b'],
-        '/tmp/repo-b',
+        'goblin+file:///tmp/repo-a',
+        { 'goblin+file:///tmp/repo-a': {}, 'goblin+file:///tmp/repo-b': {} },
+        ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
+        'goblin+file:///tmp/repo-b',
         null,
       ),
-    ).toBe('/tmp/repo-a')
+    ).toBe('goblin+file:///tmp/repo-a')
   })
 
   test('falls back to the restored preferred repo and then the first open workspace when no preferred repo was restored', () => {
     expect(
       restoredRepoIdAfterWorkspaceHydration(
         null,
-        { '/tmp/repo-a': {}, '/tmp/repo-b': {} },
-        ['/tmp/repo-a', '/tmp/repo-b'],
-        '/tmp/repo-b',
+        { 'goblin+file:///tmp/repo-a': {}, 'goblin+file:///tmp/repo-b': {} },
+        ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
+        'goblin+file:///tmp/repo-b',
         null,
       ),
-    ).toBe('/tmp/repo-b')
-    expect(restoredRepoIdAfterWorkspaceHydration(null, { '/tmp/repo-a': {} }, ['/tmp/repo-a'], null, null)).toBe(
-      '/tmp/repo-a',
-    )
+    ).toBe('goblin+file:///tmp/repo-b')
+    expect(
+      restoredRepoIdAfterWorkspaceHydration(
+        null,
+        { 'goblin+file:///tmp/repo-a': {} },
+        ['goblin+file:///tmp/repo-a'],
+        null,
+        null,
+      ),
+    ).toBe('goblin+file:///tmp/repo-a')
   })
 
   test('does not select the first restored repo while the persisted restored repo is still unavailable', () => {
     expect(
-      restoredRepoIdAfterWorkspaceHydration(null, { '/tmp/repo-a': {} }, ['/tmp/repo-a'], '/tmp/missing', null),
+      restoredRepoIdAfterWorkspaceHydration(
+        null,
+        { 'goblin+file:///tmp/repo-a': {} },
+        ['goblin+file:///tmp/repo-a'],
+        '/tmp/missing',
+        null,
+      ),
     ).toBeNull()
   })
 })

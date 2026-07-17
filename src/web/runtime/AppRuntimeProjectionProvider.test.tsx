@@ -5,11 +5,7 @@ import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import type {
-  TerminalAttachResult,
-  TerminalSessionSummary,
-  TerminalSessionsSnapshot,
-} from '#/shared/terminal-types.ts'
+import type { TerminalAttachResult, TerminalSessionSummary, TerminalSessionsSnapshot } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
@@ -573,7 +569,7 @@ function seedCurrentRepo() {
 function seedSecondRepo() {
   const current = useReposStore.getState()
   const secondRepo = seedRepoWithReadModelForTest({
-    id: '/tmp/goblin-runtime-provider-repo-2',
+    id: 'goblin+file:///tmp/goblin-runtime-provider-repo-2',
     branches: [createRepoBranch('feature/other', { worktree: { path: '/tmp/goblin-runtime-provider-worktree-2' } })],
     currentBranchName: 'feature/other',
     preferredWorkspacePaneTab: 'terminal',

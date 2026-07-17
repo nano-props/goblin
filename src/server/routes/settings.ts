@@ -6,6 +6,7 @@ import { restoreServerWorkspace } from '#/server/modules/session-restore.ts'
 import { restoreRepoTabsForRepo } from '#/server/modules/repo-workspace-tabs-restore.ts'
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import {
   handleSetFetchInterval,
   handleSetGlobalShortcutRegistered,
@@ -27,8 +28,9 @@ import {
 export function createSettingsRoutes(options: {
   settingsState: NativeShortcutRegistrationState
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
+  workspaceCapabilityTransitionHost?: WorkspaceCapabilityTransitionHost
 }) {
-  const { settingsState, workspacePaneTabsHost } = options
+  const { settingsState, workspacePaneTabsHost, workspaceCapabilityTransitionHost } = options
   const app = createRouteApp()
   app.get('/', async (c) => c.json(await getSettingsSnapshot(settingsState)))
   app.post('/github-cli', async (c) => {
@@ -78,6 +80,7 @@ export function createSettingsRoutes(options: {
         clientId,
         activeRepoRoot: activeRepoRoot ?? null,
         workspacePaneTabsHost,
+        workspaceCapabilityTransitionHost,
         signal: c.req.raw.signal,
       }),
     )
@@ -105,6 +108,7 @@ export function createSettingsRoutes(options: {
         repoRoot,
         repoRuntimeId,
         workspacePaneTabsHost,
+        workspaceCapabilityTransitionHost,
         signal: c.req.raw.signal,
       }),
     )

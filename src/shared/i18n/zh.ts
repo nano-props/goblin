@@ -74,9 +74,9 @@ export const zh: Record<DictKey, string> = {
   // ---- Dependencies ------------------------------------------------------
 
   // ---- Repository picker ---------------------------------------------------
-  'repo-picker.repos': '仓库',
+  'repo-picker.repos': '工作区',
   'repo-picker.close-named': '关闭 {name}',
-  'repo-picker.placeholder': '选择仓库',
+  'repo-picker.placeholder': '选择工作区',
   'repo-picker.open-local': '打开工作区…',
   'repo-picker.open-remote': '打开远程工作区…',
   'repo-picker.open-title': '打开工作区',
@@ -159,9 +159,9 @@ export const zh: Record<DictKey, string> = {
   'repo-picker.open-remote-home-unavailable': '无法解析远程主目录',
   'repo-picker.tooltip.last-sync-label': '上次同步',
   'repo-picker.connecting-title': '正在连接 SSH…',
-  'repo-unavailable.title': '仓库路径不可用',
-  'repo-unavailable.body': 'Goblin 无法把这个路径作为 Git 仓库读取。请恢复文件夹或重新创建 .git 后重试。',
-  'repo-unavailable.remote-body': 'Goblin 无法重新连接这个 SSH 仓库。请检查 SSH 别名、网络连通性和远端路径后再试。',
+  'repo-unavailable.title': '工作区不可用',
+  'repo-unavailable.body': 'Goblin 无法读取这个工作区。请恢复文件夹及其访问权限后重试。',
+  'repo-unavailable.remote-body': 'Goblin 无法重新连接这个 SSH 工作区。请检查 SSH 别名、网络连通性和远端路径后再试。',
   'repo-unavailable.remote-connect-failed':
     'Goblin 无法建立可用的 SSH 会话。请检查认证、主机连通性和主机密钥信任后再试。',
   'repo-unavailable.remote-config-changed': '已保存的 SSH 别名无法再从当前 SSH 配置中解析。请检查别名设置后重新连接。',
@@ -170,22 +170,22 @@ export const zh: Record<DictKey, string> = {
   'repo-unavailable.remote-path-missing':
     'Goblin 已连接到 SSH 目标，但保存的远端路径已不存在。请更新远端路径后重新连接。',
   'repo-unavailable.remote-not-a-repo':
-    'Goblin 已连接到 SSH 目标，但保存的路径已不再是 Git 仓库。请检查路径或重新连接到其他仓库。',
+    'Goblin 已连接到 SSH 目标，但保存的工作区路径不可用。请检查路径或重新连接到其他工作区。',
   'repo-unavailable.path': '路径',
   'repo-unavailable.reason': '原因',
   'repo-unavailable.retry': '重新检测',
-  'repo-unavailable.close': '关闭仓库',
+  'repo-unavailable.close': '关闭工作区',
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': '未打开工作区',
-  'empty.body': '从边栏选择仓库，或拖入 Git 文件夹。',
-  'repo-route.not-found-title': '未找到仓库',
+  'empty.body': '从边栏选择工作区，或拖入文件夹。',
+  'repo-route.not-found-title': '未找到工作区',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': '松手打开工作区',
-  'drop.body': '把 Git 仓库文件夹拖到 Goblin 任意位置。',
+  'drop.body': '把文件夹拖到 Goblin 任意位置。',
   'drop.open-failed': '无法打开工作区',
-  'repo-picker.recent-save-failed': '仓库已打开，但最近记录未更新',
+  'repo-picker.recent-save-failed': '工作区已打开，但最近记录未更新',
 
   // ---- Workspace pane tabs ------------------------------------------------
   'repo.dashboard': '仪表盘',

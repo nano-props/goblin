@@ -168,7 +168,7 @@ import {
   setTerminalSessionProjectionForTests,
 } from '#/web/components/terminal/TerminalSessionProjection.ts'
 
-const REPO_ROOT = '/repo'
+const REPO_ROOT = 'goblin+file:///repo'
 const WORKTREE_PATH = '/repo'
 const BRANCH = 'main'
 const WORKTREE_KEY = `${REPO_ROOT}\0${WORKTREE_PATH}`

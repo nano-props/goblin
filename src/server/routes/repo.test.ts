@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
-import { clearRepoRuntimesForUser, commitWorkspaceProbeState } from '#/server/modules/repo-runtimes.ts'
+import {
+  clearRepoRuntimesForUser,
+  commitWorkspaceProbeState,
+  runSerializedWorkspaceRefresh,
+} from '#/server/modules/repo-runtimes.ts'
 import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 
@@ -354,14 +358,14 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
     const opened = await post('/runtime-open', { repoRoot: '/tmp/raw-path', clientId: 'client-test' })
     expect(opened.status).toBe(400)
-    await expect(opened.json()).resolves.toMatchObject({ message: 'error.workspace-locator-malformed' })
+    await expect(opened.json()).resolves.toMatchObject({ message: 'repoRoot: Invalid workspace ID' })
 
     const reconciled = await post('/runtime-reconcile', {
       clientId: 'client-test',
       repoRoots: ['goblin+file:///tmp/valid', '/tmp/raw-path'],
     })
     expect(reconciled.status).toBe(400)
-    await expect(reconciled.json()).resolves.toMatchObject({ message: 'error.workspace-locator-malformed' })
+    await expect(reconciled.json()).resolves.toMatchObject({ message: 'repoRoots.1: Invalid workspace ID' })
     const listed = await post('/runtime-list', {})
     await expect(listed.json()).resolves.toEqual({ runtimes: [] })
   })
@@ -398,6 +402,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       userId: 'user-test',
       workspaceId,
       workspaceRuntimeId,
+      assertCurrent: expect.any(Function),
     })
   })
 
@@ -405,11 +410,11 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     const app = createTestRepoRoutes()
     const workspaceId = 'goblin+file:///tmp/plain-workspace'
     const workspaceRuntimeId = await openTestRepoRuntime(app, workspaceId)
-    commitWorkspaceProbeState({
+    await runSerializedWorkspaceRefresh({
       userId: 'user-test',
       repoRoot: workspaceId,
       repoRuntimeId: workspaceRuntimeId,
-      probe: {
+      probe: async () => ({
         status: 'ready',
         name: 'plain-workspace',
         capabilities: {
@@ -418,7 +423,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
           git: { status: 'unavailable' },
         },
         diagnostics: [],
-      },
+      }),
     })
 
     const response = await app.request(

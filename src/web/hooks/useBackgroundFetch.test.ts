@@ -6,24 +6,26 @@ import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 describe('backgroundSyncRepoIdsFromStore', () => {
   test('keeps the visible remotely backed repo registered while local refresh data loads are busy', () => {
     const repo = createRepo({
-      id: '/repo',
+      id: 'goblin+file:///repo',
       remote: { hasRemotes: true, hasGitHubRemote: true },
       availability: { phase: 'available' },
     })
     repo.dataLoads.repoReadModel.phase = 'refreshing'
     repo.operations.repoReadModel.phase = 'running'
 
-    expect(backgroundSyncRepoIdsFromStore({ repos: { '/repo': repo } }, '/repo')).toEqual(['/repo'])
+    expect(backgroundSyncRepoIdsFromStore({ repos: { 'goblin+file:///repo': repo } }, 'goblin+file:///repo')).toEqual([
+      'goblin+file:///repo',
+    ])
   })
 
   test('only registers the current repo and excludes local-only and unavailable repos', () => {
     const localOnly = createRepo({
-      id: '/local',
+      id: 'goblin+file:///local',
       remote: { hasRemotes: false, hasGitHubRemote: false },
       availability: { phase: 'available' },
     })
     const unavailable = createRepo({
-      id: '/down',
+      id: 'goblin+file:///down',
       remote: { hasRemotes: true, hasGitHubRemote: true },
       availability: { phase: 'unavailable', reason: 'error.failed-read-repo', checkedAt: Date.now() },
     })
@@ -31,17 +33,17 @@ describe('backgroundSyncRepoIdsFromStore', () => {
     expect(
       backgroundSyncRepoIdsFromStore(
         {
-          repos: { '/local': localOnly, '/down': unavailable },
+          repos: { 'goblin+file:///local': localOnly, 'goblin+file:///down': unavailable },
         },
-        '/local',
+        'goblin+file:///local',
       ),
     ).toEqual([])
     expect(
       backgroundSyncRepoIdsFromStore(
         {
-          repos: { '/local': localOnly, '/down': unavailable },
+          repos: { 'goblin+file:///local': localOnly, 'goblin+file:///down': unavailable },
         },
-        '/down',
+        'goblin+file:///down',
       ),
     ).toEqual([])
   })

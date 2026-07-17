@@ -44,20 +44,20 @@ describe('repo projection query effects', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const pruneTerminals = vi.fn(async () => ({ pruned: 0, remaining: 0 }))
     installGoblinTestBridge({ 'terminal.prune': pruneTerminals })
-    const repo = seedRepoShellForTest({ id: '/repo', repoRuntimeId: 'repo-runtime-test-1' })
+    const repo = seedRepoShellForTest({ id: 'goblin+file:///repo', repoRuntimeId: 'repo-runtime-test-1' })
     renderInJsdom(<Harness queryClient={queryClient} />)
 
     try {
       await queryClient.fetchQuery({
-        queryKey: repoProjectionQueryKey('/repo', repo.repoRuntimeId, null, 'full'),
+        queryKey: repoProjectionQueryKey('goblin+file:///repo', repo.repoRuntimeId, null, 'full'),
         queryFn: async () => projection(123),
         staleTime: Number.POSITIVE_INFINITY,
       })
 
       await vi.waitFor(() => {
-        expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(123)
+        expect(getRepoOperationsQueryData('goblin+file:///repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(123)
       })
-      expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+      expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
       expect(pruneTerminals).not.toHaveBeenCalled()
     } finally {
       queryClient.clear()
@@ -68,18 +68,18 @@ describe('repo projection query effects', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const pruneTerminals = vi.fn(async () => ({ pruned: 0, remaining: 0 }))
     installGoblinTestBridge({ 'terminal.prune': pruneTerminals })
-    const repo = seedRepoShellForTest({ id: '/repo', repoRuntimeId: 'repo-runtime-test-1' })
+    const repo = seedRepoShellForTest({ id: 'goblin+file:///repo', repoRuntimeId: 'repo-runtime-test-1' })
     renderInJsdom(<Harness queryClient={queryClient} />)
 
     try {
       await queryClient.fetchQuery({
-        queryKey: repoProjectionQueryKey('/repo', repo.repoRuntimeId, null, 'full'),
+        queryKey: repoProjectionQueryKey('goblin+file:///repo', repo.repoRuntimeId, null, 'full'),
         queryFn: async () => projection(0),
         staleTime: Number.POSITIVE_INFINITY,
       })
 
-      expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)).toBeUndefined()
-      expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+      expect(getRepoOperationsQueryData('goblin+file:///repo', repo.repoRuntimeId, queryClient)).toBeUndefined()
+      expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
       expect(pruneTerminals).not.toHaveBeenCalled()
     } finally {
       queryClient.clear()
@@ -97,12 +97,18 @@ describe('repo projection query effects', () => {
           releases.push(resolve)
         }),
     })
-    const repo = seedRepoShellForTest({ id: '/repo', repoRuntimeId: 'repo-runtime-test-1' })
+    const repo = seedRepoShellForTest({ id: 'goblin+file:///repo', repoRuntimeId: 'repo-runtime-test-1' })
     renderInJsdom(<Harness queryClient={queryClient} />)
-    setRepoOperationsQueryData('/repo', repo.repoRuntimeId, false, { operations: [], loadedAt: 0 }, queryClient)
+    setRepoOperationsQueryData(
+      'goblin+file:///repo',
+      repo.repoRuntimeId,
+      false,
+      { operations: [], loadedAt: 0 },
+      queryClient,
+    )
     const observer = new QueryObserver(
       queryClient,
-      repoProjectionQueryOptions('/repo', repo.repoRuntimeId, null, 'full'),
+      repoProjectionQueryOptions('goblin+file:///repo', repo.repoRuntimeId, null, 'full'),
     )
     const unsubscribe = observer.subscribe(() => {})
     try {
@@ -110,21 +116,21 @@ describe('repo projection query effects', () => {
         expect(releases).toHaveLength(1)
       })
 
-      invalidateRepoRuntimeProjectionQueries('/repo', repo.repoRuntimeId, queryClient)
+      invalidateRepoRuntimeProjectionQueries('goblin+file:///repo', repo.repoRuntimeId, queryClient)
       releases[0]!(projection(1, 'stale'))
       await vi.waitFor(() => {
         expect(releases).toHaveLength(2)
       })
 
-      expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(0)
-      expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+      expect(getRepoOperationsQueryData('goblin+file:///repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(0)
+      expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
       expect(pruneTerminals).not.toHaveBeenCalled()
 
       releases[1]!(projection(2, 'fresh'))
       await vi.waitFor(() => {
-        expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(2)
+        expect(getRepoOperationsQueryData('goblin+file:///repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(2)
       })
-      expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+      expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
       expect(pruneTerminals).not.toHaveBeenCalled()
     } finally {
       unsubscribe()
@@ -143,12 +149,18 @@ describe('repo projection query effects', () => {
           releases.push(resolve)
         }),
     })
-    const repo = seedRepoShellForTest({ id: '/repo', repoRuntimeId: 'repo-runtime-test-1' })
+    const repo = seedRepoShellForTest({ id: 'goblin+file:///repo', repoRuntimeId: 'repo-runtime-test-1' })
     renderInJsdom(<Harness queryClient={queryClient} />)
-    setRepoOperationsQueryData('/repo', repo.repoRuntimeId, false, { operations: [], loadedAt: 0 }, queryClient)
+    setRepoOperationsQueryData(
+      'goblin+file:///repo',
+      repo.repoRuntimeId,
+      false,
+      { operations: [], loadedAt: 0 },
+      queryClient,
+    )
     const observer = new QueryObserver(
       queryClient,
-      repoProjectionQueryOptions('/repo', repo.repoRuntimeId, null, 'full'),
+      repoProjectionQueryOptions('goblin+file:///repo', repo.repoRuntimeId, null, 'full'),
     )
     const unsubscribe = observer.subscribe(() => {})
     try {
@@ -156,27 +168,27 @@ describe('repo projection query effects', () => {
         expect(releases).toHaveLength(1)
       })
 
-      invalidateRepoDataQueries('/repo', repo.repoRuntimeId, queryClient)
+      invalidateRepoDataQueries('goblin+file:///repo', repo.repoRuntimeId, queryClient)
       releases[0]!(projection(1, 'stale'))
       await vi.waitFor(() => {
         expect(releases).toHaveLength(2)
       })
       expect(pruneTerminals).not.toHaveBeenCalled()
-      expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(0)
+      expect(getRepoOperationsQueryData('goblin+file:///repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(0)
 
-      invalidateRepoDataQueries('/repo', repo.repoRuntimeId, queryClient)
+      invalidateRepoDataQueries('goblin+file:///repo', repo.repoRuntimeId, queryClient)
       releases[1]!(projection(2, 'stale-rerun'))
       await vi.waitFor(() => {
         expect(releases).toHaveLength(3)
       })
       expect(pruneTerminals).not.toHaveBeenCalled()
-      expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(0)
+      expect(getRepoOperationsQueryData('goblin+file:///repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(0)
 
       releases[2]!(projection(3, 'fresh'))
       await vi.waitFor(() => {
-        expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(3)
+        expect(getRepoOperationsQueryData('goblin+file:///repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(3)
       })
-      expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+      expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
       expect(pruneTerminals).not.toHaveBeenCalled()
     } finally {
       unsubscribe()
@@ -195,15 +207,18 @@ describe('repo projection query effects', () => {
           releases.push(resolve)
         }),
     })
-    const repo = seedRepoShellForTest({ id: '/repo', repoRuntimeId: 'repo-runtime-test-1' })
-    const observer = new QueryObserver(queryClient, repoProjectionQueryOptions('/repo', repo.repoRuntimeId, null, 'full'))
+    const repo = seedRepoShellForTest({ id: 'goblin+file:///repo', repoRuntimeId: 'repo-runtime-test-1' })
+    const observer = new QueryObserver(
+      queryClient,
+      repoProjectionQueryOptions('goblin+file:///repo', repo.repoRuntimeId, null, 'full'),
+    )
     const unsubscribe = observer.subscribe(() => {})
     try {
       await vi.waitFor(() => {
         expect(releases).toHaveLength(1)
       })
 
-      invalidateRepoRuntimeProjectionQueries('/repo', repo.repoRuntimeId, queryClient)
+      invalidateRepoRuntimeProjectionQueries('goblin+file:///repo', repo.repoRuntimeId, queryClient)
       renderInJsdom(<Harness queryClient={queryClient} />)
       releases[0]!(projection(1, 'stale'))
 
@@ -211,7 +226,7 @@ describe('repo projection query effects', () => {
         expect(releases).toHaveLength(2)
       })
       expect(observer.getCurrentResult().data).toBeUndefined()
-      expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+      expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
       expect(pruneTerminals).not.toHaveBeenCalled()
 
       releases[1]!(projection(2, 'fresh'))

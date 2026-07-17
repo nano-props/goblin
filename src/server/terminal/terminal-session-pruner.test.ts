@@ -13,7 +13,7 @@ vi.mock('#/system/git/worktrees.ts', () => ({
 
 const USER_ID = 'user_terminal_pruner'
 const SCOPE = 'repo-runtime-terminal-pruner'
-const REPO_ROOT = '/repo'
+const REPO_ROOT = 'goblin+file:///repo'
 const LIVE_WORKTREE_PATH = '/repo/live-worktree'
 const STALE_WORKTREE_PATH = '/repo/stale-worktree'
 const REMOTE_REPO_ROOT = 'goblin+ssh://prod/srv/repo'

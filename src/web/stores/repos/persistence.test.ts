@@ -78,22 +78,22 @@ describe('normalizeRepoSnapshotCache', () => {
 describe('persistRepoSnapshotCacheEntry', () => {
   test('does not write a stale cache entry after the repo runtime changes', () => {
     const staleRepo = seedRepoWithReadModelForTest({
-      id: '/repo',
+      id: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test',
       branches: [createRepoBranch('main')],
       currentBranch: 'main',
       currentBranchName: 'main',
     })
-    seedRepoWithReadModelForTest({ id: '/repo', repoRuntimeId: 'repo-runtime-test-2' })
+    seedRepoWithReadModelForTest({ id: 'goblin+file:///repo', repoRuntimeId: 'repo-runtime-test-2' })
 
     persistRepoSnapshotCacheEntry(useReposStore.setState, staleRepo, 'repo-runtime-test')
 
-    expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+    expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
   })
 
   test('persists branch references without dynamic worktree or pull request state', () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/repo',
+      id: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test',
       branchSnapshots: [
         createBranchSnapshot('feature/a', {
@@ -121,14 +121,14 @@ describe('persistRepoSnapshotCacheEntry', () => {
 
     persistRepoSnapshotCacheEntry(useReposStore.setState, repo, 'repo-runtime-test')
 
-    const cached = useReposStore.getState().repoSnapshotCache['/repo']
+    const cached = useReposStore.getState().repoSnapshotCache['goblin+file:///repo']
     expect(cached?.data.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
     expect(cached?.data.branches[0]?.pullRequest).toBeUndefined()
   })
 
   test('persists the React Query branch read model when it is newer than the store projection', () => {
     const repo = seedRepoWithReadModelForTest({
-      id: '/repo',
+      id: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test',
       branches: [createRepoBranch('main')],
       currentBranch: 'main',
@@ -141,7 +141,7 @@ describe('persistRepoSnapshotCacheEntry', () => {
 
     persistRepoSnapshotCacheEntry(useReposStore.setState, repo, 'repo-runtime-test')
 
-    const cached = useReposStore.getState().repoSnapshotCache['/repo']
+    const cached = useReposStore.getState().repoSnapshotCache['goblin+file:///repo']
     expect(cached?.data.currentBranch).toBe('feature/query')
     expect(cached?.data.branches.map((branch) => branch.name)).toEqual(['feature/query'])
   })
@@ -165,7 +165,10 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
       }),
     ]
 
-    const repo = restoreRepoProjectionFromCacheEntry(emptyRepo('/repo', 'repo', 'repo-runtime-test'), cached)
+    const repo = restoreRepoProjectionFromCacheEntry(
+      emptyRepo('goblin+file:///repo', 'repo', 'repo-runtime-test'),
+      cached,
+    )
 
     expect(repo.name).toBe('cached-name')
     expect(repo.projection).toEqual({ source: 'cache', savedAt: now })
@@ -188,10 +191,10 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
       }),
     ]
 
-    seedRepoProjectionQueryFromCacheEntry('/repo', 'repo-runtime-test', cached)
+    seedRepoProjectionQueryFromCacheEntry('goblin+file:///repo', 'repo-runtime-test', cached)
 
-    const fullProjection = getRepoProjectionQueryData('/repo', 'repo-runtime-test', null, 'full')
-    const summaryProjection = getRepoProjectionQueryData('/repo', 'repo-runtime-test', null, 'summary')
+    const fullProjection = getRepoProjectionQueryData('goblin+file:///repo', 'repo-runtime-test', null, 'full')
+    const summaryProjection = getRepoProjectionQueryData('goblin+file:///repo', 'repo-runtime-test', null, 'summary')
     expect(fullProjection?.snapshot?.current).toBe('feature/a')
     expect(fullProjection?.snapshot?.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
     expect(fullProjection?.snapshot?.branches[0]?.pullRequest).toBeUndefined()

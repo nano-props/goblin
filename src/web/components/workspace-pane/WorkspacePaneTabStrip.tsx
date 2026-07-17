@@ -38,10 +38,7 @@ import {
 } from '#/web/components/tab-strip/tab-variants.ts'
 import { useFocusRegistry, type FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useSortableTab } from '#/web/components/tab-strip/useSortableTab.ts'
-import {
-  workspacePaneRuntimeTabProvider,
-  workspacePaneStaticTabProvider,
-} from '#/web/workspace-pane/tab-providers.ts'
+import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import {
   type WorkspacePaneRuntimeTabItem,
   type WorkspacePaneStaticTabItem,
@@ -469,7 +466,7 @@ function WorkspacePaneTabSwitcherPopover({
                       </>
                     )}
                   </button>
-                  {!pending && (
+                  {!pending && item.closable !== false && (
                     <Button
                       type="button"
                       size="icon-sm"
@@ -1054,14 +1051,15 @@ function WorkspacePaneTabChrome({
   const attentionLabel = isRuntimeWorkspacePaneTabItem(item) && item.attention ? runtimeAttentionLabel(item, t) : null
   const accessibleLabel = item.label || item.tooltip
   const ariaLabel = attentionLabel ? `${accessibleLabel} — ${attentionLabel}` : accessibleLabel
-  const closeProps = isPendingWorkspacePaneTabItem(item)
-    ? ({ closeButton: 'placeholder' } as const)
-    : ({
-        closeLabel: item.closeLabel,
-        closeVisible: isActive && !compact,
-        closeDisabled: interactionDisabled,
-        onClose: (e: React.MouseEvent<HTMLButtonElement>) => onClose(e, item.identity),
-      } as const)
+  const closeProps =
+    isPendingWorkspacePaneTabItem(item) || item.closable === false
+      ? ({ closeButton: 'placeholder' } as const)
+      : ({
+          closeLabel: item.closeLabel,
+          closeVisible: isActive && !compact,
+          closeDisabled: interactionDisabled,
+          onClose: (e: React.MouseEvent<HTMLButtonElement>) => onClose(e, item.identity),
+        } as const)
   const collectionAria =
     index !== undefined && total !== undefined
       ? {

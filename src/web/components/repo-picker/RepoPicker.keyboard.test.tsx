@@ -81,7 +81,7 @@ const labels = {
   repositories: 'Repositories',
   closeWithName: (name: string) => `Close ${name}`,
   open: 'Open',
-  placeholder: 'Select repository',
+  placeholder: 'Select workspace',
   openLocal: 'Open local repository…',
   openLocalShortcut: '⌘O',
   openRemote: 'Open remote repository…',

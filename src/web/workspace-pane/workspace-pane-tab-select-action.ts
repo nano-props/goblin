@@ -11,6 +11,7 @@ import type { WorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/
 import {
   workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForBranch,
+  workspacePaneTabTargetForWorkspace,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
@@ -54,11 +55,11 @@ export interface ShowWorkspacePaneTerminalRouteActionOptions {
 export async function dispatchSelectWorkspacePaneTabByIndexAction(
   options: SelectWorkspacePaneTabByIndexActionOptions,
 ): Promise<boolean> {
-  if (!options.repoId || !options.branchName || options.tabIndex < 1) return false
+  if (!options.repoId || options.branchName === null || options.tabIndex < 1) return false
   const coordinatorTarget = workspacePaneTabActionCoordinatorTarget(options)
   if (!coordinatorTarget) return false
   const presentationToken = beginPrimaryWindowPresentation()
-  return await runWorkspacePaneAction(coordinatorTarget, () =>
+  return await runWorkspacePaneAction(workspacePaneQueuedActionTarget(coordinatorTarget), () =>
     selectWorkspacePaneTabByIndexAction(options, coordinatorTarget, presentationToken),
   )
 }
@@ -68,9 +69,9 @@ async function selectWorkspacePaneTabByIndexAction(
   coordinatorTarget: RepoWorkspaceTabModel,
   presentationToken: PrimaryWindowPresentationToken,
 ): Promise<boolean> {
-  if (!repoId || !branchName || tabIndex < 1) return false
+  if (!repoId || branchName === null || tabIndex < 1) return false
   const sourceRoute = workspacePaneRoute
-  const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute: sourceRoute })
+  const target = resolveSelectableWorkspacePaneTarget(repoId, branchName, sourceRoute)
   const tab = target?.tabs[tabIndex - 1]
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(coordinatorTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
@@ -81,11 +82,11 @@ async function selectWorkspacePaneTabByIndexAction(
 export async function dispatchSelectWorkspacePaneTabByIdentityAction(
   options: SelectWorkspacePaneTabByIdentityActionOptions,
 ): Promise<boolean> {
-  if (!options.repoId || !options.branchName) return false
+  if (!options.repoId || options.branchName === null) return false
   const coordinatorTarget = workspacePaneTabActionCoordinatorTarget(options)
   if (!coordinatorTarget) return false
   const presentationToken = beginPrimaryWindowPresentation()
-  return await runWorkspacePaneAction(coordinatorTarget, () =>
+  return await runWorkspacePaneAction(workspacePaneQueuedActionTarget(coordinatorTarget), () =>
     selectWorkspacePaneTabByIdentityAction(options, coordinatorTarget, presentationToken),
   )
 }
@@ -103,9 +104,9 @@ async function selectWorkspacePaneTabByIdentityAction(
   coordinatorTarget: RepoWorkspaceTabModel,
   presentationToken: PrimaryWindowPresentationToken,
 ): Promise<boolean> {
-  if (!repoId || !branchName) return false
+  if (!repoId || branchName === null) return false
   const sourceRoute = workspacePaneRoute
-  const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute: sourceRoute })
+  const target = resolveSelectableWorkspacePaneTarget(repoId, branchName, sourceRoute)
   const tab = target?.tabs.find((candidate) => candidate.identity === identity) ?? null
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(coordinatorTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
@@ -133,7 +134,9 @@ export async function dispatchMoveWorkspacePaneTabAction(options: MoveWorkspaceP
   if (!options.repoId || !options.branchName) return false
   const coordinatorTarget = workspacePaneTabActionCoordinatorTarget(options)
   if (!coordinatorTarget) return false
-  return await runWorkspacePaneAction(coordinatorTarget, () => moveWorkspacePaneTabAction(options, coordinatorTarget))
+  return await runWorkspacePaneAction(workspacePaneQueuedActionTarget(coordinatorTarget), () =>
+    moveWorkspacePaneTabAction(options, coordinatorTarget),
+  )
 }
 
 async function moveWorkspacePaneTabAction(
@@ -165,8 +168,25 @@ function workspacePaneTabActionCoordinatorTarget(input: {
   branchName: string | null
   workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
 }): RepoWorkspaceTabModel | null {
-  if (!input.repoId || !input.branchName) return null
-  return workspacePaneTabTargetForBranch(input.repoId, input.branchName, {
-    workspacePaneRoute: input.workspacePaneRoute,
-  })
+  if (!input.repoId || input.branchName === null) return null
+  return resolveSelectableWorkspacePaneTarget(input.repoId, input.branchName, input.workspacePaneRoute)
+}
+
+function resolveSelectableWorkspacePaneTarget(
+  repoId: string,
+  branchName: string,
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined,
+): RepoWorkspaceTabModel | null {
+  return branchName
+    ? workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
+    : workspacePaneTabTargetForWorkspace(repoId, { workspacePaneRoute: undefined })
+}
+
+function workspacePaneQueuedActionTarget(model: RepoWorkspaceTabModel) {
+  return {
+    repoId: model.repoId,
+    repoRuntimeId: model.repoRuntimeId,
+    branchName: model.branchName,
+    worktreePath: model.worktreePath,
+  }
 }

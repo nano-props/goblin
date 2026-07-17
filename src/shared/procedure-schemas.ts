@@ -19,6 +19,7 @@ import { RepoTreePrefixSchema } from '#/shared/repo-tree-schema.ts'
 import { GIT_HASH_RE } from '#/shared/git-types.ts'
 import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/repo-settings.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
+import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 
 const StringArray = v.array(v.string())
 const TerminalAppSchema = v.picklist(['ghostty', 'terminal', 'windowsTerminal'])
@@ -45,18 +46,18 @@ const WorktreeBootstrapDecisionSchema = v.variant('kind', [
 ])
 
 const RemoteRepoRefSchema = v.object({
-  id: v.string(),
+  id: WorkspaceIdSchema,
   alias: v.string(),
   remotePath: v.string(),
   displayName: v.string(),
 })
 
 const WorkspaceSessionEntrySchema = v.variant('kind', [
-  v.object({ kind: v.literal('local'), id: v.string() }),
-  v.object({ kind: v.literal('remote'), id: v.string(), ref: RemoteRepoRefSchema }),
+  v.object({ kind: v.literal('local'), id: WorkspaceIdSchema }),
+  v.object({ kind: v.literal('remote'), id: WorkspaceIdSchema, ref: RemoteRepoRefSchema }),
 ])
 const ClientIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
-const RepoRootSchema = v.pipe(v.string(), v.minLength(1))
+const RepoRootSchema = WorkspaceIdSchema
 const RepoRuntimeOpenSchema = v.union([
   v.object({ repoRoot: RepoRootSchema, clientId: ClientIdSchema }),
   v.object({ repoInput: v.string(), clientId: ClientIdSchema }),
@@ -75,7 +76,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
     workspaceRuntimeId: RepoRuntimeIdSchema,
   }),
   fetch: v.strictObject({
-    cwd: v.string(),
+    cwd: WorkspaceIdSchema,
     repoRuntimeId: RepoRuntimeIdSchema,
   }),
   clone: v.object({
@@ -84,14 +85,14 @@ export const REPO_PROCEDURE_SCHEMAS = {
     directoryName: v.string(),
   }),
   pull: v.object({
-    cwd: v.string(),
+    cwd: WorkspaceIdSchema,
     repoRuntimeId: RepoRuntimeIdSchema,
     branch: v.string(),
     worktreePath: v.optional(v.string()),
   }),
-  push: v.object({ cwd: v.string(), repoRuntimeId: RepoRuntimeIdSchema, branch: v.string() }),
+  push: v.object({ cwd: WorkspaceIdSchema, repoRuntimeId: RepoRuntimeIdSchema, branch: v.string() }),
   createWorktree: v.object({
-    cwd: v.string(),
+    cwd: WorkspaceIdSchema,
     repoRuntimeId: RepoRuntimeIdSchema,
     worktreePath: v.string(),
     mode: v.variant('kind', [
@@ -101,17 +102,17 @@ export const REPO_PROCEDURE_SCHEMAS = {
     ]),
     worktreeBootstrap: WorktreeBootstrapDecisionSchema,
   }),
-  getRemoteBranches: v.object({ cwd: v.string(), repoRuntimeId: RepoRuntimeIdSchema }),
-  worktreeBootstrapPreview: v.object({ cwd: v.string(), repoRuntimeId: RepoRuntimeIdSchema }),
+  getRemoteBranches: v.object({ cwd: WorkspaceIdSchema, repoRuntimeId: RepoRuntimeIdSchema }),
+  worktreeBootstrapPreview: v.object({ cwd: WorkspaceIdSchema, repoRuntimeId: RepoRuntimeIdSchema }),
   deleteBranch: v.object({
-    cwd: v.string(),
+    cwd: WorkspaceIdSchema,
     repoRuntimeId: RepoRuntimeIdSchema,
     branch: v.string(),
     force: v.optional(v.boolean()),
     deleteUpstream: v.optional(v.boolean()),
   }),
   removeWorktree: v.object({
-    cwd: v.string(),
+    cwd: WorkspaceIdSchema,
     repoRuntimeId: RepoRuntimeIdSchema,
     branch: v.string(),
     worktreePath: v.string(),
@@ -119,7 +120,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
     forceDeleteBranch: v.optional(v.boolean()),
     deleteUpstream: v.optional(v.boolean()),
   }),
-  openUrl: v.object({ cwd: v.string(), repoRuntimeId: RepoRuntimeIdSchema, target: RepoUrlTargetSchema }),
+  openUrl: v.object({ cwd: WorkspaceIdSchema, repoRuntimeId: RepoRuntimeIdSchema, target: RepoUrlTargetSchema }),
   openTerminal: v.object({
     repoId: RepoRootSchema,
     repoRuntimeId: RepoRuntimeIdSchema,
@@ -147,47 +148,47 @@ export const REPO_PROCEDURE_SCHEMAS = {
   abort: CwdInput,
   probe: CwdInput,
   log: v.object({
-    cwd: v.string(),
+    cwd: WorkspaceIdSchema,
     repoRuntimeId: RepoRuntimeIdSchema,
     branch: v.string(),
     count: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200))),
     skip: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100_000))),
   }),
-  patch: v.object({ cwd: v.string(), repoRuntimeId: RepoRuntimeIdSchema, worktreePath: v.string() }),
+  patch: v.object({ cwd: WorkspaceIdSchema, repoRuntimeId: RepoRuntimeIdSchema, worktreePath: v.string() }),
   // Worktree-scoped file tree (docs/filetree.md). The route returns
   // direct children of `prefix`; omitted prefix means the worktree root.
   // The perimeter rejects absolute paths, `..` segments, control
   // characters and backslashes inside `prefix`, and the read layer
   // still verifies `worktreePath` against the worktree list.
   tree: v.object({
-    cwd: v.string(),
+    cwd: WorkspaceIdSchema,
     repoRuntimeId: RepoRuntimeIdSchema,
     worktreePath: v.string(),
     prefix: v.optional(RepoTreePrefixSchema),
   }),
   trashFile: v.object({
-    cwd: v.string(),
+    cwd: WorkspaceIdSchema,
     repoRuntimeId: RepoRuntimeIdSchema,
     worktreePath: v.string(),
     path: RepoTreePrefixSchema,
   }),
   fileViewer: v.object({
-    cwd: v.string(),
+    cwd: WorkspaceIdSchema,
     repoRuntimeId: RepoRuntimeIdSchema,
     worktreePath: v.string(),
   }),
   projection: v.object({
-    cwd: v.string(),
+    cwd: WorkspaceIdSchema,
     repoRuntimeId: RepoRuntimeIdSchema,
     branch: v.optional(v.string()),
     mode: v.optional(v.picklist(['summary', 'full'])),
   }),
   worktreeStatus: v.object({
-    cwd: v.string(),
+    cwd: WorkspaceIdSchema,
     repoRuntimeId: RepoRuntimeIdSchema,
   }),
   operations: v.object({
-    cwd: v.optional(v.string()),
+    cwd: v.optional(WorkspaceIdSchema),
     repoRuntimeId: v.optional(RepoRuntimeIdSchema),
     includeSettled: v.optional(v.boolean()),
   }),
@@ -198,7 +199,7 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
   // Starts a server-owned attempt for one repo-runtime generation and
   // returns its accepted terminal lifecycle projection.
   remoteLifecycle: v.object({
-    repoId: v.string(),
+    repoId: WorkspaceIdSchema,
     repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
     mode: v.optional(v.picklist(['restart', 'ensure'])),
   }),
@@ -244,7 +245,7 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
   // itemId, including path and NUL checks, before touching disk; this
   // schema only enforces the basic wire shape.
   repoExternalAppRecentSet: v.object({
-    repoId: v.pipe(v.string(), v.minLength(1)),
+    repoId: WorkspaceIdSchema,
     worktreePath: v.nullable(v.pipe(v.string(), v.minLength(1))),
     itemId: v.pipe(v.string(), v.minLength(1), v.maxLength(64)),
   }),

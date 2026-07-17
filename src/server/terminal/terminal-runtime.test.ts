@@ -214,11 +214,16 @@ interface RuntimeHandle {
 const createTerminalApplications = new WeakMap<ServerTerminalHost, ServerWorkspacePaneRuntimeHost>()
 const activeRuntimeShutdowns = new Set<() => void>()
 let testWorkspacePaneLayout: WorkspacePaneDurableLayout = { entries: [] }
+let testWorkspacePaneLayoutWriteError: Error | null = null
 const testWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository = {
   async load() {
     return { layout: structuredClone(testWorkspacePaneLayout) }
   },
   async compareAndSwap(input) {
+    if (testWorkspacePaneLayoutWriteError) return { kind: 'write-failure', error: testWorkspacePaneLayoutWriteError }
+    if (input.admit && !input.admit()) {
+      return { kind: 'admission-rejected', snapshot: { layout: structuredClone(testWorkspacePaneLayout) } }
+    }
     if (JSON.stringify(testWorkspacePaneLayout) !== JSON.stringify(input.expected)) {
       return { kind: 'conflict', snapshot: { layout: structuredClone(testWorkspacePaneLayout) } }
     }
@@ -265,6 +270,7 @@ beforeEach(() => {
   mockPtys.length = 0
   mockDataToEmitOnRegistration = null
   testWorkspacePaneLayout = { entries: [] }
+  testWorkspacePaneLayoutWriteError = null
   vi.clearAllMocks()
   clearRepoRuntimesForUser(USER_1)
   clearRepoRuntimesForUser(USER_2)
@@ -1274,11 +1280,80 @@ describe('server terminal runtime', () => {
       userId: USER_1,
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: REPO_RUNTIME_ID,
+      assertCurrent: () => {},
     })
 
     await expect(
       host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
     ).resolves.toEqual([])
+    expect(testWorkspacePaneLayout).toEqual({ entries: [] })
+    shutdown()
+  })
+
+  test('Git capability cleanup preserves runtime resources when durable layout commit fails', async () => {
+    const { host, workspaceCapabilityTransitionHost, shutdown } = buildRuntime()
+    const created = await createAdmittedTerminal(host, 'client_a', USER_1, {
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+    })
+    expect(created.ok).toBe(true)
+    testWorkspacePaneLayout = {
+      entries: [
+        {
+          repoRoot: REPO_ROOT,
+          branchName: 'feature',
+          worktreePath: '/repo-linked',
+          tabs: [workspacePaneStaticTabEntry('files')],
+        },
+      ],
+    }
+    testWorkspacePaneLayoutWriteError = new Error('layout write failed')
+
+    await expect(
+      workspaceCapabilityTransitionHost.removeGitScopedResources({
+        userId: USER_1,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: REPO_RUNTIME_ID,
+        assertCurrent: () => {},
+      }),
+    ).rejects.toThrow('layout write failed')
+
+    await expect(
+      host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
+    ).resolves.toHaveLength(1)
+    expect(testWorkspacePaneLayout.entries).toHaveLength(1)
+    shutdown()
+  })
+
+  test('capability cleanup is admitted before a later close and reopen', async () => {
+    const { workspaceCapabilityTransitionHost, shutdown } = buildRuntime()
+    testWorkspacePaneLayout = {
+      entries: [
+        {
+          repoRoot: REPO_ROOT,
+          branchName: 'feature',
+          worktreePath: '/repo-linked',
+          tabs: [workspacePaneStaticTabEntry('files')],
+        },
+      ],
+    }
+    let checks = 0
+    await workspaceCapabilityTransitionHost.removeGitScopedResources({
+      userId: USER_1,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: REPO_RUNTIME_ID,
+      assertCurrent: () => {
+        checks += 1
+        if (checks > 3) throw new Error('error.repo-runtime-stale')
+      },
+    })
+
+    expect(checks).toBe(3)
     expect(testWorkspacePaneLayout).toEqual({ entries: [] })
     shutdown()
   })

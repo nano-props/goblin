@@ -298,7 +298,7 @@ describe('RepoPicker', () => {
 
     const placeholder = document.body.querySelector('[data-testid="repo-picker-placeholder"]')
     expect(placeholder).not.toBeNull()
-    expect(placeholder?.textContent).toContain('Select repository')
+    expect(placeholder?.textContent).toContain('Select workspace')
     expect(placeholder?.className).toContain('w-full')
 
     await act(async () => {
@@ -369,7 +369,7 @@ const labels = {
   repositories: 'Repositories',
   closeWithName: (name: string) => `Close ${name}`,
   open: 'Open',
-  placeholder: 'Select repository',
+  placeholder: 'Select workspace',
   openLocal: 'Open local repository…',
   openLocalShortcut: '⌘O',
   openRemote: 'Open remote repository…',

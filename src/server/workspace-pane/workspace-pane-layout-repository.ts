@@ -5,10 +5,7 @@ import {
   workspacePaneStaticTabEntry,
   type WorkspacePaneStaticTabEntry,
 } from '#/shared/workspace-pane.ts'
-import type {
-  WorkspacePaneDurableLayout,
-  WorkspacePaneDurableLayoutEntry,
-} from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneDurableLayout, WorkspacePaneDurableLayoutEntry } from '#/shared/workspace-pane-tabs.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface WorkspacePaneLayoutRepositorySnapshot {
@@ -22,17 +19,18 @@ export interface WorkspacePaneLayoutRepositoryAcceptedOutcome {
 }
 
 export type WorkspacePaneLayoutRepositoryCasStateOutcome =
-  | WorkspacePaneLayoutRepositoryAcceptedOutcome
-  | { kind: 'conflict'; snapshot: WorkspacePaneLayoutRepositorySnapshot }
+  WorkspacePaneLayoutRepositoryAcceptedOutcome | { kind: 'conflict'; snapshot: WorkspacePaneLayoutRepositorySnapshot }
 
 export type WorkspacePaneLayoutRepositoryCasOutcome =
   | WorkspacePaneLayoutRepositoryCasStateOutcome
+  | { kind: 'admission-rejected'; snapshot: WorkspacePaneLayoutRepositorySnapshot }
   | { kind: 'write-failure'; error: unknown }
 
 export interface WorkspacePaneLayoutRepositoryCasInput {
   repoRoot: string
   expected: WorkspacePaneDurableLayout
   replacement: WorkspacePaneDurableLayout
+  admit?: () => boolean
 }
 
 export interface WorkspacePaneLayoutRepository {
@@ -76,6 +74,8 @@ export function workspacePaneDurableLayoutsEqual(
   a: WorkspacePaneDurableLayout,
   b: WorkspacePaneDurableLayout,
 ): boolean {
-  return JSON.stringify(normalizeWorkspacePaneDurableLayout(repoRoot, a)) ===
+  return (
+    JSON.stringify(normalizeWorkspacePaneDurableLayout(repoRoot, a)) ===
     JSON.stringify(normalizeWorkspacePaneDurableLayout(repoRoot, b))
+  )
 }

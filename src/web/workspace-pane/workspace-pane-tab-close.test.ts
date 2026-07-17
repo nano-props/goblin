@@ -26,7 +26,12 @@ import {
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import {
+  runtimeWorkspacePaneTargetForTest,
+  setWorkspacePaneTabsForTargetQueryData,
+} from '#/web/test-utils/workspace-pane-tabs.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 
 const REPO_ID = 'goblin+file:///tmp/workspace-pane-tab-close-repo'
 const BRANCH_NAME = 'feature/worktree-close'
@@ -174,6 +179,91 @@ test('clears the close transition when the server close command rejects', async 
       },
     }),
   ).resolves.toBe(false)
+})
+
+test('confirmed workspace terminal close selects Files without inventing a branch route', async () => {
+  const terminalSessionId = 'term-111111111111111111111'
+  const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+  const targetInput = {
+    repoRoot: REPO_ID,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName: '',
+    worktreePath: REPO_ID,
+  }
+  const runtimeTarget = runtimeWorkspacePaneTargetForTest(targetInput)
+  setWorkspacePaneTabsForTargetQueryData({
+    ...targetInput,
+    tabs: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+  })
+  useReposStore.getState().setWorkspacePaneTabForTarget(targetInput, 'terminal')
+  useReposStore.getState().setSelectedTerminal(formatTerminalWorktreeKey(REPO_ID, REPO_ID), terminalSessionId)
+  const terminalWorktreeKey = `${REPO_ID}\0${REPO_ID}`
+  const closeTerminalByDescriptor = vi.fn(async () => true)
+  setTerminalSessionCommandBridgeForTest({
+    terminalWorktreeSnapshot: () => ({
+      terminalWorktreeKey,
+      selectedDescriptor: {
+        terminalSessionId,
+        terminalWorktreeKey,
+        index: 1,
+        repoRuntimeId: repo.repoRuntimeId,
+        repoRoot: REPO_ID,
+        branch: '',
+        worktreePath: REPO_ID,
+        target: runtimeTarget,
+      },
+      sessions: [
+        {
+          type: 'terminal',
+          terminalSessionId,
+          terminalWorktreeKey,
+          index: 1,
+          title: 'node',
+          phase: 'open',
+          selected: true,
+          hasBell: false,
+          hasRecentOutput: false,
+        },
+      ],
+      count: 1,
+      bellCount: 0,
+      outputActiveCount: 0,
+      createPending: false,
+    }),
+    createTerminal: vi.fn(async () => terminalSessionId),
+    selectTerminal: vi.fn(),
+    closeTerminalByDescriptor,
+  })
+  const targetKey = workspacePaneTabsTargetIdentityKey(targetInput)
+  expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe('terminal')
+  expect(
+    useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[formatTerminalWorktreeKey(REPO_ID, REPO_ID)],
+  ).toBe(terminalSessionId)
+
+  await expect(
+    dispatchConfirmCloseTerminalWorkspacePaneTabAction({
+      repoId: REPO_ID,
+      branchName: null,
+      workspacePaneRoute: undefined,
+      navigation: navigationWith(),
+      currentRepoId: REPO_ID,
+      currentBranchName: null,
+      currentWorkspacePaneRoute: null,
+      confirmedTerminal: {
+        terminalSessionId,
+        base: {
+          repoRoot: REPO_ID,
+          repoRuntimeId: repo.repoRuntimeId,
+          branch: '',
+          worktreePath: REPO_ID,
+          target: runtimeTarget,
+        },
+      },
+    }),
+  ).resolves.toBe(true)
+
+  expect(closeTerminalByDescriptor).toHaveBeenCalledOnce()
+  expect(useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe('files')
 })
 
 test('does not let a late close from an old runtime navigate or clear the replacement runtime opener', async () => {

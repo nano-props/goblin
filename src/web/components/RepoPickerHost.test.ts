@@ -98,7 +98,7 @@ describe('repoPickerReposEqual', () => {
   test('treats last sync time changes as unequal', () => {
     const left: RepoPickerRepo[] = [
       {
-        id: '/tmp/repo',
+        id: 'goblin+file:///tmp/repo',
         name: 'repo',
         remoteDetails: [],
         lastSyncedAt: 1_000,
@@ -107,7 +107,7 @@ describe('repoPickerReposEqual', () => {
     ]
     const right: RepoPickerRepo[] = [
       {
-        id: '/tmp/repo',
+        id: 'goblin+file:///tmp/repo',
         name: 'repo',
         remoteDetails: [],
         lastSyncedAt: 2_000,
@@ -121,7 +121,7 @@ describe('repoPickerReposEqual', () => {
   test('treats terminal bell count changes as unequal', () => {
     const left: RepoPickerRepo[] = [
       {
-        id: '/tmp/repo',
+        id: 'goblin+file:///tmp/repo',
         name: 'repo',
         remoteDetails: [],
         lastSyncedAt: null,
@@ -131,7 +131,7 @@ describe('repoPickerReposEqual', () => {
     ]
     const right: RepoPickerRepo[] = [
       {
-        id: '/tmp/repo',
+        id: 'goblin+file:///tmp/repo',
         name: 'repo',
         remoteDetails: [],
         lastSyncedAt: null,
@@ -144,7 +144,7 @@ describe('repoPickerReposEqual', () => {
   })
 
   test('does not treat warm cache read-model time as a sync time', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-runtime-test')
+    const repo = emptyRepo('goblin+file:///tmp/repo', 'repo', 'repo-runtime-test')
     repo.projection = { source: 'cache', savedAt: 2_000 }
     repo.dataLoads.repoReadModel.loadedAt = 2_000
 
@@ -152,7 +152,7 @@ describe('repoPickerReposEqual', () => {
   })
 
   test('uses fresh read-model and fetch data-load times as sync candidates', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-runtime-test')
+    const repo = emptyRepo('goblin+file:///tmp/repo', 'repo', 'repo-runtime-test')
     repo.projection = { source: 'fresh', savedAt: null }
     repo.dataLoads.repoReadModel.loadedAt = 2_000
     repo.dataLoads.fetch.loadedAt = 3_000

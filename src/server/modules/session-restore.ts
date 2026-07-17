@@ -19,19 +19,21 @@ import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { readRepoProjection } from '#/server/modules/repo-read-paths.ts'
 import {
   acquireRepoRuntimeLease,
-  commitWorkspaceProbeState,
+  commitOrReadInitialWorkspaceProbeState,
   releaseRepoRuntimeMembershipLease,
   workspaceProbeStateForRuntime,
   type RepoRuntimeMembershipLeaseEntry,
 } from '#/server/modules/repo-runtimes.ts'
 import { probeWorkspace } from '#/server/modules/workspace-probe.ts'
-import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 import { parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
 import { compareAndReplaceServerWorkspaceRepos, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
 import { projectWorkspacePaneTabsWithMembershipGuard } from '#/server/modules/workspace-pane-tabs-restore.ts'
+import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
+import { isCurrentRepoRuntime } from '#/server/modules/repo-runtimes.ts'
 
 export interface RestoreServerWorkspaceInput {
   userId: string
@@ -42,6 +44,7 @@ export interface RestoreServerWorkspaceInput {
   // when the user navigates to them.
   activeRepoRoot?: string | null
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
+  workspaceCapabilityTransitionHost?: WorkspaceCapabilityTransitionHost
   signal?: AbortSignal
 }
 
@@ -209,26 +212,32 @@ async function openWorkspaceRepo(
   if (!parseWorkspaceLocator(entry.id, serverLocatorPlatform())) return { kind: 'invalid' }
   if (entry.kind === 'remote') return await openRemoteWorkspaceRepo(input, entry, options)
   return await withAcquiredWorkspaceRepoLease(input, entry.id, async (lease) => {
-    const probe = await probeWorkspace(entry.id, serverLocatorPlatform(), { signal: input.signal })
-    if (
-      !commitWorkspaceProbeState({
+    let authoritativeProbe = workspaceProbeStateForRuntime(input.userId, entry.id, lease.repoRuntimeId)
+    if (authoritativeProbe?.status === 'probing') {
+      const observed = await probeWorkspace(entry.id, serverLocatorPlatform(), { signal: input.signal })
+      authoritativeProbe = commitOrReadInitialWorkspaceProbeState({
         userId: input.userId,
         repoRoot: entry.id,
         repoRuntimeId: lease.repoRuntimeId,
-        probe,
+        probe: observed,
       })
-    ) {
+    }
+    if (!authoritativeProbe) {
       throw new Error('workspace runtime was superseded during restore')
     }
-    const name = probe.status === 'ready' ? probe.name : workspaceRepoDisplayName(entry.id)
-    if (probe.status !== 'ready' || probe.capabilities.git.status === 'unavailable' || !options.active) {
+    const name = authoritativeProbe.status === 'ready' ? authoritativeProbe.name : workspaceRepoDisplayName(entry.id)
+    if (
+      authoritativeProbe.status !== 'ready' ||
+      authoritativeProbe.capabilities.git.status === 'unavailable' ||
+      !options.active
+    ) {
       return {
         kind: 'opened',
         opened: stubWorkspaceRepo({
           entry,
           repoRoot: entry.id,
           name,
-          workspaceProbe: probe,
+          workspaceProbe: authoritativeProbe,
           lease,
         }),
       }
@@ -245,7 +254,7 @@ async function openWorkspaceRepo(
           entry,
           repoRoot: entry.id,
           name,
-          workspaceProbe: probe,
+          workspaceProbe: authoritativeProbe,
           lease,
         }),
       }
@@ -256,7 +265,7 @@ async function openWorkspaceRepo(
         entry,
         repoRoot: entry.id,
         name,
-        workspaceProbe: probe,
+        workspaceProbe: authoritativeProbe,
         projection,
         lease,
       }),
@@ -271,12 +280,15 @@ async function openRemoteWorkspaceRepo(
 ): Promise<OpenWorkspaceRepoResult> {
   return await withAcquiredWorkspaceRepoLease(input, entry.id, async (lease) => {
     const lifecycle = await abortableWorkspaceRestore(
-      runRemoteLifecycleWrite({
-        userId: input.userId,
-        repoId: entry.id,
-        repoRuntimeId: lease.repoRuntimeId,
-        mode: 'ensure',
-      }),
+      runRemoteLifecycleWrite(
+        {
+          userId: input.userId,
+          repoId: entry.id,
+          repoRuntimeId: lease.repoRuntimeId,
+          mode: 'ensure',
+        },
+        remoteCapabilityTransitionOptions(input, entry.id, lease.repoRuntimeId),
+      ),
       input.signal,
     )
     if (lifecycle.kind !== 'settled' || lifecycle.lifecycle.kind !== 'ready') {
@@ -343,6 +355,46 @@ async function openRemoteWorkspaceRepo(
       }),
     }
   })
+}
+
+function remoteCapabilityTransitionOptions(
+  input: RestoreServerWorkspaceInput,
+  workspaceId: string,
+  workspaceRuntimeId: string,
+) {
+  return {
+    beforeCapabilityCommit: async ({
+      before,
+      after,
+    }: {
+      before: WorkspaceProbeState
+      after: WorkspaceSettledProbeState
+    }) => {
+      if (!gitBecameUnavailable(before, after)) return
+      if (!input.workspaceCapabilityTransitionHost) {
+        throw new Error('workspace capability transition host is unavailable')
+      }
+      await input.workspaceCapabilityTransitionHost.removeGitScopedResources({
+        userId: input.userId,
+        workspaceId,
+        workspaceRuntimeId,
+        assertCurrent: () => {
+          if (!isCurrentRepoRuntime(input.userId, workspaceId, workspaceRuntimeId)) {
+            throw new Error('error.repo-runtime-stale')
+          }
+        },
+      })
+    },
+  }
+}
+
+function gitBecameUnavailable(before: WorkspaceProbeState, after: WorkspaceSettledProbeState): boolean {
+  return (
+    before.status === 'ready' &&
+    before.capabilities.git.status === 'available' &&
+    after.status === 'ready' &&
+    after.capabilities.git.status === 'unavailable'
+  )
 }
 
 async function withAcquiredWorkspaceRepoLease<T>(

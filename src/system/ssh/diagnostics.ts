@@ -82,7 +82,16 @@ export async function testRemoteRepo(
       stages,
     }
 
-  return { target, ok: true, stages }
+  return {
+    target,
+    ok: true,
+    stages,
+    gitAtWorkspaceRoot: physicalPath(pathResult.stdout) === physicalPath(repoResult.stdout),
+  }
+}
+
+function physicalPath(stdout: string): string {
+  return stdout.trim().split(/\r?\n/u).at(-1)?.trim() ?? ''
 }
 
 export function classifySshFailure(result: RemoteCommandResult): RemoteDiagnosticCategory {

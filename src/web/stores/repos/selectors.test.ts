@@ -22,15 +22,15 @@ describe('repo selectors', () => {
     expect(
       runtimeCoherentRepoProjectionStateFromStore({
         repos: {
-          '/tmp/repo': {
-            id: '/tmp/repo',
+          'goblin+file:///tmp/repo': {
+            id: 'goblin+file:///tmp/repo',
           } as never,
         },
       }),
     ).toEqual({
       repos: {
-        '/tmp/repo': {
-          id: '/tmp/repo',
+        'goblin+file:///tmp/repo': {
+          id: 'goblin+file:///tmp/repo',
         },
       },
     })
@@ -39,8 +39,8 @@ describe('repo selectors', () => {
   test('builds restorable workspace state from store fields', () => {
     expect(
       restorableWorkspaceStateFromStore({
-        order: ['/tmp/repo'],
-        restoredRepoId: '/tmp/repo',
+        order: ['goblin+file:///tmp/repo'],
+        restoredRepoId: 'goblin+file:///tmp/repo',
         zenMode: false,
         workspacePaneSize: 50,
         selectedTerminalSessionIdByTerminalWorktree: {
@@ -48,8 +48,8 @@ describe('repo selectors', () => {
         },
       }),
     ).toEqual({
-      order: ['/tmp/repo'],
-      restoredRepoId: '/tmp/repo',
+      order: ['goblin+file:///tmp/repo'],
+      restoredRepoId: 'goblin+file:///tmp/repo',
       zenMode: false,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {
@@ -137,15 +137,15 @@ describe('repo selectors', () => {
       keyboardRuntimeStateFromStore(
         {
           repos: {
-            '/tmp/repo-a': {
-              id: '/tmp/repo-a',
+            'goblin+file:///tmp/repo-a': {
+              id: 'goblin+file:///tmp/repo-a',
             } as never,
           },
         },
-        '/tmp/repo-a',
+        'goblin+file:///tmp/repo-a',
       ),
     ).toMatchObject({
-      repo: { id: '/tmp/repo-a' },
+      repo: { id: 'goblin+file:///tmp/repo-a' },
     })
     expect(
       keyboardRuntimeStateFromStore(

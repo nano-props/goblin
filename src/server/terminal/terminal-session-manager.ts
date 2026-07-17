@@ -52,8 +52,7 @@ interface TerminalPtyRestartResult {
 }
 
 export type TerminalSessionPrepareResult =
-  | { ok: true; terminalRuntimeSessionId: string; admission: TerminalSessionAdmission }
-  | { ok: false; message: string }
+  { ok: true; terminalRuntimeSessionId: string; admission: TerminalSessionAdmission } | { ok: false; message: string }
 
 export interface TerminalEnsureSessionInput<TUser extends string | number> {
   userId: TUser
@@ -253,7 +252,12 @@ export class TerminalSessionManager<TUser extends string | number> {
       // write path on the others without an identity round-trip.
       takeoverPending: false,
     }
-    const reservation = this.directory.reserve({ id, userId, scope: input.scope, terminalSessionId: input.terminalSessionId })
+    const reservation = this.directory.reserve({
+      id,
+      userId,
+      scope: input.scope,
+      terminalSessionId: input.terminalSessionId,
+    })
     if (!reservation) return { ok: false, message: 'error.unavailable' }
     let committedEffect: ReturnType<typeof attachTerminalClient> | null = null
     // Logical creation stops here. The selected client mounts and fits its
@@ -490,9 +494,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 
   async closeSessionsForUser(userId: TUser): Promise<TerminalBatchRetirementResult> {
-    const sessions = Array.from(this.directory.entries()).filter(
-      (session) => session.userId === userId,
-    )
+    const sessions = Array.from(this.directory.entries()).filter((session) => session.userId === userId)
     return await this.retireSessions(sessions, 'detached-user')
   }
 
@@ -508,6 +510,23 @@ export class TerminalSessionManager<TUser extends string | number> {
       (session) => session.userId === userId && session.scope === scope && session.target?.kind !== 'workspace',
     )
     return await this.retireSessions(sessions, 'scope')
+  }
+
+  forceCloseGitScopedSessionsForRepo(userId: TUser, scope: string): TerminalSessionSummary[] {
+    const removed: TerminalSessionSummary[] = []
+    for (const session of Array.from(this.directory.entries())) {
+      if (session.userId !== userId || session.scope !== scope || session.target?.kind === 'workspace') continue
+      const summary = this.detachSession(session)
+      removed.push(summary)
+      try {
+        session.ptyBinding.dispose(session)
+      } catch {
+        // The session is already retired from authoritative state. Disposal is
+        // best-effort process cleanup and cannot roll the capability transition back.
+      }
+      this.sink.onSessionClosed?.(session.userId, summary, 'scope')
+    }
+    return removed
   }
 
   private async retireSessions(
@@ -582,22 +601,22 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   async listSessionsForUser(userId: TUser, scope: string): Promise<TerminalSessionSummary[]> {
     return this.directory.entriesForScope(userId, scope).map((session) => ({
-        terminalRuntimeSessionId: session.id,
-        terminalRuntimeGeneration: session.terminalRuntimeGeneration,
-        terminalSessionId: session.terminalSessionId,
-        repoRuntimeId: session.repoRuntimeId,
-        repoRoot: session.repoRoot,
-        branch: session.branch,
-        worktreePath: session.worktreePath,
-        cwd: session.cwd,
-        controller: this.effectiveController(session),
-        processName: session.ptyBinding.processName(),
-        canonicalTitle: session.render.title,
-        phase: session.phase,
-        message: session.message,
-        cols: session.cols,
-        rows: session.rows,
-      }))
+      terminalRuntimeSessionId: session.id,
+      terminalRuntimeGeneration: session.terminalRuntimeGeneration,
+      terminalSessionId: session.terminalSessionId,
+      repoRuntimeId: session.repoRuntimeId,
+      repoRoot: session.repoRoot,
+      branch: session.branch,
+      worktreePath: session.worktreePath,
+      cwd: session.cwd,
+      controller: this.effectiveController(session),
+      processName: session.ptyBinding.processName(),
+      canonicalTitle: session.render.title,
+      phase: session.phase,
+      message: session.message,
+      cols: session.cols,
+      rows: session.rows,
+    }))
   }
 
   terminalSessionsSnapshotForUser(userId: TUser, scope: string): TerminalSessionsSnapshot {

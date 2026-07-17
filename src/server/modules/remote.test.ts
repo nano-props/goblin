@@ -77,14 +77,10 @@ describe('server remote target resolution', () => {
     const { resolveServerRemoteRepoConnection } = await import('#/server/modules/remote.ts')
 
     await expect(
-      resolveServerRemoteRepoConnection(
-        { repoId: target.id },
-        undefined,
-        {
-          resolveTarget: async () => ({ target }),
-          probeRemote: async () => ({ ok: false, category: 'not-a-repo' }),
-        },
-      ),
+      resolveServerRemoteRepoConnection({ repoId: target.id }, undefined, {
+        resolveTarget: async () => ({ target }),
+        probeRemote: async () => ({ ok: false, category: 'not-a-repo' }),
+      }),
     ).resolves.toEqual({
       kind: 'ready',
       repoId: target.id,
@@ -92,5 +88,71 @@ describe('server remote target resolution', () => {
       gitAvailable: false,
       lifecycle: { kind: 'ready', target },
     })
+  })
+
+  test('keeps a readable directory ready when Git enrichment times out', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'prod',
+      host: 'example.test',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/workspace',
+    })!
+    const { resolveServerRemoteRepoConnection } = await import('#/server/modules/remote.ts')
+    const result = await resolveServerRemoteRepoConnection({ repoId: target.id }, undefined, {
+      resolveTarget: async () => ({ target }),
+      probeRemote: async () => ({
+        ok: false,
+        category: 'timeout',
+        message: 'timeout',
+        stages: [
+          { name: 'git', status: 'failed' },
+          { name: 'path', status: 'passed' },
+          { name: 'repo', status: 'failed' },
+        ],
+      }),
+    })
+    expect(result).toMatchObject({ kind: 'ready', gitAvailable: false, gitDiagnostic: 'timeout' })
+  })
+
+  test('keeps directory availability authoritative when Git also fails', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'prod',
+      host: 'example.test',
+      user: 'alice',
+      port: 22,
+      remotePath: '/missing',
+    })!
+    const { resolveServerRemoteRepoConnection } = await import('#/server/modules/remote.ts')
+    const result = await resolveServerRemoteRepoConnection({ repoId: target.id }, undefined, {
+      resolveTarget: async () => ({ target }),
+      probeRemote: async () => ({
+        ok: false,
+        category: 'git-missing',
+        stages: [
+          { name: 'git', status: 'failed', category: 'git-missing' },
+          { name: 'path', status: 'failed', category: 'path-missing' },
+          { name: 'repo', status: 'failed', category: 'not-a-repo' },
+        ],
+      }),
+    })
+    expect(result).toMatchObject({ kind: 'failed', lifecycle: { reason: 'path-missing' } })
+  })
+
+  test('does not enable Git found only in a parent of the selected directory', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'prod',
+      host: 'example.test',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo/child',
+    })!
+    const { resolveServerRemoteRepoConnection } = await import('#/server/modules/remote.ts')
+    await expect(
+      resolveServerRemoteRepoConnection({ repoId: target.id }, undefined, {
+        resolveTarget: async () => ({ target }),
+        probeRemote: async () => ({ ok: true, gitAtWorkspaceRoot: false }),
+      }),
+    ).resolves.toMatchObject({ kind: 'ready', gitAvailable: false })
   })
 })

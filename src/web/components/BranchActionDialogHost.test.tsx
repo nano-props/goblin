@@ -109,7 +109,7 @@ vi.mock('#/web/components/ConfirmDialog.tsx', () => ({
   },
 }))
 
-const REPO_ID = '/tmp/goblin-dialog-host-test'
+const REPO_ID = 'goblin+file:///tmp/goblin-dialog-host-test'
 
 function setupRepo() {
   const worktreePath = '/tmp/dialog-host-worktree'

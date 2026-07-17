@@ -6,7 +6,7 @@ import {
   type TerminalRepoIndexEntry,
 } from '#/web/components/terminal/terminal-repo-index.ts'
 
-const REPO_ID = '/tmp/terminal-repo-index-repo'
+const REPO_ID = 'goblin+file:///tmp/terminal-repo-index-repo'
 const WORKTREE_PATH = '/tmp/terminal-repo-index-worktree'
 
 describe('terminal repo index', () => {

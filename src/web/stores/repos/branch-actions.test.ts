@@ -22,7 +22,7 @@ import type { BranchViewMode } from '#/web/stores/repos/types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { repoProjection } from '#/web/stores/repos/refresh-test-utils.ts'
-const REPO_ID = '/tmp/goblin-branch-actions-test-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-branch-actions-test-repo'
 const refreshStoreAccess = { get: useReposStore.getState, set: useReposStore.setState }
 
 function branchBrowserRemoteProvider(

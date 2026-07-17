@@ -10,6 +10,7 @@ import {
   workspacePaneRuntimeTabCreateAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface UseWorkspacePaneRuntimeTabCreateActionInput {
   repoRoot: string
@@ -39,18 +40,12 @@ export function useWorkspacePaneRuntimeTabCreateAction({
   t,
 }: UseWorkspacePaneRuntimeTabCreateActionInput): WorkspacePaneRuntimeTabCreateAction | null {
   const { createTerminalWithAdmission } = useTerminalSessionContext()
-  const terminalBase = useMemo<TerminalSessionBase | null>(
-    () =>
-      branchName && worktreePath
-        ? {
-            repoRoot,
-            repoRuntimeId,
-            branch: branchName,
-            worktreePath,
-          }
-        : null,
-    [branchName, repoRuntimeId, repoRoot, worktreePath],
-  )
+  const terminalBase = useMemo<TerminalSessionBase | null>(() => {
+    if (!worktreePath) return null
+    const target = runtimeWorkspacePaneTarget({ repoRoot, branchName: branchName ?? '', worktreePath }, repoRuntimeId)
+    if (!target || (target.kind !== 'workspace' && !branchName)) return null
+    return { repoRoot, repoRuntimeId, branch: branchName ?? '', worktreePath, target }
+  }, [branchName, repoRuntimeId, repoRoot, worktreePath])
   const captureOpenerIdentity = useCallback(
     () =>
       branchName

@@ -8,8 +8,13 @@ import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { REMOTE_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
+import { isCurrentRepoRuntime } from '#/server/modules/repo-runtimes.ts'
+import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
+import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 
-export function createRemoteRoutes() {
+export function createRemoteRoutes(
+  options: { workspaceCapabilityTransitionHost?: WorkspaceCapabilityTransitionHost } = {},
+) {
   const app = createRouteApp()
   app.get('/ssh-hosts', async (c) => c.json(await getServerSshHosts()))
   app.post('/resolve-target', async (c) => {
@@ -20,7 +25,29 @@ export function createRemoteRoutes() {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
     const { repoId, repoRuntimeId, mode } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.remoteLifecycle, c)
-    return c.json(await runRemoteLifecycleWrite({ userId, repoId, repoRuntimeId, mode: mode ?? 'restart' }))
+    return c.json(
+      await runRemoteLifecycleWrite(
+        { userId, repoId, repoRuntimeId, mode: mode ?? 'restart' },
+        {
+          beforeCapabilityCommit: async ({ before, after }) => {
+            if (!gitBecameUnavailable(before, after)) return
+            if (!options.workspaceCapabilityTransitionHost) {
+              throw new Error('workspace capability transition host is unavailable')
+            }
+            await options.workspaceCapabilityTransitionHost.removeGitScopedResources({
+              userId,
+              workspaceId: repoId,
+              workspaceRuntimeId: repoRuntimeId,
+              assertCurrent: () => {
+                if (!isCurrentRepoRuntime(userId, repoId, repoRuntimeId)) {
+                  throw new Error('error.repo-runtime-stale')
+                }
+              },
+            })
+          },
+        },
+      ),
+    )
   })
   app.post('/path-suggestions', async (c) => {
     const { alias, remotePath, prefix } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.pathSuggestions, c)
@@ -31,4 +58,13 @@ export function createRemoteRoutes() {
     return c.json(await testServerRemoteRepo(target, c.req.raw.signal))
   })
   return app
+}
+
+function gitBecameUnavailable(before: WorkspaceProbeState, after: WorkspaceSettledProbeState): boolean {
+  return (
+    before.status === 'ready' &&
+    before.capabilities.git.status === 'available' &&
+    after.status === 'ready' &&
+    after.capabilities.git.status === 'unavailable'
+  )
 }

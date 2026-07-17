@@ -14,7 +14,7 @@ import { terminalRuntimeTabCloseContext } from '#/web/workspace-pane/workspace-p
 
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 const terminalBase: TerminalSessionBase = {
-  repoRoot: '/repo',
+  repoRoot: 'goblin+file:///repo',
   repoRuntimeId: REPO_RUNTIME_ID,
   branch: 'main',
   worktreePath: '/repo-worktree',

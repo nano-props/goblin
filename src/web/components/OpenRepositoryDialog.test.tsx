@@ -57,7 +57,7 @@ describe('OpenRepositoryDialog', () => {
       <OpenRepositoryDialog
         open
         onClose={vi.fn()}
-        onOpen={vi.fn(async () => ({ ok: true as const, id: '/Users/tester/Developer/repo' }))}
+        onOpen={vi.fn(async () => ({ ok: true as const, id: 'goblin+file:///Users/tester/Developer/repo' }))}
       />,
     )
 
@@ -69,7 +69,7 @@ describe('OpenRepositoryDialog', () => {
       <OpenRepositoryDialog
         open
         onClose={vi.fn()}
-        onOpen={vi.fn(async () => ({ ok: true as const, id: '/Users/tester/Developer/repo' }))}
+        onOpen={vi.fn(async () => ({ ok: true as const, id: 'goblin+file:///Users/tester/Developer/repo' }))}
       />,
     )
 
@@ -81,7 +81,7 @@ describe('OpenRepositoryDialog', () => {
       <OpenRepositoryDialog
         open
         onClose={vi.fn()}
-        onOpen={vi.fn(async () => ({ ok: true as const, id: '/Users/tester/Developer/repo' }))}
+        onOpen={vi.fn(async () => ({ ok: true as const, id: 'goblin+file:///Users/tester/Developer/repo' }))}
       />,
     )
 
@@ -107,7 +107,7 @@ describe('OpenRepositoryDialog', () => {
     expect(buttonByText('dialog.cancel').disabled).toBe(true)
     expect(queryButtonByText('Close')).toBeNull()
 
-    deferred.resolve({ ok: true, id: '/Users/tester/Developer/repo' })
+    deferred.resolve({ ok: true, id: 'goblin+file:///Users/tester/Developer/repo' })
     await flush()
 
     expect(onClose).toHaveBeenCalledTimes(1)
@@ -115,7 +115,10 @@ describe('OpenRepositoryDialog', () => {
 
   test('can fill the path from the native picker and keeps the dialog open on failure', async () => {
     const onClose = vi.fn()
-    const onOpen = vi.fn(async (): Promise<OpenRepoResult> => ({ ok: false, message: 'error.workspace-git-unavailable' }))
+    const onOpen = vi.fn(async (): Promise<OpenRepoResult> => ({
+      ok: false,
+      message: 'error.workspace-git-unavailable',
+    }))
 
     render(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
 
@@ -140,7 +143,7 @@ describe('OpenRepositoryDialog', () => {
     const onOpen = vi
       .fn<() => Promise<OpenRepoResult>>()
       .mockRejectedValueOnce(new Error('boom'))
-      .mockResolvedValueOnce({ ok: true, id: '/Users/tester/Developer/repo' })
+      .mockResolvedValueOnce({ ok: true, id: 'goblin+file:///Users/tester/Developer/repo' })
 
     render(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
 
@@ -173,7 +176,7 @@ describe('OpenRepositoryDialog', () => {
     rerender(<OpenRepositoryDialog open={false} onClose={onClose} onOpen={onOpen} />)
     rerender(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
 
-    first.resolve({ ok: true, id: '/Users/tester/Developer/repo' })
+    first.resolve({ ok: true, id: 'goblin+file:///Users/tester/Developer/repo' })
     await flush()
 
     expect(onClose).not.toHaveBeenCalled()
@@ -181,7 +184,7 @@ describe('OpenRepositoryDialog', () => {
 
     setInputValue('#open-repo-path', '~/Developer/repo-next')
     click('button[type="submit"]')
-    second.resolve({ ok: true, id: '/Users/tester/Developer/repo-next' })
+    second.resolve({ ok: true, id: 'goblin+file:///Users/tester/Developer/repo-next' })
     await flush()
 
     expect(onClose).toHaveBeenCalledTimes(1)
@@ -208,7 +211,10 @@ describe('OpenRepositoryDialog', () => {
     delete testWindow.goblinNative
     setClientBridgeForTests(null)
     const onClose = vi.fn()
-    const onOpen = vi.fn(async (): Promise<OpenRepoResult> => ({ ok: true, id: '/Users/tester/Developer/repo' }))
+    const onOpen = vi.fn(async (): Promise<OpenRepoResult> => ({
+      ok: true,
+      id: 'goblin+file:///Users/tester/Developer/repo',
+    }))
 
     render(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
 

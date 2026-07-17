@@ -10,14 +10,16 @@ import {
 } from '#/shared/repo-locator.ts'
 
 describe('toSafeCanonicalRepoLocator', () => {
-  test.each(['/repo', 'C:\\repo', 'C:/repo', '\\\\server\\repo', 'goblin+ssh://host/repo'])(
-    'preserves canonical locator %s',
-    (locator) => expect(toSafeCanonicalRepoLocator(locator)).toBe(locator),
+  test.each(['goblin+file:///repo', 'goblin+ssh://host/repo'])('preserves canonical locator %s', (locator) =>
+    expect(toSafeCanonicalRepoLocator(locator)).toBe(locator),
   )
 
-  test.each(['', 'relative/repo', 'repo\0suffix'] as const)('rejects invalid locator %s', (locator) => {
-    expect(toSafeCanonicalRepoLocator(locator)).toBeNull()
-  })
+  test.each(['', '/repo', 'C:\\repo', 'C:/repo', '\\\\server\\repo', 'relative/repo', 'repo\0suffix'] as const)(
+    'rejects invalid locator %s',
+    (locator) => {
+      expect(toSafeCanonicalRepoLocator(locator)).toBeNull()
+    },
+  )
 })
 
 describe('repo locators', () => {
@@ -47,7 +49,9 @@ describe('repo locators', () => {
   })
 
   test('formats recent repo session entry locators', () => {
-    expect(formatWorkspaceSessionEntryLocator({ kind: 'local', id: '/Users/example/repo' }, '/Users/example')).toBe('~/repo')
+    expect(
+      formatWorkspaceSessionEntryLocator({ kind: 'local', id: 'goblin+file:///Users/example/repo' }, '/Users/example'),
+    ).toBe('~/repo')
     expect(
       formatWorkspaceSessionEntryLocator(
         {

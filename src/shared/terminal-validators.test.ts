@@ -56,6 +56,20 @@ describe('shared terminal validators', () => {
         repoRoot: 'goblin+file:///repo',
       }),
     ).toBe(false)
+    expect(
+      isValidTerminalNotifyBellInput({
+        title: 'Build finished',
+        body: 'done',
+        repoRoot: '/repo',
+      }),
+    ).toBe(false)
+    expect(
+      isValidTerminalNotifyBellInput({
+        title: 'Build finished',
+        body: 'done',
+        repoRoot: 'goblin+file:///C:/repo',
+      }),
+    ).toBe(true)
 
     expect(isValidTerminalTestNotificationInput({ title: 'Goblin', body: 'Notifications are working' })).toBe(true)
     expect(isValidTerminalTestNotificationInput({ title: '', body: 'Notifications are working' })).toBe(false)

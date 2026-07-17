@@ -37,7 +37,7 @@ vi.mock('#/web/hooks/openBranchExternalTarget.ts', () => ({
 
 const openExternalMock = vi.mocked(openBranchExternalTarget)
 
-const REPO_ID = '/tmp/goblin-pr-row-test-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-pr-row-test-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-pr-row-test'
 const BRANCH_NAME = 'feature/pr'
 
@@ -52,7 +52,12 @@ describe('PullRequestStatusRow', () => {
       url: 'https://github.com/acme/repo/pull/178',
     })
     renderInJsdom(
-      <PullRequestStatusRow repoId={REPO_ID} repoRuntimeId={REPO_RUNTIME_ID} branchName={BRANCH_NAME} pullRequest={pullRequest} />,
+      <PullRequestStatusRow
+        repoId={REPO_ID}
+        repoRuntimeId={REPO_RUNTIME_ID}
+        branchName={BRANCH_NAME}
+        pullRequest={pullRequest}
+      />,
     )
 
     const chip = document.querySelector<HTMLButtonElement>('[data-pull-request-link]')
@@ -72,7 +77,12 @@ describe('PullRequestStatusRow', () => {
       url: 'https://github.com/acme/repo/pull/105',
     })
     renderInJsdom(
-      <PullRequestStatusRow repoId={REPO_ID} repoRuntimeId={REPO_RUNTIME_ID} branchName={BRANCH_NAME} pullRequest={pullRequest} />,
+      <PullRequestStatusRow
+        repoId={REPO_ID}
+        repoRuntimeId={REPO_RUNTIME_ID}
+        branchName={BRANCH_NAME}
+        pullRequest={pullRequest}
+      />,
     )
 
     const chip = document.querySelector<HTMLButtonElement>('[data-pull-request-link]')!
@@ -90,7 +100,12 @@ describe('PullRequestStatusRow', () => {
         url: 'https://github.com/acme/repo/pull/178',
       })
       renderInJsdom(
-        <PullRequestStatusRow repoId={REPO_ID} repoRuntimeId={REPO_RUNTIME_ID} branchName={BRANCH_NAME} pullRequest={pullRequest} />,
+        <PullRequestStatusRow
+          repoId={REPO_ID}
+          repoRuntimeId={REPO_RUNTIME_ID}
+          branchName={BRANCH_NAME}
+          pullRequest={pullRequest}
+        />,
       )
 
       const chip = document.querySelector<HTMLButtonElement>('[data-pull-request-link]')!

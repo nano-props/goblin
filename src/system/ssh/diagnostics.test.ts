@@ -82,7 +82,8 @@ describe('testRemoteRepo parallel stages', () => {
         return { ok: true, stdout: 'profile notice\nok\nready', stderr: '', message: 'ok', timedOut: false }
       if (command.type === 'checkGit')
         return { ok: true, stdout: '/usr/bin/git', stderr: '', message: 'ok', timedOut: false }
-      if (command.type === 'testDirectory') return { ok: true, stdout: '', stderr: '', message: 'ok', timedOut: false }
+      if (command.type === 'testDirectory')
+        return { ok: true, stdout: '/srv/repo', stderr: '', message: 'ok', timedOut: false }
       if (command.type === 'revParseTopLevel')
         return { ok: true, stdout: '/srv/repo', stderr: '', message: 'ok', timedOut: false }
       return { ok: false, stdout: '', stderr: '', message: 'unexpected command', timedOut: false }
@@ -91,6 +92,22 @@ describe('testRemoteRepo parallel stages', () => {
     const result = await testRemoteRepo(target, { run })
 
     expect(result.ok).toBe(true)
+    expect(result.gitAtWorkspaceRoot).toBe(true)
     expect(result.stages.find((stage) => stage.name === 'shell')?.status).toBe('passed')
+  })
+
+  test('compares physical workspace and Git roots exactly', async () => {
+    const run = vi.fn<(command: RemoteCommandKind) => Promise<RemoteCommandResult>>(async (command) => {
+      if (command.type === 'checkShell') return okShell
+      if (command.type === 'checkGit')
+        return { ok: true, stdout: '/usr/bin/git', stderr: '', message: 'ok', timedOut: false }
+      if (command.type === 'testDirectory')
+        return { ok: true, stdout: '/physical/repo/child\n', stderr: '', message: 'ok', timedOut: false }
+      if (command.type === 'revParseTopLevel')
+        return { ok: true, stdout: '/physical/repo\n', stderr: '', message: 'ok', timedOut: false }
+      return { ok: false, stdout: '', stderr: '', message: 'unexpected', timedOut: false }
+    })
+
+    await expect(testRemoteRepo(target, { run })).resolves.toMatchObject({ ok: true, gitAtWorkspaceRoot: false })
   })
 })

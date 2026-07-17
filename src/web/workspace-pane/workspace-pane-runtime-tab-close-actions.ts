@@ -3,6 +3,7 @@ import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneRuntimeTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
+import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface WorkspacePaneRuntimeTabCloseTarget {
   repoRoot: string
@@ -129,11 +130,17 @@ export function terminalRuntimeTabCloseContext(
 export function terminalBaseForRuntimeTabCloseTarget(
   target: WorkspacePaneRuntimeTabCloseTarget,
 ): TerminalSessionBase | null {
-  if (!target.branchName || !target.worktreePath) return null
+  if (!target.worktreePath) return null
+  const runtimeTarget = runtimeWorkspacePaneTarget(
+    { repoRoot: target.repoRoot, branchName: target.branchName ?? '', worktreePath: target.worktreePath },
+    target.repoRuntimeId,
+  )
+  if (!runtimeTarget || (runtimeTarget.kind !== 'workspace' && !target.branchName)) return null
   return {
     repoRoot: target.repoRoot,
     repoRuntimeId: target.repoRuntimeId,
-    branch: target.branchName,
+    branch: target.branchName ?? '',
     worktreePath: target.worktreePath,
+    target: runtimeTarget.kind === 'workspace' ? runtimeTarget : undefined,
   }
 }

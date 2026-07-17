@@ -111,6 +111,8 @@ export interface RemoteDiagnosticsResult {
   category?: RemoteDiagnosticCategory
   message?: string
   details?: string
+  /** True only when the physical selected directory and physical Git top-level are identical. */
+  gitAtWorkspaceRoot?: boolean
 }
 
 /**

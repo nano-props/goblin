@@ -211,7 +211,14 @@ export function createApp(options: ServerAppOptions): Hono {
       onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
     }),
   )
-  app.route('/api/settings', createSettingsRoutes({ settingsState, workspacePaneTabsHost: options.workspacePaneTabsHost }))
+  app.route(
+    '/api/settings',
+    createSettingsRoutes({
+      settingsState,
+      workspacePaneTabsHost: options.workspacePaneTabsHost,
+      workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
+    }),
+  )
   // i18n is mounted at a separate public path so the client can
   // fetch it before the user is authenticated. The token gate's
   // labels are translated by this endpoint; if it were under
@@ -225,7 +232,12 @@ export function createApp(options: ServerAppOptions): Hono {
   // before the user is authenticated. The payload is non-sensitive
   // (home directory path + platform identifier).
   app.route('/api/host', createHostRoutes())
-  app.route('/api/remote', createRemoteRoutes())
+  app.route(
+    '/api/remote',
+    createRemoteRoutes({
+      workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
+    }),
+  )
   app.route(
     '/api/repo',
     createRepoRoutes({

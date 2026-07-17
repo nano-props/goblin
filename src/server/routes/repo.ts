@@ -33,7 +33,7 @@ import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import {
   acquireRepoRuntime,
-  commitWorkspaceProbeState,
+  commitOrReadInitialWorkspaceProbeState,
   isCurrentRepoRuntime,
   listRepoRuntimes,
   releaseRepoRuntime,
@@ -130,6 +130,7 @@ export function createRepoRoutes(options: {
             userId,
             workspaceId,
             workspaceRuntimeId,
+            assertCurrent: () => assertCurrentRepoRuntimeForRead(userId, workspaceId, workspaceRuntimeId),
           })
         },
       }),
@@ -462,17 +463,22 @@ export function createRepoRoutes(options: {
       if (probe.status !== 'ready') {
         return c.json({ ok: false as const, input: input.repoInput, reason: probe.reason })
       }
-      const repo = { id: workspaceId, name: probe.name }
       const repoRuntimeId = acquireRepoRuntime(userId, workspaceId, input.clientId)
-      if (!commitWorkspaceProbeState({ userId, repoRoot: workspaceId, repoRuntimeId, probe })) {
+      const authoritativeProbe = commitOrReadInitialWorkspaceProbeState({
+        userId,
+        repoRoot: workspaceId,
+        repoRuntimeId,
+        probe,
+      })
+      if (!authoritativeProbe || authoritativeProbe.status !== 'ready') {
         return c.json({ ok: false as const, input: input.repoInput, reason: 'error.workspace-transport-unavailable' })
       }
       return c.json({
         ok: true as const,
-        repo,
+        repo: { id: workspaceId, name: authoritativeProbe.name },
         repoRuntimeId,
-        capabilities: probe.capabilities,
-        diagnostics: probe.diagnostics,
+        capabilities: authoritativeProbe.capabilities,
+        diagnostics: authoritativeProbe.diagnostics,
       })
     }
     assertCanonicalWorkspaceId(input.repoRoot)

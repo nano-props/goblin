@@ -345,6 +345,33 @@ test('workspace pane layout repository does not disguise programming errors as p
   ).rejects.toBe(programmingError)
 })
 
+test('workspace pane layout repository checks runtime admission inside the serialized settings transaction', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const mod = await import('#/server/modules/settings-source.ts')
+  const replacement: WorkspacePaneDurableLayout = {
+    entries: [
+      {
+        repoRoot: REPO_A,
+        branchName: 'main',
+        worktreePath: null,
+        tabs: [workspacePaneStaticTabEntry('history')],
+      },
+    ],
+  }
+
+  await expect(
+    mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
+      repoRoot: REPO_A,
+      expected: { entries: [] },
+      replacement,
+      admit: () => false,
+    }),
+  ).resolves.toMatchObject({ kind: 'admission-rejected', snapshot: { layout: { entries: [] } } })
+  await expect(mod.serverWorkspacePaneLayoutRepository.load(REPO_A)).resolves.toEqual({ layout: { entries: [] } })
+})
+
 test('workspace pane layout repository classifies settings write failures at the persistence boundary', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR

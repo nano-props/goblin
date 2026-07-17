@@ -11,7 +11,7 @@ import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/phy
 const USER_ID = 'user_terminal_creator'
 const CLIENT_ID = 'client_terminal_creator'
 const TERMINAL_CLIENT_ID = 'client_terminal_controller'
-const REPO_ROOT = '/repo'
+const REPO_ROOT = 'goblin+file:///repo'
 const REPO_RUNTIME_ID = 'repo-runtime-terminal-creator'
 const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'

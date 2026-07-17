@@ -3,7 +3,7 @@ import { resetReposStore } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/repos/types.ts'
 
-const REPO_ID = '/tmp/repo'
+const REPO_ID = 'goblin+file:///tmp/repo'
 
 beforeEach(() => {
   resetReposStore()

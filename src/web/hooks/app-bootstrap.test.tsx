@@ -88,24 +88,24 @@ describe('app bootstrap hooks', () => {
   })
 
   test('canonicalizes boot session pane state before applying it to the repos store', async () => {
-    const targetKey = branchTargetKey('/tmp/repo', 'main')
+    const targetKey = branchTargetKey('goblin+file:///tmp/repo', 'main')
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/repo' }],
         workspacePaneTabsByTargetByWorkspace: {
-          '/tmp/repo': {
+          'goblin+file:///tmp/repo': {
             [targetKey]: [],
           },
         },
       },
       {
-        restoredRepoId: '/tmp/repo',
+        restoredRepoId: 'goblin+file:///tmp/repo',
         zenMode: false,
         workspacePaneSize: 45,
         selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'term-222222222222222222222' },
         preferredWorkspacePaneTabByTargetByRepo: {},
         filetreeViewStateByWorktreeByRepo: {
-          '/tmp/repo': {
+          'goblin+file:///tmp/repo': {
             '/tmp/worktree': {
               selectedKeys: ['src/index.ts'],
               expandedKeys: ['src'],
@@ -137,7 +137,7 @@ describe('app bootstrap hooks', () => {
       '/tmp/repo\0/tmp/worktree': 'term-222222222222222222222',
     })
     expect(useFiletreeInteractionStore.getState().interactionByScope).toMatchObject({
-      [filetreeInteractionScopeKey('/tmp/repo', '/tmp/worktree')]: {
+      [filetreeInteractionScopeKey('goblin+file:///tmp/repo', '/tmp/worktree')]: {
         selectedKeys: ['src/index.ts'],
         expandedKeys: ['src'],
         topVisibleRowIndex: 140,
@@ -159,13 +159,13 @@ describe('app bootstrap hooks', () => {
   })
 
   test('passes the routed repo root to server workspace restore', async () => {
-    renderInJsdom(<Harness activeRepoRoot="/tmp/routed-repo" />)
+    renderInJsdom(<Harness activeRepoRoot="goblin+file:///tmp/routed-repo" />)
 
     await vi.waitFor(() => {
       expect(mockedRestoreWorkspaceAtBoot).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          activeRepoRoot: '/tmp/routed-repo',
+          activeRepoRoot: 'goblin+file:///tmp/routed-repo',
           signal: expect.any(AbortSignal),
         }),
       )
@@ -175,10 +175,10 @@ describe('app bootstrap hooks', () => {
   test('restores the boot session when non-critical authenticated hydrates fail', async () => {
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/repo' }],
       },
       {
-        restoredRepoId: '/tmp/repo',
+        restoredRepoId: 'goblin+file:///tmp/repo',
         zenMode: true,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
@@ -215,10 +215,10 @@ describe('app bootstrap hooks', () => {
   test('blocks persistence when server workspace restore fails', async () => {
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/repo' }],
       },
       {
-        restoredRepoId: '/tmp/repo',
+        restoredRepoId: 'goblin+file:///tmp/repo',
         zenMode: true,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
@@ -249,16 +249,16 @@ describe('app bootstrap hooks', () => {
   test('continues with a repaired session returned by server restore', async () => {
     const persistedSession = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/repo' }],
       },
       {
-        restoredRepoId: '/tmp/repo',
+        restoredRepoId: 'goblin+file:///tmp/repo',
         zenMode: true,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
         preferredWorkspacePaneTabByTargetByRepo: {
-          '/tmp/repo': {
-            [branchTargetKey('/tmp/repo', 'main')]: 'files' as const,
+          'goblin+file:///tmp/repo': {
+            [branchTargetKey('goblin+file:///tmp/repo', 'main')]: 'files' as const,
           },
         },
         filetreeViewStateByWorktreeByRepo: {},
@@ -304,10 +304,10 @@ describe('app bootstrap hooks', () => {
   test('blocks persistence when repo session hydration fails', async () => {
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: '/tmp/missing-repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/missing-repo' }],
       },
       {
-        restoredRepoId: '/tmp/missing-repo',
+        restoredRepoId: 'goblin+file:///tmp/missing-repo',
         zenMode: true,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
@@ -406,10 +406,10 @@ describe('app bootstrap hooks', () => {
     vi.useFakeTimers()
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/repo' }],
       },
       {
-        restoredRepoId: '/tmp/repo',
+        restoredRepoId: 'goblin+file:///tmp/repo',
         zenMode: true,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},

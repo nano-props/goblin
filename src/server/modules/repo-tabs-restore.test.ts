@@ -126,7 +126,7 @@ describe('restoreRepoTabsForRepo', () => {
     })
     expect(result.repo.projection).not.toBeNull()
     expect(result.snapshot).toEqual({ revision: 5, entries: [] })
-    expect(mocks.probeRepo).toHaveBeenCalledWith('goblin+file:///repo')
+    expect(mocks.probeRepo).not.toHaveBeenCalled()
     expect(mocks.acquireRepoRuntimeLease).not.toHaveBeenCalled()
     expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
@@ -207,7 +207,7 @@ describe('restoreRepoTabsForRepo', () => {
   test('rejects lazy restore when the repo is absent from server workspace membership', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: '/other' }],
+      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///other' }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()

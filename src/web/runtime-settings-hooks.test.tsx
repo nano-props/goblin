@@ -117,8 +117,8 @@ describe('runtime settings hooks', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({
         recentWorkspaces: [
-          { kind: 'local', id: '/tmp/repo-a' },
-          { kind: 'local', id: '/tmp/repo-b' },
+          { kind: 'local', id: 'goblin+file:///tmp/repo-a' },
+          { kind: 'local', id: 'goblin+file:///tmp/repo-b' },
         ],
       }),
     )
@@ -132,8 +132,8 @@ describe('runtime settings hooks', () => {
     await renderWithPrimaryWindowQueryClient(<HookHost />)
 
     expect(result).toEqual([
-      { kind: 'local', id: '/tmp/repo-a' },
-      { kind: 'local', id: '/tmp/repo-b' },
+      { kind: 'local', id: 'goblin+file:///tmp/repo-a' },
+      { kind: 'local', id: 'goblin+file:///tmp/repo-b' },
     ])
   })
 })

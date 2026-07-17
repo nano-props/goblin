@@ -56,7 +56,14 @@ beforeEach(() => {
         }
       }
       if (url.pathname === '/api/remote/test-repo') {
-        return { ok: true, json: async () => ({ ok: true, target: body.target, stages: [] }) }
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            target: body.target,
+            stages: [{ name: 'path', label: 'path', status: 'passed' }],
+          }),
+        }
       }
       if (url.pathname === '/api/remote/path-suggestions') {
         return { ok: true, json: async () => [] }
@@ -155,7 +162,14 @@ describe('OpenRemoteRepositoryDialog', () => {
           }
         }
         if (url.pathname === '/api/remote/test-repo') {
-          return { ok: true, json: async () => ({ ok: true, target: body.target, stages: [] }) }
+          return {
+            ok: true,
+            json: async () => ({
+              ok: true,
+              target: body.target,
+              stages: [{ name: 'path', label: 'path', status: 'passed' }],
+            }),
+          }
         }
         if (url.pathname === '/api/remote/path-suggestions') {
           return { ok: true, json: async () => [] }
@@ -304,7 +318,14 @@ describe('OpenRemoteRepositoryDialog', () => {
           }
         }
         if (url.pathname === '/api/remote/test-repo') {
-          return { ok: true, json: async () => ({ ok: true, target: body.target, stages: [] }) }
+          return {
+            ok: true,
+            json: async () => ({
+              ok: true,
+              target: body.target,
+              stages: [{ name: 'path', label: 'path', status: 'passed' }],
+            }),
+          }
         }
         if (url.pathname === '/api/remote/path-suggestions') {
           return { ok: true, json: async () => [] }
@@ -372,7 +393,14 @@ describe('OpenRemoteRepositoryDialog', () => {
           }
         }
         if (url.pathname === '/api/remote/test-repo') {
-          return { ok: true, json: async () => ({ ok: true, target: body.target, stages: [] }) }
+          return {
+            ok: true,
+            json: async () => ({
+              ok: true,
+              target: body.target,
+              stages: [{ name: 'path', label: 'path', status: 'passed' }],
+            }),
+          }
         }
         if (url.pathname === '/api/remote/path-suggestions') {
           return { ok: true, json: async () => [] }

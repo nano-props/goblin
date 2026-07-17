@@ -69,7 +69,7 @@ vi.mock('#/system/git/branches.ts', () => ({
   getDefaultBranch: vi.fn(),
   getLog: vi.fn(),
   getRepoName: vi.fn(),
-  getRepoRoot: vi.fn(() => '/repo'),
+  getRepoRoot: vi.fn(() => 'goblin+file:///repo'),
   getUpstream: vi.fn(),
   isAncestor: vi.fn(),
   isGitRepo: vi.fn(),
@@ -279,10 +279,12 @@ describe('main repo ipc cancellation', () => {
     writeNativeClientWorkspaceStateMock.mockResolvedValue(undefined)
     vi.mocked(isGitRepo).mockResolvedValue(true)
     vi.mocked(getCurrentBranch).mockResolvedValue('main')
-    vi.mocked(getWorktrees).mockResolvedValue([{ path: '/repo', branch: 'main', isBare: false, isPrimary: true }])
+    vi.mocked(getWorktrees).mockResolvedValue([
+      { path: 'goblin+file:///repo', branch: 'main', isBare: false, isPrimary: true },
+    ])
     vi.mocked(getUpstream).mockResolvedValue(null)
     vi.mocked(isAncestor).mockImplementation(async () => {
-      await invokeIpc('repo.abort', { cwd: '/repo' })
+      await invokeIpc('repo.abort', { cwd: 'goblin+file:///repo' })
       return false
     })
     vi.mocked(resolveRemovableWorktree).mockReturnValue({
@@ -314,7 +316,7 @@ describe('main repo ipc cancellation', () => {
 
   test('routes native client workspace reads and writes', async () => {
     const workspace = {
-      restoredRepoId: '/repo',
+      restoredRepoId: 'goblin+file:///repo',
       zenMode: false,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {},
@@ -356,7 +358,7 @@ describe('main repo ipc cancellation', () => {
       ok: true,
       json: async () => [{ path: 'file.txt', staged: false, status: 'M' }],
     }))
-    const result = await invokeIpc('repo.status', { cwd: '/repo' })
+    const result = await invokeIpc('repo.status', { cwd: 'goblin+file:///repo' })
 
     expect(result).toEqual({
       ok: false,
@@ -380,12 +382,12 @@ describe('main repo ipc cancellation', () => {
           host: 'example.com',
           user: 'tester',
           port: 22,
-          remotePath: '/repo',
+          remotePath: 'goblin+file:///repo',
           displayName: 'prod:repo',
         },
       }),
     }))
-    const result = await invokeIpc('remote.resolveTarget', { alias: 'prod', remotePath: '/repo' })
+    const result = await invokeIpc('remote.resolveTarget', { alias: 'prod', remotePath: 'goblin+file:///repo' })
 
     expect(result).toEqual({
       ok: false,
@@ -396,7 +398,7 @@ describe('main repo ipc cancellation', () => {
   })
 
   test('returns NOT_FOUND for removed business ipc procedures regardless of embedded server runtime', async () => {
-    const result = await invokeIpc('repo.deleteBranch', { cwd: '/repo', branch: 'feature/cancel' })
+    const result = await invokeIpc('repo.deleteBranch', { cwd: 'goblin+file:///repo', branch: 'feature/cancel' })
 
     expect(result).toEqual({
       ok: false,
@@ -433,21 +435,28 @@ describe('main repo ipc cancellation', () => {
   })
 
   test('projects recent repos into native host state, syncing both menu and Dock recents', async () => {
-    const repo = { kind: 'local' as const, id: '/repo' }
+    const repo = { kind: 'local' as const, id: 'goblin+file:///repo' }
 
-    const result = await invokeIpc('settings.applyNativeHostProjection', { recentWorkspaces: { recentWorkspaces: [repo] } })
+    const result = await invokeIpc('settings.applyNativeHostProjection', {
+      recentWorkspaces: { recentWorkspaces: [repo] },
+    })
 
     expect(result).toEqual({ ok: true, data: undefined })
     expect(app.clearRecentDocuments).toHaveBeenCalledTimes(1)
-    expect(app.addRecentDocument).toHaveBeenCalledWith('/repo')
+    expect(app.addRecentDocument).toHaveBeenCalledWith('goblin+file:///repo')
   })
 
   test('skips remote repos when syncing Dock recent documents', async () => {
-    const localRepo = { kind: 'local' as const, id: '/repo' }
+    const localRepo = { kind: 'local' as const, id: 'goblin+file:///repo' }
     const remoteRepo = {
       kind: 'remote' as const,
-      id: 'gh:owner/repo',
-      ref: { id: 'gh:owner/repo', alias: 'gh', remotePath: '/owner/repo', displayName: 'gh:repo' },
+      id: 'goblin+ssh://gh/owner/repo',
+      ref: {
+        id: 'goblin+ssh://gh/owner/repo',
+        alias: 'gh',
+        remotePath: '/owner/repo',
+        displayName: 'gh:repo',
+      },
     }
 
     const result = await invokeIpc('settings.applyNativeHostProjection', {
@@ -457,7 +466,7 @@ describe('main repo ipc cancellation', () => {
     expect(result).toEqual({ ok: true, data: undefined })
     expect(app.clearRecentDocuments).toHaveBeenCalledTimes(1)
     expect(app.addRecentDocument).toHaveBeenCalledTimes(1)
-    expect(app.addRecentDocument).toHaveBeenCalledWith('/repo')
+    expect(app.addRecentDocument).toHaveBeenCalledWith('goblin+file:///repo')
   })
 
   test('projects server-owned prefs into native host state when the client updates them', async () => {

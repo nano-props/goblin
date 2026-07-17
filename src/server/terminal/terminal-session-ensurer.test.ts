@@ -40,7 +40,7 @@ vi.mock('#/system/ssh/config.ts', () => ({
 }))
 
 const USER_ID = 'user_terminal_ensurer'
-const REPO_ROOT = '/repo'
+const REPO_ROOT = 'goblin+file:///repo'
 const REPO_RUNTIME_ID = 'repo-runtime-ensure'
 const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'
@@ -135,7 +135,7 @@ describe('terminal session ensurer', () => {
     expect(prepareSession).toHaveBeenCalledWith({
       userId: USER_ID,
       scope: terminalSessionRuntimeScope(REPO_ROOT, REPO_RUNTIME_ID),
-      repoRoot: path.resolve(REPO_ROOT),
+      repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: BRANCH_NAME,
       terminalSessionId: 'term-locallocallocallocal1',
@@ -146,6 +146,7 @@ describe('terminal session ensurer', () => {
       rows: 40,
       clientId: 'client_terminal_ensurer',
       startupShellCommand: 'echo ready',
+      target: undefined,
       env: undefined,
       signal: context.signal,
     })

@@ -6,7 +6,7 @@ import {
   resolveWorktreeBootstrapDecision,
 } from '#/web/components/create-worktree/create-worktree-bootstrap-host.logic.ts'
 
-const REPO_ID = '/tmp/create-worktree-bootstrap-host-logic'
+const REPO_ID = 'goblin+file:///tmp/create-worktree-bootstrap-host-logic'
 const CONFIG_HASH = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 
 describe('create worktree bootstrap host logic', () => {

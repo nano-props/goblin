@@ -17,7 +17,7 @@ vi.mock('#/web/repo-client.ts', () => ({
   openRepoUrl: mocks.openRepoUrl,
 }))
 
-const REPO_ID = '/tmp/goblin-open-upstream-test'
+const REPO_ID = 'goblin+file:///tmp/goblin-open-upstream-test'
 const REPO_RUNTIME_ID = 'repo-runtime-open-upstream-test'
 
 beforeEach(() => {
@@ -44,7 +44,10 @@ describe('openBranchExternalTarget', () => {
 
     await openBranchExternalTarget(REPO_ID, REPO_RUNTIME_ID, { name: 'feature/no-pr', pullRequest: undefined })
 
-    expect(mocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, REPO_RUNTIME_ID, { type: 'branch', branch: 'feature/no-pr' })
+    expect(mocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, REPO_RUNTIME_ID, {
+      type: 'branch',
+      branch: 'feature/no-pr',
+    })
     expect(mocks.openExternalUrl).not.toHaveBeenCalled()
   })
 })

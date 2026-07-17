@@ -5,6 +5,7 @@ import path from 'node:path'
 import { execa } from 'execa'
 import SSHConfig, { LineType, type Line, type Section } from '#/system/ssh/vendor/ssh-config/index.ts'
 import { buildCanonicalSshConnectionSnapshot } from '#/system/ssh/commands.ts'
+import { isValidSshProfile } from '#/shared/workspace-locator.ts'
 import {
   normalizeRemoteRepoRef,
   normalizeRemoteTarget,
@@ -66,8 +67,8 @@ export async function resolveRemoteTargetWithConfigFingerprint(
   input: RemoteConnectionInput,
   signal?: AbortSignal,
 ): Promise<ResolvedRemoteTarget & { configFingerprint: string }> {
-  const alias = input.alias.trim()
-  if (!isConcreteAlias(alias)) throw new Error('Invalid SSH config host alias')
+  const alias = input.alias
+  if (!isValidSshProfile(alias)) throw new Error('Invalid SSH config host alias')
   const configState = await listSshConfigHosts()
   if (!configState.hasInclude && !configState.hosts.some((host) => host.alias === alias)) {
     throw new Error('error.ssh-config-changed')
@@ -153,10 +154,6 @@ function toResolvedTarget(input: {
   return { target }
 }
 
-function isConcreteAlias(alias: string): boolean {
-  return alias.length > 0 && !alias.includes('\0') && !alias.startsWith('!') && !/[?*]/.test(alias)
-}
-
 function containsIncludeDirective(config: ReturnType<typeof SSHConfig.parse>): boolean {
   return config.some((line: Line) => {
     if (line.type !== LineType.DIRECTIVE) return false
@@ -170,7 +167,7 @@ function hostAliases(section: Section): string[] {
   return value
     .split(/\s+/)
     .map((alias) => alias.trim())
-    .filter((alias) => isConcreteAlias(alias))
+    .filter((alias) => isValidSshProfile(alias))
 }
 
 function firstString(value: string | string[] | undefined): string | null {

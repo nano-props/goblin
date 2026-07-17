@@ -1,5 +1,6 @@
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
 import {
   runCreateTerminalTabCommand,
   type TerminalCreateCommandAdmission,
@@ -48,7 +49,7 @@ export interface WorkspacePaneTerminalCreateActionContext {
   createTerminal: (
     base: TerminalSessionBase,
     options?: TerminalCreateOptions,
-    placement?: import('#/shared/workspace-pane-runtime.ts').WorkspacePaneRuntimeTabPlacement,
+    placement?: WorkspacePaneRuntimeTabPlacement,
   ) => Promise<TerminalCreateCommandAdmission>
   captureOpenerIdentity: () => string | null
 }
@@ -58,7 +59,7 @@ export interface CreateTerminalWorkspacePaneRuntimeTabActionOptions {
   createTerminal: (
     base: TerminalSessionBase,
     options?: TerminalCreateOptions,
-    placement?: import('#/shared/workspace-pane-runtime.ts').WorkspacePaneRuntimeTabPlacement,
+    placement?: WorkspacePaneRuntimeTabPlacement,
   ) => Promise<TerminalCreateCommandAdmission>
   openerIdentity: string | null
   showCreatedTerminalTab: (terminalSessionId: string, canonicalBranch: string) => boolean | Promise<boolean>

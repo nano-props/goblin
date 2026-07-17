@@ -38,7 +38,7 @@ vi.mock('#/web/app-shell-client.ts', () => ({
   openExternalUrl: mocks.openExternalUrl,
 }))
 
-const REPO_ID = '/tmp/goblin-use-branch-actions-test-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-use-branch-actions-test-repo'
 
 describe('useBranchActions', () => {
   beforeEach(() => {
@@ -83,12 +83,7 @@ describe('useBranchActions', () => {
       await actions?.openTerminal?.('ghostty')
     })
 
-    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(
-      target!.id,
-      repo.repoRuntimeId,
-      '/srv/repo-feature',
-      'ghostty',
-    )
+    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(target!.id, repo.repoRuntimeId, '/srv/repo-feature', 'ghostty')
   })
 
   test('copyPatch reads the server patch through a mutation and writes it to the clipboard', async () => {
@@ -194,12 +189,7 @@ describe('useBranchActions', () => {
       await actions?.openEditor?.('vscode')
     })
 
-    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(
-      target!.id,
-      repo.repoRuntimeId,
-      '/srv/repo-feature',
-      'ghostty',
-    )
+    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(target!.id, repo.repoRuntimeId, '/srv/repo-feature', 'ghostty')
     expect(mocks.openRepoEditor).toHaveBeenCalledWith(target!.id, repo.repoRuntimeId, '/srv/repo-feature', 'vscode')
   })
 

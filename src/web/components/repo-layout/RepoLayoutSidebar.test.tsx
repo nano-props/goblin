@@ -13,7 +13,7 @@ vi.mock('#/web/components/RepoPickerHost.tsx', () => ({
   RepoPickerHost: () => <button type="button" data-testid="repo-picker-host" className="h-10 w-full shrink-0" />,
 }))
 
-const REPO_ID = '/tmp/repo-shell-sidebar-test'
+const REPO_ID = 'goblin+file:///tmp/repo-shell-sidebar-test'
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()

@@ -10,7 +10,7 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import { resetReposStore } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
-const REPO_ID = '/tmp/navigation-controls-repo'
+const REPO_ID = 'goblin+file:///tmp/navigation-controls-repo'
 
 beforeEach(() => {
   resetReposStore()

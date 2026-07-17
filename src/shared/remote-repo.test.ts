@@ -18,8 +18,15 @@ describe('remote repository normalization', () => {
       displayName: 'host:repo',
     })
     expect(sameWorkspaceSessionEntry(entry, { ...entry, ref: { ...entry.ref } })).toBe(true)
-    expect(sameWorkspaceSessionEntry(entry, { ...entry, ref: { ...entry.ref, displayName: 'host:renamed' } })).toBe(false)
-    expect(sameWorkspaceSessionEntry({ kind: 'local', id: '/repo' }, { kind: 'local', id: '/repo' })).toBe(true)
+    expect(sameWorkspaceSessionEntry(entry, { ...entry, ref: { ...entry.ref, displayName: 'host:renamed' } })).toBe(
+      false,
+    )
+    expect(
+      sameWorkspaceSessionEntry(
+        { kind: 'local', id: 'goblin+file:///repo' },
+        { kind: 'local', id: 'goblin+file:///repo' },
+      ),
+    ).toBe(true)
     expect(sameWorkspaceSessionEntry(null, entry)).toBe(false)
   })
 

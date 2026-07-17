@@ -41,10 +41,7 @@ import {
   serverWorkspacePaneLayoutRestoreTransaction,
 } from '#/server/modules/settings-source.ts'
 import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
-import {
-  TerminalSessionManager,
-  type TerminalSessionCloseReason,
-} from '#/server/terminal/terminal-session-manager.ts'
+import { TerminalSessionManager, type TerminalSessionCloseReason } from '#/server/terminal/terminal-session-manager.ts'
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalActionHost, type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
@@ -79,11 +76,14 @@ const serverWorkspacePaneTargetProjection: WorkspacePaneTargetProjectionProvider
     const workspaceTarget = { repoRoot, branchName: '', worktreePath: repoRoot }
     if (!workspaceRuntimeHasGitCapability(userId, repoRoot, repoRuntimeId)) return [workspaceTarget]
     const snapshot = await getRepoSnapshot(repoRoot, { repoRuntimeId })
-    return [workspaceTarget, ...(snapshot?.branches ?? []).map((branch) => ({
-      repoRoot,
-      branchName: branch.name,
-      worktreePath: branch.worktree?.path ?? null,
-    }))]
+    return [
+      workspaceTarget,
+      ...(snapshot?.branches ?? []).map((branch) => ({
+        repoRoot,
+        branchName: branch.name,
+        worktreePath: branch.worktree?.path ?? null,
+      })),
+    ]
   },
 }
 
@@ -333,12 +333,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   terminalRuntimeLogger.info({ ptyMode: ptySupervisor.getDiagnostics().mode }, 'server terminal runtime created')
 
   const workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost = {
-    async removeGitScopedResources({ userId, workspaceId, workspaceRuntimeId }) {
+    async removeGitScopedResources({ userId, workspaceId, workspaceRuntimeId, assertCurrent }) {
       const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
-      const retirement = await manager.closeGitScopedSessionsForRepo(userId, scope)
-      if (retirement.failures.length > 0) throw new Error('terminal session cleanup failed')
+      await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, workspaceId, assertCurrent)
       await workspaceTabsCoordinator.closeInvalidatedScope({ userId, scope })
-      await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, workspaceId)
+      manager.forceCloseGitScopedSessionsForRepo(userId, scope)
       broadcastRepoSessionsChanged(userId, workspaceId)
       broadcastRepoWorkspaceTabsChanged(userId, workspaceId)
     },
@@ -388,18 +387,36 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 async function clearWorkspacePaneDurableLayout(
   repository: WorkspacePaneLayoutRepository,
   workspaceId: string,
+  assertCurrent: () => void,
 ): Promise<void> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
+    assertCurrent()
     const current = await repository.load(workspaceId)
     const replacement = {
       entries: current.layout.entries.filter((entry) => entry.worktreePath === workspaceId),
     }
     if (workspacePaneDurableLayoutsEqual(workspaceId, current.layout, replacement)) return
+    assertCurrent()
     const outcome = await repository.compareAndSwap({
       repoRoot: workspaceId,
       expected: current.layout,
       replacement,
+      admit: () => {
+        try {
+          assertCurrent()
+          return true
+        } catch {
+          return false
+        }
+      },
     })
+    if (outcome.kind === 'admission-rejected') {
+      assertCurrent()
+      throw new Error('workspace pane layout cleanup admission was rejected')
+    }
+    // Admission is evaluated inside the serialized settings mutation. Once
+    // accepted, this cleanup is ordered before any close/reopen or later
+    // layout write even when the atomic file write completes asynchronously.
     if (outcome.kind === 'accepted') return
     if (outcome.kind === 'write-failure') throw outcome.error
   }

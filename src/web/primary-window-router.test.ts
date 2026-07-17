@@ -24,43 +24,43 @@ import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticate
 
 describe('primary window initial route', () => {
   test('prefers the restored repo over the first repo in order', () => {
-    const repoA = emptyRepo('/repo-a', 'repo-a', 'repo-runtime-a')
-    const repoB = emptyRepo('/repo-b', 'repo-b', 'repo-runtime-b')
+    const repoA = emptyRepo('goblin+file:///repo-a', 'repo-a', 'repo-runtime-a')
+    const repoB = emptyRepo('goblin+file:///repo-b', 'repo-b', 'repo-runtime-b')
 
     expect(
       initialRepoRouteSlugFromStore({
-        restoredRepoId: '/repo-b',
-        order: ['/repo-a', '/repo-b'],
-        repos: { '/repo-a': repoA, '/repo-b': repoB },
+        restoredRepoId: 'goblin+file:///repo-b',
+        order: ['goblin+file:///repo-a', 'goblin+file:///repo-b'],
+        repos: { 'goblin+file:///repo-a': repoA, 'goblin+file:///repo-b': repoB },
         workspaceMembershipReady: true,
       }),
-    ).toBe(repoSlugFromId('/repo-b'))
+    ).toBe(repoSlugFromId('goblin+file:///repo-b'))
   })
 
   test('waits for workspace membership restore instead of routing to the first partial repo', () => {
-    const repoA = emptyRepo('/repo-a', 'repo-a', 'repo-runtime-a')
+    const repoA = emptyRepo('goblin+file:///repo-a', 'repo-a', 'repo-runtime-a')
 
     expect(
       initialRepoRouteSlugFromStore({
         restoredRepoId: null,
-        order: ['/repo-a'],
-        repos: { '/repo-a': repoA },
+        order: ['goblin+file:///repo-a'],
+        repos: { 'goblin+file:///repo-a': repoA },
         workspaceMembershipReady: false,
       }),
     ).toBeNull()
   })
 
   test('falls back to the first ordered repo when restore has settled without a restored repo', () => {
-    const repoA = emptyRepo('/repo-a', 'repo-a', 'repo-runtime-a')
+    const repoA = emptyRepo('goblin+file:///repo-a', 'repo-a', 'repo-runtime-a')
 
     expect(
       initialRepoRouteSlugFromStore({
-        restoredRepoId: '/missing',
-        order: ['/repo-a'],
-        repos: { '/repo-a': repoA },
+        restoredRepoId: 'goblin+file:///missing',
+        order: ['goblin+file:///repo-a'],
+        repos: { 'goblin+file:///repo-a': repoA },
         workspaceMembershipReady: true,
       }),
-    ).toBe(repoSlugFromId('/repo-a'))
+    ).toBe(repoSlugFromId('goblin+file:///repo-a'))
   })
 })
 

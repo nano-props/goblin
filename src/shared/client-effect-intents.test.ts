@@ -22,17 +22,30 @@ describe('isClientEffectIntent', () => {
     expect(isClientEffectIntent({ type: 'lang-pref-set-requested', pref: 'zh' })).toBe(true)
     expect(isClientEffectIntent({ type: 'lang-pref-set-requested', pref: 'fr' })).toBe(false)
     expect(
-      isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', terminalSessionId: 'term-111111111111111111111' }),
+      isClientEffectIntent({
+        type: 'terminal-bell-click',
+        repoRoot: 'goblin+file:///tmp/repo',
+        terminalSessionId: 'term-111111111111111111111',
+      }),
     ).toBe(true)
-    expect(isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', key: 'term-111111111111111111111' })).toBe(false)
-    expect(isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', terminalSessionId: 1 })).toBe(
-      false,
-    )
+    expect(
+      isClientEffectIntent({
+        type: 'terminal-bell-click',
+        repoRoot: 'goblin+file:///tmp/repo',
+        key: 'term-111111111111111111111',
+      }),
+    ).toBe(false)
+    expect(
+      isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: 'goblin+file:///tmp/repo', terminalSessionId: 1 }),
+    ).toBe(false)
   })
 
   test('accepts only valid recent repo entries', () => {
     expect(
-      isClientEffectIntent({ type: 'open-recent-repo-requested', entry: { kind: 'local', id: '/tmp/repo' } }),
+      isClientEffectIntent({
+        type: 'open-recent-repo-requested',
+        entry: { kind: 'local', id: 'goblin+file:///tmp/repo' },
+      }),
     ).toBe(true)
     expect(isClientEffectIntent({ type: 'open-recent-repo-requested', entry: { kind: 'local', id: '' } })).toBe(false)
     expect(

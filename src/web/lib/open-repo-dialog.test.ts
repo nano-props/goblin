@@ -21,7 +21,10 @@ describe('openRepoFromDialog', () => {
     installGoblinTestBridge({
       'repo.openDialog': () => '/tmp/repo',
     })
-    const ensureWorkspaceOpen = vi.fn(async (): Promise<OpenRepoResult> => ({ ok: true, id: '/tmp/repo' }))
+    const ensureWorkspaceOpen = vi.fn(async (): Promise<OpenRepoResult> => ({
+      ok: true,
+      id: 'goblin+file:///tmp/repo',
+    }))
     const activateRepo = vi.fn()
 
     await openRepoFromDialog({
@@ -31,7 +34,7 @@ describe('openRepoFromDialog', () => {
     })
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/repo')
-    expect(activateRepo).toHaveBeenCalledWith('/tmp/repo')
+    expect(activateRepo).toHaveBeenCalledWith('goblin+file:///tmp/repo')
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
 
@@ -41,7 +44,7 @@ describe('openRepoFromDialog', () => {
     })
     const ensureWorkspaceOpen = vi.fn(async (): Promise<OpenRepoResult> => ({
       ok: true,
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       postOpenEffects: Promise.resolve([{ kind: 'recent-repo', message: 'recent write failed' }]),
     }))
     const activateRepo = vi.fn()
@@ -52,7 +55,7 @@ describe('openRepoFromDialog', () => {
       t: (key) => key,
     })
 
-    expect(activateRepo).toHaveBeenCalledWith('/tmp/repo')
+    expect(activateRepo).toHaveBeenCalledWith('goblin+file:///tmp/repo')
     await Promise.resolve()
     expect(mocks.toastError).toHaveBeenCalledWith('repo-picker.recent-save-failed', {
       description: 'recent write failed',

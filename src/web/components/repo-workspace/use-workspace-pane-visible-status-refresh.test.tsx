@@ -11,7 +11,7 @@ vi.mock('#/web/stores/repos/repo-refresh-actions.ts', async (importOriginal) => 
   return { ...actual, requestVisibleWorkspaceStatusRefresh: vi.fn(() => true) }
 })
 
-const REPO_ID = '/tmp/visible-status-refresh-repo'
+const REPO_ID = 'goblin+file:///tmp/visible-status-refresh-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-visible-status-refresh'
 
 function Harness({

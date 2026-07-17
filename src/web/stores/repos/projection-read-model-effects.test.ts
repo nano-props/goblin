@@ -35,7 +35,7 @@ describe('repo projection read-model effects', () => {
   test('snapshot success persists snapshot cache without triggering pull request summary backfill', () => {
     installGoblinTestBridge({})
     const repo = seedRepoShellForTest({
-      id: '/repo',
+      id: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
     })
@@ -48,14 +48,14 @@ describe('repo projection read-model effects', () => {
       useReposStore.setState,
       useReposStore.getState,
       {
-        repoRoot: '/repo',
+        repoRoot: 'goblin+file:///repo',
         repoRuntimeId: repo.repoRuntimeId,
         projection: acceptedProjection(),
       },
       { scope: 'repo-read-model' },
     )
 
-    expect(useReposStore.getState().repoSnapshotCache['/repo']).toMatchObject({
+    expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toMatchObject({
       data: {
         currentBranch: 'feature/a',
         branches: [{ name: 'feature/a' }, { name: 'feature/b' }],
@@ -71,7 +71,7 @@ describe('repo projection read-model effects', () => {
       },
     })
     const repo = seedRepoShellForTest({
-      id: '/repo',
+      id: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
     })
@@ -85,7 +85,7 @@ describe('repo projection read-model effects', () => {
         useReposStore.setState,
         useReposStore.getState,
         {
-          repoRoot: '/repo',
+          repoRoot: 'goblin+file:///repo',
           repoRuntimeId: repo.repoRuntimeId,
           projection: acceptedProjection(),
         },
@@ -100,7 +100,7 @@ describe('repo projection read-model effects', () => {
       'terminal.prune': pruneTerminals,
     })
     const repo = seedRepoShellForTest({
-      id: '/repo',
+      id: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
     })
@@ -113,7 +113,7 @@ describe('repo projection read-model effects', () => {
       useReposStore.setState,
       useReposStore.getState,
       {
-        repoRoot: '/repo',
+        repoRoot: 'goblin+file:///repo',
         repoRuntimeId: 'repo-runtime-stale',
         projection: acceptedProjection(),
       },
@@ -121,13 +121,13 @@ describe('repo projection read-model effects', () => {
     )
 
     expect(pruneTerminals).not.toHaveBeenCalled()
-    expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+    expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
   })
 
   test('same-millisecond core projection changes are accepted', () => {
     installGoblinTestBridge({})
     const repo = seedRepoShellForTest({
-      id: '/repo',
+      id: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
     })
@@ -149,31 +149,31 @@ describe('repo projection read-model effects', () => {
       },
     }
 
-    setRepoProjectionQueryData('/repo', repo.repoRuntimeId, null, 'full', firstProjection)
+    setRepoProjectionQueryData('goblin+file:///repo', repo.repoRuntimeId, null, 'full', firstProjection)
     acceptRepoProjectionReadModel(
       useReposStore.setState,
       useReposStore.getState,
       {
-        repoRoot: '/repo',
+        repoRoot: 'goblin+file:///repo',
         repoRuntimeId: repo.repoRuntimeId,
         projection: firstProjection,
       },
       { scope: 'repo-read-model' },
     )
 
-    setRepoProjectionQueryData('/repo', repo.repoRuntimeId, null, 'full', secondProjection)
+    setRepoProjectionQueryData('goblin+file:///repo', repo.repoRuntimeId, null, 'full', secondProjection)
     acceptRepoProjectionReadModel(
       useReposStore.setState,
       useReposStore.getState,
       {
-        repoRoot: '/repo',
+        repoRoot: 'goblin+file:///repo',
         repoRuntimeId: repo.repoRuntimeId,
         projection: secondProjection,
       },
       { scope: 'repo-read-model' },
     )
 
-    expect(useReposStore.getState().repoSnapshotCache['/repo']).toMatchObject({
+    expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toMatchObject({
       data: {
         currentBranch: 'feature/b',
         branches: [{ name: 'feature/b' }],
@@ -187,16 +187,16 @@ describe('repo projection read-model effects', () => {
       'terminal.prune': pruneTerminals,
     })
     const repo = seedRepoShellForTest({
-      id: '/repo',
+      id: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
     })
     useReposStore.setState((state) => {
-      const current = state.repos['/repo']!
+      const current = state.repos['goblin+file:///repo']!
       return {
         repos: {
           ...state.repos,
-          '/repo': {
+          'goblin+file:///repo': {
             ...current,
             dataLoads: {
               ...current.dataLoads,
@@ -211,18 +211,18 @@ describe('repo projection read-model effects', () => {
       useReposStore.setState,
       useReposStore.getState,
       {
-        repoRoot: '/repo',
+        repoRoot: 'goblin+file:///repo',
         repoRuntimeId: repo.repoRuntimeId,
         projection: acceptedProjection(null, 'summary'),
       },
       { scope: 'query-cache' },
     )
 
-    expect(useReposStore.getState().repos['/repo']?.dataLoads.repoReadModel).toMatchObject({
+    expect(useReposStore.getState().repos['goblin+file:///repo']?.dataLoads.repoReadModel).toMatchObject({
       phase: 'loading',
       loadedAt: null,
     })
-    expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+    expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
     expect(pruneTerminals).not.toHaveBeenCalled()
   })
 })

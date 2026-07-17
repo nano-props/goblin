@@ -43,7 +43,11 @@ export function formatWorkspaceLocator(
 ): WorkspaceLocator | null {
   if (!locator || typeof locator !== 'object') return null
   if (locator.transport === 'ssh') {
-    if (typeof locator.profile !== 'string' || typeof locator.path !== 'string' || !SSH_PROFILE_RE.test(locator.profile)) {
+    if (
+      typeof locator.profile !== 'string' ||
+      typeof locator.path !== 'string' ||
+      !SSH_PROFILE_RE.test(locator.profile)
+    ) {
       return null
     }
     const path = encodePosixPath(locator.path)
@@ -63,6 +67,11 @@ export function formatWorkspaceLocator(
 
 export function isWorkspaceLocator(input: unknown, platform: WorkspaceLocatorPlatform): input is WorkspaceLocator {
   return typeof input === 'string' && parseWorkspaceLocator(input, platform) !== null
+}
+
+/** The one accepted grammar for an SSH config profile at every input and execution boundary. */
+export function isValidSshProfile(input: unknown): input is string {
+  return typeof input === 'string' && SSH_PROFILE_RE.test(input)
 }
 
 function parseFileLocator(input: string, platform: WorkspaceLocatorPlatform): ParsedWorkspaceLocator | null {

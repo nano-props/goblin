@@ -369,7 +369,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
     case 'checkGit':
       return 'command -v git'
     case 'testDirectory':
-      return `test -d ${shellQuote(command.path)}`
+      return `cd ${shellQuote(command.path)} && test -r . && pwd -P`
     case 'listDirectories': {
       const limit = Math.max(1, Math.min(50, Math.floor(command.limit ?? 20)))
       return `find ${shellQuote(
@@ -380,7 +380,10 @@ function scriptForCommand(command: RemoteCommandKind): string {
       return remoteTreeChildrenScript(command.path, command.prefix)
     }
     case 'revParseTopLevel':
-      return `git -C ${shellQuote(command.path)} rev-parse --show-toplevel`
+      return [
+        `root=$(git -C ${shellQuote(command.path)} rev-parse --show-toplevel) || exit $?`,
+        `cd "$root" && pwd -P`,
+      ].join('\n')
     case 'resolvePhysicalWorktreeIdentity':
       return remotePhysicalWorktreeIdentityScript(command.path)
     case 'gitSnapshot': {

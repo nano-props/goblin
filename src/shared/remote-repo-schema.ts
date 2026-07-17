@@ -1,4 +1,5 @@
 import * as v from 'valibot'
+import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 
 export const RemoteAbsolutePathSchema = v.pipe(
   v.string(),
@@ -6,7 +7,7 @@ export const RemoteAbsolutePathSchema = v.pipe(
 )
 
 export const RemoteRepoRefSchema = v.object({
-  id: v.string(),
+  id: WorkspaceIdSchema,
   alias: v.string(),
   remotePath: RemoteAbsolutePathSchema,
   displayName: v.string(),
@@ -15,11 +16,11 @@ export const RemoteRepoRefSchema = v.object({
 export const WorkspaceSessionEntrySchema = v.union([
   v.object({
     kind: v.literal('local'),
-    id: v.string(),
+    id: WorkspaceIdSchema,
   }),
   v.object({
     kind: v.literal('remote'),
-    id: v.string(),
+    id: WorkspaceIdSchema,
     ref: RemoteRepoRefSchema,
   }),
 ])

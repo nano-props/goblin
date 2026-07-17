@@ -7,11 +7,20 @@ const REPO_C = 'goblin+file:///repo-c'
 const persistence = vi.hoisted(() => ({
   stored: null as unknown,
   failNextWrite: false,
+  nextWriteGate: null as Promise<void> | null,
+  nextWriteStarted: null as (() => void) | null,
   readUserSettingsJson: vi.fn(async () => persistence.stored),
   writeUserSettingsJson: vi.fn(async (data: unknown) => {
     if (persistence.failNextWrite) {
       persistence.failNextWrite = false
       throw new Error('disk full')
+    }
+    if (persistence.nextWriteGate) {
+      const gate = persistence.nextWriteGate
+      persistence.nextWriteGate = null
+      persistence.nextWriteStarted?.()
+      persistence.nextWriteStarted = null
+      await gate
     }
     persistence.stored = structuredClone(data)
   }),
@@ -25,8 +34,55 @@ afterEach(async () => {
   mod.resetServerSettingsSourceForTests()
   persistence.stored = null
   persistence.failNextWrite = false
+  persistence.nextWriteGate = null
+  persistence.nextWriteStarted = null
   vi.clearAllMocks()
   vi.resetModules()
+})
+
+test('rolls back an admitted layout CAS when its runtime epoch closes during the durable write', async () => {
+  const mod = await import('#/server/modules/settings-source.ts')
+  const repository = mod.serverWorkspacePaneLayoutRepository
+  const initial = {
+    entries: [{ repoRoot: REPO_A, branchName: 'main', worktreePath: null, tabs: [] }],
+  }
+  let current = await repository.load(REPO_A)
+  await expect(
+    repository.compareAndSwap({
+      repoRoot: REPO_A,
+      expected: current.layout,
+      replacement: initial,
+    }),
+  ).resolves.toMatchObject({ kind: 'accepted' })
+  current = await repository.load(REPO_A)
+
+  const writeGate = Promise.withResolvers<void>()
+  const writeStarted = Promise.withResolvers<void>()
+  persistence.nextWriteGate = writeGate.promise
+  persistence.nextWriteStarted = () => writeStarted.resolve()
+  let oldRuntimeIsCurrent = true
+  const cleanup = repository.compareAndSwap({
+    repoRoot: REPO_A,
+    expected: current.layout,
+    replacement: { entries: [] },
+    admit: () => oldRuntimeIsCurrent,
+  })
+  await writeStarted.promise
+  // Models close + reopen while the replacement is in the atomic file write.
+  // The old epoch's predicate must not authorize deleting the layout inherited
+  // by the new epoch.
+  oldRuntimeIsCurrent = false
+  writeGate.resolve()
+
+  await expect(cleanup).resolves.toMatchObject({ kind: 'admission-rejected' })
+  await expect(repository.load(REPO_A)).resolves.toEqual({ layout: initial })
+  expect(persistence.writeUserSettingsJson).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      workspace: expect.objectContaining({
+        workspacePaneTabsByTargetByWorkspace: expect.objectContaining({ [REPO_A]: expect.any(Object) }),
+      }),
+    }),
+  )
 })
 
 test('does not expose failed settings writes through the in-memory cache', async () => {

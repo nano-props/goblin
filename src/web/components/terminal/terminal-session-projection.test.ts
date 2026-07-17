@@ -6,7 +6,7 @@ import {
 } from '#/web/components/terminal/terminal-session-projection.ts'
 import type { TerminalRepoIndex } from '#/web/components/terminal/types.ts'
 
-const REPO_ROOT = '/repo'
+const REPO_ROOT = 'goblin+file:///repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/repo'
 

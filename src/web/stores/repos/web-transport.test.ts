@@ -43,7 +43,9 @@ describe('repo web transport helpers', () => {
     }))
     const { openRepoUrl } = await import('#/web/repo-client.ts')
 
-    await expect(openRepoUrl('/tmp/repo', 'repo-runtime-web-transport-test', { type: 'branch', branch: 'feature/a' })).resolves.toEqual({
+    await expect(
+      openRepoUrl('/tmp/repo', 'repo-runtime-web-transport-test', { type: 'branch', branch: 'feature/a' }),
+    ).resolves.toEqual({
       ok: true,
       message: '',
     })
@@ -68,7 +70,7 @@ describe('repo web transport helpers', () => {
     const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({
-        target: { id: 'remote:test', displayName: 'repo', alias: 'example', remotePath: '/srv/repo' },
+        target: { id: 'goblin+ssh://example/srv/repo', displayName: 'repo', alias: 'example', remotePath: '/srv/repo' },
       }),
     }))
     const { resolveRemoteRepositoryTarget } = await import('#/web/remote-client.ts')
@@ -78,7 +80,7 @@ describe('repo web transport helpers', () => {
         alias: 'example',
         remotePath: '/srv/repo',
       }),
-    ).resolves.toMatchObject({ id: 'remote:test', alias: 'example' })
+    ).resolves.toMatchObject({ id: 'goblin+ssh://example/srv/repo', alias: 'example' })
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/remote/resolve-target',
       expect.objectContaining({

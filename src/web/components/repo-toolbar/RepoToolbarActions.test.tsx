@@ -16,7 +16,7 @@ import {
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
-const REPO_ID = '/tmp/goblin-repo-toolbar-actions-test-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-repo-toolbar-actions-test-repo'
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()

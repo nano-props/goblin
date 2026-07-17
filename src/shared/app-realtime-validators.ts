@@ -1,4 +1,5 @@
 import * as v from 'valibot'
+import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import type {
   AppRealtimeClientMessage,
   AppRealtimeRequestAction,
@@ -83,7 +84,7 @@ const AppRealtimeNonTerminalClientMessageSchema = v.variant('type', [
 ])
 
 const AppRealtimeNonTerminalServerMessageSchema = v.variant('type', [
-  v.object({ type: v.literal(WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed), repoRoot: v.string() }),
+  v.object({ type: v.literal(WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed), repoRoot: WorkspaceIdSchema }),
   v.object({
     type: v.literal('response'),
     requestId: AppRealtimeRequestIdSchema,
@@ -178,9 +179,7 @@ export function isAppRealtimeWorkspacePaneTabsAction(
 export function isAppRealtimeWorkspacePaneRuntimeAction(
   action: AppRealtimeRequestAction,
 ): action is WorkspacePaneRuntimeSocketAction {
-  return (
-    action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open || action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close
-  )
+  return action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open || action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close
 }
 
 export function isAppRealtimeWsMessageWithinLimit(value: string): boolean {

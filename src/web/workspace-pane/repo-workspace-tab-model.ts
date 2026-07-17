@@ -11,6 +11,7 @@ import {
   isWorkspacePaneRuntimeTabType,
   workspacePaneRuntimeTabIdentity,
   workspacePaneRuntimeTabSessionId,
+  workspacePaneStaticTabEntry,
 } from '#/shared/workspace-pane.ts'
 import { resolveRenderableWorkspacePaneTab } from '#/web/lib/workspace-pane-tab.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
@@ -156,8 +157,16 @@ export interface RepoWorkspaceTabModelInput {
 }
 
 export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): RepoWorkspaceTabModel {
-  const tabEntries = input.branchName ? normalizeWorkspacePaneTabs(input.tabEntries) : []
-  const worktreePath = input.branchName ? input.worktreePath : null
+  const hasWorkspaceTarget = input.branchName === null && input.worktreePath !== null
+  const hasPaneTarget = !!input.branchName || hasWorkspaceTarget
+  const worktreePath = hasPaneTarget ? input.worktreePath : null
+  const normalizedTabEntries = hasPaneTarget
+    ? normalizeWorkspacePaneTabs(input.tabEntries, { hasWorktree: worktreePath !== null })
+    : []
+  const tabEntries =
+    hasWorkspaceTarget && !normalizedTabEntries.some((entry) => entry.type === 'files')
+      ? [workspacePaneStaticTabEntry('files'), ...normalizedTabEntries]
+      : normalizedTabEntries
   const runtimeTabTargetKeyByType = workspacePaneRuntimeTabTargetKeyByType({ repoRoot: input.repoId, worktreePath })
   const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ repoRoot: input.repoId, worktreePath })
   const hasWorktree = !!worktreePath

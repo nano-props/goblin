@@ -14,7 +14,7 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 
-const REPO_ID = '/tmp/repo-dashboard-pane-test'
+const REPO_ID = 'goblin+file:///tmp/repo-dashboard-pane-test'
 
 beforeEach(() => {
   resetReposStore()

@@ -58,7 +58,10 @@ afterEach(() => {
 
 describe('RepoOpenDialog', () => {
   test('ensures the workspace is open before delegating activation to navigation', async () => {
-    const ensureWorkspaceOpen = vi.fn(async () => ({ ok: true as const, id: '/Users/tester/Developer/repo' }))
+    const ensureWorkspaceOpen = vi.fn(async () => ({
+      ok: true as const,
+      id: 'goblin+file:///Users/tester/Developer/repo',
+    }))
     useReposStore.setState({ ensureWorkspaceOpen })
     const activateRepo = vi.fn()
     const onOpenChange = vi.fn()
@@ -74,7 +77,7 @@ describe('RepoOpenDialog', () => {
     await flush()
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/Users/tester/Developer/repo')
-    expect(activateRepo).toHaveBeenCalledWith('/Users/tester/Developer/repo')
+    expect(activateRepo).toHaveBeenCalledWith('goblin+file:///Users/tester/Developer/repo')
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 })

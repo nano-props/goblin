@@ -1,4 +1,5 @@
 import * as v from 'valibot'
+import { isWorkspaceIdWireValue, WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import type {
   TerminalClientMessage,
   TerminalRealtimeMessage,
@@ -83,11 +84,11 @@ const TerminalSessionInputSchema = v.object({
 })
 const RepoRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
 const TerminalListSessionsInputSchema = v.object({
-  repoRoot: v.string(),
+  repoRoot: WorkspaceIdSchema,
   repoRuntimeId: RepoRuntimeIdSchema,
 })
 export const TerminalCreateInputSchema = v.object({
-  repoRoot: v.string(),
+  repoRoot: WorkspaceIdSchema,
   repoRuntimeId: RepoRuntimeIdSchema,
   branch: v.string(),
   worktreePath: v.string(),
@@ -98,7 +99,7 @@ export const TerminalCreateInputSchema = v.object({
   clientId: TerminalOptionalClientIdSchema,
 })
 const TerminalPruneInputSchema = v.object({
-  repoRoot: v.string(),
+  repoRoot: WorkspaceIdSchema,
   repoRuntimeId: RepoRuntimeIdSchema,
 })
 export const TerminalSessionSummarySchema = v.object({
@@ -106,7 +107,7 @@ export const TerminalSessionSummarySchema = v.object({
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   terminalSessionId: v.string(),
   repoRuntimeId: RepoRuntimeIdSchema,
-  repoRoot: v.string(),
+  repoRoot: WorkspaceIdSchema,
   branch: v.string(),
   worktreePath: v.string(),
   cwd: v.string(),
@@ -223,7 +224,7 @@ const TerminalBellRealtimeEventSchema = v.object({
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   terminalSessionId: v.string(),
-  repoRoot: v.string(),
+  repoRoot: WorkspaceIdSchema,
   worktreePath: v.string(),
   processName: v.string(),
   canonicalTitle: v.nullable(v.string()),
@@ -232,7 +233,7 @@ const TerminalTitleEventSchema = v.object({
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   terminalSessionId: v.string(),
-  repoRoot: v.string(),
+  repoRoot: WorkspaceIdSchema,
   worktreePath: v.string(),
   canonicalTitle: v.nullable(v.string()),
 })
@@ -240,7 +241,7 @@ const TerminalExitEventSchema = v.object({
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   terminalSessionId: v.string(),
-  repoRoot: v.string(),
+  repoRoot: WorkspaceIdSchema,
   repoRuntimeId: RepoRuntimeIdSchema,
 })
 const TerminalSessionClosedEventSchema = v.object({
@@ -248,7 +249,7 @@ const TerminalSessionClosedEventSchema = v.object({
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   terminalSessionId: v.string(),
-  repoRoot: v.string(),
+  repoRoot: WorkspaceIdSchema,
   worktreePath: v.string(),
 })
 
@@ -278,7 +279,7 @@ const TerminalRealtimeMessageVariants = [
   v.object({ type: v.literal('exit'), event: TerminalExitEventSchema }),
   v.object({ type: v.literal('identity'), event: TerminalIdentityEventSchema }),
   v.object({ type: v.literal('lifecycle'), event: TerminalLifecycleEventSchema }),
-  v.object({ type: v.literal('sessions-changed'), repoRoot: v.string() }),
+  v.object({ type: v.literal('sessions-changed'), repoRoot: WorkspaceIdSchema }),
   TerminalSessionClosedEventSchema,
 ] as const
 const TerminalRealtimeMessageSchema = v.variant('type', TerminalRealtimeMessageVariants)
@@ -411,8 +412,7 @@ export function isValidTerminalNotifyBellInput(value: unknown): value is Termina
     (terminalSessionId === undefined || (typeof terminalSessionId === 'string' && terminalSessionId.length > 0)) &&
     (terminalWorktreeKey === undefined ||
       (typeof terminalWorktreeKey === 'string' && terminalWorktreeKey.length > 0)) &&
-    typeof repoRoot === 'string' &&
-    repoRoot.length > 0
+    isWorkspaceIdWireValue(repoRoot)
   )
 }
 

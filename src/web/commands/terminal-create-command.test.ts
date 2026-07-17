@@ -3,7 +3,7 @@ import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 
-const REPO_ID = '/tmp/goblin-terminal-create-command-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-terminal-create-command-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-terminal-create-command'
 const WORKTREE_PATH = '/tmp/goblin-terminal-create-command-worktree'
 const BASE: TerminalSessionBase = {

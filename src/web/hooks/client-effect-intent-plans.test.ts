@@ -12,7 +12,7 @@ describe('client effect intent plans', () => {
   test('creates a worktree terminal bell plan when the worktree group matches a known worktree', () => {
     resetReposStore()
     const repo = seedRepoWithReadModelForTest({
-      id: '/tmp/repo',
+      id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       branchSnapshots: [
@@ -25,7 +25,7 @@ describe('client effect intent plans', () => {
       type: 'terminal-bell-click',
       repoRoot: repo.id,
       terminalSessionId: 'term-222222222222222222222',
-      terminalWorktreeKey: '/tmp/repo\0/tmp/repo-feature',
+      terminalWorktreeKey: 'goblin+file:///tmp/repo\0/tmp/repo-feature',
     })
 
     expect(plan).toEqual({
@@ -33,16 +33,16 @@ describe('client effect intent plans', () => {
       repoId: repo.id,
       branch: 'feature/test',
       terminalSessionId: 'term-222222222222222222222',
-      terminalWorktreeKey: '/tmp/repo\0/tmp/repo-feature',
+      terminalWorktreeKey: 'goblin+file:///tmp/repo\0/tmp/repo-feature',
     })
   })
 
   test('marks worktree terminal bell intent unavailable when the branch read model is missing', () => {
-    const plan = createTerminalBellIntentPlan({ id: '/tmp/repo' }, null, {
+    const plan = createTerminalBellIntentPlan({ id: 'goblin+file:///tmp/repo' }, null, {
       type: 'terminal-bell-click',
-      repoRoot: '/tmp/repo',
+      repoRoot: 'goblin+file:///tmp/repo',
       terminalSessionId: 'term-222222222222222222222',
-      terminalWorktreeKey: '/tmp/repo\0/tmp/repo-feature',
+      terminalWorktreeKey: 'goblin+file:///tmp/repo\0/tmp/repo-feature',
     })
 
     expect(plan).toEqual({ kind: 'unavailable', reason: 'branch-read-model-unavailable' })
@@ -50,7 +50,7 @@ describe('client effect intent plans', () => {
 
   test('suppresses recent repo open when overlays block the action', () => {
     const plan = createAppLevelIntentPlan(
-      { type: 'open-recent-repo-requested', entry: { kind: 'local', id: '/tmp/repo' } },
+      { type: 'open-recent-repo-requested', entry: { kind: 'local', id: 'goblin+file:///tmp/repo' } },
       { overlayBlocked: true },
     )
 
@@ -64,8 +64,8 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
-        currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepoId: 'goblin+file:///tmp/repo',
+        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
@@ -79,8 +79,8 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
-        currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepoId: 'goblin+file:///tmp/repo',
+        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
@@ -94,8 +94,8 @@ describe('client effect intent plans', () => {
         overlayBlocked: true,
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
-        currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepoId: 'goblin+file:///tmp/repo',
+        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
@@ -124,12 +124,12 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
-        currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepoId: 'goblin+file:///tmp/repo',
+        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
-    expect(plan).toEqual({ kind: 'new-terminal-tab', repoId: '/tmp/repo' })
+    expect(plan).toEqual({ kind: 'new-terminal-tab', repoId: 'goblin+file:///tmp/repo' })
   })
 
   test('creates a refresh plan from the current repo runtime id', () => {
@@ -139,12 +139,16 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
-        currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepoId: 'goblin+file:///tmp/repo',
+        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
-    expect(plan).toEqual({ kind: 'refresh-repo', repoId: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' })
+    expect(plan).toEqual({
+      kind: 'refresh-repo',
+      repoId: 'goblin+file:///tmp/repo',
+      repoRuntimeId: 'repo-runtime-test-7',
+    })
   })
 
   test('creates a zen mode toggle plan for the current workspace', () => {
@@ -154,8 +158,8 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
-        currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepoId: 'goblin+file:///tmp/repo',
+        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
@@ -169,8 +173,8 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
-        currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepoId: 'goblin+file:///tmp/repo',
+        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
@@ -184,8 +188,8 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: false,
         terminalFocused: true,
-        currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepoId: 'goblin+file:///tmp/repo',
+        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
@@ -199,8 +203,8 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
-        currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepoId: 'goblin+file:///tmp/repo',
+        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
@@ -229,8 +233,8 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
-        currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepoId: 'goblin+file:///tmp/repo',
+        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 

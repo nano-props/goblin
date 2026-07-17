@@ -4,6 +4,7 @@ import {
   acquireRepoRuntimeLease,
   captureRepoRuntimeMembershipLease,
   clearRepoRuntimesForUser,
+  commitOrReadInitialWorkspaceProbeState,
   commitWorkspaceProbeState,
   expireRepoRuntimeMembershipLease,
   isCurrentRepoRuntime,
@@ -15,10 +16,11 @@ import {
   replaceRepoRuntimeMembershipsForClient,
   runSerializedWorkspaceRefresh,
   runRepoRemoteLifecycle,
+  workspaceRuntimeHasGitCapability,
 } from '#/server/modules/repo-runtimes.ts'
 
 const USER_ID = 'user_repo_runtime'
-const REPO_ROOT = '/repo-runtimes/repo'
+const REPO_ROOT = 'goblin+file:///repo-runtimes/repo'
 
 describe('repo runtimes', () => {
   beforeEach(() => {
@@ -81,6 +83,39 @@ describe('repo runtimes', () => {
     const reopened = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
     expect(reopened).not.toBe(runtimeId)
     expect(listRepoRuntimes(USER_ID)[0]?.workspaceProbe).toEqual({ status: 'probing' })
+  })
+
+  test('keeps the first committed initial probe as the shared runtime authority', () => {
+    const runtimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-b')
+    const first = {
+      status: 'ready' as const,
+      name: 'first',
+      capabilities: {
+        files: { read: true as const, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' as const },
+      },
+      diagnostics: [],
+    }
+    const later = { ...first, name: 'later' }
+
+    expect(
+      commitOrReadInitialWorkspaceProbeState({
+        userId: USER_ID,
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: runtimeId,
+        probe: first,
+      }),
+    ).toEqual(first)
+    expect(
+      commitOrReadInitialWorkspaceProbeState({
+        userId: USER_ID,
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: runtimeId,
+        probe: later,
+      }),
+    ).toEqual(first)
   })
 
   test('serializes refresh and preserves the committed probe after an inconclusive result', async () => {
@@ -166,6 +201,68 @@ describe('repo runtimes', () => {
       }),
     ).rejects.toThrow('cleanup failed')
     expect(listRepoRuntimes(USER_ID)[0]?.workspaceProbe).toEqual(available)
+  })
+
+  test('keeps a reopened runtime behind the closing epoch lifecycle turn', async () => {
+    const runtimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    const available = {
+      status: 'ready' as const,
+      name: 'repo',
+      capabilities: {
+        files: { read: true as const, write: true },
+        terminal: { available: true },
+        git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+      },
+      diagnostics: [],
+    }
+    commitWorkspaceProbeState({ userId: USER_ID, repoRoot: REPO_ROOT, repoRuntimeId: runtimeId, probe: available })
+    let releaseCleanup!: () => void
+    let markCleanupStarted!: () => void
+    const cleanupGate = new Promise<void>((resolve) => {
+      releaseCleanup = resolve
+    })
+    const cleanupStarted = new Promise<void>((resolve) => {
+      markCleanupStarted = resolve
+    })
+    let durableCleanupCommitted = false
+    const oldRefresh = runSerializedWorkspaceRefresh({
+      userId: USER_ID,
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: runtimeId,
+      probe: async () => ({
+        ...available,
+        capabilities: { ...available.capabilities, git: { status: 'unavailable' as const } },
+      }),
+      beforeCommit: async () => {
+        durableCleanupCommitted = true
+        markCleanupStarted()
+        await cleanupGate
+      },
+    })
+    await cleanupStarted
+    expect(durableCleanupCommitted).toBe(true)
+    // The downgrade is the transition's linearization point. While derived
+    // cleanup is pending, readers see neither the old Git authority nor a
+    // half-cleaned plain-workspace projection.
+    expect(listRepoRuntimes(USER_ID)[0]?.workspaceProbe).toEqual({ status: 'probing' })
+    expect(workspaceRuntimeHasGitCapability(USER_ID, REPO_ROOT, runtimeId)).toBe(false)
+    expect(releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({
+      released: true,
+      runtimeClosed: true,
+    })
+    const reopened = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    const nextProbe = vi.fn(async () => available)
+    const newRefresh = runSerializedWorkspaceRefresh({
+      userId: USER_ID,
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: reopened,
+      probe: nextProbe,
+    })
+    await Promise.resolve()
+    expect(nextProbe).not.toHaveBeenCalled()
+    releaseCleanup()
+    await expect(oldRefresh).resolves.toEqual({ kind: 'stale-runtime' })
+    await expect(newRefresh).resolves.toMatchObject({ kind: 'committed' })
   })
 
   test('makes repeated acquire and release idempotent per client', () => {

@@ -8,6 +8,7 @@ import {
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 import { formatWorkspaceLocator, parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 
 export const RepoRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
 
@@ -19,21 +20,21 @@ export const WorkspacePaneTabIdentitySchema = v.pipe(
 export const WorkspacePaneOptionalTabIdentitySchema = v.optional(v.nullable(WorkspacePaneTabIdentitySchema))
 
 export const WorkspacePaneTabsListInputSchema = v.object({
-  workspaceId: v.string(),
+  workspaceId: WorkspaceIdSchema,
   workspaceRuntimeId: RepoRuntimeIdSchema,
 })
 
 export const RuntimeWorkspacePaneTargetSchema = v.variant('kind', [
-  v.object({ kind: v.literal('workspace'), workspaceId: v.string(), workspaceRuntimeId: RepoRuntimeIdSchema }),
+  v.object({ kind: v.literal('workspace'), workspaceId: WorkspaceIdSchema, workspaceRuntimeId: RepoRuntimeIdSchema }),
   v.object({
     kind: v.literal('git-branch'),
-    workspaceId: v.string(),
+    workspaceId: WorkspaceIdSchema,
     workspaceRuntimeId: RepoRuntimeIdSchema,
     branch: v.pipe(v.string(), v.minLength(1)),
   }),
   v.object({
     kind: v.literal('git-worktree'),
-    workspaceId: v.string(),
+    workspaceId: WorkspaceIdSchema,
     workspaceRuntimeId: RepoRuntimeIdSchema,
     root: v.string(),
   }),
@@ -56,14 +57,14 @@ export const WorkspacePaneTabEntrySchema = v.union([
 ])
 
 export const WorkspacePaneTabsReplaceInputSchema = v.object({
-  workspaceId: v.string(),
+  workspaceId: WorkspaceIdSchema,
   workspaceRuntimeId: RepoRuntimeIdSchema,
   target: RuntimeWorkspacePaneTargetSchema,
   tabs: v.array(WorkspacePaneTabEntrySchema),
 })
 
 export const WorkspacePaneTabsUpdateInputSchema = v.object({
-  workspaceId: v.string(),
+  workspaceId: WorkspaceIdSchema,
   workspaceRuntimeId: RepoRuntimeIdSchema,
   target: RuntimeWorkspacePaneTargetSchema,
   operation: v.variant('type', [

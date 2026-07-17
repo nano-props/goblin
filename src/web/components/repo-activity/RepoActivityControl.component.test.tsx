@@ -13,7 +13,7 @@ import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
-const REPO_ID = '/tmp/repo-activity-control-component'
+const REPO_ID = 'goblin+file:///tmp/repo-activity-control-component'
 
 beforeEach(() => {
   resetReposStore()

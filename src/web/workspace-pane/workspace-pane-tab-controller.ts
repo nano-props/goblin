@@ -23,6 +23,8 @@ import {
   primaryWindowPresentationIsCurrent,
   type PrimaryWindowPresentationToken,
 } from '#/web/primary-window-presentation.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 
 export type WorkspacePaneTabControllerRoute = RepoBranchWorkspacePaneRouteTarget
 export type WorkspacePaneTabControllerObservedRoute = ParsedRepoBranchWorkspacePaneRouteTarget
@@ -95,6 +97,18 @@ export async function selectWorkspacePaneControllerTab(
   navigation: WorkspacePaneTabControllerCommitNavigation,
   presentationToken: PrimaryWindowPresentationToken = beginPrimaryWindowPresentation(),
 ): Promise<boolean> {
+  if (target.branchName === null) {
+    if (!workspacePaneTabControllerTargetIsCurrent(target) || tab.kind === 'pending') return false
+    const state = useReposStore.getState()
+    if (isRepoWorkspaceRuntimeTab(tab) && tab.runtimeType === 'terminal') {
+      state.setSelectedTerminal(formatTerminalWorktreeKey(target.repoId, target.repoId), tab.sessionId)
+    }
+    state.setWorkspacePaneTabForTarget(
+      { repoRoot: target.repoId, branchName: '', worktreePath: target.repoId },
+      tab.type,
+    )
+    return workspacePaneTabControllerTargetIsCurrent(target)
+  }
   const route = workspacePaneControllerRouteForTab(tab)
   if (route === undefined) return false
   return await commitWorkspacePaneCurrentTargetRoute(target, route, navigation, undefined, presentationToken)
@@ -246,6 +260,9 @@ export async function commitWorkspacePaneExactTargetRoute(
 }
 
 export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneActionTarget): boolean {
+  if (target.branchName === null) {
+    return useReposStore.getState().repos[target.repoId]?.repoRuntimeId === target.repoRuntimeId
+  }
   return target.branchName !== null && workspacePaneTargetLeaseIsCurrent({ ...target, branchName: target.branchName })
 }
 

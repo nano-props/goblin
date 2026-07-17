@@ -27,7 +27,15 @@ vi.mock('#/server/modules/repo-runtimes.ts', () => ({
     mocks.workspaceProbes.set(input.repoRoot, input.probe)
     return true
   }),
-  workspaceProbeStateForRuntime: vi.fn((_userId, repoRoot) => mocks.workspaceProbes.get(repoRoot) ?? gitProbe()),
+  commitOrReadInitialWorkspaceProbeState: vi.fn((input) => {
+    const current = mocks.workspaceProbes.get(input.repoRoot)
+    if (current) return current
+    mocks.workspaceProbes.set(input.repoRoot, input.probe)
+    return input.probe
+  }),
+  workspaceProbeStateForRuntime: vi.fn(
+    (_userId, repoRoot) => mocks.workspaceProbes.get(repoRoot) ?? { status: 'probing' },
+  ),
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
@@ -307,6 +315,10 @@ describe('restoreServerWorkspace', () => {
       lifecycle: { kind: 'failed', reason: 'unreachable' },
       name: 'repo',
     })
+    mocks.workspaceProbes.set(remoteEntry.id, {
+      status: 'unavailable',
+      reason: 'error.workspace-transport-unavailable',
+    })
     const workspacePaneTabsHost = {
       restoreTabs: vi.fn(async () => ({
         kind: 'restored' as const,
@@ -332,6 +344,7 @@ describe('restoreServerWorkspace', () => {
       repoRoot: remoteEntry.id,
       repoRuntimeId: 'repo-runtime-test',
       projection: null,
+      workspaceProbe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
     })
     expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
   })

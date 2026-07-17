@@ -230,7 +230,7 @@ vi.mock('#/web/components/Layout.tsx', () => ({
   ),
 }))
 
-const REPO_ID = '/tmp/repo-view-test'
+const REPO_ID = 'goblin+file:///tmp/repo-view-test'
 
 function branchRepoView(branchName = 'feature/a') {
   return (

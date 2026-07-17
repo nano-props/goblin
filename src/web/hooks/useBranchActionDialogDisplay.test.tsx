@@ -34,7 +34,7 @@ import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
-const REPO_ID = '/tmp/goblin-dialog-display-test'
+const REPO_ID = 'goblin+file:///tmp/goblin-dialog-display-test'
 const OTHER_REPO_ID = '/tmp/goblin-dialog-display-test-other'
 
 beforeEach(() => {
@@ -174,7 +174,9 @@ describe('useBranchActionDialogDisplay', () => {
     })
     setRepoOperationsQueryData(repo.id, repo.repoRuntimeId, false, {
       loadedAt: 123,
-      operations: [serverOperation({ repoRuntimeId: repo.repoRuntimeId, kind: 'delete-branch', branch: 'feature/query' })],
+      operations: [
+        serverOperation({ repoRuntimeId: repo.repoRuntimeId, kind: 'delete-branch', branch: 'feature/query' }),
+      ],
     })
     const entry: BranchActionDialogEntry<string> = {
       repoId: REPO_ID,

@@ -22,6 +22,7 @@ interface RepoRuntimeState {
   remoteAttemptController: AbortController | null
   remoteAttemptPromise: Promise<RepoRemoteLifecycleRunResult> | null
   workspaceProbe: WorkspaceProbeState
+  pendingWorkspaceProbeTransition: { before: WorkspaceProbeState; after: WorkspaceSettledProbeState } | null
   workspaceLifecycleTail: Promise<void>
 }
 
@@ -93,6 +94,7 @@ function repoRuntimeState(userId: string, repoRoot: string): RepoRuntimeState {
     remoteAttemptController: null,
     remoteAttemptPromise: null,
     workspaceProbe: { status: 'probing' },
+    pendingWorkspaceProbeTransition: null,
     workspaceLifecycleTail: Promise.resolve(),
   }
   byRepo.set(repoRoot, created)
@@ -229,7 +231,7 @@ export function listRepoRuntimes(userId: string): RepoRuntimeEntry[] {
         repoRoot,
         repoRuntimeId: state.currentRepoRuntimeId,
         remoteLifecycle: isRemoteRepoId(repoRoot) ? state.remoteLifecycle : null,
-        workspaceProbe: state.workspaceProbe,
+        workspaceProbe: exposedWorkspaceProbe(state),
       })
     }
   }
@@ -282,6 +284,7 @@ export function workspaceRuntimeHasGitCapability(userId: string, repoRoot: strin
   const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
   return (
     state?.currentRepoRuntimeId === repoRuntimeId &&
+    state.pendingWorkspaceProbeTransition === null &&
     state.workspaceProbe.status === 'ready' &&
     state.workspaceProbe.capabilities.git.status === 'available'
   )
@@ -293,7 +296,7 @@ export function workspaceProbeStateForRuntime(
   repoRuntimeId: string,
 ): WorkspaceProbeState | null {
   const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
-  return state?.currentRepoRuntimeId === repoRuntimeId ? state.workspaceProbe : null
+  return state?.currentRepoRuntimeId === repoRuntimeId ? exposedWorkspaceProbe(state) : null
 }
 
 export function commitWorkspaceProbeState(input: {
@@ -304,8 +307,21 @@ export function commitWorkspaceProbeState(input: {
 }): boolean {
   const state = repoRuntimesByUser.get(input.userId)?.get(input.repoRoot)
   if (!state || state.currentRepoRuntimeId !== input.repoRuntimeId) return false
+  if (state.workspaceProbe.status !== 'probing') return false
   state.workspaceProbe = input.probe
   return true
+}
+
+export function commitOrReadInitialWorkspaceProbeState(input: {
+  userId: string
+  repoRoot: string
+  repoRuntimeId: string
+  probe: WorkspaceSettledProbeState
+}): WorkspaceProbeState | null {
+  const state = repoRuntimesByUser.get(input.userId)?.get(input.repoRoot)
+  if (!state || state.currentRepoRuntimeId !== input.repoRuntimeId) return null
+  if (state.workspaceProbe.status === 'probing') state.workspaceProbe = input.probe
+  return state.workspaceProbe
 }
 
 export async function runSerializedWorkspaceRefresh(input: {
@@ -330,9 +346,19 @@ export async function runSerializedWorkspaceRefresh(input: {
     const probe = await input.probe()
     if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
     if (workspaceRefreshMayCommit(probe)) {
-      await input.beforeCommit?.({ before: state.workspaceProbe, after: probe })
-      if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
+      const before = state.workspaceProbe
       state.workspaceProbe = probe
+      state.pendingWorkspaceProbeTransition = { before, after: probe }
+      try {
+        await input.beforeCommit?.({ before, after: probe })
+      } catch (error) {
+        if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
+        state.workspaceProbe = before
+        state.pendingWorkspaceProbeTransition = null
+        throw error
+      }
+      if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
+      state.pendingWorkspaceProbeTransition = null
       return { kind: 'committed', probe }
     }
     return { kind: 'failed', probe }
@@ -343,6 +369,10 @@ export async function runSerializedWorkspaceRefresh(input: {
 
 function workspaceRefreshMayCommit(probe: WorkspaceSettledProbeState): boolean {
   return probe.status === 'ready' && probe.diagnostics.length === 0
+}
+
+function exposedWorkspaceProbe(state: RepoRuntimeState): WorkspaceProbeState {
+  return state.pendingWorkspaceProbeTransition ? { status: 'probing' } : state.workspaceProbe
 }
 
 export function isCurrentRepoRuntimeMembership(
@@ -556,7 +586,7 @@ function stopRepoRuntimeEpoch(state: RepoRuntimeState): string | null {
   state.remoteAttemptController = null
   state.remoteAttemptPromise = null
   state.workspaceProbe = { status: 'probing' }
-  state.workspaceLifecycleTail = Promise.resolve()
+  state.pendingWorkspaceProbeTransition = null
   state.currentRepoRuntimeId = null
   state.members.clear()
   return repoRuntimeId

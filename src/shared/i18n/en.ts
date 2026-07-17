@@ -85,9 +85,9 @@ export const en = {
   // ---- Dependencies -------------------------------------------------------
 
   // ---- Repository picker ----------------------------------------------------
-  'repo-picker.repos': 'Repositories',
+  'repo-picker.repos': 'Workspaces',
   'repo-picker.close-named': 'Close {name}',
-  'repo-picker.placeholder': 'Select repository',
+  'repo-picker.placeholder': 'Select workspace',
   'repo-picker.open-local': 'Open Workspace…',
   'repo-picker.open-remote': 'Open Remote Workspace…',
   'repo-picker.open-title': 'Open Workspace',
@@ -173,13 +173,12 @@ export const en = {
   'repo-picker.open-remote-home-unavailable': 'Could not resolve the remote home directory',
   'repo-picker.tooltip.last-sync-label': 'Last synced',
   'repo-picker.connecting-title': 'Connecting to SSH…',
-  'repo-unavailable.title': 'Repository path unavailable',
-  'repo-unavailable.body':
-    'Goblin cannot read this path as a Git repository. Restore the folder or recreate .git, then retry.',
+  'repo-unavailable.title': 'Workspace unavailable',
+  'repo-unavailable.body': 'Goblin cannot read this workspace. Restore the folder and its access, then retry.',
   'repo-unavailable.remote-body':
-    'Goblin could not reconnect to this SSH repository. Verify the SSH alias, network access, and remote path, then retry.',
+    'Goblin could not reconnect to this SSH workspace. Verify the SSH alias, network access, and remote path, then retry.',
   'repo-unavailable.remote-connect-failed':
-    'Goblin could not establish a usable SSH session for this repository. Verify authentication, host reachability, and host key trust, then retry.',
+    'Goblin could not establish a usable SSH session for this workspace. Verify authentication, host reachability, and host key trust, then retry.',
   'repo-unavailable.remote-config-changed':
     'The saved SSH alias can no longer be resolved from your current SSH config. Review the alias and reconnect.',
   'repo-unavailable.remote-home-unavailable':
@@ -187,22 +186,22 @@ export const en = {
   'repo-unavailable.remote-path-missing':
     'Goblin connected to the SSH target, but the saved remote path no longer exists. Update the remote path and reconnect.',
   'repo-unavailable.remote-not-a-repo':
-    'Goblin connected to the SSH target, but the saved path is no longer a Git repository. Check the path or reconnect to a different repository.',
+    'Goblin connected to the SSH target, but the saved workspace path is unavailable. Check the path or reconnect to a different workspace.',
   'repo-unavailable.path': 'Path',
   'repo-unavailable.reason': 'Reason',
   'repo-unavailable.retry': 'Check again',
-  'repo-unavailable.close': 'Close repository',
+  'repo-unavailable.close': 'Close workspace',
 
   // ---- Empty state --------------------------------------------------------
   'empty.title': 'No workspace open',
-  'empty.body': 'Choose a repository from the sidebar, or drop a Git folder here.',
-  'repo-route.not-found-title': 'Repository not found',
+  'empty.body': 'Choose a workspace from the sidebar, or drop a folder here.',
+  'repo-route.not-found-title': 'Workspace not found',
 
   // ---- Drag and drop ------------------------------------------------------
   'drop.title': 'Drop to open workspace',
-  'drop.body': 'Drop a Git repository folder anywhere in Goblin.',
+  'drop.body': 'Drop a folder anywhere in Goblin.',
   'drop.open-failed': 'Could not open workspace',
-  'repo-picker.recent-save-failed': 'Repository opened, but recent history was not updated',
+  'repo-picker.recent-save-failed': 'Workspace opened, but recent history was not updated',
 
   // ---- Workspace pane tabs -----------------------------------------------
   'repo.dashboard': 'Dashboard',

@@ -1,6 +1,6 @@
 import { tildifyPath } from '#/shared/paths.ts'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import type { RemoteRepoRef, RemoteRepoTarget, WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 export type RemoteRepoRefLocatorInput = Pick<RemoteRepoRef, 'alias' | 'remotePath'>
 export type RemoteRepoTargetLocatorInput = Pick<RemoteRepoTarget, 'host' | 'user' | 'remotePath'>
@@ -17,12 +17,8 @@ export function toSafeCanonicalRepoLocator(value: unknown): string | null {
   ) {
     return null
   }
-  if (isRemoteRepoId(value)) return value
-  return isAbsoluteLocalRepoPath(value) ? value : null
-}
-
-function isAbsoluteLocalRepoPath(value: string): boolean {
-  return value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value) || value.startsWith('\\\\')
+  const platform = typeof process !== 'undefined' && process.platform === 'win32' ? 'win32' : 'posix'
+  return parseWorkspaceLocator(value, platform) ? value : null
 }
 
 export function formatRepoLocator(
@@ -34,7 +30,10 @@ export function formatRepoLocator(
 }
 
 export function formatWorkspaceSessionEntryLocator(entry: WorkspaceSessionEntry, home: string): string {
-  return entry.kind === 'local' ? formatLocalRepoLocator(entry.id, home) : formatRemoteRepoRefLocator(entry.ref)
+  if (entry.kind === 'remote') return formatRemoteRepoRefLocator(entry.ref)
+  const platform = /^[A-Za-z]:\\/.test(home) ? 'win32' : 'posix'
+  const locator = parseWorkspaceLocator(entry.id, platform)
+  return locator?.transport === 'file' ? formatLocalRepoLocator(locator.path, home) : entry.id
 }
 
 export function formatLocalRepoLocator(repoId: string, home: string): string {

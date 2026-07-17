@@ -92,12 +92,17 @@ export interface InitialRepoRefresh {
   repoRuntimeId: string
 }
 
-function sessionEntryFromInput(input: string | WorkspaceSessionEntry): WorkspaceSessionEntry {
-  if (typeof input !== 'string') return input
-  if (!isRemoteRepoId(input)) return localWorkspaceSessionEntry(input)
+type WorkspaceAdmissionInput =
+  { kind: 'command-input'; input: string } | { kind: 'workspace-entry'; entry: WorkspaceSessionEntry }
+
+function workspaceAdmissionFromInput(input: string | WorkspaceSessionEntry): WorkspaceAdmissionInput {
+  if (typeof input !== 'string') return { kind: 'workspace-entry', entry: input }
+  if (!isRemoteRepoId(input)) return { kind: 'command-input', input }
   const parsed = parseRemoteRepoId(input)
   const ref = parsed ? normalizeRemoteRepoRef(parsed) : null
-  return ref ? { kind: 'remote', id: ref.id, ref } : localWorkspaceSessionEntry(input)
+  return ref
+    ? { kind: 'workspace-entry', entry: { kind: 'remote', id: ref.id, ref } }
+    : { kind: 'command-input', input }
 }
 
 export async function resolveRepoPath(
@@ -105,25 +110,29 @@ export async function resolveRepoPath(
   onError?: (err: unknown) => void,
   fallbackError = 'error.failed-read-repo',
 ): Promise<ProbeResult> {
-  const entry = sessionEntryFromInput(input)
+  const admission = workspaceAdmissionFromInput(input)
+  const value = admission.kind === 'workspace-entry' ? admission.entry : admission.input
   try {
     let target: RemoteRepoTarget | undefined
-    if (entry.kind === 'remote') target = await resolveRemoteRepositoryTarget(entry.ref)
-    const probe = await probeRepo(entry.id)
+    if (typeof value !== 'string' && value.kind === 'remote') target = await resolveRemoteRepositoryTarget(value.ref)
+    const repoInput = typeof value === 'string' ? value : value.id
+    const probe = await probeRepo(repoInput)
     if (!probe?.ok || !probe.root) {
       return {
-        input: entry.id,
+        input: repoInput,
         reason: probe?.message ?? 'error.workspace-git-unavailable',
         repo: null,
         target,
       }
     }
     return {
-      input: entry.id,
+      input: repoInput,
       reason: null,
       repo: {
         id: probe.root,
-        name: probe.name ?? (entry.kind === 'remote' ? entry.ref.displayName : lastPathSegment(probe.root)),
+        name:
+          probe.name ??
+          (typeof value !== 'string' && value.kind === 'remote' ? value.ref.displayName : lastPathSegment(probe.root)),
         ...(target ? { target } : {}),
       },
       target,
@@ -131,7 +140,7 @@ export async function resolveRepoPath(
   } catch (err) {
     onError?.(err)
     return {
-      input: entry.id,
+      input: typeof value === 'string' ? value : value.id,
       reason: err instanceof Error ? err.message : fallbackError,
       repo: null,
     }
@@ -142,16 +151,17 @@ export async function openLocalRepoRuntimeForInput(
   input: string | WorkspaceSessionEntry,
   onOpened?: (opened: RuntimeOpenResolvedRepo) => void | Promise<void>,
 ): Promise<RuntimeOpenResolvedRepo> {
-  const entry = sessionEntryFromInput(input)
-  return await runRepoRuntimeMembershipCommand(entry.id, async () => {
-    const opened = await openLocalRepoRuntimeForEntry(entry)
+  const admission = workspaceAdmissionFromInput(input)
+  const repoInput = admission.kind === 'workspace-entry' ? admission.entry.id : admission.input
+  return await runRepoRuntimeMembershipCommand(repoInput, async () => {
+    const opened = await openLocalRepoRuntimeForCommandInput(repoInput)
     await onOpened?.(opened)
     return opened
   })
 }
 
-async function openLocalRepoRuntimeForEntry(entry: WorkspaceSessionEntry): Promise<RuntimeOpenResolvedRepo> {
-  const opened = await openRepoRuntimeForInput(entry.id)
+async function openLocalRepoRuntimeForCommandInput(repoInput: string): Promise<RuntimeOpenResolvedRepo> {
+  const opened = await openRepoRuntimeForInput(repoInput)
   if (!opened.ok) {
     return {
       input: opened.input,
@@ -168,7 +178,7 @@ async function openLocalRepoRuntimeForEntry(entry: WorkspaceSessionEntry): Promi
   }
   await updateRepoRuntimeCache({ repoRoot: opened.repo.id, repoRuntimeId: opened.repoRuntimeId, workspaceProbe })
   return {
-    input: entry.id,
+    input: repoInput,
     reason: null,
     repo: { ...opened.repo, workspaceProbe },
     repoRuntimeId: opened.repoRuntimeId,
@@ -578,7 +588,9 @@ function remoteTargetsEqual(a: RemoteRepoTarget | undefined | null, b: RemoteRep
 function sessionEntryForResolvedRepo(resolvedRepo: ResolvedRepo): WorkspaceSessionEntry {
   return (
     resolvedRepo.session?.entry ??
-    (resolvedRepo.target ? remoteWorkspaceSessionEntry(resolvedRepo.target) : localWorkspaceSessionEntry(resolvedRepo.id))
+    (resolvedRepo.target
+      ? remoteWorkspaceSessionEntry(resolvedRepo.target)
+      : localWorkspaceSessionEntry(resolvedRepo.id))
   )
 }
 
@@ -822,9 +834,12 @@ export function createRuntimeRepoSessionActions(
 ): Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo' | 'retryRemoteRepoConnection'> {
   return {
     async ensureWorkspaceOpen(pathOrEntry: string | WorkspaceSessionEntry): Promise<OpenRepoResult> {
-      const entry = sessionEntryFromInput(pathOrEntry)
-      if (isRemoteRepoId(entry.id)) return await openRemoteWorkspaceRepo(set, get, entry)
-      return await runWorkspaceRepoCommand(entry.id, async () => await openLocalWorkspaceRepo(set, get, entry))
+      const admission = workspaceAdmissionFromInput(pathOrEntry)
+      if (admission.kind === 'workspace-entry' && admission.entry.kind === 'remote') {
+        return await openRemoteWorkspaceRepo(set, get, admission.entry)
+      }
+      const repoInput = admission.kind === 'workspace-entry' ? admission.entry.id : admission.input
+      return await runWorkspaceRepoCommand(repoInput, async () => await openLocalWorkspaceRepo(set, get, repoInput))
     },
 
     async closeRepo(id: string): Promise<CloseRepoResult> {
@@ -843,14 +858,16 @@ export function createRuntimeRepoSessionActions(
   }
 }
 
-async function openLocalWorkspaceRepo(set: ReposSet, get: ReposGet, entry: WorkspaceSessionEntry): Promise<OpenRepoResult> {
+async function openLocalWorkspaceRepo(set: ReposSet, get: ReposGet, repoInput: string): Promise<OpenRepoResult> {
   const initialRefreshRef: { current: InitialRepoRefresh | null } = { current: null }
-  const resolved = await runRepoRuntimeMembershipCommand(entry.id, async () => {
-    const opened = await openLocalRepoRuntimeForEntry(entry)
+  const resolved = await runRepoRuntimeMembershipCommand(repoInput, async () => {
+    const opened = await openLocalRepoRuntimeForCommandInput(repoInput)
     if (!opened.repo || !opened.repoRuntimeId) return opened
     const repo = opened.repo
     const repoRuntimeId = opened.repoRuntimeId
-    const workspaceEntry = repo.target ? remoteWorkspaceSessionEntry(repo.target) : { kind: 'local' as const, id: repo.id }
+    const workspaceEntry = repo.target
+      ? remoteWorkspaceSessionEntry(repo.target)
+      : { kind: 'local' as const, id: repo.id }
     const membership = await addWorkspaceRepoResult(workspaceEntry)
     if (!membership.ok) {
       reposLog.warn('failed to add local repo to server workspace', { repoRoot: repo.id, err: membership.error })
@@ -874,7 +891,11 @@ async function openLocalWorkspaceRepo(set: ReposSet, get: ReposGet, entry: Works
   return { ok: true, id: resolved.repo.id, postOpenEffects: recordRecentWorkspacePostOpen(recentEntry) }
 }
 
-async function openRemoteWorkspaceRepo(set: ReposSet, get: ReposGet, entry: WorkspaceSessionEntry): Promise<OpenRepoResult> {
+async function openRemoteWorkspaceRepo(
+  set: ReposSet,
+  get: ReposGet,
+  entry: WorkspaceSessionEntry,
+): Promise<OpenRepoResult> {
   const prepared = await runWorkspaceRepoCommand(entry.id, async () => {
     let openedRepoRuntimeId: string | null = null
     if (!get().repos[entry.id]) {

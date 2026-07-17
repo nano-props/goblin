@@ -16,7 +16,7 @@ import type { ExecResult } from '#/web/types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { DEFAULT_LOADING_DELAY_MS, DEFAULT_MIN_LOADING_VISIBLE_MS } from '#/web/hooks/useLoadingVisibility.ts'
 
-const REPO_ID = '/repo'
+const REPO_ID = 'goblin+file:///repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 
 const surfaceMocks = vi.hoisted(() => ({

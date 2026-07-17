@@ -13,7 +13,7 @@ import {
   scheduleRepoOperation,
   settleRepoOperationTargets,
 } from '#/web/stores/repos/repo-operation-scheduler.ts'
-const REPO_ID = '/tmp/goblin-runtime-test-repo'
+const REPO_ID = 'goblin+file:///tmp/goblin-runtime-test-repo'
 
 beforeEach(() => {
   disposeAllRepoOperationSchedulers()

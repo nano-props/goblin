@@ -171,6 +171,44 @@ describe('RepoWorkspace', () => {
     })
   })
 
+  test('does not expose a terminal surface when the workspace capability is unavailable', () => {
+    const workspaceId = 'goblin+file:///tmp/files-only-workspace'
+    seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
+    useReposStore.setState((state) => ({
+      repos: {
+        ...state.repos,
+        [workspaceId]: {
+          ...state.repos[workspaceId]!,
+          workspaceProbe: {
+            status: 'ready',
+            name: 'files-only-workspace',
+            capabilities: {
+              files: { read: true, write: false },
+              terminal: { available: false },
+              git: { status: 'unavailable' },
+            },
+            diagnostics: [],
+          },
+        },
+      },
+    }))
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace repoId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByText('tab.files')).toBeTruthy()
+    expect(screen.queryByText('tab.terminal')).toBeNull()
+  })
+
   test('forwards compact missing-branch recovery to the workspace navigation callback', () => {
     responsiveMocks.compact = true
     seedRepoWithReadModelForTest({

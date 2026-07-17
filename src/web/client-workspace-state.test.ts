@@ -14,7 +14,10 @@ afterEach(() => vi.restoreAllMocks())
 
 describe('client workspace persistence', () => {
   test('accepts canonical repo locators without Node path APIs', () => {
-    expect(normalizeClientWorkspaceState({ restoredRepoId: 'C:\\repo' }).restoredRepoId).toBe('C:\\repo')
+    expect(normalizeClientWorkspaceState({ restoredRepoId: 'goblin+file:///repo' }).restoredRepoId).toBe(
+      'goblin+file:///repo',
+    )
+    expect(normalizeClientWorkspaceState({ restoredRepoId: 'C:\\repo' }).restoredRepoId).toBeNull()
     expect(normalizeClientWorkspaceState({ restoredRepoId: 'relative/repo' }).restoredRepoId).toBeNull()
   })
 
@@ -35,13 +38,13 @@ describe('client workspace persistence', () => {
 
   test('round-trips client-owned presentation without server workspace fields', async () => {
     const presentation = normalizeClientWorkspaceState({
-      restoredRepoId: '/repo-a',
+      restoredRepoId: 'goblin+file:///repo-a',
       zenMode: true,
       workspacePaneSize: 52,
-      selectedTerminalSessionIdByTerminalWorktree: { '/repo-a\0/worktree': 'term-111' },
-      preferredWorkspacePaneTabByTargetByRepo: { '/repo-a': { target: 'history' } },
+      selectedTerminalSessionIdByTerminalWorktree: { 'goblin+file:///repo-a\0/worktree': 'term-111' },
+      preferredWorkspacePaneTabByTargetByRepo: { 'goblin+file:///repo-a': { target: 'history' } },
       filetreeViewStateByWorktreeByRepo: {
-        '/repo-a': {
+        'goblin+file:///repo-a': {
           '/worktree': { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 7 },
         },
       },
@@ -64,7 +67,7 @@ describe('client workspace persistence', () => {
         zenMode: 'yes',
         workspacePaneSize: Number.NaN,
         selectedTerminalSessionIdByTerminalWorktree: { broken: 12 },
-        preferredWorkspacePaneTabByTargetByRepo: { '/repo-a': { target: 'unknown' } },
+        preferredWorkspacePaneTabByTargetByRepo: { 'goblin+file:///repo-a': { target: 'unknown' } },
         filetreeViewStateByWorktreeByRepo: [],
       }),
     )

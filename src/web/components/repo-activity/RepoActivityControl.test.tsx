@@ -5,7 +5,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
 
-const REPO_ID = '/tmp/repo-activity-control'
+const REPO_ID = 'goblin+file:///tmp/repo-activity-control'
 
 describe('RepoActivityControl', () => {
   test('marks the primary refresh button busy from server operation projection', () => {

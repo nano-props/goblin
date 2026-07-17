@@ -1,4 +1,5 @@
 import PQueue from 'p-queue'
+import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface WorkspacePaneActionTarget {
   repoId: string
@@ -27,8 +28,21 @@ export async function runWorkspacePaneAction<T>(
 }
 
 export function workspacePaneActionTargetKey(target: WorkspacePaneActionTarget): string | null {
-  if (!target.branchName) return null
-  return `${target.repoId}\0${target.repoRuntimeId}\0${target.branchName}\0${target.worktreePath ?? ''}`
+  const runtimeTarget = runtimeWorkspacePaneTarget(
+    {
+      repoRoot: target.repoId,
+      branchName: target.branchName ?? '',
+      worktreePath: target.worktreePath,
+    },
+    target.repoRuntimeId,
+  )
+  if (!runtimeTarget) return null
+  if (runtimeTarget.kind === 'workspace')
+    return `${runtimeTarget.workspaceId}\0${runtimeTarget.workspaceRuntimeId}\0workspace`
+  if (runtimeTarget.kind === 'git-branch') {
+    return `${runtimeTarget.workspaceId}\0${runtimeTarget.workspaceRuntimeId}\0git-branch\0${runtimeTarget.branch}`
+  }
+  return `${runtimeTarget.workspaceId}\0${runtimeTarget.workspaceRuntimeId}\0git-worktree\0${runtimeTarget.root}`
 }
 
 export function resetWorkspacePaneActionQueueForTest(): void {
@@ -61,10 +75,7 @@ export function subscribeWorkspacePaneRouteIntents(onStoreChange: () => void): (
   return () => routeIntentSubscribers.delete(onStoreChange)
 }
 
-export function workspacePaneRouteIntentPending(
-  target: WorkspacePaneActionTarget,
-  fromRouteKey: string,
-): boolean {
+export function workspacePaneRouteIntentPending(target: WorkspacePaneActionTarget, fromRouteKey: string): boolean {
   const targetKey = workspacePaneActionTargetKey(target)
   if (!targetKey) return false
   return [...pendingRouteIntents.values()].some(

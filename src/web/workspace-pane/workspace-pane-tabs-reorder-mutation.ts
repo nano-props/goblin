@@ -9,6 +9,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface WorkspacePaneTabsReorderMutationInput {
   repoRoot: string
@@ -29,11 +30,18 @@ export function useWorkspacePaneTabsReorderMutation(
   const queryClient = useQueryClient()
   const target = useMemo(
     () =>
-      input.branchName
+      runtimeWorkspacePaneTarget(
+        {
+          repoRoot: input.repoRoot,
+          branchName: input.branchName ?? '',
+          worktreePath: input.worktreePath,
+        },
+        input.repoRuntimeId,
+      )
         ? {
             repoRoot: input.repoRoot,
             repoRuntimeId: input.repoRuntimeId,
-            branchName: input.branchName,
+            branchName: input.branchName ?? '',
             worktreePath: input.worktreePath,
           }
         : null,

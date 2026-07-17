@@ -4,6 +4,7 @@
 // this file aggregates what crosses process/transport boundaries.
 
 import * as v from 'valibot'
+import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import type {
   BranchSnapshotInfo,
   ExecResult,
@@ -524,7 +525,7 @@ const FiniteNumber = v.pipe(v.number(), v.finite())
 const PortNumber = v.pipe(FiniteNumber, v.integer(), v.minValue(1), v.maxValue(65535))
 
 /** Primitive valibot schema for `{ cwd: string }`. */
-export const CwdInput = v.object({ cwd: v.string() })
+export const CwdInput = v.object({ cwd: WorkspaceIdSchema })
 
 /** Primitive valibot schema for `{ cwd, branch }`. */
 export const BranchInput = v.object({ cwd: v.string(), branch: v.string() })

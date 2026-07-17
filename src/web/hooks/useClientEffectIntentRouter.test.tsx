@@ -326,7 +326,7 @@ describe('useClientEffectIntentRouter', () => {
 
   test('current repo menu actions prefer the visible routed repo over restored repo id', async () => {
     const restoredRepo = seedRepoWithReadModelForTest({
-      id: '/tmp/restored-repo',
+      id: 'goblin+file:///tmp/restored-repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       branchSnapshots: [
@@ -334,7 +334,7 @@ describe('useClientEffectIntentRouter', () => {
       ],
     })
     const visibleRepo = seedRepoWithReadModelForTest({
-      id: '/tmp/visible-repo',
+      id: 'goblin+file:///tmp/visible-repo',
       currentBranch: 'feature',
       currentBranchName: 'feature',
       branchSnapshots: [
@@ -367,7 +367,7 @@ describe('useClientEffectIntentRouter', () => {
 
   test('open-recent-repo opens without store activation and then delegates activation to navigation', async () => {
     useReposStore.setState({
-      ensureWorkspaceOpen: vi.fn(async () => ({ ok: true as const, id: '/tmp/recent-repo' })),
+      ensureWorkspaceOpen: vi.fn(async () => ({ ok: true as const, id: 'goblin+file:///tmp/recent-repo' })),
     })
 
     await renderHookHost()
@@ -376,14 +376,17 @@ describe('useClientEffectIntentRouter', () => {
       for (const listener of intentListeners) {
         listener({
           type: 'open-recent-repo-requested',
-          entry: { kind: 'local', id: '/tmp/recent-repo' },
+          entry: { kind: 'local', id: 'goblin+file:///tmp/recent-repo' },
         })
       }
       await Promise.resolve()
     })
 
-    expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith({ kind: 'local', id: '/tmp/recent-repo' })
-    expect(activateRepoSpy).toHaveBeenCalledWith('/tmp/recent-repo')
+    expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith({
+      kind: 'local',
+      id: 'goblin+file:///tmp/recent-repo',
+    })
+    expect(activateRepoSpy).toHaveBeenCalledWith('goblin+file:///tmp/recent-repo')
   })
 
   test('workspace view menu actions are suppressed while settings-like routes are active', async () => {
@@ -534,7 +537,7 @@ describe('useClientEffectIntentRouter', () => {
       })),
     })
     consumeExternalOpenPathsSpy
-      .mockResolvedValueOnce(['/tmp/repo-a', '/tmp/repo-b'] as string[])
+      .mockResolvedValueOnce(['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'] as string[])
       .mockResolvedValueOnce([] as string[])
 
     await renderHookHost()
@@ -544,9 +547,9 @@ describe('useClientEffectIntentRouter', () => {
       await Promise.resolve()
     })
 
-    expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/repo-a')
-    expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/repo-b')
-    expect(activateRepoSpy).toHaveBeenCalledWith('/tmp/repo-a')
+    expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
+    expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('goblin+file:///tmp/repo-b')
+    expect(activateRepoSpy).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
   })
 
   test('theme menu intents update theme through the client store', async () => {

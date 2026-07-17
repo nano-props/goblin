@@ -44,7 +44,6 @@ import {
   workspacePaneDurableLayoutsEqual,
   type WorkspacePaneLayoutRepositoryCasInput,
   type WorkspacePaneLayoutRepository,
-  type WorkspacePaneLayoutRepositoryAcceptedOutcome,
   type WorkspacePaneLayoutRepositoryCasOutcome,
 } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import type {
@@ -178,10 +177,7 @@ function normalizeWorkspacePaneTabsByTargetByRepo(
   return normalized
 }
 
-function safeWorkspacePaneTabsTargetIdentity(
-  repoId: string,
-  targetKey: string,
-): RestorableWorkspacePaneTarget | null {
+function safeWorkspacePaneTabsTargetIdentity(repoId: string, targetKey: string): RestorableWorkspacePaneTarget | null {
   const parsed = parseRestorableWorkspacePaneTargetKey(targetKey)
   if (!parsed) return null
   if (parsed.kind === 'git-branch') return isSafeBranchName(parsed.branch) ? parsed : null
@@ -334,6 +330,10 @@ interface UserSettingsMutation<T> {
   result: T
   changed?: boolean
   afterCommit?: () => void
+  postWriteAdmission?: {
+    admit: () => boolean
+    rejectedResult: T
+  }
 }
 
 function unchangedUserSettings<T>(data: UserSettingsData, result: T): UserSettingsMutation<T> {
@@ -351,6 +351,13 @@ async function mutateUserSettings<T>(
       const commit = await mutation(current)
       if (commit.changed !== false) {
         await writeUserSettingsFile(commit.next)
+        if (commit.postWriteAdmission && !commit.postWriteAdmission.admit()) {
+          await writeUserSettingsFile(current)
+          settingsData = current
+          settingsLoadPromise = Promise.resolve(current)
+          result = commit.postWriteAdmission.rejectedResult
+          return
+        }
         settingsData = commit.next
         settingsLoadPromise = Promise.resolve(commit.next)
       }
@@ -472,7 +479,9 @@ export async function getServerWorkspaceState(): Promise<ServerWorkspaceState> {
 export async function addServerWorkspaceRepo(entry: WorkspaceSessionEntry): Promise<ServerWorkspaceState> {
   return await mutateUserSettings(async (data) => {
     const id = workspaceSessionEntryId(entry)
-    const existingIndex = data.workspace.openWorkspaceEntries.findIndex((candidate) => workspaceSessionEntryId(candidate) === id)
+    const existingIndex = data.workspace.openWorkspaceEntries.findIndex(
+      (candidate) => workspaceSessionEntryId(candidate) === id,
+    )
     const openWorkspaceEntries = [...data.workspace.openWorkspaceEntries]
     if (existingIndex === -1) openWorkspaceEntries.push(entry)
     else openWorkspaceEntries[existingIndex] = entry
@@ -483,7 +492,9 @@ export async function addServerWorkspaceRepo(entry: WorkspaceSessionEntry): Prom
 
 export async function removeServerWorkspaceRepo(repoRoot: string): Promise<ServerWorkspaceState> {
   return await mutateUserSettings(async (data) => {
-    const openWorkspaceEntries = data.workspace.openWorkspaceEntries.filter((entry) => workspaceSessionEntryId(entry) !== repoRoot)
+    const openWorkspaceEntries = data.workspace.openWorkspaceEntries.filter(
+      (entry) => workspaceSessionEntryId(entry) !== repoRoot,
+    )
     if (openWorkspaceEntries.length === data.workspace.openWorkspaceEntries.length) {
       return unchangedUserSettings(data, cloneWorkspace(data.workspace))
     }
@@ -534,7 +545,10 @@ function sameRepoEntries(a: WorkspaceSessionEntry[], b: WorkspaceSessionEntry[])
   return a.length === b.length && a.every((entry, index) => sameWorkspaceSessionEntry(entry, b[index]))
 }
 
-function workspacePaneLayoutFromWorkspace(workspace: ServerWorkspaceState, repoRoot: string): WorkspacePaneDurableLayout {
+function workspacePaneLayoutFromWorkspace(
+  workspace: ServerWorkspaceState,
+  repoRoot: string,
+): WorkspacePaneDurableLayout {
   const entries: WorkspacePaneDurableLayout['entries'] = []
   for (const [targetKey, tabs] of Object.entries(workspace.workspacePaneTabsByTargetByWorkspace[repoRoot] ?? {})) {
     const target = parseRestorableWorkspacePaneTargetKey(targetKey)
@@ -575,14 +589,20 @@ export const serverWorkspacePaneLayoutRestoreTransaction: WorkspacePaneLayoutRes
 async function compareAndSwapWorkspacePaneLayout(
   input: WorkspacePaneLayoutRepositoryCasInput,
 ): Promise<WorkspacePaneLayoutRepositoryCasOutcome> {
-  return await mutateWorkspacePaneSettings<WorkspacePaneLayoutRepositoryCasOutcome>(async (data) => {
-    const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
-    const snapshot = { layout: currentLayout }
-    if (!workspacePaneDurableLayoutsEqual(input.repoRoot, currentLayout, input.expected)) {
-      return unchangedUserSettings(data, { kind: 'conflict', snapshot })
-    }
-    return workspacePaneLayoutMutation(data, input.repoRoot, currentLayout, input.replacement)
-  }, (error) => ({ kind: 'write-failure', error }))
+  return await mutateWorkspacePaneSettings<WorkspacePaneLayoutRepositoryCasOutcome>(
+    async (data) => {
+      const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
+      const snapshot = { layout: currentLayout }
+      if (input.admit && !input.admit()) {
+        return unchangedUserSettings(data, { kind: 'admission-rejected', snapshot })
+      }
+      if (!workspacePaneDurableLayoutsEqual(input.repoRoot, currentLayout, input.expected)) {
+        return unchangedUserSettings(data, { kind: 'conflict', snapshot })
+      }
+      return workspacePaneLayoutMutation(data, input.repoRoot, currentLayout, input.replacement, input.admit)
+    },
+    (error) => ({ kind: 'write-failure', error }),
+  )
 }
 
 async function mutateWorkspacePaneSettings<T>(
@@ -607,7 +627,8 @@ function workspacePaneLayoutMutation(
   repoRoot: string,
   currentLayout: WorkspacePaneDurableLayout,
   requestedLayout: WorkspacePaneDurableLayout,
-): UserSettingsMutation<WorkspacePaneLayoutRepositoryAcceptedOutcome> {
+  admit?: () => boolean,
+): UserSettingsMutation<WorkspacePaneLayoutRepositoryCasOutcome> {
   const snapshot = { layout: currentLayout }
   const replacement = normalizeWorkspacePaneDurableLayout(repoRoot, requestedLayout)
   if (workspacePaneDurableLayoutsEqual(repoRoot, currentLayout, replacement)) {
@@ -619,13 +640,26 @@ function workspacePaneLayoutMutation(
       return target ? [[restorableWorkspacePaneTargetKey(target), entry.tabs] as const] : []
     }),
   )
-  const workspacePaneTabsByTargetByWorkspace = Object.keys(byTarget).length === 0
-    ? recordWithoutKey(data.workspace.workspacePaneTabsByTargetByWorkspace, repoRoot)
-    : { ...data.workspace.workspacePaneTabsByTargetByWorkspace, [repoRoot]: byTarget }
+  const workspacePaneTabsByTargetByWorkspace =
+    Object.keys(byTarget).length === 0
+      ? recordWithoutKey(data.workspace.workspacePaneTabsByTargetByWorkspace, repoRoot)
+      : { ...data.workspace.workspacePaneTabsByTargetByWorkspace, [repoRoot]: byTarget }
   const workspace = normalizeWorkspace({ ...data.workspace, workspacePaneTabsByTargetByWorkspace })
   return {
     next: { ...data, workspace },
-    result: { kind: 'accepted', snapshot: { layout: workspacePaneLayoutFromWorkspace(workspace, repoRoot) }, changed: true },
+    result: {
+      kind: 'accepted',
+      snapshot: { layout: workspacePaneLayoutFromWorkspace(workspace, repoRoot) },
+      changed: true,
+    },
+    ...(admit
+      ? {
+          postWriteAdmission: {
+            admit,
+            rejectedResult: { kind: 'admission-rejected', snapshot },
+          },
+        }
+      : {}),
   }
 }
 
@@ -778,10 +812,10 @@ export async function addServerRecentWorkspace(repo: WorkspaceSessionEntry): Pro
     const safeRepo = toSafeSessionRepoEntry(repo)
     if (!safeRepo) return unchangedUserSettings(data, [...data.recentWorkspaces])
     const safeId = workspaceSessionEntryId(safeRepo)
-    const recentWorkspaces = [safeRepo, ...data.recentWorkspaces.filter((entry) => workspaceSessionEntryId(entry) !== safeId)].slice(
-      0,
-      MAX_RECENT_REPOS,
-    )
+    const recentWorkspaces = [
+      safeRepo,
+      ...data.recentWorkspaces.filter((entry) => workspaceSessionEntryId(entry) !== safeId),
+    ].slice(0, MAX_RECENT_REPOS)
     return { next: { ...data, recentWorkspaces }, result: [...recentWorkspaces] }
   })
 }

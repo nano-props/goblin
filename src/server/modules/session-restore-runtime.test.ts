@@ -36,7 +36,7 @@ vi.mock('#/server/modules/remote-lifecycle-write-paths.ts', () => ({
 
 const USER_ID = 'user_restore_runtime'
 const CLIENT_ID = 'client_restore_runtime'
-const REPO_ROOT = '/repo'
+const REPO_ROOT = 'goblin+file:///repo'
 
 describe('session restore runtime ownership', () => {
   beforeEach(() => {

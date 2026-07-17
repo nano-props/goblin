@@ -107,6 +107,14 @@ export function workspacePaneTabTargetForCreatedRuntime(
   return resolution.kind === 'ready' ? resolution.target : null
 }
 
+export function workspacePaneTabTargetForWorkspace(
+  repoId: string,
+  options: WorkspacePaneTabTargetOptions = workspacePanePreferenceTargetOptions,
+): RepoWorkspaceTabModel | null {
+  const resolution = resolveWorkspacePaneTabTarget(repoId, '', repoId, options)
+  return resolution.kind === 'ready' ? resolution.target : null
+}
+
 function resolveWorkspacePaneTabTarget(
   repoId: string,
   branchName: string,

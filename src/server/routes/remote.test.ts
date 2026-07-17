@@ -32,13 +32,64 @@ describe('remote lifecycle route', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(mocks.runLifecycleWrite).toHaveBeenCalledWith({
-      userId: 'user-test',
-      repoId: 'goblin+ssh://example/repo',
-      repoRuntimeId: 'repo-runtime-test',
-      mode: 'restart',
-    })
+    expect(mocks.runLifecycleWrite).toHaveBeenCalledWith(
+      {
+        userId: 'user-test',
+        repoId: 'goblin+ssh://example/repo',
+        repoRuntimeId: 'repo-runtime-test',
+        mode: 'restart',
+      },
+      { beforeCapabilityCommit: expect.any(Function) },
+    )
     expect(await response.json()).toMatchObject({ kind: 'settled', name: 'repo' })
+  })
+
+  test('injects Git downgrade cleanup into the serialized capability transition', async () => {
+    const removeGitScopedResources = vi.fn(async () => undefined)
+    mocks.runLifecycleWrite.mockImplementation(async (_input, options) => {
+      await options.beforeCapabilityCommit({
+        before: {
+          status: 'ready',
+          name: 'repo',
+          diagnostics: [],
+          capabilities: {
+            files: { read: true, write: true },
+            terminal: { available: true },
+            git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+          },
+        },
+        after: {
+          status: 'ready',
+          name: 'repo',
+          diagnostics: [],
+          capabilities: {
+            files: { read: true, write: true },
+            terminal: { available: true },
+            git: { status: 'unavailable' },
+          },
+        },
+      })
+      return { kind: 'settled', repoId: 'goblin+ssh://example/repo', name: 'repo', lifecycle: { kind: 'ready' } }
+    })
+
+    const response = await createRemoteRoutes({
+      workspaceCapabilityTransitionHost: { removeGitScopedResources },
+    }).request(
+      new Request('http://localhost/lifecycle', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ repoId: 'goblin+ssh://example/repo', repoRuntimeId: 'repo-runtime-test' }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(removeGitScopedResources).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-test',
+        workspaceId: 'goblin+ssh://example/repo',
+        workspaceRuntimeId: 'repo-runtime-test',
+      }),
+    )
   })
 
   test('returns validation errors before invoking the write path', async () => {

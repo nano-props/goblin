@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTerminalTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
+import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import {
   confirmWorkspacePaneRuntimeTabClose,
   terminalBaseForRuntimeTabCloseTarget,
@@ -10,8 +11,9 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 
 const REPO_RUNTIME_ID = 'repo-runtime-test'
+const REPO_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/repo' }, 'posix')!
 const terminalBase: TerminalSessionBase = {
-  repoRoot: '/repo',
+  repoRoot: REPO_ID,
   repoRuntimeId: REPO_RUNTIME_ID,
   branch: 'main',
   worktreePath: '/repo-worktree',
@@ -88,7 +90,11 @@ describe('workspace pane runtime tab close actions', () => {
       }),
     ).toBe('main')
     expect(
-      workspacePaneRuntimeTabConfirmedCloseIdentity({ type: 'terminal', sessionId: 'term-111111111111111111111', target: closeTarget }),
+      workspacePaneRuntimeTabConfirmedCloseIdentity({
+        type: 'terminal',
+        sessionId: 'term-111111111111111111111',
+        target: closeTarget,
+      }),
     ).toBe('terminal:term-111111111111111111111')
   })
 

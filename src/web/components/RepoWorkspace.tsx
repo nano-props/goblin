@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
@@ -8,7 +8,10 @@ import {
 } from '#/web/components/repo-workspace/model.ts'
 import { RepoWorkspaceToolbar } from '#/web/components/repo-workspace/RepoWorkspaceToolbar.tsx'
 import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
-import { useRepoWorkspaceTabModel } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
+import {
+  usePlainWorkspaceTabModel,
+  useRepoWorkspaceTabModel,
+} from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
 import { useWorkspacePaneVisibleStatusRefresh } from '#/web/components/repo-workspace/use-workspace-pane-visible-status-refresh.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
@@ -24,14 +27,29 @@ import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
-import { FolderTree } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
 import { FiletreeTab } from '#/web/components/repo-workspace/panels.tsx'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import { cn } from '#/web/lib/cn.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { WorkspacePaneTabStrip } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
+import {
+  createPendingWorkspacePaneTabItem,
+  createRuntimeWorkspacePaneTabItem,
+  createStaticWorkspacePaneTabItem,
+  isPendingWorkspacePaneTabItem,
+  type WorkspacePaneTabItem,
+} from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
+import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
+import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
+import { useIsInitialTerminalProjectionHydrating } from '#/web/stores/terminal-projection-hydration.ts'
+import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
+import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
+import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneRuntimeTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
 export type RepoWorkspacePaneRouteContext =
   { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null } | { kind: 'inactive' }
@@ -144,6 +162,7 @@ function RepoWorkspaceLoaded(props: {
     return (
       <PlainWorkspaceFiles
         repo={props.repoShell}
+        terminalAvailable={props.repoShell.workspaceProbe.capabilities.terminal.available}
         workspacePaneId={props.workspacePaneId}
         routeContext={props.workspacePaneRouteContext}
       />
@@ -261,51 +280,141 @@ function GitRepoWorkspaceLoaded({
 
 function PlainWorkspaceFiles({
   repo,
+  terminalAvailable,
   workspacePaneId,
   routeContext,
 }: {
-  repo: Pick<RepoWorkspaceRepoShell, 'id' | 'repoRuntimeId'>
+  repo: Pick<RepoWorkspaceRepoShell, 'id' | 'repoRuntimeId' | 'ui'>
+  terminalAvailable: boolean
   workspacePaneId: string
   routeContext: RepoWorkspacePaneRouteContext
 }) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
-  const [activePanel, setActivePanel] = useState<'files' | 'terminal'>('files')
-  const runtimeTarget = runtimeWorkspacePaneTarget(
-    { repoRoot: repo.id, branchName: '', worktreePath: repo.id },
-    repo.repoRuntimeId,
-  )
+  const model = usePlainWorkspaceTabModel(repo)
+  const target = { repoRoot: repo.id, branchName: '', worktreePath: repo.id }
+  const runtimeTarget = runtimeWorkspacePaneTarget(target, repo.repoRuntimeId)
+  const hydrating = useIsInitialTerminalProjectionHydrating(repo.id, repo.repoRuntimeId)
   useEffect(() => {
     if (routeContext.kind === 'routed' && routeContext.route !== null) {
       navigation.showWorkspaceFiles?.(repo.id, { replace: true })
     }
   }, [navigation, repo.id, routeContext])
+  const activePanel = model.selection?.tab === 'terminal' && terminalAvailable ? 'terminal' : 'files'
+  const selectedTerminalSessionId =
+    model.selection?.kind === 'materialized-tab' && model.selection.materializedTab.kind === 'runtime'
+      ? model.selection.materializedTab.sessionId
+      : null
+  const items = useMemo<WorkspacePaneTabItem[]>(() => {
+    const workspaceTabs = model.tabs.filter((tab) => tab.kind !== 'static' || tab.type === 'files')
+    return workspaceTabs.flatMap<WorkspacePaneTabItem>((tab) => {
+      if (tab.type === 'terminal' && !terminalAvailable) return []
+      if (tab.kind === 'static') {
+        const provider = workspacePaneStaticTabProvider(tab.type as WorkspacePaneStaticTabType)
+        const metadata = { t, branchName: '', statusCount: 0 }
+        return [
+          createStaticWorkspacePaneTabItem({
+            type: tab.type as WorkspacePaneStaticTabType,
+            label: provider.label(metadata),
+            tooltip: provider.tooltip(metadata),
+            closeLabel: provider.closeLabel(metadata),
+            panelId: provider.panelId(workspacePaneId),
+            closable: false,
+          }),
+        ]
+      }
+      const provider = workspacePaneRuntimeTabProvider(tab.runtimeType)
+      if (tab.kind === 'pending') {
+        const label = provider.pendingLabel({
+          t,
+          createPending: model.runtimeTabStateByType[tab.runtimeType].createPending,
+          projectionPhase: model.runtimeTabStateByType[tab.runtimeType].projectionPhase,
+        })
+        return [createPendingWorkspacePaneTabItem({ type: tab.runtimeType, label, tooltip: label })]
+      }
+      const metadata = { t, branchName: '', statusCount: 0, view: tab.view }
+      return [
+        createRuntimeWorkspacePaneTabItem({
+          view: tab.view,
+          label: provider.label(metadata),
+          tooltip: provider.tooltip(metadata),
+          closeLabel: provider.closeLabel(metadata),
+          panelId: provider.panelId(workspacePaneId),
+        }),
+      ]
+    })
+  }, [model.runtimeTabStateByType, model.tabs, t, terminalAvailable, workspacePaneId])
+  const requestedActiveIdentity =
+    model.activeTab?.identity ?? (activePanel === 'terminal' ? 'workspace-pane:terminal-host' : 'workspace-pane:files')
+  const activeTabIdentity = items.some((item) => item.identity === requestedActiveIdentity)
+    ? requestedActiveIdentity
+    : workspacePaneStaticTabProvider('files').identity()
+  const selectItem = useCallback(
+    (item: WorkspacePaneTabItem) => {
+      if (isPendingWorkspacePaneTabItem(item)) return
+      void dispatchSelectWorkspacePaneTabByIdentityAction({
+        repoId: repo.id,
+        branchName: '',
+        workspacePaneRoute: undefined,
+        identity: item.identity,
+        navigation,
+      })
+    },
+    [navigation, repo.id],
+  )
+  const createAction = useWorkspacePaneRuntimeTabCreateAction({
+    repoRoot: repo.id,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName: '',
+    worktreePath: repo.id,
+    runtimeTabStateByType: model.runtimeTabStateByType,
+    initialRuntimeProjectionHydrating: hydrating,
+    workspacePaneRoute: undefined,
+    showCreatedRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => {
+      if (type !== 'terminal') return false
+      const state = useReposStore.getState()
+      state.setSelectedTerminal(formatTerminalWorktreeKey(repo.id, repo.id), sessionId)
+      state.setWorkspacePaneTabForTarget(target, 'terminal')
+      return true
+    },
+    t,
+  })
+  const { reorderTabs } = useWorkspacePaneTabsReorderMutation({
+    repoRoot: repo.id,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName: '',
+    worktreePath: repo.id,
+    canonicalTabs: model.tabEntries,
+  })
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border/70 px-3">
-        <FolderTree className="size-4 text-muted-foreground" aria-hidden />
-        {(['files', 'terminal'] as const).map((panel) => (
-          <button
-            key={panel}
-            type="button"
-            className={cn(
-              'h-7 rounded-md px-2 text-sm transition-colors',
-              activePanel === panel ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
-            )}
-            onClick={() => setActivePanel(panel)}
-          >
-            {t(panel === 'files' ? 'tab.files' : 'tab.terminal')}
-          </button>
-        ))}
+      <div className="flex h-11 shrink-0 items-center border-b border-border/70 px-3">
+        <WorkspacePaneTabStrip
+          workspacePaneTabTargetKey={workspacePaneTabsTargetIdentityKey(target)}
+          items={items}
+          workspacePaneId={workspacePaneId}
+          activeTabIdentity={activeTabIdentity}
+          panelActive
+          createAction={terminalAvailable ? createAction : null}
+          onSelect={selectItem}
+          onReselect={selectItem}
+          onClose={(item) => {
+            if (isPendingWorkspacePaneTabItem(item)) return
+            void runCloseWorkspacePaneTabCommand({
+              repoId: repo.id,
+              branchName: '',
+              workspacePaneRoute: undefined,
+              targetIdentity: item.identity,
+              navigation,
+            })
+          }}
+          onReorder={reorderTabs}
+          activateKeyboardNavigationSelection
+        />
       </div>
       {activePanel === 'files' ? (
         <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} label={t('tab.files')}>
-          <FiletreeTab
-            repoId={repo.id}
-            repoRuntimeId={repo.repoRuntimeId}
-            branchName={null}
-            worktreePath={repo.id}
-          />
+          <FiletreeTab repoId={repo.id} repoRuntimeId={repo.repoRuntimeId} branchName={null} worktreePath={repo.id} />
         </WorkspacePanePanelFrame>
       ) : runtimeTarget ? (
         renderWorkspacePaneRuntimeTabPanel({
@@ -319,8 +428,8 @@ function PlainWorkspaceFiles({
             worktreePath: repo.id,
             runtimeTarget,
           },
-          selectedSessionId: null,
-          runtimeState: { projectionPhase: 'ready' },
+          selectedSessionId: selectedTerminalSessionId,
+          runtimeState: model.runtimeTabStateByType.terminal,
         })
       ) : null}
     </section>

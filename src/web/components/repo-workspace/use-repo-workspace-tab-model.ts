@@ -104,6 +104,48 @@ export function useRepoWorkspaceTabModelInput(
   return input
 }
 
+export function usePlainWorkspaceTabModel(
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'ui'>,
+): RepoWorkspaceTabModel {
+  const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
+    repoRoot: repo.id,
+    repoRuntimeId: repo.repoRuntimeId,
+    worktreePath: repo.id,
+  })
+  const tabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.repoRuntimeId)
+  const target = useMemo(() => ({ repoRoot: repo.id, branchName: '', worktreePath: repo.id }), [repo.id])
+  const tabEntries = useMemo(
+    () => workspacePaneTabsForTargetFromQueryData(tabsQuery.data ?? { revision: 0, entries: [] }, target),
+    [tabsQuery.data, target],
+  )
+  const preferredTab = preferredWorkspacePaneTabForTarget(repo.ui, target) ?? 'files'
+  const input = useMemo<RepoWorkspaceTabModelInput>(
+    () => ({
+      repoId: repo.id,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: null,
+      worktreePath: repo.id,
+      preferredTab,
+      tabEntries,
+      tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(tabsQuery.status),
+      runtimeTabViews: runtimeProjection.runtimeTabViews,
+      runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
+    }),
+    [
+      preferredTab,
+      repo.id,
+      repo.repoRuntimeId,
+      runtimeProjection.runtimeTabStateByType,
+      runtimeProjection.runtimeTabViews,
+      tabEntries,
+      tabsQuery.status,
+    ],
+  )
+  const model = useMemo(() => createRepoWorkspaceTabModel(input), [input])
+  useSyncRepoWorkspaceRuntimeTabSelection(model, { enabled: true })
+  return model
+}
+
 function workspacePaneTabsProjectionPhase(
   status: ReturnType<typeof useWorkspacePaneTabsQuery>['status'],
 ): RepoWorkspaceTabEntriesProjectionPhase {

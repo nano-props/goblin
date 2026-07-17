@@ -6,9 +6,10 @@ import {
 import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { readRepoProjection } from '#/server/modules/repo-read-paths.ts'
 import {
-  commitWorkspaceProbeState,
+  commitOrReadInitialWorkspaceProbeState,
   isCurrentRepoRuntimeMembership,
   workspaceProbeStateForRuntime,
+  isCurrentRepoRuntime,
 } from '#/server/modules/repo-runtimes.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
 import { confirmServerWorkspaceRepoEntry, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
@@ -19,6 +20,8 @@ import {
 import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { probeWorkspace } from '#/server/modules/workspace-probe.ts'
+import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
+import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 
 interface RestoreRepoTabsInput {
   userId: string
@@ -26,6 +29,7 @@ interface RestoreRepoTabsInput {
   repoRoot: string
   repoRuntimeId: string
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
+  workspaceCapabilityTransitionHost?: WorkspaceCapabilityTransitionHost
   signal?: AbortSignal
 }
 
@@ -56,12 +60,32 @@ async function projectWorkspaceRepo(
 ): Promise<ProjectedRestoredWorkspaceRepoRuntime | null> {
   if (entry.kind === 'remote') {
     const lifecycle = await abortableWorkspaceRestore(
-      runRemoteLifecycleWrite({
-        userId: input.userId,
-        repoId: entry.id,
-        repoRuntimeId: input.repoRuntimeId,
-        mode: 'ensure',
-      }),
+      runRemoteLifecycleWrite(
+        {
+          userId: input.userId,
+          repoId: entry.id,
+          repoRuntimeId: input.repoRuntimeId,
+          mode: 'ensure',
+        },
+        {
+          beforeCapabilityCommit: async ({ before, after }) => {
+            if (!gitBecameUnavailable(before, after)) return
+            if (!input.workspaceCapabilityTransitionHost) {
+              throw new Error('workspace capability transition host is unavailable')
+            }
+            await input.workspaceCapabilityTransitionHost.removeGitScopedResources({
+              userId: input.userId,
+              workspaceId: entry.id,
+              workspaceRuntimeId: input.repoRuntimeId,
+              assertCurrent: () => {
+                if (!isCurrentRepoRuntime(input.userId, entry.id, input.repoRuntimeId)) {
+                  throw new Error('error.repo-runtime-stale')
+                }
+              },
+            })
+          },
+        },
+      ),
       input.signal,
     )
     assertCurrentRepoRuntimeMembership(input)
@@ -91,19 +115,22 @@ async function projectWorkspaceRepo(
       projection,
     }
   }
-  const probe = await probeWorkspace(entry.id, process.platform === 'win32' ? 'win32' : 'posix', {
-    signal: input.signal,
-  })
-  assertCurrentRepoRuntimeMembership(input)
-  if (
-    !commitWorkspaceProbeState({
+  let probe = workspaceProbeStateForRuntime(input.userId, entry.id, input.repoRuntimeId)
+  if (!probe) return null
+  if (probe.status === 'probing') {
+    const observed = await probeWorkspace(entry.id, process.platform === 'win32' ? 'win32' : 'posix', {
+      signal: input.signal,
+    })
+    assertCurrentRepoRuntimeMembership(input)
+    const authoritativeProbe = commitOrReadInitialWorkspaceProbeState({
       userId: input.userId,
       repoRoot: entry.id,
       repoRuntimeId: input.repoRuntimeId,
-      probe,
+      probe: observed,
     })
-  )
-    return null
+    if (!authoritativeProbe) return null
+    probe = authoritativeProbe
+  }
   if (probe.status !== 'ready' || probe.capabilities.git.status !== 'available') return null
   const projection = await readRepoProjection(entry.id, {
     repoRuntimeId: input.repoRuntimeId,
@@ -120,6 +147,15 @@ async function projectWorkspaceRepo(
     workspaceProbe: probe,
     projection,
   }
+}
+
+function gitBecameUnavailable(before: WorkspaceProbeState, after: WorkspaceSettledProbeState): boolean {
+  return (
+    before.status === 'ready' &&
+    before.capabilities.git.status === 'available' &&
+    after.status === 'ready' &&
+    after.capabilities.git.status === 'unavailable'
+  )
 }
 
 function assertCurrentRepoRuntimeMembership(input: RestoreRepoTabsInput): void {

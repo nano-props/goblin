@@ -75,9 +75,9 @@ export const ko: Record<DictKey, string> = {
   // ---- Dependencies ------------------------------------------------------
 
   // ---- Repository picker ---------------------------------------------------
-  'repo-picker.repos': '리포지토리',
+  'repo-picker.repos': '워크스페이스',
   'repo-picker.close-named': '{name} 닫기',
-  'repo-picker.placeholder': '저장소 선택',
+  'repo-picker.placeholder': '워크스페이스 선택',
   'repo-picker.open-local': '작업 공간 열기…',
   'repo-picker.open-remote': '원격 작업 공간 열기…',
   'repo-picker.open-title': '작업 공간 열기',
@@ -163,11 +163,10 @@ export const ko: Record<DictKey, string> = {
   'repo-picker.open-remote-home-unavailable': '원격 홈 디렉터리를 확인할 수 없습니다',
   'repo-picker.tooltip.last-sync-label': '마지막 동기화',
   'repo-picker.connecting-title': 'SSH에 연결 중…',
-  'repo-unavailable.title': '리포지토리 경로를 사용할 수 없음',
-  'repo-unavailable.body':
-    'Goblin 이 이 경로를 Git 리포지토리로 읽을 수 없습니다. 폴더를 복원하거나 .git 을 다시 만든 뒤 재시도하세요.',
+  'repo-unavailable.title': '워크스페이스를 사용할 수 없음',
+  'repo-unavailable.body': 'Goblin 이 이 워크스페이스를 읽을 수 없습니다. 폴더와 접근 권한을 복원한 뒤 재시도하세요.',
   'repo-unavailable.remote-body':
-    'Goblin 이 이 SSH 리포지토리에 다시 연결하지 못했습니다. SSH 별칭, 네트워크 연결, 원격 경로를 확인한 뒤 다시 시도하세요.',
+    'Goblin 이 이 SSH 워크스페이스에 다시 연결하지 못했습니다. SSH 별칭, 네트워크 연결, 원격 경로를 확인한 뒤 다시 시도하세요.',
   'repo-unavailable.remote-connect-failed':
     'Goblin 이 이 리포지토리에 사용할 수 있는 SSH 세션을 만들지 못했습니다. 인증, 호스트 연결 상태, 호스트 키 신뢰를 확인한 뒤 다시 시도하세요.',
   'repo-unavailable.remote-config-changed':
@@ -177,22 +176,22 @@ export const ko: Record<DictKey, string> = {
   'repo-unavailable.remote-path-missing':
     'Goblin 이 SSH 대상에는 연결했지만 저장된 원격 경로가 더 이상 존재하지 않습니다. 원격 경로를 수정한 뒤 다시 연결하세요.',
   'repo-unavailable.remote-not-a-repo':
-    'Goblin 이 SSH 대상에는 연결했지만 저장된 경로가 더 이상 Git 리포지토리가 아닙니다. 경로를 확인하거나 다른 리포지토리에 다시 연결하세요.',
+    'Goblin 이 SSH 대상에는 연결했지만 저장된 작업 공간 경로를 사용할 수 없습니다. 경로를 확인하거나 다른 작업 공간에 다시 연결하세요.',
   'repo-unavailable.path': '경로',
   'repo-unavailable.reason': '이유',
   'repo-unavailable.retry': '다시 확인',
-  'repo-unavailable.close': '리포지토리 닫기',
+  'repo-unavailable.close': '작업 공간 닫기',
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': '열린 작업 공간이 없습니다',
-  'empty.body': '사이드바에서 저장소를 선택하거나 Git 폴더를 이 창으로 드래그하세요.',
-  'repo-route.not-found-title': '리포지토리를 찾을 수 없음',
+  'empty.body': '사이드바에서 작업 공간을 선택하거나 폴더를 이 창으로 드래그하세요.',
+  'repo-route.not-found-title': '작업 공간을 찾을 수 없음',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': '놓아서 작업 공간 열기',
-  'drop.body': 'Git 리포지토리 폴더를 Goblin 어디에나 놓으세요.',
+  'drop.body': '폴더를 Goblin 어디에나 놓으세요.',
   'drop.open-failed': '작업 공간을 열 수 없음',
-  'repo-picker.recent-save-failed': '리포지토리는 열렸지만 최근 기록은 업데이트되지 않았습니다',
+  'repo-picker.recent-save-failed': '작업 공간은 열렸지만 최근 기록은 업데이트되지 않았습니다',
 
   // ---- Workspace pane tabs ------------------------------------------------
   'repo.dashboard': '대시보드',

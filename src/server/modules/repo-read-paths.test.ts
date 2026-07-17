@@ -37,7 +37,7 @@ type ReadSource = Pick<
 
 function makeSource(overrides: Partial<ReadSource> = {}): ReadSource {
   const base: ReadSource = {
-    id: '/tmp/repo',
+    id: 'goblin+file:///tmp/repo',
     kind: 'local',
     probe: () => Promise.resolve({ ok: true }),
     getSnapshot: () => Promise.resolve<RepoSnapshot | null>(null),
@@ -92,7 +92,9 @@ describe('getRepoLog', () => {
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
     const signal = new AbortController().signal
 
-    await expect(getRepoLog('/tmp/repo', 'feature/work', { count: 30, skip: 0, signal })).resolves.toEqual(entries)
+    await expect(
+      getRepoLog('goblin+file:///tmp/repo', 'feature/work', { count: 30, skip: 0, signal }),
+    ).resolves.toEqual(entries)
     expect(getLog).toHaveBeenCalledWith('feature/work', { count: 30, skip: 0, signal })
   })
 
@@ -103,7 +105,7 @@ describe('getRepoLog', () => {
     )
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
 
-    await expect(getRepoLog('/tmp/repo', 'feature/work')).resolves.toEqual([])
+    await expect(getRepoLog('goblin+file:///tmp/repo', 'feature/work')).resolves.toEqual([])
     expect(getLog).toHaveBeenCalledWith('feature/work', { count: 100, skip: 0, signal: undefined })
   })
 })
@@ -164,7 +166,7 @@ describe('readRepoProjection', () => {
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
     const signal = new AbortController().signal
 
-    const result = await readRepoProjection('/tmp/repo', { branch: 'feature/a', mode: 'full', signal })
+    const result = await readRepoProjection('goblin+file:///tmp/repo', { branch: 'feature/a', mode: 'full', signal })
 
     expect(result).toMatchObject({
       snapshot,
@@ -178,7 +180,7 @@ describe('readRepoProjection', () => {
       mode: 'full',
       signal: expect.any(AbortSignal),
     })
-    expect(mocks.listRepoWriteOperationsForRepo).toHaveBeenCalledWith('/tmp/repo', {
+    expect(mocks.listRepoWriteOperationsForRepo).toHaveBeenCalledWith('goblin+file:///tmp/repo', {
       signal,
       repoRuntimeId: undefined,
     })
@@ -188,7 +190,7 @@ describe('readRepoProjection', () => {
     mocks.listRepoWriteOperationsForRepo.mockResolvedValue([
       {
         id: 'op-current',
-        repoId: '/tmp/repo',
+        repoId: 'goblin+file:///tmp/repo',
         repoRuntimeId: 'repo-runtime-current',
         kind: 'fetch',
         source: 'background',
@@ -202,10 +204,13 @@ describe('readRepoProjection', () => {
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
     const signal = new AbortController().signal
 
-    const result = await readRepoProjection('/tmp/repo', { signal, repoRuntimeId: 'repo-runtime-current' })
+    const result = await readRepoProjection('goblin+file:///tmp/repo', {
+      signal,
+      repoRuntimeId: 'repo-runtime-current',
+    })
 
     expect(result.operations.operations).toMatchObject([{ id: 'op-current', repoRuntimeId: 'repo-runtime-current' }])
-    expect(mocks.listRepoWriteOperationsForRepo).toHaveBeenCalledWith('/tmp/repo', {
+    expect(mocks.listRepoWriteOperationsForRepo).toHaveBeenCalledWith('goblin+file:///tmp/repo', {
       signal,
       repoRuntimeId: 'repo-runtime-current',
     })
@@ -218,7 +223,7 @@ describe('readRepoProjection', () => {
     )
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
 
-    const result = await readRepoProjection('/tmp/repo')
+    const result = await readRepoProjection('goblin+file:///tmp/repo')
 
     expect(result).toMatchObject({
       snapshot: null,
@@ -236,7 +241,7 @@ describe('readRepoProjection', () => {
     )
     const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
 
-    const result = await readRepoWorktreeStatus('/tmp/repo', { repoRuntimeId: 'repo-runtime-test' })
+    const result = await readRepoWorktreeStatus('goblin+file:///tmp/repo', { repoRuntimeId: 'repo-runtime-test' })
 
     expect(result).toMatchObject({ repoRuntimeId: 'repo-runtime-test', status })
     expect(result.loadedAt).toEqual(expect.any(Number))
@@ -249,7 +254,10 @@ describe('readRepoProjection', () => {
     controller.abort()
 
     await expect(
-      readRepoWorktreeStatus('/tmp/repo', { repoRuntimeId: 'repo-runtime-test', signal: controller.signal }),
+      readRepoWorktreeStatus('goblin+file:///tmp/repo', {
+        repoRuntimeId: 'repo-runtime-test',
+        signal: controller.signal,
+      }),
     ).rejects.toMatchObject({ name: 'AbortError' })
     expect(mocks.runWithRepoSource).not.toHaveBeenCalled()
   })
@@ -272,7 +280,7 @@ describe('readRepoProjection', () => {
     )
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
 
-    const result = await readRepoProjection('/tmp/repo', { mode: 'summary' })
+    const result = await readRepoProjection('goblin+file:///tmp/repo', { mode: 'summary' })
 
     expect(result).toMatchObject({
       pullRequests,
@@ -301,7 +309,7 @@ describe('repo projection section deadlines', () => {
       ),
     )
     const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
-    const promise = readRepoWorktreeStatus('/tmp/repo', {
+    const promise = readRepoWorktreeStatus('goblin+file:///tmp/repo', {
       repoRuntimeId: 'repo-runtime-test',
       timeoutMs: 50,
     })
@@ -326,7 +334,7 @@ describe('repo projection section deadlines', () => {
       ),
     )
     const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
-    const promise = readRepoWorktreeStatus('/tmp/repo', {
+    const promise = readRepoWorktreeStatus('goblin+file:///tmp/repo', {
       repoRuntimeId: 'repo-runtime-test',
       timeoutMs: 50,
     })
@@ -352,7 +360,7 @@ describe('repo projection section deadlines', () => {
       ),
     )
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
-    const result = await readRepoProjection('/tmp/repo', { branch: 'feature/a', timeoutMs: 5_000 })
+    const result = await readRepoProjection('goblin+file:///tmp/repo', { branch: 'feature/a', timeoutMs: 5_000 })
     expect(result).toMatchObject({ snapshot, pullRequests: null })
   })
 
@@ -373,7 +381,7 @@ describe('repo projection section deadlines', () => {
       ),
     )
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
-    const promise = readRepoProjection('/tmp/repo', { branch: 'feature/a', timeoutMs: 50 })
+    const promise = readRepoProjection('goblin+file:///tmp/repo', { branch: 'feature/a', timeoutMs: 50 })
     const rejected = expect(promise).rejects.toThrow('aborted')
     // Advance the fake clock past the section deadline.
     await vi.advanceTimersByTimeAsync(75)
@@ -397,7 +405,7 @@ describe('repo projection section deadlines', () => {
       ),
     )
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
-    const promise = readRepoProjection('/tmp/repo', { timeoutMs: 0 })
+    const promise = readRepoProjection('goblin+file:///tmp/repo', { timeoutMs: 0 })
     // Give the microtask queue a chance to wire up.
     await Promise.resolve()
     // A fresh, never-aborting signal is still wired through to the
@@ -439,7 +447,7 @@ describe('repo projection section deadlines', () => {
     )
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
     const controller = new AbortController()
-    const promise = readRepoProjection('/tmp/repo', {
+    const promise = readRepoProjection('goblin+file:///tmp/repo', {
       branch: 'feature/a',
       signal: controller.signal,
     })

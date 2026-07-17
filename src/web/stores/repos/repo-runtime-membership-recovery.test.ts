@@ -9,7 +9,7 @@ import {
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { installGoblinTestBridge, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
-const REPO_ROOT = '/tmp/runtime-membership-recovery'
+const REPO_ROOT = 'goblin+file:///tmp/runtime-membership-recovery'
 const REMOTE_REPO_ROOT = 'goblin+ssh://example/srv/runtime-membership-recovery'
 
 describe('repo runtime membership recovery', () => {
