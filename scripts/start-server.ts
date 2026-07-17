@@ -14,9 +14,13 @@ import { bootstrapServer } from '#/server/bootstrap.ts'
 import { serverDataDir } from '#/shared/data-dir.ts'
 import { readOrCreateAccessToken } from '#/shared/access-token-file.ts'
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
+import { prepareNodePtyDarwinRuntime } from '#/system/node-pty-runtime.ts'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
 process.chdir(repoRoot)
+prepareNodePtyDarwinRuntime({
+  packageRoot: path.join(repoRoot, 'node_modules/node-pty'),
+})
 
 const { values } = parseArgs({
   options: {

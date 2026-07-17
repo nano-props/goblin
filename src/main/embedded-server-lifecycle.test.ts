@@ -145,9 +145,9 @@ describe('embedded server process lifecycle', () => {
     )
   })
 
-  test('resolves packaged server entries exclusively from app.asar.unpacked', () => {
+  test('resolves packaged server entries from the ordinary Resources runtime', () => {
     expect(resolveEmbeddedServerRuntimeRoot('/Applications/Goblin.app/Contents/Resources/app.asar', true)).toBe(
-      path.join('/Applications/Goblin.app/Contents/Resources/app.asar.unpacked', 'dist/server'),
+      path.join('/Applications/Goblin.app/Contents/Resources', 'dist/server'),
     )
     expect(() => resolveEmbeddedServerRuntimeRoot('/Applications/Goblin.app/Contents/Resources/app', true)).toThrow(
       'Packaged app path must be an ASAR archive',

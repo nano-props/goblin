@@ -14,11 +14,12 @@
 // Usage: ./scripts/build.ts [install|i] [--clean]
 import { $ } from 'bun'
 import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { closeRunningApp } from '#scripts/close-app.ts'
+import { prepareNodePtyDarwinRuntime, validateNodePtyDarwinRuntime } from '#/system/node-pty-runtime.ts'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
 process.chdir(repoRoot)
@@ -213,19 +214,16 @@ function planDarwin(): PlatformPlan {
     verifyPrebuilds(hostArch) {
       // node-pty ships `spawn-helper` as a separate executable on macOS
       // that Electron forks; if it's missing or non-executable, every
-      // terminal spawn fails at runtime. Verify here so a fresh checkout
+      // terminal spawn fails at runtime. Prepare it here so a fresh checkout
       // without `bun install` artifacts fails fast instead of producing
       // a .app that crashes on first terminal use.
       const arches = shouldInstall ? [hostArch] : (['arm64', 'x64'] as const)
-      const helpers = arches.map((arch) =>
-        path.join(repoRoot, 'node_modules/node-pty/prebuilds', `darwin-${arch}`, 'spawn-helper'),
-      )
-      const missing = helpers.filter((helper) => !existsSync(helper))
-      if (missing.length > 0) {
-        console.error(`Error: missing node-pty darwin spawn-helper(s): ${missing.join(', ')}`)
-        process.exit(1)
+      for (const arch of arches) {
+        prepareNodePtyDarwinRuntime({
+          packageRoot: path.join(repoRoot, 'node_modules/node-pty'),
+          arch,
+        })
       }
-      for (const helper of helpers) chmodSync(helper, 0o755)
     },
     cacheDirs() {
       return [
@@ -271,9 +269,8 @@ function planWindows(): PlatformPlan {
     verifyPrebuilds(hostArch) {
       // On Windows the native binding lives in `pty.node` (conpty.node
       // and the rest of the conpty.dll sibling files are also required).
-      // electron-builder's `asarUnpack` glob handles this at packaging
-      // time; here we just confirm the per-arch prebuild directory
-      // shipped something node-pty can load.
+      // electron-builder copies the complete node-pty package into the
+      // server runtime; here we confirm each target architecture is present.
       const arches = shouldInstall ? [hostArch] : (['arm64', 'x64'] as const)
       for (const arch of arches) {
         const prebuildDir = path.join(repoRoot, 'node_modules', 'node-pty', 'prebuilds', `win32-${arch}`)
@@ -332,8 +329,8 @@ plan.verifyPrebuilds(process.arch === 'arm64' ? 'arm64' : 'x64')
 if (!options.skipTypecheck) {
   await $`bun run typecheck`
 }
-// Client bundle MUST exist before electron-builder packs it (the
-// `files` glob in electron-builder.ts expects `dist/web/`).
+// Client and server bundles MUST exist before electron-builder copies them
+// into the independent server runtime through `extraResources`.
 await $`bun run build:web`
 await $`bun run build:preload`
 await $`bun run build:server`
@@ -437,7 +434,6 @@ if (shouldInstall) {
 }
 
 function verifyPackagedServerRuntime(resourcesDir: string, arch: 'arm64' | 'x64'): void {
-  const unpackedRoot = path.join(resourcesDir, 'app.asar.unpacked')
   const platformPrebuild = process.platform === 'darwin' ? `darwin-${arch}` : `win32-${arch}`
   const requiredArtifacts = [
     'dist/server/main.js',
@@ -450,9 +446,13 @@ function verifyPackagedServerRuntime(resourcesDir: string, arch: 'arm64' | 'x64'
     `node_modules/node-pty/prebuilds/${platformPrebuild}/pty.node`,
     ...(process.platform === 'darwin' ? [`node_modules/node-pty/prebuilds/${platformPrebuild}/spawn-helper`] : []),
   ]
-  const missing = requiredArtifacts.filter((artifact) => !existsSync(path.join(unpackedRoot, artifact)))
+  const missing = requiredArtifacts.filter((artifact) => !existsSync(path.join(resourcesDir, artifact)))
   if (missing.length > 0) {
     console.error(`Error: packaged server runtime is incomplete: ${missing.join(', ')}`)
     process.exit(1)
   }
+  validateNodePtyDarwinRuntime({
+    packageRoot: path.join(resourcesDir, 'node_modules/node-pty'),
+    arch,
+  })
 }

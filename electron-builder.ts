@@ -1,5 +1,5 @@
 import type { Configuration } from 'electron-builder'
-import { ELECTRON_ASAR_UNPACK_PATTERNS } from '#scripts/electron-packaging.ts'
+import { ELECTRON_SERVER_EXTRA_RESOURCES } from '#scripts/electron-packaging.ts'
 
 const config: Configuration = {
   appId: 'goblin.app',
@@ -12,7 +12,6 @@ const config: Configuration = {
     output: 'release',
   },
   files: [
-    'dist/server/**/*',
     // Keep these runtime-loaded TS sources in the asar. Main resolves `#/*`
     // imports through Electron's native TS loader, so removing these globs
     // breaks packaged builds even though dev still works.
@@ -22,16 +21,14 @@ const config: Configuration = {
     'src/server/**/*.ts',
     'src/shared/**/*.ts',
     'dist/preload/**/*',
-    'dist/web/**/*',
     'package.json',
     '!src/**/*.test.ts',
+    '!node_modules/node-pty/**/*',
     '!**/*.map',
   ],
-  extraResources: [{ from: 'resources/terminal-bin', to: 'terminal-bin' }],
-  // The embedded server runs with Electron's ASAR filesystem disabled so
-  // workspace paths always have native OS semantics. Keep its complete
-  // runtime dependency closure on the real filesystem.
-  asarUnpack: [...ELECTRON_ASAR_UNPACK_PATTERNS],
+  // The embedded server is an independent ASAR-unaware runtime. Deploy its
+  // code, web assets, and native dependency closure as ordinary resources.
+  extraResources: [{ from: 'resources/terminal-bin', to: 'terminal-bin' }, ...ELECTRON_SERVER_EXTRA_RESOURCES],
   win: {
     // Windows requires a multi-resolution .ico for proper taskbar and
     // file explorer rendering (16/32/48/256 frames embedded).
