@@ -2,16 +2,18 @@ import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { RuntimeWorkspacePaneTarget, WorkspaceCapabilities } from '#/shared/workspace-runtime.ts'
 import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
-interface WorkspacePaneFilesystemTargetBase {
+interface WorkspacePaneSurfaceTargetBase {
   workspaceId: string
   workspaceRuntimeId: string
-  rootPath: string
-  capabilities: Pick<WorkspaceCapabilities, 'files' | 'terminal'>
+  capabilities: WorkspaceCapabilities
 }
 
-export type WorkspacePaneFilesystemTarget =
-  | (WorkspacePaneFilesystemTargetBase & { kind: 'workspace-root' })
-  | (WorkspacePaneFilesystemTargetBase & { kind: 'git-worktree'; branchName: string })
+export type WorkspacePaneSurfaceTarget =
+  | (WorkspacePaneSurfaceTargetBase & { kind: 'workspace-root'; rootPath: string })
+  | (WorkspacePaneSurfaceTargetBase & { kind: 'git-worktree'; branchName: string; rootPath: string })
+  | (WorkspacePaneSurfaceTargetBase & { kind: 'git-branch'; branchName: string })
+
+export type WorkspacePaneFilesystemTarget = Exclude<WorkspacePaneSurfaceTarget, { kind: 'git-branch' }>
 
 export function workspacePaneFilesystemRuntimeTarget(
   target: WorkspacePaneFilesystemTarget,

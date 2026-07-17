@@ -1306,6 +1306,7 @@ describe('RepoWorkspaceContent', () => {
                 capabilities: {
                   files: { read: true, write: true },
                   terminal: { available: true },
+                  git: { status: 'unavailable' },
                 },
               }}
             />
@@ -1372,6 +1373,7 @@ describe('RepoWorkspaceContent', () => {
                 capabilities: {
                   files: { read: true, write: false },
                   terminal: { available: false },
+                  git: { status: 'unavailable' },
                 },
               }}
             />

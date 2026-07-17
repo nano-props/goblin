@@ -35,24 +35,9 @@ import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-re
 import { useT } from '#/web/stores/i18n.ts'
 import { FiletreeTab } from '#/web/components/repo-workspace/panels.tsx'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import { WorkspacePaneToolbar } from '#/web/components/workspace-pane/WorkspacePaneToolbar.tsx'
-import {
-  isPendingWorkspacePaneTabItem,
-  type WorkspacePaneTabItem,
-} from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
-import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
-import { useIsInitialTerminalProjectionHydrating } from '#/web/stores/terminal-projection-hydration.ts'
-import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
-import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
-import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
-import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
-import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
+import { WorkspacePaneTargetToolbar } from '#/web/components/workspace-pane/WorkspacePaneTargetToolbar.tsx'
 import { WorkspaceDirectoryStatus } from '#/web/components/repo-workspace/WorkspaceDirectoryStatus.tsx'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import {
@@ -60,10 +45,6 @@ import {
   workspaceGitUnavailable,
   type WorkspaceReadyProbeState,
 } from '#/shared/workspace-runtime.ts'
-import {
-  workspacePaneTabEntryForItem,
-  workspacePaneTabItems,
-} from '#/web/components/repo-workspace/workspace-pane-tab-items.ts'
 
 export type RepoWorkspacePaneRouteContext =
   { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null } | { kind: 'inactive' }
@@ -178,7 +159,6 @@ function RepoWorkspaceLoaded(props: {
           ui: props.repoShell.ui,
           workspaceProbe: props.repoShell.workspaceProbe,
         }}
-        terminalAvailable={props.repoShell.workspaceProbe.capabilities.terminal.available}
         workspacePaneId={props.workspacePaneId}
         toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
         onBackToNavigator={props.onBackToBranchNavigator}
@@ -300,126 +280,43 @@ function GitRepoWorkspaceLoaded({
 
 function WorkspaceRootPane({
   repo,
-  terminalAvailable,
   workspacePaneId,
   toolbarTrafficLightOffset,
   onBackToNavigator,
 }: {
   repo: Pick<RepoWorkspaceRepoShell, 'id' | 'repoRuntimeId' | 'ui'> & { workspaceProbe: WorkspaceReadyProbeState }
-  terminalAvailable: boolean
   workspacePaneId: string
   toolbarTrafficLightOffset: boolean
   onBackToNavigator?: () => void
 }) {
   const t = useT()
-  const navigation = usePrimaryWindowNavigation()
   const model = useWorkspaceRootTabModel(repo)
   const target = { kind: 'workspace-root' as const, repoRoot: repo.id, branchName: null, worktreePath: null }
   const runtimeTarget = runtimeWorkspacePaneTarget(target, repo.repoRuntimeId)
-  const hydrating = useIsInitialTerminalProjectionHydrating(repo.id, repo.repoRuntimeId)
+  const terminalAvailable = repo.workspaceProbe.capabilities.terminal.available
   const activePanel = model.selection?.tab === 'terminal' && !terminalAvailable ? null : (model.selection?.tab ?? null)
   const overviewReadModel = useWorkspaceDirectoryOverview(repo.id, repo.repoRuntimeId, activePanel === 'status')
   const selectedTerminalSessionId =
     model.selection?.kind === 'materialized-tab' && model.selection.materializedTab.kind === 'runtime'
       ? model.selection.materializedTab.sessionId
       : null
-  const items = useMemo<WorkspacePaneTabItem[]>(() => {
-    return workspacePaneTabItems({
-      model,
-      workspacePaneId,
-      branchName: null,
-      statusCount: 0,
-      t,
-      staticTabAvailable: (type) => type === 'status' || type === 'files',
-      runtimeTabAvailable: (type) => type !== 'terminal' || terminalAvailable,
-    })
-  }, [model.runtimeTabStateByType, model.tabs, t, terminalAvailable, workspacePaneId])
-  const requestedActiveIdentity =
-    model.activeTab?.identity ?? (activePanel === 'terminal' ? 'workspace-pane:terminal-host' : null)
-  const activeTabIdentity =
-    requestedActiveIdentity && items.some((item) => item.identity === requestedActiveIdentity)
-      ? requestedActiveIdentity
-      : null
-  const selectItem = useCallback(
-    (item: WorkspacePaneTabItem) => {
-      if (isPendingWorkspacePaneTabItem(item)) return
-      void dispatchSelectWorkspacePaneTabByIdentityAction({
-        repoId: repo.id,
-        branchName: null,
-        workspacePaneRoute: undefined,
-        identity: item.identity,
-        navigation,
-      })
-    },
-    [navigation, repo.id],
-  )
-  const createAction = useWorkspacePaneRuntimeTabCreateAction({
-    repoRoot: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
-    branchName: null,
-    worktreePath: repo.id,
-    runtimeTabStateByType: model.runtimeTabStateByType,
-    initialRuntimeProjectionHydrating: hydrating,
-    workspacePaneRoute: undefined,
-    showCreatedRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => {
-      if (type !== 'terminal') return false
-      const state = useReposStore.getState()
-      state.setSelectedTerminal(formatTerminalWorktreeKey(repo.id, repo.id), sessionId)
-      state.setWorkspacePaneTabForTarget(target, 'terminal')
-      return true
-    },
-    t,
-  })
-  const { visualTabs, stageDragPreview, clearDragPreview } = useWorkspacePaneTabDragPreview({
-    kind: 'workspace-root',
-    repoRoot: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
-    branchName: null,
-    worktreePath: null,
-    canonicalTabs: model.tabEntries,
-  })
-  const { reorderTabs } = useWorkspacePaneTabsReorderMutation({
-    repoRoot: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
-    branchName: null,
-    worktreePath: null,
-    canonicalTabs: model.tabEntries,
-    onReorderRejected: clearDragPreview,
-  })
-  const visualItems = useMemo(
-    () => orderWorkspacePaneItemsByTabEntries(items, visualTabs, (item) => workspacePaneTabEntryForItem(item)),
-    [items, visualTabs],
-  )
-  const handleReorder = useCallback(
-    (tabs: Parameters<typeof reorderTabs>[0]) => {
-      if (!stageDragPreview(tabs)) return
-      reorderTabs(tabs)
-    },
-    [reorderTabs, stageDragPreview],
-  )
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
-      <WorkspacePaneToolbar
-        workspacePaneTabTargetKey={workspacePaneTabsTargetIdentityKey(target)}
-        items={visualItems}
+      <WorkspacePaneTargetToolbar
+        target={{
+          kind: 'workspace-root',
+          workspaceId: repo.id,
+          workspaceRuntimeId: repo.repoRuntimeId,
+          rootPath: repo.id,
+          capabilities: repo.workspaceProbe.capabilities,
+        }}
+        model={model}
         workspacePaneId={workspacePaneId}
-        activeTabIdentity={activeTabIdentity}
-        createAction={terminalAvailable ? createAction : null}
+        workspacePaneRoute={undefined}
+        statusCount={0}
         trafficLightOffset={toolbarTrafficLightOffset}
         onBackToNavigator={onBackToNavigator}
-        onSelect={selectItem}
-        onReselect={selectItem}
-        onClose={(item) => {
-          if (isPendingWorkspacePaneTabItem(item)) return
-          void runCloseWorkspacePaneTabCommand({
-            repoId: repo.id,
-            branchName: null,
-            workspacePaneRoute: undefined,
-            targetIdentity: item.identity,
-            navigation,
-          })
-        }}
-        onReorder={handleReorder}
+        staticTabAvailable={(type) => type === 'status' || type === 'files'}
       />
       {activePanel === 'status' ? (
         <WorkspacePanePanelFrame id={`${workspacePaneId}-status-panel`} label={t('tab.status')}>
