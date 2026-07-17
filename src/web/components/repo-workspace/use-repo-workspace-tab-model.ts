@@ -104,7 +104,7 @@ export function useRepoWorkspaceTabModelInput(
   return input
 }
 
-export function usePlainWorkspaceTabModel(
+export function useWorkspaceRootTabModel(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'ui'>,
 ): RepoWorkspaceTabModel {
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({

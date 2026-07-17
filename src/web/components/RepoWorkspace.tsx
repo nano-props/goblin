@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo } from 'react'
+import { useCallback, useId, useMemo } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
@@ -9,7 +9,7 @@ import {
 import { RepoWorkspaceToolbar } from '#/web/components/repo-workspace/RepoWorkspaceToolbar.tsx'
 import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
 import {
-  usePlainWorkspaceTabModel,
+  useWorkspaceRootTabModel,
   useRepoWorkspaceTabModel,
 } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
 import { useWorkspacePaneVisibleStatusRefresh } from '#/web/components/repo-workspace/use-workspace-pane-visible-status-refresh.ts'
@@ -38,7 +38,7 @@ import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import { WorkspacePaneTabStrip } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
+import { WorkspacePaneToolbar } from '#/web/components/workspace-pane/WorkspacePaneToolbar.tsx'
 import {
   createPendingWorkspacePaneTabItem,
   createRuntimeWorkspacePaneTabItem,
@@ -52,6 +52,8 @@ import { useIsInitialTerminalProjectionHydrating } from '#/web/stores/terminal-p
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
+import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
+import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { DirectoryOverviewContent } from '#/web/components/repo-pages/DirectoryOverviewContent.tsx'
@@ -168,7 +170,8 @@ function RepoWorkspaceLoaded(props: {
         repo={props.repoShell}
         terminalAvailable={props.repoShell.workspaceProbe.capabilities.terminal.available}
         workspacePaneId={props.workspacePaneId}
-        routeContext={props.workspacePaneRouteContext}
+        toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
+        onBackToNavigator={props.onBackToBranchNavigator}
       />
     )
   }
@@ -289,24 +292,21 @@ function WorkspaceRootPane({
   repo,
   terminalAvailable,
   workspacePaneId,
-  routeContext,
+  toolbarTrafficLightOffset,
+  onBackToNavigator,
 }: {
   repo: Pick<RepoWorkspaceRepoShell, 'id' | 'repoRuntimeId' | 'ui'>
   terminalAvailable: boolean
   workspacePaneId: string
-  routeContext: RepoWorkspacePaneRouteContext
+  toolbarTrafficLightOffset: boolean
+  onBackToNavigator?: () => void
 }) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
-  const model = usePlainWorkspaceTabModel(repo)
+  const model = useWorkspaceRootTabModel(repo)
   const target = { kind: 'workspace-root' as const, repoRoot: repo.id, branchName: null, worktreePath: null }
   const runtimeTarget = runtimeWorkspacePaneTarget(target, repo.repoRuntimeId)
   const hydrating = useIsInitialTerminalProjectionHydrating(repo.id, repo.repoRuntimeId)
-  useEffect(() => {
-    if (routeContext.kind === 'routed' && routeContext.route !== null) {
-      navigation.showWorkspaceFiles?.(repo.id, { replace: true })
-    }
-  }, [navigation, repo.id, routeContext])
   const activePanel =
     model.selection?.tab === 'terminal' && terminalAvailable
       ? 'terminal'
@@ -394,39 +394,60 @@ function WorkspaceRootPane({
     },
     t,
   })
+  const { visualTabs, stageDragPreview, clearDragPreview } = useWorkspacePaneTabDragPreview({
+    kind: 'workspace-root',
+    repoRoot: repo.id,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName: null,
+    worktreePath: null,
+    canonicalTabs: model.tabEntries,
+  })
   const { reorderTabs } = useWorkspacePaneTabsReorderMutation({
     repoRoot: repo.id,
     repoRuntimeId: repo.repoRuntimeId,
     branchName: null,
-    worktreePath: repo.id,
+    worktreePath: null,
     canonicalTabs: model.tabEntries,
+    onReorderRejected: clearDragPreview,
   })
+  const visualItems = useMemo(
+    () =>
+      orderWorkspacePaneItemsByTabEntries(items, visualTabs, (item) =>
+        isPendingWorkspacePaneTabItem(item) ? null : item.tabEntry,
+      ),
+    [items, visualTabs],
+  )
+  const handleReorder = useCallback(
+    (tabs: Parameters<typeof reorderTabs>[0]) => {
+      if (!stageDragPreview(tabs)) return
+      reorderTabs(tabs)
+    },
+    [reorderTabs, stageDragPreview],
+  )
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
-      <div className="flex h-11 shrink-0 items-center border-b border-border/70 px-3">
-        <WorkspacePaneTabStrip
-          workspacePaneTabTargetKey={workspacePaneTabsTargetIdentityKey(target)}
-          items={items}
-          workspacePaneId={workspacePaneId}
-          activeTabIdentity={activeTabIdentity}
-          panelActive
-          createAction={terminalAvailable ? createAction : null}
-          onSelect={selectItem}
-          onReselect={selectItem}
-          onClose={(item) => {
-            if (isPendingWorkspacePaneTabItem(item)) return
-            void runCloseWorkspacePaneTabCommand({
-              repoId: repo.id,
-              branchName: null,
-              workspacePaneRoute: undefined,
-              targetIdentity: item.identity,
-              navigation,
-            })
-          }}
-          onReorder={reorderTabs}
-          activateKeyboardNavigationSelection
-        />
-      </div>
+      <WorkspacePaneToolbar
+        workspacePaneTabTargetKey={workspacePaneTabsTargetIdentityKey(target)}
+        items={visualItems}
+        workspacePaneId={workspacePaneId}
+        activeTabIdentity={activeTabIdentity}
+        createAction={terminalAvailable ? createAction : null}
+        trafficLightOffset={toolbarTrafficLightOffset}
+        onBackToNavigator={onBackToNavigator}
+        onSelect={selectItem}
+        onReselect={selectItem}
+        onClose={(item) => {
+          if (isPendingWorkspacePaneTabItem(item)) return
+          void runCloseWorkspacePaneTabCommand({
+            repoId: repo.id,
+            branchName: null,
+            workspacePaneRoute: undefined,
+            targetIdentity: item.identity,
+            navigation,
+          })
+        }}
+        onReorder={handleReorder}
+      />
       {activePanel === 'status' ? (
         <WorkspacePanePanelFrame id={`${workspacePaneId}-status-panel`} label={t('tab.status')}>
           <ScrollArea className="min-h-0 flex-1 bg-background">

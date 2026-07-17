@@ -103,6 +103,18 @@ describe('useWorkspacePaneTabDragPreview', () => {
     expect(currentControls().visualTabs).toEqual(sourceTabs)
   })
 
+  test('stages and clears a workspace-root preview without a branch sentinel', () => {
+    const sourceTabs = [staticEntry('status'), staticEntry('files')]
+    const reorderedTabs = [...sourceTabs].reverse()
+    renderPreviewHook({ kind: 'workspace-root', canonicalTabs: sourceTabs })
+
+    act(() => expect(currentControls().stageDragPreview(reorderedTabs)).toBe(true))
+    expect(currentControls().visualTabs).toEqual(reorderedTabs)
+
+    act(() => currentControls().clearDragPreview())
+    expect(currentControls().visualTabs).toEqual(sourceTabs)
+  })
+
   test('keeps a staged preview when only a worktree target branch changes', () => {
     const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
     const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
@@ -171,18 +183,49 @@ describe('useWorkspacePaneTabDragPreview', () => {
   })
 })
 
-function renderPreviewHook(input: Partial<WorkspacePaneTabDragPreviewInput> = {}) {
+interface PreviewInputOverrides {
+  kind?: 'workspace-root' | 'inactive'
+  repoRoot?: string
+  repoRuntimeId?: string
+  branchName?: string | null
+  worktreePath?: string | null
+  canonicalTabs?: readonly WorkspacePaneTabEntry[]
+}
+
+function renderPreviewHook(input: PreviewInputOverrides = {}) {
   return renderInJsdom(<HookHost input={previewInput(input)} />)
 }
 
-function previewInput(input: Partial<WorkspacePaneTabDragPreviewInput> = {}): WorkspacePaneTabDragPreviewInput {
+function previewInput(input: PreviewInputOverrides = {}): WorkspacePaneTabDragPreviewInput {
+  const repoRoot = input.repoRoot ?? REPO_ROOT
+  const repoRuntimeId = input.repoRuntimeId ?? REPO_RUNTIME_ID
+  const canonicalTabs = input.canonicalTabs ?? []
+  if (input.kind === 'workspace-root') {
+    return {
+      kind: 'workspace-root',
+      repoRoot,
+      repoRuntimeId,
+      branchName: null,
+      worktreePath: null,
+      canonicalTabs,
+    }
+  }
+  if (input.kind === 'inactive' || input.branchName === null) {
+    return {
+      kind: 'inactive',
+      repoRoot,
+      repoRuntimeId,
+      branchName: null,
+      worktreePath: null,
+      canonicalTabs,
+    }
+  }
   return {
-    repoRoot: REPO_ROOT,
-    repoRuntimeId: REPO_RUNTIME_ID,
-    branchName: BRANCH_NAME,
-    worktreePath: WORKTREE_PATH,
-    canonicalTabs: [],
-    ...input,
+    repoRoot,
+    repoRuntimeId,
+    branchName: input.branchName ?? BRANCH_NAME,
+    worktreePath: input.worktreePath === undefined ? WORKTREE_PATH : input.worktreePath,
+    canonicalTabs,
   }
 }
 

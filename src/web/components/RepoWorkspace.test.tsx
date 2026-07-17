@@ -98,7 +98,6 @@ const terminalCommandContext: TerminalSessionContextValue = terminalSessionConte
 })
 
 const navigation: PrimaryWindowNavigationActions = {
-  showWorkspaceFiles: vi.fn(),
   currentRepoBranchWorkspacePaneRoute: () => undefined,
   activateRepo: vi.fn(),
   closeRepo: vi.fn(),
@@ -130,39 +129,36 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+function directoryWorkspaceProbe(name: string, options: { filesWritable?: boolean; terminalAvailable?: boolean } = {}) {
+  return {
+    status: 'ready' as const,
+    name,
+    capabilities: {
+      files: { read: true as const, write: options.filesWritable ?? true },
+      terminal: { available: options.terminalAvailable ?? true },
+      git: { status: 'unavailable' as const },
+    },
+    diagnostics: [],
+  }
+}
+
 describe('RepoWorkspace', () => {
   test('renders a non-Git workspace with workspace-scoped Status and Files tabs', async () => {
     const workspaceId = 'goblin+file:///tmp/plain-workspace'
-    const repo = seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
+    const repo = seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branches: [],
+      currentBranchName: null,
+      workspaceProbe: directoryWorkspaceProbe('plain-workspace'),
+    })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.repoRuntimeId)
-    useReposStore.setState((state) => ({
-      repos: {
-        ...state.repos,
-        [workspaceId]: {
-          ...state.repos[workspaceId]!,
-          workspaceProbe: {
-            status: 'ready',
-            name: 'plain-workspace',
-            capabilities: {
-              files: { read: true, write: true },
-              terminal: { available: true },
-              git: { status: 'unavailable' },
-            },
-            diagnostics: [],
-          },
-        },
-      },
-    }))
 
     render(
       <QueryClientProvider client={primaryWindowQueryClient}>
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
-                repoId={workspaceId}
-                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'history' } }}
-              />
+              <RepoWorkspace repoId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -186,37 +182,51 @@ describe('RepoWorkspace', () => {
         undefined,
       )
     })
-    await waitFor(() => {
-      expect(navigation.showWorkspaceFiles).toHaveBeenCalledWith(workspaceId, { replace: true })
+  })
+
+  test('uses the shared compact workspace toolbar back action for a non-Git workspace', () => {
+    responsiveMocks.compact = true
+    const workspaceId = 'goblin+file:///tmp/plain-compact-workspace'
+    seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branches: [],
+      currentBranchName: null,
+      workspaceProbe: directoryWorkspaceProbe('plain-compact-workspace'),
     })
+    const onBackToNavigator = vi.fn()
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace
+                repoId={workspaceId}
+                workspacePaneRouteContext={{ kind: 'routed', route: null }}
+                onBackToBranchNavigator={onBackToNavigator}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    screen.getByRole('button', { name: 'workspace.back-to-branch-navigator' }).click()
+    expect(onBackToNavigator).toHaveBeenCalledOnce()
   })
 
   test('renders directory overview data in the non-Git Status tab without a Git projection', () => {
     const workspaceId = 'goblin+file:///tmp/plain-status-workspace'
-    seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
-    useReposStore.setState((state) => ({
-      repos: {
-        ...state.repos,
-        [workspaceId]: {
-          ...state.repos[workspaceId]!,
-          workspaceProbe: {
-            status: 'ready',
-            name: 'plain-status-workspace',
-            capabilities: {
-              files: { read: true, write: true },
-              terminal: { available: true },
-              git: { status: 'unavailable' },
-            },
-            diagnostics: [],
-          },
-        },
-      },
-    }))
+    seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branches: [],
+      currentBranchName: null,
+      workspaceProbe: directoryWorkspaceProbe('plain-status-workspace'),
+    })
     const repo = useReposStore.getState().repos[workspaceId]!
-    useReposStore.getState().setWorkspacePaneTabForTarget(
-      { repoRoot: workspaceId, branchName: '', worktreePath: workspaceId },
-      'status',
-    )
+    useReposStore
+      .getState()
+      .setWorkspacePaneTabForTarget({ repoRoot: workspaceId, branchName: '', worktreePath: workspaceId }, 'status')
     primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.repoRuntimeId), {
       topLevelFileCount: 7,
       topLevelDirectoryCount: 3,
@@ -242,25 +252,15 @@ describe('RepoWorkspace', () => {
 
   test('does not expose a terminal surface when the workspace capability is unavailable', () => {
     const workspaceId = 'goblin+file:///tmp/files-only-workspace'
-    seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
-    useReposStore.setState((state) => ({
-      repos: {
-        ...state.repos,
-        [workspaceId]: {
-          ...state.repos[workspaceId]!,
-          workspaceProbe: {
-            status: 'ready',
-            name: 'files-only-workspace',
-            capabilities: {
-              files: { read: true, write: false },
-              terminal: { available: false },
-              git: { status: 'unavailable' },
-            },
-            diagnostics: [],
-          },
-        },
-      },
-    }))
+    seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branches: [],
+      currentBranchName: null,
+      workspaceProbe: directoryWorkspaceProbe('files-only-workspace', {
+        filesWritable: false,
+        terminalAvailable: false,
+      }),
+    })
 
     render(
       <QueryClientProvider client={primaryWindowQueryClient}>

@@ -168,6 +168,42 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
       }),
     )
   })
+
+  test('preserves the workspace-root target through the reorder transaction', async () => {
+    const updateWorkspaceTabs = vi.fn(async () => [staticEntry('files'), staticEntry('status')])
+    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
+    const sourceTabs = [staticEntry('status'), staticEntry('files')]
+    setWorkspacePaneTabsForTargetQueryData(
+      {
+        kind: 'workspace-root',
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+        branchName: null,
+        worktreePath: null,
+        tabs: sourceTabs,
+      },
+      queryClient,
+    )
+    renderMutationHook({ branchName: null, worktreePath: REPO_ROOT, canonicalTabs: sourceTabs })
+
+    act(() => currentControls().reorderTabs([...sourceTabs].reverse()))
+
+    await vi.waitFor(() =>
+      expect(updateWorkspaceTabs).toHaveBeenCalledWith({
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: REPO_RUNTIME_ID,
+        target: {
+          kind: 'workspace-root',
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: REPO_RUNTIME_ID,
+        },
+        operation: {
+          type: 'reorder',
+          tabIdentities: ['workspace-pane:files', 'workspace-pane:status'],
+        },
+      }),
+    )
+  })
 })
 
 function renderMutationHook(input: Partial<WorkspacePaneTabsReorderMutationInput> = {}) {

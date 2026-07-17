@@ -8,8 +8,11 @@ import {
   writeCanonicalWorkspacePaneTabsSnapshot,
 } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  runWorkspacePaneAction,
+  type WorkspacePaneActionTarget,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { runtimeWorkspacePaneTarget, type WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface WorkspacePaneTabsReorderMutationInput {
   repoRoot: string
@@ -28,27 +31,19 @@ export function useWorkspacePaneTabsReorderMutation(
   input: WorkspacePaneTabsReorderMutationInput,
 ): WorkspacePaneTabsReorderMutationResult {
   const queryClient = useQueryClient()
-  const target = useMemo(
-    () =>
-      runtimeWorkspacePaneTarget(
-        input.branchName === null
-          ? { kind: 'workspace-root', repoRoot: input.repoRoot, branchName: null, worktreePath: null }
-          : {
-              repoRoot: input.repoRoot,
-              branchName: input.branchName,
-              worktreePath: input.worktreePath,
-            },
-        input.repoRuntimeId,
-      )
-        ? {
+  const target = useMemo(() => {
+    const paneTarget =
+      input.branchName === null
+        ? { kind: 'workspace-root' as const, repoRoot: input.repoRoot, branchName: null, worktreePath: null }
+        : {
             repoRoot: input.repoRoot,
-            repoRuntimeId: input.repoRuntimeId,
-            branchName: input.branchName ?? '',
+            branchName: input.branchName,
             worktreePath: input.worktreePath,
           }
-        : null,
-    [input.branchName, input.repoRuntimeId, input.repoRoot, input.worktreePath],
-  )
+    return runtimeWorkspacePaneTarget(paneTarget, input.repoRuntimeId)
+      ? { ...paneTarget, repoRuntimeId: input.repoRuntimeId }
+      : null
+  }, [input.branchName, input.repoRuntimeId, input.repoRoot, input.worktreePath])
   const canonicalTabsIdentity = useMemo(
     () => workspacePaneTabEntryListIdentity(input.canonicalTabs),
     [input.canonicalTabs],
@@ -69,34 +64,18 @@ export function useWorkspacePaneTabsReorderMutation(
 }
 
 async function runWorkspacePaneTabsReorder(
-  target: {
-    repoRoot: string
-    repoRuntimeId: string
-    branchName: string
-    worktreePath: string | null
-  },
+  target: WorkspacePaneTabsReorderTarget,
   draggedTabs: readonly WorkspacePaneTabEntry[],
   queryClient: QueryClient,
   onReorderRejected: (() => void) | undefined,
 ): Promise<void> {
-  await runWorkspacePaneAction(
-    {
-      repoId: target.repoRoot,
-      repoRuntimeId: target.repoRuntimeId,
-      branchName: target.branchName,
-      worktreePath: target.worktreePath,
-    },
-    () => runWorkspacePaneTabsReorderInQueue(target, draggedTabs, queryClient, onReorderRejected),
+  await runWorkspacePaneAction(workspacePaneReorderActionTarget(target), () =>
+    runWorkspacePaneTabsReorderInQueue(target, draggedTabs, queryClient, onReorderRejected),
   )
 }
 
 async function runWorkspacePaneTabsReorderInQueue(
-  target: {
-    repoRoot: string
-    repoRuntimeId: string
-    branchName: string
-    worktreePath: string | null
-  },
+  target: WorkspacePaneTabsReorderTarget,
   draggedTabs: readonly WorkspacePaneTabEntry[],
   queryClient: QueryClient,
   onReorderRejected: (() => void) | undefined,
@@ -117,4 +96,23 @@ async function runWorkspacePaneTabsReorderInQueue(
     })
     onReorderRejected?.()
   }
+}
+
+type WorkspacePaneTabsReorderTarget = WorkspacePaneTabsTarget & { repoRuntimeId: string }
+
+function workspacePaneReorderActionTarget(target: WorkspacePaneTabsReorderTarget): WorkspacePaneActionTarget {
+  return 'kind' in target
+    ? {
+        kind: 'workspace-root',
+        repoId: target.repoRoot,
+        repoRuntimeId: target.repoRuntimeId,
+        branchName: null,
+        worktreePath: null,
+      }
+    : {
+        repoId: target.repoRoot,
+        repoRuntimeId: target.repoRuntimeId,
+        branchName: target.branchName,
+        worktreePath: target.worktreePath,
+      }
 }

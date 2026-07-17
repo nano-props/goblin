@@ -6,21 +6,21 @@ import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
-import { runtimeWorkspacePaneTarget, workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  runtimeWorkspacePaneTarget,
+  workspacePaneTabsTargetIdentityKey,
+  type WorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
 
-export interface CommitWorkspacePaneTabsInput {
-  repoRoot: string
+type WorkspacePaneTabsMutationTarget = WorkspacePaneTabsTarget & {
   repoRuntimeId: string
-  branchName: string
-  worktreePath: string | null
+}
+
+export type CommitWorkspacePaneTabsInput = WorkspacePaneTabsMutationTarget & {
   tabs: WorkspacePaneTabEntry[]
 }
 
-export interface UpdateWorkspacePaneTabsInput {
-  repoRoot: string
-  repoRuntimeId: string
-  branchName: string
-  worktreePath: string | null
+export type UpdateWorkspacePaneTabsInput = WorkspacePaneTabsMutationTarget & {
   operation: WorkspacePaneTabsUpdateOperation
 }
 
@@ -36,7 +36,7 @@ export interface WorkspacePaneTabsMutationFailure {
   ok: false
   operation: WorkspacePaneTabsMutationOperation
   repoRoot: string
-  branchName: string
+  branchName: string | null
   worktreePath: string | null
   message: string
   error: unknown
@@ -45,11 +45,7 @@ export interface WorkspacePaneTabsMutationFailure {
 
 export type WorkspacePaneTabsMutationResult = WorkspacePaneTabsMutationSuccess | WorkspacePaneTabsMutationFailure
 
-interface WorkspacePaneTabsInteractionTarget {
-  repoRoot: string
-  branchName: string
-  worktreePath: string | null
-}
+type WorkspacePaneTabsInteractionTarget = WorkspacePaneTabsTarget
 
 function createWorkspacePaneTabsInteractionBlocker() {
   const blockedCountsByTarget = new Map<string, number>()
@@ -68,18 +64,8 @@ function createWorkspacePaneTabsInteractionBlocker() {
   }
 
   return {
-    isBlocked(input: {
-      repoRoot: string
-      branchName: string | null | undefined
-      worktreePath: string | null
-    }): boolean {
-      const branchName = input.branchName
-      if (!branchName) return false
-      const key = workspacePaneTabsTargetIdentityKey({
-        repoRoot: input.repoRoot,
-        branchName,
-        worktreePath: input.worktreePath,
-      })
+    isBlocked(input: WorkspacePaneTabsInteractionTarget): boolean {
+      const key = workspacePaneTabsTargetIdentityKey(input)
       return (blockedCountsByTarget.get(key) ?? 0) > 0
     },
     async run<T>(
@@ -108,7 +94,7 @@ const workspacePaneTabsInteractionBlocker = createWorkspacePaneTabsInteractionBl
 export function reportWorkspacePaneTabsFailure(input: {
   operation: WorkspacePaneTabsMutationOperation
   repoRoot: string
-  branchName: string
+  branchName: string | null
   worktreePath: string | null
   error: unknown
 }): WorkspacePaneTabsMutationFailure {
@@ -153,11 +139,7 @@ export async function updateWorkspacePaneTabs(
   )
 }
 
-export function workspacePaneTabsInteractionBlockedForTarget(input: {
-  repoRoot: string
-  branchName: string | null | undefined
-  worktreePath: string | null
-}): boolean {
+export function workspacePaneTabsInteractionBlockedForTarget(input: WorkspacePaneTabsTarget): boolean {
   return workspacePaneTabsInteractionBlocker.isBlocked(input)
 }
 

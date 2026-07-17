@@ -290,6 +290,7 @@ export function RepoView({
               workspacePaneRouteContext={{ kind: 'routed', route: null }}
               shortcutsEnabled={!compact || singlePane === 'workspace'}
               toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+              onBackToBranchNavigator={() => onOpenRepoRoot?.(repo.id)}
             />
           ) : routeView?.kind === 'newWorktree' ? (
             <CreateWorktreePagePane

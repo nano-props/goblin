@@ -1,12 +1,5 @@
 import { useCallback, useMemo } from 'react'
-import { ArrowLeft } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
-import { Button } from '#/web/components/ui/button.tsx'
-import { Tip } from '#/web/components/Tip.tsx'
-import {
-  WorkspacePaneTabStrip,
-  EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY,
-} from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
 import {
   createPendingWorkspacePaneTabItem,
   createRuntimeWorkspacePaneTabItem,
@@ -23,7 +16,6 @@ import type {
 import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import type { RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useIsInitialTerminalProjectionHydrating } from '#/web/stores/terminal-projection-hydration.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
@@ -32,11 +24,10 @@ import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from 
 import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
 import {
   WorkspaceToolbar,
-  WorkspaceToolbarActions,
-  WorkspaceToolbarContent,
   WorkspaceToolbarLeadingSpacer,
   WorkspaceToolbarPrimary,
 } from '#/web/components/workspace-toolbar-chrome.tsx'
+import { WorkspacePaneToolbar } from '#/web/components/workspace-pane/WorkspacePaneToolbar.tsx'
 import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/WorkspaceOpenExternallyMenu.tsx'
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
@@ -85,10 +76,6 @@ export function RepoWorkspaceToolbar({
         worktreePath,
       })
     : null
-  const showBranchLevelTabs = !!detail.branch
-
-  const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
-
   const showCreatedWorkspacePaneRuntimeTab = useCallback(
     (
       type: WorkspacePaneRuntimeTabType,
@@ -163,10 +150,11 @@ export function RepoWorkspaceToolbar({
     stageDragPreview: stageWorkspacePaneTabDragPreview,
     clearDragPreview: clearWorkspacePaneTabDragPreview,
   } = useWorkspacePaneTabDragPreview({
+    ...(branchName
+      ? { branchName, worktreePath }
+      : { kind: 'inactive' as const, branchName: null, worktreePath: null }),
     repoRoot: repo.id,
     repoRuntimeId: repo.repoRuntimeId,
-    branchName,
-    worktreePath,
     canonicalTabs: workspacePaneTabModel.tabEntries,
   })
   const { reorderTabs: reorderWorkspacePaneTabs } = useWorkspacePaneTabsReorderMutation({
@@ -290,63 +278,26 @@ export function RepoWorkspaceToolbar({
     )
   }
 
-  const backLabel = t('workspace.back-to-branch-navigator')
-  const repoWorkspaceBackAction = compact ? (
-    <Tip label={backLabel}>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7 shrink-0"
-        onClick={onBackToBranchNavigator}
-        disabled={!onBackToBranchNavigator}
-        aria-label={backLabel}
-        title={backLabel}
-      >
-        <ArrowLeft size={14} />
-      </Button>
-    </Tip>
+  return workspacePaneTabTargetKey ? (
+    <WorkspacePaneToolbar
+      workspacePaneTabTargetKey={workspacePaneTabTargetKey}
+      items={workspacePaneTabItems}
+      workspacePaneId={workspacePaneId}
+      activeTabIdentity={activeTabIdentity}
+      createAction={workspacePaneCreateAction}
+      trafficLightOffset={trafficLightOffset}
+      onBackToNavigator={onBackToBranchNavigator}
+      trailingActions={
+        branchActions ? (
+          <WorkspaceOpenExternallyMenu repo={repo} branch={detail.branch} branchActions={branchActions} />
+        ) : null
+      }
+      onSelect={handleSelectWorkspacePaneTabItem}
+      onReselect={handleReselectWorkspacePaneTabItem}
+      onClose={handleCloseWorkspacePaneTab}
+      onReorder={handleReorderWorkspacePaneTabStrip}
+    />
   ) : null
-  return (
-    <WorkspaceToolbar draggable={!compact} trafficLightOffset={trafficLightOffset}>
-      <WorkspaceToolbarLeadingSpacer reserve={trafficLightOffset} />
-      <WorkspaceToolbarContent>
-        <WorkspaceToolbarPrimary>
-          {/* Compact UI only: back-to-branch-navigator is the user's escape hatch
-              from the repo workspace. It must stay visible even when the tab
-              strip below is empty, so it lives at the toolbar level rather than
-              inside WorkspacePaneTabStrip's tab chrome. */}
-          {compact && repoWorkspaceBackAction}
-          {showBranchLevelTabs && workspacePaneTabTargetKey && (
-            <WorkspacePaneTabStrip
-              workspacePaneTabTargetKey={workspacePaneTabTargetKey}
-              items={workspacePaneTabItems}
-              workspacePaneId={workspacePaneId}
-              activeTabIdentity={activeTabIdentity}
-              responsiveCompact={compact}
-              panelActive
-              focusRegistry={workspacePaneTabFocusRegistry}
-              emptyFocusKey={EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY}
-              // While a runtime create is in flight, the tab model contributes
-              // a pending runtime tab. This is presentation only: create
-              // intent still goes to the server, which is the lifecycle
-              // authority and either accepts, serializes, or rejects it.
-              createAction={workspacePaneCreateAction}
-              onSelect={handleSelectWorkspacePaneTabItem}
-              onReselect={handleReselectWorkspacePaneTabItem}
-              onClose={handleCloseWorkspacePaneTab}
-              onReorder={handleReorderWorkspacePaneTabStrip}
-              activateKeyboardNavigationSelection
-            />
-          )}
-        </WorkspaceToolbarPrimary>
-        {!compact && branchActions && (
-          <WorkspaceToolbarActions data-workspace-toolbar-trailing-actions="">
-            <WorkspaceOpenExternallyMenu repo={repo} branch={detail.branch} branchActions={branchActions} />
-          </WorkspaceToolbarActions>
-        )}
-      </WorkspaceToolbarContent>
-    </WorkspaceToolbar>
-  )
 }
 
 function workspacePaneTabEntryForItem(item: WorkspacePaneTabItem): WorkspacePaneTabEntry | null {

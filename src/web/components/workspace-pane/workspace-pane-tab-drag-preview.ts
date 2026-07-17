@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  workspacePaneTabsTargetIdentityKey,
+  type WorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
 interface WorkspacePaneTabDragPreviewSnapshot {
@@ -10,11 +13,11 @@ interface WorkspacePaneTabDragPreviewSnapshot {
   tabs: WorkspacePaneTabEntry[]
 }
 
-export interface WorkspacePaneTabDragPreviewInput {
-  repoRoot: string
+type WorkspacePaneTabDragPreviewTarget =
+  WorkspacePaneTabsTarget | { kind: 'inactive'; repoRoot: string; branchName: null; worktreePath: null }
+
+export type WorkspacePaneTabDragPreviewInput = WorkspacePaneTabDragPreviewTarget & {
   repoRuntimeId: string
-  branchName: string | null
-  worktreePath: string | null
   canonicalTabs: readonly WorkspacePaneTabEntry[]
 }
 
@@ -31,18 +34,7 @@ export function useWorkspacePaneTabDragPreview(
   // Visual-only drag state. Runtime tab truth lives on the server and
   // React Query only caches that server projection; this hook must not
   // write either one.
-  const targetKey = useMemo(
-    () =>
-      input.branchName
-        ? workspacePaneTabDragPreviewTargetKey({
-            repoRoot: input.repoRoot,
-            repoRuntimeId: input.repoRuntimeId,
-            branchName: input.branchName,
-            worktreePath: input.worktreePath,
-          })
-        : null,
-    [input.branchName, input.repoRuntimeId, input.repoRoot, input.worktreePath],
-  )
+  const targetKey = workspacePaneTabDragPreviewTargetKey(input)
   const canonicalTabsIdentity = useMemo(
     () => workspacePaneTabEntryListIdentity(input.canonicalTabs),
     [input.canonicalTabs],
@@ -91,11 +83,9 @@ export function useWorkspacePaneTabDragPreview(
   }
 }
 
-function workspacePaneTabDragPreviewTargetKey(input: {
-  repoRoot: string
-  repoRuntimeId: string
-  branchName: string
-  worktreePath: string | null
-}): string {
+function workspacePaneTabDragPreviewTargetKey(
+  input: WorkspacePaneTabDragPreviewTarget & { repoRuntimeId: string },
+): string | null {
+  if ('kind' in input && input.kind === 'inactive') return null
   return `${workspacePaneTabsTargetIdentityKey(input)}::${input.repoRuntimeId}`
 }

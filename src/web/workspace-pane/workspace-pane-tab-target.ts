@@ -229,12 +229,9 @@ function preferredWorkspacePaneTabForRoute(
 }
 
 export function workspacePaneTabTargetBlocksInteraction(model: RepoWorkspaceTabModel): boolean {
-  return (
-    repoWorkspaceTabModelBlocksTabInteraction(model) ||
-    workspacePaneTabsInteractionBlockedForTarget({
-      repoRoot: model.repoId,
-      branchName: model.branchName,
-      worktreePath: model.worktreePath,
-    })
-  )
+  const target =
+    model.branchName === null
+      ? { kind: 'workspace-root' as const, repoRoot: model.repoId, branchName: null, worktreePath: null }
+      : { repoRoot: model.repoId, branchName: model.branchName, worktreePath: model.worktreePath }
+  return repoWorkspaceTabModelBlocksTabInteraction(model) || workspacePaneTabsInteractionBlockedForTarget(target)
 }

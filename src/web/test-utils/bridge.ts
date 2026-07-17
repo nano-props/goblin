@@ -1218,6 +1218,7 @@ export function seedRepoWithReadModelForTest(options: {
   repoRuntimeId?: string
   status?: WorktreeStatus[]
   remote?: Partial<RepoState['remote']>
+  workspaceProbe?: RepoState['workspaceProbe']
 }): RepoState {
   const branchesWithSnapshotWorktreeMetadata = options.branchSnapshots ?? options.branches ?? []
   const branches = options.branches ?? stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
@@ -1243,7 +1244,7 @@ export function seedRepoWithReadModelForTest(options: {
     currentBranchName,
     ...(preferredWorkspacePaneTabByTarget ? { preferredWorkspacePaneTabByTarget } : {}),
     remote: options.remote,
-    workspaceProbe: {
+    workspaceProbe: options.workspaceProbe ?? {
       status: 'ready',
       name: options.name ?? 'repo',
       capabilities: {

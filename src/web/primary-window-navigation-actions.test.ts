@@ -69,9 +69,6 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
     expect(navigation.openRepoRoot).not.toHaveBeenCalled()
     expect(navigation.openRepoBranch).not.toHaveBeenCalled()
-
-    actions.showWorkspaceFiles?.(REPO_ID)
-    expect(navigation.openRepoWorkspace).toHaveBeenCalledWith(REPO_ID, undefined)
   })
 
   test('selects branches by resolving the branch workspace pane route', () => {
@@ -120,11 +117,7 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     actions.selectRepoBranch(REPO_ID, BRANCH_NAME, { replace: true })
 
-    expect(navigation.openRepoBranch).toHaveBeenCalledWith(
-      REPO_ID,
-      BRANCH_NAME,
-      presentationOptions({ replace: true }),
-    )
+    expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, presentationOptions({ replace: true }))
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
     expect(navigation.openRepoBranchTerminal).not.toHaveBeenCalled()
   })
