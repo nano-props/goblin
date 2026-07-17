@@ -8,6 +8,7 @@ import {
 import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import {
   dispatchMoveWorkspacePaneTabAction,
+  dispatchSelectWorkspacePaneTabByIdentityAction,
   dispatchSelectWorkspacePaneTabByIndexAction,
 } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
@@ -17,7 +18,10 @@ import {
   dispatchNewTerminalRuntimeTabAction,
   dispatchTerminalRuntimePrimaryAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
-import { resolveWorkspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  resolveWorkspacePaneTabTargetForBranch,
+  workspacePaneTabTargetForWorkspace,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 type WorkspacePaneCommandRoute = ParsedRepoBranchWorkspacePaneRoute | null | undefined
@@ -105,8 +109,22 @@ async function showWorkspacePaneTabCommand({
   tab,
   navigation,
 }: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
-  if (!repoId || !branchName) return false
+  if (!repoId) return false
   const provider = workspacePaneTabProvider(tab)
+  if (branchName === null) {
+    if (isWorkspacePaneStaticTabProvider(provider)) {
+      return await dispatchSelectWorkspacePaneTabByIdentityAction({
+        repoId,
+        branchName,
+        workspacePaneRoute,
+        identity: provider.identity(),
+        navigation,
+      })
+    }
+    return tab === 'terminal'
+      ? await runTerminalPrimaryActionCommand({ repoId, branchName, workspacePaneRoute, navigation })
+      : false
+  }
   if (isWorkspacePaneStaticTabProvider(provider)) {
     const outcome = await dispatchShowWorkspacePaneStaticTabAction({
       repoId,
@@ -167,19 +185,28 @@ export async function runMoveWorkspacePaneTabCommand(options: MoveWorkspacePaneT
 function resolveCloseWorkspaceSurfaceIntent(options: CloseWorkspacePaneTabCommandOptions): CloseWorkspaceSurfaceIntent {
   const { repoId, targetIdentity } = options
   if (!repoId) return { kind: 'close-window' }
-  if (!options.branchName) return { kind: 'close-window' }
-  const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, options.branchName, {
-    workspacePaneRoute: options.workspacePaneRoute,
-  })
-  if (resolution.kind === 'unavailable') return { kind: 'noop' }
-  const target = resolution.kind === 'ready' ? resolution.target : null
+  const branchResolution = options.branchName
+    ? resolveWorkspacePaneTabTargetForBranch(repoId, options.branchName, {
+        workspacePaneRoute: options.workspacePaneRoute,
+      })
+    : null
+  if (branchResolution?.kind === 'unavailable') return { kind: 'noop' }
+  const target = options.branchName
+    ? branchResolution?.kind === 'ready'
+      ? branchResolution.target
+      : null
+    : workspacePaneTabTargetForWorkspace(repoId)
   if (!target) return { kind: 'close-window' }
   if (targetIdentity) {
     return target.tabs.some((candidate) => candidate.identity === targetIdentity)
       ? { kind: 'close-tab' }
       : { kind: 'noop' }
   }
-  if (target.activeTab) return { kind: 'close-tab' }
+  if (target.activeTab) {
+    return target.branchName === null && target.activeTab.kind === 'static'
+      ? { kind: 'close-window' }
+      : { kind: 'close-tab' }
+  }
   if (target.selection?.kind === 'runtime-host') return { kind: 'noop' }
   return { kind: 'close-window' }
 }

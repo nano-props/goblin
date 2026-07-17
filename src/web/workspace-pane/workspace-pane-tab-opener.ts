@@ -3,6 +3,7 @@ import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
   workspacePaneTabTargetForBranch,
+  workspacePaneTabTargetForWorkspace,
   type WorkspacePaneTabTargetOptions,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
@@ -22,11 +23,14 @@ export type WorkspacePaneTabOpenerRecordResult = 'recorded' | 'missing' | 'unava
 export function captureWorkspacePaneActiveTabIdentity(
   repoId: string,
   repoRuntimeId: string,
-  branchName: string,
+  branchName: string | null,
   options: WorkspacePaneTabTargetOptions,
 ): string | null {
   if (useReposStore.getState().repos[repoId]?.repoRuntimeId !== repoRuntimeId) return null
-  return workspacePaneTabTargetForBranch(repoId, branchName, options)?.activeTab?.identity ?? null
+  const target = branchName
+    ? workspacePaneTabTargetForBranch(repoId, branchName, options)
+    : workspacePaneTabTargetForWorkspace(repoId, options)
+  return target?.activeTab?.identity ?? null
 }
 
 /** Records that `childIdentity` (any static or runtime tab identity) was
@@ -43,16 +47,15 @@ export function captureWorkspacePaneActiveTabIdentity(
 export function recordWorkspacePaneTabOpener(
   repoId: string,
   repoRuntimeId: string,
-  branchName: string,
+  branchName: string | null,
   childIdentity: string,
   openerIdentity: string,
 ): WorkspacePaneTabOpenerRecordResult {
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
   if (!repo || repo.repoRuntimeId !== repoRuntimeId) return 'missing'
-  const branchModel = readRepoBranchSnapshotQueryProjection(repo)
-  if (!branchModel) return 'unavailable'
-  const target = workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
+  if (branchName !== null && !readRepoBranchSnapshotQueryProjection(repo)) return 'unavailable'
+  const target = workspacePaneTabOpenerTarget(repoId, branchName)
   if (!target) return 'missing'
   state.setTabOpener(runtimeScopedTabOpenerKey(target, repoRuntimeId), childIdentity, openerIdentity)
   return 'recorded'
@@ -64,7 +67,7 @@ export function recordWorkspacePaneTabOpener(
 export function workspacePaneTabOpener(
   repoId: string,
   repoRuntimeId: string,
-  branchName: string,
+  branchName: string | null,
   closingIdentity: string,
 ): string | null {
   const scopeKey = workspacePaneTabOpenerScopeKey(repoId, repoRuntimeId, branchName)
@@ -76,7 +79,7 @@ export function workspacePaneTabOpener(
 export function clearWorkspacePaneTabOpener(
   repoId: string,
   repoRuntimeId: string,
-  branchName: string,
+  branchName: string | null,
   childIdentity: string,
 ): void {
   const scopeKey = workspacePaneTabOpenerScopeKey(repoId, repoRuntimeId, branchName)
@@ -84,7 +87,11 @@ export function clearWorkspacePaneTabOpener(
   useReposStore.getState().clearTabOpener(scopeKey, childIdentity)
 }
 
-function workspacePaneTabOpenerScopeKey(repoId: string, repoRuntimeId: string, branchName: string): string | null {
+function workspacePaneTabOpenerScopeKey(
+  repoId: string,
+  repoRuntimeId: string,
+  branchName: string | null,
+): string | null {
   const target = workspacePaneTabOpenerTarget(repoId, branchName)
   return target ? runtimeScopedTabOpenerKey(target, repoRuntimeId) : null
 }
@@ -93,9 +100,13 @@ function runtimeScopedTabOpenerKey(target: WorkspacePaneTabsTarget, repoRuntimeI
   return `${tabOpenerScopeKey(target)}\0${repoRuntimeId}`
 }
 
-function workspacePaneTabOpenerTarget(repoId: string, branchName: string): WorkspacePaneTabsTarget | null {
+function workspacePaneTabOpenerTarget(repoId: string, branchName: string | null): WorkspacePaneTabsTarget | null {
   const repo = useReposStore.getState().repos[repoId]
+  if (!repo) return null
+  if (branchName === null) {
+    return { kind: 'workspace-root', repoRoot: repo.id, branchName: null, worktreePath: null }
+  }
   const branchModel = repo ? readRepoBranchSnapshotQueryProjection(repo) : null
-  if (!repo || !branchModel) return null
+  if (!branchModel) return null
   return workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
 }

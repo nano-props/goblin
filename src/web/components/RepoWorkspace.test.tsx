@@ -226,7 +226,10 @@ describe('RepoWorkspace', () => {
     const repo = useReposStore.getState().repos[workspaceId]!
     useReposStore
       .getState()
-      .setWorkspacePaneTabForTarget({ repoRoot: workspaceId, branchName: '', worktreePath: workspaceId }, 'status')
+      .setWorkspacePaneTabForTarget(
+        { kind: 'workspace-root', repoRoot: workspaceId, branchName: null, worktreePath: null },
+        'status',
+      )
     primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.repoRuntimeId), {
       topLevelFileCount: 7,
       topLevelDirectoryCount: 3,

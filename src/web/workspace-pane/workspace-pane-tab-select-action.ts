@@ -55,7 +55,7 @@ export interface ShowWorkspacePaneTerminalRouteActionOptions {
 export async function dispatchSelectWorkspacePaneTabByIndexAction(
   options: SelectWorkspacePaneTabByIndexActionOptions,
 ): Promise<boolean> {
-  if (!options.repoId || options.branchName === null || options.tabIndex < 1) return false
+  if (!options.repoId || options.tabIndex < 1) return false
   const coordinatorTarget = workspacePaneTabActionCoordinatorTarget(options)
   if (!coordinatorTarget) return false
   const presentationToken = beginPrimaryWindowPresentation()
@@ -69,7 +69,7 @@ async function selectWorkspacePaneTabByIndexAction(
   coordinatorTarget: RepoWorkspaceTabModel,
   presentationToken: PrimaryWindowPresentationToken,
 ): Promise<boolean> {
-  if (!repoId || branchName === null || tabIndex < 1) return false
+  if (!repoId || tabIndex < 1) return false
   const sourceRoute = workspacePaneRoute
   const target = resolveSelectableWorkspacePaneTarget(repoId, branchName, sourceRoute)
   const tab = target?.tabs[tabIndex - 1]
@@ -131,7 +131,7 @@ export async function dispatchShowWorkspacePaneTerminalRouteAction(
 }
 
 export async function dispatchMoveWorkspacePaneTabAction(options: MoveWorkspacePaneTabActionOptions): Promise<boolean> {
-  if (!options.repoId || !options.branchName) return false
+  if (!options.repoId) return false
   const coordinatorTarget = workspacePaneTabActionCoordinatorTarget(options)
   if (!coordinatorTarget) return false
   return await runWorkspacePaneAction(workspacePaneQueuedActionTarget(coordinatorTarget), () =>
@@ -143,10 +143,10 @@ async function moveWorkspacePaneTabAction(
   { repoId, branchName, direction, navigation }: MoveWorkspacePaneTabActionOptions,
   queuedTarget: RepoWorkspaceTabModel,
 ): Promise<boolean> {
-  if (!repoId || !branchName) return false
-  const currentRoute = navigation.currentRepoBranchWorkspacePaneRoute(repoId, branchName)
-  if (currentRoute === undefined) return false
-  const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute: currentRoute })
+  if (!repoId) return false
+  const currentRoute = branchName ? navigation.currentRepoBranchWorkspacePaneRoute(repoId, branchName) : undefined
+  if (branchName && currentRoute === undefined) return false
+  const target = resolveSelectableWorkspacePaneTarget(repoId, branchName, currentRoute)
   const tab = target ? adjacentRepoWorkspaceTab(target.tabs, target.activeTab?.identity, direction) : null
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(queuedTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false

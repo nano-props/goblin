@@ -41,13 +41,10 @@ import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { WorkspacePaneToolbar } from '#/web/components/workspace-pane/WorkspacePaneToolbar.tsx'
 import {
-  createPendingWorkspacePaneTabItem,
-  createRuntimeWorkspacePaneTabItem,
-  createStaticWorkspacePaneTabItem,
   isPendingWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
-import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
+import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
 import { useIsInitialTerminalProjectionHydrating } from '#/web/stores/terminal-projection-hydration.ts'
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
@@ -56,10 +53,14 @@ import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/worksp
 import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
 import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import type { WorkspacePaneRuntimeTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { WorkspaceDirectoryStatus } from '#/web/components/repo-workspace/WorkspaceDirectoryStatus.tsx'
-import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
+import { ScrollPane } from '#/web/components/Layout.tsx'
 import { workspaceGitAvailable, workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
+import {
+  workspacePaneTabEntryForItem,
+  workspacePaneTabItems,
+} from '#/web/components/repo-workspace/workspace-pane-tab-items.ts'
 
 export type RepoWorkspacePaneRouteContext =
   { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null } | { kind: 'inactive' }
@@ -319,44 +320,15 @@ function WorkspaceRootPane({
       ? model.selection.materializedTab.sessionId
       : null
   const items = useMemo<WorkspacePaneTabItem[]>(() => {
-    const workspaceTabs = model.tabs.filter(
-      (tab) => tab.kind !== 'static' || tab.type === 'status' || tab.type === 'files',
-    )
-    return workspaceTabs.flatMap<WorkspacePaneTabItem>((tab) => {
-      if (tab.type === 'terminal' && !terminalAvailable) return []
-      if (tab.kind === 'static') {
-        const provider = workspacePaneStaticTabProvider(tab.type as WorkspacePaneStaticTabType)
-        const metadata = { t, branchName: '', statusCount: 0 }
-        return [
-          createStaticWorkspacePaneTabItem({
-            type: tab.type as WorkspacePaneStaticTabType,
-            label: provider.label(metadata),
-            tooltip: provider.tooltip(metadata),
-            closeLabel: provider.closeLabel(metadata),
-            panelId: provider.panelId(workspacePaneId),
-            closable: false,
-          }),
-        ]
-      }
-      const provider = workspacePaneRuntimeTabProvider(tab.runtimeType)
-      if (tab.kind === 'pending') {
-        const label = provider.pendingLabel({
-          t,
-          createPending: model.runtimeTabStateByType[tab.runtimeType].createPending,
-          projectionPhase: model.runtimeTabStateByType[tab.runtimeType].projectionPhase,
-        })
-        return [createPendingWorkspacePaneTabItem({ type: tab.runtimeType, label, tooltip: label })]
-      }
-      const metadata = { t, branchName: '', statusCount: 0, view: tab.view }
-      return [
-        createRuntimeWorkspacePaneTabItem({
-          view: tab.view,
-          label: provider.label(metadata),
-          tooltip: provider.tooltip(metadata),
-          closeLabel: provider.closeLabel(metadata),
-          panelId: provider.panelId(workspacePaneId),
-        }),
-      ]
+    return workspacePaneTabItems({
+      model,
+      workspacePaneId,
+      branchName: null,
+      statusCount: 0,
+      t,
+      staticTabAvailable: (type) => type === 'status' || type === 'files',
+      runtimeTabAvailable: (type) => type !== 'terminal' || terminalAvailable,
+      staticTabsClosable: false,
     })
   }, [model.runtimeTabStateByType, model.tabs, t, terminalAvailable, workspacePaneId])
   const requestedActiveIdentity =
@@ -411,10 +383,7 @@ function WorkspaceRootPane({
     onReorderRejected: clearDragPreview,
   })
   const visualItems = useMemo(
-    () =>
-      orderWorkspacePaneItemsByTabEntries(items, visualTabs, (item) =>
-        isPendingWorkspacePaneTabItem(item) ? null : item.tabEntry,
-      ),
+    () => orderWorkspacePaneItemsByTabEntries(items, visualTabs, (item) => workspacePaneTabEntryForItem(item)),
     [items, visualTabs],
   )
   const handleReorder = useCallback(
@@ -450,21 +419,15 @@ function WorkspaceRootPane({
       />
       {activePanel === 'status' ? (
         <WorkspacePanePanelFrame id={`${workspacePaneId}-status-panel`} label={t('tab.status')}>
-          <ScrollArea className="min-h-0 flex-1 bg-background">
-            <div className="p-4">
-              {overviewReadModel.data ? (
-                <WorkspaceDirectoryStatus overview={overviewReadModel.data} />
-              ) : overviewReadModel.isError ? (
-                <div className="rounded-lg border border-border/60 bg-card p-4 text-sm text-destructive">
-                  {t('dashboard.directory.read-failed')}
-                </div>
-              ) : (
-                <div className="rounded-lg border border-border/60 bg-card p-4 text-sm text-muted-foreground">
-                  {t('dashboard.loading')}
-                </div>
-              )}
-            </div>
-          </ScrollArea>
+          <ScrollPane>
+            {overviewReadModel.data ? (
+              <WorkspaceDirectoryStatus overview={overviewReadModel.data} />
+            ) : overviewReadModel.isError ? (
+              <div className="p-4 text-sm text-destructive">{t('dashboard.directory.read-failed')}</div>
+            ) : (
+              <div className="p-4 text-sm text-muted-foreground">{t('dashboard.loading')}</div>
+            )}
+          </ScrollPane>
         </WorkspacePanePanelFrame>
       ) : activePanel === 'files' ? (
         <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} label={t('tab.files')}>

@@ -9,9 +9,19 @@ import {
 import { createTerminalWithAdmissionForTest } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
+import {
+  selectedWorkspacePaneTerminalBase,
+  workspacePaneRuntimeTabCommandContext,
+} from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
 import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import {
+  captureWorkspacePaneActiveTabIdentity,
+  recordWorkspacePaneTabOpener,
+  workspacePaneTabOpener,
+} from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 
 const terminalBase: TerminalSessionBase & { repoRuntimeId: string } = {
   repoRoot: 'goblin+file:///repo',
@@ -30,6 +40,56 @@ describe('workspace pane runtime tab command actions', () => {
   beforeEach(() => {
     resetWorkspacePaneActionQueueForTest()
     resetReposStore()
+  })
+
+  test('resolves the ordinary workspace root as the same terminal command target', () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: terminalBase.repoRoot,
+      repoRuntimeId: terminalBase.repoRuntimeId,
+      branches: [],
+      currentBranchName: null,
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'workspace-root',
+      repoRoot: repo.id,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: null,
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('files')],
+    })
+    useReposStore
+      .getState()
+      .setWorkspacePaneTabForTarget(
+        { kind: 'workspace-root', repoRoot: repo.id, branchName: null, worktreePath: null },
+        'files',
+      )
+
+    expect(selectedWorkspacePaneTerminalBase(repo.id, null, undefined)).toEqual({
+      repoRoot: repo.id,
+      repoRuntimeId: repo.repoRuntimeId,
+      branch: '',
+      worktreePath: repo.id,
+      target: {
+        kind: 'workspace-root',
+        workspaceId: canonicalWorkspaceLocator(repo.id),
+        workspaceRuntimeId: repo.repoRuntimeId,
+      },
+    })
+    expect(
+      captureWorkspacePaneActiveTabIdentity(repo.id, repo.repoRuntimeId, null, { workspacePaneRoute: undefined }),
+    ).toBe('workspace-pane:files')
+    expect(
+      recordWorkspacePaneTabOpener(
+        repo.id,
+        repo.repoRuntimeId,
+        null,
+        'terminal:term-111111111111111111111',
+        'workspace-pane:files',
+      ),
+    ).toBe('recorded')
+    expect(workspacePaneTabOpener(repo.id, repo.repoRuntimeId, null, 'terminal:term-111111111111111111111')).toBe(
+      'workspace-pane:files',
+    )
   })
 
   test('routes a committed create with its canonical admission branch', async () => {

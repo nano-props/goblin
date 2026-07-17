@@ -164,7 +164,7 @@ function recordCreatedTerminalWorkspacePaneRuntimeTabOpener(
   recordWorkspacePaneTabOpener(
     options.base.repoRoot,
     repoRuntimeId,
-    options.base.branch,
+    options.base.target?.kind === 'workspace-root' ? null : options.base.branch,
     terminalWorkspacePaneTabProvider.identity(options.admission.terminalSessionId),
     options.openerIdentity,
   )

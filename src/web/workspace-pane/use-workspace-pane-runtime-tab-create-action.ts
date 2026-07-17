@@ -54,11 +54,9 @@ export function useWorkspacePaneRuntimeTabCreateAction({
   }, [branchName, repoRuntimeId, repoRoot, worktreePath])
   const captureOpenerIdentity = useCallback(
     () =>
-      branchName
-        ? captureWorkspacePaneActiveTabIdentity(repoRoot, repoRuntimeId, branchName, {
-            workspacePaneRoute,
-          })
-        : null,
+      captureWorkspacePaneActiveTabIdentity(repoRoot, repoRuntimeId, branchName, {
+        workspacePaneRoute,
+      }),
     [branchName, repoRoot, repoRuntimeId, workspacePaneRoute],
   )
 

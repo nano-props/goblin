@@ -1,18 +1,11 @@
 import { useCallback, useMemo } from 'react'
 import { useT } from '#/web/stores/i18n.ts'
 import {
-  createPendingWorkspacePaneTabItem,
-  createRuntimeWorkspacePaneTabItem,
-  createStaticWorkspacePaneTabItem,
   isPendingWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
-import type {
-  WorkspacePaneRuntimeTabType,
-  WorkspacePaneStaticTabType,
-  WorkspacePaneTabEntry,
-} from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import type { RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
@@ -20,7 +13,6 @@ import { useIsInitialTerminalProjectionHydrating } from '#/web/stores/terminal-p
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
 import {
   WorkspaceToolbar,
@@ -37,6 +29,10 @@ import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import { useWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-action-context.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import {
+  workspacePaneTabEntryForItem,
+  workspacePaneTabItems as buildWorkspacePaneTabItems,
+} from '#/web/components/repo-workspace/workspace-pane-tab-items.ts'
 
 interface Props {
   repo: RepoWorkspaceRepo
@@ -176,48 +172,12 @@ export function RepoWorkspaceToolbar({
 
   const canonicalWorkspacePaneTabItems = useMemo<WorkspacePaneTabItem[]>(
     () =>
-      workspacePaneTabModel.tabs.map((tab) => {
-        if (tab.kind === 'static') {
-          const metadata = { t, branchName: branchName ?? '', statusCount: detail.statusCount }
-          const type = tab.type as WorkspacePaneStaticTabType
-          const provider = workspacePaneStaticTabProvider(type)
-          return createStaticWorkspacePaneTabItem({
-            type,
-            label: provider.label(metadata),
-            tooltip: provider.tooltip(metadata),
-            closeLabel: provider.closeLabel(metadata),
-            panelId: provider.panelId(workspacePaneId),
-          })
-        }
-        if (tab.kind === 'pending') {
-          const provider = workspacePaneRuntimeTabProvider(tab.runtimeType)
-          const runtimeState = workspacePaneTabModel.runtimeTabStateByType[tab.runtimeType]
-          const label = provider.pendingLabel({
-            t,
-            createPending: runtimeState.createPending,
-            projectionPhase: runtimeState.projectionPhase,
-          })
-          return createPendingWorkspacePaneTabItem({
-            type: tab.type,
-            label,
-            tooltip: label,
-            panelId: provider.panelId(workspacePaneId),
-          })
-        }
-        const provider = workspacePaneRuntimeTabProvider(tab.runtimeType)
-        const metadata = {
-          t,
-          branchName: branchName ?? '',
-          statusCount: detail.statusCount,
-          view: tab.view,
-        }
-        return createRuntimeWorkspacePaneTabItem({
-          view: tab.view,
-          label: provider.label(metadata),
-          tooltip: provider.tooltip(metadata),
-          closeLabel: provider.closeLabel(metadata),
-          panelId: provider.panelId(workspacePaneId),
-        })
+      buildWorkspacePaneTabItems({
+        model: workspacePaneTabModel,
+        workspacePaneId,
+        branchName,
+        statusCount: detail.statusCount,
+        t,
       }),
     [
       branchName,
@@ -298,10 +258,6 @@ export function RepoWorkspaceToolbar({
       onReorder={handleReorderWorkspacePaneTabStrip}
     />
   ) : null
-}
-
-function workspacePaneTabEntryForItem(item: WorkspacePaneTabItem): WorkspacePaneTabEntry | null {
-  return isPendingWorkspacePaneTabItem(item) ? null : item.tabEntry
 }
 
 function activePendingTabIdentity(model: RepoWorkspaceTabModel): string | null {

@@ -8,14 +8,20 @@ import type { WorkspacePaneTabControllerCommitNavigation } from '#/web/workspace
 import {
   commitWorkspacePaneCommittedRuntimeTargetRoute,
   commitWorkspacePaneCurrentTargetRoute,
+  selectWorkspacePaneControllerTab,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
-import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import {
+  runWorkspacePaneAction,
+  type WorkspacePaneActionTarget,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
   workspacePaneTabTargetForBranch,
   workspacePaneTabTargetForCreatedRuntime,
+  workspacePaneTabTargetForWorkspace,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
 import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
+import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 
 export interface WorkspacePaneRuntimeTabCommandContext {
   terminal?: {
@@ -36,11 +42,6 @@ export interface WorkspacePaneTerminalRuntimeCommandOptions {
   t?: TerminalCreateTranslator
 }
 
-type ResolvedWorkspacePaneTerminalRuntimeCommandOptions = WorkspacePaneTerminalRuntimeCommandOptions & {
-  repoId: string
-  branchName: string
-}
-
 interface WorkspacePaneRuntimeTabCommandActions {
   primary: (context: WorkspacePaneRuntimeTabCommandContext) => Promise<boolean>
   createNew: (context: WorkspacePaneRuntimeTabCommandContext) => Promise<boolean>
@@ -59,7 +60,7 @@ const WORKSPACE_PANE_RUNTIME_TAB_COMMAND_ACTIONS_BY_TYPE: Record<
 export async function dispatchTerminalRuntimePrimaryAction(
   options: WorkspacePaneTerminalRuntimeCommandOptions,
 ): Promise<boolean> {
-  if (!options.repoId || !options.branchName) return false
+  if (!options.repoId) return false
   return await terminalRuntimePrimaryAction(options)
 }
 
@@ -70,7 +71,7 @@ async function terminalRuntimePrimaryAction({
   navigation,
   t,
 }: WorkspacePaneTerminalRuntimeCommandOptions): Promise<boolean> {
-  if (!repoId || !branchName) return false
+  if (!repoId) return false
   return await runWorkspacePaneRuntimePrimaryAction(
     'terminal',
     workspacePaneRuntimeTabCommandContext({
@@ -84,6 +85,7 @@ async function terminalRuntimePrimaryAction({
           type,
           sessionId,
           repoId,
+          branchName,
           canonicalBranch,
           worktreePath,
           workspacePaneRoute,
@@ -98,8 +100,8 @@ export async function dispatchNewTerminalRuntimeTabAction(
   options: WorkspacePaneTerminalRuntimeCommandOptions,
 ): Promise<boolean> {
   const { repoId, branchName } = options
-  if (!repoId || !branchName) return false
-  const context = newTerminalRuntimeTabActionContext({ ...options, repoId, branchName })
+  if (!repoId) return false
+  const context = newTerminalRuntimeTabActionContext({ ...options, repoId })
   return await runWorkspacePaneRuntimeNewAction('terminal', context)
 }
 
@@ -109,7 +111,7 @@ function newTerminalRuntimeTabActionContext({
   workspacePaneRoute,
   navigation,
   t,
-}: ResolvedWorkspacePaneTerminalRuntimeCommandOptions): WorkspacePaneRuntimeTabCommandContext {
+}: WorkspacePaneTerminalRuntimeCommandOptions & { repoId: string }): WorkspacePaneRuntimeTabCommandContext {
   return workspacePaneRuntimeTabCommandContext({
     repoId,
     branchName,
@@ -121,6 +123,7 @@ function newTerminalRuntimeTabActionContext({
         type,
         sessionId,
         repoId,
+        branchName,
         canonicalBranch,
         worktreePath,
         workspacePaneRoute,
@@ -148,13 +151,21 @@ function showTerminalRuntimeTab(
   type: WorkspacePaneRuntimeTabType,
   sessionId: string,
   repoId: string,
-  branchName: string,
+  branchName: string | null,
   workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined,
   navigation: WorkspacePaneTabControllerCommitNavigation,
 ): boolean | Promise<boolean> {
   if (type !== 'terminal') return false
-  const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
+  const target = branchName
+    ? workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
+    : workspacePaneTabTargetForWorkspace(repoId, { workspacePaneRoute })
   if (!target) return false
+  if (branchName === null) {
+    const tab = target.tabs.find(
+      (candidate) => candidate.identity === terminalWorkspacePaneTabProvider.identity(sessionId),
+    )
+    return tab ? selectWorkspacePaneControllerTab(target, tab, navigation) : false
+  }
   return commitWorkspacePaneCurrentTargetRoute(target, { kind: 'terminal', terminalSessionId: sessionId }, navigation)
 }
 
@@ -162,14 +173,23 @@ function showCreatedTerminalRuntimeTab(
   type: WorkspacePaneRuntimeTabType,
   sessionId: string,
   repoId: string,
+  sourceBranchName: string | null,
   canonicalBranch: string,
   worktreePath: string,
   workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined,
   navigation: WorkspacePaneTabControllerCommitNavigation,
 ): boolean | Promise<boolean> {
   if (type !== 'terminal') return false
-  const target = workspacePaneTabTargetForCreatedRuntime(repoId, canonicalBranch, worktreePath, { workspacePaneRoute })
+  const target = sourceBranchName
+    ? workspacePaneTabTargetForCreatedRuntime(repoId, canonicalBranch, worktreePath, { workspacePaneRoute })
+    : workspacePaneTabTargetForWorkspace(repoId, { workspacePaneRoute })
   if (!target) return false
+  if (sourceBranchName === null) {
+    const tab = target.tabs.find(
+      (candidate) => candidate.identity === terminalWorkspacePaneTabProvider.identity(sessionId),
+    )
+    return tab ? selectWorkspacePaneControllerTab(target, tab, navigation) : false
+  }
   return commitWorkspacePaneCommittedRuntimeTargetRoute(
     target,
     { kind: 'terminal', terminalSessionId: sessionId },
@@ -221,14 +241,12 @@ async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandConte
   return result.ok
 }
 
-function terminalCoordinatorTarget(base: TerminalSessionBase): {
-  repoId: string
-  repoRuntimeId: string
-  branchName: string
-  worktreePath: string
-} | null {
+function terminalCoordinatorTarget(base: TerminalSessionBase): WorkspacePaneActionTarget | null {
   const repoRuntimeId = base.repoRuntimeId
   if (!repoRuntimeId) return null
+  if (base.target?.kind === 'workspace-root') {
+    return { kind: 'workspace-root', repoId: base.repoRoot, repoRuntimeId, branchName: null, worktreePath: null }
+  }
   return {
     repoId: base.repoRoot,
     repoRuntimeId,

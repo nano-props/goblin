@@ -5,7 +5,10 @@ import { readTerminalSessionCommandBridge } from '#/web/components/terminal/term
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { resolveWorkspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  resolveWorkspacePaneTabTargetForBranch,
+  workspacePaneTabTargetForWorkspace,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
@@ -13,7 +16,7 @@ type WorkspacePaneCommandRoute = ParsedRepoBranchWorkspacePaneRoute | null | und
 
 export interface WorkspacePaneRuntimeTabCommandContextInput {
   repoId: string
-  branchName: string
+  branchName: string | null
   workspacePaneRoute: WorkspacePaneCommandRoute
   showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean | Promise<boolean>
   showCreatedRuntimeTab: (
@@ -73,30 +76,53 @@ function assignTerminalRuntimeTabCommandContext(
 
 export function selectedWorkspacePaneTerminalBase(
   repoId: string,
-  branchName: string,
+  branchName: string | null,
   workspacePaneRoute: WorkspacePaneCommandRoute,
 ): TerminalSessionBase | null {
   const repo = useReposStore.getState().repos[repoId]
-  const target = selectedRepoWorkspaceTargetForRuntimeCommand(repoId, branchName, workspacePaneRoute)
-  if (!repo || !target?.worktreePath) return null
-  const runtimeTarget = runtimeWorkspacePaneTarget({ repoRoot: repoId, ...target }, repo.repoRuntimeId)
+  const target = selectedWorkspacePaneTargetForRuntimeCommand(repoId, branchName, workspacePaneRoute)
+  if (!repo || !target) return null
+  const runtimeTarget = runtimeWorkspacePaneTarget(target.paneTarget, repo.repoRuntimeId)
   if (!runtimeTarget) return null
   return {
     repoRoot: repoId,
     repoRuntimeId: repo.repoRuntimeId,
-    branch: target.branchName,
+    branch: target.terminalBranch,
     worktreePath: target.worktreePath,
     target: runtimeTarget,
   }
 }
 
-function selectedRepoWorkspaceTargetForRuntimeCommand(
+function selectedWorkspacePaneTargetForRuntimeCommand(
   repoId: string,
-  branchName: string,
+  branchName: string | null,
   workspacePaneRoute: WorkspacePaneCommandRoute,
-): { branchName: string; worktreePath: string | null } | null {
+): {
+  paneTarget: Parameters<typeof runtimeWorkspacePaneTarget>[0]
+  terminalBranch: string
+  worktreePath: string
+} | null {
+  if (branchName === null) {
+    const target = workspacePaneTabTargetForWorkspace(repoId, { workspacePaneRoute })
+    return target
+      ? {
+          paneTarget: { kind: 'workspace-root', repoRoot: repoId, branchName: null, worktreePath: null },
+          terminalBranch: '',
+          worktreePath: repoId,
+        }
+      : null
+  }
   const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
   if (resolution.kind !== 'ready') return null
   if (!resolution.target.branchName) return null
-  return { branchName: resolution.target.branchName, worktreePath: resolution.target.worktreePath }
+  if (!resolution.target.worktreePath) return null
+  return {
+    paneTarget: {
+      repoRoot: repoId,
+      branchName: resolution.target.branchName,
+      worktreePath: resolution.target.worktreePath,
+    },
+    terminalBranch: resolution.target.branchName,
+    worktreePath: resolution.target.worktreePath,
+  }
 }

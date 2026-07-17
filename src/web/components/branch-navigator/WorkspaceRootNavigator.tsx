@@ -3,9 +3,6 @@ import { FileText, FolderTree } from 'lucide-react'
 import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
 import {
   BRANCH_ROW_ACTION_BOX_CLASS,
-  BRANCH_ROW_ACTION_SLOT_CLASS,
-  BRANCH_ROW_CONTENT_CLASS,
-  BRANCH_ROW_GRID_CLASS,
   BRANCH_ROW_LIST_CLASS,
 } from '#/web/components/branch-navigator/branch-row-metrics.ts'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
@@ -13,6 +10,7 @@ import { cn } from '#/web/lib/cn.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
+import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx'
 
 interface WorkspaceRootNavigatorProps {
   repoId: string
@@ -42,23 +40,21 @@ export function WorkspaceRootNavigator({
   return (
     <ScrollArea className="h-full min-h-0 flex-1" data-testid="workspace-root-navigator">
       <ul className={BRANCH_ROW_LIST_CLASS}>
-        <li
+        <NavigatorRow
           data-testid="workspace-root-row"
+          selected={selected}
           onClick={onSelect}
           onDoubleClick={onOpenStatus}
-          className={cn(
-            BRANCH_ROW_GRID_CLASS,
-            'group relative cursor-pointer transition-colors duration-100',
-            selected ? 'bg-selected text-selected-foreground hover:bg-selected' : 'hover:bg-muted',
-          )}
-        >
-          <div className={cn(BRANCH_ROW_CONTENT_CLASS, 'pointer-events-none relative z-10 gap-2')}>
-            <FolderTree size={16} className="shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate text-sm" title={name}>
-              {name}
-            </span>
-          </div>
-          <div className={cn(BRANCH_ROW_ACTION_SLOT_CLASS, 'pointer-events-none relative z-20')}>
+          contentClassName="gap-2"
+          content={
+            <>
+              <FolderTree size={16} className="shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate text-sm" title={name}>
+                {name}
+              </span>
+            </>
+          }
+          actions={
             <div className={BRANCH_ROW_ACTION_BOX_CLASS}>
               <div
                 className={cn(
@@ -88,8 +84,8 @@ export function WorkspaceRootNavigator({
                 </ActionPopover>
               </div>
             </div>
-          </div>
-        </li>
+          }
+        />
       </ul>
     </ScrollArea>
   )

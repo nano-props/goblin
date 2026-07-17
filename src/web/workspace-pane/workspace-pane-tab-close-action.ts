@@ -118,7 +118,12 @@ async function closeWorkspacePaneTabAction(options: CloseWorkspacePaneTabActionO
     completeWorkspacePaneTabClose(start.target, start.closingIdentity)
     if (!start.wasActive) return true
     if (!workspacePaneTabControllerTargetIsCurrent(start.target)) return true
-    if (!start.presentationLease) return start.target.branchName === null
+    if (!start.presentationLease) {
+      if (start.target.branchName !== null) return false
+      return start.nextTab
+        ? await selectWorkspacePaneControllerTab(start.target, start.nextTab, options.navigation)
+        : true
+    }
     const presented = await commitWorkspacePaneControllerCloseBackTarget(start.presentationLease, options.navigation)
     return presented || !primaryWindowPresentationIsCurrent(start.presentationLease.presentationToken)
   })
@@ -221,8 +226,8 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
   // Close the original runtime tab, but only drive close-back navigation when
   // the current routed pane is still showing that same tab.
   const openerIdentity =
-    wasActive && closeTarget && tab && gitBranchName !== null
-      ? workspacePaneTabOpener(closeTarget.repoId, closeTarget.repoRuntimeId, gitBranchName, tab.identity)
+    wasActive && closeTarget && tab
+      ? workspacePaneTabOpener(closeTarget.repoId, closeTarget.repoRuntimeId, closeTarget.branchName, tab.identity)
       : null
   const nextTab =
     wasActive && closeTarget && tab
@@ -315,10 +320,9 @@ function beginCloseWorkspacePaneTabAction(
 
   const closingIdentity = tab.identity
   const wasActive = target.activeTab?.identity === closingIdentity
-  const openerIdentity =
-    wasActive && target.branchName
-      ? workspacePaneTabOpener(target.repoId, target.repoRuntimeId, target.branchName, closingIdentity)
-      : null
+  const openerIdentity = wasActive
+    ? workspacePaneTabOpener(target.repoId, target.repoRuntimeId, target.branchName, closingIdentity)
+    : null
   const nextTab = wasActive ? nextRepoWorkspaceTabAfterClose(target.tabs, closingIdentity, openerIdentity) : null
   const presentationLease = wasActive
     ? beginWorkspacePaneCloseActiveTabPresentationLease({
@@ -373,7 +377,6 @@ function openWorkspacePaneRuntimeCloseConfirm(
 }
 
 function completeWorkspacePaneTabClose(target: RepoWorkspaceTabModel, identity: string): void {
-  if (!target.branchName) return
   clearWorkspacePaneTabOpener(target.repoId, target.repoRuntimeId, target.branchName, identity)
 }
 

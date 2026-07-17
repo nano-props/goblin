@@ -31,10 +31,7 @@ import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/R
 import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
 import { workspaceGitAvailable, workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 import { DirectoryOverviewContent } from '#/web/components/repo-pages/DirectoryOverviewContent.tsx'
-
-type DashboardTone = 'default' | 'attention' | 'success'
-
-const DASHBOARD_CARD_CLASS_NAME = 'rounded-lg border border-border/60 bg-card shadow-[var(--shadow-inset-highlight)]'
+import { DASHBOARD_CARD_CLASS_NAME, DashboardMetricCard } from '#/web/components/repo-pages/dashboard-ui.tsx'
 const DASHBOARD_BRANCH_ROW_CLASS_NAME =
   'w-full px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45'
 
@@ -336,27 +333,27 @@ function DashboardStats({ compact, summary }: { compact: boolean; summary: Dashb
     <div
       className={cn('grid gap-2', compact ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4')}
     >
-      <MetricCard
+      <DashboardMetricCard
         icon={GitBranch}
         label={t('dashboard.metric.branches')}
         value={summary.branchCount}
         detail={t('dashboard.metric.branches-detail', { count: summary.worktreeCount })}
       />
-      <MetricCard
+      <DashboardMetricCard
         icon={Workflow}
         label={t('dashboard.metric.worktrees')}
         value={summary.worktreeCount}
         detail={t('dashboard.metric.worktrees-detail', { count: summary.dirtyWorktreeCount })}
         tone={summary.dirtyWorktreeCount > 0 ? 'attention' : 'default'}
       />
-      <MetricCard
+      <DashboardMetricCard
         icon={GitCompareArrows}
         label={t('dashboard.metric.sync')}
         value={`${summary.aheadCount}/${summary.behindCount}`}
         detail={t('dashboard.metric.sync-detail')}
         tone={summary.behindCount > 0 ? 'attention' : 'success'}
       />
-      <MetricCard
+      <DashboardMetricCard
         icon={GitPullRequest}
         label={t('dashboard.metric.prs')}
         value={summary.openPullRequestCount}
@@ -364,41 +361,6 @@ function DashboardStats({ compact, summary }: { compact: boolean; summary: Dashb
       />
     </div>
   )
-}
-
-function MetricCard({
-  icon: Icon,
-  label,
-  value,
-  detail,
-  tone = 'default',
-}: {
-  icon: LucideIcon
-  label: string
-  value: string | number
-  detail: string
-  tone?: DashboardTone
-}) {
-  return (
-    <div className={cn(DASHBOARD_CARD_CLASS_NAME, 'flex min-h-14 items-center gap-2 px-2.5 py-2')}>
-      <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted/45">
-        <Icon size={14} className={metricToneClass(tone)} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-baseline gap-2">
-          <div className="truncate text-xs font-medium text-muted-foreground">{label}</div>
-          <div className="shrink-0 text-lg font-semibold leading-none text-foreground">{value}</div>
-        </div>
-        <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{detail}</div>
-      </div>
-    </div>
-  )
-}
-
-function metricToneClass(tone: DashboardTone) {
-  if (tone === 'attention') return 'text-attention'
-  if (tone === 'success') return 'text-success'
-  return 'text-brand-text'
 }
 
 function DashboardAttention({
