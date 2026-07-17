@@ -619,8 +619,9 @@ function HookHost() {
   useClientEffectIntentRouter({
     navigation,
     currentRepoId,
-    currentBranchName,
-    currentWorkspacePaneRoute,
+    currentWorkspacePaneCommandTarget: currentBranchName
+      ? { kind: 'git-branch', branchName: currentBranchName, workspacePaneRoute: currentWorkspacePaneRoute }
+      : null,
     closeAllOverlays,
     openRepoPathDialog: () => {},
     openCloneRepo: () => {},

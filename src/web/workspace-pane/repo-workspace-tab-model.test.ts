@@ -19,7 +19,7 @@ const WORKTREE_PATH = '/tmp/goblin-repo-workspace-tab-model-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
 describe('repo workspace pane tab model', () => {
-  test('projects a canonical workspace target without requiring a Git branch', () => {
+  test('projects exactly the authoritative workspace tabs without resurrecting a closed tab', () => {
     const repoId = 'goblin+file:///tmp/plain-workspace'
     const model = createRepoWorkspaceTabModel({
       repoId,
@@ -33,7 +33,7 @@ describe('repo workspace pane tab model', () => {
     })
 
     expect(model.worktreePath).toBe(repoId)
-    expect(model.tabs.map((tab) => tab.type)).toEqual(['status', 'files'])
+    expect(model.tabs.map((tab) => tab.type)).toEqual(['files'])
     expect(model.renderedTab).toBe('files')
   })
 
@@ -60,7 +60,6 @@ describe('repo workspace pane tab model', () => {
     })
 
     expect(model.tabs.map((tab) => tab.identity)).toEqual([
-      'workspace-pane:status',
       'workspace-pane:files',
       'terminal:term-111111111111111111111',
       'terminal:term-222222222222222222222',

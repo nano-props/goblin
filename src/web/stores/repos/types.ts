@@ -167,6 +167,7 @@ export interface RestorableWorkspaceState {
 
 export type WorkspaceNavigationHistoryRoute =
   | { kind: 'empty' }
+  | { kind: 'workspace' }
   | { kind: 'dashboard' }
   | { kind: 'newWorktree'; returnTo: string | null }
   | {

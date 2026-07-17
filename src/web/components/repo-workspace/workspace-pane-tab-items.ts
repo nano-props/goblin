@@ -18,7 +18,6 @@ interface WorkspacePaneTabItemsInput {
   t: WorkspacePaneStaticTabMetadataInput['t']
   staticTabAvailable?: (type: WorkspacePaneStaticTabType) => boolean
   runtimeTabAvailable?: (type: WorkspacePaneRuntimeTabType) => boolean
-  staticTabsClosable?: boolean
 }
 
 export function workspacePaneTabItems(input: WorkspacePaneTabItemsInput): WorkspacePaneTabItem[] {
@@ -35,7 +34,6 @@ export function workspacePaneTabItems(input: WorkspacePaneTabItemsInput): Worksp
           tooltip: provider.tooltip(metadata),
           closeLabel: provider.closeLabel(metadata),
           panelId: provider.panelId(input.workspacePaneId),
-          closable: input.staticTabsClosable,
         }),
       ]
     }

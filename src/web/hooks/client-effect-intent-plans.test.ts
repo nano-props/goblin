@@ -66,6 +66,7 @@ describe('client effect intent plans', () => {
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
         currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
 
@@ -81,6 +82,7 @@ describe('client effect intent plans', () => {
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
         currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
 
@@ -96,6 +98,7 @@ describe('client effect intent plans', () => {
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
         currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
 
@@ -111,6 +114,7 @@ describe('client effect intent plans', () => {
         terminalFocused: false,
         currentRepoId: null,
         currentRepo: null,
+        currentWorkspacePaneCommandTarget: null,
       },
     )
 
@@ -126,10 +130,15 @@ describe('client effect intent plans', () => {
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
         currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
 
-    expect(plan).toEqual({ kind: 'new-terminal-tab', repoId: 'goblin+file:///tmp/repo' })
+    expect(plan).toEqual({
+      kind: 'new-terminal-tab',
+      repoId: 'goblin+file:///tmp/repo',
+      target: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
+    })
   })
 
   test('creates a refresh plan from the current repo runtime id', () => {
@@ -141,6 +150,7 @@ describe('client effect intent plans', () => {
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
         currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
 
@@ -160,6 +170,7 @@ describe('client effect intent plans', () => {
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
         currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
 
@@ -175,6 +186,7 @@ describe('client effect intent plans', () => {
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
         currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
 
@@ -190,6 +202,7 @@ describe('client effect intent plans', () => {
         terminalFocused: true,
         currentRepoId: 'goblin+file:///tmp/repo',
         currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
 
@@ -205,6 +218,7 @@ describe('client effect intent plans', () => {
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
         currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
 
@@ -220,6 +234,7 @@ describe('client effect intent plans', () => {
         terminalFocused: false,
         currentRepoId: null,
         currentRepo: null,
+        currentWorkspacePaneCommandTarget: null,
       },
     )
 
@@ -235,6 +250,7 @@ describe('client effect intent plans', () => {
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
         currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
 

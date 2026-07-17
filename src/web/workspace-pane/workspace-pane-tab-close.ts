@@ -26,7 +26,6 @@ export function beginWorkspacePaneTabClose(
     branchName: target.branchName,
     worktreePath: target.worktreePath,
   }
-  if (tab.kind === 'static' && !target.branchName) return { accepted: false, completion: null }
   if (
     isRepoWorkspaceRuntimeTab(tab) &&
     !canCloseWorkspacePaneRuntimeTabWithContext(
@@ -55,22 +54,23 @@ export function beginWorkspacePaneTabClose(
   return {
     accepted: true,
     completion: provider.close({
-      repoId: target.repoId,
-      branchName: target.branchName,
-      closeStaticTab: closeStaticTabWithCommit(target.worktreePath),
+      closeStaticTab: closeStaticTabWithCommit(target),
     }),
   }
 }
 
-function closeStaticTabWithCommit(worktreePath: string | null) {
-  return async (repoId: string, type: WorkspacePaneStaticTabType, branchName: string): Promise<boolean> => {
-    const repo = useReposStore.getState().repos[repoId]
+function closeStaticTabWithCommit(target: RepoWorkspaceTabModel) {
+  return async (type: WorkspacePaneStaticTabType): Promise<boolean> => {
+    const repo = useReposStore.getState().repos[target.repoId]
     if (!repo) return false
+    const persistenceTarget =
+      target.branchName === null
+        ? { kind: 'workspace-root' as const, branchName: null, worktreePath: null }
+        : { branchName: target.branchName, worktreePath: target.worktreePath }
     const result = await updateWorkspacePaneTabs({
-      repoRoot: repoId,
+      repoRoot: target.repoId,
       repoRuntimeId: repo.repoRuntimeId,
-      branchName,
-      worktreePath,
+      ...persistenceTarget,
       operation: { type: 'close-static', tabType: type },
     })
     return result.ok

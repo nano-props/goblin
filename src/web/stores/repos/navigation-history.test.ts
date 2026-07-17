@@ -68,6 +68,17 @@ describe('workspace navigation history', () => {
     expect(history().backStack).toEqual([])
   })
 
+  test('records the workspace root as its own navigable route', () => {
+    const store = useReposStore.getState()
+    const workspace = workspaceEntry()
+    store.recordWorkspaceNavigation(entry('dashboard'))
+    store.recordWorkspaceNavigation(workspace)
+
+    expect(history().current).toEqual(workspace)
+    expect(traverse('back')).toEqual(entry('dashboard'))
+    expect(traverse('forward')).toEqual(workspace)
+  })
+
   test('explicitly replaces the current entry without pushing history', () => {
     const store = useReposStore.getState()
     store.recordWorkspaceNavigation(entry('dashboard'))
@@ -239,6 +250,10 @@ function entry(kind: 'dashboard' | 'newWorktree' | 'branch', branchName?: string
 
 function newWorktreeEntry(returnTo: string | null): WorkspaceNavigationHistoryEntry {
   return { repoId: REPO_ID, route: { kind: 'newWorktree', returnTo } }
+}
+
+function workspaceEntry(): WorkspaceNavigationHistoryEntry {
+  return { repoId: REPO_ID, route: { kind: 'workspace' } }
 }
 
 function branchEntry({

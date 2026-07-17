@@ -214,34 +214,28 @@ describe('workspace pane tab providers', () => {
 
     await expect(
       statusWorkspacePaneTabProvider.close({
-        repoId: '/repo',
-        branchName: 'main',
         closeStaticTab,
       }),
     ).resolves.toBe(true)
 
-    expect(closeStaticTab).toHaveBeenCalledWith('/repo', 'status', 'main')
+    expect(closeStaticTab).toHaveBeenCalledWith('status')
   })
 
-  test('rejects static tab close without a branch owner', async () => {
+  test('closes static tabs without requiring a branch owner', async () => {
     const closeStaticTab = vi.fn()
 
     await expect(
       statusWorkspacePaneTabProvider.close({
-        repoId: '/repo',
-        branchName: null,
         closeStaticTab,
       }),
-    ).resolves.toBe(false)
+    ).resolves.toBe(true)
 
-    expect(closeStaticTab).not.toHaveBeenCalled()
+    expect(closeStaticTab).toHaveBeenCalledWith('status')
   })
 
   test('runtime provider close is delegated to runtime close actions', async () => {
     await expect(
       terminalWorkspacePaneTabProvider.close({
-        repoId: '/repo',
-        branchName: 'main',
         runtimeSessionId: 'term-111111111111111111111',
       }),
     ).resolves.toBe(false)

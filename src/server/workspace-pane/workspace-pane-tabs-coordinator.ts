@@ -1,6 +1,9 @@
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { isWorkspacePaneStaticTabType, workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import {
+  defaultWorkspacePaneTabEntries,
+  isWorkspacePaneStaticTabType,
+  workspacePaneTabsWithRuntimeTab,
+} from '#/shared/workspace-pane.ts'
 import type {
   WorkspacePaneTabsEntry,
   WorkspacePaneTabsSnapshot,
@@ -156,9 +159,8 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
         (candidate) => runtimeTargetKey(candidate.target) === runtimeTargetKey(capturedTarget.target),
       )
       const tabs = workspacePaneTabsWithRuntimeTab(
-        entry?.tabs ?? [
-          workspacePaneStaticTabEntry(capturedTarget.target.kind === 'workspace-root' ? 'files' : 'status'),
-        ],
+        entry?.tabs ??
+          defaultWorkspacePaneTabEntries(capturedTarget.target.kind === 'workspace-root' ? 'workspace-root' : 'git'),
         input.runtimeType,
         input.sessionId,
         { insertAfterIdentity: input.insertAfterIdentity ?? null },

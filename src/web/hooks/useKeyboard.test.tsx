@@ -25,6 +25,7 @@ import {
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
@@ -41,6 +42,7 @@ const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 interface HookHostOptions {
   currentRepoId: string | null
   currentBranchName: string | null
+  currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   isWorkspaceShortcutSuppressed: () => boolean
   isSettingsOpen: () => boolean
   onExitSettings: () => void
@@ -281,7 +283,15 @@ describe('useKeyboard', () => {
       createTerminal,
       selectTerminal: vi.fn(),
     })
-    await renderHookHost({ currentRepoId: REPO_ID, currentBranchName: 'feature/worktree' })
+    await renderHookHost({
+      currentRepoId: REPO_ID,
+      currentBranchName: 'feature/worktree',
+      currentWorkspacePaneCommandTarget: {
+        kind: 'git-branch',
+        branchName: 'feature/worktree',
+        workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+      },
+    })
 
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', ctrlKey: true, bubbles: true }))
@@ -444,6 +454,31 @@ describe('useKeyboard', () => {
     expect(toast.error).not.toHaveBeenCalled()
   })
 
+  test('does not dispatch workspace-pane shortcuts from the dashboard route', async () => {
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
+    seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    const createTerminal = vi.fn(async () => 'term-222222222222222222222')
+    const closeTerminalByDescriptor = vi.fn(async () => true)
+    setTerminalSessionCommandBridge({
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
+      createTerminal,
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor,
+    })
+
+    await renderHookHost({ currentRepoId: REPO_ID, currentWorkspacePaneCommandTarget: null })
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', ctrlKey: true, bubbles: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', ctrlKey: true, bubbles: true }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: '1', code: 'Digit1', ctrlKey: true, bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(createTerminal).not.toHaveBeenCalled()
+    expect(closeTerminalByDescriptor).not.toHaveBeenCalled()
+  })
+
   test('primary modifier plus w closes the selected terminal tab', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     seedRepoWithReadModelForTest({
@@ -465,7 +500,18 @@ describe('useKeyboard', () => {
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
     })
-    await renderHookHost({ currentRepoId: REPO_ID, currentBranchName: 'feature/worktree' })
+    await renderHookHost({
+      currentRepoId: REPO_ID,
+      currentBranchName: 'feature/worktree',
+      currentWorkspacePaneCommandTarget: {
+        kind: 'git-branch',
+        branchName: 'feature/worktree',
+        workspacePaneRoute: {
+          kind: 'terminal',
+          terminalSessionId: 'term-111111111111111111111',
+        },
+      },
+    })
 
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', ctrlKey: true, bubbles: true }))
@@ -528,6 +574,11 @@ function HookHost(overrides: Partial<HookHostOptions>) {
     navigation: overrides.navigation ?? navigationWith(),
     currentRepoId: overrides.currentRepoId ?? null,
     currentBranchName: overrides.currentBranchName ?? null,
+    currentWorkspacePaneCommandTarget:
+      overrides.currentWorkspacePaneCommandTarget ??
+      (overrides.currentBranchName
+        ? { kind: 'git-branch', branchName: overrides.currentBranchName, workspacePaneRoute: null }
+        : null),
     onShowHelp: () => {},
     isWorkspaceShortcutSuppressed: overrides.isWorkspaceShortcutSuppressed ?? (() => false),
     isSettingsOpen: overrides.isSettingsOpen ?? (() => false),

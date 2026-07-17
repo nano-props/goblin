@@ -150,7 +150,9 @@ function deps(currentRepoId: string | null, currentBranchName = 'feature/worktre
   return {
     navigation: navigationWithStoreActions(),
     currentRepoId,
-    currentBranchName,
+    currentWorkspacePaneCommandTarget: currentRepoId
+      ? { kind: 'git-branch' as const, branchName: currentBranchName, workspacePaneRoute: null }
+      : null,
     closeAllOverlays: vi.fn(),
     openRepoPathDialog: vi.fn(),
     openCloneRepo: vi.fn(),

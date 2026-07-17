@@ -82,6 +82,44 @@ test('commits active close-back route through command-owned navigation', async (
   expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'status')
 })
 
+test('closes a workspace-root static tab through the shared tab transaction', async () => {
+  const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+  const target = {
+    kind: 'workspace-root' as const,
+    repoRoot: REPO_ID,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName: null,
+    worktreePath: null,
+  }
+  setWorkspacePaneTabsForTargetQueryData({
+    ...target,
+    tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
+  })
+  useReposStore.getState().setWorkspacePaneTabForTarget(target, 'status')
+  const updateWorkspaceTabs = vi.fn(async () => [workspacePaneStaticTabEntry('files')])
+  installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
+
+  await expect(
+    dispatchCloseWorkspacePaneTabAction({
+      repoId: REPO_ID,
+      branchName: null,
+      workspacePaneRoute: undefined,
+      navigation: navigationWith(),
+    }),
+  ).resolves.toBe(true)
+
+  expect(updateWorkspaceTabs).toHaveBeenCalledWith({
+    workspaceId: REPO_ID,
+    workspaceRuntimeId: repo.repoRuntimeId,
+    target: {
+      kind: 'workspace-root',
+      workspaceId: REPO_ID,
+      workspaceRuntimeId: repo.repoRuntimeId,
+    },
+    operation: { type: 'close-static', tabType: 'status' },
+  })
+})
+
 test('awaits close-back navigation and clears the transition when navigation rejects', async () => {
   seedRepoWithReadModelForTest({
     id: REPO_ID,

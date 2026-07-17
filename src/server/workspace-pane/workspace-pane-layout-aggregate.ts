@@ -1,5 +1,6 @@
 import PQueue from 'p-queue'
 import {
+  defaultWorkspacePaneTabEntries,
   isWorkspacePaneRuntimeTabEntry,
   workspacePaneRuntimeTabEntry,
   workspacePaneStaticTabEntry,
@@ -490,9 +491,8 @@ function canonicalTabsForTarget(
   providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
 ): WorkspacePaneTabEntry[] {
   const durable = layout.entries.find((entry) => durableTargetKey(input, entry.target) === targetProjectionKey(input))
-  const staticTabs = durable?.tabs ?? [
-    workspacePaneStaticTabEntry(input.target.kind === 'workspace-root' ? 'files' : 'status'),
-  ]
+  const staticTabs =
+    durable?.tabs ?? defaultWorkspacePaneTabEntries(input.target.kind === 'workspace-root' ? 'workspace-root' : 'git')
   const liveRuntimeTabs = providers.flatMap((provider) =>
     provider.liveSessions
       .filter((session) => input.nativeWorktreePath !== null && session.worktreePath === input.nativeWorktreePath)

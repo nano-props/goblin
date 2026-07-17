@@ -74,14 +74,8 @@ export interface WorkspacePanePanelLabel {
 }
 
 export interface WorkspacePaneTabCloseInput {
-  repoId: string
-  branchName: string | null
   runtimeSessionId?: string
-  closeStaticTab?: (
-    repoId: string,
-    type: WorkspacePaneStaticTabType,
-    branchName: string,
-  ) => boolean | void | Promise<boolean | void>
+  closeStaticTab?: (type: WorkspacePaneStaticTabType) => boolean | void | Promise<boolean | void>
 }
 
 export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneTabType = WorkspacePaneTabType> {
@@ -149,10 +143,8 @@ export abstract class WorkspacePaneStaticTabProvider<
   }
 
   close(input: WorkspacePaneTabCloseInput): Promise<boolean> {
-    if (!input.branchName || !input.closeStaticTab) return Promise.resolve(false)
-    return Promise.resolve(input.closeStaticTab(input.repoId, this.type, input.branchName)).then(
-      (result) => result !== false,
-    )
+    if (!input.closeStaticTab) return Promise.resolve(false)
+    return Promise.resolve(input.closeStaticTab(this.type)).then((result) => result !== false)
   }
 }
 

@@ -91,7 +91,7 @@ export function workspacePaneTabsForTargetFromQueryData(
   const resolvedTarget = 'kind' in target && target.kind === 'inactive' ? null : target
   if (!resolvedTarget) return []
   const entry = workspacePaneTabsEntryForTarget(data.entries, resolvedTarget)
-  return [...(entry?.tabs ?? defaultWorkspacePaneTabs())]
+  return [...(entry?.tabs ?? defaultWorkspacePaneTabs('kind' in resolvedTarget ? 'workspace-root' : 'git'))]
 }
 
 /**

@@ -328,7 +328,6 @@ function WorkspaceRootPane({
       t,
       staticTabAvailable: (type) => type === 'status' || type === 'files',
       runtimeTabAvailable: (type) => type !== 'terminal' || terminalAvailable,
-      staticTabsClosable: false,
     })
   }, [model.runtimeTabStateByType, model.tabs, t, terminalAvailable, workspacePaneId])
   const requestedActiveIdentity =

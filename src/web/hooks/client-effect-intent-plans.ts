@@ -6,6 +6,7 @@ import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import type { RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
+import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 
 type ClientWorkspaceIntent = Extract<
   ClientEffectIntent,
@@ -51,14 +52,14 @@ export type WorkspaceIntentPlan =
   | { kind: 'open-clone-repo' }
   | { kind: 'open-remote-workspace' }
   | { kind: 'create-worktree' }
-  | { kind: 'new-terminal-tab'; repoId: string }
-  | { kind: 'close-workspace-pane-tab-or-window'; repoId: string | null }
+  | { kind: 'new-terminal-tab'; repoId: string; target: WorkspacePaneCommandTarget }
+  | { kind: 'close-workspace-pane-tab-or-window'; repoId: string; target: WorkspacePaneCommandTarget }
   | { kind: 'close-repo'; repoId: string }
   | { kind: 'close-window' }
   | { kind: 'cycle-repo'; direction: 1 | -1 }
   | { kind: 'refresh-repo'; repoId: string; repoRuntimeId: string }
-  | { kind: 'show-workspace-pane-tab'; repoId: string; tab: WorkspacePaneTabType }
-  | { kind: 'terminal-primary-action'; repoId: string }
+  | { kind: 'show-workspace-pane-tab'; repoId: string; target: WorkspacePaneCommandTarget; tab: WorkspacePaneTabType }
+  | { kind: 'terminal-primary-action'; repoId: string; target: WorkspacePaneCommandTarget }
   | { kind: 'toggle-zen-mode' }
 
 export type ExternalOpenDrainKickPlan = { kind: 'ignore' } | { kind: 'schedule-rerun' } | { kind: 'start-drain' }
@@ -73,6 +74,7 @@ interface WorkspaceIntentPlanContext {
   terminalFocused: boolean
   currentRepoId: string | null
   currentRepo: Pick<RepoState, 'id' | 'repoRuntimeId'> | null
+  currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
 }
 
 export function createTerminalBellIntentPlan(
@@ -125,9 +127,13 @@ export function createWorkspaceIntentPlan(
 ): WorkspaceIntentPlan | null {
   if (!isClientWorkspaceIntent(event)) return null
   if (event.type === 'workspace-pane-close-tab-or-window-requested') {
-    if (!context.currentRepoId) return { kind: 'close-window' }
+    if (!context.currentRepoId || !context.currentWorkspacePaneCommandTarget) return { kind: 'close-window' }
     if (context.overlayBlocked || context.workspaceShortcutSuppressed) return { kind: 'noop' }
-    return { kind: 'close-workspace-pane-tab-or-window', repoId: context.currentRepoId }
+    return {
+      kind: 'close-workspace-pane-tab-or-window',
+      repoId: context.currentRepoId,
+      target: context.currentWorkspacePaneCommandTarget,
+    }
   }
   if (context.overlayBlocked) return { kind: 'noop' }
   switch (event.type) {
@@ -143,8 +149,12 @@ export function createWorkspaceIntentPlan(
     case 'open-remote-workspace-requested':
       return { kind: 'open-remote-workspace' }
     case 'terminal-new-tab-requested':
-      if (!context.currentRepoId) return { kind: 'noop' }
-      return { kind: 'new-terminal-tab', repoId: context.currentRepoId }
+      if (!context.currentRepoId || !context.currentWorkspacePaneCommandTarget) return { kind: 'noop' }
+      return {
+        kind: 'new-terminal-tab',
+        repoId: context.currentRepoId,
+        target: context.currentWorkspacePaneCommandTarget,
+      }
     case 'close-repo-requested':
       if (context.workspaceShortcutSuppressed) return { kind: 'noop' }
       return context.currentRepoId ? { kind: 'close-repo', repoId: context.currentRepoId } : { kind: 'close-window' }
@@ -155,11 +165,22 @@ export function createWorkspaceIntentPlan(
         return { kind: 'noop' }
       return { kind: 'refresh-repo', repoId: context.currentRepo.id, repoRuntimeId: context.currentRepo.repoRuntimeId }
     case 'show-workspace-pane-tab-requested':
-      if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
-      return { kind: 'show-workspace-pane-tab', repoId: context.currentRepoId, tab: event.tab }
+      if (context.workspaceShortcutSuppressed || !context.currentRepoId || !context.currentWorkspacePaneCommandTarget)
+        return { kind: 'noop' }
+      return {
+        kind: 'show-workspace-pane-tab',
+        repoId: context.currentRepoId,
+        target: context.currentWorkspacePaneCommandTarget,
+        tab: event.tab,
+      }
     case 'terminal-primary-action-requested':
-      if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
-      return { kind: 'terminal-primary-action', repoId: context.currentRepoId }
+      if (context.workspaceShortcutSuppressed || !context.currentRepoId || !context.currentWorkspacePaneCommandTarget)
+        return { kind: 'noop' }
+      return {
+        kind: 'terminal-primary-action',
+        repoId: context.currentRepoId,
+        target: context.currentWorkspacePaneCommandTarget,
+      }
     case 'workspace-zen-mode-toggle-requested':
       if (context.workspaceShortcutSuppressed || context.terminalFocused || !context.currentRepoId)
         return { kind: 'noop' }

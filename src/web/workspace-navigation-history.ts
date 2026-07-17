@@ -18,6 +18,7 @@ import {
 
 export type WorkspaceNavigationRouteContext =
   | { kind: 'empty'; repoId: string }
+  | { kind: 'workspace'; repoId: string }
   | { kind: 'dashboard'; repoId: string }
   | { kind: 'newWorktree'; repoId: string; returnTo: string | null }
   | {
@@ -131,7 +132,7 @@ function useWorkspaceNavigationHistoryEntry(
 }
 
 type WorkspaceNavigationHistoryRouteSnapshot =
-  | { repoId: string; kind: 'empty' | 'dashboard' }
+  | { repoId: string; kind: 'empty' | 'workspace' | 'dashboard' }
   | { repoId: string; kind: 'newWorktree'; returnTo: string | null }
   | {
       repoId: string
@@ -152,6 +153,8 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
   switch (routeContext.kind) {
     case 'empty':
       return { repoId, kind: 'empty' }
+    case 'workspace':
+      return { repoId, kind: 'workspace' }
     case 'dashboard':
       return { repoId, kind: 'dashboard' }
     case 'newWorktree':
@@ -183,6 +186,7 @@ function workspaceNavigationHistoryEntryFromSnapshot(
   if (!snapshot) return null
   switch (snapshot.kind) {
     case 'empty':
+    case 'workspace':
     case 'dashboard':
       return { repoId: snapshot.repoId, route: { kind: snapshot.kind } }
     case 'newWorktree':
@@ -227,6 +231,9 @@ export function restoreWorkspaceNavigationEntry(
   switch (entry.route.kind) {
     case 'empty':
       routeNavigation.openRepoRoot(entry.repoId, options)
+      return { kind: 'accepted' }
+    case 'workspace':
+      routeNavigation.openRepoWorkspace(entry.repoId, options)
       return { kind: 'accepted' }
     case 'dashboard':
       routeNavigation.openRepoDashboard(entry.repoId, options)
