@@ -1,6 +1,6 @@
 import type { TerminalCreateInput, TerminalCreateResult } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 
 export const WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS = {
   open: 'workspace-pane-runtime.open',
@@ -28,10 +28,9 @@ export interface TerminalWorkspacePaneRuntimeOpenInput extends WorkspacePaneRunt
 
 export type WorkspacePaneRuntimeOpenInput = TerminalWorkspacePaneRuntimeOpenInput
 
-export interface WorkspacePaneRuntimeCommandTarget extends WorkspacePaneTabsTarget {
-  repoRoot: string
-  repoRuntimeId: string
-  worktreePath: string
+export interface WorkspacePaneRuntimeCommandTarget {
+  target: RuntimeWorkspacePaneTarget
+  nativeWorktreePath: string
 }
 
 export interface WorkspacePaneRuntimeCloseInput {

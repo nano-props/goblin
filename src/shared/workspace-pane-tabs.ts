@@ -3,8 +3,7 @@ import type {
   WorkspacePaneStaticTabType,
   WorkspacePaneTabEntry,
 } from '#/shared/workspace-pane.ts'
-import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { RestorableWorkspacePaneTarget, RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 
 export const WORKSPACE_PANE_TABS_SOCKET_ACTIONS = {
   list: 'workspace-pane-tabs.list',
@@ -66,7 +65,8 @@ export interface WorkspacePaneTabsEntry {
   tabs: WorkspacePaneTabEntry[]
 }
 
-export interface WorkspacePaneDurableLayoutEntry extends WorkspacePaneTabsTarget {
+export interface WorkspacePaneDurableLayoutEntry {
+  target: RestorableWorkspacePaneTarget
   tabs: WorkspacePaneStaticTabEntry[]
 }
 

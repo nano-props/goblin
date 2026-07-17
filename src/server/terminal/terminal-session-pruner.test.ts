@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createTerminalSessionPruner } from '#/server/terminal/terminal-session-pruner.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 vi.mock('#/system/git/worktrees.ts', () => ({
   getWorktrees: vi.fn(async () => [
@@ -29,7 +30,10 @@ describe('terminal session pruner', () => {
     const sessions = [
       terminalSession('term-livelivelivelivelive1', { repoRoot: REPO_ROOT, worktreePath: LIVE_WORKTREE_PATH }),
       terminalSession('term-stalestalestalestale1', { repoRoot: REPO_ROOT, worktreePath: STALE_WORKTREE_PATH }),
-      terminalSession('term-otherrepootherrepo001', { repoRoot: '/other-repo', worktreePath: '/other-repo/worktree' }),
+      terminalSession('term-otherrepootherrepo001', {
+        repoRoot: 'goblin+file:///other-repo',
+        worktreePath: '/other-repo/worktree',
+      }),
     ]
     const closeSession = vi.fn(async (terminalRuntimeSessionId: string) => {
       const index = sessions.findIndex((session) => session.terminalRuntimeSessionId === terminalRuntimeSessionId)
@@ -115,15 +119,24 @@ function terminalSession(
   terminalSessionId: string,
   overrides: Partial<Pick<TerminalSessionSummary, 'repoRoot' | 'worktreePath'>> = {},
 ): TerminalSessionSummary {
+  const repoRoot = overrides.repoRoot ?? REPO_ROOT
+  const worktreePath = overrides.worktreePath ?? LIVE_WORKTREE_PATH
+  const workspaceId = requiredWorkspaceLocator(repoRoot)
+  const root = requiredWorkspaceLocator(
+    repoRoot.startsWith('goblin+ssh://')
+      ? `${repoRoot.slice(0, repoRoot.indexOf('/', 'goblin+ssh://'.length))}${worktreePath}`
+      : `goblin+file://${worktreePath}`,
+  )
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalRuntimeGeneration: 1,
     terminalSessionId,
     repoRuntimeId: 'repo-runtime-test',
-    repoRoot: overrides.repoRoot ?? REPO_ROOT,
+    target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId: 'repo-runtime-test', root },
+    repoRoot,
     branch: 'feature/worktree',
-    worktreePath: overrides.worktreePath ?? LIVE_WORKTREE_PATH,
-    cwd: overrides.worktreePath ?? LIVE_WORKTREE_PATH,
+    worktreePath,
+    cwd: worktreePath,
     controller: null,
     processName: 'zsh',
     canonicalTitle: null,
@@ -132,4 +145,10 @@ function terminalSession(
     cols: 80,
     rows: 24,
   }
+}
+
+function requiredWorkspaceLocator(input: string) {
+  const locator = canonicalWorkspaceLocator(input)
+  if (!locator) throw new Error('invalid workspace locator fixture')
+  return locator
 }

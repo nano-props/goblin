@@ -39,12 +39,18 @@ vi.mock('#/server/terminal/terminal-runtime.ts', () => ({
 
 function makeWorkspacePaneTabsHost(): ServerWorkspacePaneTabsHost {
   return {
-    restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
+    restoreTabs: vi.fn(async () => ({
+      kind: 'restored' as const,
+      snapshot: { revision: 0, entries: [] },
+      repaired: false,
+    })),
     listWorkspaceTabs: vi.fn(),
     replaceTabs: vi.fn(),
     updateTabs: vi.fn(),
   }
 }
+
+const workspaceCapabilityTransitionHost = { removeGitScopedResources: vi.fn() }
 
 describe('server runtime', () => {
   beforeEach(() => {
@@ -66,6 +72,7 @@ describe('server runtime', () => {
       appRealtimeHost,
       workspacePaneTabsHost,
       worktreeRemovalApplication,
+      workspaceCapabilityTransitionHost,
     })
 
     expect(runtime.appRealtimeHost).toBe(appRealtimeHost)
@@ -78,6 +85,7 @@ describe('server runtime', () => {
       appRealtimeHost,
       workspacePaneTabsHost,
       worktreeRemovalApplication,
+      workspaceCapabilityTransitionHost,
     })
   })
 
@@ -152,6 +160,7 @@ describe('server runtime', () => {
       appRealtimeHost,
       workspacePaneTabsHost,
       worktreeRemovalApplication,
+      workspaceCapabilityTransitionHost,
     })
 
     runtime.shutdown()

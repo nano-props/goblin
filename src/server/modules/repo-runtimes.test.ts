@@ -203,7 +203,7 @@ describe('repo runtimes', () => {
     expect(listRepoRuntimes(USER_ID)[0]?.workspaceProbe).toEqual(available)
   })
 
-  test('keeps a reopened runtime behind the closing epoch lifecycle turn', async () => {
+  test('keeps close and reopen in the same epoch while lifecycle cleanup is active', async () => {
     const runtimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
     const available = {
       status: 'ready' as const,
@@ -248,9 +248,10 @@ describe('repo runtimes', () => {
     expect(workspaceRuntimeHasGitCapability(USER_ID, REPO_ROOT, runtimeId)).toBe(false)
     expect(releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({
       released: true,
-      runtimeClosed: true,
+      runtimeClosed: false,
     })
     const reopened = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    expect(reopened).toBe(runtimeId)
     const nextProbe = vi.fn(async () => available)
     const newRefresh = runSerializedWorkspaceRefresh({
       userId: USER_ID,
@@ -261,8 +262,64 @@ describe('repo runtimes', () => {
     await Promise.resolve()
     expect(nextProbe).not.toHaveBeenCalled()
     releaseCleanup()
-    await expect(oldRefresh).resolves.toEqual({ kind: 'stale-runtime' })
+    await expect(oldRefresh).resolves.toMatchObject({ kind: 'committed' })
     await expect(newRefresh).resolves.toMatchObject({ kind: 'committed' })
+  })
+
+  test('closes an empty epoch only after its active lifecycle cleanup finishes', async () => {
+    const runtimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    const closed = vi.fn()
+    const unsubscribe = onRepoRuntimeClosed(closed)
+    let releaseCleanup!: () => void
+    const cleanupGate = new Promise<void>((resolve) => {
+      releaseCleanup = resolve
+    })
+    const refresh = runSerializedWorkspaceRefresh({
+      userId: USER_ID,
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: runtimeId,
+      probe: async () => ({
+        status: 'ready',
+        name: 'repo',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'unavailable' },
+        },
+        diagnostics: [],
+      }),
+      beforeCommit: async () => await cleanupGate,
+    })
+    await vi.waitFor(() => expect(listRepoRuntimes(USER_ID)[0]?.workspaceProbe).toEqual({ status: 'probing' }))
+
+    expect(releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({
+      released: true,
+      runtimeClosed: false,
+    })
+    expect(closed).not.toHaveBeenCalled()
+    releaseCleanup()
+    await expect(refresh).resolves.toMatchObject({ kind: 'committed' })
+    expect(closed).toHaveBeenCalledWith({ userId: USER_ID, repoRoot: REPO_ROOT, repoRuntimeId: runtimeId })
+    expect(isCurrentRepoRuntime(USER_ID, REPO_ROOT, runtimeId)).toBe(false)
+    unsubscribe()
+  })
+
+  test('test reset fast-fails while a lifecycle operation is active', async () => {
+    const runtimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    const gate = Promise.withResolvers<void>()
+    const refresh = runSerializedWorkspaceRefresh({
+      userId: USER_ID,
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: runtimeId,
+      probe: async () => {
+        await gate.promise
+        return { status: 'unavailable', reason: 'error.workspace-transport-unavailable' }
+      },
+    })
+
+    expect(() => clearRepoRuntimesForUser(USER_ID)).toThrow('active workspace lifecycle operations')
+    gate.resolve()
+    await refresh
   })
 
   test('makes repeated acquire and release idempotent per client', () => {

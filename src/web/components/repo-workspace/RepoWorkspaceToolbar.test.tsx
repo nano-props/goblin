@@ -638,6 +638,13 @@ describe('RepoWorkspaceToolbar', () => {
 
       repoRuntimeId: repoRuntimeIdForTest(),
 
+      target: {
+        kind: 'git-worktree',
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: repoRuntimeIdForTest(),
+        root: 'goblin+file:///tmp/goblin-repo-workspace-toolbar-worktree',
+      },
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
@@ -1115,6 +1122,13 @@ describe('RepoWorkspaceToolbar', () => {
       repoRoot: REPO_ID,
 
       repoRuntimeId: repoRuntimeIdForTest(),
+
+      target: {
+        kind: 'git-worktree',
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: repoRuntimeIdForTest(),
+        root: 'goblin+file:///tmp/goblin-repo-workspace-toolbar-worktree',
+      },
 
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,

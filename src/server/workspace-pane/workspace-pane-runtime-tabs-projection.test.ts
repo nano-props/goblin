@@ -1,196 +1,67 @@
 // @vitest-environment node
 
 import { describe, expect, test } from 'vitest'
-import {
-  projectCanonicalWorkspacePaneTabs,
-  projectWorkspaceRuntimeTabsForWorktree,
-  workspaceTabsWithoutStaleRuntimeEntries,
-} from '#/server/workspace-pane/workspace-pane-runtime-tabs-projection.ts'
-import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
+import { workspaceRuntimeTabWorktreePaths } from '#/server/workspace-pane/workspace-pane-runtime-tabs-projection.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-const WORKTREE_PATH = '/repo/worktree'
-const BRANCH_NAME = 'feature/worktree'
+const WORKSPACE_ID = canonicalWorkspaceLocator('goblin+file:///repo')!
+const WORKTREE_ROOT = canonicalWorkspaceLocator('goblin+file:///repo/worktree')!
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 
 describe('workspace pane runtime tabs projection', () => {
-  test('synthesizes status only for a provider-only target, not an explicit empty target', () => {
-    const providerSnapshots = [{
-      type: 'terminal' as const,
-      revision: 1,
-      liveSessions: [{ sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH }],
-    }]
-
-    expect(projectCanonicalWorkspacePaneTabs({ entries: [], providerSnapshots })).toEqual([{
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')],
-    }])
-    expect(projectCanonicalWorkspacePaneTabs({
-      entries: [{ branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH, tabs: [] }],
-      providerSnapshots,
-    })).toEqual([{
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')],
-    }])
-  })
-
-  test('preserves mixed gaps while dropping a missing runtime session', () => {
-    const first = workspacePaneRuntimeTabEntry('terminal', 'term-firstfirstfirstfirstfi1')
-    const missing = workspacePaneRuntimeTabEntry('terminal', 'term-missingmissingmissing1')
-    const last = workspacePaneRuntimeTabEntry('terminal', 'term-lastlastlastlastlast1')
-
-    expect(projectCanonicalWorkspacePaneTabs({
-      entries: [{
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        tabs: [first, workspacePaneStaticTabEntry('status'), missing, workspacePaneStaticTabEntry('history'), last],
-      }],
-      providerSnapshots: [{
-        type: 'terminal',
-        revision: 2,
-        liveSessions: [
-          { sessionId: 'term-firstfirstfirstfirstfi1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
-          { sessionId: 'term-lastlastlastlastlast1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
-        ],
-      }],
-    })).toEqual([{
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      tabs: [first, workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history'), last],
-    }])
-  })
-
-  test('projects a full scope without mutating layout input', () => {
-    const entries = [{
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      tabs: [workspacePaneStaticTabEntry('status')],
-    }]
-    expect(projectCanonicalWorkspacePaneTabs({
-      entries,
-      providerSnapshots: [{
-        type: 'terminal',
-        revision: 0,
-        liveSessions: [{ sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH }],
-      }],
-    })).toEqual([{
-      ...entries[0],
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')],
-    }])
-    expect(entries[0]!.tabs).toEqual([workspacePaneStaticTabEntry('status')])
-  })
-  test('prunes stale runtime tabs and materializes missing live runtime tabs', () => {
+  test('collects native worktree execution paths without reconstructing target identity', () => {
     expect(
-      projectWorkspaceRuntimeTabsForWorktree({
-        runtimeType: 'terminal',
-        worktreePath: WORKTREE_PATH,
+      workspaceRuntimeTabWorktreePaths({
         entries: [
           {
-            branchName: BRANCH_NAME,
-            worktreePath: WORKTREE_PATH,
-            tabs: [
-              workspacePaneStaticTabEntry('status'),
-              workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
-              workspacePaneStaticTabEntry('history'),
-              workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+            target: {
+              kind: 'git-worktree',
+              workspaceId: WORKSPACE_ID,
+              workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+              root: WORKTREE_ROOT,
+            },
+            tabs: [],
+          },
+        ],
+        providerSnapshots: [
+          {
+            type: 'terminal',
+            revision: 1,
+            liveSessions: [
+              {
+                sessionId: 'term-livelivelivelivelive1',
+                target: {
+                  kind: 'git-worktree',
+                  workspaceId: WORKSPACE_ID,
+                  workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+                  root: canonicalWorkspaceLocator('goblin+file:///repo/other')!,
+                },
+                branch: 'feature/other',
+                worktreePath: '/repo/other',
+              },
             ],
           },
         ],
-        liveSessions: [
-          { sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME },
-          { sessionId: 'term-missingmissingmissing', branch: BRANCH_NAME },
-        ],
       }),
-    ).toEqual([
-      {
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        tabs: [
-          workspacePaneStaticTabEntry('status'),
-          workspacePaneStaticTabEntry('history'),
-          workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
-          workspacePaneRuntimeTabEntry('terminal', 'term-missingmissingmissing'),
-        ],
-      },
-    ])
+    ).toEqual(['/repo/worktree', '/repo/other'])
   })
 
-  test('uses the existing worktree entry branch when materializing sessions', () => {
-    expect(
-      projectWorkspaceRuntimeTabsForWorktree({
-        runtimeType: 'terminal',
-        worktreePath: WORKTREE_PATH,
+  test('fast-fails a worktree target from a different transport', () => {
+    expect(() =>
+      workspaceRuntimeTabWorktreePaths({
         entries: [
           {
-            branchName: BRANCH_NAME,
-            worktreePath: WORKTREE_PATH,
-            tabs: [workspacePaneStaticTabEntry('status')],
+            target: {
+              kind: 'git-worktree',
+              workspaceId: WORKSPACE_ID,
+              workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+              root: canonicalWorkspaceLocator('goblin+ssh://server/repo/worktree')!,
+            },
+            tabs: [],
           },
         ],
-        liveSessions: [{ sessionId: 'term-livelivelivelivelive1', branch: 'feature/from-session' }],
+        providerSnapshots: [],
       }),
-    ).toEqual([
-      {
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')],
-      },
-    ])
-  })
-
-  test('uses live runtime sessions to materialize a discovered worktree', () => {
-    expect(
-      projectWorkspaceRuntimeTabsForWorktree({
-        runtimeType: 'terminal',
-        worktreePath: WORKTREE_PATH,
-        entries: [],
-        liveSessions: [{ sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME }],
-      }),
-    ).toEqual([
-      {
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')],
-      },
-    ])
-  })
-
-  test('does not materialize runtime tabs when no live sessions exist', () => {
-    expect(
-      projectWorkspaceRuntimeTabsForWorktree({
-        runtimeType: 'terminal',
-        worktreePath: WORKTREE_PATH,
-        entries: [
-          {
-            branchName: BRANCH_NAME,
-            worktreePath: WORKTREE_PATH,
-            tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1')],
-          },
-        ],
-        liveSessions: [],
-      }),
-    ).toEqual([
-      {
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('status')],
-      },
-    ])
-  })
-
-  test('deduplicates repeated tab entries while pruning stale runtime entries', () => {
-    expect(
-      workspaceTabsWithoutStaleRuntimeEntries(
-        [
-          workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
-          workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
-          workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
-          workspacePaneStaticTabEntry('status'),
-          workspacePaneStaticTabEntry('status'),
-        ],
-        'terminal',
-        ['term-livelivelivelivelive1'],
-      ),
-    ).toEqual([workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'), workspacePaneStaticTabEntry('status')])
+    ).toThrow('error.workspace-tabs-target-invalid')
   })
 })

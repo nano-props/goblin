@@ -173,7 +173,7 @@ export interface WorkspaceRestoreResult {
 }
 
 export interface RepoWorkspaceTabsRestoreResult {
-  repo: ProjectedRestoredWorkspaceRepoRuntime
+  repo: RestoredWorkspaceRepoRuntime
   snapshot: WorkspacePaneTabsSnapshot | null
 }
 

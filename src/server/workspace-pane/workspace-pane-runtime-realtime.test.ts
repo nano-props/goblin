@@ -5,12 +5,18 @@ import {
 } from '#/server/workspace-pane/workspace-pane-runtime-realtime.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
 import { WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS } from '#/shared/workspace-pane-runtime.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+
+const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')
+const worktreeRoot = canonicalWorkspaceLocator('goblin+file:///repo/worktree')
+if (!workspaceId || !worktreeRoot) throw new Error('invalid workspace locator fixture')
 
 const input = {
   runtimeType: 'terminal' as const,
   request: {
     repoRoot: '/repo',
     repoRuntimeId: 'repo-runtime-test',
+    target: { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: 'repo-runtime-test', root: worktreeRoot },
     branch: 'main',
     worktreePath: '/repo/worktree',
     kind: 'primary' as const,

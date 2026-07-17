@@ -40,7 +40,7 @@ export interface ServerAppOptions {
   appRealtimeHost: ServerAppRealtimeHost
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   worktreeRemovalApplication: ServerWorktreeRemovalHost
-  workspaceCapabilityTransitionHost?: WorkspaceCapabilityTransitionHost
+  workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
   /**
    * The actual host the server is listening on. Used by the CORS
    * origin predicate to allow same-machine browsers. Defaults to

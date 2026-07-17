@@ -1,5 +1,5 @@
 import { isValidRepoLocator } from '#/shared/input-validation.ts'
-import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import { restorableWorkspacePaneTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import type {
   WorkspacePaneTabsListInput,
   WorkspacePaneTabsReplaceInput,
@@ -67,9 +67,9 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
 function validInputTarget(input: WorkspacePaneTabsReplaceInput | WorkspacePaneTabsUpdateInput): boolean {
   return Boolean(
     isValidRepoLocator(input?.workspaceId) &&
-      input.target.workspaceId === input.workspaceId &&
-      input.target.workspaceRuntimeId === input.workspaceRuntimeId &&
-      workspacePaneTabsTargetFromRuntime(input.target),
+    input.target.workspaceId === input.workspaceId &&
+    input.target.workspaceRuntimeId === input.workspaceRuntimeId &&
+    restorableWorkspacePaneTargetFromRuntime(input.target),
   )
 }
 

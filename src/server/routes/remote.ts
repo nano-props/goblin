@@ -10,11 +10,9 @@ import { userIdFromContext } from '#/server/common/identity.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
 import { isCurrentRepoRuntime } from '#/server/modules/repo-runtimes.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
-import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
+import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
 
-export function createRemoteRoutes(
-  options: { workspaceCapabilityTransitionHost?: WorkspaceCapabilityTransitionHost } = {},
-) {
+export function createRemoteRoutes(options: { workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost }) {
   const app = createRouteApp()
   app.get('/ssh-hosts', async (c) => c.json(await getServerSshHosts()))
   app.post('/resolve-target', async (c) => {
@@ -30,10 +28,7 @@ export function createRemoteRoutes(
         { userId, repoId, repoRuntimeId, mode: mode ?? 'restart' },
         {
           beforeCapabilityCommit: async ({ before, after }) => {
-            if (!gitBecameUnavailable(before, after)) return
-            if (!options.workspaceCapabilityTransitionHost) {
-              throw new Error('workspace capability transition host is unavailable')
-            }
+            if (!workspaceGitCleanupRequired(before, after)) return
             await options.workspaceCapabilityTransitionHost.removeGitScopedResources({
               userId,
               workspaceId: repoId,
@@ -58,13 +53,4 @@ export function createRemoteRoutes(
     return c.json(await testServerRemoteRepo(target, c.req.raw.signal))
   })
   return app
-}
-
-function gitBecameUnavailable(before: WorkspaceProbeState, after: WorkspaceSettledProbeState): boolean {
-  return (
-    before.status === 'ready' &&
-    before.capabilities.git.status === 'available' &&
-    after.status === 'ready' &&
-    after.capabilities.git.status === 'unavailable'
-  )
 }

@@ -16,6 +16,7 @@ export function terminalDescriptor(
     terminalWorktreeKey,
     terminalSessionId,
     index,
+    ...(base.target ? { target: base.target } : {}),
   }
 }
 

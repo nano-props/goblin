@@ -38,6 +38,7 @@ import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-proje
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { TerminalCreateOptions, TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
@@ -388,15 +389,7 @@ describe('workspace commands', () => {
     )
     // "Click the Terminal menu" is a generic entry — no insertion anchor is
     // passed, so the new terminal appends to the end of the strip.
-    expect(createTerminal).toHaveBeenCalledWith(
-      {
-        repoRoot: REPO_ID,
-        repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
-        branch: 'feature/worktree',
-        worktreePath: WORKTREE_PATH,
-      },
-      undefined,
-    )
+    expect(createTerminal).toHaveBeenCalledWith(expectedTerminalBase(), undefined)
   })
 
   test('terminal primary action focuses the first existing terminal instead of creating a new one', async () => {
@@ -561,15 +554,7 @@ describe('workspace commands', () => {
     )
     // Cmd+T / File → New Terminal Tab is a generic entry — no insertion
     // anchor is passed, so the new terminal appends to the end of the strip.
-    expect(createTerminal).toHaveBeenCalledWith(
-      {
-        repoRoot: REPO_ID,
-        repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
-        branch: 'feature/worktree',
-        worktreePath: WORKTREE_PATH,
-      },
-      undefined,
-    )
+    expect(createTerminal).toHaveBeenCalledWith(expectedTerminalBase(), undefined)
   })
 
   test('new terminal tab command preserves a terminal opener across routed close-back', async () => {
@@ -644,12 +629,7 @@ describe('workspace commands', () => {
       }),
     ).toBe(true)
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', {
-      repoRoot: REPO_ID,
-      repoRuntimeId: repoRuntimeIdForTest(),
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-    })
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', expectedTerminalBase())
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
       REPO_ID,
       'feature/worktree',
@@ -744,12 +724,7 @@ describe('workspace commands', () => {
       }),
     ).toBe(true)
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', {
-      repoRoot: REPO_ID,
-      repoRuntimeId: repoRuntimeIdForTest(),
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-    })
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', expectedTerminalBase())
     expect(closeEvents).toEqual(['close-terminal', 'navigate:status'])
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status')
     expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
@@ -1070,6 +1045,12 @@ describe('workspace commands', () => {
     const base = {
       repoRoot: REPO_ID,
       repoRuntimeId: repoRuntimeIdForTest(),
+      target: {
+        kind: 'git-worktree' as const,
+        workspaceId: canonicalWorkspaceLocator(REPO_ID)!,
+        workspaceRuntimeId: repoRuntimeIdForTest(),
+        root: canonicalWorkspaceLocator('goblin+file:///tmp/goblin-workspace-command-worktree')!,
+      },
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     }
@@ -1248,14 +1229,7 @@ describe('workspace commands', () => {
       }),
     ).toBe(true)
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', {
-      repoRoot: REPO_ID,
-
-      repoRuntimeId: repoRuntimeIdForTest(),
-
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-    })
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', expectedTerminalBase())
     // Tab removal is owned by the server workspace tab list broadcast, not the command.
     expect(tabsFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('term-111111111111111111111')])
     expect(closeWindow).not.toHaveBeenCalled()
@@ -1331,14 +1305,7 @@ describe('workspace commands', () => {
       }),
     ).toBe(true)
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', {
-      repoRoot: REPO_ID,
-
-      repoRuntimeId: repoRuntimeIdForTest(),
-
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-    })
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', expectedTerminalBase())
     expect(useTerminalActionDialogsStore.getState().closeConfirm).toBeNull()
   })
 
@@ -1410,14 +1377,7 @@ describe('workspace commands', () => {
       }),
     ).toBe(true)
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', {
-      repoRoot: REPO_ID,
-
-      repoRuntimeId: repoRuntimeIdForTest(),
-
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-    })
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', expectedTerminalBase())
   })
 
   test('close workspace tab confirm does not navigate when the user has switched away from the original route', async () => {
@@ -1475,14 +1435,7 @@ describe('workspace commands', () => {
       }),
     ).toBe(true)
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', {
-      repoRoot: REPO_ID,
-
-      repoRuntimeId: repoRuntimeIdForTest(),
-
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-    })
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', expectedTerminalBase())
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
   })
 
@@ -1556,14 +1509,7 @@ describe('workspace commands', () => {
       }),
     ).toBe(true)
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', {
-      repoRoot: REPO_ID,
-
-      repoRuntimeId: repoRuntimeIdForTest(),
-
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-    })
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', expectedTerminalBase())
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
   })
 
@@ -1610,14 +1556,7 @@ describe('workspace commands', () => {
     })
     await Promise.resolve()
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', {
-      repoRoot: REPO_ID,
-
-      repoRuntimeId: repoRuntimeIdForTest(),
-
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-    })
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', expectedTerminalBase())
     expect(settled).toBe(false)
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(preferredWorkspacePaneTab()).toBe('terminal')
@@ -1682,27 +1621,13 @@ describe('workspace commands', () => {
     })
     await Promise.resolve()
 
-    expect(closeTerminalByDescriptor).toHaveBeenNthCalledWith(1, 'term-111111111111111111111', {
-      repoRoot: REPO_ID,
-
-      repoRuntimeId: repoRuntimeIdForTest(),
-
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-    })
+    expect(closeTerminalByDescriptor).toHaveBeenNthCalledWith(1, 'term-111111111111111111111', expectedTerminalBase())
     expect(closeTerminalByDescriptor).toHaveBeenCalledOnce()
     expect(closeWindow).not.toHaveBeenCalled()
 
     closeResolvers[0]?.(true)
     await expect(firstClose).resolves.toBe(true)
-    expect(closeTerminalByDescriptor).toHaveBeenNthCalledWith(2, 'term-222222222222222222222', {
-      repoRoot: REPO_ID,
-
-      repoRuntimeId: repoRuntimeIdForTest(),
-
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-    })
+    expect(closeTerminalByDescriptor).toHaveBeenNthCalledWith(2, 'term-222222222222222222222', expectedTerminalBase())
     closeResolvers[1]?.(true)
     await expect(secondClose).resolves.toBe(true)
   })
@@ -1741,14 +1666,7 @@ describe('workspace commands', () => {
       }),
     ).toBe(true)
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', {
-      repoRoot: REPO_ID,
-
-      repoRuntimeId: repoRuntimeIdForTest(),
-
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-    })
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', expectedTerminalBase())
     expect(closeWindow).not.toHaveBeenCalled()
   })
 
@@ -2811,6 +2729,22 @@ function repoRuntimeIdForTest(repoId = REPO_ID): string {
   const repo = useReposStore.getState().repos[repoId]
   if (!repo) throw new Error(`expected seeded repo ${repoId}`)
   return repo.repoRuntimeId
+}
+
+function expectedTerminalBase(): TerminalSessionBase {
+  const repoRuntimeId = repoRuntimeIdForTest()
+  return {
+    repoRoot: REPO_ID,
+    repoRuntimeId,
+    target: {
+      kind: 'git-worktree',
+      workspaceId: canonicalWorkspaceLocator(REPO_ID)!,
+      workspaceRuntimeId: repoRuntimeId,
+      root: canonicalWorkspaceLocator('goblin+file:///tmp/goblin-workspace-command-worktree')!,
+    },
+    branch: 'feature/worktree',
+    worktreePath: WORKTREE_PATH,
+  }
 }
 
 function createTerminalWithProjection(resolveSessionId: () => string | Promise<string>) {

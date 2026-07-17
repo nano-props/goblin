@@ -16,7 +16,11 @@ import type {
   TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
-import { WorkspacePaneTabsSnapshotSchema } from '#/shared/workspace-pane-tabs-validators.ts'
+import {
+  canonicalRuntimeWorkspacePaneTarget,
+  RuntimeWorkspacePaneTargetSchema,
+  WorkspacePaneTabsSnapshotSchema,
+} from '#/shared/workspace-pane-tabs-validators.ts'
 
 const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
@@ -97,6 +101,7 @@ export const TerminalCreateInputSchema = v.object({
   cols: v.optional(TerminalColsSchema),
   rows: v.optional(TerminalRowsSchema),
   clientId: TerminalOptionalClientIdSchema,
+  target: RuntimeWorkspacePaneTargetSchema,
 })
 const TerminalPruneInputSchema = v.object({
   repoRoot: WorkspaceIdSchema,
@@ -118,6 +123,7 @@ export const TerminalSessionSummarySchema = v.object({
   message: v.nullable(v.string()),
   cols: v.number(),
   rows: v.number(),
+  target: RuntimeWorkspacePaneTargetSchema,
 })
 export const TerminalSessionsSnapshotSchema = v.object({
   revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
@@ -431,7 +437,12 @@ export function isValidTerminalTestNotificationInput(value: unknown): value is T
 
 export function normalizeTerminalSessionsSnapshot(value: unknown): TerminalSessionsSnapshot | null {
   const parsed = v.safeParse(TerminalSessionsSnapshotSchema, value)
-  return parsed.success ? parsed.output : null
+  if (!parsed.success) return null
+  const sessions = parsed.output.sessions.flatMap((session) => {
+    const target = canonicalRuntimeWorkspacePaneTarget(session.target)
+    return target ? [{ ...session, target }] : []
+  })
+  return sessions.length === parsed.output.sessions.length ? { revision: parsed.output.revision, sessions } : null
 }
 
 export function normalizeTerminalCreateResult(value: unknown): TerminalCreateResult | null {

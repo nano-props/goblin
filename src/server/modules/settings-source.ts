@@ -157,7 +157,7 @@ function normalizeWorkspacePaneTabsByTargetByRepo(
     if (!safeRepoId || !rawByTarget || typeof rawByTarget !== 'object' || Array.isArray(rawByTarget)) continue
     const byTarget: Record<string, WorkspacePaneStaticTabEntry[]> = {}
     for (const [targetKey, rawTabs] of Object.entries(rawByTarget)) {
-      const target = safeWorkspacePaneTabsTargetIdentity(safeRepoId, targetKey)
+      const target = safeRestorableWorkspacePaneTarget(safeRepoId, targetKey)
       if (!target || !Array.isArray(rawTabs)) continue
       const tabs: WorkspacePaneStaticTabEntry[] = []
       const seen = new Set<string>()
@@ -177,7 +177,7 @@ function normalizeWorkspacePaneTabsByTargetByRepo(
   return normalized
 }
 
-function safeWorkspacePaneTabsTargetIdentity(repoId: string, targetKey: string): RestorableWorkspacePaneTarget | null {
+function safeRestorableWorkspacePaneTarget(repoId: string, targetKey: string): RestorableWorkspacePaneTarget | null {
   const parsed = parseRestorableWorkspacePaneTargetKey(targetKey)
   if (!parsed) return null
   if (parsed.kind === 'git-branch') return isSafeBranchName(parsed.branch) ? parsed : null
@@ -330,10 +330,6 @@ interface UserSettingsMutation<T> {
   result: T
   changed?: boolean
   afterCommit?: () => void
-  postWriteAdmission?: {
-    admit: () => boolean
-    rejectedResult: T
-  }
 }
 
 function unchangedUserSettings<T>(data: UserSettingsData, result: T): UserSettingsMutation<T> {
@@ -351,13 +347,6 @@ async function mutateUserSettings<T>(
       const commit = await mutation(current)
       if (commit.changed !== false) {
         await writeUserSettingsFile(commit.next)
-        if (commit.postWriteAdmission && !commit.postWriteAdmission.admit()) {
-          await writeUserSettingsFile(current)
-          settingsData = current
-          settingsLoadPromise = Promise.resolve(current)
-          result = commit.postWriteAdmission.rejectedResult
-          return
-        }
         settingsData = commit.next
         settingsLoadPromise = Promise.resolve(commit.next)
       }
@@ -552,9 +541,8 @@ function workspacePaneLayoutFromWorkspace(
   const entries: WorkspacePaneDurableLayout['entries'] = []
   for (const [targetKey, tabs] of Object.entries(workspace.workspacePaneTabsByTargetByWorkspace[repoRoot] ?? {})) {
     const target = parseRestorableWorkspacePaneTargetKey(targetKey)
-    const runtimeTarget = target ? workspacePaneTabsTargetFromRestorable(repoRoot, target) : null
-    if (!runtimeTarget) continue
-    entries.push({ ...runtimeTarget, tabs })
+    if (!target || !workspacePaneTabsTargetFromRestorable(repoRoot, target)) continue
+    entries.push({ target, tabs })
   }
   return normalizeWorkspacePaneDurableLayout(repoRoot, { entries })
 }
@@ -593,13 +581,10 @@ async function compareAndSwapWorkspacePaneLayout(
     async (data) => {
       const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
       const snapshot = { layout: currentLayout }
-      if (input.admit && !input.admit()) {
-        return unchangedUserSettings(data, { kind: 'admission-rejected', snapshot })
-      }
       if (!workspacePaneDurableLayoutsEqual(input.repoRoot, currentLayout, input.expected)) {
         return unchangedUserSettings(data, { kind: 'conflict', snapshot })
       }
-      return workspacePaneLayoutMutation(data, input.repoRoot, currentLayout, input.replacement, input.admit)
+      return workspacePaneLayoutMutation(data, input.repoRoot, currentLayout, input.replacement)
     },
     (error) => ({ kind: 'write-failure', error }),
   )
@@ -627,7 +612,6 @@ function workspacePaneLayoutMutation(
   repoRoot: string,
   currentLayout: WorkspacePaneDurableLayout,
   requestedLayout: WorkspacePaneDurableLayout,
-  admit?: () => boolean,
 ): UserSettingsMutation<WorkspacePaneLayoutRepositoryCasOutcome> {
   const snapshot = { layout: currentLayout }
   const replacement = normalizeWorkspacePaneDurableLayout(repoRoot, requestedLayout)
@@ -635,10 +619,7 @@ function workspacePaneLayoutMutation(
     return unchangedUserSettings(data, { kind: 'accepted', snapshot, changed: false })
   }
   const byTarget = Object.fromEntries(
-    replacement.entries.flatMap((entry) => {
-      const target = restorableWorkspacePaneTarget(entry)
-      return target ? [[restorableWorkspacePaneTargetKey(target), entry.tabs] as const] : []
-    }),
+    replacement.entries.map((entry) => [restorableWorkspacePaneTargetKey(entry.target), entry.tabs] as const),
   )
   const workspacePaneTabsByTargetByWorkspace =
     Object.keys(byTarget).length === 0
@@ -652,14 +633,6 @@ function workspacePaneLayoutMutation(
       snapshot: { layout: workspacePaneLayoutFromWorkspace(workspace, repoRoot) },
       changed: true,
     },
-    ...(admit
-      ? {
-          postWriteAdmission: {
-            admit,
-            rejectedResult: { kind: 'admission-rejected', snapshot },
-          },
-        }
-      : {}),
   }
 }
 

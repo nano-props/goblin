@@ -6,6 +6,7 @@ import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const CLIENT_ID = 'client_terminal_actions'
 // Identity is userId-keyed under method 2: the runtime derives
@@ -15,6 +16,22 @@ const CLIENT_ID = 'client_terminal_actions'
 const USER_ID = 'user_terminal_actions'
 const REPO_ROOT = 'goblin+file:///repo'
 let REPO_RUNTIME_ID = ''
+const WORKSPACE_ID = requiredWorkspaceLocator(REPO_ROOT)
+
+function requiredWorkspaceLocator(input: string) {
+  const locator = canonicalWorkspaceLocator(input)
+  if (!locator) throw new Error('invalid workspace locator fixture')
+  return locator
+}
+
+function worktreeTarget(repoRuntimeId: string) {
+  return {
+    kind: 'git-worktree' as const,
+    workspaceId: WORKSPACE_ID,
+    workspaceRuntimeId: repoRuntimeId,
+    root: WORKSPACE_ID,
+  }
+}
 // 16+ alphanumerics, matches TERMINAL_RUNTIME_SESSION_ID_RE in
 // shared/terminal-validators.ts.
 const RUNTIME_SESSION_ID = 'session_aaaaaaaaaaaaaa'
@@ -138,6 +155,7 @@ describe('terminal-runtime-actions close broadcast', () => {
             {
               repoRoot: REPO_ROOT,
               repoRuntimeId: REPO_RUNTIME_ID,
+              target: worktreeTarget(REPO_RUNTIME_ID),
               branch: 'feature/worktree',
               worktreePath: '/repo',
               kind: 'additional',
@@ -173,6 +191,7 @@ describe('terminal-runtime-actions close broadcast', () => {
             {
               repoRoot: REPO_ROOT,
               repoRuntimeId: REPO_RUNTIME_ID,
+              target: worktreeTarget(REPO_RUNTIME_ID),
               branch: 'feature/worktree',
               worktreePath: '/repo',
               kind: 'additional',
@@ -210,6 +229,7 @@ describe('terminal-runtime-actions close broadcast', () => {
             {
               repoRoot: '',
               repoRuntimeId: 'repo-runtime-stale',
+              target: worktreeTarget('repo-runtime-stale'),
               branch: 'feature/worktree',
               worktreePath: '/repo',
               kind: 'additional',

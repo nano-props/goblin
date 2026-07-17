@@ -90,6 +90,7 @@ import {
   parseWorkspaceLocator,
   type WorkspaceLocatorPlatform,
 } from '#/shared/workspace-locator.ts'
+import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
@@ -183,7 +184,7 @@ export async function runWithRepoSource<T>(
 
 export async function runWithCapturedRepoSource<T>(
   cwd: string,
-  physicalWorktreeCapability: import('#/server/worktree-removal/physical-worktree-identity-resolver.ts').PhysicalWorktreeExecutionCapability,
+  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
   task: (source: Awaited<ReturnType<typeof resolveRepoSource>>) => Promise<T>,
   runtime?: RepoSourceRuntimeContext,
 ): Promise<T> {
@@ -326,9 +327,7 @@ async function probeGitRepo(cwd: string): Promise<ProbeAvailability> {
 
 function createLocalRepoSource(
   repoId: string,
-  physicalWorktreeCapability:
-    | import('#/server/worktree-removal/physical-worktree-identity-resolver.ts').PhysicalWorktreeExecutionCapability
-    | null = null,
+  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability | null = null,
 ): RepoSource {
   const capabilities: RepoSourceCapabilities = { pullRequests: 'cwd-github' }
 
@@ -603,9 +602,7 @@ function createLocalRepoSource(
 async function createRemoteRepoSource(
   repoId: string,
   capturedTarget?: RemoteRepoTarget,
-  physicalWorktreeCapability:
-    | import('#/server/worktree-removal/physical-worktree-identity-resolver.ts').PhysicalWorktreeExecutionCapability
-    | null = null,
+  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability | null = null,
   runtime?: RepoSourceRuntimeContext,
 ): Promise<RepoSource> {
   const target = capturedTarget ?? (await resolveRemoteRepoTarget(repoId, runtime))

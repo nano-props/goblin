@@ -20,6 +20,7 @@ import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
 import type { TerminalCreateInput, TerminalCreateResult } from '#/shared/terminal-types.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import {
   WORKSPACE_PANE_TABS_REALTIME_EVENTS,
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
@@ -32,20 +33,26 @@ import {
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-
 // Under method 2 the host threads `userId` (derived from the
 // access token) alongside `clientId` (per-tab routing). Tests use
 // a fixed value so the assertions don't have to mock the
 // derivation helper.
 const USER_1 = 'user_terminal_runtime'
 const USER_2 = 'user_terminal_runtime_second'
-const REPO_ROOT = 'goblin+file:///repo'
+const REPO_ROOT = requiredWorkspaceLocator('goblin+file:///repo')
+const LINKED_REPO_ROOT = requiredWorkspaceLocator('goblin+file:///repo-linked')
 let REPO_RUNTIME_ID = ''
 let SSH_REPO_RUNTIME_ID = ''
 let USER_2_REPO_RUNTIME_ID = ''
 const TEST_NOW = new Date('2026-06-24T00:00:00Z')
 const DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 const HEARTBEAT_SILENCE_MS = HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS
+
+function requiredWorkspaceLocator(input: string) {
+  const locator = canonicalWorkspaceLocator(input)
+  if (!locator) throw new Error('invalid workspace locator fixture')
+  return locator
+}
 
 function workspacePaneTabsListInput(workspaceRuntimeId: string) {
   return { workspaceId: REPO_ROOT, workspaceRuntimeId }
@@ -56,7 +63,7 @@ function workspacePaneWorktreeTarget(workspaceRuntimeId: string) {
     kind: 'git-worktree' as const,
     workspaceId: REPO_ROOT,
     workspaceRuntimeId,
-    root: 'goblin+file:///repo-linked',
+    root: LINKED_REPO_ROOT,
   }
 }
 
@@ -221,9 +228,6 @@ const testWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository = {
   },
   async compareAndSwap(input) {
     if (testWorkspacePaneLayoutWriteError) return { kind: 'write-failure', error: testWorkspacePaneLayoutWriteError }
-    if (input.admit && !input.admit()) {
-      return { kind: 'admission-rejected', snapshot: { layout: structuredClone(testWorkspacePaneLayout) } }
-    }
     if (JSON.stringify(testWorkspacePaneLayout) !== JSON.stringify(input.expected)) {
       return { kind: 'conflict', snapshot: { layout: structuredClone(testWorkspacePaneLayout) } }
     }
@@ -238,13 +242,25 @@ function buildRuntime(): RuntimeHandle {
     ptySupervisor: createInProcessPtySupervisor(),
     workspacePaneLayoutRepository: testWorkspacePaneLayoutRepository,
     workspacePaneTargetProjection: {
-      captureTargets: async (_userId, repoRoot) => [
-        {
-          repoRoot,
-          branchName: 'feature',
-          worktreePath: repoRoot.startsWith('goblin+ssh://') ? '/srv/repo' : '/repo-linked',
-        },
-      ],
+      captureTargets: async (_userId, repoRoot, scope) => {
+        const workspaceId = canonicalWorkspaceLocator(repoRoot)
+        if (!workspaceId) throw new Error('invalid test workspace id')
+        const separator = scope.lastIndexOf('\0')
+        const workspaceRuntimeId = scope.slice(separator + 1)
+        const nativeWorktreePath = repoRoot.startsWith('goblin+ssh://') ? '/srv/repo' : '/repo-linked'
+        return [
+          {
+            target: {
+              kind: 'git-worktree',
+              workspaceId,
+              workspaceRuntimeId,
+              root: repoRoot.startsWith('goblin+ssh://') ? workspaceId : LINKED_REPO_ROOT,
+            },
+            nativeWorktreePath,
+            canonicalBranch: 'feature',
+          },
+        ]
+      },
     },
   })
   REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_a')
@@ -371,15 +387,27 @@ async function createAdmittedTerminal(
   host: ServerTerminalHost,
   clientId: string,
   userId: string,
-  input: TerminalCreateInput,
+  input: Omit<TerminalCreateInput, 'target'> & { target?: TerminalCreateInput['target'] },
 ): Promise<TerminalCreateResult> {
   const application = createTerminalApplications.get(host)
   if (!application) throw new Error('missing workspace pane runtime application')
+  const request: TerminalCreateInput = {
+    ...input,
+    target: input.target ?? terminalCreateTarget(input),
+  }
   const result = await application.openRuntime(clientId, userId, {
     runtimeType: 'terminal',
-    request: input.clientId ? input : { ...input, clientId },
+    request: request.clientId ? request : { ...request, clientId },
   })
   return result.ok ? result.runtime : { ok: false, message: result.message }
+}
+
+function terminalCreateTarget(input: Pick<TerminalCreateInput, 'repoRoot' | 'repoRuntimeId' | 'worktreePath'>) {
+  const workspaceId = requiredWorkspaceLocator(input.repoRoot)
+  const root = input.repoRoot.startsWith('goblin+ssh://')
+    ? workspaceId
+    : requiredWorkspaceLocator(`goblin+file://${input.worktreePath}`)
+  return { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: input.repoRuntimeId, root }
 }
 
 describe('server terminal runtime', () => {
@@ -848,6 +876,7 @@ describe('server terminal runtime', () => {
         request: {
           repoRoot: REPO_ROOT,
           repoRuntimeId: REPO_RUNTIME_ID,
+          target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
           branch: 'feature',
           worktreePath: '/repo-linked',
           kind: 'additional',
@@ -903,6 +932,7 @@ describe('server terminal runtime', () => {
         request: {
           repoRoot: REPO_ROOT,
           repoRuntimeId: REPO_RUNTIME_ID,
+          target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
           branch: 'feature',
           worktreePath: '/repo-linked',
           kind: 'additional',
@@ -1268,9 +1298,7 @@ describe('server terminal runtime', () => {
     testWorkspacePaneLayout = {
       entries: [
         {
-          repoRoot: REPO_ROOT,
-          branchName: 'feature',
-          worktreePath: '/repo-linked',
+          target: { kind: 'git-worktree', root: LINKED_REPO_ROOT },
           tabs: [workspacePaneStaticTabEntry('files')],
         },
       ],
@@ -1305,9 +1333,7 @@ describe('server terminal runtime', () => {
     testWorkspacePaneLayout = {
       entries: [
         {
-          repoRoot: REPO_ROOT,
-          branchName: 'feature',
-          worktreePath: '/repo-linked',
+          target: { kind: 'git-worktree', root: LINKED_REPO_ROOT },
           tabs: [workspacePaneStaticTabEntry('files')],
         },
       ],
@@ -1330,14 +1356,12 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('capability cleanup is admitted before a later close and reopen', async () => {
+  test('capability cleanup fast-fails once before its durable transaction', async () => {
     const { workspaceCapabilityTransitionHost, shutdown } = buildRuntime()
     testWorkspacePaneLayout = {
       entries: [
         {
-          repoRoot: REPO_ROOT,
-          branchName: 'feature',
-          worktreePath: '/repo-linked',
+          target: { kind: 'git-worktree', root: LINKED_REPO_ROOT },
           tabs: [workspacePaneStaticTabEntry('files')],
         },
       ],
@@ -1349,11 +1373,11 @@ describe('server terminal runtime', () => {
       workspaceRuntimeId: REPO_RUNTIME_ID,
       assertCurrent: () => {
         checks += 1
-        if (checks > 3) throw new Error('error.repo-runtime-stale')
+        if (checks > 1) throw new Error('error.repo-runtime-stale')
       },
     })
 
-    expect(checks).toBe(3)
+    expect(checks).toBe(1)
     expect(testWorkspacePaneLayout).toEqual({ entries: [] })
     shutdown()
   })
@@ -1685,6 +1709,7 @@ describe('server terminal runtime', () => {
           request: {
             repoRoot: REPO_ROOT,
             repoRuntimeId: REPO_RUNTIME_ID,
+            target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
             branch: 'feature',
             worktreePath: '/repo-linked',
             kind: 'primary',
@@ -1745,6 +1770,7 @@ describe('server terminal runtime', () => {
         request: {
           repoRoot: REPO_ROOT,
           repoRuntimeId: REPO_RUNTIME_ID,
+          target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
           branch: 'feature',
           worktreePath: '/repo-linked',
           kind: 'additional',
@@ -1766,10 +1792,8 @@ describe('server terminal runtime', () => {
           runtimeType: 'terminal',
           sessionId: opened.runtime.terminalSessionId,
           target: {
-            repoRoot: REPO_ROOT,
-            repoRuntimeId: REPO_RUNTIME_ID,
-            branchName: 'feature',
-            worktreePath: '/repo-linked',
+            target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
+            nativeWorktreePath: '/repo-linked',
           },
         },
         'req_runtime_close',
@@ -1792,10 +1816,8 @@ describe('server terminal runtime', () => {
           runtimeType: 'terminal',
           sessionId: opened.runtime.terminalSessionId,
           target: {
-            repoRoot: REPO_ROOT,
-            repoRuntimeId: REPO_RUNTIME_ID,
-            branchName: 'feature',
-            worktreePath: '/repo-linked',
+            target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
+            nativeWorktreePath: '/repo-linked',
           },
         },
         'req_runtime_close_again',

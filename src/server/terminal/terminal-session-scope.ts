@@ -5,14 +5,12 @@
 // runtime if the client ever invoked it.
 
 import path from 'node:path'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 
 /**
- * Normalize a repoRoot into the scope string the manager stores on
- * each session. For local repos this is the path-resolved form (so
- * `/repo` and `./repo` collapse to the same scope on every platform,
- * including Windows where `path.resolve('/repo')` becomes `C:\repo`).
- * For remote (SSH) repos the input is opaque and stays as-is.
+ * Runtime scopes are keyed by canonical workspace identity. Native paths are
+ * execution metadata and must never be allowed to rewrite this identity.
  *
  * This is the **single source of truth** for session scope. Any
  * caller that needs to ask the manager about a repoRoot (create,
@@ -20,7 +18,8 @@ import { isRemoteRepoId } from '#/shared/remote-repo.ts'
  * string-equality lookups will silently miss.
  */
 export function terminalSessionScope(repoRoot: string): string {
-  return isRemoteRepoId(repoRoot) ? repoRoot : path.resolve(repoRoot)
+  if (!parseCanonicalWorkspaceLocator(repoRoot)) throw new Error('error.workspace-locator-malformed')
+  return repoRoot
 }
 
 export function terminalSessionRuntimeScope(repoRoot: string, repoRuntimeId: string): string {
@@ -32,5 +31,19 @@ export function terminalSessionScopeBelongsToRepo(scope: string, repoRoot: strin
 }
 
 export function terminalSessionWorktreePath(repoRoot: string, worktreePath: string): string {
-  return isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
+  const workspace = parseCanonicalWorkspaceLocator(repoRoot)
+  if (!workspace) throw new Error('error.workspace-locator-malformed')
+  if (worktreePath === repoRoot) return workspace.path
+  return workspace.transport === 'ssh' ? worktreePath : path.resolve(worktreePath)
+}
+
+export function terminalSessionTargetWorktreePath(
+  target: RuntimeWorkspacePaneTarget,
+  worktreePath: string,
+): string | null {
+  if (target.kind === 'git-branch') return null
+  const expected = parseCanonicalWorkspaceLocator(target.kind === 'workspace' ? target.workspaceId : target.root)
+  if (!expected) return null
+  const actual = terminalSessionWorktreePath(target.workspaceId, worktreePath)
+  return actual === expected.path ? actual : null
 }

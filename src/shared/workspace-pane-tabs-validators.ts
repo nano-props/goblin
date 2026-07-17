@@ -6,7 +6,7 @@ import {
   WORKSPACE_PANE_STATIC_TAB_TYPES,
 } from '#/shared/workspace-pane.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
-import { formatWorkspaceLocator, parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { formatWorkspaceLocator, parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 
@@ -92,13 +92,13 @@ export function normalizeWorkspacePaneTabsSnapshot(value: unknown): WorkspacePan
   const parsed = v.safeParse(WorkspacePaneTabsSnapshotSchema, value)
   if (!parsed.success) return null
   const entries = parsed.output.entries.flatMap((entry) => {
-    const target = canonicalRuntimeTarget(entry.target)
+    const target = canonicalRuntimeWorkspacePaneTarget(entry.target)
     return target ? [{ target, tabs: entry.tabs }] : []
   })
   return entries.length === parsed.output.entries.length ? { revision: parsed.output.revision, entries } : null
 }
 
-function canonicalRuntimeTarget(
+export function canonicalRuntimeWorkspacePaneTarget(
   target: v.InferOutput<typeof RuntimeWorkspacePaneTargetSchema>,
 ): RuntimeWorkspacePaneTarget | null {
   const workspaceId = canonicalLocator(target.workspaceId)
@@ -106,12 +106,20 @@ function canonicalRuntimeTarget(
   if (target.kind === 'workspace') return { ...target, workspaceId }
   if (target.kind === 'git-branch') return { ...target, workspaceId }
   const root = canonicalLocator(target.root)
-  return root ? { ...target, workspaceId, root } : null
+  if (!root) return null
+  const workspace = parseCanonicalWorkspaceLocator(workspaceId)
+  const parsedRoot = parseCanonicalWorkspaceLocator(root)
+  if (!workspace || !parsedRoot || workspace.transport !== parsedRoot.transport) return null
+  if (workspace.transport === 'ssh' && (parsedRoot.transport !== 'ssh' || workspace.profile !== parsedRoot.profile)) {
+    return null
+  }
+  return { ...target, workspaceId, root }
 }
 
 function canonicalLocator(value: string) {
-  const platform = typeof process !== 'undefined' && process.platform === 'win32' ? 'win32' : 'posix'
-  const parsed = parseWorkspaceLocator(value, platform)
-  const canonical = parsed ? formatWorkspaceLocator(parsed, platform) : null
+  const parsed = parseCanonicalWorkspaceLocator(value)
+  const canonical = parsed
+    ? formatWorkspaceLocator(parsed, parsed.transport === 'file' ? parsed.platform : 'posix')
+    : null
   return canonical === value ? canonical : null
 }

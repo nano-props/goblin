@@ -13,6 +13,7 @@ import {
 } from '#/server/terminal/terminal-session-manager.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const USER_ID = 'user_terminal_session_manager'
 const CLIENT_ID = 'client_terminal_session_manager'
@@ -20,6 +21,24 @@ const SCOPE = '/repo'
 const BRANCH_NAME = 'feature/test'
 const WORKTREE_PATH = '/repo'
 const TERMINAL_SESSION_ID = 'term-111111111111111111111'
+const WORKSPACE_ID = requiredWorkspaceLocator('goblin+file:///repo')
+const WORKTREE_TARGET = {
+  kind: 'git-worktree' as const,
+  workspaceId: WORKSPACE_ID,
+  workspaceRuntimeId: 'repo-runtime-test',
+  root: WORKSPACE_ID,
+}
+const LINKED_WORKTREE_TARGET = {
+  ...WORKTREE_TARGET,
+  workspaceRuntimeId: 'repo-runtime-linked',
+  root: requiredWorkspaceLocator('goblin+file:///repo-linked'),
+}
+
+function requiredWorkspaceLocator(input: string) {
+  const locator = canonicalWorkspaceLocator(input)
+  if (!locator) throw new Error('invalid workspace locator fixture')
+  return locator
+}
 
 function createDeferredPtySupervisor(): PtySupervisor & {
   spawns: Array<(result: PtySpawnResult) => void>
@@ -128,6 +147,7 @@ async function createSession(
     scope: SCOPE,
     repoRoot: SCOPE,
     repoRuntimeId: 'repo-runtime-test',
+    target: WORKTREE_TARGET,
     branch: BRANCH_NAME,
     terminalSessionId: TERMINAL_SESSION_ID,
     worktreePath: WORKTREE_PATH,
@@ -172,6 +192,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       scope: SCOPE,
       repoRoot: SCOPE,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -196,6 +217,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       scope: SCOPE,
       repoRoot: SCOPE,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -241,6 +263,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       scope: SCOPE,
       repoRoot: SCOPE,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -282,6 +305,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       scope: SCOPE,
       repoRoot: SCOPE,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -304,12 +328,15 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     admission.admission.publishCommittedEffects()
 
     expect(onIdentity).toHaveBeenCalledOnce()
-    expect(onIdentity).toHaveBeenCalledWith(USER_ID, expect.objectContaining({
-      terminalRuntimeSessionId: created.terminalRuntimeSessionId,
-      controller: { clientId: 'client-replacement', status: 'connected' },
-      canonicalCols: 80,
-      canonicalRows: 24,
-    }))
+    expect(onIdentity).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({
+        terminalRuntimeSessionId: created.terminalRuntimeSessionId,
+        controller: { clientId: 'client-replacement', status: 'connected' },
+        canonicalCols: 80,
+        canonicalRows: 24,
+      }),
+    )
   })
 
   test('rejects an existing admission after the PTY exits during placement preparation', async () => {
@@ -323,6 +350,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       scope: SCOPE,
       repoRoot: SCOPE,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -360,6 +388,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       scope: SCOPE,
       repoRoot: SCOPE,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -392,6 +421,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       scope: SCOPE,
       repoRoot: SCOPE,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -469,6 +499,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       scope: SCOPE,
       repoRoot: SCOPE,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -496,7 +527,6 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(supervisor.spawn).toHaveBeenCalledOnce()
   })
 
-
   test('closes a prepared session without ever allocating a PTY', async () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = createManager(supervisor)
@@ -505,6 +535,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       scope: SCOPE,
       repoRoot: SCOPE,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -535,6 +566,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
       scope: SCOPE,
       repoRoot: SCOPE,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -548,6 +580,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
       scope: SCOPE,
       repoRoot: SCOPE,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -578,6 +611,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
       scope: SCOPE,
       repoRoot: SCOPE,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -726,12 +760,13 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     })
     const onSessionClosed = vi.fn()
     const manager = createManager(supervisor, { onSessionClosed })
-    const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
+    const scope = terminalSessionRuntimeScope('goblin+file:///repo', 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
       scope,
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -765,13 +800,14 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     supervisor.killAndWait = killAndWait
     const onSessionClosed = vi.fn()
     const manager = createManager(supervisor, { onSessionClosed })
-    const repoRoot = '/repo'
+    const repoRoot = 'goblin+file:///repo'
     const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
       scope,
       repoRoot,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -795,6 +831,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
         scope,
         repoRoot,
         repoRuntimeId: 'repo-runtime-test',
+        target: WORKTREE_TARGET,
         branch: BRANCH_NAME,
         terminalSessionId: TERMINAL_SESSION_ID,
         worktreePath: WORKTREE_PATH,
@@ -816,7 +853,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const supervisor = createDeferredPtySupervisor()
     supervisor.killAndWait = vi.fn(async () => {})
     const manager = createManager(supervisor)
-    const linkedRepoRoot = '/repo-linked'
+    const linkedRepoRoot = 'goblin+file:///repo-linked'
     const physicalWorktreePath = '/repo-linked/worktree'
     const scope = terminalSessionRuntimeScope(linkedRepoRoot, 'repo-runtime-linked')
     const pending = ensureSession(manager, {
@@ -824,6 +861,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       scope,
       repoRoot: linkedRepoRoot,
       repoRuntimeId: 'repo-runtime-linked',
+      target: LINKED_WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: physicalWorktreePath,
@@ -853,13 +891,14 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     })
     supervisor.killAndWait = vi.fn(async () => await killAcknowledged)
     const manager = createManager(supervisor)
-    const repoRoot = '/repo'
+    const repoRoot = 'goblin+file:///repo'
     const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
     const pendingCreate = ensureSession(manager, {
       userId: USER_ID,
       scope,
       repoRoot,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -892,13 +931,14 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     })
     supervisor.killAndWait = killAndWait
     const manager = createManager(supervisor)
-    const repoRoot = '/repo'
+    const repoRoot = 'goblin+file:///repo'
     const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
       scope,
       repoRoot,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -938,7 +978,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const killAndWait = vi.fn(async () => await killAcknowledged.promise)
     supervisor.killAndWait = killAndWait
     const manager = createManager(supervisor)
-    const repoRoot = '/repo'
+    const repoRoot = 'goblin+file:///repo'
     const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
     const controller = new AbortController()
     const pendingCreate = ensureSession(manager, {
@@ -946,6 +986,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       scope,
       repoRoot,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -981,7 +1022,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     killAndWait.mockRejectedValueOnce(new Error('PTY close timed out'))
     supervisor.killAndWait = killAndWait
     const manager = createManager(supervisor)
-    const repoRoot = '/repo'
+    const repoRoot = 'goblin+file:///repo'
     const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
     const controller = new AbortController()
     const pendingCreate = ensureSession(manager, {
@@ -989,6 +1030,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       scope,
       repoRoot,
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -1034,12 +1076,13 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const termination = Promise.withResolvers<void>()
     supervisor.killAndWait = vi.fn(async () => await termination.promise)
     const manager = createManager(supervisor)
-    const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
+    const scope = terminalSessionRuntimeScope('goblin+file:///repo', 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
       scope,
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -1075,12 +1118,13 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     })
     supervisor.killAndWait = killAndWait
     const manager = createManager(supervisor)
-    const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
+    const scope = terminalSessionRuntimeScope('goblin+file:///repo', 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
       scope,
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -1119,12 +1163,13 @@ describe('TerminalSessionManager membership catalog', () => {
     const supervisor = createDeferredPtySupervisor()
     supervisor.processName = vi.fn(() => 'terminal')
     const manager = createManager(supervisor)
-    const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
+    const scope = terminalSessionRuntimeScope('goblin+file:///repo', 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
       scope,
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -1148,12 +1193,13 @@ describe('TerminalSessionManager membership catalog', () => {
   test('advances the catalog revision only for membership changes', async () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = createManager(supervisor)
-    const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
+    const scope = terminalSessionRuntimeScope('goblin+file:///repo', 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
       scope,
-      repoRoot: '/repo',
+      repoRoot: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-test',
+      target: WORKTREE_TARGET,
       branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
@@ -1202,7 +1248,6 @@ describe('TerminalSessionManager membership catalog', () => {
     expect(closedSnapshot.revision).toBe(resizedSnapshot.revision + 1)
     expect(closedSnapshot.sessions).toEqual([])
   })
-
 })
 
 describe('TerminalSessionManager runtime binding generations', () => {

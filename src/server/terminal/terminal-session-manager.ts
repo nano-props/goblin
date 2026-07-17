@@ -41,6 +41,7 @@ import { physicalWorktreeIdentityKey } from '#/server/worktree-removal/physical-
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { TerminalDirectory } from '#/server/terminal/terminal-directory.ts'
 import type { TerminalSessionAdmission } from '#/server/terminal/terminal-session-ensurer.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 
@@ -72,7 +73,7 @@ export interface TerminalEnsureSessionInput<TUser extends string | number> {
   startupShellCommand?: string
   env?: Record<string, string>
   signal?: AbortSignal
-  target?: import('#/shared/workspace-runtime.ts').RuntimeWorkspacePaneTarget
+  target: RuntimeWorkspacePaneTarget
 }
 
 interface TerminalSessionView<TUser extends string | number> extends TerminalPtySessionState<TUser> {
@@ -82,7 +83,7 @@ interface TerminalSessionView<TUser extends string | number> extends TerminalPty
   branch: string
   terminalSessionId: string
   worktreePath: string
-  target?: import('#/shared/workspace-runtime.ts').RuntimeWorkspacePaneTarget
+  target: RuntimeWorkspacePaneTarget
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   ptyBinding: TerminalPtyBinding<TerminalSessionView<TUser>>
   attachments: Map<string, TerminalClientControllerState>
@@ -505,13 +506,6 @@ export class TerminalSessionManager<TUser extends string | number> {
     return await this.retireSessions(sessions, 'scope')
   }
 
-  async closeGitScopedSessionsForRepo(userId: TUser, scope: string): Promise<TerminalBatchRetirementResult> {
-    const sessions = Array.from(this.directory.entries()).filter(
-      (session) => session.userId === userId && session.scope === scope && session.target?.kind !== 'workspace',
-    )
-    return await this.retireSessions(sessions, 'scope')
-  }
-
   forceCloseGitScopedSessionsForRepo(userId: TUser, scope: string): TerminalSessionSummary[] {
     const removed: TerminalSessionSummary[] = []
     for (const session of Array.from(this.directory.entries())) {
@@ -616,6 +610,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       message: session.message,
       cols: session.cols,
       rows: session.rows,
+      target: session.target,
     }))
   }
 

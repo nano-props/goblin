@@ -43,6 +43,7 @@ import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/worksp
 import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import { useWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-action-context.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
@@ -89,10 +90,15 @@ export function RepoWorkspaceToolbar({
   const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
   const showCreatedWorkspacePaneRuntimeTab = useCallback(
-    (type: WorkspacePaneRuntimeTabType, sessionId: string, canonicalBranch: string) => {
+    (
+      type: WorkspacePaneRuntimeTabType,
+      sessionId: string,
+      canonicalBranch: string,
+      target: RuntimeWorkspacePaneTarget,
+    ) => {
       if (type === 'terminal' && worktreePath) {
         return showCreatedTerminalWorkspacePaneRuntimeTab(
-          { repoRoot: repo.id, repoRuntimeId: repo.repoRuntimeId, branch: canonicalBranch, worktreePath },
+          { repoRoot: repo.id, repoRuntimeId: repo.repoRuntimeId, branch: canonicalBranch, worktreePath, target },
           sessionId,
           navigation,
         )

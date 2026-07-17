@@ -54,6 +54,12 @@ import { createPhysicalWorktreeIdentityResolver } from '#/server/worktree-remova
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 import { getRepoSnapshot } from '#/server/modules/repo-read-paths.ts'
 import { workspaceRuntimeHasGitCapability } from '#/server/modules/repo-runtimes.ts'
+import {
+  canonicalWorkspaceLocator,
+  formatWorkspaceLocator,
+  parseCanonicalWorkspaceLocator,
+} from '#/shared/workspace-locator.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
@@ -73,18 +79,57 @@ const serverWorkspacePaneTargetProjection: WorkspacePaneTargetProjectionProvider
     const separator = scope.lastIndexOf('\0')
     if (separator < 0 || separator === scope.length - 1) throw new Error('invalid workspace pane runtime scope')
     const repoRuntimeId = scope.slice(separator + 1)
-    const workspaceTarget = { repoRoot, branchName: '', worktreePath: repoRoot }
+    const workspaceId = canonicalWorkspaceLocator(repoRoot)
+    if (!workspaceId) throw new Error('invalid workspace pane workspace id')
+    const workspace = parseCanonicalWorkspaceLocator(workspaceId)
+    if (!workspace) throw new Error('invalid workspace pane workspace id')
+    const workspaceTarget = {
+      target: { kind: 'workspace' as const, workspaceId, workspaceRuntimeId: repoRuntimeId },
+      nativeWorktreePath: workspace.path,
+      canonicalBranch: null,
+    }
     if (!workspaceRuntimeHasGitCapability(userId, repoRoot, repoRuntimeId)) return [workspaceTarget]
     const snapshot = await getRepoSnapshot(repoRoot, { repoRuntimeId })
     return [
       workspaceTarget,
-      ...(snapshot?.branches ?? []).map((branch) => ({
-        repoRoot,
-        branchName: branch.name,
-        worktreePath: branch.worktree?.path ?? null,
-      })),
+      ...(snapshot?.branches ?? []).map((branch) =>
+        branch.worktree
+          ? {
+              target: {
+                kind: 'git-worktree' as const,
+                workspaceId,
+                workspaceRuntimeId: repoRuntimeId,
+                root: workspaceLocatorForNativePath(workspaceId, branch.worktree.path),
+              },
+              nativeWorktreePath: branch.worktree.path,
+              canonicalBranch: branch.name,
+            }
+          : {
+              target: {
+                kind: 'git-branch' as const,
+                workspaceId,
+                workspaceRuntimeId: repoRuntimeId,
+                branch: branch.name,
+              },
+              nativeWorktreePath: null,
+              canonicalBranch: branch.name,
+            },
+      ),
     ]
   },
+}
+
+function workspaceLocatorForNativePath(workspaceId: WorkspaceId, nativePath: string) {
+  const workspace = parseCanonicalWorkspaceLocator(workspaceId)
+  if (!workspace) throw new Error('invalid workspace pane workspace id')
+  const root = formatWorkspaceLocator(
+    workspace.transport === 'ssh'
+      ? { transport: 'ssh', profile: workspace.profile, path: nativePath }
+      : { transport: 'file', platform: workspace.platform, path: nativePath },
+    workspace.transport === 'file' ? workspace.platform : 'posix',
+  )
+  if (!root) throw new Error('invalid workspace pane worktree path')
+  return root
 }
 
 export interface ServerTerminalRuntimeOptions {
@@ -335,7 +380,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost = {
     async removeGitScopedResources({ userId, workspaceId, workspaceRuntimeId, assertCurrent }) {
       const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
-      await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, workspaceId, assertCurrent)
+      // The probe transition is staged before this hook runs, so this cleanup
+      // is already ordered before a concurrent close/reopen. Admission is a
+      // single fast-fail check; the durable write must never be compensated.
+      assertCurrent()
+      await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, workspaceId)
       await workspaceTabsCoordinator.closeInvalidatedScope({ userId, scope })
       manager.forceCloseGitScopedSessionsForRepo(userId, scope)
       broadcastRepoSessionsChanged(userId, workspaceId)
@@ -387,36 +436,18 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 async function clearWorkspacePaneDurableLayout(
   repository: WorkspacePaneLayoutRepository,
   workspaceId: string,
-  assertCurrent: () => void,
 ): Promise<void> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    assertCurrent()
     const current = await repository.load(workspaceId)
     const replacement = {
-      entries: current.layout.entries.filter((entry) => entry.worktreePath === workspaceId),
+      entries: current.layout.entries.filter((entry) => entry.target.kind === 'workspace'),
     }
     if (workspacePaneDurableLayoutsEqual(workspaceId, current.layout, replacement)) return
-    assertCurrent()
     const outcome = await repository.compareAndSwap({
       repoRoot: workspaceId,
       expected: current.layout,
       replacement,
-      admit: () => {
-        try {
-          assertCurrent()
-          return true
-        } catch {
-          return false
-        }
-      },
     })
-    if (outcome.kind === 'admission-rejected') {
-      assertCurrent()
-      throw new Error('workspace pane layout cleanup admission was rejected')
-    }
-    // Admission is evaluated inside the serialized settings mutation. Once
-    // accepted, this cleanup is ordered before any close/reopen or later
-    // layout write even when the atomic file write completes asynchronously.
     if (outcome.kind === 'accepted') return
     if (outcome.kind === 'write-failure') throw outcome.error
   }

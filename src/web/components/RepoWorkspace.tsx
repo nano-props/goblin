@@ -422,11 +422,8 @@ function PlainWorkspaceFiles({
           workspacePaneId,
           panelLabel: { label: t('tab.terminal') },
           target: {
-            repoRoot: repo.id,
-            repoRuntimeId: repo.repoRuntimeId,
-            branchName: null,
-            worktreePath: repo.id,
             runtimeTarget,
+            worktreePath: repo.id,
           },
           selectedSessionId: selectedTerminalSessionId,
           runtimeState: model.runtimeTabStateByType.terminal,

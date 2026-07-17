@@ -1,7 +1,8 @@
 import type { RestoredWorkspaceRepoRuntime, ServerWorkspaceState } from '#/shared/api-types.ts'
 import { workspaceSessionEntryId, type WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
-import { restorableWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { formatWorkspaceLocator, parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { ServerWorkspaceMatchOutcome } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
@@ -67,24 +68,29 @@ async function restoreWorkspacePaneTabsForRepos(
 }
 
 function restorableTargetsForRepo(repo: RestoredWorkspaceRepoRuntime) {
+  if (repo.workspaceProbe.status !== 'ready') return null
   if (repo.projection) {
-    return (repo.projection.snapshot?.branches ?? []).flatMap((branch) => {
-      const target = restorableWorkspacePaneTarget({
-        repoRoot: repo.repoRoot,
-        branchName: branch.name,
-        worktreePath: branch.worktree?.path ?? null,
-      })
+    const gitTargets = (repo.projection.snapshot?.branches ?? []).flatMap((branch) => {
+      const target: RestorableWorkspacePaneTarget | null = branch.worktree
+        ? restorableWorktreeTarget(repo.repoRoot, branch.worktree.path)
+        : { kind: 'git-branch', branch: branch.name }
       return target ? [target] : []
     })
+    return [{ kind: 'workspace' as const }, ...gitTargets]
   }
-  if (
-    repo.workspaceProbe.status === 'ready' &&
-    repo.workspaceProbe.capabilities.git.status === 'unavailable' &&
-    repo.workspaceProbe.diagnostics.length === 0
-  ) {
-    return [{ kind: 'workspace' as const }]
-  }
-  return null
+  return [{ kind: 'workspace' as const }]
+}
+
+function restorableWorktreeTarget(workspaceId: string, nativePath: string): RestorableWorkspacePaneTarget | null {
+  const workspace = parseCanonicalWorkspaceLocator(workspaceId)
+  if (!workspace) return null
+  const root = formatWorkspaceLocator(
+    workspace.transport === 'ssh'
+      ? { transport: 'ssh', profile: workspace.profile, path: nativePath }
+      : { transport: 'file', platform: workspace.platform, path: nativePath },
+    workspace.transport === 'file' ? workspace.platform : 'posix',
+  )
+  return root ? { kind: 'git-worktree', root } : null
 }
 
 export function workspaceRepoEntry(workspace: ServerWorkspaceState, repoRoot: string) {

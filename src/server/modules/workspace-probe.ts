@@ -167,7 +167,7 @@ async function localPullRequestProvider(workspacePath: string, signal?: AbortSig
   }
 }
 
-export function pullRequestProviderFromGitConfig(configured: string): 'github' | 'none' {
+function pullRequestProviderFromGitConfig(configured: string): 'github' | 'none' {
   const hasGitHubRemote = configured.split('\n').some((line) => {
     const separator = line.search(/\s/)
     return separator >= 0 && parseGitHubRemoteUrl(line.slice(separator).trim()) !== null

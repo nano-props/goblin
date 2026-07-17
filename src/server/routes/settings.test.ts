@@ -65,10 +65,13 @@ const workspacePaneTabsHostStub = {
   updateTabs: vi.fn(),
 } satisfies ServerWorkspacePaneTabsHost
 
+const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = { removeGitScopedResources: vi.fn() }
+
 function settingsRouteOptions() {
   return {
     settingsState: createNativeShortcutRegistrationState(),
     workspacePaneTabsHost: workspacePaneTabsHostStub,
+    workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
   }
 }
 
@@ -140,6 +143,7 @@ describe('settings routes', () => {
       clientId: 'client_test000000000000',
       activeRepoRoot: 'goblin+file:///repo-active',
       workspacePaneTabsHost: workspacePaneTabsHostStub,
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       signal: expect.any(AbortSignal),
     })
   })
@@ -221,6 +225,7 @@ describe('settings routes', () => {
       repoRoot: 'goblin+file:///repo-active',
       repoRuntimeId: 'repo_runtime_test',
       workspacePaneTabsHost: workspacePaneTabsHostStub,
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       signal: expect.any(AbortSignal),
     })
   })

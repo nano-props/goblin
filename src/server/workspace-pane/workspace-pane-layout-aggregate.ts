@@ -12,12 +12,12 @@ import type {
   WorkspacePaneTabsUpdateOperation,
 } from '#/shared/workspace-pane-tabs.ts'
 import {
-  restorableWorkspacePaneTarget,
-  runtimeWorkspacePaneTarget,
-  workspacePaneTabsTargetIdentityKey,
-  type WorkspacePaneTabsTarget,
-  type WorkspacePaneTabsTargetIdentity,
+  restorableWorkspacePaneTargetKey,
+  workspacePaneTabsTargetFromRestorable,
+  runtimeWorkspacePaneTargetKey,
+  restorableWorkspacePaneTargetFromRuntime,
 } from '#/shared/workspace-pane-tabs-target.ts'
+import type { RestorableWorkspacePaneTarget, RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import { workspacePaneTabsWithUpdateOperation } from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
 import {
   projectRuntimePlacements,
@@ -34,6 +34,7 @@ import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { PhysicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const MAX_LAYOUT_CAS_RETRIES = 3
 
@@ -59,13 +60,23 @@ export interface WorkspacePaneLayoutCommitResult {
 }
 
 type WorkspacePaneLayoutMutationTarget =
-  | { branchName: string; worktreePath: null; physicalWorktreeLease?: never }
-  | { branchName: string; worktreePath: string; physicalWorktreeLease: PhysicalWorktreeAdmissionLease }
+  | { target: RuntimeWorkspacePaneTarget; nativeWorktreePath: null; physicalWorktreeLease?: never }
+  | {
+      target: RuntimeWorkspacePaneTarget
+      nativeWorktreePath: string
+      physicalWorktreeLease: PhysicalWorktreeAdmissionLease
+    }
+
+export interface WorkspacePaneTargetProjection {
+  target: RuntimeWorkspacePaneTarget
+  nativeWorktreePath: string | null
+  canonicalBranch: string | null
+}
 
 export type WorkspacePaneLayoutReplaceInput = WorkspacePaneEpochScope &
   WorkspacePaneLayoutMutationTarget & {
     tabs: readonly WorkspacePaneTabEntry[]
-    validTargets: readonly WorkspacePaneTabsTarget[]
+    validTargets: readonly WorkspacePaneTargetProjection[]
     providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
     assertCurrent?: () => void
   }
@@ -73,21 +84,21 @@ export type WorkspacePaneLayoutReplaceInput = WorkspacePaneEpochScope &
 export type WorkspacePaneLayoutUpdateInput = WorkspacePaneEpochScope &
   WorkspacePaneLayoutMutationTarget & {
     operation: WorkspacePaneTabsUpdateOperation
-    validTargets: readonly WorkspacePaneTabsTarget[]
+    validTargets: readonly WorkspacePaneTargetProjection[]
     providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
     assertCurrent?: () => void
   }
 
 export interface WorkspacePaneLayoutSnapshotInput {
   scope: WorkspacePaneEpochScope
-  validTargets: readonly WorkspacePaneTabsTarget[]
+  validTargets: readonly WorkspacePaneTargetProjection[]
   providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
   knownLayout?: WorkspacePaneDurableLayout
 }
 
 export type WorkspacePaneLayoutValidationInput = WorkspacePaneEpochScope & {
-  validTargets: readonly WorkspacePaneTabsTarget[]
-  physicalTargets: readonly { target: WorkspacePaneTabsTargetIdentity; lease: PhysicalWorktreeAdmissionLease }[]
+  validTargets: readonly WorkspacePaneTargetProjection[]
+  physicalTargets: readonly { target: RuntimeWorkspacePaneTarget; lease: PhysicalWorktreeAdmissionLease }[]
   expectedRepoEntry: WorkspaceSessionEntry
   providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
   assertCurrent?: () => void
@@ -101,7 +112,7 @@ export interface WorkspacePaneLayoutOperation {
   validateMembershipAndSnapshot(input: WorkspacePaneLayoutValidationInput): Promise<WorkspacePaneLayoutValidationResult>
   commitRuntimeTarget(
     input: WorkspacePaneEpochScope & {
-      target: WorkspacePaneTabsTargetIdentity
+      target: RuntimeWorkspacePaneTarget
       lease: PhysicalWorktreeAdmissionLease
       tabs: readonly WorkspacePaneTabEntry[]
     },
@@ -109,8 +120,8 @@ export interface WorkspacePaneLayoutOperation {
   closeEpoch(scope: WorkspacePaneEpochScope): void
   commitProjectionTargets(
     input: WorkspacePaneEpochScope & {
-      targets: readonly WorkspacePaneTabsTarget[]
-      physicalTargets: readonly { target: WorkspacePaneTabsTargetIdentity; lease: PhysicalWorktreeAdmissionLease }[]
+      targets: readonly WorkspacePaneTargetProjection[]
+      physicalTargets: readonly { target: RuntimeWorkspacePaneTarget; lease: PhysicalWorktreeAdmissionLease }[]
     },
   ): void
   indexedAdmissionLeases(scope: WorkspacePaneEpochScope): PhysicalWorktreeAdmissionLease[]
@@ -227,7 +238,7 @@ export class WorkspacePaneLayoutAggregate {
 
   private commitRuntimeTarget(
     input: WorkspacePaneEpochScope & {
-      target: WorkspacePaneTabsTargetIdentity
+      target: RuntimeWorkspacePaneTarget
       lease: PhysicalWorktreeAdmissionLease
       tabs: readonly WorkspacePaneTabEntry[]
     },
@@ -268,11 +279,16 @@ export class WorkspacePaneLayoutAggregate {
       const staticTabs = mixedTabs.filter(
         (tab): tab is WorkspacePaneStaticTabEntry => !isWorkspacePaneRuntimeTabEntry(tab),
       )
-      const targetKey = workspacePaneTabsTargetIdentityKey(target)
-      const entry = { ...target, tabs: staticTabs }
+      const targetKey = targetProjectionKey(target)
+      const durableTarget = restorableWorkspacePaneTargetFromRuntime(target.target)
+      if (!durableTarget) throw new Error('error.workspace-tabs-target-invalid')
+      const entry = { target: durableTarget, tabs: staticTabs }
       const replacement = normalizeWorkspacePaneDurableLayout(input.repoRoot, {
         entries: [
-          ...current.layout.entries.filter((candidate) => workspacePaneTabsTargetIdentityKey(candidate) !== targetKey),
+          ...current.layout.entries.filter(
+            (candidate) =>
+              restorableWorkspacePaneTargetKey(candidate.target) !== restorableWorkspacePaneTargetKey(durableTarget),
+          ),
           entry,
         ],
       })
@@ -285,12 +301,11 @@ export class WorkspacePaneLayoutAggregate {
       if (outcome.kind === 'write-failure') throw outcome.error
       if (outcome.kind === 'conflict' && policy.retryConflicts && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
       if (outcome.kind !== 'accepted') throw new Error('error.workspace-tabs-layout-conflict')
-      const targetIdentityValue = targetIdentity(target)
-      const placementChanged = this.overlay.recordMixedOrder({ ...input, target: targetIdentityValue, tabs: mixedTabs })
+      const placementChanged = this.overlay.recordMixedOrder({ ...input, target: target.target, tabs: mixedTabs })
       if (input.physicalWorktreeLease) {
         this.overlay.registerPhysicalTarget({
           ...input,
-          target: targetIdentityValue,
+          target: target.target,
           lease: input.physicalWorktreeLease,
         })
       }
@@ -301,7 +316,7 @@ export class WorkspacePaneLayoutAggregate {
   private revision(
     scope: WorkspacePaneEpochScope,
     layout: WorkspacePaneDurableLayout,
-    validTargets: readonly WorkspacePaneTabsTarget[],
+    validTargets: readonly WorkspacePaneTargetProjection[],
     providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
     entries: WorkspacePaneTabsSnapshot['entries'],
   ): number {
@@ -351,8 +366,8 @@ export class WorkspacePaneLayoutAggregate {
 
   private commitProjectionTargets(
     input: WorkspacePaneEpochScope & {
-      targets: readonly WorkspacePaneTabsTarget[]
-      physicalTargets: readonly { target: WorkspacePaneTabsTargetIdentity; lease: PhysicalWorktreeAdmissionLease }[]
+      targets: readonly WorkspacePaneTargetProjection[]
+      physicalTargets: readonly { target: RuntimeWorkspacePaneTarget; lease: PhysicalWorktreeAdmissionLease }[]
     },
   ): boolean {
     const next = targetMap(input.targets)
@@ -366,7 +381,7 @@ export class WorkspacePaneLayoutAggregate {
   private projectEntries(
     scope: WorkspacePaneEpochScope,
     layout: WorkspacePaneDurableLayout,
-    validTargets: readonly WorkspacePaneTabsTarget[],
+    validTargets: readonly WorkspacePaneTargetProjection[],
     providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
   ): WorkspacePaneTabsSnapshot['entries'] {
     return projectCanonicalEntries(scope, layout, this.overlay, targetMap(validTargets), providers)
@@ -400,89 +415,121 @@ function projectCanonicalEntries(
   scope: WorkspacePaneEpochScope,
   layout: WorkspacePaneDurableLayout,
   overlay: WorkspacePaneEpochOverlay,
-  validatedTargets: ReadonlyMap<string, WorkspacePaneTabsTarget>,
+  validatedTargets: ReadonlyMap<string, WorkspacePaneTargetProjection>,
   providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
 ): WorkspacePaneTabsSnapshot['entries'] {
-  const liveTargets = providerTargets(scope, providers)
+  const liveTargets = providerTargets(scope, validatedTargets, providers)
   layout = {
-    entries: layout.entries.filter((entry) => validatedTargets.has(workspacePaneTabsTargetIdentityKey(entry))),
+    entries: layout.entries.filter((entry) => validatedTargets.has(durableTargetKey(scope, entry.target))),
   }
-  const targets = new Map<string, WorkspacePaneTabsTarget>()
+  const targets = new Map<string, WorkspacePaneTargetProjection>()
   for (const entry of layout.entries) {
-    const key = workspacePaneTabsTargetIdentityKey(entry)
-    targets.set(key, validatedTargets.get(key) ?? entry)
+    const key = durableTargetKey(scope, entry.target)
+    const projection = validatedTargets.get(key)
+    if (!projection) throw new Error('error.workspace-tabs-target-invalid')
+    targets.set(key, projection)
   }
   for (const [key, target] of liveTargets) targets.set(key, target)
-  return Array.from(targets.values()).map((target) => {
-    const tabs = canonicalTabsForTarget({ ...scope, ...target }, layout, overlay, providers)
-    return { target: runtimeTarget(scope, target), tabs }
+  return Array.from(targets.values()).map((projection) => {
+    const tabs = canonicalTabsForTarget({ ...scope, ...projection }, layout, overlay, providers)
+    return { target: projection.target, tabs }
   })
 }
 
 function providerTargets(
-  scope: Pick<WorkspacePaneEpochScope, 'repoRoot'>,
+  scope: WorkspacePaneEpochScope,
+  validatedTargets: ReadonlyMap<string, WorkspacePaneTargetProjection>,
   providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
-): Map<string, WorkspacePaneTabsTarget> {
-  const targets = new Map<string, WorkspacePaneTabsTarget>()
+): Map<string, WorkspacePaneTargetProjection> {
+  const targets = new Map<string, WorkspacePaneTargetProjection>()
   for (const provider of providers) {
     for (const session of provider.liveSessions) {
-      const target = { repoRoot: scope.repoRoot, branchName: session.branch, worktreePath: session.worktreePath }
-      targets.set(workspacePaneTabsTargetIdentityKey(target), target)
+      if (session.target.workspaceId !== scope.repoRoot || session.target.workspaceRuntimeId !== scope.repoRuntimeId) {
+        throw new Error('error.workspace-tabs-target-invalid')
+      }
+      const key = runtimeTargetKey(session.target)
+      const validated = validatedTargets.get(key)
+      if (validated && validated.nativeWorktreePath !== session.worktreePath) {
+        throw new Error('error.workspace-tabs-target-invalid')
+      }
+      targets.set(
+        key,
+        validated ?? {
+          target: session.target,
+          nativeWorktreePath: session.worktreePath,
+          canonicalBranch: session.branch,
+        },
+      )
     }
   }
   return targets
 }
 
-function targetMap(targets: readonly WorkspacePaneTabsTarget[]): Map<string, WorkspacePaneTabsTarget> {
+function targetMap(targets: readonly WorkspacePaneTargetProjection[]): Map<string, WorkspacePaneTargetProjection> {
   return new Map(
     targets
-      .map((target) => [workspacePaneTabsTargetIdentityKey(target), { ...target }] as const)
+      .map(
+        (projection) => [targetProjectionKey(projection), { ...projection, target: { ...projection.target } }] as const,
+      )
       .sort(([a], [b]) => a.localeCompare(b)),
   )
 }
 
 function resolveMutationTarget(
-  scope: WorkspacePaneEpochScope & WorkspacePaneTabsTarget,
-  validTargets: readonly WorkspacePaneTabsTarget[],
-): WorkspacePaneTabsTarget | null {
-  const targetKey = workspacePaneTabsTargetIdentityKey(scope)
-  return targetMap(validTargets).get(targetKey) ?? null
+  scope: WorkspacePaneEpochScope & WorkspacePaneLayoutMutationTarget,
+  validTargets: readonly WorkspacePaneTargetProjection[],
+): WorkspacePaneTargetProjection | null {
+  const projection = targetMap(validTargets).get(runtimeTargetKey(scope.target)) ?? null
+  return projection && projection.nativeWorktreePath === scope.nativeWorktreePath ? projection : null
 }
 
 function canonicalTabsForTarget(
-  input: WorkspacePaneEpochScope & WorkspacePaneTabsTarget,
+  input: WorkspacePaneEpochScope & WorkspacePaneTargetProjection,
   layout: WorkspacePaneDurableLayout,
   overlay: WorkspacePaneEpochOverlay,
   providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
 ): WorkspacePaneTabEntry[] {
-  const durable = layout.entries.find(
-    (entry) => workspacePaneTabsTargetIdentityKey(entry) === workspacePaneTabsTargetIdentityKey(input),
-  )
+  const durable = layout.entries.find((entry) => durableTargetKey(input, entry.target) === targetProjectionKey(input))
   const staticTabs = durable?.tabs ?? [
-    workspacePaneStaticTabEntry(runtimeTarget(input, input).kind === 'workspace' ? 'files' : 'status'),
+    workspacePaneStaticTabEntry(input.target.kind === 'workspace' ? 'files' : 'status'),
   ]
   const liveRuntimeTabs = providers.flatMap((provider) =>
     provider.liveSessions
-      .filter((session) => input.worktreePath !== null && session.worktreePath === input.worktreePath)
+      .filter((session) => input.nativeWorktreePath !== null && session.worktreePath === input.nativeWorktreePath)
       .map((session) => workspacePaneRuntimeTabEntry(provider.type, session.sessionId)),
   )
   return projectRuntimePlacements({
     staticTabs,
-    hints: overlay.placementHints({ ...input, target: targetIdentity(input) }),
+    hints: overlay.placementHints(input),
     liveRuntimeTabs,
   })
 }
 
-function runtimeTarget(scope: WorkspacePaneEpochScope, target: WorkspacePaneTabsTarget) {
-  const resolved = runtimeWorkspacePaneTarget(target, scope.repoRuntimeId)
-  if (!resolved) throw new Error('error.workspace-tabs-target-invalid')
-  return resolved
+function durableTargetKey(
+  scope: Pick<WorkspacePaneEpochScope, 'repoRoot' | 'repoRuntimeId'>,
+  target: RestorableWorkspacePaneTarget,
+): string {
+  const runtime = workspacePaneTabsTargetFromRestorable(scope.repoRoot, target)
+  if (!runtime) throw new Error('error.workspace-tabs-target-invalid')
+  const workspaceId = canonicalWorkspaceLocator(scope.repoRoot)
+  if (!workspaceId) throw new Error('error.workspace-tabs-target-invalid')
+  const bound =
+    target.kind === 'workspace'
+      ? { kind: 'workspace' as const, workspaceId, workspaceRuntimeId: scope.repoRuntimeId }
+      : target.kind === 'git-branch'
+        ? { ...target, workspaceId, workspaceRuntimeId: scope.repoRuntimeId }
+        : { ...target, workspaceId, workspaceRuntimeId: scope.repoRuntimeId }
+  return runtimeTargetKey(bound)
 }
 
-function targetIdentity(target: WorkspacePaneTabsTarget): WorkspacePaneTabsTargetIdentity {
-  return target.worktreePath === null
-    ? { kind: 'branch', repoRoot: target.repoRoot, branchName: target.branchName }
-    : { kind: 'worktree', repoRoot: target.repoRoot, worktreePath: target.worktreePath }
+function runtimeTargetKey(target: RuntimeWorkspacePaneTarget): string {
+  const key = runtimeWorkspacePaneTargetKey(target)
+  if (!key) throw new Error('error.workspace-tabs-target-invalid')
+  return key
+}
+
+function targetProjectionKey(projection: WorkspacePaneTargetProjection): string {
+  return runtimeTargetKey(projection.target)
 }
 
 function epochKey(scope: WorkspacePaneEpochScope): string {

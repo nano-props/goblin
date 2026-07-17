@@ -194,6 +194,12 @@ describe('shared terminal validators', () => {
         input: {
           repoRoot: 'goblin+file:///repo',
           repoRuntimeId: 'repo-runtime-test',
+          target: {
+            kind: 'git-worktree',
+            workspaceId: 'goblin+file:///repo',
+            workspaceRuntimeId: 'repo-runtime-test',
+            root: 'goblin+file:///repo/worktree',
+          },
           branchName: 'main',
           worktreePath: '/repo',
           tabs: [{ type: 'terminal', runtimeSessionId: '' }],
@@ -263,6 +269,12 @@ describe('shared terminal validators', () => {
         request: {
           repoRoot: 'goblin+file:///repo',
           repoRuntimeId: 'repo-runtime-test',
+          target: {
+            kind: 'git-worktree',
+            workspaceId: 'goblin+file:///repo',
+            workspaceRuntimeId: 'repo-runtime-test',
+            root: 'goblin+file:///repo/worktree',
+          },
           branch: 'main',
           worktreePath: '/repo/worktree',
           kind: 'primary',
@@ -291,10 +303,13 @@ describe('shared terminal validators', () => {
 
   test('normalizes runtime close application requests and rejects invalid session ids', () => {
     const target = {
-      repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test',
-      branchName: 'main',
-      worktreePath: '/repo/worktree',
+      target: {
+        kind: 'git-worktree',
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-test',
+        root: 'goblin+file:///repo/worktree',
+      },
+      nativeWorktreePath: '/repo/worktree',
     }
     const closeMessage = {
       type: 'request',
@@ -316,7 +331,7 @@ describe('shared terminal validators', () => {
     expect(
       normalizeAppRealtimeClientMessage({
         ...closeMessage,
-        input: { ...closeMessage.input, target: { ...target, worktreePath: null } },
+        input: { ...closeMessage.input, target: { ...target, nativeWorktreePath: null } },
       }),
     ).toBeNull()
   })

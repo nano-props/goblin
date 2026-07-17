@@ -2,6 +2,16 @@ import { describe, expect, test, vi } from 'vitest'
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+
+const workspaceId = requiredWorkspaceLocator('goblin+file:///repo')
+const worktreeRoot = requiredWorkspaceLocator('goblin+file:///repo/expected')
+
+function requiredWorkspaceLocator(input: string) {
+  const locator = canonicalWorkspaceLocator(input)
+  if (!locator) throw new Error('invalid workspace locator fixture')
+  return locator
+}
 
 describe('terminal session create provider', () => {
   test('rejects an active permit issued for a different physical worktree', async () => {
@@ -35,6 +45,7 @@ function createRequest() {
   return {
     repoRoot: '/repo',
     repoRuntimeId: 'repo-runtime-test',
+    target: { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: 'repo-runtime-test', root: worktreeRoot },
     branch: 'main',
     worktreePath: '/repo/expected',
     kind: 'primary' as const,

@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   workspaceProbes: new Map<string, unknown>(),
 }))
 
+const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = { removeGitScopedResources: vi.fn() }
+
 vi.mock('#/server/modules/repo-runtimes.ts', () => ({
   acquireRepoRuntimeLease: mocks.acquireRepoRuntimeLease,
   releaseRepoRuntimeMembershipLease: mocks.releaseRepoRuntimeMembershipLease,
@@ -32,6 +34,14 @@ vi.mock('#/server/modules/repo-runtimes.ts', () => ({
     if (current) return current
     mocks.workspaceProbes.set(input.repoRoot, input.probe)
     return input.probe
+  }),
+  runSerializedInitialWorkspaceProbe: vi.fn(async (input) => {
+    const current = mocks.workspaceProbes.get(input.repoRoot)
+    if (current && (current as { status: string }).status !== 'probing') return current
+    const probe = await input.probe()
+    await input.beforeCommit?.({ before: { status: 'probing' }, after: probe })
+    mocks.workspaceProbes.set(input.repoRoot, probe)
+    return probe
   }),
   workspaceProbeStateForRuntime: vi.fn(
     (_userId, repoRoot) => mocks.workspaceProbes.get(repoRoot) ?? { status: 'probing' },
@@ -113,6 +123,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: 'user-test',
       clientId: 'client_test000000000000',
       workspacePaneTabsHost,
@@ -131,12 +142,18 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(stub.projection).toBeNull()
     expect(stub.repoRuntimeId).toBe('runtime-goblin_file____repo_stub')
     expect(stub.name).toBe('repo')
-    // Only the projected active repo contributes a tabs scope snapshot.
+    // Every readable workspace contributes its workspace-level tabs scope;
+    // only the active repo performs the Git projection read.
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
     expect(result.runtime.workspacePaneTabs).toEqual([
       {
         repoRoot: 'goblin+file:///repo-active',
         repoRuntimeId: 'runtime-goblin_file____repo_active',
+        snapshot: { revision: 0, entries: [] },
+      },
+      {
+        repoRoot: 'goblin+file:///repo-stub',
+        repoRuntimeId: 'runtime-goblin_file____repo_stub',
         snapshot: { revision: 0, entries: [] },
       },
     ])
@@ -158,6 +175,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 
@@ -192,6 +210,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 
@@ -222,6 +241,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 
@@ -242,6 +262,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     await expect(
       restoreServerWorkspace({
+        workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
         userId: 'user-test',
         clientId: 'client_test000000000000',
         workspacePaneTabsHost,
@@ -274,6 +295,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: 'user-test',
       clientId: 'client_test000000000000',
       activeRepoRoot: 'goblin+file:///repo-b',
@@ -317,6 +339,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 
@@ -328,6 +351,13 @@ describe('restoreServerWorkspace — active-only restore', () => {
       projection: null,
       workspaceProbe: { capabilities: { git: { status: 'unavailable' } } },
     })
+    expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.removeGitScopedResources).toHaveBeenCalledWith({
+      userId: 'user-test',
+      workspaceId: 'goblin+file:///repo-stub/src',
+      workspaceRuntimeId: 'runtime-goblin_file____repo_stub_src',
+      assertCurrent: expect.any(Function),
+    })
+    expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.removeGitScopedResources).toHaveBeenCalledOnce()
     expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
   })
 
@@ -362,6 +392,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 
@@ -375,7 +406,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(mocks.runRemoteLifecycleWrite).toHaveBeenCalledOnce()
   })
 
-  test('non-active repos with stale tabs are ignored during validation', async () => {
+  test('restores the workspace scope for non-active Git stubs without eagerly validating Git targets', async () => {
     const staleTargetKey = workspacePaneTabsTargetIdentityKey({
       repoRoot: 'goblin+file:///repo-stub',
       branchName: 'feature',
@@ -388,8 +419,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
         { kind: 'local', id: 'goblin+file:///repo-stub' },
       ],
       workspacePaneTabsByTargetByWorkspace: {
-        // Stale tab entry for the stub repo that would normally force a
-        // rebuild — but plan B skips validation for stubs.
+        // The Git target cannot be validated without the deferred projection;
+        // workspace-level tabs can still be restored independently.
         'goblin+file:///repo-stub': { [staleTargetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
@@ -409,10 +440,49 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 
     expect(result.status).toBe('restored')
+  })
+
+  test('restores workspace-level layout when Git enrichment has a diagnostic', async () => {
+    const repoRoot = 'goblin+file:///repo'
+    const workspace = {
+      ...defaultServerWorkspaceState(),
+      openWorkspaceEntries: [{ kind: 'local' as const, id: repoRoot }],
+    }
+    mocks.getServerWorkspaceState.mockResolvedValue(workspace)
+    mocks.workspaceProbes.set(repoRoot, {
+      status: 'ready',
+      name: 'repo',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [{ scope: 'git', message: 'Git probe timed out' }],
+    })
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
+
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspace({
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+      workspacePaneTabsHost,
+    })
+
+    expect(result.runtime.repos[0]).toMatchObject({ projection: null, workspaceProbe: { status: 'ready' } })
+    expect(mocks.readRepoProjection).not.toHaveBeenCalled()
+    expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.removeGitScopedResources).not.toHaveBeenCalled()
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
+      workspaceId: repoRoot,
+      workspaceRuntimeId: 'runtime-goblin_file____repo',
+      expectedRepoEntry: { kind: 'local', id: repoRoot },
+      targets: [{ kind: 'workspace' }],
+    })
   })
 })
 

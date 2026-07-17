@@ -43,6 +43,8 @@ import {
 import { workspacePaneTabEntryIdentity, workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
+import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
+import type { RemoteRepoRuntimeLifecycle } from '#/shared/remote-repo.ts'
 import type {
   TerminalAttachResult,
   TerminalRestartResult,
@@ -404,12 +406,9 @@ export function installWorkspacePaneTabsTestBridge(
       open: async (input) => {
         const terminalSessionId = 'term-testtesttesttesttest1'
         const terminalRuntimeSessionId = 'pty_test_aaaaaaaaa'
-        const target = {
-          repoRoot: input.request.repoRoot,
-          repoRuntimeId: input.request.repoRuntimeId,
-          branchName: input.request.branch,
-          worktreePath: input.request.worktreePath,
-        }
+        const projectedTarget = workspacePaneTabsTargetFromRuntime(input.request.target)
+        if (!projectedTarget) throw new Error('invalid terminal runtime target')
+        const target = { ...projectedTarget, repoRuntimeId: input.request.repoRuntimeId }
         replaceServerTarget(
           target,
           workspacePaneTabsWithRuntimeTab(serverTabsForTarget(target), 'terminal', terminalSessionId, {
@@ -438,12 +437,15 @@ export function installWorkspacePaneTabsTestBridge(
         } as const
       },
       close: async (input) => {
-        const currentTabs = serverTabsForTarget(input.target)
+        const projectedTarget = workspacePaneTabsTargetFromRuntime(input.target.target)
+        if (!projectedTarget) throw new Error('invalid terminal runtime target')
+        const target = { ...projectedTarget, repoRuntimeId: input.target.target.workspaceRuntimeId }
+        const currentTabs = serverTabsForTarget(target)
         const wasOpen = currentTabs.some(
           (tab) => tab.type === input.runtimeType && tab.runtimeSessionId === input.sessionId,
         )
         replaceServerTarget(
-          input.target,
+          target,
           currentTabs.filter((tab) => tab.type !== input.runtimeType || tab.runtimeSessionId !== input.sessionId),
         )
         return {
@@ -574,8 +576,8 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     {
       currentRepoRuntimeId: string | null
       members: Set<string>
-      workspaceProbe?: import('#/shared/workspace-runtime.ts').WorkspaceProbeState
-      remoteLifecycle?: import('#/shared/remote-repo.ts').RemoteRepoRuntimeLifecycle
+      workspaceProbe?: WorkspaceProbeState
+      remoteLifecycle?: RemoteRepoRuntimeLifecycle
     }
   >()
   const sessionStorageValues = new Map<string, string>()
@@ -1079,7 +1081,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
               kind?: string
               repoId?: string
               name?: string
-              lifecycle?: import('#/shared/remote-repo.ts').RemoteRepoRuntimeLifecycle
+              lifecycle?: RemoteRepoRuntimeLifecycle
             }
             if (value.kind === 'settled' && value.repoId && value.lifecycle) {
               const requestedRuntimeId =

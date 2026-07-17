@@ -128,7 +128,9 @@ function createTestRepoRoutes(
   repoMutationApplication: Parameters<typeof createRepoRoutes>[0]['repoMutationApplication'] = {
     deleteBranch: async (_userId, input) => await input.deleteBranch(),
   },
-  workspaceCapabilityTransitionHost?: Parameters<typeof createRepoRoutes>[0]['workspaceCapabilityTransitionHost'],
+  workspaceCapabilityTransitionHost: Parameters<typeof createRepoRoutes>[0]['workspaceCapabilityTransitionHost'] = {
+    removeGitScopedResources: vi.fn(),
+  },
 ) {
   return createRepoRoutes({
     worktreeRemovalApplication,
@@ -266,7 +268,8 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       },
       diagnostics: [],
     })
-    const app = createTestRepoRoutes()
+    const removeGitScopedResources = vi.fn(async () => undefined)
+    const app = createTestRepoRoutes(undefined, undefined, { removeGitScopedResources })
 
     const response = await app.request(
       new Request('http://localhost/runtime-open', {
@@ -293,6 +296,64 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       process.platform === 'win32' ? 'win32' : 'posix',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
+    expect(removeGitScopedResources).toHaveBeenCalledOnce()
+    expect(removeGitScopedResources).toHaveBeenCalledWith({
+      userId: 'user-test',
+      workspaceId: 'goblin+file:///tmp/repo/subdir',
+      workspaceRuntimeId: json.repoRuntimeId,
+      assertCurrent: expect.any(Function),
+    })
+  })
+
+  test('defers initial diagnostic Git cleanup until unavailability becomes conclusive', async () => {
+    mocks.probeLocalWorkspace.mockResolvedValue({
+      status: 'ready',
+      name: 'workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [{ scope: 'git', message: 'Git probe timed out' }],
+    })
+    const removeGitScopedResources = vi.fn(async () => undefined)
+    const app = createTestRepoRoutes(undefined, undefined, { removeGitScopedResources })
+    const opened = await app.request(
+      new Request('http://localhost/runtime-open', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ repoInput: '/tmp/diagnostic', clientId: 'client-test' }),
+      }),
+    )
+    const openedJson = (await opened.json()) as { ok: true; repo: { id: string }; repoRuntimeId: string }
+    expect(removeGitScopedResources).not.toHaveBeenCalled()
+
+    mocks.probeWorkspace.mockResolvedValue({
+      status: 'ready',
+      name: 'workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [],
+    })
+    await app.request(
+      new Request('http://localhost/workspace-refresh', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId: openedJson.repo.id, workspaceRuntimeId: openedJson.repoRuntimeId }),
+      }),
+    )
+    await app.request(
+      new Request('http://localhost/workspace-refresh', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId: openedJson.repo.id, workspaceRuntimeId: openedJson.repoRuntimeId }),
+      }),
+    )
+
+    expect(removeGitScopedResources).toHaveBeenCalledOnce()
   })
 
   test('runtime-open with repoInput fails without minting a runtime id when probe fails', async () => {

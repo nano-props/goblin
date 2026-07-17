@@ -55,9 +55,7 @@ export type WorkspaceGitProbeResult =
   | { status: 'inconclusive'; diagnostic: string }
 
 export type RestorableWorkspacePaneTarget =
-  | { kind: 'workspace' }
-  | { kind: 'git-branch'; branch: string }
-  | { kind: 'git-worktree'; root: WorkspaceId }
+  { kind: 'workspace' } | { kind: 'git-branch'; branch: string } | { kind: 'git-worktree'; root: WorkspaceId }
 
 export type RuntimeWorkspacePaneTarget =
   | { kind: 'workspace'; workspaceId: WorkspaceId; workspaceRuntimeId: string }
@@ -80,12 +78,6 @@ export function capabilitiesFromGitProbe(
           }
         : { status: 'unavailable' },
   }
-}
-
-export function isConclusiveWorkspaceGitProbe(
-  result: WorkspaceGitProbeResult,
-): result is Exclude<WorkspaceGitProbeResult, { status: 'inconclusive' }> {
-  return result.status !== 'inconclusive'
 }
 
 export function bindWorkspacePaneTarget(
@@ -121,8 +113,6 @@ function sameGitCapability(a: WorkspaceCapabilities['git'], b: WorkspaceCapabili
   if (a.status !== b.status) return false
   return (
     a.status === 'unavailable' ||
-    (b.status === 'available' &&
-      a.worktrees === b.worktrees &&
-      a.pullRequests.provider === b.pullRequests.provider)
+    (b.status === 'available' && a.worktrees === b.worktrees && a.pullRequests.provider === b.pullRequests.provider)
   )
 }

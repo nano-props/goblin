@@ -20,11 +20,9 @@ export interface WorkspacePaneRuntimeTabPanelState {
 }
 
 export interface WorkspacePaneRuntimeTabPanelTarget {
-  repoRoot: string
-  repoRuntimeId: string
-  branchName: string | null
-  worktreePath: string | null
-  runtimeTarget?: RuntimeWorkspacePaneTarget
+  runtimeTarget: RuntimeWorkspacePaneTarget
+  /** Native path used only by the terminal view execution adapter. */
+  worktreePath: string
 }
 
 export interface WorkspacePaneRuntimeTabPanelRenderInput {
@@ -94,19 +92,20 @@ function TerminalWorkspacePaneRuntimeTabPanel({
     [createTerminalWithAdmission, navigation, t],
   )
 
-  if ((!target.branchName && target.runtimeTarget?.kind !== 'workspace') || !target.worktreePath) return null
+  const { runtimeTarget } = target
+  const branch = runtimeTarget.kind === 'git-branch' ? runtimeTarget.branch : ''
   return (
     <WorkspacePanePanelFrame id={`${workspacePaneId}-terminal-panel`} {...panelLabel}>
       <TerminalSessionView
-        repoRoot={target.repoRoot}
-        repoRuntimeId={target.repoRuntimeId}
-        branch={target.branchName ?? ''}
+        repoRoot={runtimeTarget.workspaceId}
+        repoRuntimeId={runtimeTarget.workspaceRuntimeId}
+        branch={branch}
         worktreePath={target.worktreePath}
         selectedTerminalSessionId={selectedSessionId}
         projectionPhase={runtimeState.projectionPhase}
         projectionErrorMessage={runtimeState.projectionErrorMessage}
         createTerminalForSlot={createTerminalForSlot}
-        target={target.runtimeTarget}
+        target={runtimeTarget}
       />
     </WorkspacePanePanelFrame>
   )

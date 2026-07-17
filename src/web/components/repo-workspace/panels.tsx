@@ -36,6 +36,7 @@ import { getRepositoryFileViewer } from '#/web/filetree-client.ts'
 import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/repo-workspace/file-read-command.ts'
 import { HistoryCommitGraph, HistoryCommitGraphSkeleton } from '#/web/components/repo-workspace/HistoryCommitGraph.tsx'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
+import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
@@ -67,16 +68,21 @@ export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInpu
   const { type, selection, ...panelProps } = input
   if (isWorkspacePaneRuntimeTabType(type)) {
     const runtimeState = input.runtimeTabStateByType[type]
+    const branchName = input.detail.branch?.name ?? ''
+    const worktreePath = input.detail.branch?.worktree?.path ?? null
+    const runtimeTarget = runtimeWorkspacePaneTarget(
+      { repoRoot: input.repo.id, branchName, worktreePath },
+      input.repo.repoRuntimeId,
+    )
+    if (!runtimeTarget || !worktreePath) return null
     return renderWorkspacePaneRuntimeTabPanel({
       type,
       workspacePaneId: input.workspacePaneId,
       panelLabel: input.panelLabel,
       selectedSessionId: selectedRuntimeSessionId(selection, type),
       target: {
-        repoRoot: input.repo.id,
-        repoRuntimeId: input.repo.repoRuntimeId,
-        branchName: input.detail.branch?.name ?? null,
-        worktreePath: input.detail.branch?.worktree?.path ?? null,
+        runtimeTarget,
+        worktreePath,
       },
       runtimeState: {
         projectionPhase: runtimeState.projectionPhase,
@@ -245,7 +251,9 @@ export function FiletreeTab({
       if (!beginOpeningFile(openingFileKey)) return
       try {
         const openerIdentity = workspacePaneStaticTabId('files')
-        const base = { repoRoot: repoId, repoRuntimeId, branch: branchName, worktreePath }
+        const target = runtimeWorkspacePaneTarget({ repoRoot: repoId, branchName, worktreePath }, repoRuntimeId)
+        if (!target) throw new Error('error.workspace-tabs-target-invalid')
+        const base = { repoRoot: repoId, repoRuntimeId, branch: branchName, worktreePath, target }
         await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
           base,
           createTerminal: createTerminalWithAdmission,

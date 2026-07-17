@@ -122,11 +122,16 @@ function createSessionSummaryFromCreate(
     message: result.message,
     cols: result.canonicalCols,
     rows: result.canonicalRows,
-    target: base.target,
+    target: requireBaseRuntimeTarget(base),
   }
 }
 
 function requireBaseRepoRuntimeId(base: TerminalSessionBase): string {
   if (typeof base.repoRuntimeId === 'string' && base.repoRuntimeId.length > 0) return base.repoRuntimeId
   throw new Error('error.repo-runtime-stale')
+}
+
+function requireBaseRuntimeTarget(base: TerminalSessionBase) {
+  if (base.target) return base.target
+  throw new Error('error.workspace-tabs-target-invalid')
 }

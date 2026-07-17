@@ -3,11 +3,20 @@
 import { describe, expect, test, vi } from 'vitest'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const USER_ID = 'user_terminal_create_coordinator'
 const SCOPE = 'repo-runtime-terminal-create'
 const WORKTREE_PATH = '/repo/worktree'
 const OTHER_WORKTREE_PATH = '/repo/other-worktree'
+const WORKSPACE_ID = requiredWorkspaceLocator('goblin+file:///repo')
+const WORKTREE_ROOT = requiredWorkspaceLocator('goblin+file:///repo/worktree')
+
+function requiredWorkspaceLocator(input: string) {
+  const locator = canonicalWorkspaceLocator(input)
+  if (!locator) throw new Error('invalid workspace locator fixture')
+  return locator
+}
 
 describe('terminal session create coordinator', () => {
   test('reuses an existing worktree session for primary creates', async () => {
@@ -115,9 +124,15 @@ describe('terminal session create coordinator', () => {
 function terminalSession(terminalSessionId: string): TerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
-        terminalRuntimeGeneration: 1,
+    terminalRuntimeGeneration: 1,
     terminalSessionId,
     repoRuntimeId: 'repo-runtime-test',
+    target: {
+      kind: 'git-worktree',
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: 'repo-runtime-test',
+      root: WORKTREE_ROOT,
+    },
     repoRoot: '/repo',
     branch: 'feature/worktree',
     worktreePath: WORKTREE_PATH,

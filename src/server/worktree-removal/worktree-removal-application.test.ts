@@ -11,6 +11,7 @@ import {
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const failRemoteRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
 vi.mock('#/server/modules/remote-runtime-failure-settlement.ts', async (importActual) => {
@@ -19,11 +20,18 @@ vi.mock('#/server/modules/remote-runtime-failure-settlement.ts', async (importAc
 })
 
 const target = {
-  repoRoot: '/repo',
+  repoRoot: 'goblin+file:///repo',
   repoRuntimeId: 'repo-runtime-test',
   worktreePath: '/repo/worktree',
   branchName: 'feature/worktree',
   deleteBranch: false,
+}
+const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')
+const worktreeRoot = canonicalWorkspaceLocator('goblin+file:///repo/worktree')
+const linkedWorkspaceId = canonicalWorkspaceLocator('goblin+file:///linked-repo')
+const linkedWorktreeRoot = canonicalWorkspaceLocator('goblin+file:///linked/worktree')
+if (!workspaceId || !worktreeRoot || !linkedWorkspaceId || !linkedWorktreeRoot) {
+  throw new Error('invalid workspace locator fixture')
 }
 
 describe('WorktreeRemovalApplication', () => {
@@ -94,8 +102,18 @@ describe('WorktreeRemovalApplication', () => {
 
   test('reconciles every affected user scope after Git removal fails', async () => {
     const affectedScopes = [
-      { userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a', worktreePath: '/repo/worktree' },
-      { userId: 'user-b', repoRoot: '/repo', scope: '/repo\0runtime-b', worktreePath: '/repo/worktree' },
+      {
+        userId: 'user-a',
+        repoRoot: 'goblin+file:///repo',
+        scope: 'goblin+file:///repo\0runtime-a',
+        worktreePath: '/repo/worktree',
+      },
+      {
+        userId: 'user-b',
+        repoRoot: 'goblin+file:///repo',
+        scope: 'goblin+file:///repo\0runtime-b',
+        worktreePath: '/repo/worktree',
+      },
     ]
     const reconcilePhysicalWorktreeAfterRemovalFailure = vi.fn(async () => {})
     const retireTarget = vi.fn(async () => {})
@@ -308,13 +326,18 @@ describe('WorktreeRemovalApplication', () => {
         userId: 'user-a',
         scope: '/repo\0runtime-a',
         repoRuntimeId: 'runtime-a',
-        target: { kind: 'worktree' as const, repoRoot: '/repo', worktreePath: '/repo/worktree' },
+        target: { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: 'runtime-a', root: worktreeRoot },
       },
       {
         userId: 'user-a',
         scope: '/linked-repo\0runtime-b',
         repoRuntimeId: 'runtime-b',
-        target: { kind: 'worktree' as const, repoRoot: '/linked-repo', worktreePath: '/linked/worktree' },
+        target: {
+          kind: 'git-worktree' as const,
+          workspaceId: linkedWorkspaceId,
+          workspaceRuntimeId: 'runtime-b',
+          root: linkedWorktreeRoot,
+        },
       },
     ]
     const broadcastSessionsChanged = vi.fn()
@@ -338,10 +361,10 @@ describe('WorktreeRemovalApplication', () => {
     ).resolves.toEqual({ ok: true, message: '' })
 
     expect(retireTarget).not.toHaveBeenCalled()
-    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', '/repo')
-    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', '/linked-repo')
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', '/repo')
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', '/linked-repo')
+    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///repo')
+    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///linked-repo')
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///repo')
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///linked-repo')
   })
 })
 

@@ -1215,7 +1215,18 @@ describe('RepoWorkspaceContent', () => {
     )
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(createTerminalWithAdmission).toHaveBeenCalledWith(
-      { repoRoot: REPO_ID, repoRuntimeId: repo.repoRuntimeId, branch: branchName, worktreePath },
+      {
+        repoRoot: REPO_ID,
+        repoRuntimeId: repo.repoRuntimeId,
+        target: {
+          kind: 'git-worktree',
+          workspaceId: REPO_ID,
+          workspaceRuntimeId: repo.repoRuntimeId,
+          root: 'goblin+file:///tmp/filetree-open-worktree',
+        },
+        branch: branchName,
+        worktreePath,
+      },
       {
         resolveStartupShellCommand: expect.any(Function),
       },

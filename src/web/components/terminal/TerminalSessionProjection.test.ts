@@ -12,6 +12,7 @@ import type { TerminalDescriptor, TerminalRepoIndex } from '#/web/components/ter
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import { resetReposStore } from '#/web/test-utils/bridge.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const workspacePaneRuntimeMocks = vi.hoisted(() => ({
   close: vi.fn(),
@@ -33,6 +34,19 @@ const REPO_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/repo'
 const BRANCH = 'main'
 const WORKTREE_KEY = formatTerminalWorktreeKey(REPO_ROOT, WORKTREE_PATH)
+const WORKSPACE_ID = requiredWorkspaceLocator(REPO_ROOT)
+const RUNTIME_TARGET = {
+  kind: 'git-worktree' as const,
+  workspaceId: WORKSPACE_ID,
+  workspaceRuntimeId: REPO_RUNTIME_ID,
+  root: WORKSPACE_ID,
+}
+
+function requiredWorkspaceLocator(input: string) {
+  const locator = canonicalWorkspaceLocator(input)
+  if (!locator) throw new Error('invalid workspace locator fixture')
+  return locator
+}
 
 function makeDescriptor(terminalSessionId: string, index: number): TerminalDescriptor {
   return {
@@ -40,6 +54,7 @@ function makeDescriptor(terminalSessionId: string, index: number): TerminalDescr
     terminalWorktreeKey: WORKTREE_KEY,
     index,
     repoRuntimeId: REPO_RUNTIME_ID,
+    target: RUNTIME_TARGET,
     repoRoot: REPO_ROOT,
     branch: BRANCH,
     worktreePath: WORKTREE_PATH,
@@ -75,6 +90,7 @@ function makeServerSession(
     terminalRuntimeGeneration: overrides.terminalRuntimeGeneration ?? 1,
     terminalSessionId,
     repoRuntimeId: overrides.repoRuntimeId ?? REPO_RUNTIME_ID,
+    target: { ...RUNTIME_TARGET, workspaceRuntimeId: overrides.repoRuntimeId ?? REPO_RUNTIME_ID },
     repoRoot: REPO_ROOT,
     branch: BRANCH,
     worktreePath: WORKTREE_PATH,
@@ -677,6 +693,7 @@ describe('TerminalSessionProjection', () => {
         .closeTerminalByDescriptor(terminalSessionId, {
           repoRoot: REPO_ROOT,
           repoRuntimeId: REPO_RUNTIME_ID,
+          target: RUNTIME_TARGET,
           branch: BRANCH,
           worktreePath: WORKTREE_PATH,
         })
@@ -712,6 +729,7 @@ describe('TerminalSessionProjection', () => {
       const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
+        target: RUNTIME_TARGET,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
       })
@@ -746,6 +764,7 @@ describe('TerminalSessionProjection', () => {
       const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
+        target: RUNTIME_TARGET,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
       })
@@ -872,6 +891,7 @@ describe('TerminalSessionProjection', () => {
       const close = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
+        target: RUNTIME_TARGET,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
       })
@@ -909,6 +929,7 @@ describe('TerminalSessionProjection', () => {
       const firstClose = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
+        target: RUNTIME_TARGET,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
       })
@@ -927,6 +948,7 @@ describe('TerminalSessionProjection', () => {
       const secondClose = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
         repoRuntimeId: replacementRepoRuntimeId,
+        target: { ...RUNTIME_TARGET, workspaceRuntimeId: replacementRepoRuntimeId },
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
       })
@@ -965,6 +987,7 @@ describe('TerminalSessionProjection', () => {
       const closePromise = projection.closeTerminalByDescriptor(activeSessionId, {
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
+        target: RUNTIME_TARGET,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
       })
@@ -1006,6 +1029,7 @@ describe('TerminalSessionProjection', () => {
         projection.closeTerminalByDescriptor('term-111111111111111111111', {
           repoRoot: REPO_ROOT,
           repoRuntimeId: REPO_RUNTIME_ID,
+          target: RUNTIME_TARGET,
           branch: BRANCH,
           worktreePath: WORKTREE_PATH,
         }),
@@ -1031,6 +1055,7 @@ describe('TerminalSessionProjection', () => {
         projection.closeTerminalByDescriptor('term-111111111111111111111', {
           repoRoot: REPO_ROOT,
           repoRuntimeId: REPO_RUNTIME_ID,
+          target: RUNTIME_TARGET,
           branch: BRANCH,
           worktreePath: WORKTREE_PATH,
         }),
@@ -1053,12 +1078,14 @@ describe('TerminalSessionProjection', () => {
       const firstClose = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
+        target: RUNTIME_TARGET,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
       })
       const secondClose = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
+        target: RUNTIME_TARGET,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
       })
@@ -1089,6 +1116,7 @@ describe('TerminalSessionProjection', () => {
       const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
+        target: RUNTIME_TARGET,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
       })
@@ -1121,6 +1149,7 @@ describe('TerminalSessionProjection', () => {
         projection.closeTerminalByDescriptor(terminalSessionId, {
           repoRoot: REPO_ROOT,
           repoRuntimeId: REPO_RUNTIME_ID,
+          target: RUNTIME_TARGET,
           branch: BRANCH,
           worktreePath: WORKTREE_PATH,
         }),
@@ -1144,6 +1173,7 @@ describe('TerminalSessionProjection', () => {
         projection.closeTerminalByDescriptor('term-111111111111111111111', {
           repoRoot: REPO_ROOT,
           repoRuntimeId: REPO_RUNTIME_ID,
+          target: RUNTIME_TARGET,
           branch: BRANCH,
           worktreePath: WORKTREE_PATH,
         }),
@@ -1171,6 +1201,7 @@ describe('TerminalSessionProjection', () => {
         projection.closeTerminalByDescriptor(terminalSessionId, {
           repoRoot: REPO_ROOT,
           repoRuntimeId: 'repo-runtime-new',
+          target: { ...RUNTIME_TARGET, workspaceRuntimeId: 'repo-runtime-new' },
           branch: BRANCH,
           worktreePath: WORKTREE_PATH,
         }),

@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalCreateResult } from '#/shared/terminal-types.ts'
+import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const mocks = vi.hoisted(() => ({
   createMock: vi.fn(),
@@ -203,6 +204,12 @@ function terminalBase() {
   return {
     repoRoot: REPO_ROOT,
     repoRuntimeId: REPO_RUNTIME_ID,
+    target: runtimeWorkspacePaneTargetForTest({
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+      branchName: BRANCH,
+      worktreePath: WORKTREE_PATH,
+    }),
     branch: BRANCH,
     worktreePath: WORKTREE_PATH,
   }
@@ -314,6 +321,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
+      target: terminalBase().target,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
       kind: 'primary',
@@ -357,6 +365,7 @@ describe('TerminalSessionProjection create flow', () => {
       request: {
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
+        target: terminalBase().target,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
         kind: 'primary',
@@ -378,6 +387,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
+      target: terminalBase().target,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
       kind: 'additional',
@@ -406,6 +416,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
+      target: terminalBase().target,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
       kind: 'additional',
@@ -531,6 +542,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.createMock).toHaveBeenLastCalledWith({
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
+      target: terminalBase().target,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
       kind: 'additional',
@@ -612,6 +624,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
+      target: terminalBase().target,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
       kind: 'primary',
@@ -669,6 +682,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
+      target: terminalBase().target,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
       kind: 'primary',
@@ -697,6 +711,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
+      target: terminalBase().target,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
       kind: 'primary',

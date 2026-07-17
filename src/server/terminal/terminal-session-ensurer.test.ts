@@ -13,6 +13,7 @@ import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { resolveKnownWorktree } from '#/shared/worktree-guards.ts'
 import type { TerminalSessionPrepareManagerResult } from '#/server/terminal/terminal-session-ensurer.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 vi.mock('#/system/git/worktrees.ts', () => ({
   getWorktrees: vi.fn(async () => [
@@ -43,9 +44,20 @@ const USER_ID = 'user_terminal_ensurer'
 const REPO_ROOT = 'goblin+file:///repo'
 const REPO_RUNTIME_ID = 'repo-runtime-ensure'
 const WORKTREE_PATH = '/repo/worktree'
+const LOCAL_TARGET = {
+  kind: 'git-worktree' as const,
+  workspaceId: canonicalWorkspaceLocator(REPO_ROOT)!,
+  workspaceRuntimeId: REPO_RUNTIME_ID,
+  root: canonicalWorkspaceLocator('goblin+file:///repo/worktree')!,
+}
 const BRANCH_NAME = 'feature/worktree'
 const REMOTE_REPO_ROOT = 'goblin+ssh://prod/srv/repo'
 const REMOTE_WORKTREE_PATH = '/srv/repo'
+const REMOTE_TARGET = {
+  kind: 'workspace' as const,
+  workspaceId: canonicalWorkspaceLocator(REMOTE_REPO_ROOT)!,
+  workspaceRuntimeId: REPO_RUNTIME_ID,
+}
 
 function ensureContext(context: Omit<TerminalSessionEnsureContext, 'signal'>): TerminalSessionEnsureContext {
   return { ...context, signal: new AbortController().signal }
@@ -117,6 +129,7 @@ describe('terminal session ensurer', () => {
       {
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
+        target: LOCAL_TARGET,
         branch: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         startupShellCommand: 'echo ready',
@@ -146,7 +159,7 @@ describe('terminal session ensurer', () => {
       rows: 40,
       clientId: 'client_terminal_ensurer',
       startupShellCommand: 'echo ready',
-      target: undefined,
+      target: LOCAL_TARGET,
       env: undefined,
       signal: context.signal,
     })
@@ -163,6 +176,7 @@ describe('terminal session ensurer', () => {
       {
         repoRoot: REMOTE_REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
+        target: REMOTE_TARGET,
         branch: BRANCH_NAME,
         worktreePath: REMOTE_WORKTREE_PATH,
         startupShellCommand: 'pwd',
@@ -219,6 +233,7 @@ describe('terminal session ensurer', () => {
         {
           repoRoot: REMOTE_REPO_ROOT,
           repoRuntimeId: REPO_RUNTIME_ID,
+          target: REMOTE_TARGET,
           branch: BRANCH_NAME,
           worktreePath: REMOTE_WORKTREE_PATH,
         },

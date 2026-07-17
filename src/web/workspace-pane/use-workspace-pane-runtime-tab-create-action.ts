@@ -11,6 +11,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 
 export interface UseWorkspacePaneRuntimeTabCreateActionInput {
   repoRoot: string
@@ -24,6 +25,7 @@ export interface UseWorkspacePaneRuntimeTabCreateActionInput {
     type: WorkspacePaneRuntimeTabType,
     sessionId: string,
     canonicalBranch: string,
+    target: RuntimeWorkspacePaneTarget,
   ) => boolean | Promise<boolean>
   t: TerminalCreateTranslator
 }
@@ -62,7 +64,8 @@ export function useWorkspacePaneRuntimeTabCreateAction({
         repoRoot,
         runtimeTabStateByType,
         initialRuntimeProjectionHydrating,
-        showCreatedRuntimeTab,
+        showCreatedRuntimeTab: (type, sessionId, canonicalBranch) =>
+          terminalBase?.target ? showCreatedRuntimeTab(type, sessionId, canonicalBranch, terminalBase.target) : false,
         t,
         terminal: {
           base: terminalBase,

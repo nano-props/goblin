@@ -89,7 +89,7 @@ test('persists updates and notifies subscribers from the server settings store',
     lanEnabled: false,
   })
   await writeWorkspacePaneLayout(mod, REPO_B, {
-    entries: [{ repoRoot: REPO_B, branchName: 'main', worktreePath: null, tabs: [] }],
+    entries: [{ target: { kind: 'git-branch', branch: 'main' }, tabs: [] }],
   })
   await mod.addServerRecentWorkspace({ kind: 'local', id: REPO_B })
   await mod.trustServerRepoWorktreeBootstrapConfig({
@@ -244,9 +244,7 @@ test('persists durable tabs independently of runtime membership', async () => {
   await writeWorkspacePaneLayout(mod, REPO_A, {
     entries: [
       {
-        repoRoot: REPO_A,
-        branchName: 'main',
-        worktreePath: null,
+        target: { kind: 'git-branch', branch: 'main' },
         tabs: [workspacePaneStaticTabEntry('history')],
       },
     ],
@@ -274,12 +272,10 @@ test('workspace pane layout repository loads and applies normalized CAS outcomes
   const mod = await import('#/server/modules/settings-source.ts')
   const repoEntry = { kind: 'local' as const, id: REPO_A }
   const empty = { entries: [] }
-  const history = {
+  const history: WorkspacePaneDurableLayout = {
     entries: [
       {
-        repoRoot: REPO_A,
-        branchName: 'main',
-        worktreePath: null,
+        target: { kind: 'git-branch', branch: 'main' },
         tabs: [workspacePaneStaticTabEntry('history')],
       },
     ],
@@ -345,33 +341,6 @@ test('workspace pane layout repository does not disguise programming errors as p
   ).rejects.toBe(programmingError)
 })
 
-test('workspace pane layout repository checks runtime admission inside the serialized settings transaction', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
-  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
-  process.env.GOBLIN_SERVER_DATA_DIR = tmp
-  const mod = await import('#/server/modules/settings-source.ts')
-  const replacement: WorkspacePaneDurableLayout = {
-    entries: [
-      {
-        repoRoot: REPO_A,
-        branchName: 'main',
-        worktreePath: null,
-        tabs: [workspacePaneStaticTabEntry('history')],
-      },
-    ],
-  }
-
-  await expect(
-    mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
-      repoRoot: REPO_A,
-      expected: { entries: [] },
-      replacement,
-      admit: () => false,
-    }),
-  ).resolves.toMatchObject({ kind: 'admission-rejected', snapshot: { layout: { entries: [] } } })
-  await expect(mod.serverWorkspacePaneLayoutRepository.load(REPO_A)).resolves.toEqual({ layout: { entries: [] } })
-})
-
 test('workspace pane layout repository classifies settings write failures at the persistence boundary', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
@@ -389,9 +358,7 @@ test('workspace pane layout repository classifies settings write failures at the
       replacement: {
         entries: [
           {
-            repoRoot: REPO_A,
-            branchName: 'main',
-            worktreePath: null,
+            target: { kind: 'git-branch', branch: 'main' },
             tabs: [workspacePaneStaticTabEntry('history')],
           },
         ],
@@ -406,12 +373,10 @@ test('workspace pane restore does not write or classify persistence failures', a
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
   const repoEntry = { kind: 'local' as const, id: REPO_A }
-  const staleLayout = {
+  const staleLayout: WorkspacePaneDurableLayout = {
     entries: [
       {
-        repoRoot: REPO_A,
-        branchName: 'deleted',
-        worktreePath: null,
+        target: { kind: 'git-branch', branch: 'deleted' },
         tabs: [workspacePaneStaticTabEntry('history')],
       },
     ],
@@ -522,9 +487,7 @@ test('normalizes workspace pane tab list in server sessions', async () => {
   await writeWorkspacePaneLayout(mod, REPO_B, {
     entries: [
       {
-        repoRoot: REPO_B,
-        branchName: 'main',
-        worktreePath: null,
+        target: { kind: 'git-branch', branch: 'main' },
         tabs: [
           workspacePaneStaticTabEntry('status'),
           workspacePaneStaticTabEntry('history'),
@@ -533,16 +496,12 @@ test('normalizes workspace pane tab list in server sessions', async () => {
         ],
       },
       {
-        repoRoot: REPO_B,
-        branchName: 'feature/worktree',
-        worktreePath: '/tmp/repo-b-worktree',
+        target: { kind: 'git-worktree', root: requiredFileWorkspaceLocator('/tmp/repo-b-worktree') },
         tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')],
       },
-      { repoRoot: REPO_B, branchName: 'empty', worktreePath: null, tabs: [] },
+      { target: { kind: 'git-branch', branch: 'empty' }, tabs: [] },
       {
-        repoRoot: REPO_B,
-        branchName: 'invalid',
-        worktreePath: null,
+        target: { kind: 'git-branch', branch: 'invalid' },
         tabs: [{ type: 'changes', tabId: WORKSPACE_PANE_STATIC_TAB_IDS.status }],
       },
     ] as never,
@@ -708,8 +667,14 @@ function branchTargetKey(_repoRoot: string, branchName: string): string {
 }
 
 function worktreeTargetKey(_repoRoot: string, _branchName: string, worktreePath: string): string {
-  const root = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: worktreePath }, 'posix')!
+  const root = requiredFileWorkspaceLocator(worktreePath)
   return restorableWorkspacePaneTargetKey({ kind: 'git-worktree', root })
+}
+
+function requiredFileWorkspaceLocator(worktreePath: string) {
+  const root = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: worktreePath }, 'posix')
+  if (!root) throw new Error('invalid workspace locator fixture')
+  return root
 }
 
 test('normalizer drops malformed workspace external app recent entries on load', async () => {

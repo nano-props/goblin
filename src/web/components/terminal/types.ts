@@ -7,12 +7,16 @@ import type {
   TerminalSessionPhase,
 } from '#/shared/terminal-types.ts'
 import type { TerminalInput, TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
+import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
+import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 
 export interface TerminalDescriptor {
   terminalWorktreeKey: string
   terminalSessionId: string
   index: number
   repoRuntimeId: string
+  target?: RuntimeWorkspacePaneTarget
   repoRoot: string
   branch: string
   worktreePath: string
@@ -176,8 +180,8 @@ export interface TerminalSessionContextValue {
   createTerminalWithAdmission: (
     base: TerminalSessionBase,
     options?: TerminalCreateOptions,
-    placement?: import('#/shared/workspace-pane-runtime.ts').WorkspacePaneRuntimeTabPlacement,
-  ) => Promise<import('#/web/components/terminal/terminal-create-admission.ts').TerminalCreateAdmissionResult>
+    placement?: WorkspacePaneRuntimeTabPlacement,
+  ) => Promise<TerminalCreateAdmissionResult>
   registerHost: (terminalWorktreeKey: string, host: HTMLElement) => void
   unregisterHost: (terminalWorktreeKey: string, host: HTMLElement) => void
   selectTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void

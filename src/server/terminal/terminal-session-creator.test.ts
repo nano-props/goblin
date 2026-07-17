@@ -7,6 +7,7 @@ import { createTerminalSessionCreateCoordinator } from '#/server/terminal/termin
 import type { TerminalCreateInput, TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import type { TerminalSessionEnsureResult } from '#/server/terminal/terminal-session-ensurer.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const USER_ID = 'user_terminal_creator'
 const CLIENT_ID = 'client_terminal_creator'
@@ -15,6 +16,14 @@ const REPO_ROOT = 'goblin+file:///repo'
 const REPO_RUNTIME_ID = 'repo-runtime-terminal-creator'
 const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'
+const WORKSPACE_ID = requiredWorkspaceLocator(REPO_ROOT)
+const WORKTREE_ROOT = requiredWorkspaceLocator('goblin+file:///repo/worktree')
+
+function requiredWorkspaceLocator(input: string) {
+  const locator = canonicalWorkspaceLocator(input)
+  if (!locator) throw new Error('invalid workspace locator fixture')
+  return locator
+}
 
 describe('terminal session creator', () => {
   test('keeps the manager metadata revision when takeover advances current revision during stale validation', async () => {
@@ -126,6 +135,12 @@ function createRequest(overrides: Partial<TerminalCreateInput> = {}): TerminalCr
   return {
     repoRoot: REPO_ROOT,
     repoRuntimeId: REPO_RUNTIME_ID,
+    target: {
+      kind: 'git-worktree',
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: REPO_RUNTIME_ID,
+      root: WORKTREE_ROOT,
+    },
     branch: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
     kind: 'additional',
@@ -141,6 +156,12 @@ function terminalSession(terminalSessionId: string): TerminalSessionSummary {
     terminalRuntimeGeneration: 1,
     terminalSessionId,
     repoRuntimeId: REPO_RUNTIME_ID,
+    target: {
+      kind: 'git-worktree',
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: REPO_RUNTIME_ID,
+      root: WORKTREE_ROOT,
+    },
     repoRoot: path.resolve(REPO_ROOT),
     branch: BRANCH_NAME,
     worktreePath: path.resolve(WORKTREE_PATH),

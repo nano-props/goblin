@@ -20,7 +20,9 @@ describe('remote lifecycle route', () => {
       lifecycle: { kind: 'failed', attemptId: 1, reason: 'unreachable' },
     })
 
-    const response = await createRemoteRoutes().request(
+    const response = await createRemoteRoutes({
+      workspaceCapabilityTransitionHost: { removeGitScopedResources: vi.fn() },
+    }).request(
       new Request('http://localhost/lifecycle', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -93,7 +95,9 @@ describe('remote lifecycle route', () => {
   })
 
   test('returns validation errors before invoking the write path', async () => {
-    const response = await createRemoteRoutes().request(
+    const response = await createRemoteRoutes({
+      workspaceCapabilityTransitionHost: { removeGitScopedResources: vi.fn() },
+    }).request(
       new Request('http://localhost/lifecycle', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },

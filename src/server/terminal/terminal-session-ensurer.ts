@@ -10,6 +10,7 @@ import {
   physicalWorktreeExecutionBinding,
   type PhysicalWorktreeExecutionCapability,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 
 export interface TerminalSessionEnsureInput {
   repoRoot: string
@@ -21,7 +22,7 @@ export interface TerminalSessionEnsureInput {
   cols?: number
   rows?: number
   clientId?: string
-  target?: import('#/shared/workspace-runtime.ts').RuntimeWorkspacePaneTarget
+  target: RuntimeWorkspacePaneTarget
 }
 
 export type TerminalSessionEnsureResult =
@@ -34,8 +35,7 @@ export type TerminalSessionEnsureResult =
   | { ok: false; message: string }
 
 export type TerminalSessionPrepareManagerResult =
-  | { ok: true; terminalRuntimeSessionId: string; admission: TerminalSessionAdmission }
-  | { ok: false; message: string }
+  { ok: true; terminalRuntimeSessionId: string; admission: TerminalSessionAdmission } | { ok: false; message: string }
 
 export type TerminalSessionAdmissionCommitResult = {
   action: TerminalCreateAction
@@ -68,7 +68,7 @@ export interface TerminalSessionEnsureManagerInput {
   startupShellCommand?: string
   env?: Record<string, string>
   signal?: AbortSignal
-  target?: import('#/shared/workspace-runtime.ts').RuntimeWorkspacePaneTarget
+  target: RuntimeWorkspacePaneTarget
 }
 
 export interface TerminalSessionEnsureManager {

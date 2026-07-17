@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTerminalTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
-import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import {
   confirmWorkspacePaneRuntimeTabClose,
   terminalBaseForRuntimeTabCloseTarget,
@@ -15,6 +15,12 @@ const REPO_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posix', p
 const terminalBase: TerminalSessionBase = {
   repoRoot: REPO_ID,
   repoRuntimeId: REPO_RUNTIME_ID,
+  target: {
+    kind: 'git-worktree',
+    workspaceId: REPO_ID,
+    workspaceRuntimeId: REPO_RUNTIME_ID,
+    root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
+  },
   branch: 'main',
   worktreePath: '/repo-worktree',
 }

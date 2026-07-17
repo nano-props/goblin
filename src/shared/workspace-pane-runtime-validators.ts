@@ -1,12 +1,15 @@
 import * as v from 'valibot'
-import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import { normalizeTerminalCreateResult, TerminalCreateInputSchema } from '#/shared/terminal-validators.ts'
 import type { WorkspacePaneRuntimeOpenInput, WorkspacePaneRuntimeOpenResult } from '#/shared/workspace-pane-runtime.ts'
 import type {
   WorkspacePaneRuntimeCloseInput,
   WorkspacePaneRuntimeCloseResult,
 } from '#/shared/workspace-pane-runtime.ts'
-import { RepoRuntimeIdSchema, WorkspacePaneOptionalTabIdentitySchema } from '#/shared/workspace-pane-tabs-validators.ts'
+import {
+  canonicalRuntimeWorkspacePaneTarget,
+  RuntimeWorkspacePaneTargetSchema,
+  WorkspacePaneOptionalTabIdentitySchema,
+} from '#/shared/workspace-pane-tabs-validators.ts'
 import { WORKSPACE_PANE_RUNTIME_TAB_TYPES } from '#/shared/workspace-pane.ts'
 
 export const WorkspacePaneRuntimeOpenInputSchema = v.variant('runtimeType', [
@@ -18,10 +21,8 @@ export const WorkspacePaneRuntimeOpenInputSchema = v.variant('runtimeType', [
 ])
 
 const WorkspacePaneRuntimeCommandTargetSchema = v.object({
-  repoRoot: WorkspaceIdSchema,
-  repoRuntimeId: RepoRuntimeIdSchema,
-  branchName: v.string(),
-  worktreePath: v.string(),
+  target: RuntimeWorkspacePaneTargetSchema,
+  nativeWorktreePath: v.string(),
 })
 
 export const WorkspacePaneRuntimeCloseInputSchema = v.object({
@@ -67,12 +68,16 @@ const WorkspacePaneRuntimeCloseResultSchema = v.variant('ok', [
 
 export function normalizeWorkspacePaneRuntimeOpenInput(value: unknown): WorkspacePaneRuntimeOpenInput | null {
   const parsed = v.safeParse(WorkspacePaneRuntimeOpenInputSchema, value)
-  return parsed.success ? (parsed.output as WorkspacePaneRuntimeOpenInput) : null
+  if (!parsed.success) return null
+  const target = canonicalRuntimeWorkspacePaneTarget(parsed.output.request.target)
+  return target ? { ...parsed.output, request: { ...parsed.output.request, target } } : null
 }
 
 export function normalizeWorkspacePaneRuntimeCloseInput(value: unknown): WorkspacePaneRuntimeCloseInput | null {
   const parsed = v.safeParse(WorkspacePaneRuntimeCloseInputSchema, value)
-  return parsed.success ? (parsed.output as WorkspacePaneRuntimeCloseInput) : null
+  if (!parsed.success) return null
+  const target = canonicalRuntimeWorkspacePaneTarget(parsed.output.target.target)
+  return target ? { ...parsed.output, target: { ...parsed.output.target, target } } : null
 }
 
 export function normalizeWorkspacePaneRuntimeOpenResult(value: unknown): WorkspacePaneRuntimeOpenResult | null {

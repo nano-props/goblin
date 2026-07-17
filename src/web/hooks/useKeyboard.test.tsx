@@ -477,6 +477,13 @@ describe('useKeyboard', () => {
 
       repoRuntimeId: repoRuntimeIdForTest(),
 
+      target: {
+        kind: 'git-worktree',
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: repoRuntimeIdForTest(),
+        root: 'goblin+file:///tmp/keyboard-worktree',
+      },
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })

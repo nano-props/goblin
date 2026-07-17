@@ -52,10 +52,7 @@ import type {
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
-import {
-  workspacePaneStaticTabEntry,
-  workspacePaneRuntimeTabEntry,
-} from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
@@ -107,9 +104,16 @@ function selectedWorkspacePaneTab(repoId: string, branchName = 'feature/worktree
 }
 
 function repoTerminalBase() {
+  const repoRuntimeId = useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
   return {
     repoRoot: REPO_ID,
-    repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
+    repoRuntimeId,
+    target: runtimeWorkspacePaneTargetForTest({
+      repoRoot: REPO_ID,
+      repoRuntimeId,
+      branchName: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+    }),
     branch: 'feature/worktree',
     worktreePath: WORKTREE_PATH,
   }
@@ -356,9 +360,9 @@ let sessionClosedHandler:
   | null = null
 type TestTerminalSessionSummary = Omit<
   TerminalSessionSummary,
-  'repoRuntimeId' | 'repoRoot' | 'branch' | 'worktreePath'
+  'repoRuntimeId' | 'repoRoot' | 'branch' | 'worktreePath' | 'target'
 > &
-  Partial<Pick<TerminalSessionSummary, 'repoRuntimeId' | 'repoRoot' | 'branch' | 'worktreePath'>>
+  Partial<Pick<TerminalSessionSummary, 'repoRuntimeId' | 'repoRoot' | 'branch' | 'worktreePath' | 'target'>>
 const listSessionsMock = vi.fn<
   (...args: Array<{ repoRoot: string; repoRuntimeId?: string }>) => Promise<TestTerminalSessionSummary[]>
 >(async () => [])
@@ -370,15 +374,26 @@ const createTerminalMock = vi.fn<(input: TerminalCreateInput) => Promise<Termina
 let serverSessions: TestTerminalSessionSummary[] = []
 
 function completeServerSession(session: TestTerminalSessionSummary): TerminalSessionSummary {
+  const repoRuntimeId = session.repoRuntimeId ?? useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
   return {
     ...session,
     terminalRuntimeGeneration: session.terminalRuntimeGeneration ?? 1,
     terminalSessionId: normalizeTestSessionId(session.terminalSessionId),
-    repoRuntimeId: session.repoRuntimeId ?? useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
+    repoRuntimeId,
     repoRoot: session.repoRoot ?? REPO_ID,
     branch: session.branch ?? BRANCH_NAME,
     worktreePath: session.worktreePath ?? WORKTREE_PATH,
+    target: session.target ?? terminalRuntimeTarget(repoRuntimeId),
   }
+}
+
+function terminalRuntimeTarget(workspaceRuntimeId: string) {
+  return runtimeWorkspacePaneTargetForTest({
+    repoRoot: REPO_ID,
+    repoRuntimeId: workspaceRuntimeId,
+    branchName: BRANCH_NAME,
+    worktreePath: WORKTREE_PATH,
+  })
 }
 
 function completeServerSessions(sessions: TestTerminalSessionSummary[]): TerminalSessionSummary[] {

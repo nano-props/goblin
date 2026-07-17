@@ -44,9 +44,9 @@ const WORKTREE_PATH = '/tmp/goblin-runtime-provider-worktree'
 
 type TestTerminalSessionSummary = Omit<
   TerminalSessionSummary,
-  'repoRuntimeId' | 'repoRoot' | 'branch' | 'worktreePath'
+  'repoRuntimeId' | 'repoRoot' | 'branch' | 'worktreePath' | 'target'
 > &
-  Partial<Pick<TerminalSessionSummary, 'repoRuntimeId' | 'repoRoot' | 'branch' | 'worktreePath'>>
+  Partial<Pick<TerminalSessionSummary, 'repoRuntimeId' | 'repoRoot' | 'branch' | 'worktreePath' | 'target'>>
 
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let workspaceTabsChangedHandler: ((repoRoot: string) => void) | null = null
@@ -697,12 +697,21 @@ function serverSession(terminalSessionId: string): TestTerminalSessionSummary {
 }
 
 function completeServerSession(session: TestTerminalSessionSummary): TerminalSessionSummary {
+  const repoRuntimeId = session.repoRuntimeId ?? useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
   return {
     ...session,
-    repoRuntimeId: session.repoRuntimeId ?? useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
+    repoRuntimeId,
     repoRoot: session.repoRoot ?? REPO_ID,
     branch: session.branch ?? BRANCH_NAME,
     worktreePath: session.worktreePath ?? WORKTREE_PATH,
+    target:
+      session.target ??
+      runtimeWorkspacePaneTargetForTest({
+        repoRoot: REPO_ID,
+        repoRuntimeId,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+      }),
   }
 }
 

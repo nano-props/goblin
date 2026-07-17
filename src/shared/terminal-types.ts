@@ -66,7 +66,7 @@ export interface TerminalCreateInput {
   cols?: number
   rows?: number
   clientId?: string
-  target?: RuntimeWorkspacePaneTarget
+  target: RuntimeWorkspacePaneTarget
 }
 
 export interface TerminalRestartInput {
@@ -236,7 +236,7 @@ export interface TerminalSessionSummary {
   message: string | null
   cols: number
   rows: number
-  target?: RuntimeWorkspacePaneTarget
+  target: RuntimeWorkspacePaneTarget
 }
 
 /**

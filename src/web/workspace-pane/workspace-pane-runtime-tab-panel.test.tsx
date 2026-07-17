@@ -18,6 +18,7 @@ import {
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 stubI18n()
@@ -119,6 +120,12 @@ describe('workspace pane runtime tab panel', () => {
     const base: TerminalSessionBase = {
       repoRoot: 'goblin+file:///repo',
       repoRuntimeId: 'repo-runtime-1',
+      target: {
+        kind: 'git-worktree',
+        workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
+        workspaceRuntimeId: 'repo-runtime-1',
+        root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
+      },
       branch: 'stale-branch',
       worktreePath: '/repo-worktree',
     }
@@ -178,9 +185,12 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
           workspacePaneId: 'workspace',
           panelLabel: { label: 'Terminal' },
           target: {
-            repoRoot: 'goblin+file:///repo',
-            repoRuntimeId: 'repo-runtime-1',
-            branchName: 'main',
+            runtimeTarget: {
+              kind: 'git-branch',
+              workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
+              workspaceRuntimeId: 'repo-runtime-1',
+              branch: 'main',
+            },
             worktreePath: '/repo-worktree',
           },
           selectedSessionId: 'term-111111111111111111111',

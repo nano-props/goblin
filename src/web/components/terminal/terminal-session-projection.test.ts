@@ -5,10 +5,17 @@ import {
   projectTerminalAttachResultForClient,
 } from '#/web/components/terminal/terminal-session-projection.ts'
 import type { TerminalRepoIndex } from '#/web/components/terminal/types.ts'
+import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const REPO_ROOT = 'goblin+file:///repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/repo'
+const RUNTIME_TARGET = runtimeWorkspacePaneTargetForTest({
+  repoRoot: REPO_ROOT,
+  repoRuntimeId: REPO_RUNTIME_ID,
+  branchName: 'main',
+  worktreePath: WORKTREE_PATH,
+})
 
 function makeRepoIndex(): TerminalRepoIndex {
   return {
@@ -28,6 +35,7 @@ describe('terminal session projection helpers', () => {
       clientId: 'client_a',
       index: 2,
       serverSession: {
+        target: RUNTIME_TARGET,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-222222222222222222222',
@@ -55,6 +63,7 @@ describe('terminal session projection helpers', () => {
         repoRoot: REPO_ROOT,
         branch: 'main',
         worktreePath: WORKTREE_PATH,
+        target: RUNTIME_TARGET,
       },
       terminalWorktreeKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
       hydrateInput: {
@@ -84,6 +93,7 @@ describe('terminal session projection helpers', () => {
       clientId: 'client_b',
       index: 1,
       serverSession: {
+        target: RUNTIME_TARGET,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
@@ -117,6 +127,7 @@ describe('terminal session projection helpers', () => {
       clientId: 'client_b',
       index: 1,
       serverSession: {
+        target: RUNTIME_TARGET,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
@@ -151,6 +162,7 @@ describe('terminal session projection helpers', () => {
       clientId: 'client_b',
       index: 1,
       serverSession: {
+        target: RUNTIME_TARGET,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
@@ -185,6 +197,7 @@ describe('terminal session projection helpers', () => {
       clientId: 'client_b',
       index: 1,
       serverSession: {
+        target: RUNTIME_TARGET,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
@@ -233,7 +246,13 @@ describe('terminal session projection helpers', () => {
 
   test('materializes a prepared create projection with the committed canonical branch', () => {
     const projected = projectCreateResultForClient(
-      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'feature/stale', worktreePath: WORKTREE_PATH },
+      {
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+        target: RUNTIME_TARGET,
+        branch: 'feature/stale',
+        worktreePath: WORKTREE_PATH,
+      },
       {
         ok: true,
         action: 'created',
@@ -257,6 +276,7 @@ describe('terminal session projection helpers', () => {
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       repoRuntimeId: REPO_RUNTIME_ID,
+      target: RUNTIME_TARGET,
       repoRoot: REPO_ROOT,
       branch: 'feature/renamed',
       worktreePath: WORKTREE_PATH,
@@ -273,7 +293,13 @@ describe('terminal session projection helpers', () => {
 
   test('uses authoritative create metadata for the projected session', () => {
     const projected = projectCreateResultForClient(
-      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'main', worktreePath: WORKTREE_PATH },
+      {
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+        target: RUNTIME_TARGET,
+        branch: 'main',
+        worktreePath: WORKTREE_PATH,
+      },
       {
         ok: true,
         action: 'created',
@@ -312,7 +338,13 @@ describe('terminal session projection helpers', () => {
 
   test('projects restored create metadata for the durable terminal session id', () => {
     const projected = projectCreateResultForClient(
-      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'main', worktreePath: WORKTREE_PATH },
+      {
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+        target: RUNTIME_TARGET,
+        branch: 'main',
+        worktreePath: WORKTREE_PATH,
+      },
       {
         ok: true,
         action: 'restored',

@@ -181,9 +181,9 @@ function terminalWorkspacePaneCoordinatorTarget(base: TerminalSessionBase & { re
 
 function terminalSessionBaseWithRuntime(
   base: TerminalSessionBase,
-): (TerminalSessionBase & { repoRuntimeId: string }) | null {
+): (TerminalSessionBase & { repoRuntimeId: string; target: NonNullable<TerminalSessionBase['target']> }) | null {
   const repoRuntimeId = base.repoRuntimeId
-  return repoRuntimeId ? { ...base, repoRuntimeId } : null
+  return repoRuntimeId && base.target ? { ...base, repoRuntimeId, target: base.target } : null
 }
 
 async function applyCreatedTerminalWorkspacePaneRuntimeTabs(

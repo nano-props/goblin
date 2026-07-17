@@ -1,10 +1,10 @@
-import type { ProjectedRestoredWorkspaceRepoRuntime } from '#/shared/api-types.ts'
+import type { RestoredWorkspaceRepoRuntime } from '#/shared/api-types.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { restoreRepoTabsOnView } from '#/web/settings-actions.ts'
 
 export type RepoProjectionPromotionResult =
-  | { ok: true; repo: ProjectedRestoredWorkspaceRepoRuntime; snapshot: WorkspacePaneTabsSnapshot | null }
+  | { ok: true; repo: RestoredWorkspaceRepoRuntime; snapshot: WorkspacePaneTabsSnapshot | null }
   | { ok: false; message: string }
 
 export interface RepoProjectionPromotionTarget {

@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   runRemoteLifecycleWrite: vi.fn(),
 }))
 
+const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = { removeGitScopedResources: vi.fn() }
+
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerWorkspaceState: mocks.getServerWorkspaceState,
   compareAndReplaceServerWorkspaceRepos: vi.fn(),
@@ -57,6 +59,7 @@ describe('session restore runtime ownership', () => {
     const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
       restoreRepoTabsForRepo({
+        workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
         userId: USER_ID,
         clientId: CLIENT_ID,
         repoRoot: REPO_ROOT,

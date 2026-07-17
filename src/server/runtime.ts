@@ -36,7 +36,7 @@ interface ServerRuntimeInjectedHosts {
   appRealtimeHost: ServerAppRealtimeHost
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   worktreeRemovalApplication: ServerWorktreeRemovalHost
-  workspaceCapabilityTransitionHost?: WorkspaceCapabilityTransitionHost
+  workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
 }
 
 type ServerRuntimeManagedHosts = Partial<Record<keyof ServerRuntimeInjectedHosts, never>>
@@ -49,11 +49,14 @@ export interface ServerRuntime {
   shutdown(): void
 }
 
-function isServerRuntimeInjectedHosts(options: ServerRuntimeOptions): options is ServerRuntimeBaseOptions & ServerRuntimeInjectedHosts {
+function isServerRuntimeInjectedHosts(
+  options: ServerRuntimeOptions,
+): options is ServerRuntimeBaseOptions & ServerRuntimeInjectedHosts {
   return (
     options.appRealtimeHost !== undefined &&
     options.workspacePaneTabsHost !== undefined &&
-    options.worktreeRemovalApplication !== undefined
+    options.worktreeRemovalApplication !== undefined &&
+    options.workspaceCapabilityTransitionHost !== undefined
   )
 }
 
@@ -61,7 +64,8 @@ function hasAnyServerRuntimeInjectedHost(options: ServerRuntimeOptions): boolean
   return (
     options.appRealtimeHost !== undefined ||
     options.workspacePaneTabsHost !== undefined ||
-    options.worktreeRemovalApplication !== undefined
+    options.worktreeRemovalApplication !== undefined ||
+    options.workspaceCapabilityTransitionHost !== undefined
   )
 }
 
@@ -92,28 +96,30 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
   }
 
   let terminalRuntime: ReturnType<typeof createServerTerminalRuntime> | null = null
-  const hosts = injectedHosts ?? (() => {
-    terminalRuntime = createServerTerminalRuntime({
-      ptySupervisor: ptyWorkerEntry
-        ? new WorkerBackedPtySupervisor({ workerEntry: ptyWorkerEntry })
-        : createInProcessPtySupervisor(),
-      gCommand: gCommandEntry
-        ? {
-            serverUrl: embeddedServerUrl(serverHost, serverPort),
-            accessToken: appOptions.accessToken,
-            entryPath: gCommandEntry,
-            binDir: gCommandBinDir,
-            nodePath: gCommandNodePath,
-          }
-        : undefined,
-    })
-    return {
-      appRealtimeHost: terminalRuntime.host as ServerAppRealtimeHost,
-      workspacePaneTabsHost: terminalRuntime.workspacePaneTabsHost,
-      worktreeRemovalApplication: terminalRuntime.worktreeRemovalApplication,
-      workspaceCapabilityTransitionHost: terminalRuntime.workspaceCapabilityTransitionHost,
-    }
-  })()
+  const hosts =
+    injectedHosts ??
+    (() => {
+      terminalRuntime = createServerTerminalRuntime({
+        ptySupervisor: ptyWorkerEntry
+          ? new WorkerBackedPtySupervisor({ workerEntry: ptyWorkerEntry })
+          : createInProcessPtySupervisor(),
+        gCommand: gCommandEntry
+          ? {
+              serverUrl: embeddedServerUrl(serverHost, serverPort),
+              accessToken: appOptions.accessToken,
+              entryPath: gCommandEntry,
+              binDir: gCommandBinDir,
+              nodePath: gCommandNodePath,
+            }
+          : undefined,
+      })
+      return {
+        appRealtimeHost: terminalRuntime.host as ServerAppRealtimeHost,
+        workspacePaneTabsHost: terminalRuntime.workspacePaneTabsHost,
+        worktreeRemovalApplication: terminalRuntime.worktreeRemovalApplication,
+        workspaceCapabilityTransitionHost: terminalRuntime.workspaceCapabilityTransitionHost,
+      }
+    })()
 
   // `appOptions` carries `accessToken` (renamed from the pre-PR
   // `internalSecret`); it's forwarded straight to `createApp`.

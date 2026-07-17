@@ -714,7 +714,7 @@ export class TerminalSessionProjection {
         cols: geometry.cols,
         rows: geometry.rows,
         clientId,
-        ...(base.target ? { target: base.target } : {}),
+        target: requireRuntimeTarget(base),
       },
       ...request.placement,
     })
@@ -1220,10 +1220,8 @@ export class TerminalSessionProjection {
         runtimeType: 'terminal',
         sessionId: terminalSessionId,
         target: {
-          repoRoot: base.repoRoot,
-          repoRuntimeId,
-          branchName: base.branch,
-          worktreePath: base.worktreePath,
+          target: requireRuntimeTarget(base),
+          nativeWorktreePath: base.worktreePath,
         },
       })
     } catch (err) {
@@ -1377,8 +1375,7 @@ export class TerminalSessionProjection {
     const sessionIdsToRemove = Array.from(this.sessions.entries())
       .filter(([, session]) => !this.sessionBelongsToCurrentRepoIndex(session))
       .map(([terminalSessionId]) => terminalSessionId)
-    for (const terminalSessionId of sessionIdsToRemove)
-      this.removeSession(terminalSessionId, { dispose: true })
+    for (const terminalSessionId of sessionIdsToRemove) this.removeSession(terminalSessionId, { dispose: true })
   }
 
   private sessionBelongsToCurrentRepoIndex(session: TerminalSession): boolean {
@@ -1516,6 +1513,11 @@ export class TerminalSessionProjection {
 function requireRepoRuntimeId(base: TerminalSessionBase): string {
   if (typeof base.repoRuntimeId === 'string' && base.repoRuntimeId.length > 0) return base.repoRuntimeId
   throw new Error('error.repo-runtime-stale')
+}
+
+function requireRuntimeTarget(base: TerminalSessionBase) {
+  if (base.target) return base.target
+  throw new Error('error.workspace-tabs-target-invalid')
 }
 
 async function resolveTerminalCreateOptions(options: TerminalCreateOptions): Promise<ResolvedTerminalCreateOptions> {

@@ -19,13 +19,9 @@ import {
   type WorkspacePaneTabsCoordinator,
   type WorkspacePaneRuntimeTabsProvider,
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
-import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import {
-  workspacePaneTabsTargetFromRestorable,
-  workspacePaneTabsTargetFromRuntime,
-} from '#/shared/workspace-pane-tabs-target.ts'
-import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import { restorableWorkspacePaneTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import { bindWorkspacePaneTarget, type RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import { canonicalWorkspaceLocator, parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneTabsRestoreResult } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
@@ -149,24 +145,24 @@ class TerminalSessionService {
     })
   }
 
-  async replaceTabs(
-    userId: string,
-    input: WorkspacePaneTabsReplaceInput,
-  ): Promise<WorkspacePaneTabsSnapshot> {
-    const target = workspacePaneTabsTargetFromRuntime(input.target)
-    if (!target || input.workspaceId !== input.target.workspaceId || input.workspaceRuntimeId !== input.target.workspaceRuntimeId) {
+  async replaceTabs(userId: string, input: WorkspacePaneTabsReplaceInput): Promise<WorkspacePaneTabsSnapshot> {
+    const nativeWorktreePath = nativeWorktreePathForRuntimeTarget(input.target)
+    if (
+      nativeWorktreePath === undefined ||
+      input.workspaceId !== input.target.workspaceId ||
+      input.workspaceRuntimeId !== input.target.workspaceRuntimeId
+    ) {
       return emptyWorkspacePaneTabsSnapshot()
     }
     const scope = terminalSessionRuntimeScope(input.workspaceId, input.workspaceRuntimeId)
-    const worktreePath = target.worktreePath === null || target.worktreePath === input.workspaceId
-      ? target.worktreePath
-      : terminalSessionWorktreePath(input.workspaceId, target.worktreePath)
+    const worktreePath =
+      nativeWorktreePath === null ? null : terminalSessionWorktreePath(input.workspaceId, nativeWorktreePath)
     const result = await this.workspaceTabsCoordinator.replaceTabs({
       userId,
       repoRoot: input.workspaceId,
       scope,
-      branchName: target.branchName,
-      worktreePath,
+      target: input.target,
+      nativeWorktreePath: worktreePath,
       tabs: input.tabs,
       assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.workspaceId, input.workspaceRuntimeId),
     })
@@ -186,21 +182,26 @@ class TerminalSessionService {
     if (!isValidRepoLocator(input.workspaceId)) {
       return { kind: 'restored', snapshot: emptyWorkspacePaneTabsSnapshot(), repaired: false }
     }
+    const workspaceId = canonicalWorkspaceLocator(input.workspaceId)
+    if (!workspaceId) return { kind: 'restored', snapshot: emptyWorkspacePaneTabsSnapshot(), repaired: false }
     const scope = terminalSessionRuntimeScope(input.workspaceId, input.workspaceRuntimeId)
     const result = await this.workspaceTabsCoordinator.restoreScope({
       userId,
       repoRoot: input.workspaceId,
       scope,
       targets: input.targets.flatMap((restorable) => {
-        const target = workspacePaneTabsTargetFromRestorable(input.workspaceId, restorable)
-        if (!target) return []
-        return [{
-          ...target,
-          worktreePath:
-            target.worktreePath === null || target.worktreePath === input.workspaceId
-              ? target.worktreePath
-              : terminalSessionWorktreePath(input.workspaceId, target.worktreePath),
-        }]
+        const nativePath = nativeWorktreePathForRestorableTarget(workspaceId, restorable)
+        if (nativePath === undefined) return []
+        return [
+          {
+            target: bindWorkspacePaneTarget(restorable, workspaceId, input.workspaceRuntimeId),
+            nativeWorktreePath:
+              nativePath === null || nativePath === input.workspaceId
+                ? nativePath
+                : terminalSessionWorktreePath(input.workspaceId, nativePath),
+            canonicalBranch: restorable.kind === 'git-branch' ? restorable.branch : null,
+          },
+        ]
       }),
       expectedRepoEntry: input.expectedRepoEntry,
       assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.workspaceId, input.workspaceRuntimeId),
@@ -211,21 +212,26 @@ class TerminalSessionService {
   }
 
   async updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabsSnapshot> {
-    const target = workspacePaneTabsTargetFromRuntime(input.target)
-    if (!target || input.workspaceId !== input.target.workspaceId || input.workspaceRuntimeId !== input.target.workspaceRuntimeId) {
+    const nativeWorktreePath = nativeWorktreePathForRuntimeTarget(input.target)
+    if (
+      nativeWorktreePath === undefined ||
+      input.workspaceId !== input.target.workspaceId ||
+      input.workspaceRuntimeId !== input.target.workspaceRuntimeId
+    ) {
       return emptyWorkspacePaneTabsSnapshot()
     }
     if (!isValidWorkspacePaneTabsOperation(input.operation)) return emptyWorkspacePaneTabsSnapshot()
     const scope = terminalSessionRuntimeScope(input.workspaceId, input.workspaceRuntimeId)
-    const worktreePath = target.worktreePath === null || target.worktreePath === input.workspaceId
-      ? target.worktreePath
-      : terminalSessionWorktreePath(input.workspaceId, target.worktreePath)
+    const worktreePath =
+      nativeWorktreePath === null || nativeWorktreePath === input.workspaceId
+        ? nativeWorktreePath
+        : terminalSessionWorktreePath(input.workspaceId, nativeWorktreePath)
     const result = await this.workspaceTabsCoordinator.updateTabs({
       userId,
       repoRoot: input.workspaceId,
       scope,
-      branchName: target.branchName,
-      worktreePath,
+      target: input.target,
+      nativeWorktreePath: worktreePath,
       operation: input.operation,
       assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.workspaceId, input.workspaceRuntimeId),
     })
@@ -290,7 +296,6 @@ class TerminalSessionService {
       this.options.broadcastWorkspaceTabsChanged(affectedUserId, repoRoot)
     }
   }
-
 }
 
 export function createTerminalSessionService(options: TerminalSessionServiceOptions): TerminalSessionService {
@@ -310,6 +315,7 @@ export function terminalWorkspacePaneRuntimeTabsProvider(
         revision: snapshot.revision,
         liveSessions: snapshot.sessions.map((session) => ({
           sessionId: session.terminalSessionId,
+          target: session.target,
           branch: session.branch,
           worktreePath: session.worktreePath,
         })),
@@ -320,4 +326,24 @@ export function terminalWorkspacePaneRuntimeTabsProvider(
 
 function emptyWorkspacePaneTabsSnapshot(): WorkspacePaneTabsSnapshot {
   return { revision: 0, entries: [] }
+}
+
+function nativeWorktreePathForRuntimeTarget(
+  target: WorkspacePaneTabsReplaceInput['target'],
+): string | null | undefined {
+  if (!restorableWorkspacePaneTargetFromRuntime(target)) return undefined
+  if (target.kind === 'workspace') return parseCanonicalWorkspaceLocator(target.workspaceId)?.path
+  if (target.kind === 'git-branch') return null
+  return parseCanonicalWorkspaceLocator(target.root)?.path
+}
+
+function nativeWorktreePathForRestorableTarget(
+  workspaceId: WorkspacePaneTabsReplaceInput['target']['workspaceId'],
+  target: RestorableWorkspacePaneTarget,
+): string | null | undefined {
+  if (target.kind === 'workspace') return parseCanonicalWorkspaceLocator(workspaceId)?.path
+  if (target.kind === 'git-branch') return null
+  const runtime = bindWorkspacePaneTarget(target, workspaceId, 'restore-validation')
+  if (!restorableWorkspacePaneTargetFromRuntime(runtime)) return undefined
+  return parseCanonicalWorkspaceLocator(target.root)?.path
 }

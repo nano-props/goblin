@@ -141,6 +141,6 @@ export function terminalBaseForRuntimeTabCloseTarget(
     repoRuntimeId: target.repoRuntimeId,
     branch: target.branchName ?? '',
     worktreePath: target.worktreePath,
-    target: runtimeTarget.kind === 'workspace' ? runtimeTarget : undefined,
+    target: runtimeTarget,
   }
 }

@@ -6,6 +6,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { resolveWorkspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 type WorkspacePaneCommandRoute = ParsedRepoBranchWorkspacePaneRoute | null | undefined
@@ -65,9 +66,7 @@ function assignTerminalRuntimeTabCommandContext(
     ),
     showTerminalSession: (terminalSessionId) => input.showRuntimeTab('terminal', terminalSessionId),
     showCreatedTerminalSession: (terminalSessionId, canonicalBranch) =>
-      base
-        ? input.showCreatedRuntimeTab('terminal', terminalSessionId, canonicalBranch, base.worktreePath)
-        : false,
+      base ? input.showCreatedRuntimeTab('terminal', terminalSessionId, canonicalBranch, base.worktreePath) : false,
     t: input.terminalCreateTranslator,
   }
 }
@@ -80,11 +79,14 @@ export function selectedWorkspacePaneTerminalBase(
   const repo = useReposStore.getState().repos[repoId]
   const target = selectedRepoWorkspaceTargetForRuntimeCommand(repoId, branchName, workspacePaneRoute)
   if (!repo || !target?.worktreePath) return null
+  const runtimeTarget = runtimeWorkspacePaneTarget({ repoRoot: repoId, ...target }, repo.repoRuntimeId)
+  if (!runtimeTarget) return null
   return {
     repoRoot: repoId,
     repoRuntimeId: repo.repoRuntimeId,
     branch: target.branchName,
     worktreePath: target.worktreePath,
+    target: runtimeTarget,
   }
 }
 

@@ -10,6 +10,7 @@ import {
   issueTestPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeIdentity,
 } from '#/server/test-utils/physical-worktree-identity.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const REMOTE_REPO = 'goblin+ssh://prod/srv/repo'
 const REMOTE_PATH = '/srv/worktrees/feature'
@@ -40,6 +41,12 @@ describe('physical worktree capability boundaries', () => {
       {
         repoRoot: REMOTE_REPO,
         repoRuntimeId: 'runtime-a',
+        target: {
+          kind: 'git-worktree',
+          workspaceId: canonicalWorkspaceLocator(REMOTE_REPO)!,
+          workspaceRuntimeId: 'runtime-a',
+          root: canonicalWorkspaceLocator('goblin+ssh://prod/srv/worktrees/feature')!,
+        },
         branch: 'feature',
         worktreePath: REMOTE_PATH,
       },

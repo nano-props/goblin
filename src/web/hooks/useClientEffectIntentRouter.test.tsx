@@ -521,6 +521,12 @@ describe('useClientEffectIntentRouter', () => {
       expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', {
         repoRoot: repo.id,
         repoRuntimeId: repo.repoRuntimeId,
+        target: {
+          kind: 'git-worktree',
+          workspaceId: repo.id,
+          workspaceRuntimeId: repo.repoRuntimeId,
+          root: 'goblin+file:///tmp/repo-worktree',
+        },
         branch: 'main',
         worktreePath: '/tmp/repo-worktree',
       })

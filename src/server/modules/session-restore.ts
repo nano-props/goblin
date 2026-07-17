@@ -19,8 +19,9 @@ import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { readRepoProjection } from '#/server/modules/repo-read-paths.ts'
 import {
   acquireRepoRuntimeLease,
-  commitOrReadInitialWorkspaceProbeState,
+  isCurrentRepoRuntimeMembership,
   releaseRepoRuntimeMembershipLease,
+  runSerializedInitialWorkspaceProbe,
   workspaceProbeStateForRuntime,
   type RepoRuntimeMembershipLeaseEntry,
 } from '#/server/modules/repo-runtimes.ts'
@@ -33,7 +34,7 @@ import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/worksp
 import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
 import { projectWorkspacePaneTabsWithMembershipGuard } from '#/server/modules/workspace-pane-tabs-restore.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
-import { isCurrentRepoRuntime } from '#/server/modules/repo-runtimes.ts'
+import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
 
 export interface RestoreServerWorkspaceInput {
   userId: string
@@ -44,7 +45,7 @@ export interface RestoreServerWorkspaceInput {
   // when the user navigates to them.
   activeRepoRoot?: string | null
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
-  workspaceCapabilityTransitionHost?: WorkspaceCapabilityTransitionHost
+  workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
   signal?: AbortSignal
 }
 
@@ -155,7 +156,7 @@ async function restoreServerWorkspaceSnapshot(
   // Only the active repo's tabs are validated and restored at startup.
   // Non-active repos carry `projection: null` and are restored lazily.
   const openedForLayoutRestore = opened.filter(
-    (repo) => isOpenedProjectedRepo(repo) || conclusivePlainWorkspace(repo.workspaceProbe),
+    (repo) => isOpenedProjectedRepo(repo) || readableWorkspace(repo.workspaceProbe),
   )
   const expectedMembership = membership.workspace.openWorkspaceEntries
   const projectedTabs = await projectWorkspacePaneTabsWithMembershipGuard({
@@ -185,8 +186,8 @@ async function restoreServerWorkspaceSnapshot(
   }
 }
 
-function conclusivePlainWorkspace(probe: WorkspaceProbeState): boolean {
-  return probe.status === 'ready' && probe.capabilities.git.status === 'unavailable' && probe.diagnostics.length === 0
+function readableWorkspace(probe: WorkspaceProbeState): boolean {
+  return probe.status === 'ready'
 }
 
 function reconcileOpenedRepoMemberships(
@@ -214,12 +215,15 @@ async function openWorkspaceRepo(
   return await withAcquiredWorkspaceRepoLease(input, entry.id, async (lease) => {
     let authoritativeProbe = workspaceProbeStateForRuntime(input.userId, entry.id, lease.repoRuntimeId)
     if (authoritativeProbe?.status === 'probing') {
-      const observed = await probeWorkspace(entry.id, serverLocatorPlatform(), { signal: input.signal })
-      authoritativeProbe = commitOrReadInitialWorkspaceProbeState({
+      authoritativeProbe = await runSerializedInitialWorkspaceProbe({
         userId: input.userId,
         repoRoot: entry.id,
         repoRuntimeId: lease.repoRuntimeId,
-        probe: observed,
+        probe: async () => await probeWorkspace(entry.id, serverLocatorPlatform(), { signal: input.signal }),
+        beforeCommit: async ({ before, after }) => {
+          if (!workspaceGitCleanupRequired(before, after)) return
+          await removeGitScopedResources(input, entry.id, lease.repoRuntimeId)
+        },
       })
     }
     if (!authoritativeProbe) {
@@ -370,31 +374,27 @@ function remoteCapabilityTransitionOptions(
       before: WorkspaceProbeState
       after: WorkspaceSettledProbeState
     }) => {
-      if (!gitBecameUnavailable(before, after)) return
-      if (!input.workspaceCapabilityTransitionHost) {
-        throw new Error('workspace capability transition host is unavailable')
-      }
-      await input.workspaceCapabilityTransitionHost.removeGitScopedResources({
-        userId: input.userId,
-        workspaceId,
-        workspaceRuntimeId,
-        assertCurrent: () => {
-          if (!isCurrentRepoRuntime(input.userId, workspaceId, workspaceRuntimeId)) {
-            throw new Error('error.repo-runtime-stale')
-          }
-        },
-      })
+      if (!workspaceGitCleanupRequired(before, after)) return
+      await removeGitScopedResources(input, workspaceId, workspaceRuntimeId)
     },
   }
 }
 
-function gitBecameUnavailable(before: WorkspaceProbeState, after: WorkspaceSettledProbeState): boolean {
-  return (
-    before.status === 'ready' &&
-    before.capabilities.git.status === 'available' &&
-    after.status === 'ready' &&
-    after.capabilities.git.status === 'unavailable'
-  )
+async function removeGitScopedResources(
+  input: RestoreServerWorkspaceInput,
+  workspaceId: string,
+  workspaceRuntimeId: string,
+): Promise<void> {
+  await input.workspaceCapabilityTransitionHost.removeGitScopedResources({
+    userId: input.userId,
+    workspaceId,
+    workspaceRuntimeId,
+    assertCurrent: () => {
+      if (!isCurrentRepoRuntimeMembership(input.userId, workspaceId, workspaceRuntimeId, input.clientId)) {
+        throw new Error('error.repo-runtime-stale')
+      }
+    },
+  })
 }
 
 async function withAcquiredWorkspaceRepoLease<T>(

@@ -24,6 +24,7 @@ interface RepoRuntimeState {
   workspaceProbe: WorkspaceProbeState
   pendingWorkspaceProbeTransition: { before: WorkspaceProbeState; after: WorkspaceSettledProbeState } | null
   workspaceLifecycleTail: Promise<void>
+  activeWorkspaceLifecycleOperations: number
 }
 
 export interface RepoRuntimeClosedEvent {
@@ -96,6 +97,7 @@ function repoRuntimeState(userId: string, repoRoot: string): RepoRuntimeState {
     workspaceProbe: { status: 'probing' },
     pendingWorkspaceProbeTransition: null,
     workspaceLifecycleTail: Promise.resolve(),
+    activeWorkspaceLifecycleOperations: 0,
   }
   byRepo.set(repoRoot, created)
   return created
@@ -176,6 +178,7 @@ function releaseRepoRuntimeMembershipForCurrentState(
   }
   state.members.delete(clientId)
   if (state.members.size > 0) return { released: true, runtimeClosed: false }
+  if (state.activeWorkspaceLifecycleOperations > 0) return { released: true, runtimeClosed: false }
   stopRepoRuntimeEpoch(state)
   emitRepoRuntimeClosed({ userId, repoRoot: lease.repoRoot, repoRuntimeId: lease.repoRuntimeId })
   return { released: true, runtimeClosed: true }
@@ -211,7 +214,7 @@ export function expireRepoRuntimeMembershipLease(lease: RepoRuntimeMembershipLea
       continue
     }
     state.members.delete(lease.clientId)
-    if (state.members.size > 0) continue
+    if (state.members.size > 0 || state.activeWorkspaceLifecycleOperations > 0) continue
     const repoRuntimeId = stopRepoRuntimeEpoch(state)
     if (!repoRuntimeId) continue
     const event = { userId: lease.userId, repoRoot: entry.repoRoot, repoRuntimeId }
@@ -256,6 +259,7 @@ export function replaceRepoRuntimeMembershipsForClient(
       if (desired.has(repoRoot)) continue
       const repoRuntimeId = state.currentRepoRuntimeId
       if (!repoRuntimeId || !state.members.delete(clientId) || state.members.size > 0) continue
+      if (state.activeWorkspaceLifecycleOperations > 0) continue
       stopRepoRuntimeEpoch(state)
       closed.push({ userId, repoRoot, repoRuntimeId })
     }
@@ -324,6 +328,35 @@ export function commitOrReadInitialWorkspaceProbeState(input: {
   return state.workspaceProbe
 }
 
+export async function runSerializedInitialWorkspaceProbe(input: {
+  userId: string
+  repoRoot: string
+  repoRuntimeId: string
+  probe: () => Promise<WorkspaceSettledProbeState>
+  beforeCommit?: (input: { before: WorkspaceProbeState; after: WorkspaceSettledProbeState }) => Promise<void>
+}): Promise<WorkspaceProbeState | null> {
+  return await runSerializedWorkspaceLifecycleOperation(input, async (state) => {
+    if (state.workspaceProbe.status !== 'probing') return state.workspaceProbe
+    const probe = await input.probe()
+    if (state.currentRepoRuntimeId !== input.repoRuntimeId) return null
+    if (state.workspaceProbe.status !== 'probing') return state.workspaceProbe
+    const before = state.workspaceProbe
+    state.workspaceProbe = probe
+    state.pendingWorkspaceProbeTransition = { before, after: probe }
+    try {
+      await input.beforeCommit?.({ before, after: probe })
+    } catch (error) {
+      if (state.currentRepoRuntimeId !== input.repoRuntimeId) return null
+      state.workspaceProbe = before
+      state.pendingWorkspaceProbeTransition = null
+      throw error
+    }
+    if (state.currentRepoRuntimeId !== input.repoRuntimeId) return null
+    state.pendingWorkspaceProbeTransition = null
+    return probe
+  })
+}
+
 export async function runSerializedWorkspaceRefresh(input: {
   userId: string
   repoRoot: string
@@ -331,9 +364,41 @@ export async function runSerializedWorkspaceRefresh(input: {
   probe: () => Promise<WorkspaceSettledProbeState>
   beforeCommit?: (input: { before: WorkspaceProbeState; after: WorkspaceSettledProbeState }) => Promise<void>
 }): Promise<WorkspaceRefreshResult> {
-  const state = repoRuntimesByUser.get(input.userId)?.get(input.repoRoot)
-  if (!state || state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
+  const result = await runSerializedWorkspaceLifecycleOperation(
+    input,
+    async (state): Promise<WorkspaceRefreshResult> => {
+      if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
+      const probe = await input.probe()
+      if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
+      if (workspaceRefreshMayCommit(probe)) {
+        const before = state.workspaceProbe
+        state.workspaceProbe = probe
+        state.pendingWorkspaceProbeTransition = { before, after: probe }
+        try {
+          await input.beforeCommit?.({ before, after: probe })
+        } catch (error) {
+          if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
+          state.workspaceProbe = before
+          state.pendingWorkspaceProbeTransition = null
+          throw error
+        }
+        if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
+        state.pendingWorkspaceProbeTransition = null
+        return { kind: 'committed', probe }
+      }
+      return { kind: 'failed', probe }
+    },
+  )
+  return result ?? { kind: 'stale-runtime' }
+}
 
+async function runSerializedWorkspaceLifecycleOperation<T>(
+  input: { userId: string; repoRoot: string; repoRuntimeId: string },
+  operation: (state: RepoRuntimeState) => Promise<T>,
+): Promise<T | null> {
+  const state = repoRuntimesByUser.get(input.userId)?.get(input.repoRoot)
+  if (!state || state.currentRepoRuntimeId !== input.repoRuntimeId) return null
+  state.activeWorkspaceLifecycleOperations += 1
   const predecessor = state.workspaceLifecycleTail
   let releaseTurn!: () => void
   const turn = new Promise<void>((resolve) => {
@@ -342,29 +407,32 @@ export async function runSerializedWorkspaceRefresh(input: {
   state.workspaceLifecycleTail = predecessor.then(async () => await turn)
   await predecessor
   try {
-    if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
-    const probe = await input.probe()
-    if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
-    if (workspaceRefreshMayCommit(probe)) {
-      const before = state.workspaceProbe
-      state.workspaceProbe = probe
-      state.pendingWorkspaceProbeTransition = { before, after: probe }
-      try {
-        await input.beforeCommit?.({ before, after: probe })
-      } catch (error) {
-        if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
-        state.workspaceProbe = before
-        state.pendingWorkspaceProbeTransition = null
-        throw error
-      }
-      if (state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
-      state.pendingWorkspaceProbeTransition = null
-      return { kind: 'committed', probe }
-    }
-    return { kind: 'failed', probe }
+    if (state.currentRepoRuntimeId !== input.repoRuntimeId) return null
+    return await operation(state)
   } finally {
     releaseTurn()
+    releaseWorkspaceLifecycleOperation(input, state)
   }
+}
+
+function releaseWorkspaceLifecycleOperation(
+  input: { userId: string; repoRoot: string; repoRuntimeId: string },
+  state: RepoRuntimeState,
+): void {
+  state.activeWorkspaceLifecycleOperations -= 1
+  if (state.activeWorkspaceLifecycleOperations < 0) {
+    throw new Error('workspace lifecycle operation lease underflow')
+  }
+  if (
+    state.activeWorkspaceLifecycleOperations > 0 ||
+    state.members.size > 0 ||
+    state.currentRepoRuntimeId !== input.repoRuntimeId ||
+    repoRuntimesByUser.get(input.userId)?.get(input.repoRoot) !== state
+  ) {
+    return
+  }
+  stopRepoRuntimeEpoch(state)
+  emitRepoRuntimeClosed({ userId: input.userId, repoRoot: input.repoRoot, repoRuntimeId: input.repoRuntimeId })
 }
 
 function workspaceRefreshMayCommit(probe: WorkspaceSettledProbeState): boolean {
@@ -556,10 +624,14 @@ function notifyRemoteLifecycleTransition(
   }
 }
 
+/** Test reset only. Production closes runtimes through membership release. */
 export function clearRepoRuntimesForUser(userId: string): void {
   const states = repoRuntimesByUser.get(userId)
   if (states) {
     for (const [repoRoot, state] of states) {
+      if (state.activeWorkspaceLifecycleOperations > 0) {
+        throw new Error(`cannot reset repo runtimes with active workspace lifecycle operations for ${repoRoot}`)
+      }
       const repoRuntimeId = stopRepoRuntimeEpoch(state)
       if (repoRuntimeId) emitRepoRuntimeClosed({ userId, repoRoot, repoRuntimeId })
     }
@@ -568,7 +640,12 @@ export function clearRepoRuntimesForUser(userId: string): void {
 }
 
 function startRepoRuntimeEpoch(state: RepoRuntimeState): string {
-  if (state.currentRepoRuntimeId || state.remoteAttemptController || state.remoteAttemptPromise) {
+  if (
+    state.currentRepoRuntimeId ||
+    state.remoteAttemptController ||
+    state.remoteAttemptPromise ||
+    state.activeWorkspaceLifecycleOperations > 0
+  ) {
     throw new Error('repo runtime epoch must stop before it starts')
   }
   const repoRuntimeId = createOpaqueId('repo-runtime')

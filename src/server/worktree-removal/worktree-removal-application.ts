@@ -13,6 +13,7 @@ import type {
   PhysicalWorktreeIdentityResolver,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure-settlement.ts'
+import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const worktreeRemovalLogger = serverLogger.child({ module: 'worktree-removal-application' })
 
@@ -160,9 +161,9 @@ export class WorktreeRemovalApplication {
       ...terminal.scopes.map((item) => ({ ...item, worktreePath })),
       ...targets.map(({ userId, scope, target }) => ({
         userId,
-        repoRoot: target.repoRoot,
+        repoRoot: target.workspaceId,
         scope,
-        worktreePath: target.kind === 'worktree' ? target.worktreePath : worktreePath,
+        worktreePath: target.kind === 'git-worktree' ? nativeTargetPath(target.root) : worktreePath,
       })),
     ])
     return terminal.ok ? { ok: true, scopes } : { ok: false, scopes, message: terminal.message }
@@ -198,6 +199,12 @@ export class WorktreeRemovalApplication {
   }
 }
 
+function nativeTargetPath(root: string): string {
+  const locator = parseCanonicalWorkspaceLocator(root)
+  if (!locator) throw new Error('error.workspace-tabs-target-invalid')
+  return locator.path
+}
+
 function abortMessage(error: unknown): string {
   if (error instanceof Error && error.message === 'error.repo-runtime-stale') return error.message
   return error instanceof Error && error.name !== 'AbortError' ? error.message : 'error.repo-runtime-stale'
@@ -212,8 +219,9 @@ export function createWorktreeRemovalApplication(
 function uniqueScopes(
   scopes: readonly { userId: string; repoRoot: string; scope: string; worktreePath: string }[],
 ): Array<{ userId: string; repoRoot: string; scope: string; worktreePath: string }> {
-  return Array.from(new Map(scopes.map((item) => [
-    `${item.userId}\0${item.scope}\0${item.repoRoot}\0${item.worktreePath}`,
-    item,
-  ])).values())
+  return Array.from(
+    new Map(
+      scopes.map((item) => [`${item.userId}\0${item.scope}\0${item.repoRoot}\0${item.worktreePath}`, item]),
+    ).values(),
+  )
 }

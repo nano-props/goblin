@@ -1,13 +1,9 @@
-import {
-  IpcError,
-  type ProjectedRestoredWorkspaceRepoRuntime,
-  type RepoWorkspaceTabsRestoreResult,
-} from '#/shared/api-types.ts'
+import { IpcError, type RestoredWorkspaceRepoRuntime, type RepoWorkspaceTabsRestoreResult } from '#/shared/api-types.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { readRepoProjection } from '#/server/modules/repo-read-paths.ts'
 import {
-  commitOrReadInitialWorkspaceProbeState,
   isCurrentRepoRuntimeMembership,
+  runSerializedInitialWorkspaceProbe,
   workspaceProbeStateForRuntime,
   isCurrentRepoRuntime,
 } from '#/server/modules/repo-runtimes.ts'
@@ -21,6 +17,7 @@ import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/mo
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { probeWorkspace } from '#/server/modules/workspace-probe.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
+import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 
 interface RestoreRepoTabsInput {
@@ -29,7 +26,7 @@ interface RestoreRepoTabsInput {
   repoRoot: string
   repoRuntimeId: string
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
-  workspaceCapabilityTransitionHost?: WorkspaceCapabilityTransitionHost
+  workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
   signal?: AbortSignal
 }
 
@@ -57,7 +54,7 @@ export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promi
 async function projectWorkspaceRepo(
   input: RestoreRepoTabsInput,
   entry: WorkspaceSessionEntry,
-): Promise<ProjectedRestoredWorkspaceRepoRuntime | null> {
+): Promise<RestoredWorkspaceRepoRuntime | null> {
   if (entry.kind === 'remote') {
     const lifecycle = await abortableWorkspaceRestore(
       runRemoteLifecycleWrite(
@@ -69,10 +66,7 @@ async function projectWorkspaceRepo(
         },
         {
           beforeCapabilityCommit: async ({ before, after }) => {
-            if (!gitBecameUnavailable(before, after)) return
-            if (!input.workspaceCapabilityTransitionHost) {
-              throw new Error('workspace capability transition host is unavailable')
-            }
+            if (!workspaceGitCleanupRequired(before, after)) return
             await input.workspaceCapabilityTransitionHost.removeGitScopedResources({
               userId: input.userId,
               workspaceId: entry.id,
@@ -91,12 +85,17 @@ async function projectWorkspaceRepo(
     assertCurrentRepoRuntimeMembership(input)
     if (lifecycle.kind !== 'settled' || lifecycle.lifecycle.kind !== 'ready') return null
     const workspaceProbe = workspaceProbeStateForRuntime(input.userId, entry.id, input.repoRuntimeId)
-    if (
-      !workspaceProbe ||
-      workspaceProbe.status !== 'ready' ||
-      workspaceProbe.capabilities.git.status !== 'available'
-    ) {
-      return null
+    if (!workspaceProbe || workspaceProbe.status !== 'ready') return null
+    if (workspaceProbe.capabilities.git.status === 'unavailable') {
+      return {
+        entry,
+        repoRoot: entry.id,
+        repoRuntimeId: input.repoRuntimeId,
+        name: lifecycle.name,
+        target: lifecycle.lifecycle.target,
+        workspaceProbe,
+        projection: null,
+      }
     }
     const projection = await readRepoProjection(entry.id, {
       repoRuntimeId: input.repoRuntimeId,
@@ -118,20 +117,38 @@ async function projectWorkspaceRepo(
   let probe = workspaceProbeStateForRuntime(input.userId, entry.id, input.repoRuntimeId)
   if (!probe) return null
   if (probe.status === 'probing') {
-    const observed = await probeWorkspace(entry.id, process.platform === 'win32' ? 'win32' : 'posix', {
-      signal: input.signal,
-    })
-    assertCurrentRepoRuntimeMembership(input)
-    const authoritativeProbe = commitOrReadInitialWorkspaceProbeState({
+    const authoritativeProbe = await runSerializedInitialWorkspaceProbe({
       userId: input.userId,
       repoRoot: entry.id,
       repoRuntimeId: input.repoRuntimeId,
-      probe: observed,
+      probe: async () =>
+        await probeWorkspace(entry.id, process.platform === 'win32' ? 'win32' : 'posix', {
+          signal: input.signal,
+        }),
+      beforeCommit: async ({ before, after }) => {
+        if (!workspaceGitCleanupRequired(before, after)) return
+        await input.workspaceCapabilityTransitionHost.removeGitScopedResources({
+          userId: input.userId,
+          workspaceId: entry.id,
+          workspaceRuntimeId: input.repoRuntimeId,
+          assertCurrent: () => assertCurrentRepoRuntimeMembership(input),
+        })
+      },
     })
     if (!authoritativeProbe) return null
     probe = authoritativeProbe
   }
-  if (probe.status !== 'ready' || probe.capabilities.git.status !== 'available') return null
+  if (probe.status !== 'ready') return null
+  if (probe.capabilities.git.status === 'unavailable') {
+    return {
+      entry,
+      repoRoot: entry.id,
+      repoRuntimeId: input.repoRuntimeId,
+      name: probe.name ?? workspaceRepoDisplayName(entry.id),
+      workspaceProbe: probe,
+      projection: null,
+    }
+  }
   const projection = await readRepoProjection(entry.id, {
     repoRuntimeId: input.repoRuntimeId,
     signal: input.signal,
@@ -147,15 +164,6 @@ async function projectWorkspaceRepo(
     workspaceProbe: probe,
     projection,
   }
-}
-
-function gitBecameUnavailable(before: WorkspaceProbeState, after: WorkspaceSettledProbeState): boolean {
-  return (
-    before.status === 'ready' &&
-    before.capabilities.git.status === 'available' &&
-    after.status === 'ready' &&
-    after.capabilities.git.status === 'unavailable'
-  )
 }
 
 function assertCurrentRepoRuntimeMembership(input: RestoreRepoTabsInput): void {

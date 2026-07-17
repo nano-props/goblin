@@ -10,6 +10,7 @@ import {
   workspacePaneRuntimeTabCreateAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-runtime-create-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-workspace-pane-create'
@@ -19,6 +20,12 @@ const TERMINAL_SESSION_ID = 'term-111111111111111111111'
 const BASE: TerminalSessionBase = {
   repoRoot: REPO_ROOT,
   repoRuntimeId: REPO_RUNTIME_ID,
+  target: {
+    kind: 'git-worktree',
+    workspaceId: canonicalWorkspaceLocator(REPO_ROOT)!,
+    workspaceRuntimeId: REPO_RUNTIME_ID,
+    root: canonicalWorkspaceLocator('goblin+file:///tmp/workspace-pane-runtime-create-worktree')!,
+  },
   branch: BRANCH_NAME,
   worktreePath: WORKTREE_PATH,
 }
@@ -140,11 +147,14 @@ describe('workspace pane runtime tab create action', () => {
       }),
     ).resolves.toEqual({ status: 'committed' })
 
-    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).toHaveBeenCalledWith(REPO_ROOT, REPO_RUNTIME_ID)
+    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).toHaveBeenCalledWith(
+      REPO_ROOT,
+      REPO_RUNTIME_ID,
+    )
     expect(showCreatedTerminalTab).toHaveBeenCalledWith(TERMINAL_SESSION_ID, BRANCH_NAME)
-    expect(
-      workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mock.invocationCallOrder[0],
-    ).toBeLessThan(showCreatedTerminalTab.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY)
+    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mock.invocationCallOrder[0]).toBeLessThan(
+      showCreatedTerminalTab.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    )
   })
 
   test('does not navigate when a newer server snapshot supersedes create presentation', async () => {
@@ -200,7 +210,10 @@ describe('workspace pane runtime tab create action', () => {
       }),
     ).resolves.toEqual({ status: 'projection-failed' })
 
-    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).toHaveBeenCalledWith(REPO_ROOT, REPO_RUNTIME_ID)
+    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).toHaveBeenCalledWith(
+      REPO_ROOT,
+      REPO_RUNTIME_ID,
+    )
     expect(showCreatedTerminalTab).not.toHaveBeenCalled()
   })
 

@@ -13,6 +13,8 @@ import {
   testPhysicalWorktrees,
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 
 const failRemoteRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
 vi.mock('#/server/modules/remote-runtime-failure-settlement.ts', async (importActual) => {
@@ -20,11 +22,16 @@ vi.mock('#/server/modules/remote-runtime-failure-settlement.ts', async (importAc
   return { ...actual, failRemoteRuntimeIfNeeded: failRemoteRuntimeIfNeededMock }
 })
 
+const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')
+const worktreeRoot = canonicalWorkspaceLocator('goblin+file:///repo/worktree')
+if (!workspaceId || !worktreeRoot) throw new Error('invalid workspace locator fixture')
+
 const request = {
-  repoRoot: '/repo',
+  repoRoot: 'goblin+file:///repo',
   repoRuntimeId: 'repo-runtime-test',
   branch: 'main',
   worktreePath: '/repo/worktree',
+  target: { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: 'repo-runtime-test', root: worktreeRoot },
   kind: 'primary' as const,
   cols: 100,
   rows: 30,
@@ -66,8 +73,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(ensureRuntimeTabForSession).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'user-test',
-        repoRoot: '/repo',
-        scope: '/repo\0repo-runtime-test',
+        target: request.target,
         worktreePath: '/repo/worktree',
         runtimeType: 'terminal',
         sessionId: runtime.terminalSessionId,
@@ -79,7 +85,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       runtimeType: 'terminal',
       runtime: publishedTerminalResult(runtime),
     })
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', '/repo')
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', request.repoRoot)
   })
 
   test('does not touch tabs when the provider create fails', async () => {
@@ -105,6 +111,71 @@ describe('WorkspacePaneRuntimeApplication', () => {
     })
     expect(ensureRuntimeTabForSession).not.toHaveBeenCalled()
     expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
+  })
+
+  test('rejects native execution metadata that does not match the runtime target', async () => {
+    const capture = vi.fn()
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: { capture },
+      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminal: {
+        createAdmitted: async () => ({ ok: false, message: 'unexpected' }),
+        close: () => false,
+      },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged: vi.fn(),
+    })
+
+    await expect(
+      application.open('client-test', 'user-test', {
+        runtimeType: 'terminal',
+        request: { ...request, worktreePath: '/repo/other' },
+      }),
+    ).resolves.toMatchObject({ ok: false, message: 'error.invalid-arguments' })
+    await expect(
+      application.close('client-test', 'user-test', {
+        runtimeType: 'terminal',
+        sessionId: 'term-111111111111111111111',
+        target: { target: request.target, nativeWorktreePath: '/repo/other' },
+      }),
+    ).resolves.toMatchObject({ ok: false, message: 'error.invalid-arguments' })
+    expect(capture).not.toHaveBeenCalled()
+  })
+
+  test('normalizes a workspace locator before closing its native terminal session', async () => {
+    const target = {
+      kind: 'workspace' as const,
+      workspaceId,
+      workspaceRuntimeId: request.repoRuntimeId,
+    }
+    const close = vi.fn(() => true)
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: {
+        captureWorkspace: async () => testPhysicalWorktreeExecutionCapability('/repo'),
+        capture: async () => testPhysicalWorktreeExecutionCapability('/repo'),
+      },
+      terminalWorktree: {
+        listSessionsForUser: async () => [
+          { ...terminalSession('term-workspaceworkspace001', 'pty_workspace_aaaaaaaa'), target, worktreePath: '/repo' },
+        ],
+      },
+      terminal: { createAdmitted: async () => ({ ok: false, message: 'unexpected' }), close },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged: vi.fn(),
+    })
+
+    await expect(
+      application.close('client-test', 'user-test', {
+        runtimeType: 'terminal',
+        sessionId: 'term-workspaceworkspace001',
+        target: { target, nativeWorktreePath: workspaceId },
+      }),
+    ).resolves.toMatchObject({ ok: true, runtime: { action: 'closed' } })
+    expect(close).toHaveBeenCalledOnce()
   })
 
   test('reports remote runtime failure when physical worktree capture proves transport failure', async () => {
@@ -243,10 +314,8 @@ describe('WorkspacePaneRuntimeApplication', () => {
         runtimeType: 'terminal',
         sessionId: session.terminalSessionId,
         target: {
-          repoRoot: request.repoRoot,
-          repoRuntimeId: request.repoRuntimeId,
-          branchName: request.branch,
-          worktreePath: request.worktreePath,
+          target: request.target,
+          nativeWorktreePath: request.worktreePath,
         },
       }),
     ).resolves.toEqual({
@@ -282,10 +351,8 @@ describe('WorkspacePaneRuntimeApplication', () => {
         runtimeType: 'terminal',
         sessionId: 'term-closedclosedclosed001',
         target: {
-          repoRoot: request.repoRoot,
-          repoRuntimeId: request.repoRuntimeId,
-          branchName: request.branch,
-          worktreePath: request.worktreePath,
+          target: request.target,
+          nativeWorktreePath: request.worktreePath,
         },
       }),
     ).resolves.toEqual({
@@ -318,10 +385,8 @@ describe('WorkspacePaneRuntimeApplication', () => {
         runtimeType: 'terminal',
         sessionId: session.terminalSessionId,
         target: {
-          repoRoot: request.repoRoot,
-          repoRuntimeId: request.repoRuntimeId,
-          branchName: request.branch,
-          worktreePath: request.worktreePath,
+          target: request.target,
+          nativeWorktreePath: request.worktreePath,
         },
       }),
     ).resolves.toEqual({ ok: false, runtimeType: 'terminal', message: 'error.unavailable' })
@@ -354,10 +419,8 @@ describe('WorkspacePaneRuntimeApplication', () => {
       runtimeType: 'terminal',
       sessionId: session.terminalSessionId,
       target: {
-        repoRoot: request.repoRoot,
-        repoRuntimeId: request.repoRuntimeId,
-        branchName: request.branch,
-        worktreePath: request.worktreePath,
+        target: request.target,
+        nativeWorktreePath: request.worktreePath,
       },
     })
     await Promise.resolve()
@@ -504,7 +567,9 @@ describe('WorkspacePaneRuntimeApplication', () => {
   })
 })
 
-function terminalCreateSuccess(action: 'created' | 'restored' | 'reused' = 'created'): Extract<ServerTerminalCreateResult, { ok: true }> {
+function terminalCreateSuccess(
+  action: 'created' | 'restored' | 'reused' = 'created',
+): Extract<ServerTerminalCreateResult, { ok: true }> {
   const terminalRuntimeSessionId = 'pty_session_1_aaaaaaaaa'
   const terminalSessionId = 'term-111111111111111111111'
   return {
@@ -553,6 +618,7 @@ function terminalSession(terminalSessionId: string, terminalRuntimeSessionId: st
     terminalRuntimeGeneration: 1,
     terminalSessionId,
     repoRuntimeId: request.repoRuntimeId,
+    target: request.target,
     repoRoot: request.repoRoot,
     branch: request.branch,
     worktreePath: request.worktreePath,

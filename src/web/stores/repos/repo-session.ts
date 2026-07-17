@@ -128,12 +128,20 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         ) {
           return s
         }
-        const { repos } = addResolvedRepo(s, resolvedRepoForStubPromotion(restoredRepo), restoredRepo.repoRuntimeId)
+        const { repos } = addResolvedRepo(
+          s,
+          resolvedRepoForProjectionPromotion(restoredRepo),
+          restoredRepo.repoRuntimeId,
+        )
         promoted = true
         return repos === s.repos ? s : { repos }
       })
       if (!promoted) return false
 
+      if (!isProjectedRestoredWorkspaceRepo(restoredRepo)) {
+        writeWorkspacePaneTabsSnapshotQueryData(restoredRepo.repoRoot, restoredRepo.repoRuntimeId, result.snapshot)
+        return true
+      }
       seedRepoProjectionQueryData(restoredRepo.repoRoot, restoredRepo.repoRuntimeId, restoredRepo.projection)
       writeWorkspacePaneTabsSnapshotQueryData(restoredRepo.repoRoot, restoredRepo.repoRuntimeId, result.snapshot)
       acceptRepoProjectionReadModel(
@@ -230,14 +238,12 @@ function resolvedRepoFromRestoredRuntime(restored: RestoredWorkspaceRepoRuntime)
   }
 }
 
-function resolvedRepoForStubPromotion(restored: RepoWorkspaceTabsRestoreResult['repo']) {
+function resolvedRepoForProjectionPromotion(restored: RestoredWorkspaceRepoRuntime) {
+  const resolvedRepo = resolvedRepoFromRestoredRuntime(restored)
   return {
-    id: restored.repoRoot,
-    name: restored.name,
-    workspaceProbe: restored.workspaceProbe,
-    session: {
-      entry: restored.entry,
-      projectionState: 'projected' as const,
-    },
+    id: resolvedRepo.id,
+    name: resolvedRepo.name,
+    workspaceProbe: resolvedRepo.workspaceProbe,
+    session: resolvedRepo.session,
   }
 }

@@ -4,6 +4,7 @@ import { act, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRestoreRepoTabsOnView } from '#/web/hooks/useRestoreRepoTabsOnView.ts'
+import type { ClientWorkspaceState } from '#/shared/api-types.ts'
 
 const mocks = vi.hoisted(() => ({
   restoreRepoTabsOnView: vi.fn(),
@@ -14,7 +15,7 @@ const mocks = vi.hoisted(() => ({
     promoteRestoredWorkspaceRepo: vi.fn(),
   } as {
     repos: Record<string, ReturnType<typeof stubRepo> | undefined>
-    restoredClientWorkspaceBaseline?: import('#/shared/api-types.ts').ClientWorkspaceState | null
+    restoredClientWorkspaceBaseline?: ClientWorkspaceState | null
     promoteRestoredWorkspaceRepo: ReturnType<typeof vi.fn>
   },
 }))

@@ -28,7 +28,7 @@ import {
 export function createSettingsRoutes(options: {
   settingsState: NativeShortcutRegistrationState
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
-  workspaceCapabilityTransitionHost?: WorkspaceCapabilityTransitionHost
+  workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
 }) {
   const { settingsState, workspacePaneTabsHost, workspaceCapabilityTransitionHost } = options
   const app = createRouteApp()

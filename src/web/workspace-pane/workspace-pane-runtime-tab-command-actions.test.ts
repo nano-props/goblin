@@ -11,10 +11,17 @@ import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/works
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
 import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const terminalBase: TerminalSessionBase & { repoRuntimeId: string } = {
   repoRoot: 'goblin+file:///repo',
   repoRuntimeId: 'repo-runtime-1',
+  target: {
+    kind: 'git-worktree',
+    workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
+    workspaceRuntimeId: 'repo-runtime-1',
+    root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
+  },
   branch: 'main',
   worktreePath: '/repo-worktree',
 }

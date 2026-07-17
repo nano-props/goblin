@@ -102,6 +102,35 @@ describe('remote lifecycle write path', () => {
     })
   })
 
+  test('serializes initial conclusive non-Git cleanup exactly once', async () => {
+    const repoRuntimeId = acquireRepoRuntime(userId, repoId, 'client-test')
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.test',
+      user: 'developer',
+      port: 22,
+      remotePath: '/repo',
+    })!
+    mocks.resolveConnection.mockResolvedValue({
+      kind: 'ready',
+      repoId,
+      name: 'repo',
+      lifecycle: { kind: 'ready', target },
+      gitAvailable: false,
+    })
+    const cleanup = vi.fn(async ({ before, after }) => {
+      expect(before).toEqual({ status: 'probing' })
+      expect(after).toMatchObject({ capabilities: { git: { status: 'unavailable' } }, diagnostics: [] })
+    })
+
+    await runRemoteLifecycleWrite(
+      { userId, repoId, repoRuntimeId, mode: 'restart' },
+      { beforeCapabilityCommit: cleanup },
+    )
+
+    expect(cleanup).toHaveBeenCalledOnce()
+  })
+
   test('rejects a later Git downgrade when no transactional cleanup dependency was injected', async () => {
     const repoRuntimeId = acquireRepoRuntime(userId, repoId, 'client-test')
     const target = normalizeRemoteTarget({
@@ -180,7 +209,7 @@ describe('remote lifecycle write path', () => {
     expect(listRepoRuntimes(userId)[0]?.workspaceProbe).toEqual({ status: 'unavailable', reason: expected })
   })
 
-  test('does not let an old remote capability transition commit into a reopened epoch', async () => {
+  test('keeps reopen in the same epoch while a remote capability transition is committing', async () => {
     const repoRuntimeId = acquireRepoRuntime(userId, repoId, 'client-test')
     const target = normalizeRemoteTarget({
       alias: 'example',
@@ -222,8 +251,11 @@ describe('remote lifecycle write path', () => {
     cleanupGate.resolve()
 
     await expect(transition).resolves.toMatchObject({ kind: 'settled' })
-    expect(reopenedRuntimeId).not.toBe(repoRuntimeId)
-    expect(listRepoRuntimes(userId)[0]?.workspaceProbe).toEqual({ status: 'probing' })
+    expect(reopenedRuntimeId).toBe(repoRuntimeId)
+    expect(listRepoRuntimes(userId)[0]?.workspaceProbe).toMatchObject({
+      status: 'ready',
+      capabilities: { git: { status: 'unavailable' } },
+    })
   })
 
   test('maps a superseded attempt without leaking runtime internals', async () => {

@@ -1,13 +1,17 @@
 import { describe, expect, test, vi } from 'vitest'
 import { WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS } from '#/shared/workspace-pane-runtime.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { ClientAppRealtime } from '#/web/app-realtime-client.ts'
 import { createServerWorkspacePaneRuntimeClient } from '#/web/client-workspace-pane-runtime.ts'
 
 const target = {
-  repoRoot: '/repo',
-  repoRuntimeId: 'repo-runtime-test',
-  branchName: 'main',
-  worktreePath: '/repo/worktree',
+  target: {
+    kind: 'git-worktree' as const,
+    workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
+    workspaceRuntimeId: 'repo-runtime-test',
+    root: canonicalWorkspaceLocator('goblin+file:///repo/worktree')!,
+  },
+  nativeWorktreePath: '/repo/worktree',
 }
 
 describe('createServerWorkspacePaneRuntimeClient', () => {

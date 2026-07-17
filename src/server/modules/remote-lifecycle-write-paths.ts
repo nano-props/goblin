@@ -3,11 +3,13 @@ import { resolveServerRemoteRepoConnection } from '#/server/modules/remote.ts'
 import {
   commitOrReadInitialWorkspaceProbeState,
   runRepoRemoteLifecycle,
+  runSerializedInitialWorkspaceProbe,
   runSerializedWorkspaceRefresh,
   workspaceProbeStateForRuntime,
 } from '#/server/modules/repo-runtimes.ts'
 import type { RemoteRepoLifecycleCommandResult } from '#/shared/remote-repo.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
+import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
 
 export interface RunRemoteLifecycleInput {
   userId: string
@@ -77,7 +79,13 @@ export async function runRemoteLifecycleWrite(
     }
     const current = workspaceProbeStateForRuntime(userId, repoId, repoRuntimeId)
     if (current?.status === 'probing') {
-      commitOrReadInitialWorkspaceProbeState({ userId, repoRoot: repoId, repoRuntimeId, probe })
+      await runSerializedInitialWorkspaceProbe({
+        userId,
+        repoRoot: repoId,
+        repoRuntimeId,
+        probe: async () => probe,
+        beforeCommit: options.beforeCapabilityCommit,
+      })
     } else {
       await runSerializedWorkspaceRefresh({
         userId,
@@ -85,7 +93,7 @@ export async function runRemoteLifecycleWrite(
         repoRuntimeId,
         probe: async () => probe,
         beforeCommit: async (transition) => {
-          if (gitBecameUnavailable(transition.before, transition.after) && !options.beforeCapabilityCommit) {
+          if (workspaceGitCleanupRequired(transition.before, transition.after) && !options.beforeCapabilityCommit) {
             throw new Error('workspace capability downgrade requires transactional cleanup')
           }
           await options.beforeCapabilityCommit?.(transition)
@@ -94,13 +102,4 @@ export async function runRemoteLifecycleWrite(
     }
   }
   return { kind: 'settled', repoId, name: result.name, lifecycle: result.lifecycle }
-}
-
-function gitBecameUnavailable(before: WorkspaceProbeState, after: WorkspaceSettledProbeState): boolean {
-  return (
-    before.status === 'ready' &&
-    before.capabilities.git.status === 'available' &&
-    after.status === 'ready' &&
-    after.capabilities.git.status === 'unavailable'
-  )
 }

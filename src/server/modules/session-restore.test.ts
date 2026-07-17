@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   workspaceProbes: new Map<string, unknown>(),
 }))
 
+const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = { removeGitScopedResources: vi.fn() }
+
 vi.mock('#/server/modules/repo-runtimes.ts', () => ({
   acquireRepoRuntimeLease: mocks.acquireRepoRuntimeLease,
   releaseRepoRuntimeMembershipLease: mocks.releaseRepoRuntimeMembershipLease,
@@ -32,6 +34,14 @@ vi.mock('#/server/modules/repo-runtimes.ts', () => ({
     if (current) return current
     mocks.workspaceProbes.set(input.repoRoot, input.probe)
     return input.probe
+  }),
+  runSerializedInitialWorkspaceProbe: vi.fn(async (input) => {
+    const current = mocks.workspaceProbes.get(input.repoRoot)
+    if (current && (current as { status: string }).status !== 'probing') return current
+    const probe = await input.probe()
+    await input.beforeCommit?.({ before: { status: 'probing' }, after: probe })
+    mocks.workspaceProbes.set(input.repoRoot, probe)
+    return probe
   }),
   workspaceProbeStateForRuntime: vi.fn(
     (_userId, repoRoot) => mocks.workspaceProbes.get(repoRoot) ?? { status: 'probing' },
@@ -124,6 +134,7 @@ describe('restoreServerWorkspace', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 
@@ -132,7 +143,7 @@ describe('restoreServerWorkspace', () => {
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
       expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
-      targets: [{ kind: 'git-worktree', root: 'goblin+file:///repo' }],
+      targets: [{ kind: 'workspace' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
     expect(result.runtime).toMatchObject({
       restoredRepoId: 'goblin+file:///repo',
@@ -172,6 +183,7 @@ describe('restoreServerWorkspace', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 
@@ -217,6 +229,7 @@ describe('restoreServerWorkspace', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 
@@ -226,7 +239,7 @@ describe('restoreServerWorkspace', () => {
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
       expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
-      targets: [{ kind: 'git-worktree', root: 'goblin+file:///repo' }],
+      targets: [{ kind: 'workspace' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
     expect(result.runtime.workspacePaneTabs).toEqual([
       { repoRoot: 'goblin+file:///repo', repoRuntimeId: 'repo-runtime-test', snapshot: { revision: 3, entries: [] } },
@@ -255,6 +268,7 @@ describe('restoreServerWorkspace', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 
@@ -283,6 +297,7 @@ describe('restoreServerWorkspace', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 
@@ -334,6 +349,7 @@ describe('restoreServerWorkspace', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 
@@ -376,6 +392,7 @@ describe('restoreServerWorkspace', () => {
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     await expect(
       restoreServerWorkspace({
+        workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
         userId: 'user-test',
         clientId: 'client_test000000000000',
         workspacePaneTabsHost,
@@ -430,6 +447,7 @@ describe('restoreServerWorkspace', () => {
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     await expect(
       restoreServerWorkspace({
+        workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
         userId: 'user-test',
         clientId: 'client_test000000000000',
         workspacePaneTabsHost,
@@ -474,6 +492,7 @@ describe('restoreServerWorkspace', () => {
     const restore = restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
       signal: controller.signal,
     })
@@ -516,6 +535,7 @@ describe('restoreServerWorkspace', () => {
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     await expect(
       restoreServerWorkspace({
+        workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
         userId: 'user-test',
         clientId: 'client_test000000000000',
         workspacePaneTabsHost,
@@ -571,6 +591,7 @@ describe('restoreServerWorkspace', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       workspacePaneTabsHost,
     })
 

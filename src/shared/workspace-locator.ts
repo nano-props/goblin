@@ -37,6 +37,23 @@ export function parseWorkspaceLocator(
   return formatWorkspaceLocator(parsed, platform) === input ? parsed : null
 }
 
+/**
+ * Decode a canonical locator carried by a platform-neutral protocol.
+ *
+ * Platform admission belongs at the native execution boundary. Shared/browser
+ * decoders must accept either canonical file grammar (and the platform-neutral
+ * SSH grammar), otherwise a Windows locator is corrupted merely by crossing a
+ * browser process that has no authoritative `process.platform`.
+ */
+export function parseCanonicalWorkspaceLocator(input: string): ParsedWorkspaceLocator | null {
+  return parseWorkspaceLocator(input, 'posix') ?? parseWorkspaceLocator(input, 'win32')
+}
+
+export function canonicalWorkspaceLocator(input: string): WorkspaceLocator | null {
+  const parsed = parseCanonicalWorkspaceLocator(input)
+  return parsed ? formatWorkspaceLocator(parsed, parsed.transport === 'file' ? parsed.platform : 'posix') : null
+}
+
 export function formatWorkspaceLocator(
   locator: ParsedWorkspaceLocator,
   platform: WorkspaceLocatorPlatform,

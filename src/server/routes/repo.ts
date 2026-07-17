@@ -33,11 +33,11 @@ import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import {
   acquireRepoRuntime,
-  commitOrReadInitialWorkspaceProbeState,
   isCurrentRepoRuntime,
   listRepoRuntimes,
   releaseRepoRuntime,
   replaceRepoRuntimeMembershipsForClient,
+  runSerializedInitialWorkspaceProbe,
   runSerializedWorkspaceRefresh,
   workspaceRuntimeHasGitCapability,
 } from '#/server/modules/repo-runtimes.ts'
@@ -59,7 +59,7 @@ import {
 } from '#/shared/workspace-locator.ts'
 import path from 'node:path'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
-import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
+import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
 
 // Soft-fail envelope returned by `jsonOr` for every repo action that
 // doesn't have a more specific success shape. Keep this in one place
@@ -70,7 +70,7 @@ const READ_REPO_ERROR = { ok: false as const, message: 'error.failed-read-repo' 
 export function createRepoRoutes(options: {
   worktreeRemovalApplication: ServerWorktreeRemovalHost
   repoMutationApplication: ServerRepoMutationHost
-  workspaceCapabilityTransitionHost?: WorkspaceCapabilityTransitionHost
+  workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
 }) {
   const app = createRouteApp()
   async function jsonOr<T>(run: () => Promise<T>, fallback: T, label: string) {
@@ -125,8 +125,8 @@ export function createRepoRoutes(options: {
         repoRuntimeId: workspaceRuntimeId,
         probe: async () => await probeWorkspace(workspaceId, platform, { signal: c.req.raw.signal }),
         beforeCommit: async ({ before, after }) => {
-          if (!gitBecameUnavailable(before, after)) return
-          await options.workspaceCapabilityTransitionHost?.removeGitScopedResources({
+          if (!workspaceGitCleanupRequired(before, after)) return
+          await options.workspaceCapabilityTransitionHost.removeGitScopedResources({
             userId,
             workspaceId,
             workspaceRuntimeId,
@@ -464,11 +464,20 @@ export function createRepoRoutes(options: {
         return c.json({ ok: false as const, input: input.repoInput, reason: probe.reason })
       }
       const repoRuntimeId = acquireRepoRuntime(userId, workspaceId, input.clientId)
-      const authoritativeProbe = commitOrReadInitialWorkspaceProbeState({
+      const authoritativeProbe = await runSerializedInitialWorkspaceProbe({
         userId,
         repoRoot: workspaceId,
         repoRuntimeId,
-        probe,
+        probe: async () => probe,
+        beforeCommit: async ({ before, after }) => {
+          if (!workspaceGitCleanupRequired(before, after)) return
+          await options.workspaceCapabilityTransitionHost.removeGitScopedResources({
+            userId,
+            workspaceId,
+            workspaceRuntimeId: repoRuntimeId,
+            assertCurrent: () => assertCurrentRepoRuntimeForRead(userId, workspaceId, repoRuntimeId),
+          })
+        },
       })
       if (!authoritativeProbe || authoritativeProbe.status !== 'ready') {
         return c.json({ ok: false as const, input: input.repoInput, reason: 'error.workspace-transport-unavailable' })
@@ -511,15 +520,6 @@ export function createRepoRoutes(options: {
     return c.json(await jsonOr(async () => abortRepoOperation(cwd), false, 'abort'))
   })
   return app
-}
-
-function gitBecameUnavailable(before: WorkspaceProbeState, after: WorkspaceSettledProbeState): boolean {
-  return (
-    before.status === 'ready' &&
-    before.capabilities.git.status === 'available' &&
-    after.status === 'ready' &&
-    after.capabilities.git.status === 'unavailable'
-  )
 }
 
 function serverLocatorPlatform(): WorkspaceLocatorPlatform {
