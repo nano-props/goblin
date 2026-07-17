@@ -148,6 +148,37 @@ describe('settings routes', () => {
     })
   })
 
+  test('discards an invalid active workspace hint without blocking authoritative workspace restore', async () => {
+    const restored = {
+      status: 'repaired' as const,
+      openWorkspaceEntries: [],
+      runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
+    }
+    mocks.restoreServerWorkspace.mockResolvedValue(restored)
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = new Hono<{ Variables: { userId: string } }>()
+    app.use('*', async (c, next) => {
+      c.set('userId', 'user-test')
+      await next()
+    })
+    app.route('/', createSettingsRoutes(settingsRouteOptions()))
+
+    const response = await app.request('/workspace/restore', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        clientId: 'client_test000000000000',
+        activeRepoRoot: '/stale/native/path',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual(restored)
+    expect(mocks.restoreServerWorkspace).toHaveBeenCalledWith(
+      expect.objectContaining({ activeRepoRoot: null }),
+    )
+  })
+
   test('delegates authenticated workspace membership commands', async () => {
     const workspace = {
       openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///repo-a' }],

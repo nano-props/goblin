@@ -20,6 +20,7 @@ import { GIT_HASH_RE } from '#/shared/git-types.ts'
 import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/repo-settings.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
+import { MAX_REPO_LOCATOR_LENGTH } from '#/shared/repo-locator.ts'
 
 const StringArray = v.array(v.string())
 const TerminalAppSchema = v.picklist(['ghostty', 'terminal', 'windowsTerminal'])
@@ -252,7 +253,10 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
   githubCli: GITHUB_CLI_REFRESH_SCHEMA,
   workspaceRestore: v.object({
     clientId: ClientIdSchema,
-    activeRepoRoot: v.optional(v.nullable(RepoRootSchema)),
+    // This is only a presentation hint used to choose which authoritative
+    // workspace membership to enrich first. Decode its bounded wire shape
+    // here; the server restore boundary discards a stale/non-canonical value.
+    activeRepoRoot: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(MAX_REPO_LOCATOR_LENGTH)))),
   }),
   workspaceRepoAdd: v.object({ entry: WorkspaceSessionEntrySchema }),
   workspaceRepoRemove: v.object({ repoRoot: RepoRootSchema }),

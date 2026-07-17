@@ -24,6 +24,7 @@ import {
   SETTINGS_PATCH_SCHEMAS,
   SETTINGS_PROCEDURE_SCHEMAS,
 } from '#/shared/procedure-schemas.ts'
+import { toSafeCanonicalRepoLocator } from '#/shared/repo-locator.ts'
 
 export function createSettingsRoutes(options: {
   settingsState: NativeShortcutRegistrationState
@@ -78,7 +79,7 @@ export function createSettingsRoutes(options: {
       await restoreServerWorkspace({
         userId,
         clientId,
-        activeRepoRoot: activeRepoRoot ?? null,
+        activeRepoRoot: toSafeCanonicalRepoLocator(activeRepoRoot),
         workspacePaneTabsHost,
         workspaceCapabilityTransitionHost,
         signal: c.req.raw.signal,
