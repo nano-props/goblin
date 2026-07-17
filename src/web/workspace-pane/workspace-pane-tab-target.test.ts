@@ -43,7 +43,7 @@ describe('workspace pane tab target read model', () => {
 
     const target = workspacePaneTabTargetForWorkspace(REPO_ID)
 
-    expect(target).toMatchObject({ branchName: null, worktreePath: REPO_ID, renderedTab: 'files' })
+    expect(target).toMatchObject({ branchName: null, worktreePath: REPO_ID, renderedTab: 'status' })
   })
 
   test('marks target resolution unavailable when the repo branch read model is unavailable', () => {
