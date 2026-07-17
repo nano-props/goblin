@@ -1,6 +1,5 @@
 import path from 'node:path'
-import { constants as fsConstants } from 'node:fs'
-import { access, realpath, stat } from 'node:fs/promises'
+import { constants as fsConstants, promises as fs } from 'node:fs'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { checkGitAvailable } from '#/system/git/git-exec.ts'
 import {
@@ -302,9 +301,9 @@ async function readRemoteAffectedRepoIds(
 
 async function probeReadableDirectory(cwd: string): Promise<ProbeAvailability> {
   try {
-    const value = await stat(cwd)
+    const value = await fs.stat(cwd)
     if (!value.isDirectory()) return { ok: false, message: 'error.path-not-directory' }
-    await access(cwd, fsConstants.R_OK)
+    await fs.access(cwd, fsConstants.R_OK)
     return { ok: true }
   } catch (err) {
     return { ok: false, message: classifyPathProbeError(err) }
@@ -540,8 +539,8 @@ function createLocalRepoSource(
       if (physicalWorktreeCapability) {
         try {
           await validatePhysicalWorktreeExecution(physicalWorktreeCapability, signal)
-          const currentPath = await realpath(removable.target.path)
-          const currentStat = await stat(currentPath, { bigint: true })
+          const currentPath = await fs.realpath(removable.target.path)
+          const currentStat = await fs.stat(currentPath, { bigint: true })
           if (
             exactExecution?.kind !== 'local' ||
             currentPath !== exactExecution.canonicalWorktreePath ||
