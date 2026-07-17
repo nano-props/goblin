@@ -53,11 +53,12 @@ export function useRepoWorkspaceTabModelInput(
 
   const workspacePaneTabEntries = useMemo(
     () =>
-      workspacePaneTabsForTargetFromQueryData(workspacePaneTabsQuery.data ?? { revision: 0, entries: [] }, {
-        repoRoot: repo.id,
-        branchName,
-        worktreePath,
-      }),
+      workspacePaneTabsForTargetFromQueryData(
+        workspacePaneTabsQuery.data ?? { revision: 0, entries: [] },
+        branchName
+          ? { repoRoot: repo.id, branchName, worktreePath }
+          : { kind: 'inactive', repoRoot: repo.id, branchName: null, worktreePath: null },
+      ),
     [workspacePaneTabsQuery.data, repo.id, repo.repoRuntimeId, branchName, worktreePath],
   )
 

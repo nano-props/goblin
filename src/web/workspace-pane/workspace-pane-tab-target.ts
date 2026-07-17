@@ -128,18 +128,27 @@ function resolveWorkspacePaneTabTarget(
     repoRuntimeId: repo.repoRuntimeId,
     worktreePath,
   })
-  const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget({
-    repoRoot: repoId,
-    repoRuntimeId: repo.repoRuntimeId,
-    branchName,
-    worktreePath,
-  })
+  const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget(
+    branchName === null
+      ? {
+          kind: 'workspace-root',
+          repoRoot: repoId,
+          repoRuntimeId: repo.repoRuntimeId,
+          branchName: null,
+          worktreePath: null,
+        }
+      : { repoRoot: repoId, repoRuntimeId: repo.repoRuntimeId, branchName, worktreePath },
+  )
   if (tabEntriesProjection.phase !== 'ready') {
     return {
       kind: 'unavailable',
       reason: tabEntriesProjection.phase === 'failed' ? 'workspace-pane-tabs-failed' : 'workspace-pane-tabs-pending',
     }
   }
+  const preferenceTarget =
+    branchName === null
+      ? { kind: 'workspace-root' as const, repoRoot: repoId, branchName: null, worktreePath: null }
+      : { repoRoot: repoId, branchName, worktreePath }
   return {
     kind: 'ready',
     target: createRepoWorkspaceTabModel({
@@ -147,11 +156,7 @@ function resolveWorkspacePaneTabTarget(
       repoRuntimeId: repo.repoRuntimeId,
       branchName,
       worktreePath,
-      preferredTab: preferredWorkspacePaneTabForRoute(
-        repo.ui,
-        { repoRoot: repoId, branchName: branchName ?? '', worktreePath },
-        options,
-      ),
+      preferredTab: preferredWorkspacePaneTabForRoute(repo.ui, preferenceTarget, options),
       allowPreferredTabFallback: options.workspacePaneRoute === undefined,
       tabEntries: tabEntriesProjection.tabs,
       tabEntriesProjectionPhase: tabEntriesProjection.phase,

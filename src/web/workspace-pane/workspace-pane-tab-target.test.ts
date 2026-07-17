@@ -41,10 +41,16 @@ describe('workspace pane tab target read model', () => {
       worktreePath: null,
       tabs: [workspacePaneStaticTabEntry('files')],
     })
+    useReposStore
+      .getState()
+      .setWorkspacePaneTabForTarget(
+        { kind: 'workspace-root', repoRoot: REPO_ID, branchName: null, worktreePath: null },
+        'files',
+      )
 
     const target = workspacePaneTabTargetForWorkspace(REPO_ID)
 
-    expect(target).toMatchObject({ branchName: null, worktreePath: REPO_ID, renderedTab: 'status' })
+    expect(target).toMatchObject({ branchName: null, worktreePath: REPO_ID, renderedTab: 'files' })
   })
 
   test('marks target resolution unavailable when the repo branch read model is unavailable', () => {

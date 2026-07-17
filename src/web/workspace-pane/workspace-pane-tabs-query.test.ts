@@ -46,6 +46,44 @@ test('test target construction rejects legacy raw workspace ids', () => {
 })
 
 describe('workspace pane tabs revisioned query cache', () => {
+  test('reads workspace-root runtime tabs by their explicit target identity', () => {
+    const queryClient = new QueryClient()
+    const tabs = [
+      workspacePaneStaticTabEntry('files'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-rootrootrootrootroot1'),
+    ]
+    writeWorkspacePaneTabsSnapshotQueryData(
+      REPO_ROOT,
+      REPO_RUNTIME_ID,
+      snapshot(1, [
+        {
+          target: runtimeWorkspacePaneTargetForTest({
+            kind: 'workspace-root',
+            repoRoot: REPO_ROOT,
+            repoRuntimeId: REPO_RUNTIME_ID,
+            branchName: null,
+            worktreePath: null,
+          }),
+          tabs,
+        },
+      ]),
+      queryClient,
+    )
+
+    expect(
+      readWorkspacePaneTabsForTarget(
+        {
+          kind: 'workspace-root',
+          repoRoot: REPO_ROOT,
+          repoRuntimeId: REPO_RUNTIME_ID,
+          branchName: null,
+          worktreePath: null,
+        },
+        queryClient,
+      ),
+    ).toEqual(tabs)
+  })
+
   test('accepts an identical same-revision snapshot as current', () => {
     const queryClient = new QueryClient()
     const current = snapshot(4, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])])
