@@ -171,6 +171,15 @@ function recordCreatedTerminalWorkspacePaneRuntimeTabOpener(
 }
 
 function terminalWorkspacePaneCoordinatorTarget(base: TerminalSessionBase & { repoRuntimeId: string }) {
+  if (base.target?.kind === 'workspace-root') {
+    return {
+      kind: 'workspace-root' as const,
+      repoId: base.repoRoot,
+      repoRuntimeId: base.repoRuntimeId,
+      branchName: null,
+      worktreePath: null,
+    }
+  }
   return {
     repoId: base.repoRoot,
     repoRuntimeId: base.repoRuntimeId,

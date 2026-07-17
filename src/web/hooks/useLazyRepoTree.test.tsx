@@ -197,7 +197,7 @@ describe('useLazyRepoTree', () => {
     expect(mocks.getRepositoryTree).toHaveBeenCalledWith(
       '/repo-a',
       '/repo-a/main',
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      { repoRuntimeId: REPO_RUNTIME_ID },
     )
     expect(lastSnapshot?.loading).toBe(true)
     expect(lastSnapshot?.error).toBeNull()
@@ -248,7 +248,7 @@ describe('useLazyRepoTree', () => {
     })
     await flush()
 
-    expect(mocks.getRepositoryTree).toHaveBeenCalled()
+    expect(mocks.getRepositoryTree).toHaveBeenCalledOnce()
     expect(lastSnapshot?.tree).toEqual(result)
     expect(lastSnapshot?.loading).toBe(false)
   })
@@ -286,7 +286,7 @@ describe('useLazyRepoTree', () => {
     expect(lastSnapshot?.loading).toBe(false)
   })
 
-  test('refetches and aborts the previous request when the worktree path changes', async () => {
+  test('starts the new target read without letting the previous cache read clobber it', async () => {
     const first = makeDeferred<RepoTreeResult>()
     const second = makeDeferred<RepoTreeResult>()
     mocks.getRepositoryTree.mockReturnValueOnce(first.promise)
@@ -300,9 +300,6 @@ describe('useLazyRepoTree', () => {
       },
     })
 
-    const firstSignal = mocks.getRepositoryTree.mock.calls[0]?.[2]?.signal as AbortSignal
-    expect(firstSignal.aborted).toBe(false)
-
     await setProps({
       repoId: '/repo-a',
       worktreePath: '/repo-a/feature',
@@ -311,8 +308,6 @@ describe('useLazyRepoTree', () => {
       },
     })
 
-    // After the input change, the prior controller should be aborted.
-    expect(firstSignal.aborted).toBe(true)
     expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
     expect(mocks.getRepositoryTree.mock.calls[1]?.[1]).toBe('/repo-a/feature')
 
@@ -335,7 +330,7 @@ describe('useLazyRepoTree', () => {
     expect(lastSnapshot?.tree?.nodes).toHaveLength(1)
   })
 
-  test('aborts the in-flight request when the consumer unmounts', async () => {
+  test('lets the query-owned root read settle after the consumer unmounts', async () => {
     const deferred = makeDeferred<RepoTreeResult>()
     mocks.getRepositoryTree.mockReturnValueOnce(deferred.promise)
 
@@ -346,10 +341,12 @@ describe('useLazyRepoTree', () => {
         lastSnapshot = snapshot
       },
     })
-    const signal = mocks.getRepositoryTree.mock.calls[0]?.[2]?.signal as AbortSignal
-
     act(() => root?.unmount())
-    expect(signal.aborted).toBe(true)
+    await act(async () => {
+      deferred.resolve({ nodes: [], truncated: false })
+      await deferred.promise
+    })
+    expect(mocks.getRepositoryTree).toHaveBeenCalledOnce()
   })
 
   test('refetches when a repo-snapshot invalidation arrives for the current repo', async () => {

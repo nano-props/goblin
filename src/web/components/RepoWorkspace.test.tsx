@@ -133,7 +133,8 @@ afterEach(() => {
 describe('RepoWorkspace', () => {
   test('renders a non-Git workspace with workspace-scoped Status and Files tabs', async () => {
     const workspaceId = 'goblin+file:///tmp/plain-workspace'
-    seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
+    const repo = seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.repoRuntimeId)
     useReposStore.setState((state) => ({
       repos: {
         ...state.repos,
@@ -171,6 +172,20 @@ describe('RepoWorkspace', () => {
     expect(screen.getByText('tab.files')).toBeTruthy()
     expect(screen.getByText('tab.status')).toBeTruthy()
     expect(screen.queryByText('branches.empty')).toBeNull()
+    const newTerminalButton = screen.getByRole('button', { name: 'terminal.new' }) as HTMLButtonElement
+    await waitFor(() => expect(newTerminalButton.disabled).toBe(false))
+    newTerminalButton.click()
+    await waitFor(() => {
+      expect(terminalCommandContext.createTerminalWithAdmission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          repoRoot: workspaceId,
+          branch: '',
+          worktreePath: workspaceId,
+          target: expect.objectContaining({ kind: 'workspace-root', workspaceId }),
+        }),
+        undefined,
+      )
+    })
     await waitFor(() => {
       expect(navigation.showWorkspaceFiles).toHaveBeenCalledWith(workspaceId, { replace: true })
     })

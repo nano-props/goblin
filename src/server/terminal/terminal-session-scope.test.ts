@@ -1,20 +1,31 @@
 import { describe, expect, test } from 'vitest'
-import { terminalSessionScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
+import { terminalSessionTargetWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-describe('terminalSessionScope', () => {
-  test('preserves canonical local workspace identity as the session scope', () => {
-    expect(terminalSessionScope('goblin+file:///repo')).toBe('goblin+file:///repo')
-    expect(() => terminalSessionScope('/repo')).toThrow('error.workspace-locator-malformed')
+const workspaceId = canonicalWorkspaceLocator('goblin+file:///tmp/workspace')!
+
+describe('terminal session target worktree path', () => {
+  test('derives a workspace-root execution path from its authoritative locator', () => {
+    expect(
+      terminalSessionTargetWorktreePath(
+        {
+          kind: 'workspace-root',
+          workspaceId,
+          workspaceRuntimeId: 'repo-runtime-current',
+        },
+        'goblin+file:///tmp/workspace',
+      ),
+    ).toBe('/tmp/workspace')
   })
 
-  test('preserves remote repo roots as opaque session scopes', () => {
-    expect(terminalSessionScope('goblin+ssh://prod/%252Frepo')).toBe('goblin+ssh://prod/%252Frepo')
-  })
-
-  test('normalizes local worktrees and preserves remote worktree paths', () => {
-    expect(terminalSessionWorktreePath('goblin+file:///repo', './repo-worktree')).toMatch(/repo-worktree$/)
-    expect(terminalSessionWorktreePath('goblin+file:///repo', 'goblin+file:///repo')).toBe('/repo')
-    expect(terminalSessionWorktreePath('goblin+ssh://prod/%252Frepo', '/srv/repo')).toBe('/srv/repo')
-    expect(terminalSessionWorktreePath('goblin+ssh://prod/srv/repo', 'goblin+ssh://prod/srv/repo')).toBe('/srv/repo')
+  test('continues to validate a Git worktree path against its target root', () => {
+    const target = {
+      kind: 'git-worktree' as const,
+      workspaceId,
+      workspaceRuntimeId: 'repo-runtime-current',
+      root: canonicalWorkspaceLocator('goblin+file:///tmp/worktree')!,
+    }
+    expect(terminalSessionTargetWorktreePath(target, '/tmp/worktree')).toBe('/tmp/worktree')
+    expect(terminalSessionTargetWorktreePath(target, '/tmp/other')).toBeNull()
   })
 })

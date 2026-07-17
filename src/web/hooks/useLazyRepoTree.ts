@@ -72,8 +72,12 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
   const rootQuery = useQuery({
     queryKey: rootQueryKey,
     enabled,
-    queryFn: ({ signal }) => getRepositoryTree(repoId, worktreePath, { repoRuntimeId, signal }),
+    // The query cache owns this root read across transient panel observer lifetimes.
+    // Runtime identity is part of the key and the server rejects stale runtimes, so
+    // aborting when a tab briefly remounts only creates duplicate replacement reads.
+    queryFn: () => getRepositoryTree(repoId, worktreePath, { repoRuntimeId }),
     retry: false,
+    staleTime: Infinity,
   })
   const { data: rootData, error: rootError, isPending, refetch } = rootQuery
 
