@@ -389,7 +389,7 @@ function findRepoProjectionPlaceholderSource(
 ): RepoRuntimeProjection | undefined {
   const candidates = queryClient
     .getQueriesData<RepoRuntimeProjection>({ queryKey: repoProjectionQueryPrefix(repoRoot, repoRuntimeId) })
-    .map(([_key, projection]) => projection)
+    .map(([, projection]) => projection)
     .filter((projection): projection is RepoRuntimeProjection => !!projection?.snapshot)
   candidates.sort(
     (a, b) => repoProjectionPlaceholderRank(a, branch, mode) - repoProjectionPlaceholderRank(b, branch, mode),

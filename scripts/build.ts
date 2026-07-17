@@ -174,7 +174,7 @@ function planDarwin(): PlatformPlan {
     resourcesDir(builtApp) {
       return path.join(builtApp, 'Contents', 'Resources')
     },
-    installDestination(_hostArch) {
+    installDestination() {
       const appsDir = path.join(os.homedir(), 'Applications')
       mkdirSync(appsDir, { recursive: true })
       return path.join(appsDir, `${APP_NAME}.app`)
@@ -263,7 +263,7 @@ function planWindows(): PlatformPlan {
       const hostDir = hostArch === 'arm64' ? 'Goblin-arm64' : 'Goblin'
       return path.join(localAppData, 'Programs', hostDir)
     },
-    async postInstall(_destPath) {
+    async postInstall() {
       // No signing configured for Windows yet — the unsigned installer
       // builds rely on the user explicitly trusting the binary. Signing
       // can be added here once a code-signing certificate is wired up.

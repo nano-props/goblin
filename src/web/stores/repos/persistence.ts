@@ -46,7 +46,7 @@ const RepoSnapshotCacheEntrySchema = v.object({
 function cachedBranches(
   branches: RepoSnapshotCacheEntry['data']['branches'],
 ): RepoSnapshotCacheEntry['data']['branches'] {
-  return stripBranchWorktreeMetadata(branches).map(({ pullRequest: _pullRequest, ...branch }) => branch)
+  return stripBranchWorktreeMetadata(branches)
 }
 
 function restoreProjectionFromSnapshot(repo: RepoState, snapshot: RepoSnapshotCacheEntry): RepoState {

@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { omit } from 'es-toolkit'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
@@ -124,8 +125,7 @@ function publishRepoSnapshotInvalidations(cwd: string, affectedRepoIds: readonly
 }
 
 function execResultOnly(result: RepoMutationResult & { affectedWorktreePaths?: readonly string[] }): ExecResult {
-  const { affectedRepoIds: _affectedRepoIds, affectedWorktreePaths: _affectedWorktreePaths, ...execResult } = result
-  return execResult
+  return omit(result, ['affectedRepoIds', 'affectedWorktreePaths'])
 }
 
 async function runUserNetworkMutation(

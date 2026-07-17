@@ -1,4 +1,5 @@
 import type { Hono } from 'hono'
+import { omit } from 'es-toolkit'
 import { createApp, type ServerAppOptions } from '#/server/app-factory.ts'
 import { stopBackgroundSync } from '#/server/modules/background-sync.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
@@ -70,19 +71,14 @@ function hasAnyServerRuntimeInjectedHost(options: ServerRuntimeOptions): boolean
 }
 
 export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntime {
-  const {
-    appRealtimeHost: _appRealtimeHost,
-    workspacePaneTabsHost: _workspacePaneTabsHost,
-    worktreeRemovalApplication: _worktreeRemovalApplication,
-    workspaceCapabilityTransitionHost: _workspaceCapabilityTransitionHost,
-    ptyWorkerEntry,
-    gCommandEntry,
-    gCommandBinDir,
-    gCommandNodePath,
-    serverHost,
-    serverPort,
-    ...appOptions
-  } = options
+  const appRuntimeOptions = omit(options, [
+    'appRealtimeHost',
+    'workspacePaneTabsHost',
+    'worktreeRemovalApplication',
+    'workspaceCapabilityTransitionHost',
+  ])
+  const { ptyWorkerEntry, gCommandEntry, gCommandBinDir, gCommandNodePath, serverHost, serverPort, ...appOptions } =
+    appRuntimeOptions
   const injectedHosts = isServerRuntimeInjectedHosts(options)
     ? {
         appRealtimeHost: options.appRealtimeHost,

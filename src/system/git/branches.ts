@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { omit } from 'es-toolkit'
 import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
 import { FIELD_SEP, parseBranches, parseLog } from '#/system/git/parsers.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
@@ -86,8 +87,7 @@ export function markDefaultBranch(branches: BranchSnapshotInfo[], defaultBranch:
   return branches.map((branch) => {
     if (branch.name === defaultBranch) return branch.isDefault ? branch : { ...branch, isDefault: true }
     if (!branch.isDefault) return branch
-    const { isDefault: _isDefault, ...rest } = branch
-    return rest
+    return omit(branch, ['isDefault'])
   })
 }
 

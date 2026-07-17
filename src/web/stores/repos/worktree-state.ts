@@ -1,3 +1,4 @@
+import { omit } from 'es-toolkit'
 import type { BranchSnapshotInfo, WorktreeStatus } from '#/web/types.ts'
 import type { RepoBranchState, RepoWorktreeState } from '#/web/stores/repos/types.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
@@ -67,7 +68,8 @@ export function worktreeStatesFromBranchReadModel(
 
 export function stripBranchWorktreeMetadata(branches: BranchSnapshotInfo[]): RepoBranchState[] {
   return branches.map((branch) => {
-    const { worktree, pullRequest: _pullRequest, ...rest } = branch
+    const worktree = branch.worktree
+    const rest = omit(branch, ['worktree', 'pullRequest'])
     if (!worktree) return rest
     return { ...rest, worktree: { path: worktree.path } }
   })

@@ -1,4 +1,5 @@
 import { useCallback, useId, useMemo } from 'react'
+import { omit } from 'es-toolkit'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
@@ -237,8 +238,7 @@ function GitRepoWorkspaceLoaded({
       branches: presentationBranchModel.branches.map((branch) => {
         if (branch.name !== currentBranchName) return branch
         if (pullRequest) return { ...branch, pullRequest }
-        const { pullRequest: _pullRequest, ...branchWithoutPullRequest } = branch
-        return branchWithoutPullRequest
+        return omit(branch, ['pullRequest'])
       }),
     }
   }

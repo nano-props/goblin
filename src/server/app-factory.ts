@@ -97,7 +97,7 @@ export function createApp(options: ServerAppOptions): Hono {
   app.use(
     '/api/*',
     cors({
-      origin: (origin: string, _c) => (buildCorsOriginPredicate(serverHost, serverPort)(origin) ? origin : ''),
+      origin: (origin: string) => (buildCorsOriginPredicate(serverHost, serverPort)(origin) ? origin : ''),
       // `credentials: true` is required so the browser sends the
       // `goblin_access_token` cookie on cross-origin LAN requests.
       // Hono's `cors()` echoes the matched origin in

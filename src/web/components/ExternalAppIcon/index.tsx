@@ -17,8 +17,8 @@ export function EditorAppIcon({ pref, className }: AppIconProps & { pref: Editor
     case 'vscode':
       return <VSCodeIcon className={className} />
     default: {
-      const _exhaustive: never = pref
-      return _exhaustive
+      const exhaustive: never = pref
+      return exhaustive
     }
   }
 }

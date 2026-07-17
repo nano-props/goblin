@@ -1,4 +1,5 @@
 import PQueue from 'p-queue'
+import { omit } from 'es-toolkit'
 import {
   isProjectedRestoredWorkspaceRepo,
   type ProjectedRestoredWorkspaceRepoRuntime,
@@ -469,7 +470,7 @@ function runtimeSnapshotFromOpened(
   workspacePaneTabs: Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>,
 ): WorkspaceRuntimeRestoreSnapshot {
   return {
-    repos: opened.map(({ lease: _lease, ...repo }) => repo),
+    repos: opened.map((repo) => omit(repo, ['lease'])),
     workspacePaneTabs,
     restoredRepoId,
   }
