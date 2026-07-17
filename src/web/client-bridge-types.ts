@@ -24,6 +24,7 @@ import type {
   TerminalSessionsSnapshot,
 } from '#/shared/terminal-types.ts'
 import type {
+  WorkspacePaneTabsChangedRealtimeMessage,
   WorkspacePaneTabsListInput,
   WorkspacePaneTabsReplaceInput,
   WorkspacePaneTabsSnapshot,
@@ -79,7 +80,7 @@ export interface ClientWorkspacePaneTabs {
   list: (input: WorkspacePaneTabsListInput) => Promise<WorkspacePaneTabsSnapshot>
   replace: (input: WorkspacePaneTabsReplaceInput) => Promise<WorkspacePaneTabsSnapshot>
   update: (input: WorkspacePaneTabsUpdateInput) => Promise<WorkspacePaneTabsSnapshot>
-  onChanged: (cb: (repoRoot: string) => void) => () => void
+  onChanged: (cb: (message: WorkspacePaneTabsChangedRealtimeMessage) => void) => () => void
 }
 
 export interface ClientWorkspacePaneRuntime {

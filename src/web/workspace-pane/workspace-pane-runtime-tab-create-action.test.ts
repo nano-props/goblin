@@ -33,17 +33,9 @@ const BASE: TerminalSessionBase = {
 const terminalCreateCommandMocks = vi.hoisted(() => ({
   runCreateTerminalTabCommand: vi.fn(),
 }))
-const workspacePaneTabsQueryMocks = vi.hoisted(() => ({
-  refreshWorkspacePaneTabsQueryData: vi.fn(),
-}))
 
 vi.mock('#/web/commands/terminal-create-command.ts', () => ({
   runCreateTerminalTabCommand: terminalCreateCommandMocks.runCreateTerminalTabCommand,
-}))
-
-vi.mock('#/web/workspace-pane/workspace-pane-tabs-query.ts', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('#/web/workspace-pane/workspace-pane-tabs-query.ts')>()),
-  refreshWorkspacePaneTabsQueryData: workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData,
 }))
 
 beforeEach(() => {
@@ -55,8 +47,6 @@ beforeEach(() => {
     terminalSessionId: TERMINAL_SESSION_ID,
     presentationStatus: 'committed',
   })
-  workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mockReset()
-  workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -129,7 +119,7 @@ describe('workspace pane runtime tab create action', () => {
     )
   })
 
-  test('refreshes the canonical projection, records the opener, then commits the exact route', async () => {
+  test('records the opener and commits the exact route without another projection request', async () => {
     const admission = createAdmission()
     const showCreatedTerminalTab = vi.fn(() => {
       expect(workspacePaneTabOpener(REPO_ROOT, REPO_RUNTIME_ID, BRANCH_NAME, `terminal:${TERMINAL_SESSION_ID}`)).toBe(
@@ -147,32 +137,7 @@ describe('workspace pane runtime tab create action', () => {
       }),
     ).resolves.toEqual({ status: 'committed' })
 
-    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).toHaveBeenCalledWith(
-      REPO_ROOT,
-      REPO_RUNTIME_ID,
-    )
     expect(showCreatedTerminalTab).toHaveBeenCalledWith(TERMINAL_SESSION_ID, BRANCH_NAME)
-    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mock.invocationCallOrder[0]).toBeLessThan(
-      showCreatedTerminalTab.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
-    )
-  })
-
-  test('does not navigate when a newer server snapshot supersedes create presentation', async () => {
-    workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mockImplementationOnce(async () => {
-      seedCurrentRepoRuntime('repo-runtime-replacement')
-    })
-    const showCreatedTerminalTab = vi.fn(() => true)
-
-    await expect(
-      commitCreatedTerminalWorkspacePaneRuntimeTab({
-        base: BASE,
-        admission: createAdmission(),
-        openerIdentity: null,
-        showCreatedTerminalTab,
-      }),
-    ).resolves.toEqual({ status: 'superseded' })
-
-    expect(showCreatedTerminalTab).not.toHaveBeenCalled()
   })
 
   test('does not navigate or record opener after the command target runtime is superseded', async () => {
@@ -193,28 +158,6 @@ describe('workspace pane runtime tab create action', () => {
       workspacePaneTabOpener(REPO_ROOT, REPO_RUNTIME_ID, BRANCH_NAME, `terminal:${TERMINAL_SESSION_ID}`),
     ).toBeNull()
     expect(useReposStore.getState().repos[REPO_ROOT]?.repoRuntimeId).toBe('repo-runtime-replacement')
-  })
-
-  test('refreshes after projection failure without routing an unprojected session', async () => {
-    workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mockRejectedValueOnce(
-      new Error('query projection failed'),
-    )
-    const showCreatedTerminalTab = vi.fn(() => true)
-
-    await expect(
-      commitCreatedTerminalWorkspacePaneRuntimeTab({
-        base: BASE,
-        admission: createAdmission(),
-        openerIdentity: null,
-        showCreatedTerminalTab,
-      }),
-    ).resolves.toEqual({ status: 'projection-failed' })
-
-    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).toHaveBeenCalledWith(
-      REPO_ROOT,
-      REPO_RUNTIME_ID,
-    )
-    expect(showCreatedTerminalTab).not.toHaveBeenCalled()
   })
 
   test('marks the terminal create action busy while projection or create is pending', () => {

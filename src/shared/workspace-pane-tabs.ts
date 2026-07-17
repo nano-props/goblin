@@ -25,15 +25,36 @@ export const WORKSPACE_PANE_TABS_REALTIME_EVENTS = {
   changed: 'workspace-pane-tabs.changed',
 } as const
 
-export interface WorkspacePaneTabsChangedRealtimeMessage {
+export interface WorkspacePaneTabsInvalidatedRealtimeMessage {
   type: typeof WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed
+  change: 'invalidation'
   repoRoot: string
 }
 
+export interface WorkspacePaneTabsRevisionRealtimeMessage {
+  type: typeof WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed
+  change: 'revision'
+  repoRoot: string
+  workspaceRuntimeId: string
+  revision: number
+}
+
+export type WorkspacePaneTabsChangedRealtimeMessage =
+  | WorkspacePaneTabsInvalidatedRealtimeMessage
+  | WorkspacePaneTabsRevisionRealtimeMessage
+
 export type WorkspacePaneTabsRealtimeMessage = WorkspacePaneTabsChangedRealtimeMessage
 
-export function workspacePaneTabsChangedRealtimeMessage(repoRoot: string): WorkspacePaneTabsChangedRealtimeMessage {
-  return { type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed, repoRoot }
+export function workspacePaneTabsInvalidatedRealtimeMessage(repoRoot: string): WorkspacePaneTabsInvalidatedRealtimeMessage {
+  return { type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed, change: 'invalidation', repoRoot }
+}
+
+export function workspacePaneTabsRevisionRealtimeMessage(
+  repoRoot: string,
+  workspaceRuntimeId: string,
+  revision: number,
+): WorkspacePaneTabsRevisionRealtimeMessage {
+  return { type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed, change: 'revision', repoRoot, workspaceRuntimeId, revision }
 }
 
 export interface WorkspacePaneTabsListInput {

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalAttachResult, TerminalSessionSummary, TerminalSessionsSnapshot } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsChangedRealtimeMessage, WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
@@ -49,7 +49,7 @@ type TestTerminalSessionSummary = Omit<
   Partial<Pick<TerminalSessionSummary, 'repoRuntimeId' | 'repoRoot' | 'branch' | 'worktreePath' | 'target'>>
 
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
-let workspaceTabsChangedHandler: ((repoRoot: string) => void) | null = null
+let workspaceTabsChangedHandler: ((message: WorkspacePaneTabsChangedRealtimeMessage) => void) | null = null
 let recoveredHandler: ((clientId: string) => void) | null = null
 const kickReconnectMock = vi.fn(() => {})
 const recoverSessionsMock =
@@ -236,13 +236,52 @@ describe('AppRuntimeProjectionProvider', () => {
       recoverSessionsMock.mockClear()
 
       await act(async () => {
-        workspaceTabsChangedHandler?.(REPO_ID)
+        workspaceTabsChangedHandler?.({
+          type: 'workspace-pane-tabs.changed',
+          change: 'invalidation',
+          repoRoot: REPO_ID,
+        })
         await waitForScheduledServerSync()
       })
 
       await vi.waitFor(() => expect(listWorkspaceTabsMock).toHaveBeenCalledTimes(1))
       expect(recoverSessionsMock).not.toHaveBeenCalled()
       expect(tabsFor(repo.repoRuntimeId)).toEqual([workspacePaneStaticTabEntry('history')])
+    } finally {
+      result.unmount()
+    }
+  })
+
+  test('skips a revision broadcast already applied by the runtime-open response', async () => {
+    const repo = seedCurrentRepo()
+    writeWorkspacePaneTabsSnapshotQueryData(REPO_ID, repo.repoRuntimeId, { revision: 5, entries: [] })
+    const result = renderRuntimeProvider(REPO_ID)
+    try {
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
+
+      await act(async () => {
+        workspaceTabsChangedHandler?.({
+          type: 'workspace-pane-tabs.changed',
+          change: 'revision',
+          repoRoot: REPO_ID,
+          workspaceRuntimeId: repo.repoRuntimeId,
+          revision: 5,
+        })
+        await waitForScheduledServerSync()
+      })
+      expect(listWorkspaceTabsMock).not.toHaveBeenCalled()
+
+      await act(async () => {
+        workspaceTabsChangedHandler?.({
+          type: 'workspace-pane-tabs.changed',
+          change: 'revision',
+          repoRoot: REPO_ID,
+          workspaceRuntimeId: repo.repoRuntimeId,
+          revision: 6,
+        })
+        await waitForScheduledServerSync()
+      })
+      await vi.waitFor(() => expect(listWorkspaceTabsMock).toHaveBeenCalledOnce())
     } finally {
       result.unmount()
     }
@@ -257,7 +296,11 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await act(async () => {
         sessionsChangedHandler?.(REPO_ID)
-        workspaceTabsChangedHandler?.(REPO_ID)
+        workspaceTabsChangedHandler?.({
+          type: 'workspace-pane-tabs.changed',
+          change: 'invalidation',
+          repoRoot: REPO_ID,
+        })
         await waitForScheduledServerSync()
       })
 
@@ -647,7 +690,7 @@ function testBridge(): ClientBridge {
       replace: vi.fn(async () => ({ revision: 1, entries: [] })),
       update: vi.fn(async () => ({ revision: 1, entries: [] })),
       list: vi.fn(async (input) => ({ revision: 1, entries: await listWorkspaceTabsMock(input) })),
-      onChanged: vi.fn((cb: (repoRoot: string) => void) => {
+      onChanged: vi.fn((cb: (message: WorkspacePaneTabsChangedRealtimeMessage) => void) => {
         workspaceTabsChangedHandler = cb
         return () => {
           if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null

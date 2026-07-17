@@ -15,8 +15,6 @@ import {
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { refreshWorkspacePaneTabsQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { goblinLog } from '#/web/logger.ts'
 import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
@@ -144,7 +142,7 @@ export async function commitCreatedTerminalWorkspacePaneRuntimeTab(
     ...options,
     base: { ...options.base, branch: options.admission.branch },
   }
-  const projectionStatus = await applyCreatedTerminalWorkspacePaneRuntimeTabs(canonicalOptions)
+  const projectionStatus = applyCreatedTerminalWorkspacePaneRuntimeTabs(canonicalOptions)
   if (projectionStatus !== 'accepted') return { status: projectionStatus }
   if (!terminalCreateTargetRuntimeIsCurrent(canonicalOptions.base)) return { status: 'superseded' }
   recordCreatedTerminalWorkspacePaneRuntimeTabOpener(canonicalOptions)
@@ -195,24 +193,13 @@ function terminalSessionBaseWithRuntime(
   return repoRuntimeId && base.target ? { ...base, repoRuntimeId, target: base.target } : null
 }
 
-async function applyCreatedTerminalWorkspacePaneRuntimeTabs(
+function applyCreatedTerminalWorkspacePaneRuntimeTabs(
   options: CommitCreatedTerminalWorkspacePaneRuntimeTabOptions,
-): Promise<'accepted' | 'superseded' | 'projection-failed'> {
+): 'accepted' | 'superseded' | 'projection-failed' {
   const repoRuntimeId = options.base.repoRuntimeId
   if (!repoRuntimeId) return 'superseded'
-  try {
-    await refreshWorkspacePaneTabsQueryData(options.base.repoRoot, repoRuntimeId)
-    return terminalCreateTargetRuntimeIsCurrent(options.base) ? 'accepted' : 'superseded'
-  } catch (err) {
-    goblinLog.warn('failed to refresh workspace pane tabs after runtime creation', {
-      repoRoot: options.base.repoRoot,
-      repoRuntimeId,
-      branchName: options.base.branch,
-      worktreePath: options.base.worktreePath,
-      err,
-    })
-    return 'projection-failed'
-  }
+  if (!terminalCreateTargetRuntimeIsCurrent(options.base)) return 'superseded'
+  return 'accepted'
 }
 
 function terminalCreateTargetRuntimeIsCurrent(base: TerminalSessionBase): boolean {

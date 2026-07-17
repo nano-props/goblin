@@ -167,6 +167,12 @@ export function workspacePaneTabsPersistenceSnapshot(): number {
   return workspacePaneTabsPersistenceVersion
 }
 
+export function workspacePaneTabsProjectionRevision(repoRoot: string, repoRuntimeId: string): number | null {
+  return primaryWindowQueryClient.getQueryData<WorkspacePaneTabsSnapshot>(
+    workspacePaneTabsQueryKey(repoRoot, repoRuntimeId),
+  )?.revision ?? null
+}
+
 function notifyWorkspacePaneTabsPersistenceChanged(): void {
   workspacePaneTabsPersistenceVersion += 1
   for (const listener of workspacePaneTabsPersistenceListeners) listener()

@@ -8,6 +8,7 @@ import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-proje
 import { useTerminalSessionProjection } from '#/web/components/terminal/use-terminal-session-projection.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import { workspacePaneTabsProjectionRevision } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   createRuntimeProjectionScopeRegistry,
   type RuntimeProjectionScope,
@@ -184,9 +185,17 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
       }),
     )
     const offWorkspaceTabsChanged = scopeRegistry.track(
-      workspacePaneTabsClient.onChanged((repoRoot) => {
-        const scope = currentScopeForRepo(scopeRegistry, repoRoot)
-        if (scope) refreshWorkspacePaneTabsForScope(scope)
+      workspacePaneTabsClient.onChanged((message) => {
+        const scope = currentScopeForRepo(scopeRegistry, message.repoRoot)
+        if (!scope) return
+        if (
+          message.change === 'revision' &&
+          message.workspaceRuntimeId === scope.target.repoRuntimeId &&
+          (workspacePaneTabsProjectionRevision(message.repoRoot, message.workspaceRuntimeId) ?? -1) >= message.revision
+        ) {
+          return
+        }
+        refreshWorkspacePaneTabsForScope(scope)
       }),
     )
     return () => {

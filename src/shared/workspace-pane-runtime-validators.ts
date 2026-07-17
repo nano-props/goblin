@@ -7,8 +7,10 @@ import type {
 } from '#/shared/workspace-pane-runtime.ts'
 import {
   canonicalRuntimeWorkspacePaneTarget,
+  normalizeWorkspacePaneTabsSnapshot,
   RuntimeWorkspacePaneTargetSchema,
   WorkspacePaneOptionalTabIdentitySchema,
+  WorkspacePaneTabsSnapshotSchema,
 } from '#/shared/workspace-pane-tabs-validators.ts'
 import { WORKSPACE_PANE_RUNTIME_TAB_TYPES } from '#/shared/workspace-pane.ts'
 
@@ -37,6 +39,7 @@ const WorkspacePaneRuntimeOpenResultEnvelopeSchema = v.variant('runtimeType', [
       ok: v.literal(true),
       runtimeType: v.literal('terminal'),
       runtime: v.unknown(),
+      paneTabsSnapshot: WorkspacePaneTabsSnapshotSchema,
     }),
     v.object({
       ok: v.literal(false),
@@ -85,8 +88,9 @@ export function normalizeWorkspacePaneRuntimeOpenResult(value: unknown): Workspa
   if (!parsed.success) return null
   if (!parsed.output.ok) return parsed.output
   const runtime = normalizeTerminalCreateResult(parsed.output.runtime)
-  if (!runtime?.ok) return null
-  return { ...parsed.output, runtime }
+  const paneTabsSnapshot = normalizeWorkspacePaneTabsSnapshot(parsed.output.paneTabsSnapshot)
+  if (!runtime?.ok || !paneTabsSnapshot) return null
+  return { ...parsed.output, runtime, paneTabsSnapshot }
 }
 
 export function normalizeWorkspacePaneRuntimeCloseResult(value: unknown): WorkspacePaneRuntimeCloseResult | null {

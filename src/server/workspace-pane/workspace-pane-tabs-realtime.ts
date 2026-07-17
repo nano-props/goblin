@@ -1,5 +1,6 @@
 import {
-  workspacePaneTabsChangedRealtimeMessage,
+  workspacePaneTabsInvalidatedRealtimeMessage,
+  workspacePaneTabsRevisionRealtimeMessage,
   type WorkspacePaneTabsRealtimeMessage,
 } from '#/shared/workspace-pane-tabs.ts'
 
@@ -12,5 +13,18 @@ export function broadcastWorkspacePaneTabsChanged(
   userId: string,
   repoRoot: string,
 ): void {
-  broadcaster.broadcastToUser(userId, workspacePaneTabsChangedRealtimeMessage(repoRoot))
+  broadcaster.broadcastToUser(userId, workspacePaneTabsInvalidatedRealtimeMessage(repoRoot))
+}
+
+export function broadcastWorkspacePaneTabsRevision(
+  broadcaster: WorkspacePaneTabsRealtimeBroadcaster,
+  userId: string,
+  repoRoot: string,
+  workspaceRuntimeId: string,
+  revision: number,
+): void {
+  broadcaster.broadcastToUser(
+    userId,
+    workspacePaneTabsRevisionRealtimeMessage(repoRoot, workspaceRuntimeId, revision),
+  )
 }

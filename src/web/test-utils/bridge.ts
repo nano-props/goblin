@@ -29,7 +29,10 @@ import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { resetAcceptedRepoProjectionReadModelState } from '#/web/stores/repos/projection-read-model-effects.ts'
 import { setRepoProjectionQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-data-query.ts'
-import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import {
+  readWorkspacePaneTabsForTarget,
+  writeWorkspacePaneTabsSnapshotQueryData,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   workspacePaneTabsWithStaticTab,
@@ -408,9 +411,11 @@ export function installWorkspacePaneTabsTestBridge(
             insertAfterIdentity: input.insertAfterIdentity,
           }),
         )
+        const paneTabsSnapshot = commitServerSnapshot()
         return {
           ok: true,
           runtimeType: 'terminal',
+          paneTabsSnapshot,
           runtime: {
             ok: true,
             action: 'created',
@@ -462,7 +467,8 @@ export function installWorkspacePaneTabsTestBridge(
           insertAfterIdentity: input.insertAfterIdentity,
         }),
       )
-      commitServerSnapshot()
+      const snapshot = commitServerSnapshot()
+      writeWorkspacePaneTabsSnapshotQueryData(input.repoRoot, input.repoRuntimeId, snapshot)
     },
     removeRuntimeTab: (input) => {
       replaceServerTarget(

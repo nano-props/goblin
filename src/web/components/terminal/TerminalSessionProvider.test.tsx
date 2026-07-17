@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import type { WorkspacePaneTabsChangedRealtimeMessage } from '#/shared/workspace-pane-tabs.ts'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
 import { setTerminalSessionProjectionForTests } from '#/web/components/terminal/TerminalSessionProjection.ts'
@@ -348,7 +349,7 @@ let titleHandler: ((event: TerminalTitleEvent) => void) | null = null
 let identityHandler: ((event: TerminalIdentityRealtimeEvent) => void) | null = null
 let lifecycleHandler: ((event: TerminalLifecycleRealtimeEvent) => void) | null = null
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
-let workspaceTabsChangedHandler: ((repoRoot: string) => void) | null = null
+let workspaceTabsChangedHandler: ((message: WorkspacePaneTabsChangedRealtimeMessage) => void) | null = null
 let sessionClosedHandler:
   | ((event: {
       terminalRuntimeSessionId: string
@@ -662,7 +663,7 @@ beforeEach(() => {
           revision: 1,
           entries: await listWorkspaceTabsMock(input),
         }),
-        onChanged: vi.fn((cb: (repoRoot: string) => void) => {
+        onChanged: vi.fn((cb: (message: WorkspacePaneTabsChangedRealtimeMessage) => void) => {
           workspaceTabsChangedHandler = cb
           return () => {
             if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null
@@ -787,7 +788,7 @@ beforeEach(() => {
       replace: vi.fn(async () => ({ revision: 1, entries: [] })),
       update: vi.fn(async () => ({ revision: 1, entries: [] })),
       list: async (input) => ({ revision: 1, entries: await listWorkspaceTabsMock(input) }),
-      onChanged: vi.fn((cb: (repoRoot: string) => void) => {
+      onChanged: vi.fn((cb: (message: WorkspacePaneTabsChangedRealtimeMessage) => void) => {
         workspaceTabsChangedHandler = cb
         return () => {
           if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null
@@ -802,6 +803,7 @@ beforeEach(() => {
           ok: true as const,
           runtimeType: 'terminal' as const,
           runtime,
+          paneTabsSnapshot: { revision: 1, entries: await listWorkspaceTabsMock(input.request) },
         }
       }),
       close: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),

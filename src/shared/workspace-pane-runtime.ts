@@ -1,6 +1,7 @@
 import type { TerminalCreateInput, TerminalCreateResult } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 
 export const WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS = {
   open: 'workspace-pane-runtime.open',
@@ -44,6 +45,7 @@ export type TerminalWorkspacePaneRuntimeOpenResult =
       ok: true
       runtimeType: 'terminal'
       runtime: Extract<TerminalCreateResult, { ok: true }>
+      paneTabsSnapshot: WorkspacePaneTabsSnapshot
     }
   | {
       ok: false

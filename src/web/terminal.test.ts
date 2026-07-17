@@ -521,6 +521,7 @@ describe('terminal web host client', () => {
     socket.emitMessage(
       JSON.stringify({
         type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
+        change: 'invalidation',
         repoRoot: 'goblin+file:///tmp/repo',
       }),
     )
@@ -576,7 +577,11 @@ describe('terminal web host client', () => {
       takeoverPending: false,
     })
     expect(onSessionsChanged).toHaveBeenCalledWith('goblin+file:///tmp/repo')
-    expect(onWorkspaceTabsChanged).toHaveBeenCalledWith('goblin+file:///tmp/repo')
+    expect(onWorkspaceTabsChanged).toHaveBeenCalledWith({
+      type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
+      change: 'invalidation',
+      repoRoot: 'goblin+file:///tmp/repo',
+    })
 
     disposeOutput()
     disposeBell()

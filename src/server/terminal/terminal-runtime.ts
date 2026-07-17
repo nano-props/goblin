@@ -27,7 +27,10 @@ import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-runtime-coordinator.ts'
 import { createWorkspacePaneTabsActions } from '#/server/workspace-pane/workspace-pane-tabs-actions.ts'
-import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/workspace-pane-tabs-realtime.ts'
+import {
+  broadcastWorkspacePaneTabsChanged,
+  broadcastWorkspacePaneTabsRevision,
+} from '#/server/workspace-pane/workspace-pane-tabs-realtime.ts'
 import { createTerminalRealtimeHandlers } from '#/server/terminal/terminal-runtime-realtime.ts'
 import { createWorkspacePaneTabsRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
 import { createWorkspacePaneRuntimeApplication } from '#/server/workspace-pane/workspace-pane-runtime-application.ts'
@@ -260,7 +263,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     terminal: { ...terminalCreateProvider, close: actions.close },
     terminalWorktree: manager,
     isCurrentRepoRuntime,
-    broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
+    broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsRevision,
   })
   const worktreeRemovalApplication = createWorktreeRemovalApplication({
     worktreeOperations,
@@ -410,6 +413,15 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 
   function broadcastRepoWorkspaceTabsChanged(userId: string, repoRoot: string): void {
     broadcastWorkspacePaneTabsChanged(broker, userId, repoRoot)
+  }
+
+  function broadcastRepoWorkspaceTabsRevision(
+    userId: string,
+    repoRoot: string,
+    workspaceRuntimeId: string,
+    revision: number,
+  ): void {
+    broadcastWorkspacePaneTabsRevision(broker, userId, repoRoot, workspaceRuntimeId, revision)
   }
 
   function handleSessionClosed(

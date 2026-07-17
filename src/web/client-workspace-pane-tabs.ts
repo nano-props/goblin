@@ -2,14 +2,17 @@ import {
   WORKSPACE_PANE_TABS_REALTIME_EVENTS,
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
 } from '#/shared/workspace-pane-tabs.ts'
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import type {
+  WorkspacePaneTabsChangedRealtimeMessage,
+  WorkspacePaneTabsSnapshot,
+} from '#/shared/workspace-pane-tabs.ts'
 import { normalizeWorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs-validators.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import type { ClientWorkspacePaneTabs } from '#/web/client-bridge-types.ts'
 import type { ClientAppRealtime } from '#/web/app-realtime-client.ts'
 
 export function createServerWorkspacePaneTabsClient(realtime: ClientAppRealtime): ClientWorkspacePaneTabs {
-  const changedSubscribers = new Set<(repoRoot: string) => void>()
+  const changedSubscribers = new Set<(message: WorkspacePaneTabsChangedRealtimeMessage) => void>()
   let realtimeUnsubscribe: (() => void) | null = null
 
   return {
@@ -57,6 +60,6 @@ export function createServerWorkspacePaneTabsClient(realtime: ClientAppRealtime)
 
   function handleRealtimeMessage(message: AppRealtimeMessage): void {
     if (message.type !== WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed) return
-    for (const subscriber of changedSubscribers) subscriber(message.repoRoot)
+    for (const subscriber of changedSubscribers) subscriber(message)
   }
 }

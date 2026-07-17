@@ -42,7 +42,7 @@ interface WorkspacePaneRuntimeApplicationDependencies {
     listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
   }
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
-  broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
+  broadcastWorkspaceTabsChanged(userId: string, repoRoot: string, workspaceRuntimeId: string, revision: number): void
 }
 
 /**
@@ -210,11 +210,17 @@ export class WorkspacePaneRuntimeApplication {
 
     if (committedRuntime === null) throw new Error('terminal admission did not produce a committed result')
     runtime.admission.publishCommittedEffects()
-    this.deps.broadcastWorkspaceTabsChanged(userId, input.request.repoRoot)
+    this.deps.broadcastWorkspaceTabsChanged(
+      userId,
+      input.request.repoRoot,
+      input.request.repoRuntimeId,
+      paneCommit.snapshot.revision,
+    )
     return {
       ok: true,
       runtimeType: 'terminal',
       runtime: committedRuntime,
+      paneTabsSnapshot: paneCommit.snapshot,
     }
   }
 

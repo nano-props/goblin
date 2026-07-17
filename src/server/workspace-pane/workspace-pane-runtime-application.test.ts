@@ -37,16 +37,17 @@ const request = {
   rows: 30,
   clientId: 'client-test',
 }
+const paneTabsSnapshot = { revision: 1, entries: [] }
 
 describe('WorkspacePaneRuntimeApplication', () => {
-  test('returns the provider result and broadcasts workspace invalidation', async () => {
+  test('returns the provider result and broadcasts the committed workspace revision', async () => {
     const runtime = terminalCreateSuccess()
     const create = vi.fn(async () => runtime)
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(request.worktreePath)
     const capture = vi.fn(async () => physicalWorktreeCapability)
     const ensureRuntimeTabForSession = vi.fn(async (input: { commitAdmission: (canonicalBranch: string) => void }) => {
       input.commitAdmission(request.branch)
-      return { kind: 'committed' as const }
+      return { kind: 'committed' as const, snapshot: paneTabsSnapshot }
     })
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
@@ -84,8 +85,14 @@ describe('WorkspacePaneRuntimeApplication', () => {
       ok: true,
       runtimeType: 'terminal',
       runtime: publishedTerminalResult(runtime),
+      paneTabsSnapshot,
     })
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', request.repoRoot)
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(
+      'user-test',
+      request.repoRoot,
+      request.repoRuntimeId,
+      paneTabsSnapshot.revision,
+    )
   })
 
   test('does not touch tabs when the provider create fails', async () => {
@@ -288,7 +295,9 @@ describe('WorkspacePaneRuntimeApplication', () => {
       const close = vi.fn(() => true)
       const stale = { ok: false as const, runtimeType: 'terminal' as const, message: 'error.repo-runtime-stale' }
       const ensureRuntimeTabForSession = vi.fn(async (input: { isRuntimeCurrent: () => boolean }) =>
-        input.isRuntimeCurrent() ? { kind: 'committed' as const } : { kind: 'runtime-stale' as const },
+        input.isRuntimeCurrent()
+          ? { kind: 'committed' as const, snapshot: paneTabsSnapshot }
+          : { kind: 'runtime-stale' as const },
       )
       const broadcastWorkspaceTabsChanged = vi.fn()
       const providerResult = deferred<Extract<ServerTerminalCreateResult, { ok: true }>>()
@@ -436,7 +445,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       workspaceTabsCoordinator: {
         ensureRuntimeTabForSession: async (input: { commitAdmission: (canonicalBranch: string) => void }) => {
           input.commitAdmission(request.branch)
-          return { kind: 'committed' as const }
+          return { kind: 'committed' as const, snapshot: paneTabsSnapshot }
         },
       },
       isCurrentRepoRuntime: () => true,
@@ -479,7 +488,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
         }) => {
           worktreeOperations.assertPermit(input.physicalWorktreeCapability, input.permit)
           input.commitAdmission(request.branch)
-          return { kind: 'committed' as const }
+          return { kind: 'committed' as const, snapshot: paneTabsSnapshot }
         },
       },
       isCurrentRepoRuntime: () => true,

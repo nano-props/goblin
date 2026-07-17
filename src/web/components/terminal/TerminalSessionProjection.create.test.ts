@@ -265,6 +265,7 @@ describe('TerminalSessionProjection create flow', () => {
             ok: true as const,
             runtimeType: 'terminal' as const,
             runtime,
+            paneTabsSnapshot: { revision: 7, entries: [] },
           }
         : { ok: false as const, runtimeType: 'terminal' as const, message: runtime.message }
     })
@@ -483,6 +484,10 @@ describe('TerminalSessionProjection create flow', () => {
 
     first.resolve(makeCreateResult())
     const firstResult = await firstCreate
+    expect(mocks.writeWorkspaceTabsSnapshotMock).toHaveBeenCalledWith(REPO_ROOT, REPO_RUNTIME_ID, {
+      revision: 7,
+      entries: [],
+    })
     expect(firstResult).toEqual({
       terminalSessionId: 'term-111111111111111111111',
       branch: BRANCH,

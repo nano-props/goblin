@@ -496,6 +496,7 @@ describe('shared terminal validators', () => {
     const payload = {
       ok: true,
       runtimeType: 'terminal',
+      paneTabsSnapshot: { revision: 7, entries: [] },
       runtime: {
         ok: true,
         action: 'created',
@@ -817,10 +818,12 @@ describe('shared terminal validators', () => {
     expect(
       normalizeAppRealtimeSocketServerMessage({
         type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
+        change: 'invalidation',
         repoRoot: 'goblin+file:///repo',
       }),
     ).toEqual({
       type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
+      change: 'invalidation',
       repoRoot: 'goblin+file:///repo',
     })
 

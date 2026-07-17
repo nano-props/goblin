@@ -15,7 +15,7 @@ import {
   testPhysicalWorktreeIdentity,
   testPhysicalWorktrees,
 } from '#/server/test-utils/physical-worktree-identity.ts'
-import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
@@ -154,7 +154,25 @@ describe('workspace pane tabs coordinator queues', () => {
         }),
     )
 
-    expect(admitted).toEqual({ admitted: true, value: { kind: 'committed' } })
+    expect(admitted).toEqual({
+      admitted: true,
+      value: {
+        kind: 'committed',
+        snapshot: {
+          revision: 1,
+          entries: [
+            {
+              target: projection.target,
+              tabs: [
+                workspacePaneStaticTabEntry('status'),
+                workspacePaneStaticTabEntry('files'),
+                workspacePaneRuntimeTabEntry('terminal', 'term-workspaceworkspace001'),
+              ],
+            },
+          ],
+        },
+      },
+    })
     expect(commitAdmission).toHaveBeenCalledWith(null)
   })
 
@@ -197,7 +215,25 @@ describe('workspace pane tabs coordinator queues', () => {
         }),
     )
 
-    expect(admitted).toEqual({ admitted: true, value: { kind: 'committed' } })
+    expect(admitted).toEqual({
+      admitted: true,
+      value: {
+        kind: 'committed',
+        snapshot: {
+          revision: 1,
+          entries: [
+            {
+              target: projection.target,
+              tabs: [
+                workspacePaneStaticTabEntry('status'),
+                workspacePaneStaticTabEntry('files'),
+                workspacePaneRuntimeTabEntry('terminal', 'term-workspaceworkspace002'),
+              ],
+            },
+          ],
+        },
+      },
+    })
     expect(commitAdmission).toHaveBeenCalledWith(null)
   })
 
@@ -395,7 +431,28 @@ describe('workspace pane tabs coordinator queues', () => {
     targets = [{ repoRoot: 'goblin+file:///repo', branchName: 'feature/renamed', worktreePath: '/repo/worktree' }]
     releaseProvider()
 
-    await expect(admitted).resolves.toEqual({ admitted: true, value: { kind: 'committed' } })
+    await expect(admitted).resolves.toEqual({
+      admitted: true,
+      value: {
+        kind: 'committed',
+        snapshot: {
+          revision: 1,
+          entries: [
+            {
+              target: testRuntimeTargetProjection({
+                repoRoot: 'goblin+file:///repo',
+                branchName: 'feature/renamed',
+                worktreePath: '/repo/worktree',
+              }).target,
+              tabs: [
+                workspacePaneStaticTabEntry('status'),
+                workspacePaneRuntimeTabEntry('terminal', 'term-preparedprepared001'),
+              ],
+            },
+          ],
+        },
+      },
+    })
     expect(commitAdmission).toHaveBeenCalledWith('feature/renamed')
   })
 

@@ -50,7 +50,10 @@ import type {
 } from '#/shared/workspace-pane-runtime.ts'
 import { workspacePaneRuntimeClient } from '#/web/workspace-pane/workspace-pane-runtime-client.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
-import { refreshWorkspacePaneTabsQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import {
+  refreshWorkspacePaneTabsQueryData,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { FutureExitLedger } from '#/web/components/terminal/future-exit-ledger.ts'
 import { createTerminalWriteFailureReporter } from '#/web/components/terminal/terminal-write-failure-feedback.ts'
 
@@ -719,6 +722,11 @@ export class TerminalSessionProjection {
       ...request.placement,
     })
     if (!openResult.ok) throw new Error(openResult.message)
+    writeCanonicalWorkspacePaneTabsSnapshot(
+      base.repoRoot,
+      requireRepoRuntimeId(base),
+      openResult.paneTabsSnapshot,
+    )
     const result = openResult.runtime
     if (!result.terminalRuntimeSessionId) throw new Error('error.terminal-create-failed')
     let runtimeProjectionApplied = false

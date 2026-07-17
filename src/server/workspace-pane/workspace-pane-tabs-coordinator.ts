@@ -67,7 +67,9 @@ export interface WorkspacePaneTabsCommandResult extends WorkspacePaneLayoutCommi
   snapshot: WorkspacePaneTabsSnapshot
 }
 
-export type WorkspacePaneRuntimeTabCommitResult = { kind: 'committed' } | { kind: 'runtime-stale' }
+export type WorkspacePaneRuntimeTabCommitResult =
+  | { kind: 'committed'; snapshot: WorkspacePaneTabsSnapshot }
+  | { kind: 'runtime-stale' }
 
 export interface WorkspaceRuntimeTabPlacementInput {
   userId: string
@@ -171,8 +173,20 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
         lease: physicalWorktreeAdmissionLease(physicalCapability),
         tabs,
       })
+      const pendingProviderSnapshots = providerSnapshotsWithPendingSession(providerSnapshots, {
+        type: input.runtimeType,
+        sessionId: input.sessionId,
+        target: commitTarget.target,
+        branch: commitTarget.canonicalBranch ?? '',
+        worktreePath: input.worktreePath,
+      })
+      const snapshot = await layout.snapshot({
+        scope,
+        validTargets: commitTargets,
+        providerSnapshots: pendingProviderSnapshots,
+      })
       input.commitAdmission(commitTarget.canonicalBranch)
-      return { kind: 'committed' }
+      return { kind: 'committed', snapshot }
     })
   }
 
@@ -647,6 +661,26 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
   ): Promise<T> {
     return await this.layoutAggregate.runExclusive(repoRoot, task)
   }
+}
+
+function providerSnapshotsWithPendingSession(
+  snapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
+  session: WorkspacePaneRuntimeTabsLiveSession & { type: WorkspacePaneRuntimeTabType },
+): WorkspacePaneRuntimeTabsProviderSnapshot[] {
+  let matched = false
+  const next = snapshots.map((snapshot) => {
+    if (snapshot.type !== session.type) return snapshot
+    matched = true
+    return {
+      ...snapshot,
+      liveSessions: [
+        ...snapshot.liveSessions.filter((candidate) => candidate.sessionId !== session.sessionId),
+        session,
+      ],
+    }
+  })
+  if (!matched) next.push({ type: session.type, revision: 0, liveSessions: [session] })
+  return next
 }
 
 function uniqueSortedCapabilities(

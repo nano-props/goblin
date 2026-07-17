@@ -162,10 +162,7 @@ describe('workspace pane runtime tab panel', () => {
       resourceDisposition: 'created',
       runtimeProjectionApplied: true,
     })
-    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).toHaveBeenCalledWith(
-      'goblin+file:///repo',
-      'repo-runtime-1',
-    )
+    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).not.toHaveBeenCalled()
     expect(navigation.commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
       'goblin+file:///repo',
       'main',
