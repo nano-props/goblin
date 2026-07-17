@@ -78,7 +78,7 @@ function TerminalWorkspacePaneRuntimeTabPanel({
         createTerminal: createTerminalWithAdmission,
         openerIdentity: null,
         showCreatedTerminalTab: (terminalSessionId, canonicalBranch) =>
-          base.target?.kind === 'workspace'
+          base.target?.kind === 'workspace-root'
             ? true
             : showCreatedTerminalWorkspacePaneRuntimeTab(
                 { ...base, branch: canonicalBranch },

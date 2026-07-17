@@ -494,6 +494,7 @@ export function useWorkspaceDirectoryOverview(repoRoot: string, repoRuntimeId: s
   return useQuery({
     queryKey: workspaceDirectoryOverviewQueryKey(repoRoot, repoRuntimeId),
     queryFn: ({ signal }) => getWorkspaceDirectoryOverview(repoRoot, repoRuntimeId, signal),
+    staleTime: 30_000,
     enabled,
     subscribed: enabled,
   })

@@ -509,7 +509,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   forceCloseGitScopedSessionsForRepo(userId: TUser, scope: string): TerminalSessionSummary[] {
     const removed: TerminalSessionSummary[] = []
     for (const session of Array.from(this.directory.entries())) {
-      if (session.userId !== userId || session.scope !== scope || session.target?.kind === 'workspace') continue
+      if (session.userId !== userId || session.scope !== scope || session.target?.kind === 'workspace-root') continue
       const summary = this.detachSession(session)
       removed.push(summary)
       try {

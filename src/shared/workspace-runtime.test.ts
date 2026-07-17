@@ -21,8 +21,8 @@ describe('workspace runtime domain', () => {
 
   it('binds persisted targets to the current runtime without duplicating identity in persistence', () => {
     const workspaceId = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/workspace' }, 'posix')!
-    expect(bindWorkspacePaneTarget({ kind: 'workspace' }, workspaceId, 'runtime-current')).toEqual({
-      kind: 'workspace',
+    expect(bindWorkspacePaneTarget({ kind: 'workspace-root' }, workspaceId, 'runtime-current')).toEqual({
+      kind: 'workspace-root',
       workspaceId,
       workspaceRuntimeId: 'runtime-current',
     })

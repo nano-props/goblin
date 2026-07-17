@@ -143,7 +143,7 @@ describe('restoreServerWorkspace', () => {
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
       expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
-      targets: [{ kind: 'workspace' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
+      targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
     expect(result.runtime).toMatchObject({
       restoredRepoId: 'goblin+file:///repo',
@@ -239,7 +239,7 @@ describe('restoreServerWorkspace', () => {
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
       expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
-      targets: [{ kind: 'workspace' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
+      targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
     expect(result.runtime.workspacePaneTabs).toEqual([
       { repoRoot: 'goblin+file:///repo', repoRuntimeId: 'repo-runtime-test', snapshot: { revision: 3, entries: [] } },

@@ -33,6 +33,9 @@ export function workspacePaneTabsTargetForRepoTargetKey(
 ): WorkspacePaneTabsTarget | null {
   const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
   if (!target || target.repoRoot !== repo.repoRoot) return null
+  if (target.kind === 'workspace-root') {
+    return { kind: 'workspace-root', repoRoot: repo.repoRoot, branchName: null, worktreePath: null }
+  }
   if (target.kind === 'branch') {
     return repo.branches.some((branch) => branch.name === target.branchName)
       ? { repoRoot: repo.repoRoot, branchName: target.branchName, worktreePath: null }

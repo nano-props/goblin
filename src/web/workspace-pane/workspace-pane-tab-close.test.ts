@@ -185,10 +185,11 @@ test('confirmed workspace terminal close selects Files without inventing a branc
   const terminalSessionId = 'term-111111111111111111111'
   const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
   const targetInput = {
+    kind: 'workspace-root' as const,
     repoRoot: REPO_ID,
     repoRuntimeId: repo.repoRuntimeId,
-    branchName: '',
-    worktreePath: REPO_ID,
+    branchName: null,
+    worktreePath: null,
   }
   const runtimeTarget = runtimeWorkspacePaneTargetForTest(targetInput)
   setWorkspacePaneTabsForTargetQueryData({

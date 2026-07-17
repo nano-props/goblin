@@ -113,7 +113,10 @@ export function usePlainWorkspaceTabModel(
     worktreePath: repo.id,
   })
   const tabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.repoRuntimeId)
-  const target = useMemo(() => ({ repoRoot: repo.id, branchName: '', worktreePath: repo.id }), [repo.id])
+  const target = useMemo(
+    () => ({ kind: 'workspace-root' as const, repoRoot: repo.id, branchName: null, worktreePath: null }),
+    [repo.id],
+  )
   const tabEntries = useMemo(
     () => workspacePaneTabsForTargetFromQueryData(tabsQuery.data ?? { revision: 0, entries: [] }, target),
     [tabsQuery.data, target],

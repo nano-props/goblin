@@ -147,7 +147,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
       if (!commitTarget || commitTarget.nativeWorktreePath !== input.worktreePath) {
         return { kind: 'runtime-stale' }
       }
-      if (commitTarget.target.kind === 'workspace') {
+      if (commitTarget.target.kind === 'workspace-root') {
         if (commitTarget.canonicalBranch !== null) return { kind: 'runtime-stale' }
       } else if (!commitTarget.canonicalBranch) {
         return { kind: 'runtime-stale' }
@@ -156,7 +156,9 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
         (candidate) => runtimeTargetKey(candidate.target) === runtimeTargetKey(capturedTarget.target),
       )
       const tabs = workspacePaneTabsWithRuntimeTab(
-        entry?.tabs ?? [workspacePaneStaticTabEntry(capturedTarget.target.kind === 'workspace' ? 'files' : 'status')],
+        entry?.tabs ?? [
+          workspacePaneStaticTabEntry(capturedTarget.target.kind === 'workspace-root' ? 'files' : 'status'),
+        ],
         input.runtimeType,
         input.sessionId,
         { insertAfterIdentity: input.insertAfterIdentity ?? null },

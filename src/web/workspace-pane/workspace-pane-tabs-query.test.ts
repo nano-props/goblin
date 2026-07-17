@@ -42,7 +42,7 @@ test('test target construction rejects legacy raw workspace ids', () => {
       branchName: 'main',
       worktreePath: '/tmp/legacy-workspace-id',
     }),
-  ).toThrow('workspace pane test target requires a canonical workspace id')
+  ).toThrow('workspace pane test target requires a canonical target')
 })
 
 describe('workspace pane tabs revisioned query cache', () => {

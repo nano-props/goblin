@@ -26,7 +26,7 @@ import { RepoDashboardPane } from '#/web/components/repo-pages/RepoDashboardPane
 import { CreateWorktreePagePane } from '#/web/components/repo-pages/CreateWorktreePagePane.tsx'
 import type { RepoRouteView } from '#/web/App.tsx'
 import { useT } from '#/web/stores/i18n.ts'
-import { workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
+import { workspaceGitAvailable, workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 
 function EmptyRepoWorkspacePane({ trafficLightOffset }: { trafficLightOffset: boolean }) {
   return (
@@ -79,7 +79,9 @@ export function RepoView({
   )
   const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
   const repo = useReposStore((s) => s.repos[repoId])
+  const gitAvailable = workspaceGitAvailable(repo?.workspaceProbe)
   const gitUnavailable = workspaceGitUnavailable(repo?.workspaceProbe)
+  const gitCapabilitySettled = gitAvailable || gitUnavailable
   useRepoToasts(repoId)
   const projectionRestore = useRestoreRepoTabsOnView({ repoId: repo ? repoId : null })
 
@@ -142,10 +144,12 @@ export function RepoView({
   const dashboardSelected = routeView?.kind === 'dashboard'
   const newWorktreeSelected = routeView?.kind === 'newWorktree'
   const openWorkspaceTab = (type: 'status' | 'files') => {
-    useReposStore.getState().setWorkspacePaneTabForTarget(
-      { repoRoot: repo.id, branchName: '', worktreePath: repo.id },
-      type,
-    )
+    useReposStore
+      .getState()
+      .setWorkspacePaneTabForTarget(
+        { kind: 'workspace-root', repoRoot: repo.id, branchName: null, worktreePath: null },
+        type,
+      )
     onOpenRepoWorkspace?.(repo.id)
   }
   const renderSidebarPane = (
@@ -156,7 +160,7 @@ export function RepoView({
       <RepoLayoutSidebar
         repoId={repoId}
         compact={compact}
-        branchContent={branchContent}
+        branchContent={branchContent ?? (!gitCapabilitySettled ? <BranchNavigatorSkeleton /> : undefined)}
         chromeRegion={chromeRegion}
         onOpenSettings={onOpenSettings}
         onSelectBranch={sidebarSelectBranch}
@@ -165,7 +169,7 @@ export function RepoView({
         dashboardSelected={dashboardSelected}
         newWorktreeSelected={newWorktreeSelected}
         currentBranchName={routeBranchName}
-        gitAvailable={!gitUnavailable}
+        gitAvailable={gitAvailable}
         workspaceRootSelected={gitUnavailable && routeView?.kind === 'workspace'}
         onSelectWorkspaceRoot={gitUnavailable ? () => onOpenRepoWorkspace?.(repo.id) : undefined}
         onOpenWorkspaceStatus={gitUnavailable ? () => openWorkspaceTab('status') : undefined}

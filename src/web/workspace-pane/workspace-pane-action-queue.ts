@@ -1,12 +1,22 @@
 import PQueue from 'p-queue'
 import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
-export interface WorkspacePaneActionTarget {
+export interface GitWorkspacePaneActionTarget {
   repoId: string
   repoRuntimeId: string
   branchName: string | null
   worktreePath: string | null
 }
+
+export interface RootWorkspacePaneActionTarget {
+  kind: 'workspace-root'
+  repoId: string
+  repoRuntimeId: string
+  branchName: null
+  worktreePath: null
+}
+
+export type WorkspacePaneActionTarget = GitWorkspacePaneActionTarget | RootWorkspacePaneActionTarget
 
 const queuesByTarget = new Map<string, PQueue>()
 const pendingRouteIntents = new Map<number, { targetKey: string; fromRouteKey: string }>()
@@ -29,16 +39,18 @@ export async function runWorkspacePaneAction<T>(
 
 export function workspacePaneActionTargetKey(target: WorkspacePaneActionTarget): string | null {
   const runtimeTarget = runtimeWorkspacePaneTarget(
-    {
-      repoRoot: target.repoId,
-      branchName: target.branchName ?? '',
-      worktreePath: target.worktreePath,
-    },
+    'kind' in target
+      ? { kind: 'workspace-root', repoRoot: target.repoId, branchName: null, worktreePath: null }
+      : {
+          repoRoot: target.repoId,
+          branchName: target.branchName ?? '',
+          worktreePath: target.worktreePath,
+        },
     target.repoRuntimeId,
   )
   if (!runtimeTarget) return null
-  if (runtimeTarget.kind === 'workspace')
-    return `${runtimeTarget.workspaceId}\0${runtimeTarget.workspaceRuntimeId}\0workspace`
+  if (runtimeTarget.kind === 'workspace-root')
+    return `${runtimeTarget.workspaceId}\0${runtimeTarget.workspaceRuntimeId}\0workspace-root`
   if (runtimeTarget.kind === 'git-branch') {
     return `${runtimeTarget.workspaceId}\0${runtimeTarget.workspaceRuntimeId}\0git-branch\0${runtimeTarget.branch}`
   }

@@ -56,6 +56,7 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { DirectoryOverviewContent } from '#/web/components/repo-pages/DirectoryOverviewContent.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
+import { workspaceGitAvailable, workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 
 export type RepoWorkspacePaneRouteContext =
   { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null } | { kind: 'inactive' }
@@ -161,18 +162,18 @@ function RepoWorkspaceLoaded(props: {
   toolbarTrafficLightOffset: boolean
   onBackToBranchNavigator?: () => void
 }) {
-  if (
-    props.repoShell.workspaceProbe.status === 'ready' &&
-    props.repoShell.workspaceProbe.capabilities.git.status === 'unavailable'
-  ) {
+  if (workspaceGitUnavailable(props.repoShell.workspaceProbe)) {
     return (
-      <PlainWorkspaceFiles
+      <WorkspaceRootPane
         repo={props.repoShell}
         terminalAvailable={props.repoShell.workspaceProbe.capabilities.terminal.available}
         workspacePaneId={props.workspacePaneId}
         routeContext={props.workspacePaneRouteContext}
       />
     )
+  }
+  if (!workspaceGitAvailable(props.repoShell.workspaceProbe)) {
+    return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={props.toolbarTrafficLightOffset} />
   }
   return <GitRepoWorkspaceLoaded {...props} />
 }
@@ -284,7 +285,7 @@ function GitRepoWorkspaceLoaded({
   )
 }
 
-function PlainWorkspaceFiles({
+function WorkspaceRootPane({
   repo,
   terminalAvailable,
   workspacePaneId,
@@ -298,7 +299,7 @@ function PlainWorkspaceFiles({
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
   const model = usePlainWorkspaceTabModel(repo)
-  const target = { repoRoot: repo.id, branchName: '', worktreePath: repo.id }
+  const target = { kind: 'workspace-root' as const, repoRoot: repo.id, branchName: null, worktreePath: null }
   const runtimeTarget = runtimeWorkspacePaneTarget(target, repo.repoRuntimeId)
   const hydrating = useIsInitialTerminalProjectionHydrating(repo.id, repo.repoRuntimeId)
   useEffect(() => {
@@ -368,7 +369,7 @@ function PlainWorkspaceFiles({
       if (isPendingWorkspacePaneTabItem(item)) return
       void dispatchSelectWorkspacePaneTabByIdentityAction({
         repoId: repo.id,
-        branchName: '',
+        branchName: null,
         workspacePaneRoute: undefined,
         identity: item.identity,
         navigation,
@@ -379,7 +380,7 @@ function PlainWorkspaceFiles({
   const createAction = useWorkspacePaneRuntimeTabCreateAction({
     repoRoot: repo.id,
     repoRuntimeId: repo.repoRuntimeId,
-    branchName: '',
+    branchName: null,
     worktreePath: repo.id,
     runtimeTabStateByType: model.runtimeTabStateByType,
     initialRuntimeProjectionHydrating: hydrating,
@@ -396,7 +397,7 @@ function PlainWorkspaceFiles({
   const { reorderTabs } = useWorkspacePaneTabsReorderMutation({
     repoRoot: repo.id,
     repoRuntimeId: repo.repoRuntimeId,
-    branchName: '',
+    branchName: null,
     worktreePath: repo.id,
     canonicalTabs: model.tabEntries,
   })
@@ -416,7 +417,7 @@ function PlainWorkspaceFiles({
             if (isPendingWorkspacePaneTabItem(item)) return
             void runCloseWorkspacePaneTabCommand({
               repoId: repo.id,
-              branchName: '',
+              branchName: null,
               workspacePaneRoute: undefined,
               targetIdentity: item.identity,
               navigation,

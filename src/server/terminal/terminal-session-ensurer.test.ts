@@ -54,7 +54,7 @@ const BRANCH_NAME = 'feature/worktree'
 const REMOTE_REPO_ROOT = 'goblin+ssh://prod/srv/repo'
 const REMOTE_WORKTREE_PATH = '/srv/repo'
 const REMOTE_TARGET = {
-  kind: 'workspace' as const,
+  kind: 'workspace-root' as const,
   workspaceId: canonicalWorkspaceLocator(REMOTE_REPO_ROOT)!,
   workspaceRuntimeId: REPO_RUNTIME_ID,
 }
@@ -183,7 +183,7 @@ describe('terminal session ensurer', () => {
         repoRoot: 'goblin+file:///tmp/workspace',
         repoRuntimeId: REPO_RUNTIME_ID,
         target: {
-          kind: 'workspace',
+          kind: 'workspace-root',
           workspaceId: canonicalWorkspaceLocator('goblin+file:///tmp/workspace')!,
           workspaceRuntimeId: REPO_RUNTIME_ID,
         },

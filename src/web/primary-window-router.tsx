@@ -21,7 +21,7 @@ import {
 } from '#/web/primary-window-route-navigation.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { openRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
-import { workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
+import { workspaceGitAvailable, workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 
 const rootRoute = createRootRoute()
 
@@ -133,7 +133,14 @@ function RepoRoute() {
     const repo = repoId ? state.repos[repoId] : null
     return workspaceGitUnavailable(repo?.workspaceProbe)
   })
+  const gitAvailable = useReposStore((state) => {
+    const repo = repoId ? state.repos[repoId] : null
+    return workspaceGitAvailable(repo?.workspaceProbe)
+  })
   if (gitUnavailable && (branchMatch || newWorktreeMatch)) {
+    return <Navigate to="/repo/$repoSlug/dashboard" params={{ repoSlug }} replace />
+  }
+  if (gitAvailable && workspaceMatch) {
     return <Navigate to="/repo/$repoSlug/dashboard" params={{ repoSlug }} replace />
   }
   const routeRepoView = repoRouteViewFromSlugChildRoute(repoSlug, {

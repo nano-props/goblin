@@ -115,7 +115,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
 
   test('passes the native workspace root through terminal admission', async () => {
     const target = {
-      kind: 'workspace' as const,
+      kind: 'workspace-root' as const,
       workspaceId,
       workspaceRuntimeId: request.repoRuntimeId,
     }
@@ -134,9 +134,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
 
     await application.open('client-test', 'user-test', { runtimeType: 'terminal', request: workspaceRequest })
 
-    expect(capture).toHaveBeenCalledWith(
-      expect.objectContaining({ repoRoot: workspaceId, worktreePath: '/repo' }),
-    )
+    expect(capture).toHaveBeenCalledWith(expect.objectContaining({ repoRoot: workspaceId, worktreePath: '/repo' }))
     expect(createAdmitted).toHaveBeenCalledWith(
       'client-test',
       'user-test',
@@ -178,7 +176,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
 
   test('normalizes a workspace locator before closing its native terminal session', async () => {
     const target = {
-      kind: 'workspace' as const,
+      kind: 'workspace-root' as const,
       workspaceId,
       workspaceRuntimeId: request.repoRuntimeId,
     }

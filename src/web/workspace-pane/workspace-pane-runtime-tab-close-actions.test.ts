@@ -6,7 +6,6 @@ import {
   confirmWorkspacePaneRuntimeTabClose,
   terminalBaseForRuntimeTabCloseTarget,
   workspacePaneRuntimeTabCloseConfirmRequest,
-  workspacePaneRuntimeTabConfirmedCloseBranchName,
   workspacePaneRuntimeTabConfirmedCloseIdentity,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 
@@ -88,13 +87,6 @@ describe('workspace pane runtime tab close actions', () => {
     ).resolves.toBe(true)
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', terminalBase)
-    expect(
-      workspacePaneRuntimeTabConfirmedCloseBranchName({
-        type: 'terminal',
-        sessionId: 'term-111111111111111111111',
-        target: closeTarget,
-      }),
-    ).toBe('main')
     expect(
       workspacePaneRuntimeTabConfirmedCloseIdentity({
         type: 'terminal',

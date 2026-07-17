@@ -149,7 +149,7 @@ describe('restoreRepoTabsForRepo', () => {
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
       expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
-      targets: [{ kind: 'workspace' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
+      targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
   })
 
@@ -195,7 +195,7 @@ describe('restoreRepoTabsForRepo', () => {
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
       expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
-      targets: [{ kind: 'workspace' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
+      targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
   })
 
@@ -232,7 +232,7 @@ describe('restoreRepoTabsForRepo', () => {
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
       expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
-      targets: [{ kind: 'workspace' }],
+      targets: [{ kind: 'workspace-root' }],
     })
   })
 
@@ -295,7 +295,7 @@ describe('restoreRepoTabsForRepo', () => {
       workspaceId: entry.id,
       workspaceRuntimeId: 'repo-runtime-test',
       expectedRepoEntry: entry,
-      targets: [{ kind: 'workspace' }],
+      targets: [{ kind: 'workspace-root' }],
     })
   })
 

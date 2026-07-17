@@ -29,7 +29,7 @@ import type { PullRequestEntry } from '#/shared/api-types.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
-import { workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
+import { workspaceGitAvailable, workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 import { DirectoryOverviewContent } from '#/web/components/repo-pages/DirectoryOverviewContent.tsx'
 
 type DashboardTone = 'default' | 'attention' | 'success'
@@ -88,7 +88,7 @@ export function RepoDashboardPane({
     }),
   )
   const directoryWorkspace = workspaceGitUnavailable(repo?.workspaceProbe)
-  const gitQueriesEnabled = !!repo && !directoryWorkspace
+  const gitQueriesEnabled = !!repo && workspaceGitAvailable(repo.workspaceProbe)
   const projectionReadModel = useRepoProjectionReadModel(
     repoId,
     repo?.repoRuntimeId ?? '',

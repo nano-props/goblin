@@ -29,6 +29,7 @@ const restoreRepoTabsMocks = vi.hoisted(() => ({
 
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useResponsiveUiMode: () => responsiveMocks.mode,
+  useIsCompactUi: () => responsiveMocks.mode === 'compact',
 }))
 
 vi.mock('#/web/hooks/useRepoToasts.tsx', () => ({
@@ -321,9 +322,7 @@ describe('RepoView workspace navigation', () => {
       },
     }))
 
-    const { container } = render(
-      <RepoView repoId={REPO_ID} routeView={{ kind: 'dashboard', repoId: REPO_ID }} />,
-    )
+    const { container } = render(<RepoView repoId={REPO_ID} routeView={{ kind: 'dashboard', repoId: REPO_ID }} />)
 
     expect(container.querySelector('[data-testid="repo-dashboard-page"]')).not.toBeNull()
     expect(repoWorkspace(container)).toBeNull()

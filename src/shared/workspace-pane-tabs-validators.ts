@@ -25,7 +25,11 @@ export const WorkspacePaneTabsListInputSchema = v.object({
 })
 
 export const RuntimeWorkspacePaneTargetSchema = v.variant('kind', [
-  v.object({ kind: v.literal('workspace'), workspaceId: WorkspaceIdSchema, workspaceRuntimeId: RepoRuntimeIdSchema }),
+  v.object({
+    kind: v.literal('workspace-root'),
+    workspaceId: WorkspaceIdSchema,
+    workspaceRuntimeId: RepoRuntimeIdSchema,
+  }),
   v.object({
     kind: v.literal('git-branch'),
     workspaceId: WorkspaceIdSchema,
@@ -103,7 +107,7 @@ export function canonicalRuntimeWorkspacePaneTarget(
 ): RuntimeWorkspacePaneTarget | null {
   const workspaceId = canonicalLocator(target.workspaceId)
   if (!workspaceId) return null
-  if (target.kind === 'workspace') return { ...target, workspaceId }
+  if (target.kind === 'workspace-root') return { ...target, workspaceId }
   if (target.kind === 'git-branch') return { ...target, workspaceId }
   const root = canonicalLocator(target.root)
   if (!root) return null

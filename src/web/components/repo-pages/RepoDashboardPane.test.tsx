@@ -7,6 +7,7 @@ import { RepoDashboardPane } from '#/web/components/repo-pages/RepoDashboardPane
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   repoWorktreeStatusQueryKey,
+  repoProjectionQueryKey,
   setRepoProjectionQueryData,
   workspaceDirectoryOverviewQueryKey,
 } from '#/web/repo-data-query.ts'
@@ -22,6 +23,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 const REPO_ID = 'goblin+file:///tmp/repo-dashboard-pane-test'
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   resetReposStore()
 })
 
@@ -31,6 +33,38 @@ afterEach(() => {
 })
 
 describe('RepoDashboardPane', () => {
+  test('does not admit Git or directory reads before workspace capability settles', () => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, name: 'probing' })
+    useReposStore.setState((state) => ({
+      repos: {
+        ...state.repos,
+        [REPO_ID]: { ...state.repos[REPO_ID]!, workspaceProbe: { status: 'probing' } },
+      },
+    }))
+    primaryWindowQueryClient.removeQueries({
+      queryKey: repoProjectionQueryKey(REPO_ID, repo.repoRuntimeId, null, 'summary'),
+    })
+    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId) })
+
+    renderInJsdom(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <RepoDashboardPane repoId={REPO_ID} />
+      </QueryClientProvider>,
+    )
+
+    const projectionState = primaryWindowQueryClient.getQueryState(
+      repoProjectionQueryKey(REPO_ID, repo.repoRuntimeId, null, 'summary'),
+    )
+    const statusState = primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId))
+    const overviewState = primaryWindowQueryClient.getQueryState(
+      workspaceDirectoryOverviewQueryKey(REPO_ID, repo.repoRuntimeId),
+    )
+    for (const queryState of [projectionState, statusState, overviewState]) {
+      expect(queryState?.fetchStatus).not.toBe('fetching')
+      expect(queryState?.dataUpdateCount ?? 0).toBe(0)
+    }
+  })
+
   test('shows directory metrics without mounting Git reads for a non-Git workspace', () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, name: 'notes' })
     useReposStore.setState((state) => ({

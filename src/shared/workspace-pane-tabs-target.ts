@@ -5,13 +5,26 @@ import {
   parseCanonicalWorkspaceLocator,
 } from '#/shared/workspace-locator.ts'
 
-export interface WorkspacePaneTabsTarget {
+export interface GitWorkspacePaneTabsTarget {
   repoRoot: string
   branchName: string
   worktreePath: string | null
 }
 
+export interface RootWorkspacePaneTabsTarget {
+  kind: 'workspace-root'
+  repoRoot: string
+  branchName: null
+  worktreePath: null
+}
+
+export type WorkspacePaneTabsTarget = GitWorkspacePaneTabsTarget | RootWorkspacePaneTabsTarget
+
 export type WorkspacePaneTabsTargetIdentity =
+  | {
+      kind: 'workspace-root'
+      repoRoot: string
+    }
   | {
       kind: 'branch'
       repoRoot: string
@@ -25,19 +38,25 @@ export type WorkspacePaneTabsTargetIdentity =
 
 export function workspacePaneTabsTargetIdentityKey(target: WorkspacePaneTabsTarget): string {
   return workspacePaneTabsTargetIdentityKeyFromIdentity(
-    target.worktreePath !== null
-      ? { kind: 'worktree', repoRoot: target.repoRoot, worktreePath: target.worktreePath }
-      : { kind: 'branch', repoRoot: target.repoRoot, branchName: target.branchName },
+    'kind' in target
+      ? target
+      : target.worktreePath !== null
+        ? { kind: 'worktree', repoRoot: target.repoRoot, worktreePath: target.worktreePath }
+        : { kind: 'branch', repoRoot: target.repoRoot, branchName: target.branchName },
   )
 }
 
 export function workspacePaneTabsTargetIdentityKeyFromIdentity(target: WorkspacePaneTabsTargetIdentity): string {
+  if (target.kind === 'workspace-root') return `${target.repoRoot}\0workspace-root`
   if (target.kind === 'worktree') return `${target.repoRoot}\0worktree\0${target.worktreePath}`
   return `${target.repoRoot}\0branch\0${target.branchName}`
 }
 
 export function parseWorkspacePaneTabsTargetIdentityKey(key: string): WorkspacePaneTabsTargetIdentity | null {
   const parts = key.split('\0')
+  if (parts.length === 2 && parts[0] && parts[1] === 'workspace-root') {
+    return { kind: 'workspace-root', repoRoot: parts[0] }
+  }
   if (parts.length !== 3) return null
   const [repoRoot, kind, value] = parts
   if (!repoRoot || !value) return null
@@ -47,7 +66,7 @@ export function parseWorkspacePaneTabsTargetIdentityKey(key: string): WorkspaceP
 }
 
 export function restorableWorkspacePaneTargetKey(target: RestorableWorkspacePaneTarget): string {
-  if (target.kind === 'workspace') return 'workspace'
+  if (target.kind === 'workspace-root') return 'workspace-root'
   if (target.kind === 'git-branch') return `git-branch\0${target.branch}`
   return `git-worktree\0${target.root}`
 }
@@ -56,7 +75,7 @@ export function restorableWorkspacePaneTargetFromRuntime(
   target: RuntimeWorkspacePaneTarget,
 ): RestorableWorkspacePaneTarget | null {
   if (!target.workspaceId || !target.workspaceRuntimeId) return null
-  if (target.kind === 'workspace') return { kind: 'workspace' }
+  if (target.kind === 'workspace-root') return { kind: 'workspace-root' }
   if (target.kind === 'git-branch') return target.branch ? { kind: 'git-branch', branch: target.branch } : null
   const workspace = parseCanonicalWorkspaceLocator(target.workspaceId)
   const root = parseCanonicalWorkspaceLocator(target.root)
@@ -73,7 +92,7 @@ export function runtimeWorkspacePaneTargetKey(target: RuntimeWorkspacePaneTarget
 }
 
 export function parseRestorableWorkspacePaneTargetKey(key: string): RestorableWorkspacePaneTarget | null {
-  if (key === 'workspace') return { kind: 'workspace' }
+  if (key === 'workspace-root') return { kind: 'workspace-root' }
   const separator = key.indexOf('\0')
   if (separator < 0 || key.indexOf('\0', separator + 1) >= 0) return null
   const kind = key.slice(0, separator)
@@ -86,8 +105,8 @@ export function parseRestorableWorkspacePaneTargetKey(key: string): RestorableWo
 }
 
 export function restorableWorkspacePaneTarget(target: WorkspacePaneTabsTarget): RestorableWorkspacePaneTarget | null {
+  if ('kind' in target) return { kind: 'workspace-root' }
   if (target.worktreePath === null) return { kind: 'git-branch', branch: target.branchName }
-  if (target.worktreePath === target.repoRoot) return { kind: 'workspace' }
   const workspace = parseCanonicalWorkspaceLocator(target.repoRoot)
   if (!workspace) return null
   const root = formatWorkspaceLocator(
@@ -103,7 +122,9 @@ export function workspacePaneTabsTargetFromRestorable(
   workspaceId: string,
   target: RestorableWorkspacePaneTarget,
 ): WorkspacePaneTabsTarget | null {
-  if (target.kind === 'workspace') return { repoRoot: workspaceId, branchName: '', worktreePath: workspaceId }
+  if (target.kind === 'workspace-root') {
+    return { kind: 'workspace-root', repoRoot: workspaceId, branchName: null, worktreePath: null }
+  }
   if (target.kind === 'git-branch') {
     return { repoRoot: workspaceId, branchName: target.branch, worktreePath: null }
   }
@@ -116,8 +137,8 @@ export function workspacePaneTabsTargetFromRestorable(
 
 export function workspacePaneTabsTargetFromRuntime(target: RuntimeWorkspacePaneTarget): WorkspacePaneTabsTarget | null {
   if (!target.workspaceId || !target.workspaceRuntimeId) return null
-  if (target.kind === 'workspace') {
-    return { repoRoot: target.workspaceId, branchName: '', worktreePath: target.workspaceId }
+  if (target.kind === 'workspace-root') {
+    return { kind: 'workspace-root', repoRoot: target.workspaceId, branchName: null, worktreePath: null }
   }
   if (target.kind === 'git-branch') {
     return target.branch ? { repoRoot: target.workspaceId, branchName: target.branch, worktreePath: null } : null
@@ -135,7 +156,7 @@ export function runtimeWorkspacePaneTarget(
 ): RuntimeWorkspacePaneTarget | null {
   const workspaceId = canonicalWorkspaceLocator(target.repoRoot)
   if (!workspaceId || !workspaceRuntimeId) return null
-  if (target.worktreePath === target.repoRoot) return { kind: 'workspace', workspaceId, workspaceRuntimeId }
+  if ('kind' in target) return { kind: 'workspace-root', workspaceId, workspaceRuntimeId }
   if (target.worktreePath === null) {
     return target.branchName ? { kind: 'git-branch', workspaceId, workspaceRuntimeId, branch: target.branchName } : null
   }

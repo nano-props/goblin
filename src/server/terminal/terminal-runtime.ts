@@ -84,7 +84,7 @@ const serverWorkspacePaneTargetProjection: WorkspacePaneTargetProjectionProvider
     const workspace = parseCanonicalWorkspaceLocator(workspaceId)
     if (!workspace) throw new Error('invalid workspace pane workspace id')
     const workspaceTarget = {
-      target: { kind: 'workspace' as const, workspaceId, workspaceRuntimeId: repoRuntimeId },
+      target: { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: repoRuntimeId },
       nativeWorktreePath: workspace.path,
       canonicalBranch: null,
     }
@@ -440,7 +440,7 @@ async function clearWorkspacePaneDurableLayout(
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const current = await repository.load(workspaceId)
     const replacement = {
-      entries: current.layout.entries.filter((entry) => entry.target.kind === 'workspace'),
+      entries: current.layout.entries.filter((entry) => entry.target.kind === 'workspace-root'),
     }
     if (workspacePaneDurableLayoutsEqual(workspaceId, current.layout, replacement)) return
     const outcome = await repository.compareAndSwap({

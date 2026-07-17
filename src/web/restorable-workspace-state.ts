@@ -249,6 +249,7 @@ function workspacePaneTabsTargetKeyBelongsToRepo(
 ) {
   const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
   if (!target || target.repoRoot !== repoRoot) return null
+  if (target.kind === 'workspace-root') return target
   if (target.kind === 'branch') {
     return repo.branches.some((branch) => branch.name === target.branchName) ? target : null
   }

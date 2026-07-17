@@ -39,6 +39,7 @@ import {
   runtimeWorkspacePaneTarget,
   workspacePaneTabsTargetFromRuntime,
   workspacePaneTabsTargetIdentityKey,
+  type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspacePaneTabEntryIdentity, workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
@@ -106,6 +107,7 @@ export function seedRepoShellForTest(options: {
   preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType | null>
   repoRuntimeId?: string
   remote?: Partial<RepoState['remote']>
+  workspaceProbe?: WorkspaceProbeState
 }): RepoState {
   const base = emptyRepo(options.id, options.name ?? 'repo', options.repoRuntimeId ?? createOpaqueId('repo-runtime'))
   const repo: RepoState = {
@@ -119,6 +121,7 @@ export function seedRepoShellForTest(options: {
       ...base.remote,
       ...options.remote,
     },
+    workspaceProbe: options.workspaceProbe ?? base.workspaceProbe,
   }
   useReposStore.setState({
     repos: { [options.id]: repo },
@@ -246,15 +249,9 @@ export function installWorkspacePaneTabsTestBridge(
 } {
   let serverEntries: WorkspacePaneTabsEntry[] = []
   let serverRevision = 0
-  const targetKey = (input: { repoRoot: string; branchName: string; worktreePath: string | null }) =>
-    workspacePaneTabsTargetIdentityKey(input)
+  const targetKey = (input: WorkspacePaneTabsTarget) => workspacePaneTabsTargetIdentityKey(input)
   const entryTarget = (entry: WorkspacePaneTabsEntry) => workspacePaneTabsTargetFromRuntime(entry.target)
-  const serverTabsForTarget = (input: {
-    repoRoot: string
-    repoRuntimeId: string
-    branchName: string
-    worktreePath: string | null
-  }): WorkspacePaneTabEntry[] => {
+  const serverTabsForTarget = (input: WorkspacePaneTabsTarget & { repoRuntimeId: string }): WorkspacePaneTabEntry[] => {
     const entry = serverEntries.find((candidate) => {
       const target = entryTarget(candidate)
       return target && targetKey(target) === targetKey(input)
@@ -272,7 +269,7 @@ export function installWorkspacePaneTabsTestBridge(
     return tabs
   }
   const replaceServerTarget = (
-    input: { repoRoot: string; repoRuntimeId: string; branchName: string; worktreePath: string | null },
+    input: WorkspacePaneTabsTarget & { repoRuntimeId: string },
     tabs: readonly WorkspacePaneTabEntry[],
   ): WorkspacePaneTabEntry[] => {
     const nextTabs = [...tabs]
@@ -1246,6 +1243,16 @@ export function seedRepoWithReadModelForTest(options: {
     currentBranchName,
     ...(preferredWorkspacePaneTabByTarget ? { preferredWorkspacePaneTabByTarget } : {}),
     remote: options.remote,
+    workspaceProbe: {
+      status: 'ready',
+      name: options.name ?? 'repo',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
+      diagnostics: [],
+    },
   })
   seedRepoReadModelQueryData(repo, {
     branches: branchesWithSnapshotWorktreeMetadata,

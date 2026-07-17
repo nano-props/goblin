@@ -38,10 +38,11 @@ describe('workspace pane action queue', () => {
 
   test('serializes workspace-scoped actions without inventing a branch', async () => {
     const workspaceTarget = {
+      kind: 'workspace-root' as const,
       repoId: 'goblin+file:///workspace',
       repoRuntimeId: 'repo-runtime-1',
-      branchName: '',
-      worktreePath: 'goblin+file:///workspace',
+      branchName: null,
+      worktreePath: null,
     }
     const order: string[] = []
     const release = Promise.withResolvers<void>()

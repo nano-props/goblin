@@ -125,7 +125,7 @@ describe('workspace pane tabs coordinator queues', () => {
     })
     const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')!
     const projection: WorkspacePaneTargetProjection = {
-      target: { kind: 'workspace', workspaceId, workspaceRuntimeId: 'runtime-a' },
+      target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: 'runtime-a' },
       nativeWorktreePath: '/repo',
       canonicalBranch: null,
     }
@@ -168,7 +168,7 @@ describe('workspace pane tabs coordinator queues', () => {
     })
     const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')!
     const projection: WorkspacePaneTargetProjection = {
-      target: { kind: 'workspace', workspaceId, workspaceRuntimeId: 'runtime-a' },
+      target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: 'runtime-a' },
       nativeWorktreePath: '/repo',
       canonicalBranch: null,
     }
@@ -181,18 +181,20 @@ describe('workspace pane tabs coordinator queues', () => {
       targetProjection: { captureTargets: async () => [projection] },
     })
 
-    const admitted = await operations.runOperation(capability, async (permit) =>
-      await coordinator.ensureRuntimeTabForSession({
-        userId: 'user-a',
-        target: projection.target,
-        worktreePath: '/repo',
-        runtimeType: 'terminal',
-        sessionId: 'term-workspaceworkspace002',
-        permit,
-        physicalWorktreeCapability: capability,
-        isRuntimeCurrent: () => true,
-        commitAdmission,
-      }),
+    const admitted = await operations.runOperation(
+      capability,
+      async (permit) =>
+        await coordinator.ensureRuntimeTabForSession({
+          userId: 'user-a',
+          target: projection.target,
+          worktreePath: '/repo',
+          runtimeType: 'terminal',
+          sessionId: 'term-workspaceworkspace002',
+          permit,
+          physicalWorktreeCapability: capability,
+          isRuntimeCurrent: () => true,
+          commitAdmission,
+        }),
     )
 
     expect(admitted).toEqual({ admitted: true, value: { kind: 'committed' } })

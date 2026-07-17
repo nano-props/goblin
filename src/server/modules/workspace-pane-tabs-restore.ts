@@ -76,9 +76,9 @@ function restorableTargetsForRepo(repo: RestoredWorkspaceRepoRuntime) {
         : { kind: 'git-branch', branch: branch.name }
       return target ? [target] : []
     })
-    return [{ kind: 'workspace' as const }, ...gitTargets]
+    return [{ kind: 'workspace-root' as const }, ...gitTargets]
   }
-  return [{ kind: 'workspace' as const }]
+  return [{ kind: 'workspace-root' as const }]
 }
 
 function restorableWorktreeTarget(workspaceId: string, nativePath: string): RestorableWorkspacePaneTarget | null {

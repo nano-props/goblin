@@ -91,9 +91,10 @@ describe('workspace pane tab controller transactions', () => {
 
     expect(navigation.commitRepoBranchWorkspacePaneRoute).not.toHaveBeenCalled()
     const targetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'workspace-root',
       repoRoot: 'goblin+file:///repo',
-      branchName: '',
-      worktreePath: 'goblin+file:///repo',
+      branchName: null,
+      worktreePath: null,
     })
     expect(useReposStore.getState().repos['goblin+file:///repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
       'files',

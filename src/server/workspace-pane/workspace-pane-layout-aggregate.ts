@@ -491,7 +491,7 @@ function canonicalTabsForTarget(
 ): WorkspacePaneTabEntry[] {
   const durable = layout.entries.find((entry) => durableTargetKey(input, entry.target) === targetProjectionKey(input))
   const staticTabs = durable?.tabs ?? [
-    workspacePaneStaticTabEntry(input.target.kind === 'workspace' ? 'files' : 'status'),
+    workspacePaneStaticTabEntry(input.target.kind === 'workspace-root' ? 'files' : 'status'),
   ]
   const liveRuntimeTabs = providers.flatMap((provider) =>
     provider.liveSessions
@@ -514,8 +514,8 @@ function durableTargetKey(
   const workspaceId = canonicalWorkspaceLocator(scope.repoRoot)
   if (!workspaceId) throw new Error('error.workspace-tabs-target-invalid')
   const bound =
-    target.kind === 'workspace'
-      ? { kind: 'workspace' as const, workspaceId, workspaceRuntimeId: scope.repoRuntimeId }
+    target.kind === 'workspace-root'
+      ? { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: scope.repoRuntimeId }
       : target.kind === 'git-branch'
         ? { ...target, workspaceId, workspaceRuntimeId: scope.repoRuntimeId }
         : { ...target, workspaceId, workspaceRuntimeId: scope.repoRuntimeId }

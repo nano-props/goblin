@@ -44,8 +44,12 @@ export function useWorkspacePaneRuntimeTabCreateAction({
   const { createTerminalWithAdmission } = useTerminalSessionContext()
   const terminalBase = useMemo<TerminalSessionBase | null>(() => {
     if (!worktreePath) return null
-    const target = runtimeWorkspacePaneTarget({ repoRoot, branchName: branchName ?? '', worktreePath }, repoRuntimeId)
-    if (!target || (target.kind !== 'workspace' && !branchName)) return null
+    const paneTarget =
+      branchName === null
+        ? { kind: 'workspace-root' as const, repoRoot, branchName: null, worktreePath: null }
+        : { repoRoot, branchName, worktreePath }
+    const target = runtimeWorkspacePaneTarget(paneTarget, repoRuntimeId)
+    if (!target || (target.kind !== 'workspace-root' && !branchName)) return null
     return { repoRoot, repoRuntimeId, branch: branchName ?? '', worktreePath, target }
   }, [branchName, repoRuntimeId, repoRoot, worktreePath])
   const captureOpenerIdentity = useCallback(

@@ -10,7 +10,10 @@ import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/w
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { workspacePaneTabsInteractionBlockedForTarget } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import type { WorkspacePaneActionTarget } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import type {
+  GitWorkspacePaneActionTarget,
+  WorkspacePaneActionTarget,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 export type WorkspacePaneTabTargetResolution =
   | { kind: 'ready'; target: RepoWorkspaceTabModel }
@@ -31,12 +34,9 @@ export interface WorkspacePaneTabTargetOptions {
 
 export const workspacePanePreferenceTargetOptions: WorkspacePaneTabTargetOptions = { workspacePaneRoute: undefined }
 
-export interface WorkspacePaneDestinationTargetLease extends WorkspacePaneActionTarget {
-  branchName: string
-  worktreePath: string | null
-}
+export type WorkspacePaneDestinationTargetLease = GitWorkspacePaneActionTarget & { branchName: string }
 
-export type WorkspacePaneTargetLease = WorkspacePaneActionTarget & { branchName: string }
+export type WorkspacePaneTargetLease = GitWorkspacePaneActionTarget & { branchName: string }
 
 export type WorkspacePaneDestinationTargetResolution =
   { kind: 'ready'; lease: WorkspacePaneDestinationTargetLease } | { kind: 'missing' }

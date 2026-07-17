@@ -12,6 +12,7 @@ import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 
 interface WorkspaceRootNavigatorProps {
   repoId: string
@@ -30,7 +31,9 @@ export function WorkspaceRootNavigator({
   onOpenFiles,
 }: WorkspaceRootNavigatorProps) {
   const t = useT()
+  const compact = useIsCompactUi()
   const [menuOpen, setMenuOpen] = useState(false)
+  const actionVisible = compact || menuOpen
   const name = useReposStore((state) => {
     const probe = state.repos[repoId]?.workspaceProbe
     return probe?.status === 'ready' ? probe.name : repoId
@@ -60,16 +63,26 @@ export function WorkspaceRootNavigator({
               <div
                 className={cn(
                   'relative',
-                  menuOpen
-                    ? 'pointer-events-auto opacity-100'
-                    : 'pointer-events-none opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
+                  actionVisible && 'pointer-events-auto opacity-100',
+                  !actionVisible &&
+                    'pointer-events-none opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
                 )}
               >
                 <ActionPopover label={t('action.menu')} open={menuOpen} onOpenChange={setMenuOpen}>
                   {({ close }) => (
                     <div className="space-y-0.5 p-1" role="list">
-                      <WorkspaceAction label={t('tab.status')} icon={<FileText />} close={close} onSelect={onOpenStatus} />
-                      <WorkspaceAction label={t('tab.files')} icon={<FolderTree />} close={close} onSelect={onOpenFiles} />
+                      <WorkspaceAction
+                        label={t('tab.status')}
+                        icon={<FileText />}
+                        close={close}
+                        onSelect={onOpenStatus}
+                      />
+                      <WorkspaceAction
+                        label={t('tab.files')}
+                        icon={<FolderTree />}
+                        close={close}
+                        onSelect={onOpenFiles}
+                      />
                     </div>
                   )}
                 </ActionPopover>

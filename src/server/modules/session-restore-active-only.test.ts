@@ -481,7 +481,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       workspaceId: repoRoot,
       workspaceRuntimeId: 'runtime-goblin_file____repo',
       expectedRepoEntry: { kind: 'local', id: repoRoot },
-      targets: [{ kind: 'workspace' }],
+      targets: [{ kind: 'workspace-root' }],
     })
   })
 })

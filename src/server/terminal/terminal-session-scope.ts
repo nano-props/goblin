@@ -42,7 +42,7 @@ export function terminalSessionTargetWorktreePath(
   worktreePath: string,
 ): string | null {
   if (target.kind === 'git-branch') return null
-  const expected = parseCanonicalWorkspaceLocator(target.kind === 'workspace' ? target.workspaceId : target.root)
+  const expected = parseCanonicalWorkspaceLocator(target.kind === 'workspace-root' ? target.workspaceId : target.root)
   if (!expected) return null
   const actual = terminalSessionWorktreePath(target.workspaceId, worktreePath)
   return actual === expected.path ? actual : null

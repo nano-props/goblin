@@ -13,9 +13,15 @@ vi.mock('#/web/components/RepoPickerHost.tsx', () => ({
   RepoPickerHost: () => <button type="button" data-testid="repo-picker-host" className="h-10 w-full shrink-0" />,
 }))
 
+const responsiveMocks = vi.hoisted(() => ({ compact: false }))
+vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
+  useIsCompactUi: () => responsiveMocks.compact,
+}))
+
 const REPO_ID = 'goblin+file:///tmp/repo-shell-sidebar-test'
 
 beforeEach(() => {
+  responsiveMocks.compact = false
   primaryWindowQueryClient.clear()
   resetReposStore()
   seedRepoWithReadModelForTest({
@@ -116,10 +122,23 @@ describe('RepoLayoutSidebar', () => {
     expect(onOpenWorkspaceStatus).toHaveBeenCalledOnce()
 
     fireEvent.click(menuTrigger)
-    const reopenedFilesAction = [...document.querySelectorAll('button')].find((button) => button.textContent === 'tab.files')
+    const reopenedFilesAction = [...document.querySelectorAll('button')].find(
+      (button) => button.textContent === 'tab.files',
+    )
     if (!(reopenedFilesAction instanceof HTMLButtonElement)) throw new Error('missing reopened Files action')
     fireEvent.click(reopenedFilesAction)
     expect(onOpenWorkspaceFiles).toHaveBeenCalledOnce()
+  })
+
+  test('keeps the workspace row action menu visible in compact UI', () => {
+    responsiveMocks.compact = true
+    const { container } = renderSidebar(
+      <RepoLayoutSidebar repoId={REPO_ID} compact gitAvailable={false} onOpenWorkspaceStatus={vi.fn()} />,
+    )
+
+    const menuTrigger = container.querySelector('button[aria-label="action.menu"]')
+    expect(menuTrigger?.parentElement?.className).toContain('opacity-100')
+    expect(menuTrigger?.parentElement?.className).toContain('pointer-events-auto')
   })
 
   test('opens create-worktree from the row action', () => {

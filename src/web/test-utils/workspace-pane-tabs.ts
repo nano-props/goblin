@@ -2,10 +2,11 @@ import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsEntry, WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import {
+  runtimeWorkspacePaneTarget,
   workspacePaneTabsTargetFromRuntime,
   workspacePaneTabsTargetIdentityKey,
+  type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
-import { formatWorkspaceLocator, parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   type WorkspacePaneTabsQueryData,
@@ -14,13 +15,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 export function setWorkspacePaneTabsForTargetQueryData(
-  input: {
-    repoRoot: string
-    repoRuntimeId: string
-    branchName: string
-    worktreePath: string | null
-    tabs: readonly WorkspacePaneTabEntry[]
-  },
+  input: WorkspacePaneTabsTarget & { repoRuntimeId: string; tabs: readonly WorkspacePaneTabEntry[] },
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
   const current = currentSnapshot(input.repoRoot, input.repoRuntimeId, queryClient)
@@ -68,27 +63,8 @@ function currentSnapshot(repoRoot: string, repoRuntimeId: string, queryClient: Q
   )
 }
 
-export function runtimeWorkspacePaneTargetForTest(input: {
-  repoRoot: string
-  repoRuntimeId: string
-  branchName: string
-  worktreePath: string | null
-}) {
-  const parsed = parseWorkspaceLocator(input.repoRoot, 'posix')
-  const workspaceId = parsed ? formatWorkspaceLocator(parsed, 'posix') : null
-  if (!workspaceId) throw new Error('workspace pane test target requires a canonical workspace id')
-  if (input.worktreePath === input.repoRoot) {
-    return { kind: 'workspace' as const, workspaceId, workspaceRuntimeId: input.repoRuntimeId }
-  }
-  if (input.worktreePath === null) {
-    return {
-      kind: 'git-branch' as const,
-      workspaceId,
-      workspaceRuntimeId: input.repoRuntimeId,
-      branch: input.branchName,
-    }
-  }
-  const root = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: input.worktreePath }, 'posix')
-  if (!root) throw new Error('workspace pane test target requires an absolute worktree path')
-  return { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: input.repoRuntimeId, root }
+export function runtimeWorkspacePaneTargetForTest(input: WorkspacePaneTabsTarget & { repoRuntimeId: string }) {
+  const target = runtimeWorkspacePaneTarget(input, input.repoRuntimeId)
+  if (!target) throw new Error('workspace pane test target requires a canonical target')
+  return target
 }

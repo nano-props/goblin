@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -24,6 +24,22 @@ describe('workspace directory overview', () => {
       topLevelFileCount: 1,
       topLevelDirectoryCount: 1,
       totalSizeBytes: 15,
+    })
+  })
+
+  it('does not count or traverse symbolic links', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'goblin-overview-'))
+    const outside = await mkdtemp(path.join(os.tmpdir(), 'goblin-overview-outside-'))
+    roots.push(root, outside)
+    await writeFile(path.join(root, 'inside.txt'), 'abc')
+    await writeFile(path.join(outside, 'outside.txt'), 'not part of workspace')
+    await symlink(path.join(outside, 'outside.txt'), path.join(root, 'linked-file'))
+    await symlink(outside, path.join(root, 'linked-directory'))
+
+    await expect(readLocalDirectoryOverview(root)).resolves.toEqual({
+      topLevelFileCount: 1,
+      topLevelDirectoryCount: 0,
+      totalSizeBytes: 3,
     })
   })
 

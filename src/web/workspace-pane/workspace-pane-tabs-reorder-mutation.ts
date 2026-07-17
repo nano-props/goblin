@@ -31,11 +31,13 @@ export function useWorkspacePaneTabsReorderMutation(
   const target = useMemo(
     () =>
       runtimeWorkspacePaneTarget(
-        {
-          repoRoot: input.repoRoot,
-          branchName: input.branchName ?? '',
-          worktreePath: input.worktreePath,
-        },
+        input.branchName === null
+          ? { kind: 'workspace-root', repoRoot: input.repoRoot, branchName: null, worktreePath: null }
+          : {
+              repoRoot: input.repoRoot,
+              branchName: input.branchName,
+              worktreePath: input.worktreePath,
+            },
         input.repoRuntimeId,
       )
         ? {

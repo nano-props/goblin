@@ -26,6 +26,7 @@ export type WorkspaceProbeState =
   | { status: 'unavailable'; reason: WorkspaceUnavailableReason }
 
 export type WorkspaceSettledProbeState = Exclude<WorkspaceProbeState, { status: 'probing' }>
+export type WorkspaceReadyProbeState = Extract<WorkspaceProbeState, { status: 'ready' }>
 
 export type WorkspaceRefreshResult =
   | { kind: 'committed'; probe: WorkspaceSettledProbeState }
@@ -55,10 +56,10 @@ export type WorkspaceGitProbeResult =
   | { status: 'inconclusive'; diagnostic: string }
 
 export type RestorableWorkspacePaneTarget =
-  { kind: 'workspace' } | { kind: 'git-branch'; branch: string } | { kind: 'git-worktree'; root: WorkspaceId }
+  { kind: 'workspace-root' } | { kind: 'git-branch'; branch: string } | { kind: 'git-worktree'; root: WorkspaceId }
 
 export type RuntimeWorkspacePaneTarget =
-  | { kind: 'workspace'; workspaceId: WorkspaceId; workspaceRuntimeId: string }
+  | { kind: 'workspace-root'; workspaceId: WorkspaceId; workspaceRuntimeId: string }
   | { kind: 'git-branch'; workspaceId: WorkspaceId; workspaceRuntimeId: string; branch: string }
   | { kind: 'git-worktree'; workspaceId: WorkspaceId; workspaceRuntimeId: string; root: WorkspaceId }
 
@@ -80,11 +81,15 @@ export function capabilitiesFromGitProbe(
   }
 }
 
-export function workspaceGitAvailable(probe: WorkspaceProbeState | null | undefined): boolean {
+export function workspaceGitAvailable(
+  probe: WorkspaceProbeState | null | undefined,
+): probe is WorkspaceReadyProbeState {
   return probe?.status === 'ready' && probe.capabilities.git.status === 'available'
 }
 
-export function workspaceGitUnavailable(probe: WorkspaceProbeState | null | undefined): boolean {
+export function workspaceGitUnavailable(
+  probe: WorkspaceProbeState | null | undefined,
+): probe is WorkspaceReadyProbeState {
   return probe?.status === 'ready' && probe.capabilities.git.status === 'unavailable'
 }
 
@@ -93,8 +98,8 @@ export function bindWorkspacePaneTarget(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
 ): RuntimeWorkspacePaneTarget {
-  return target.kind === 'workspace'
-    ? { kind: 'workspace', workspaceId, workspaceRuntimeId }
+  return target.kind === 'workspace-root'
+    ? { kind: 'workspace-root', workspaceId, workspaceRuntimeId }
     : { ...target, workspaceId, workspaceRuntimeId }
 }
 

@@ -95,7 +95,7 @@ class TerminalSessionService {
   ): Promise<TerminalSessionEnsureResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidRepoLocator(input.repoRoot)) return { ok: false, message: 'error.invalid-arguments' }
-    if (input.target?.kind !== 'workspace' && !isValidBranch(input.branch)) {
+    if (input.target?.kind !== 'workspace-root' && !isValidBranch(input.branch)) {
       return { ok: false, message: 'error.invalid-arguments' }
     }
     if (!isValidCwd(input.worktreePath)) return { ok: false, message: 'error.invalid-arguments' }
@@ -128,7 +128,7 @@ class TerminalSessionService {
   ): Promise<ServerTerminalCreateResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidRepoLocator(input.repoRoot)) return { ok: false, message: 'error.invalid-arguments' }
-    if (input.target?.kind !== 'workspace' && !isValidBranch(input.branch)) {
+    if (input.target?.kind !== 'workspace-root' && !isValidBranch(input.branch)) {
       return { ok: false, message: 'error.invalid-arguments' }
     }
     if (!isValidCwd(input.worktreePath)) return { ok: false, message: 'error.invalid-arguments' }
@@ -332,7 +332,7 @@ function nativeWorktreePathForRuntimeTarget(
   target: WorkspacePaneTabsReplaceInput['target'],
 ): string | null | undefined {
   if (!restorableWorkspacePaneTargetFromRuntime(target)) return undefined
-  if (target.kind === 'workspace') return parseCanonicalWorkspaceLocator(target.workspaceId)?.path
+  if (target.kind === 'workspace-root') return parseCanonicalWorkspaceLocator(target.workspaceId)?.path
   if (target.kind === 'git-branch') return null
   return parseCanonicalWorkspaceLocator(target.root)?.path
 }
@@ -341,7 +341,7 @@ function nativeWorktreePathForRestorableTarget(
   workspaceId: WorkspacePaneTabsReplaceInput['target']['workspaceId'],
   target: RestorableWorkspacePaneTarget,
 ): string | null | undefined {
-  if (target.kind === 'workspace') return parseCanonicalWorkspaceLocator(workspaceId)?.path
+  if (target.kind === 'workspace-root') return parseCanonicalWorkspaceLocator(workspaceId)?.path
   if (target.kind === 'git-branch') return null
   const runtime = bindWorkspacePaneTarget(target, workspaceId, 'restore-validation')
   if (!restorableWorkspacePaneTargetFromRuntime(runtime)) return undefined

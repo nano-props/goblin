@@ -50,7 +50,6 @@ interface WorkspacePaneRuntimeTabCloseActions {
     confirmed: ConfirmedWorkspacePaneRuntimeTabClose,
     context: WorkspacePaneRuntimeTabCloseContext,
   ) => Promise<boolean>
-  confirmedBranchName: (confirmed: ConfirmedWorkspacePaneRuntimeTabClose) => string | null
 }
 
 const WORKSPACE_PANE_RUNTIME_TAB_CLOSE_ACTIONS_BY_TYPE: Record<
@@ -60,7 +59,6 @@ const WORKSPACE_PANE_RUNTIME_TAB_CLOSE_ACTIONS_BY_TYPE: Record<
   terminal: {
     closeConfirmRequest: terminalCloseConfirmRequest,
     confirmClose: confirmTerminalClose,
-    confirmedBranchName: terminalConfirmedBranchName,
   },
 }
 
@@ -75,12 +73,6 @@ export async function confirmWorkspacePaneRuntimeTabClose(
   context: WorkspacePaneRuntimeTabCloseContext,
 ): Promise<boolean> {
   return await WORKSPACE_PANE_RUNTIME_TAB_CLOSE_ACTIONS_BY_TYPE[confirmed.type].confirmClose(confirmed, context)
-}
-
-export function workspacePaneRuntimeTabConfirmedCloseBranchName(
-  confirmed: ConfirmedWorkspacePaneRuntimeTabClose,
-): string | null {
-  return WORKSPACE_PANE_RUNTIME_TAB_CLOSE_ACTIONS_BY_TYPE[confirmed.type].confirmedBranchName(confirmed)
 }
 
 export function workspacePaneRuntimeTabConfirmedCloseIdentity(
@@ -117,10 +109,6 @@ async function confirmTerminalClose(
   return await closeTerminalByDescriptor(confirmed.sessionId, terminalBase)
 }
 
-function terminalConfirmedBranchName(confirmed: ConfirmedWorkspacePaneRuntimeTabClose): string | null {
-  return confirmed.target.branchName
-}
-
 export function terminalRuntimeTabCloseContext(
   context: WorkspacePaneRuntimeTabCloseContext,
 ): TerminalWorkspacePaneRuntimeTabCloseContext | undefined {
@@ -132,10 +120,12 @@ export function terminalBaseForRuntimeTabCloseTarget(
 ): TerminalSessionBase | null {
   if (!target.worktreePath) return null
   const runtimeTarget = runtimeWorkspacePaneTarget(
-    { repoRoot: target.repoRoot, branchName: target.branchName ?? '', worktreePath: target.worktreePath },
+    target.branchName === null
+      ? { kind: 'workspace-root', repoRoot: target.repoRoot, branchName: null, worktreePath: null }
+      : { repoRoot: target.repoRoot, branchName: target.branchName, worktreePath: target.worktreePath },
     target.repoRuntimeId,
   )
-  if (!runtimeTarget || (runtimeTarget.kind !== 'workspace' && !target.branchName)) return null
+  if (!runtimeTarget || (runtimeTarget.kind !== 'workspace-root' && !target.branchName)) return null
   return {
     repoRoot: target.repoRoot,
     repoRuntimeId: target.repoRuntimeId,

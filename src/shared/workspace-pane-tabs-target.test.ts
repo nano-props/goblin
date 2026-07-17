@@ -10,7 +10,7 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 describe('restorable workspace pane targets', () => {
   it('does not duplicate workspace identity or runtime identity in persisted keys', () => {
-    expect(restorableWorkspacePaneTargetKey({ kind: 'workspace' })).toBe('workspace')
+    expect(restorableWorkspacePaneTargetKey({ kind: 'workspace-root' })).toBe('workspace-root')
     expect(restorableWorkspacePaneTargetKey({ kind: 'git-branch', branch: 'feature/a' })).toBe('git-branch\0feature/a')
   })
 

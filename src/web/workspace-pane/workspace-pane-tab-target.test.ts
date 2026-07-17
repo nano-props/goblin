@@ -34,10 +34,11 @@ describe('workspace pane tab target read model', () => {
   test('models the workspace root as a workspace target rather than an empty branch', () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     setWorkspacePaneTabsForTargetQueryData({
+      kind: 'workspace-root',
       repoRoot: REPO_ID,
       repoRuntimeId: repo.repoRuntimeId,
-      branchName: '',
-      worktreePath: REPO_ID,
+      branchName: null,
+      worktreePath: null,
       tabs: [workspacePaneStaticTabEntry('files')],
     })
 

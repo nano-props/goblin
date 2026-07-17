@@ -60,7 +60,7 @@ export function projectServerTerminalSession(input: {
 }): ProjectedServerTerminalSession | null {
   if (input.serverSession.repoRoot !== input.repoRoot) return null
   if (input.serverSession.repoRuntimeId !== input.repoRuntimeId) return null
-  const workspaceScoped = input.serverSession.target?.kind === 'workspace'
+  const workspaceScoped = input.serverSession.target?.kind === 'workspace-root'
   const branch = workspaceScoped
     ? ''
     : branchForTerminalWorktree(input.repoIndex, input.serverSession.repoRoot, input.serverSession.worktreePath) ||

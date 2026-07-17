@@ -82,7 +82,7 @@ async function selectWorkspacePaneTabByIndexAction(
 export async function dispatchSelectWorkspacePaneTabByIdentityAction(
   options: SelectWorkspacePaneTabByIdentityActionOptions,
 ): Promise<boolean> {
-  if (!options.repoId || options.branchName === null) return false
+  if (!options.repoId) return false
   const coordinatorTarget = workspacePaneTabActionCoordinatorTarget(options)
   if (!coordinatorTarget) return false
   const presentationToken = beginPrimaryWindowPresentation()
@@ -104,7 +104,7 @@ async function selectWorkspacePaneTabByIdentityAction(
   coordinatorTarget: RepoWorkspaceTabModel,
   presentationToken: PrimaryWindowPresentationToken,
 ): Promise<boolean> {
-  if (!repoId || branchName === null) return false
+  if (!repoId) return false
   const sourceRoute = workspacePaneRoute
   const target = resolveSelectableWorkspacePaneTarget(repoId, branchName, sourceRoute)
   const tab = target?.tabs.find((candidate) => candidate.identity === identity) ?? null
@@ -168,21 +168,30 @@ function workspacePaneTabActionCoordinatorTarget(input: {
   branchName: string | null
   workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
 }): RepoWorkspaceTabModel | null {
-  if (!input.repoId || input.branchName === null) return null
+  if (!input.repoId) return null
   return resolveSelectableWorkspacePaneTarget(input.repoId, input.branchName, input.workspacePaneRoute)
 }
 
 function resolveSelectableWorkspacePaneTarget(
   repoId: string,
-  branchName: string,
+  branchName: string | null,
   workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined,
 ): RepoWorkspaceTabModel | null {
-  return branchName
+  return branchName !== null
     ? workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
     : workspacePaneTabTargetForWorkspace(repoId, { workspacePaneRoute: undefined })
 }
 
 function workspacePaneQueuedActionTarget(model: RepoWorkspaceTabModel) {
+  if (model.branchName === null) {
+    return {
+      kind: 'workspace-root' as const,
+      repoId: model.repoId,
+      repoRuntimeId: model.repoRuntimeId,
+      branchName: null,
+      worktreePath: null,
+    }
+  }
   return {
     repoId: model.repoId,
     repoRuntimeId: model.repoRuntimeId,

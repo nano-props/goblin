@@ -104,7 +104,7 @@ export async function selectWorkspacePaneControllerTab(
       state.setSelectedTerminal(formatTerminalWorktreeKey(target.repoId, target.repoId), tab.sessionId)
     }
     state.setWorkspacePaneTabForTarget(
-      { repoRoot: target.repoId, branchName: '', worktreePath: target.repoId },
+      { kind: 'workspace-root', repoRoot: target.repoId, branchName: null, worktreePath: null },
       tab.type,
     )
     return workspacePaneTabControllerTargetIsCurrent(target)
