@@ -122,6 +122,33 @@ describe('RepoPicker', () => {
     expect(document.body.textContent).toContain('/tmp/repo-b')
   })
 
+  test('renders canonical workspace ids as user-facing locations in the repo menu', async () => {
+    const workspaceId = 'goblin+file:///Users/example/Developer/GitHub/nano-props/goblin'
+    render(
+      <RepoPicker
+        repos={[repo('goblin', workspaceId), repo('other', 'goblin+file:///Users/example/Developer/other')]}
+        currentRepoId={workspaceId}
+        labels={labels}
+        onActivate={() => {}}
+        onClose={() => {}}
+        onOpenLocal={() => {}}
+        onOpenRemote={() => {}}
+        onClone={() => {}}
+        surface="sidebar"
+      />,
+    )
+
+    const trigger = document.body.querySelector(`[data-current-repo-id="${workspaceId}"]`)
+    await act(async () => {
+      trigger!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      trigger!.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      await Promise.resolve()
+    })
+
+    expect(document.body.textContent).toContain('/Users/example/Developer/GitHub/nano-props/goblin')
+    expect(document.body.textContent).not.toContain('goblin+file://')
+  })
+
   test('opens the repo menu popover when the current repo tab is clicked', async () => {
     render(
       <RepoPicker

@@ -4,7 +4,7 @@ import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { PanelInset } from '#/web/components/ui/panel.tsx'
-import { formatRepoLocator } from '#/web/lib/paths.ts'
+import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { formatTranslatableReason, shouldOfferSshSettings, unavailableBodyKey } from '#/web/lib/remote-diagnostics.ts'
 import { runManualRepoSync } from '#/web/stores/repos/refresh.ts'
@@ -60,7 +60,7 @@ export function UnavailableRepoView({ repo }: Props) {
                 {t('repo-unavailable.path')}
               </div>
               <div className="mt-1 break-all font-mono text-[11px] text-foreground">
-                {formatRepoLocator(repo.id, remoteRepoTarget(repo.id, repo.remote.lifecycle))}
+                {formatWorkspaceDisplayLocation(repo.id, remoteRepoTarget(repo.id, repo.remote.lifecycle))}
               </div>
               <div className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 {t('repo-unavailable.reason')}

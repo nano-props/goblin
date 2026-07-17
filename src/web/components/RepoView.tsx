@@ -27,6 +27,7 @@ import { CreateWorktreePagePane } from '#/web/components/repo-pages/CreateWorktr
 import type { RepoRouteView } from '#/web/App.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { workspaceGitAvailable, workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
+import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 
 function EmptyRepoWorkspacePane({ trafficLightOffset }: { trafficLightOffset: boolean }) {
   return (
@@ -324,12 +325,13 @@ export function RepoView({
 
 function RoutedRepoNotFound({ repoId }: { repoId: string }) {
   const t = useT()
+  const displayLocation = formatWorkspaceDisplayLocation(repoId)
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
       <div className="flex flex-1 items-center justify-center p-6 text-center">
         <div className="flex max-w-sm flex-col gap-2">
           <h1 className="text-sm font-medium text-foreground">{t('repo-route.not-found-title')}</h1>
-          <p className="break-all text-sm text-muted-foreground">{repoId}</p>
+          <p className="break-all text-sm text-muted-foreground">{displayLocation}</p>
         </div>
       </div>
     </section>

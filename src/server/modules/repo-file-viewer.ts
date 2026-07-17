@@ -10,8 +10,10 @@ import { resolveWorkspaceScopedPath } from '#/server/modules/workspace-path.ts'
 import { parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const BAT_VIEWERS = ['bat', 'batcat'] as const
-const POSIX_CAT_VIEWER: RepoFileViewerResult = { viewer: 'cat', shell: 'posix' }
-const CMD_TYPE_VIEWER: RepoFileViewerResult = { viewer: 'type', shell: 'cmd' }
+type RepoFileViewer = Omit<RepoFileViewerResult, 'executionRoot'>
+
+const POSIX_CAT_VIEWER: RepoFileViewer = { viewer: 'cat', shell: 'posix' }
+const CMD_TYPE_VIEWER: RepoFileViewer = { viewer: 'type', shell: 'cmd' }
 
 export async function getRepositoryFileViewer(
   cwd: string,
@@ -45,9 +47,9 @@ export async function getRepositoryFileViewer(
             knownWorktrees: [worktree!],
             ...(run ? { run } : {}),
           })
-      if (exists) return { viewer, shell: 'posix' }
+      if (exists) return fileViewerResult({ viewer, shell: 'posix' }, executionPath)
     }
-    return POSIX_CAT_VIEWER
+    return fileViewerResult(POSIX_CAT_VIEWER, executionPath)
   }
 
   if (!workspacePath) {
@@ -59,17 +61,21 @@ export async function getRepositoryFileViewer(
 
   for (const viewer of BAT_VIEWERS) {
     const exists = await userShellCommandExists(viewer, executionPath, signal)
-    if (exists) return { viewer, shell: localShellDialect() }
+    if (exists) return fileViewerResult({ viewer, shell: localShellDialect() }, executionPath)
   }
-  return fallbackViewer
+  return fileViewerResult(fallbackViewer, executionPath)
 }
 
-function localFallbackViewer(): RepoFileViewerResult {
+function localFallbackViewer(): RepoFileViewer {
   return process.platform === 'win32' ? CMD_TYPE_VIEWER : POSIX_CAT_VIEWER
 }
 
-function localShellDialect(): RepoFileViewerResult['shell'] {
+function localShellDialect(): RepoFileViewer['shell'] {
   return process.platform === 'win32' ? 'cmd' : 'posix'
+}
+
+function fileViewerResult(viewer: RepoFileViewer, executionRoot: string): RepoFileViewerResult {
+  return { ...viewer, executionRoot }
 }
 
 function hasUsableWorktreePath(worktreePath: string): boolean {

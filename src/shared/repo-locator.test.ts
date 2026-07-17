@@ -4,7 +4,7 @@ import {
   formatRemoteRepoRefLocator,
   formatRemoteRepoTargetLocator,
   formatRemoteWorktreeLocator,
-  formatRepoLocator,
+  formatWorkspaceDisplayLocation,
   formatWorkspaceSessionEntryLocator,
   toSafeCanonicalRepoLocator,
 } from '#/shared/repo-locator.ts'
@@ -39,13 +39,33 @@ describe('repo locators', () => {
 
   test('formats repo locators from the best available remote metadata', () => {
     expect(
-      formatRepoLocator('/Users/example/Developer/repo', '/Users/example', {
+      formatWorkspaceDisplayLocation('goblin+file:///Users/example/Developer/repo', '/Users/example', {
+        user: 'git',
+        host: 'example.test',
+        remotePath: '/srv/repo',
+      }),
+    ).toBe('~/Developer/repo')
+    expect(
+      formatWorkspaceDisplayLocation('goblin+file:///Users/example/Developer/repo', '/Users/example', null),
+    ).toBe('~/Developer/repo')
+    expect(formatWorkspaceDisplayLocation('goblin+ssh://prod/srv/repo', '/Users/example')).toBe('prod:/srv/repo')
+    expect(
+      formatWorkspaceDisplayLocation('goblin+ssh://prod/srv/repo', '/Users/example', {
         user: 'git',
         host: 'example.test',
         remotePath: '/srv/repo',
       }),
     ).toBe('git@example.test:/srv/repo')
-    expect(formatRepoLocator('/Users/example/Developer/repo', '/Users/example', null)).toBe('~/Developer/repo')
+    expect(
+      formatWorkspaceDisplayLocation('goblin+ssh://prod/srv/repo', '/Users/example', {
+        user: 'git',
+        host: 'stale.example.test',
+        remotePath: '/srv/other',
+      }),
+    ).toBe('prod:/srv/repo')
+    expect(
+      formatWorkspaceDisplayLocation('goblin+file:///C:/Users/example/My%20Repo', 'C:\\Users\\example'),
+    ).toBe('~\\My Repo')
   })
 
   test('formats recent repo session entry locators', () => {

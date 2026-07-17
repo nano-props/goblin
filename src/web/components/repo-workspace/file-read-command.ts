@@ -1,15 +1,18 @@
 import type { RepoFileViewerResult } from '#/shared/api-types.ts'
 import { shellEscapePath } from '#/web/clipboard/terminal-path-write.ts'
 
-export function absoluteFilePathForTerminal(worktreePath: string, filePath: string): string {
-  const normalizedRoot = worktreePath.replace(/[\\/]+$/u, '')
-  if (/^[A-Za-z]:[\\/]/u.test(worktreePath) || worktreePath.includes('\\')) {
+export function absoluteFilePathForTerminal(executionRoot: string, filePath: string): string {
+  const normalizedRoot = executionRoot.replace(/[\\/]+$/u, '')
+  if (/^[A-Za-z]:[\\/]/u.test(executionRoot) || executionRoot.includes('\\')) {
     return `${normalizedRoot}\\${filePath.split('/').join('\\')}`
   }
   return `${normalizedRoot}/${filePath}`
 }
 
-export function fileReadCommand(reader: RepoFileViewerResult, filePath: string): string {
+export function fileReadCommand(
+  reader: Pick<RepoFileViewerResult, 'viewer' | 'shell'>,
+  filePath: string,
+): string {
   const quotedPath = reader.shell === 'cmd' ? cmdQuotePath(filePath) : shellEscapePath(filePath)
   return `${fileReadViewerCommand(reader.viewer)} ${quotedPath}\r`
 }

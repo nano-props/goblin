@@ -11,6 +11,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx'
+import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 
 interface WorkspaceRootNavigatorProps {
   repoId: string
@@ -34,7 +35,7 @@ export function WorkspaceRootNavigator({
   const actionVisible = compact || menuOpen
   const name = useReposStore((state) => {
     const probe = state.repos[repoId]?.workspaceProbe
-    return probe?.status === 'ready' ? probe.name : repoId
+    return probe?.status === 'ready' ? probe.name : formatWorkspaceDisplayLocation(repoId)
   })
 
   return (

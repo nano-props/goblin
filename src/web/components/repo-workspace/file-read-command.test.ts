@@ -9,6 +9,12 @@ describe('absoluteFilePathForTerminal', () => {
   test('joins Windows worktree paths with Windows separators', () => {
     expect(absoluteFilePathForTerminal('C:\\repo\\', 'src/index.ts')).toBe('C:\\repo\\src\\index.ts')
   })
+
+  test('joins a server-resolved execution root without interpreting workspace identity', () => {
+    expect(absoluteFilePathForTerminal('/Users/example/Workspace/sample-project', 'sample-document.md')).toBe(
+      '/Users/example/Workspace/sample-project/sample-document.md',
+    )
+  })
 })
 
 describe('fileReadCommand', () => {

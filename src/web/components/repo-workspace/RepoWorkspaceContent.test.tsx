@@ -173,7 +173,11 @@ beforeEach(() => {
   repoClientMocks.getRepoLog.mockResolvedValue([])
   repoClientMocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
   filetreeClientMocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
-  filetreeClientMocks.getRepositoryFileViewer.mockResolvedValue({ viewer: 'bat', shell: 'posix' })
+  filetreeClientMocks.getRepositoryFileViewer.mockResolvedValue({
+    viewer: 'bat',
+    shell: 'posix',
+    executionRoot: '/tmp/repo',
+  })
 })
 
 afterEach(() => {
@@ -1155,7 +1159,7 @@ describe('RepoWorkspaceContent', () => {
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
     const showRepoBranchTerminalSession = vi.fn(() => true)
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession })
-    let resolveViewer!: (value: { viewer: 'bat'; shell: 'posix' }) => void
+    let resolveViewer!: (value: { viewer: 'bat'; shell: 'posix'; executionRoot: string }) => void
     filetreeClientMocks.getRepositoryFileViewer.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
@@ -1205,7 +1209,7 @@ describe('RepoWorkspaceContent', () => {
     expect(filetreeClientMocks.getRepositoryFileViewer).toHaveBeenCalledTimes(1)
     useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/changes', 'status')
     await act(async () => {
-      resolveViewer({ viewer: 'bat', shell: 'posix' })
+      resolveViewer({ viewer: 'bat', shell: 'posix', executionRoot: worktreePath })
       await Promise.resolve()
     })
 
@@ -1257,14 +1261,14 @@ describe('RepoWorkspaceContent', () => {
   })
 
   test('opens a workspace-root file through the shared filesystem terminal flow', async () => {
-    const workspaceId = 'goblin+file:///tmp/plain-filetree-workspace'
+    const workspaceId = 'goblin+file:///Users/example/Workspace/sample-project'
     const repo = seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
     filetreeClientMocks.getRepositoryTree.mockResolvedValueOnce({
       nodes: [
         {
-          id: 'README.md',
-          path: 'README.md',
-          name: 'README.md',
+          id: 'sample-document.md',
+          path: 'sample-document.md',
+          name: 'sample-document.md',
           parentId: null,
           kind: 'file',
           status: 'clean',
@@ -1272,8 +1276,15 @@ describe('RepoWorkspaceContent', () => {
       ],
       truncated: false,
     })
+    filetreeClientMocks.getRepositoryFileViewer.mockResolvedValueOnce({
+      viewer: 'bat',
+      shell: 'posix',
+      executionRoot: '/Users/example/Workspace/sample-project',
+    })
+    let startupShellCommand: string | null = null
     const createTerminalWithAdmission: TerminalSessionContextValue['createTerminalWithAdmission'] = vi.fn(
-      async (base) => {
+      async (base, options) => {
+        startupShellCommand = (await options?.resolveStartupShellCommand?.()) ?? null
         workspacePaneTabsTestBridge.addRuntimeTab({
           kind: 'workspace-root',
           repoRoot: workspaceId,
@@ -1315,7 +1326,7 @@ describe('RepoWorkspaceContent', () => {
       </QueryClientProvider>,
     )
 
-    const row = await screen.findByRole('treeitem', { name: 'README.md' })
+    const row = await screen.findByRole('treeitem', { name: 'sample-document.md' })
     await act(async () => {
       row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
       await Promise.resolve()
@@ -1340,6 +1351,9 @@ describe('RepoWorkspaceContent', () => {
     expect(
       useReposStore.getState().repos[workspaceId]?.ui.preferredWorkspacePaneTabByTarget[`${workspaceId}\0workspace-root`],
     ).toBe('terminal')
+    expect(startupShellCommand).toBe(
+      "bat --paging=never --style=plain '/Users/example/Workspace/sample-project/sample-document.md'\r",
+    )
   })
 
   test('does not expose terminal-open or trash actions without filesystem capabilities', async () => {

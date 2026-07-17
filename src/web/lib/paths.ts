@@ -1,5 +1,8 @@
 import { homeDirectory } from '#/web/app-shell-client.ts'
-import { formatRemoteWorktreeLocator, formatRepoLocator as formatSharedRepoLocator } from '#/shared/repo-locator.ts'
+import {
+  formatRemoteWorktreeLocator,
+  formatWorkspaceDisplayLocation as formatSharedWorkspaceDisplayLocation,
+} from '#/shared/repo-locator.ts'
 import { tildifyPath, untildifyPath } from '#/shared/paths.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 export { tildifyPath, untildifyPath } from '#/shared/paths.ts'
@@ -52,8 +55,8 @@ export function untildify(path: string): string {
   return untildifyPath(path, homeDirectory())
 }
 
-export function formatRepoLocator(path: string, target?: RemoteRepoTarget | null): string {
-  return formatSharedRepoLocator(path, homeDirectory(), target)
+export function formatWorkspaceDisplayLocation(workspaceId: string, target?: RemoteRepoTarget | null): string {
+  return formatSharedWorkspaceDisplayLocation(workspaceId, homeDirectory(), target)
 }
 
 export function formatWorktreePath(path: string, target?: RemoteRepoTarget | null): string {

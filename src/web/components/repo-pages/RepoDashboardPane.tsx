@@ -17,7 +17,7 @@ import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSumma
 import { useI18nStore, useT, type Lang } from '#/web/stores/i18n.ts'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { cn } from '#/web/lib/cn.ts'
-import { tildify } from '#/web/lib/paths.ts'
+import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { repoBranchReadModelFromSnapshot, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import {
@@ -32,6 +32,7 @@ import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-re
 import { workspaceGitAvailable, workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 import { DirectoryOverviewContent } from '#/web/components/repo-pages/DirectoryOverviewContent.tsx'
 import { DASHBOARD_CARD_CLASS_NAME, DashboardMetricCard } from '#/web/components/repo-pages/dashboard-ui.tsx'
+import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 const DASHBOARD_BRANCH_ROW_CLASS_NAME =
   'w-full px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45'
 
@@ -186,17 +187,21 @@ function DirectoryDashboard({
   overview,
   compact,
 }: {
-  repo: { name: string; id: string }
+  repo: Pick<RepoState, 'name' | 'id' | 'remote'>
   overview: { topLevelFileCount: number; topLevelDirectoryCount: number; totalSizeBytes: number }
   compact: boolean
 }) {
   const t = useT()
+  const displayLocation = formatWorkspaceDisplayLocation(
+    repo.id,
+    remoteRepoTarget(repo.id, repo.remote.lifecycle),
+  )
   return (
     <>
       <div className={cn(DASHBOARD_CARD_CLASS_NAME, 'p-4')}>
         <h1 className="truncate text-base font-semibold text-foreground">{repo.name}</h1>
-        <div className="mt-1 truncate text-xs text-muted-foreground" title={repo.id}>
-          {tildify(repo.id)}
+        <div className="mt-1 truncate text-xs text-muted-foreground" title={displayLocation}>
+          {displayLocation}
         </div>
       </div>
       <DirectoryOverviewContent overview={overview} compact={compact} />
@@ -291,6 +296,10 @@ function DashboardHeader({
     ? formatRelativeTimeOrNull(new Date(repo.projection.savedAt).toISOString(), lang)
     : null
   const remoteState = dashboardRemoteState(repo)
+  const displayLocation = formatWorkspaceDisplayLocation(
+    repo.id,
+    remoteRepoTarget(repo.id, repo.remote.lifecycle),
+  )
 
   return (
     <div
@@ -306,8 +315,8 @@ function DashboardHeader({
             {currentBranch || t('dashboard.no-current-branch')}
           </Badge>
         </div>
-        <div className="mt-1 truncate text-xs text-muted-foreground" title={repo.id}>
-          {tildify(repo.id)}
+        <div className="mt-1 truncate text-xs text-muted-foreground" title={displayLocation}>
+          {displayLocation}
         </div>
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">

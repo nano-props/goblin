@@ -1062,7 +1062,11 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   })
 
   test('passes /file-viewer requests through to the read layer', async () => {
-    mocks.getRepositoryFileViewer.mockResolvedValueOnce({ viewer: 'bat', shell: 'posix' })
+    mocks.getRepositoryFileViewer.mockResolvedValueOnce({
+      viewer: 'bat',
+      shell: 'posix',
+      executionRoot: '/tmp/repo/.worktrees/feature',
+    })
     const app = createTestRepoRoutes()
     const repoRuntimeId = await openTestRepoRuntime(app)
     const response = await app.request(
@@ -1073,7 +1077,11 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       }),
     )
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ viewer: 'bat', shell: 'posix' })
+    expect(await response.json()).toEqual({
+      viewer: 'bat',
+      shell: 'posix',
+      executionRoot: '/tmp/repo/.worktrees/feature',
+    })
     expect(mocks.getRepositoryFileViewer).toHaveBeenCalledWith(
       WORKSPACE_ID,
       '/tmp/repo/.worktrees/feature',

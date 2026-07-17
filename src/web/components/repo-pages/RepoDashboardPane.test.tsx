@@ -100,6 +100,8 @@ describe('RepoDashboardPane', () => {
     expect(container.textContent).toContain('dashboard.directory.files4')
     expect(container.textContent).toContain('dashboard.directory.folders2')
     expect(container.textContent).toContain('2.0 KB')
+    expect(container.textContent).toContain('/tmp/repo-dashboard-pane-test')
+    expect(container.textContent).not.toContain('goblin+file://')
     expect(
       primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId))?.fetchStatus,
     ).not.toBe('fetching')

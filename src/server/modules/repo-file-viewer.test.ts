@@ -54,7 +54,7 @@ describe('repo file viewer read layer', () => {
     try {
       await expect(
         getRepositoryFileViewer('goblin+file:///tmp/plain-workspace', 'goblin+file:///tmp/plain-workspace'),
-      ).resolves.toEqual({ viewer: 'cat', shell: 'posix' })
+      ).resolves.toEqual({ viewer: 'cat', shell: 'posix', executionRoot: '/tmp/plain-workspace' })
       expect(mocks.getWorktrees).not.toHaveBeenCalled()
       expect(mocks.userShellCommandExists).toHaveBeenCalledWith('bat', '/tmp/plain-workspace', undefined)
     } finally {
@@ -69,7 +69,7 @@ describe('repo file viewer read layer', () => {
     try {
       const result = await getRepositoryFileViewer('goblin+file:///tmp/repo', '/tmp/repo-feature')
 
-      expect(result).toEqual({ viewer: 'bat', shell: 'posix' })
+      expect(result).toEqual({ viewer: 'bat', shell: 'posix', executionRoot: '/tmp/repo-feature' })
       expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false, signal: undefined })
       expect(mocks.userShellCommandExists).toHaveBeenCalledWith('bat', '/tmp/repo-feature', undefined)
     } finally {
@@ -84,7 +84,7 @@ describe('repo file viewer read layer', () => {
     try {
       const result = await getRepositoryFileViewer('goblin+file:///tmp/repo', '/tmp/repo-feature')
 
-      expect(result).toEqual({ viewer: 'batcat', shell: 'posix' })
+      expect(result).toEqual({ viewer: 'batcat', shell: 'posix', executionRoot: '/tmp/repo-feature' })
       expect(mocks.userShellCommandExists).toHaveBeenNthCalledWith(1, 'bat', '/tmp/repo-feature', undefined)
       expect(mocks.userShellCommandExists).toHaveBeenNthCalledWith(2, 'batcat', '/tmp/repo-feature', undefined)
     } finally {
@@ -100,6 +100,7 @@ describe('repo file viewer read layer', () => {
       await expect(getRepositoryFileViewer('goblin+file:///tmp/repo', '/tmp/repo-feature')).resolves.toEqual({
         viewer: 'cat',
         shell: 'posix',
+        executionRoot: '/tmp/repo-feature',
       })
     } finally {
       platformSpy.mockRestore()
@@ -136,7 +137,7 @@ describe('repo file viewer read layer', () => {
 
     const result = await getRepositoryFileViewer(repoId, '/srv/repo-feature')
 
-    expect(result).toEqual({ viewer: 'batcat', shell: 'posix' })
+    expect(result).toEqual({ viewer: 'batcat', shell: 'posix', executionRoot: '/srv/repo-feature' })
     expect(mocks.remoteCommandExists).toHaveBeenNthCalledWith(1, target, '/srv/repo-feature', 'bat', {
       knownWorktrees: [{ path: '/srv/repo-feature', branch: 'feature', isBare: false, isPrimary: false }],
       signal: undefined,
@@ -162,7 +163,11 @@ describe('repo file viewer read layer', () => {
     mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
     mocks.remoteCommandExistsAtWorkspaceRoot.mockResolvedValueOnce(true)
 
-    await expect(getRepositoryFileViewer(repoId, repoId)).resolves.toEqual({ viewer: 'bat', shell: 'posix' })
+    await expect(getRepositoryFileViewer(repoId, repoId)).resolves.toEqual({
+      viewer: 'bat',
+      shell: 'posix',
+      executionRoot: '/srv/plain-workspace',
+    })
     expect(mocks.resolveRemoteWorktree).not.toHaveBeenCalled()
     expect(mocks.remoteCommandExistsAtWorkspaceRoot).toHaveBeenCalledWith(target, '/srv/plain-workspace', 'bat', {
       signal: undefined,
@@ -185,7 +190,7 @@ describe('repo file viewer read layer', () => {
 
     const result = await getRepositoryFileViewer(repoId, '/srv/repo-feature/')
 
-    expect(result).toEqual({ viewer: 'bat', shell: 'posix' })
+    expect(result).toEqual({ viewer: 'bat', shell: 'posix', executionRoot: '/srv/repo-feature/' })
     expect(mocks.resolveRemoteWorktree).toHaveBeenCalledWith(target, '/srv/repo-feature/', { signal: undefined })
     expect(mocks.remoteCommandExists).toHaveBeenCalledWith(target, '/srv/repo-feature', 'bat', {
       knownWorktrees: [{ path: '/srv/repo-feature', branch: 'feature', isBare: false, isPrimary: false }],
@@ -213,6 +218,7 @@ describe('repo file viewer read layer', () => {
     await expect(getRepositoryFileViewer(repoId, '/srv/repo-feature', undefined, { repoRuntimeId })).resolves.toEqual({
       viewer: 'bat',
       shell: 'posix',
+      executionRoot: '/srv/repo-feature',
     })
 
     expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(repoId, { repoRuntimeId })

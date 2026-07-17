@@ -265,7 +265,7 @@ export function FiletreeTab({
           options: {
             resolveStartupShellCommand: async () => {
               const viewerResult = await getRepositoryFileViewer(repoId, worktreePath, { repoRuntimeId })
-              return fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path))
+              return fileReadCommand(viewerResult, absoluteFilePathForTerminal(viewerResult.executionRoot, node.path))
             },
           },
           t,

@@ -350,7 +350,8 @@ describe('RepoView workspace navigation', () => {
     const { container } = render(<RepoView repoId={REPO_ID} routeView={{ kind: 'dashboard', repoId: REPO_ID }} />)
 
     expect(container.textContent).toContain('repo-route.not-found-title')
-    expect(container.textContent).toContain(REPO_ID)
+    expect(container.textContent).toContain('/tmp/repo-view-test')
+    expect(container.textContent).not.toContain('goblin+file://')
   })
 
   test('moves a missing routed repo from restore skeleton to not-found when membership settles', () => {

@@ -11,7 +11,7 @@ import { CurrentRepoSidebarButton, CurrentRepoToolbarButton } from '#/web/compon
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import type { RepoPickerLabels, RepoPickerRepo, RepoPickerSurface } from '#/web/components/repo-picker/types.ts'
 import { isRemoteRepoId, remoteRepoConnectionTarget } from '#/shared/remote-repo.ts'
-import { formatRepoLocator } from '#/web/lib/paths.ts'
+import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
 
 function navigatedRepoId(
@@ -140,7 +140,7 @@ function RepoMenuContent({
                     >
                       <div className="truncate font-medium leading-5">{repo.name}</div>
                       <div className="truncate font-mono text-xs leading-4 text-muted-foreground">
-                        {formatRepoLocator(repo.id, remoteTarget)}
+                        {formatWorkspaceDisplayLocation(repo.id, remoteTarget)}
                       </div>
                     </MenuRowButton>
                     <Button

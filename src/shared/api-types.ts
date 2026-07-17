@@ -273,6 +273,7 @@ export type RepoFileViewerShell = 'posix' | 'cmd'
 export interface RepoFileViewerResult {
   readonly viewer: RepoFileViewer
   readonly shell: RepoFileViewerShell
+  readonly executionRoot: string
 }
 
 export interface ProbeResult {
