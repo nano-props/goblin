@@ -120,18 +120,16 @@ export function RepoView({
     return () => window.clearTimeout(timeout)
   }, [compactWorkspaceTransitioning, setCompactWorkspaceTransitioning])
 
-  if (!view.exists || !repo) {
-    if (!view.workspaceMembershipReady) {
-      return (
-        <RepoWorkspaceLayoutSkeleton
-          singlePane={compact}
-          singlePaneView={singlePane}
-          repoWorkspaceState={currentBranchName ? 'content' : 'empty'}
-        />
-      )
-    }
-    return <RoutedRepoNotFound repoId={repoId} />
+  if (!view.workspaceMembershipReady) {
+    return (
+      <RepoWorkspaceLayoutSkeleton
+        singlePane={compact}
+        singlePaneView={singlePane}
+        repoWorkspaceState={currentBranchName ? 'content' : 'empty'}
+      />
+    )
   }
+  if (!view.exists || !repo) return <RoutedRepoNotFound repoId={repoId} />
 
   const zenModeCollapsed = !compact && view.zenMode && repoWorkspaceActive
   const workspaceTrafficLightOffset = zenModeCollapsed

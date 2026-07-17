@@ -259,6 +259,16 @@ afterEach(() => {
 })
 
 describe('RepoView workspace navigation', () => {
+  test('does not mount an existing repo before its runtime membership is restored', () => {
+    useReposStore.setState({ workspaceMembershipReady: false })
+
+    const { container } = render(<RepoView repoId={REPO_ID} routeView={{ kind: 'dashboard', repoId: REPO_ID }} />)
+
+    expect(repoWorkspace(container)).toBeNull()
+    expect(branchNavigator(container)).toBeNull()
+    expect(container.querySelector('[data-testid="repo-dashboard-page"]')).toBeNull()
+  })
+
   test('renders a non-Git workspace as a Files workspace without mounting Git surfaces', () => {
     useReposStore.setState((state) => ({
       repos: {
