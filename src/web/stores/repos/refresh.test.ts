@@ -1,7 +1,7 @@
 import { CancelledError } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import { terminalLog } from '#/web/logger.ts'
+import { refreshStatusLog, terminalLog } from '#/web/logger.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { requestRepoProjectionReadModelRefresh, runManualRepoSync } from '#/web/stores/repos/refresh.ts'
 import {
@@ -1250,6 +1250,16 @@ describe('projection refresh request ordering', () => {
         cause: expect.objectContaining({ message: 'status failed' }),
       }),
     )
+  })
+
+  test('treats query cancellation as a lifecycle outcome rather than a status failure', async () => {
+    const repoRuntimeId = seedRepo([branch('feature/a')])
+    const warn = vi.spyOn(refreshStatusLog, 'warn')
+    vi.spyOn(primaryWindowQueryClient, 'fetchQuery').mockRejectedValueOnce(new CancelledError())
+
+    await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, repoRuntimeId)
+
+    expect(warn).not.toHaveBeenCalled()
   })
 
   test('cancels projection data-load state when a read is cancelled without a successor', async () => {

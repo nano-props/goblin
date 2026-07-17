@@ -82,6 +82,10 @@ export function openRepoBranchWorkspacePaneRoute(
   options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
 ): boolean {
   const resolution = resolveRepoBranchWorkspacePaneRoute(repoId, branchName)
-  if (resolution.kind === 'missing' || resolution.kind === 'unavailable') return false
+  if (resolution.kind === 'missing') return false
+  if (resolution.kind === 'unavailable') {
+    if (resolution.reason === 'branch-read-model-unavailable') return false
+    return openResolvedRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName, null, options)
+  }
   return openResolvedRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName, resolution.route, options)
 }
