@@ -203,9 +203,7 @@ function resolveCloseWorkspaceSurfaceIntent(options: CloseWorkspacePaneTabComman
       : { kind: 'noop' }
   }
   if (target.activeTab) {
-    return target.branchName === null && target.activeTab.kind === 'static'
-      ? { kind: 'close-window' }
-      : { kind: 'close-tab' }
+    return { kind: 'close-tab' }
   }
   if (target.selection?.kind === 'runtime-host') return { kind: 'noop' }
   return { kind: 'close-window' }

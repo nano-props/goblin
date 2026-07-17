@@ -40,6 +40,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
+import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
 
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
@@ -194,6 +195,8 @@ export function useKeyboard({
         const menuBackedShortcut = hasNativeMenuAccelerators()
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
           if (!paneTarget) return
+          const repo = repoId ? useReposStore.getState().repos[repoId] : null
+          if (!workspaceTerminalAvailable(repo?.workspaceProbe)) return
           e.preventDefault()
           const target = workspacePaneCommandCoordinates(paneTarget)
           // Cmd+T is a generic entry → new terminal appends to the end.
@@ -208,7 +211,7 @@ export function useKeyboard({
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
           e.preventDefault()
           const repo = repoId ? useReposStore.getState().repos[repoId] : null
-          if (!repo) return
+          if (!repo || !workspaceWorktreesAvailable(repo.workspaceProbe)) return
           const branchAction = projectBranchActionOperation(
             repo.operations.branchAction,
             getRepoOperationsQueryData(repo.id, repo.repoRuntimeId)?.operations,

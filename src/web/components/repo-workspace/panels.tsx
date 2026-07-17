@@ -19,10 +19,7 @@ import type {
   RepoWorkspaceSelection,
 } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
-import {
-  dispatchCreateTerminalWorkspacePaneRuntimeTabAction,
-  showCreatedTerminalWorkspacePaneRuntimeTab,
-} from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
+import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
@@ -37,12 +34,15 @@ import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/r
 import { HistoryCommitGraph, HistoryCommitGraphSkeleton } from '#/web/components/repo-workspace/HistoryCommitGraph.tsx'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { workspacePaneFilesystemTerminalBase } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { showCreatedWorkspacePaneFilesystemTerminal } from '#/web/workspace-pane/workspace-pane-filesystem-terminal.ts'
 
 const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
 export interface WorkspacePanePanelRenderInput {
   type: WorkspacePaneTabType
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'branchModel' | 'ui'> & {
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'branchModel' | 'ui' | 'workspaceProbe'> & {
     branchModel: RepoWorkspaceRepo['branchModel']
   }
   detail: CurrentRepoWorkspacePresentation
@@ -145,7 +145,8 @@ function ChangesWorkspacePanePanel({ detail, workspacePaneId, panelLabel }: Work
 function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: WorkspacePanePanelProps) {
   const branch = detail.branch
   const worktreePath = branch?.worktree?.path
-  if (!worktreePath) {
+  const capabilities = repo.workspaceProbe.status === 'ready' ? repo.workspaceProbe.capabilities : null
+  if (!worktreePath || !capabilities) {
     return (
       <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} {...panelLabel}>
         <FiletreeNoWorktreeView />
@@ -155,26 +156,27 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
   return (
     <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} {...panelLabel}>
       <FiletreeTab
-        repoId={repo.id}
-        repoRuntimeId={repo.repoRuntimeId}
-        branchName={branch.name}
-        worktreePath={worktreePath}
+        target={{
+          kind: 'git-worktree',
+          workspaceId: repo.id,
+          workspaceRuntimeId: repo.repoRuntimeId,
+          branchName: branch.name,
+          rootPath: worktreePath,
+          capabilities,
+        }}
       />
     </WorkspacePanePanelFrame>
   )
 }
 
 export function FiletreeTab({
-  repoId,
-  repoRuntimeId,
-  branchName,
-  worktreePath,
+  target,
 }: {
-  repoId: string
-  repoRuntimeId: string
-  branchName: string | null
-  worktreePath: string
+  target: WorkspacePaneFilesystemTarget
 }) {
+  const repoId = target.workspaceId
+  const repoRuntimeId = target.workspaceRuntimeId
+  const worktreePath = target.rootPath
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
   const { createTerminalWithAdmission } = useTerminalSessionContext()
@@ -246,24 +248,19 @@ export function FiletreeTab({
 
   const openFileInTerminal = useCallback(
     async (node: RepoTreeNode) => {
-      if (node.kind !== 'file' || branchName === null) return
+      if (node.kind !== 'file') return
       const openingFileKey = `${openingFileKeyPrefix}${node.id}`
       if (!beginOpeningFile(openingFileKey)) return
       try {
         const openerIdentity = workspacePaneStaticTabId('files')
-        const target = runtimeWorkspacePaneTarget({ repoRoot: repoId, branchName, worktreePath }, repoRuntimeId)
-        if (!target) throw new Error('error.workspace-tabs-target-invalid')
-        const base = { repoRoot: repoId, repoRuntimeId, branch: branchName, worktreePath, target }
+        const base = workspacePaneFilesystemTerminalBase(target)
+        if (!base) throw new Error('error.workspace-tabs-target-invalid')
         await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
           base,
           createTerminal: createTerminalWithAdmission,
           openerIdentity,
           showCreatedTerminalTab: (terminalSessionId, canonicalBranch) =>
-            showCreatedTerminalWorkspacePaneRuntimeTab(
-              { ...base, branch: canonicalBranch },
-              terminalSessionId,
-              navigation,
-            ),
+            showCreatedWorkspacePaneFilesystemTerminal(target, terminalSessionId, canonicalBranch, navigation),
           insertAfterIdentity: openerIdentity,
           options: {
             resolveStartupShellCommand: async () => {
@@ -280,7 +277,6 @@ export function FiletreeTab({
     },
     [
       beginOpeningFile,
-      branchName,
       createTerminalWithAdmission,
       endOpeningFile,
       openingFileKeyPrefix,
@@ -289,6 +285,7 @@ export function FiletreeTab({
       repoRuntimeId,
       t,
       worktreePath,
+      target,
     ],
   )
 
@@ -317,15 +314,15 @@ export function FiletreeTab({
       scrollRestoreReady={scrollRestoreReady}
       onTopVisibleRowIndexChange={handleTopVisibleRowIndexChange}
       onOpenFile={
-        branchName === null
-          ? undefined
-          : (node) => {
+        target.capabilities.terminal.available
+          ? (node) => {
               void openFileInTerminal(node).catch((err) => {
                 toast.error(t(err instanceof Error ? err.message : 'error.terminal-create-failed'))
               })
             }
+          : undefined
       }
-      onRequestTrashFile={requestTrashFile}
+      onRequestTrashFile={target.capabilities.files.write ? requestTrashFile : undefined}
     />
   )
 }

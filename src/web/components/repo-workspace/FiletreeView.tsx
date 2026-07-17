@@ -295,7 +295,7 @@ export function FiletreeView({
                 onRowClick={handleRowPress}
                 onToggleDirectory={onDirectoryRowToggle}
                 onSelect={selectNode}
-                onOpenFile={handleOpenFile}
+                onOpenFile={onOpenFile || onActivate ? handleOpenFile : undefined}
                 onRequestTrashFile={onRequestTrashFile}
               />
             )
@@ -349,7 +349,7 @@ function FiletreeTreeRow({
   readonly onRowClick: (node: RepoTreeNode, isExpanded: boolean) => void
   readonly onToggleDirectory: (key: string, expanded: boolean) => void
   readonly onSelect: (node: RepoTreeNode) => void
-  readonly onOpenFile: (node: RepoTreeNode) => void
+  readonly onOpenFile?: (node: RepoTreeNode) => void
   readonly onRequestTrashFile?: (node: RepoTreeNode) => void
 }) {
   const { node, level } = row
@@ -377,7 +377,7 @@ function FiletreeTreeRow({
         transform: `translateY(${virtualStart}px)`,
       }}
       onClick={(event) => handleTreeItemClick(event, node, isExpanded, onRowClick)}
-      onDoubleClick={(event) => handleItemDoubleClick(event, node, onOpenFile)}
+      onDoubleClick={onOpenFile ? (event) => handleItemDoubleClick(event, node, onOpenFile) : undefined}
       onKeyDown={(event) => onKeyDown(node, event)}
     >
       <div
@@ -412,14 +412,18 @@ function FiletreeTreeRow({
           {isDirectory ? <Folder size={12} aria-hidden /> : <File size={12} aria-hidden />}
         </span>
         <span className="min-w-0 flex-1 truncate text-current">{node.name}</span>
-        {!isDirectory ? (
+        {!isDirectory && (onOpenFile || onRequestTrashFile) ? (
           <FiletreeActionMenu
             node={node}
             busy={isOpeningFile}
-            onOpenFile={(target) => {
-              onSelect(target)
-              onOpenFile(target)
-            }}
+            onOpenFile={
+              onOpenFile
+                ? (target) => {
+                    onSelect(target)
+                    onOpenFile(target)
+                  }
+                : undefined
+            }
             onRequestTrashFile={onRequestTrashFile}
           />
         ) : null}
@@ -460,7 +464,7 @@ function FiletreeActionMenu({
 }: {
   readonly node: RepoTreeNode
   readonly busy: boolean
-  readonly onOpenFile: (node: RepoTreeNode) => void
+  readonly onOpenFile?: (node: RepoTreeNode) => void
   readonly onRequestTrashFile?: (node: RepoTreeNode) => void
 }) {
   const t = useT()
@@ -485,19 +489,21 @@ function FiletreeActionMenu({
     >
       {({ close }) => (
         <div role="list">
-          <div className="space-y-0.5 p-1" role="group">
-            <div role="listitem">
-              <ActionPopoverItem
-                label={t(FILE_TREE_I18N_KEYS.open)}
-                disabled={busy}
-                busy={busy}
-                onSelect={() => {
-                  close()
-                  onOpenFile(node)
-                }}
-              />
+          {onOpenFile ? (
+            <div className="space-y-0.5 p-1" role="group">
+              <div role="listitem">
+                <ActionPopoverItem
+                  label={t(FILE_TREE_I18N_KEYS.open)}
+                  disabled={busy}
+                  busy={busy}
+                  onSelect={() => {
+                    close()
+                    onOpenFile(node)
+                  }}
+                />
+              </div>
             </div>
-          </div>
+          ) : null}
           {onRequestTrashFile ? (
             <div className="space-y-0.5 border-t border-border p-1" role="group">
               <div role="listitem">

@@ -7,6 +7,7 @@ import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import type { RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
+import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
 
 type ClientWorkspaceIntent = Extract<
   ClientEffectIntent,
@@ -73,7 +74,7 @@ interface WorkspaceIntentPlanContext {
   workspaceShortcutSuppressed: boolean
   terminalFocused: boolean
   currentRepoId: string | null
-  currentRepo: Pick<RepoState, 'id' | 'repoRuntimeId'> | null
+  currentRepo: Pick<RepoState, 'id' | 'repoRuntimeId' | 'workspaceProbe'> | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
 }
 
@@ -144,12 +145,22 @@ export function createWorkspaceIntentPlan(
     case 'clone-repo-requested':
       return { kind: 'open-clone-repo' }
     case 'create-worktree-requested':
-      if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
+      if (
+        context.workspaceShortcutSuppressed ||
+        !context.currentRepoId ||
+        !workspaceWorktreesAvailable(context.currentRepo?.workspaceProbe)
+      )
+        return { kind: 'noop' }
       return { kind: 'create-worktree' }
     case 'open-remote-workspace-requested':
       return { kind: 'open-remote-workspace' }
     case 'terminal-new-tab-requested':
-      if (!context.currentRepoId || !context.currentWorkspacePaneCommandTarget) return { kind: 'noop' }
+      if (
+        !context.currentRepoId ||
+        !context.currentWorkspacePaneCommandTarget ||
+        !workspaceTerminalAvailable(context.currentRepo?.workspaceProbe)
+      )
+        return { kind: 'noop' }
       return {
         kind: 'new-terminal-tab',
         repoId: context.currentRepoId,
@@ -174,7 +185,12 @@ export function createWorkspaceIntentPlan(
         tab: event.tab,
       }
     case 'terminal-primary-action-requested':
-      if (context.workspaceShortcutSuppressed || !context.currentRepoId || !context.currentWorkspacePaneCommandTarget)
+      if (
+        context.workspaceShortcutSuppressed ||
+        !context.currentRepoId ||
+        !context.currentWorkspacePaneCommandTarget ||
+        !workspaceTerminalAvailable(context.currentRepo?.workspaceProbe)
+      )
         return { kind: 'noop' }
       return {
         kind: 'terminal-primary-action',

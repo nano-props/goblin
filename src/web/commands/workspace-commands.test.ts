@@ -1707,6 +1707,44 @@ describe('workspace commands', () => {
     expect(closeWindow).not.toHaveBeenCalled()
   })
 
+  test('close workspace tab command closes a workspace-root static tab instead of the window', async () => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branchSnapshots: [], currentBranchName: null })
+    const target = {
+      kind: 'workspace-root' as const,
+      repoRoot: REPO_ID,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: null,
+      worktreePath: null,
+    }
+    setWorkspacePaneTabsForTargetQueryData({
+      ...target,
+      tabs: [staticEntry('status'), staticEntry('files')],
+    })
+    useReposStore.getState().setWorkspacePaneTabForTarget(target, 'status')
+    const closeWindow = vi.fn()
+
+    await expect(
+      runCloseWorkspacePaneTabOrWindowCommand({
+        workspacePaneRoute: undefined,
+        repoId: REPO_ID,
+        branchName: null,
+        navigation: navigationWith(),
+        closeWindow,
+      }),
+    ).resolves.toBe(true)
+
+    expect(
+      readWorkspacePaneTabsForTarget({
+        kind: 'workspace-root',
+        repoRoot: REPO_ID,
+        repoRuntimeId: repo.repoRuntimeId,
+        branchName: null,
+        worktreePath: null,
+      }).map((tab) => tab.type),
+    ).toEqual(['files'])
+    expect(closeWindow).not.toHaveBeenCalled()
+  })
+
   test('close workspace tab command queues tab switching while a static close is in flight', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,

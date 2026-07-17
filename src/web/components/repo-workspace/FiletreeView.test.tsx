@@ -348,7 +348,7 @@ describe('FiletreeView', () => {
   test('keeps the file action menu trigger visible in compact mode', () => {
     compactUi = true
     const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
-    renderView({ tree, loading: false, error: null })
+    renderView({ tree, loading: false, error: null, onOpenFile: vi.fn() })
 
     const actionButton = row('README.md').querySelector<HTMLButtonElement>('[data-action-popover-trigger]')
     expect(actionButton).toBeTruthy()
@@ -366,6 +366,7 @@ describe('FiletreeView', () => {
       loading: false,
       openingFileKeys: new Set(['README.md']),
       error: null,
+      onOpenFile: vi.fn(),
     })
 
     const actionButton = row('README.md').querySelector<HTMLButtonElement>('[data-action-popover-trigger]')

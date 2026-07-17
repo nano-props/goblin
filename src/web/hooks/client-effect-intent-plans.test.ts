@@ -8,6 +8,33 @@ import {
 } from '#/web/hooks/client-effect-intent-plans.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
+const CURRENT_GIT_REPO = {
+  id: 'goblin+file:///tmp/repo',
+  repoRuntimeId: 'repo-runtime-test-7',
+  workspaceProbe: {
+    status: 'ready' as const,
+    name: 'repo',
+    capabilities: {
+      files: { read: true as const, write: true },
+      terminal: { available: true },
+      git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+    },
+    diagnostics: [],
+  },
+}
+
+const CURRENT_DIRECTORY_REPO = {
+  ...CURRENT_GIT_REPO,
+  workspaceProbe: {
+    ...CURRENT_GIT_REPO.workspaceProbe,
+    capabilities: {
+      files: { read: true as const, write: true },
+      terminal: { available: false },
+      git: { status: 'unavailable' as const },
+    },
+  },
+}
+
 describe('client effect intent plans', () => {
   test('creates a worktree terminal bell plan when the worktree group matches a known worktree', () => {
     resetReposStore()
@@ -65,7 +92,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
-        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepo: CURRENT_GIT_REPO,
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -81,7 +108,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
-        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepo: CURRENT_GIT_REPO,
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -97,7 +124,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
-        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepo: CURRENT_GIT_REPO,
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -129,7 +156,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
-        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepo: CURRENT_GIT_REPO,
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -141,6 +168,22 @@ describe('client effect intent plans', () => {
     })
   })
 
+  test('rejects native terminal intent when the workspace has no terminal capability', () => {
+    const plan = createWorkspaceIntentPlan(
+      { type: 'terminal-new-tab-requested' },
+      {
+        overlayBlocked: false,
+        workspaceShortcutSuppressed: false,
+        terminalFocused: false,
+        currentRepoId: CURRENT_DIRECTORY_REPO.id,
+        currentRepo: CURRENT_DIRECTORY_REPO,
+        currentWorkspacePaneCommandTarget: { kind: 'workspace-root' },
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'noop' })
+  })
+
   test('creates a refresh plan from the current repo runtime id', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'repo-refresh-requested' },
@@ -149,7 +192,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
-        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepo: CURRENT_GIT_REPO,
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -169,7 +212,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
-        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepo: CURRENT_GIT_REPO,
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -185,7 +228,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
-        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepo: CURRENT_GIT_REPO,
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -201,7 +244,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: true,
         currentRepoId: 'goblin+file:///tmp/repo',
-        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepo: CURRENT_GIT_REPO,
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -217,12 +260,28 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
-        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepo: CURRENT_GIT_REPO,
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
 
     expect(plan).toEqual({ kind: 'create-worktree' })
+  })
+
+  test('rejects create-worktree intent for a non-Git workspace', () => {
+    const plan = createWorkspaceIntentPlan(
+      { type: 'create-worktree-requested' },
+      {
+        overlayBlocked: false,
+        workspaceShortcutSuppressed: false,
+        terminalFocused: false,
+        currentRepoId: CURRENT_DIRECTORY_REPO.id,
+        currentRepo: CURRENT_DIRECTORY_REPO,
+        currentWorkspacePaneCommandTarget: { kind: 'workspace-root' },
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'noop' })
   })
 
   test('suppresses create-worktree when there is no current repo', () => {
@@ -249,7 +308,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: 'goblin+file:///tmp/repo',
-        currentRepo: { id: 'goblin+file:///tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
+        currentRepo: CURRENT_GIT_REPO,
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )

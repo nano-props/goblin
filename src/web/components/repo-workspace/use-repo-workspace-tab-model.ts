@@ -122,7 +122,8 @@ export function useWorkspaceRootTabModel(
     () => workspacePaneTabsForTargetFromQueryData(tabsQuery.data ?? { revision: 0, entries: [] }, target),
     [tabsQuery.data, target],
   )
-  const preferredTab = preferredWorkspacePaneTabForTarget(repo.ui, target) ?? 'status'
+  const preferredTab =
+    tabEntries.length > 0 ? (preferredWorkspacePaneTabForTarget(repo.ui, target) ?? tabEntries[0]!.type) : null
   const input = useMemo<RepoWorkspaceTabModelInput>(
     () => ({
       repoId: repo.id,

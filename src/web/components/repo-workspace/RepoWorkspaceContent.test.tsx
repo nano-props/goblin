@@ -5,6 +5,7 @@ import { act, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
+import { FiletreeTab } from '#/web/components/repo-workspace/panels.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import {
   getCurrentRepoWorkspacePresentation as buildRepoWorkspacePresentation,
@@ -1253,6 +1254,136 @@ describe('RepoWorkspaceContent', () => {
     expect(workspacePaneTabOpener(REPO_ID, repo.repoRuntimeId, branchName, 'terminal:term-111111111111111111111')).toBe(
       'workspace-pane:files',
     )
+  })
+
+  test('opens a workspace-root file through the shared filesystem terminal flow', async () => {
+    const workspaceId = 'goblin+file:///tmp/plain-filetree-workspace'
+    const repo = seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
+    filetreeClientMocks.getRepositoryTree.mockResolvedValueOnce({
+      nodes: [
+        {
+          id: 'README.md',
+          path: 'README.md',
+          name: 'README.md',
+          parentId: null,
+          kind: 'file',
+          status: 'clean',
+        },
+      ],
+      truncated: false,
+    })
+    const createTerminalWithAdmission: TerminalSessionContextValue['createTerminalWithAdmission'] = vi.fn(
+      async (base) => {
+        workspacePaneTabsTestBridge.addRuntimeTab({
+          kind: 'workspace-root',
+          repoRoot: workspaceId,
+          repoRuntimeId: repo.repoRuntimeId,
+          branchName: null,
+          worktreePath: null,
+          terminalSessionId: 'term-111111111111111111111',
+          insertAfterIdentity: 'workspace-pane:files',
+        })
+        return {
+          terminalSessionId: 'term-111111111111111111111',
+          branch: base.branch,
+          requestRole: 'leader' as const,
+          resourceDisposition: 'created' as const,
+          runtimeProjectionApplied: true,
+        }
+      },
+    )
+
+    renderInJsdom(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigationWith({})}>
+          <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
+            <FiletreeTab
+              target={{
+                kind: 'workspace-root',
+                workspaceId,
+                workspaceRuntimeId: repo.repoRuntimeId,
+                rootPath: workspaceId,
+                capabilities: {
+                  files: { read: true, write: true },
+                  terminal: { available: true },
+                },
+              }}
+            />
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    const row = await screen.findByRole('treeitem', { name: 'README.md' })
+    await act(async () => {
+      row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    await waitFor(() => expect(createTerminalWithAdmission).toHaveBeenCalledOnce())
+    expect(createTerminalWithAdmission).toHaveBeenCalledWith(
+      {
+        repoRoot: workspaceId,
+        repoRuntimeId: repo.repoRuntimeId,
+        branch: '',
+        worktreePath: workspaceId,
+        target: {
+          kind: 'workspace-root',
+          workspaceId,
+          workspaceRuntimeId: repo.repoRuntimeId,
+        },
+      },
+      { resolveStartupShellCommand: expect.any(Function) },
+      { insertAfterIdentity: 'workspace-pane:files' },
+    )
+    expect(
+      useReposStore.getState().repos[workspaceId]?.ui.preferredWorkspacePaneTabByTarget[`${workspaceId}\0workspace-root`],
+    ).toBe('terminal')
+  })
+
+  test('does not expose terminal-open or trash actions without filesystem capabilities', async () => {
+    const workspaceId = 'goblin+file:///tmp/read-only-filetree-workspace'
+    const repo = seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
+    filetreeClientMocks.getRepositoryTree.mockResolvedValueOnce({
+      nodes: [
+        {
+          id: 'README.md',
+          path: 'README.md',
+          name: 'README.md',
+          parentId: null,
+          kind: 'file',
+          status: 'clean',
+        },
+      ],
+      truncated: false,
+    })
+    const createTerminalWithAdmission = vi.fn()
+
+    renderInJsdom(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigationWith({})}>
+          <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
+            <FiletreeTab
+              target={{
+                kind: 'workspace-root',
+                workspaceId,
+                workspaceRuntimeId: repo.repoRuntimeId,
+                rootPath: workspaceId,
+                capabilities: {
+                  files: { read: true, write: false },
+                  terminal: { available: false },
+                },
+              }}
+            />
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    const row = await screen.findByRole('treeitem', { name: 'README.md' })
+    expect(row.querySelector('[data-action-popover-trigger]')).toBeNull()
+    row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    expect(createTerminalWithAdmission).not.toHaveBeenCalled()
   })
 
   test('falls back to status when a branch preference names a closed tab', async () => {

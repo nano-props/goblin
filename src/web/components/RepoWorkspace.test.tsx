@@ -284,6 +284,41 @@ describe('RepoWorkspace', () => {
     expect(screen.queryByText('tab.terminal')).toBeNull()
   })
 
+  test('renders the shared empty pane when every workspace-root tab is closed', () => {
+    const workspaceId = 'goblin+file:///tmp/empty-plain-workspace'
+    const repo = seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branches: [],
+      currentBranchName: null,
+      workspaceProbe: directoryWorkspaceProbe('empty-plain-workspace'),
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'workspace-root',
+      repoRoot: workspaceId,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: null,
+      worktreePath: null,
+      tabs: [],
+    })
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace repoId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByText('workspace-pane-tabs.empty')).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: 'tab.files' })).toBeNull()
+    expect(screen.queryByRole('tab', { name: 'tab.status' })).toBeNull()
+    expect(screen.queryByRole('tree')).toBeNull()
+  })
+
   test('forwards compact missing-branch recovery to the workspace navigation callback', () => {
     responsiveMocks.compact = true
     seedRepoWithReadModelForTest({

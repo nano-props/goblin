@@ -44,7 +44,6 @@ import {
   isPendingWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
-import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
 import { useIsInitialTerminalProjectionHydrating } from '#/web/stores/terminal-projection-hydration.ts'
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
@@ -55,8 +54,12 @@ import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/worksp
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { WorkspaceDirectoryStatus } from '#/web/components/repo-workspace/WorkspaceDirectoryStatus.tsx'
-import { ScrollPane } from '#/web/components/Layout.tsx'
-import { workspaceGitAvailable, workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
+import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
+import {
+  workspaceGitAvailable,
+  workspaceGitUnavailable,
+  type WorkspaceReadyProbeState,
+} from '#/shared/workspace-runtime.ts'
 import {
   workspacePaneTabEntryForItem,
   workspacePaneTabItems,
@@ -169,7 +172,12 @@ function RepoWorkspaceLoaded(props: {
   if (workspaceGitUnavailable(props.repoShell.workspaceProbe)) {
     return (
       <WorkspaceRootPane
-        repo={props.repoShell}
+        repo={{
+          id: props.repoShell.id,
+          repoRuntimeId: props.repoShell.repoRuntimeId,
+          ui: props.repoShell.ui,
+          workspaceProbe: props.repoShell.workspaceProbe,
+        }}
         terminalAvailable={props.repoShell.workspaceProbe.capabilities.terminal.available}
         workspacePaneId={props.workspacePaneId}
         toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
@@ -246,6 +254,7 @@ function GitRepoWorkspaceLoaded({
   const presentationRepo: RepoWorkspaceRepo = {
     ...projectBranchActionRepo(repoShell, projection.operations.operations, currentBranchName),
     branchModel: presentationBranchModel,
+    workspaceProbe: repoShell.workspaceProbe,
   }
   const statusError = statusReadModel.error
   const statusErrorKey = statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
@@ -296,7 +305,7 @@ function WorkspaceRootPane({
   toolbarTrafficLightOffset,
   onBackToNavigator,
 }: {
-  repo: Pick<RepoWorkspaceRepoShell, 'id' | 'repoRuntimeId' | 'ui'>
+  repo: Pick<RepoWorkspaceRepoShell, 'id' | 'repoRuntimeId' | 'ui'> & { workspaceProbe: WorkspaceReadyProbeState }
   terminalAvailable: boolean
   workspacePaneId: string
   toolbarTrafficLightOffset: boolean
@@ -308,12 +317,7 @@ function WorkspaceRootPane({
   const target = { kind: 'workspace-root' as const, repoRoot: repo.id, branchName: null, worktreePath: null }
   const runtimeTarget = runtimeWorkspacePaneTarget(target, repo.repoRuntimeId)
   const hydrating = useIsInitialTerminalProjectionHydrating(repo.id, repo.repoRuntimeId)
-  const activePanel =
-    model.selection?.tab === 'terminal' && terminalAvailable
-      ? 'terminal'
-      : model.selection?.tab === 'status'
-        ? 'status'
-        : 'files'
+  const activePanel = model.selection?.tab === 'terminal' && !terminalAvailable ? null : (model.selection?.tab ?? null)
   const overviewReadModel = useWorkspaceDirectoryOverview(repo.id, repo.repoRuntimeId, activePanel === 'status')
   const selectedTerminalSessionId =
     model.selection?.kind === 'materialized-tab' && model.selection.materializedTab.kind === 'runtime'
@@ -331,10 +335,11 @@ function WorkspaceRootPane({
     })
   }, [model.runtimeTabStateByType, model.tabs, t, terminalAvailable, workspacePaneId])
   const requestedActiveIdentity =
-    model.activeTab?.identity ?? (activePanel === 'terminal' ? 'workspace-pane:terminal-host' : 'workspace-pane:files')
-  const activeTabIdentity = items.some((item) => item.identity === requestedActiveIdentity)
-    ? requestedActiveIdentity
-    : workspacePaneStaticTabProvider('files').identity()
+    model.activeTab?.identity ?? (activePanel === 'terminal' ? 'workspace-pane:terminal-host' : null)
+  const activeTabIdentity =
+    requestedActiveIdentity && items.some((item) => item.identity === requestedActiveIdentity)
+      ? requestedActiveIdentity
+      : null
   const selectItem = useCallback(
     (item: WorkspacePaneTabItem) => {
       if (isPendingWorkspacePaneTabItem(item)) return
@@ -430,9 +435,17 @@ function WorkspaceRootPane({
         </WorkspacePanePanelFrame>
       ) : activePanel === 'files' ? (
         <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} label={t('tab.files')}>
-          <FiletreeTab repoId={repo.id} repoRuntimeId={repo.repoRuntimeId} branchName={null} worktreePath={repo.id} />
+          <FiletreeTab
+            target={{
+              kind: 'workspace-root',
+              workspaceId: repo.id,
+              workspaceRuntimeId: repo.repoRuntimeId,
+              rootPath: repo.id,
+              capabilities: repo.workspaceProbe.capabilities,
+            }}
+          />
         </WorkspacePanePanelFrame>
-      ) : runtimeTarget ? (
+      ) : activePanel === 'terminal' && runtimeTarget ? (
         renderWorkspacePaneRuntimeTabPanel({
           type: 'terminal',
           workspacePaneId,
@@ -444,7 +457,9 @@ function WorkspaceRootPane({
           selectedSessionId: selectedTerminalSessionId,
           runtimeState: model.runtimeTabStateByType.terminal,
         })
-      ) : null}
+      ) : (
+        <EmptyState title={t('workspace-pane-tabs.empty')} />
+      )}
     </section>
   )
 }

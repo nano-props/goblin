@@ -231,19 +231,15 @@ export function installWorkspacePaneTabsTestBridge(
     onEffectIntent?: ClientBridge['onEffectIntent']
   } = {},
 ): {
-  addRuntimeTab: (input: {
+  addRuntimeTab: (input: WorkspacePaneTabsTarget & {
     repoRoot: string
     repoRuntimeId: string
-    branchName: string
-    worktreePath: string | null
     terminalSessionId: string
     insertAfterIdentity?: string | null
   }) => void
-  removeRuntimeTab: (input: {
+  removeRuntimeTab: (input: WorkspacePaneTabsTarget & {
     repoRoot: string
     repoRuntimeId: string
-    branchName: string
-    worktreePath: string | null
     terminalSessionId: string
   }) => void
 } {

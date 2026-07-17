@@ -32,6 +32,7 @@ export type CurrentRepoWorkspacePresentation = ReturnType<typeof getCurrentRepoW
 
 export interface RepoWorkspaceRepo extends BranchActionRepo {
   branchModel: RepoBranchReadModelData
+  workspaceProbe: RepoState['workspaceProbe']
   ui: Pick<RepoState['ui'], 'preferredWorkspacePaneTabByTarget'> & { currentBranchName: string | null }
   unavailable: boolean
   remote: BranchActionRepo['remote'] & Pick<RepoState['remote'], 'lifecycle'>
