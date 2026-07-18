@@ -100,7 +100,7 @@ type WorkspacePaneTabsReorderTarget = WorkspacePaneTabsTarget & { workspaceRunti
 
 function workspacePaneReorderActionTarget(target: WorkspacePaneTabsReorderTarget): WorkspacePaneActionTarget {
   return workspacePaneActionTargetFromCoordinates({
-    repoId: target.repoRoot,
+    workspaceId: target.repoRoot,
     workspaceRuntimeId: target.workspaceRuntimeId,
     branchName: workspacePaneTabsBranchIdentity(target),
     worktreePath: workspacePaneTabsTargetWorktreePath(target),

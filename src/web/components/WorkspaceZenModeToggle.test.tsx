@@ -3,12 +3,12 @@
 import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { WorkspaceZenModeToggle } from '#/web/components/WorkspaceZenModeToggle.tsx'
-import { resetReposStore } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 beforeEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
 })
 
 describe('WorkspaceZenModeToggle', () => {
@@ -20,7 +20,7 @@ describe('WorkspaceZenModeToggle', () => {
     expect(button?.getAttribute('aria-pressed')).toBe('false')
 
     act(() => {
-      useReposStore.getState().setZenMode(true)
+      useWorkspacesStore.getState().setZenMode(true)
     })
 
     expect(zenModeToggle(container)).toBe(button)
@@ -30,13 +30,13 @@ describe('WorkspaceZenModeToggle', () => {
   test('toggles zen mode when clicked', () => {
     const { container } = renderInJsdom(<WorkspaceZenModeToggle />)
 
-    expect(useReposStore.getState().zenMode).toBe(false)
+    expect(useWorkspacesStore.getState().zenMode).toBe(false)
 
     act(() => {
       zenModeToggle(container)?.click()
     })
 
-    expect(useReposStore.getState().zenMode).toBe(true)
+    expect(useWorkspacesStore.getState().zenMode).toBe(true)
     expect(zenModeToggle(container)?.getAttribute('aria-pressed')).toBe('true')
   })
 

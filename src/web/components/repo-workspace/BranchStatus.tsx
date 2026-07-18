@@ -34,8 +34,8 @@ import {
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { formatWorktreePath } from '#/web/lib/paths.ts'
-import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { remoteRepoTarget } from '#/web/stores/workspaces/workspace-guards.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import { openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import type { CurrentRepoWorkspace } from '#/web/components/repo-workspace/model.ts'
@@ -163,8 +163,8 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
   // Phase 4: pull the target off the lifecycle union. The
   // selector is keyed on the lifecycle itself, so a re-probe
   // (e.g. network reconnect) re-renders this row.
-  const worktreeTarget = useReposStore((s) => {
-    const repo = s.repos[detail.repoId]
+  const worktreeTarget = useWorkspacesStore((s) => {
+    const repo = s.workspaces[detail.repoId]
     return repo ? remoteRepoTarget(repo.id, repo.remote.lifecycle) : null
   })
   const openFilesTab = useMemo(
@@ -173,7 +173,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
         () => {
           if (!branchName || !worktreePathRaw) return
           void dispatchOpenWorkspacePaneStaticTabAction({
-            repoId: detail.repoId,
+            workspaceId: detail.repoId,
             branchName,
             worktreePath: worktreePathRaw,
             type: 'files',
@@ -192,7 +192,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
         () => {
           if (!branchName || !worktreePathRaw) return
           void dispatchOpenWorkspacePaneStaticTabAction({
-            repoId: detail.repoId,
+            workspaceId: detail.repoId,
             branchName,
             worktreePath: worktreePathRaw,
             type: 'changes',
@@ -212,7 +212,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
         () => {
           if (!branchName) return
           void dispatchOpenWorkspacePaneStaticTabAction({
-            repoId: detail.repoId,
+            workspaceId: detail.repoId,
             branchName,
             worktreePath: worktreePathRaw,
             type: 'history',

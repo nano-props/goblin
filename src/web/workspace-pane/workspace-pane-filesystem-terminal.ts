@@ -1,6 +1,6 @@
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { workspacePaneFilesystemTerminalBase } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
@@ -14,7 +14,7 @@ export function showCreatedWorkspacePaneFilesystemTerminal(
 ): boolean | Promise<boolean> {
   if (target.kind === 'workspace-root') {
     if (presentation.kind !== 'workspace-root') return false
-    const state = useReposStore.getState()
+    const state = useWorkspacesStore.getState()
     state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootPath), terminalSessionId)
     state.setWorkspacePaneTabForTarget(
       { kind: 'workspace-root', repoRoot: target.workspaceId },

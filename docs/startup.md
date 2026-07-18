@@ -51,14 +51,14 @@ The repos store keeps low-level fields because different UI surfaces need differ
 - `sessionPersistenceReady`: server workspace restore and client-local workspace hydrate have both converged.
 - `sessionRestoreError`: restore failed in a way that must block persistence.
 
-Code that needs the combined state should use `workspaceRestoreStatusFromStore` or `workspaceSessionPersistenceOpenFromStore` from `src/web/stores/repos/selector-state.ts` instead of recombining booleans at call sites.
+Code that needs the combined state should use `workspaceRestoreStatusFromStore` or `workspaceSessionPersistenceOpenFromStore` from `src/web/stores/workspaces/selector-state.ts` instead of recombining booleans at call sites.
 
 ## Routing Rules
 
 - Repo routes derive `RepoRouteView` directly from the URL before store hydration.
 - A routed repo may be missing from the repo store while workspace membership is restoring. Render restore skeletons until `workspaceMembershipReady` is true.
 - After membership is ready, a routed repo missing from the store is a not-found state, not an empty placeholder.
-- Client workspace persistence should prefer the routed repo id over `restoredRepoId`.
+- Client workspace persistence should prefer the routed repo id over `restoredWorkspaceId`.
 
 ## Persistence Rules
 

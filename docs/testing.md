@@ -165,7 +165,7 @@ upstream `@xterm/*` ships its own test helper.
   `fetch` stub. `handlers` is `Record<string, (input) => unknown>` mapping
   IPC pathnames (e.g. `'repo.probe'`) and server routes (e.g.
   `'repo.projection'`) to their test handlers.
-- `resetReposStore()`, `seedRepoState({...})`, `createBranchSnapshot(...)`,
+- `resetWorkspacesStore()`, `seedWorkspaceState({...})`, `createBranchSnapshot(...)`,
   `createRepoBranch(...)`, `createPullRequest(...)` — co-located here
   so non-repo tests can use them without dragging in the repo store.
 
@@ -296,7 +296,7 @@ items:
 - **WebSocket mock single source** — `bridge.ts` no longer contains an
   inline `MockWebSocket`; it wraps the shared `installWebSocketMock`.
 - **Lifecycle mock backed by real server composition** —
-  `src/web/stores/repos/repo-session-test-utils.ts` injects test doubles
+  `src/web/stores/workspaces/workspace-session-test-utils.ts` injects test doubles
   into the real `resolveServerRemoteRepoConnection` instead of
   duplicating its compose logic.
 

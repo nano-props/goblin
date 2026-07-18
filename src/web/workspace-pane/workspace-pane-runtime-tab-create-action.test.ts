@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalCreateLeaderAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   commitCreatedTerminalWorkspacePaneRuntimeTab,
   dispatchCreateTerminalWorkspacePaneRuntimeTabAction,
@@ -39,7 +39,7 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
 }))
 
 beforeEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
   seedCurrentWorkspaceRuntime(WORKSPACE_RUNTIME_ID)
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockReset()
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockResolvedValue({
@@ -50,7 +50,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
 })
 
 describe('workspace pane runtime tab create action', () => {
@@ -173,7 +173,7 @@ describe('workspace pane runtime tab create action', () => {
 
     expect(showCreatedTerminalTab).not.toHaveBeenCalled()
     expect(workspacePaneTabOpener(PANE_TARGET, WORKSPACE_RUNTIME_ID, `terminal:${TERMINAL_SESSION_ID}`)).toBeNull()
-    expect(useReposStore.getState().repos[REPO_ROOT]?.workspaceRuntimeId).toBe('repo-runtime-replacement')
+    expect(useWorkspacesStore.getState().workspaces[REPO_ROOT]?.workspaceRuntimeId).toBe('repo-runtime-replacement')
   })
 
   test('marks the terminal create action busy only while terminal creation is pending', () => {

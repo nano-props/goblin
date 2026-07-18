@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { createBranchSnapshot, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import {
   createAppLevelIntentPlan,
   createExternalOpenDrainKickPlan,
@@ -38,7 +38,7 @@ const CURRENT_DIRECTORY_REPO = {
 
 describe('client effect intent plans', () => {
   test('creates a worktree terminal bell plan when the worktree group matches a known worktree', () => {
-    resetReposStore()
+    resetWorkspacesStore()
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
@@ -192,7 +192,7 @@ describe('client effect intent plans', () => {
 
     expect(plan).toEqual({
       kind: 'new-terminal-tab',
-      repoId: 'goblin+file:///tmp/repo',
+      workspaceId: 'goblin+file:///tmp/repo',
       target: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
     })
   })

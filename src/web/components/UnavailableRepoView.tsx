@@ -7,13 +7,13 @@ import { PanelInset } from '#/web/components/ui/panel.tsx'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { formatTranslatableReason, shouldOfferSshSettings, unavailableBodyKey } from '#/web/lib/remote-diagnostics.ts'
-import { runManualRepoSync } from '#/web/stores/repos/refresh.ts'
-import { isRepoUnavailable, remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { runManualRepoSync } from '#/web/stores/workspaces/refresh.ts'
+import { isRepoUnavailable, remoteRepoTarget } from '#/web/stores/workspaces/workspace-guards.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 interface Props {
-  repo: RepoState
+  repo: WorkspaceState
 }
 
 export function UnavailableRepoView({ repo }: Props) {
@@ -73,7 +73,7 @@ export function UnavailableRepoView({ repo }: Props) {
                 variant="default"
                 onClick={() =>
                   void runManualRepoSync(
-                    { get: useReposStore.getState, set: useReposStore.setState },
+                    { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
                     repo.id,
                     { workspaceRuntimeId: repo.workspaceRuntimeId },
                   )

@@ -6,7 +6,7 @@ import {
   projectBranchActionRepo,
   serverBranchActionReason,
 } from '#/web/hooks/branch-action-state.ts'
-import { idleOperation } from '#/web/stores/repos/operations.ts'
+import { idleOperation } from '#/web/stores/workspaces/operations.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
 const REPO_ID = 'goblin+file:///tmp/goblin-branch-action-state'

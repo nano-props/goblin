@@ -16,10 +16,10 @@ import {
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RepoWorkspaceStaticTab, RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   createRepoBranch,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
@@ -31,7 +31,7 @@ const TARGET_ROUTE = { kind: 'static' as const, tab: 'status' as const }
 describe('workspace pane tab controller transactions', () => {
   beforeEach(() => {
     primaryWindowQueryClient.clear()
-    resetReposStore()
+    resetWorkspacesStore()
     seedRepoWithReadModelForTest({
       id: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-1',
@@ -42,7 +42,7 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('commits an exact target route without feature observation', async () => {
-    const setWorkspacePaneTab = vi.spyOn(useReposStore.getState(), 'setWorkspacePaneTab')
+    const setWorkspacePaneTab = vi.spyOn(useWorkspacesStore.getState(), 'setWorkspacePaneTab')
     await expect(
       commitWorkspacePaneExactTargetRoute(workspacePaneTarget(), SOURCE_ROUTE, TARGET_ROUTE, committingNavigation()),
     ).resolves.toBe(true)
@@ -86,7 +86,7 @@ describe('workspace pane tab controller transactions', () => {
 
   test('presents a workspace-scoped tab through the workspace route', async () => {
     const showWorkspaceRootPaneTab = vi.fn((_repoId, presentation, options) => {
-      useReposStore
+      useWorkspacesStore
         .getState()
         .setWorkspacePaneTabForTarget(
           { kind: 'workspace-root', repoRoot: 'goblin+file:///repo' },
@@ -120,7 +120,7 @@ describe('workspace pane tab controller transactions', () => {
       kind: 'workspace-root',
       repoRoot: 'goblin+file:///repo',
     })
-    expect(useReposStore.getState().repos['goblin+file:///repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
+    expect(useWorkspacesStore.getState().workspaces['goblin+file:///repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
       'files',
     )
   })
@@ -158,7 +158,7 @@ describe('workspace pane tab controller transactions', () => {
     await expect(
       commitWorkspacePaneCommittedRuntimeTargetRoute(
         {
-          repoId: 'goblin+file:///repo',
+          workspaceId: 'goblin+file:///repo',
           workspaceRuntimeId: 'repo-runtime-1',
           branchName: 'feature/renamed',
           worktreePath: '/worktree-a',
@@ -184,7 +184,7 @@ describe('workspace pane tab controller transactions', () => {
       repoRoot: 'goblin+file:///repo',
       worktreePath: '/worktree-a',
     })
-    expect(useReposStore.getState().repos['goblin+file:///repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
+    expect(useWorkspacesStore.getState().workspaces['goblin+file:///repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
       'terminal',
     )
   })
@@ -203,10 +203,10 @@ describe('workspace pane tab controller transactions', () => {
       TARGET_ROUTE,
       navigation,
     )
-    useReposStore.setState((state) => ({
-      repos: {
-        ...state.repos,
-        'goblin+file:///repo': { ...state.repos['goblin+file:///repo']!, workspaceRuntimeId: 'repo-runtime-2' },
+    useWorkspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
+        'goblin+file:///repo': { ...state.workspaces['goblin+file:///repo']!, workspaceRuntimeId: 'repo-runtime-2' },
       },
     }))
     commit.resolve(true)
@@ -237,7 +237,7 @@ describe('workspace pane tab controller transactions', () => {
       TARGET_ROUTE,
       navigation,
     )
-    const repo = useReposStore.getState().repos['goblin+file:///repo']!
+    const repo = useWorkspacesStore.getState().workspaces['goblin+file:///repo']!
     seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('feature/a', { worktree: { path: '/worktree-b' } })],
       currentBranch: 'feature/a',
@@ -262,7 +262,7 @@ describe('workspace pane tab controller transactions', () => {
 
 function workspacePaneTarget(): RepoWorkspaceTabModel {
   return {
-    repoId: 'goblin+file:///repo',
+    workspaceId: 'goblin+file:///repo',
     workspaceRuntimeId: 'repo-runtime-1',
     branchName: 'feature/a',
     worktreePath: '/worktree-a',

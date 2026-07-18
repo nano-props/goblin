@@ -4,7 +4,7 @@ import { RepoLayoutWorkspaceShell } from '#/web/components/repo-layout/RepoLayou
 import { RepoWorkspacePane } from '#/web/components/Layout.tsx'
 import { WorkspaceChrome } from '#/web/components/workspace-toolbar-chrome.tsx'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 
 interface EmptyRepoViewProps {
@@ -15,8 +15,8 @@ export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
   const t = useT()
   const uiMode = useResponsiveUiMode()
   const compact = uiMode === 'compact'
-  const workspacePaneSize = useReposStore((s) => s.workspacePaneSize)
-  const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
+  const workspacePaneSize = useWorkspacesStore((s) => s.workspacePaneSize)
+  const setWorkspacePaneSize = useWorkspacesStore((s) => s.setWorkspacePaneSize)
 
   return (
     <RepoLayoutWorkspaceShell

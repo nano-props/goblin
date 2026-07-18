@@ -1,6 +1,6 @@
 import { toast } from 'sonner'
 import { chooseLocalWorkspacePath, hasNativeDirectoryPicker } from '#/web/app-shell-client.ts'
-import type { OpenWorkspaceResult } from '#/web/stores/repos/types.ts'
+import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import { reportOpenWorkspacePostOpenEffects } from '#/web/lib/open-workspace-result-feedback.ts'
 interface Options {
   ensureWorkspaceOpen: (path: string) => Promise<OpenWorkspaceResult>

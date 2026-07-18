@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
-import type { OpenWorkspaceResult } from '#/web/stores/repos/types.ts'
+import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
 }))

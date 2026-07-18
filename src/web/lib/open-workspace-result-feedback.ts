@@ -1,5 +1,5 @@
 import { toast } from 'sonner'
-import type { OpenWorkspaceResult } from '#/web/stores/repos/types.ts'
+import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import { sessionLog } from '#/web/logger.ts'
 
 export function reportOpenWorkspacePostOpenEffects(

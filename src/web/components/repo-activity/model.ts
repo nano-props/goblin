@@ -1,11 +1,11 @@
-import type { RepoState } from '#/web/stores/repos/types.ts'
-import { repoLocalPrimaryRefreshBusy } from '#/web/stores/repos/repo-operation-scheduler.ts'
-import { repoBranchActionLoadingLabel, type RepoActionLabel } from '#/web/stores/repos/action-labels.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import { repoLocalPrimaryRefreshBusy } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
+import { repoBranchActionLoadingLabel, type RepoActionLabel } from '#/web/stores/workspaces/action-labels.ts'
 import {
   branchActionKindFromReason,
   isBranchActionReason,
   type RepoOperationState,
-} from '#/web/stores/repos/operations.ts'
+} from '#/web/stores/workspaces/operations.ts'
 import { repoServerOperationActive } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import type { RepoOperationsSnapshot, RepoServerOperationState } from '#/shared/api-types.ts'
@@ -27,7 +27,7 @@ export type RepoActivityControlView =
   | { kind: 'refresh-button'; manualSyncBusy: boolean }
 
 export interface RepoActivityProjectionRepo {
-  id: RepoState['id']
+  id: WorkspaceState['id']
   branchAction: RepoOperationState
 }
 

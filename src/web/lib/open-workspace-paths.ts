@@ -1,4 +1,4 @@
-import type { OpenWorkspaceResult } from '#/web/stores/repos/types.ts'
+import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import { sessionLog } from '#/web/logger.ts'
 interface Options {
   ensureWorkspaceOpen: (path: string) => Promise<OpenWorkspaceResult>

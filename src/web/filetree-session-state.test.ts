@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import {
-  persistedFiletreeViewStateByWorktreeByRepoForSession,
+  persistedFiletreeViewStateByWorktreeByWorkspaceForSession,
   restoreFiletreeViewStateFromSession,
 } from '#/web/filetree-session-state.ts'
 import {
   filetreeInteractionScopeKey,
   resetFiletreeInteractionStore,
   useFiletreeInteractionStore,
-} from '#/web/stores/repos/filetree-interaction-state.ts'
+} from '#/web/stores/workspaces/filetree-interaction-state.ts'
 
 describe('filetree-session-state', () => {
   beforeEach(() => {
@@ -19,7 +19,7 @@ describe('filetree-session-state', () => {
     const staleScopeKey = filetreeInteractionScopeKey('goblin+file:///tmp/repo', '/tmp/stale-worktree')
     const closedRepoScopeKey = filetreeInteractionScopeKey('/tmp/closed-repo', '/tmp/worktree')
 
-    const persisted = persistedFiletreeViewStateByWorktreeByRepoForSession(
+    const persisted = persistedFiletreeViewStateByWorktreeByWorkspaceForSession(
       {
         [scopeKey]: {
           selectedKeys: ['src/index.ts'],
@@ -80,7 +80,7 @@ describe('filetree-session-state', () => {
 
   test('persists the workspace-root file tree without a synthetic branch', () => {
     const workspaceId = 'goblin+file:///tmp/plain-workspace'
-    const persisted = persistedFiletreeViewStateByWorktreeByRepoForSession(
+    const persisted = persistedFiletreeViewStateByWorktreeByWorkspaceForSession(
       {
         [filetreeInteractionScopeKey(workspaceId, '/tmp/plain-workspace')]: {
           selectedKeys: ['README.md'],

@@ -25,12 +25,12 @@ export function defaultServerWorkspaceState(): ServerWorkspaceState {
 
 export function defaultClientWorkspaceState(): ClientWorkspaceState {
   return {
-    restoredRepoId: null,
+    restoredWorkspaceId: null,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionIdByTerminalWorktree: {},
-    preferredWorkspacePaneTabByTargetByRepo: {},
-    filetreeViewStateByWorktreeByRepo: {},
+    preferredWorkspacePaneTabByTargetByWorkspace: {},
+    filetreeViewStateByWorktreeByWorkspace: {},
   }
 }
 

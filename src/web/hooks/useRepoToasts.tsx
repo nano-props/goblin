@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import type { RepoEvent } from '#/web/stores/repos/types.ts'
-import { repoEventActionSuccessLabel } from '#/web/stores/repos/action-labels.ts'
+import type { RepoEvent } from '#/web/stores/workspaces/types.ts'
+import { repoEventActionSuccessLabel } from '#/web/stores/workspaces/action-labels.ts'
 import {
   hasWorktreeBootstrapSummaryDetails,
   type WorktreeBootstrapPathSummary,
@@ -42,7 +42,7 @@ const WORKTREE_BOOTSTRAP_SETUP_KEY = 'worktree-bootstrap.summary.setup'
 
 export function useRepoToasts(repoId: string) {
   const t = useT()
-  const events = useReposStore((s) => s.repos[repoId]?.events ?? EMPTY_EVENTS)
+  const events = useWorkspacesStore((s) => s.workspaces[repoId]?.events ?? EMPTY_EVENTS)
 
   // `t` is read through a ref so a language flip doesn't re-fire these
   // effects (which would already be no-ops after the store clear, but
@@ -91,7 +91,7 @@ export function useRepoToasts(repoId: string) {
         })
       }
     }
-    useReposStore.getState().clearEvents(
+    useWorkspacesStore.getState().clearEvents(
       repoId,
       events.map((event) => event.id),
     )

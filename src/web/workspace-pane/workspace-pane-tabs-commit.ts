@@ -2,8 +2,8 @@ import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
 import { goblinLog } from '#/web/logger.ts'
-import { currentWorkspaceRuntimeId } from '#/web/stores/repos/repo-guards.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { currentWorkspaceRuntimeId } from '#/web/stores/workspaces/workspace-guards.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 import {
@@ -224,5 +224,5 @@ export async function updateWorkspacePaneTabsOnServer(
 function workspacePaneTabsProjectionScopeAccepted(
   input: Pick<CommitWorkspacePaneTabsInput, 'repoRoot' | 'workspaceRuntimeId'>,
 ): boolean {
-  return currentWorkspaceRuntimeId(useReposStore.getState(), input.repoRoot) === input.workspaceRuntimeId
+  return currentWorkspaceRuntimeId(useWorkspacesStore.getState(), input.repoRoot) === input.workspaceRuntimeId
 }

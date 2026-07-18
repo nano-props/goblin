@@ -37,9 +37,9 @@ import {
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
+import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
 import { branchNameFromSlug, repoIdFromSlug, worktreePathFromSlug } from '#/web/repo-route-slugs.ts'
 import { returnToFromHref, usePrimaryWindowRouteActions } from '#/web/primary-window-route-navigation.ts'
 import {
@@ -147,10 +147,10 @@ function AuthenticatedWorkspaceShell() {
   const routedRepoId = routeContext ? repoIdFromSlug(routeContext.repoSlug) : null
   // `hydratedRouteRepoId` means the routed repo is present in the hydrated repo store and
   // can safely drive refreshes, dialogs, and commands that need repo data.
-  const hydratedRouteRepoId = useReposStore((s) => {
-    return routedRepoId && s.repos[routedRepoId] ? routedRepoId : null
+  const hydratedRouteRepoId = useWorkspacesStore((s) => {
+    return routedRepoId && s.workspaces[routedRepoId] ? routedRepoId : null
   })
-  const commandRepo = useReposStore((s) => (hydratedRouteRepoId ? s.repos[hydratedRouteRepoId] : undefined))
+  const commandRepo = useWorkspacesStore((s) => (hydratedRouteRepoId ? s.workspaces[hydratedRouteRepoId] : undefined))
   const currentBranchName = routeContext?.kind === 'branch' ? (routeContext.branchName ?? null) : null
   const currentWorkspacePaneRoute = routeContext?.kind === 'branch' ? (routeContext.workspacePaneRoute ?? null) : null
   const commandCapabilities =
@@ -209,8 +209,8 @@ function AuthenticatedWorkspaceShell() {
               },
             }
           : null
-  const order = useReposStore((s) => s.order)
-  const { closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation } = useReposStore(
+  const workspaceOrder = useWorkspacesStore((s) => s.workspaceOrder)
+  const { closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation } = useWorkspacesStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
   )
   const routeNavigation = usePrimaryWindowRouteActions()
@@ -219,13 +219,13 @@ function AuthenticatedWorkspaceShell() {
     () =>
       createPrimaryWindowNavigationActions({
         currentWorkspaceId: hydratedRouteRepoId,
-        order,
+        workspaceOrder,
         closeWorkspace,
         peekWorkspaceNavigation,
         commitWorkspaceNavigation,
         routeNavigation,
       }),
-    [closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation, order, routeNavigation, hydratedRouteRepoId],
+    [closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation, workspaceOrder, routeNavigation, hydratedRouteRepoId],
   )
 
   const workspaceDrop = useWorkspaceDrop({ blocked: modalOpen })
@@ -403,9 +403,9 @@ function PrimaryWindowOverlays({
         onOpenChange={overlays.setOpenRemoteWorkspaceOpen}
       />
       <BranchActionDialogHost currentRepoId={hydratedRouteRepoId} currentBranchName={currentBranchName} />
-      <FiletreeActionDialogHost currentRepoId={hydratedRouteRepoId} />
+      <FiletreeActionDialogHost currentWorkspaceId={hydratedRouteRepoId} />
       <TerminalActionDialogHost
-        currentRepoId={hydratedRouteRepoId}
+        currentWorkspaceId={hydratedRouteRepoId}
         currentWorkspacePaneRoute={currentWorkspacePaneRoute}
         navigation={navigation}
       />
@@ -505,22 +505,22 @@ function workspaceNavigationRouteContext(
   routeHref: string | null,
 ): WorkspaceNavigationRouteContext | null {
   if (!routeContext) return null
-  const repoId = repoIdFromSlug(routeContext.repoSlug)
-  if (!repoId) return null
+  const workspaceId = repoIdFromSlug(routeContext.repoSlug)
+  if (!workspaceId) return null
   if (routeContext.kind === 'branch') {
     return null
   }
   if (routeContext.kind === 'worktree') {
     return {
       kind: 'worktree',
-      repoId,
+      workspaceId,
       worktreePath: routeContext.worktreePath,
       workspacePaneRoute:
         routeContext.workspacePaneRoute?.kind === 'invalid-static' ? null : (routeContext.workspacePaneRoute ?? null),
     }
   }
   if (routeContext.kind === 'newWorktree') {
-    return { kind: 'newWorktree', repoId, returnTo: returnToFromHref(routeHref) }
+    return { kind: 'newWorktree', workspaceId, returnTo: returnToFromHref(routeHref) }
   }
-  return { kind: routeContext.kind, repoId }
+  return { kind: routeContext.kind, workspaceId }
 }

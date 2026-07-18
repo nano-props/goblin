@@ -18,15 +18,15 @@ import {
   resetBranchActionDialogsStore,
   useBranchActionDialogsStore,
   type RemoveWorktreeDialogPayload,
-} from '#/web/stores/repos/branch-action-dialogs.ts'
+} from '#/web/stores/workspaces/branch-action-dialogs.ts'
 import {
   createRepoBranch,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
@@ -120,7 +120,7 @@ function setupRepo() {
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
   resetBranchActionDialogsStore()
 })
 
@@ -147,7 +147,7 @@ function findButtonByText(text: string): HTMLButtonElement | null {
 }
 
 function setBranchSnapshotForRepo(repoId: string, branches: ReturnType<typeof createRepoBranch>[]): void {
-  const repo = useReposStore.getState().repos[repoId]
+  const repo = useWorkspacesStore.getState().workspaces[repoId]
   if (!repo) throw new Error(`missing test repo: ${repoId}`)
   const readModel = readRepoBranchQueryProjection(repo)
   seedRepoReadModelQueryData(repo, {
@@ -158,7 +158,7 @@ function setBranchSnapshotForRepo(repoId: string, branches: ReturnType<typeof cr
 }
 
 function removeBranchFromReadModel(repoId: string, branchName: string): void {
-  const repo = useReposStore.getState().repos[repoId]
+  const repo = useWorkspacesStore.getState().workspaces[repoId]
   if (!repo) throw new Error(`missing test repo: ${repoId}`)
   const readModel = readRepoBranchQueryProjection(repo)
   setBranchSnapshotForRepo(repoId, readModel?.branches.filter((branch) => branch.name !== branchName) ?? [])
@@ -201,9 +201,9 @@ describe('BranchActionDialogHost', () => {
     // setState merge (seedRepoWithReadModelForTest alone would overwrite `repos`).
     seedRepoWithReadModelForTest({ id: repoBId, branches: [createRepoBranch('main')] })
     act(() => {
-      useReposStore.setState((state) => ({
-        repos: { ...state.repos, [REPO_ID]: repoA },
-        restoredRepoId: REPO_ID,
+      useWorkspacesStore.setState((state) => ({
+        workspaces: { ...state.workspaces, [REPO_ID]: repoA },
+        restoredWorkspaceId: REPO_ID,
       }))
     })
 
@@ -340,9 +340,9 @@ describe('BranchActionDialogHost', () => {
     const repoBId = '/tmp/goblin-other-repo'
     seedRepoWithReadModelForTest({ id: repoBId, branches: [createRepoBranch('main')] })
     act(() => {
-      useReposStore.setState((state) => ({
-        repos: { ...state.repos, [REPO_ID]: repoA },
-        restoredRepoId: REPO_ID,
+      useWorkspacesStore.setState((state) => ({
+        workspaces: { ...state.workspaces, [REPO_ID]: repoA },
+        restoredWorkspaceId: REPO_ID,
       }))
     })
 

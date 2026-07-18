@@ -11,7 +11,7 @@ import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import type { TerminalDescriptor, TerminalRuntimeMembershipIndex } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import { terminalClient } from '#/web/terminal.ts'
-import { resetReposStore } from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const workspacePaneRuntimeMocks = vi.hoisted(() => ({
@@ -117,7 +117,7 @@ describe('TerminalSessionProjection', () => {
   let selectedChanges: Array<{ terminalWorktreeKey: string; terminalSessionId: string | null }>
 
   beforeEach(() => {
-    resetReposStore()
+    resetWorkspacesStore()
     workspacePaneRuntimeMocks.close.mockReset()
     workspacePaneRuntimeMocks.close.mockResolvedValue(successfulRuntimeCloseSnapshot())
     workspacePaneRuntimeMocks.refreshTabs.mockReset()
@@ -141,7 +141,7 @@ describe('TerminalSessionProjection', () => {
     // contract documented at `setTerminalSessionProjectionForTests`.
     projection.destroy()
     setTerminalSessionProjectionForTests(null)
-    resetReposStore()
+    resetWorkspacesStore()
   })
 
   test('rejects reconciliation for a workspace runtime outside the current repo index', () => {

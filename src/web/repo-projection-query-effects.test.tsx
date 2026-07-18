@@ -14,10 +14,10 @@ import {
 import {
   createBranchSnapshot,
   installGoblinTestBridge,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoShellForTest,
 } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 
 function Harness({ queryClient }: { queryClient?: QueryClient }) {
@@ -37,7 +37,7 @@ function projection(loadedAt: number, current = 'main'): WorkspaceRuntimeProject
 
 describe('repo projection query effects', () => {
   beforeEach(() => {
-    resetReposStore()
+    resetWorkspacesStore()
   })
 
   test('copies fetched projection operations into the active operations cache', async () => {
@@ -57,7 +57,7 @@ describe('repo projection query effects', () => {
       await vi.waitFor(() => {
         expect(getRepoOperationsQueryData('goblin+file:///repo', repo.workspaceRuntimeId, queryClient)?.loadedAt).toBe(123)
       })
-      expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
+      expect(useWorkspacesStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
       expect(pruneTerminals).not.toHaveBeenCalled()
     } finally {
       queryClient.clear()
@@ -79,7 +79,7 @@ describe('repo projection query effects', () => {
       })
 
       expect(getRepoOperationsQueryData('goblin+file:///repo', repo.workspaceRuntimeId, queryClient)).toBeUndefined()
-      expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
+      expect(useWorkspacesStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
       expect(pruneTerminals).not.toHaveBeenCalled()
     } finally {
       queryClient.clear()
@@ -123,14 +123,14 @@ describe('repo projection query effects', () => {
       })
 
       expect(getRepoOperationsQueryData('goblin+file:///repo', repo.workspaceRuntimeId, queryClient)?.loadedAt).toBe(0)
-      expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
+      expect(useWorkspacesStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
       expect(pruneTerminals).not.toHaveBeenCalled()
 
       releases[1]!(projection(2, 'fresh'))
       await vi.waitFor(() => {
         expect(getRepoOperationsQueryData('goblin+file:///repo', repo.workspaceRuntimeId, queryClient)?.loadedAt).toBe(2)
       })
-      expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
+      expect(useWorkspacesStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
       expect(pruneTerminals).not.toHaveBeenCalled()
     } finally {
       unsubscribe()
@@ -188,7 +188,7 @@ describe('repo projection query effects', () => {
       await vi.waitFor(() => {
         expect(getRepoOperationsQueryData('goblin+file:///repo', repo.workspaceRuntimeId, queryClient)?.loadedAt).toBe(3)
       })
-      expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
+      expect(useWorkspacesStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
       expect(pruneTerminals).not.toHaveBeenCalled()
     } finally {
       unsubscribe()
@@ -226,7 +226,7 @@ describe('repo projection query effects', () => {
         expect(releases).toHaveLength(2)
       })
       expect(observer.getCurrentResult().data).toBeUndefined()
-      expect(useReposStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
+      expect(useWorkspacesStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
       expect(pruneTerminals).not.toHaveBeenCalled()
 
       releases[1]!(projection(2, 'fresh'))

@@ -6,7 +6,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CreateWorktreePageBody } from '#/web/components/create-worktree/CreateWorktreeSurface.tsx'
-import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { getRepoRemoteBranches } from '#/web/repo-client.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -249,14 +249,14 @@ describe('CreateWorktreePageBody', () => {
 })
 
 function createRepo(): RepoPresentationForTest {
-  const repo = emptyRepo('/tmp/goblin-repo', 'goblin-repo', 'repo-runtime-test')
+  const repo = emptyWorkspace('/tmp/goblin-repo', 'goblin-repo', 'repo-runtime-test')
   const branches = [createRepoBranch('main'), createRepoBranch('feature/base')]
   seedRepoReadModelQueryData(repo, { branches, currentBranch: 'main', status: [] })
   return repoPresentationForTest(repo, { currentBranch: 'main', branches, status: [], worktreesByPath: {} })
 }
 
 function createRepoWithCreatedWorktree(): RepoPresentationForTest {
-  const repo = emptyRepo('/tmp/goblin-repo', 'goblin-repo', 'repo-runtime-test')
+  const repo = emptyWorkspace('/tmp/goblin-repo', 'goblin-repo', 'repo-runtime-test')
   const branches = [
     createRepoBranch('main'),
     createRepoBranch('feature/base'),

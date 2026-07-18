@@ -27,7 +27,7 @@ import {
 } from '#/web/components/repo-workspace/workspace-pane-tab-items.ts'
 import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspacePaneSurfaceTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { workspacePaneFilesystemTerminalBase } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { gitHeadBranch } from '#/shared/git-head.ts'
@@ -95,7 +95,7 @@ export function WorkspacePaneTargetToolbar({
       if (type !== 'terminal') return false
       if (target.kind === 'workspace-root') {
         if (presentation.kind !== 'workspace-root') return false
-        const state = useReposStore.getState()
+        const state = useWorkspacesStore.getState()
         state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootPath), sessionId)
         state.setWorkspacePaneTabForTarget(persistenceTarget, 'terminal')
         return true
@@ -115,7 +115,7 @@ export function WorkspacePaneTargetToolbar({
     (type: WorkspacePaneRuntimeTabType, sessionId: string) => {
       if (type !== 'terminal') return false
       if (target.kind === 'workspace-root') {
-        const state = useReposStore.getState()
+        const state = useWorkspacesStore.getState()
         state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootPath), sessionId)
         state.setWorkspacePaneTabForTarget(persistenceTarget, 'terminal')
         return true
@@ -123,7 +123,7 @@ export function WorkspacePaneTargetToolbar({
       if (target.kind !== 'git-worktree') return false
       const targetBranch = gitHeadBranch(target.head)
       if (targetBranch) return navigation.showRepoBranchTerminalSession(target.workspaceId, targetBranch, sessionId)
-      const state = useReposStore.getState()
+      const state = useWorkspacesStore.getState()
       state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootPath), sessionId)
       state.setWorkspacePaneTabForTarget(persistenceTarget, 'terminal')
       return true
@@ -170,7 +170,7 @@ export function WorkspacePaneTargetToolbar({
     (item: WorkspacePaneTabItem, reselect: boolean) => {
       if (isPendingWorkspacePaneTabItem(item)) return
       void dispatchSelectWorkspacePaneTabByIdentityAction({
-        repoId: target.workspaceId,
+        workspaceId: target.workspaceId,
         paneTarget: persistenceTarget,
         worktreeHead,
         workspacePaneRoute,
@@ -199,7 +199,7 @@ export function WorkspacePaneTargetToolbar({
       onClose={(item) => {
         if (isPendingWorkspacePaneTabItem(item)) return
         void runCloseWorkspacePaneTabCommand({
-          repoId: target.workspaceId,
+          workspaceId: target.workspaceId,
           target: commandTarget,
           targetIdentity: item.identity,
           runtimeView: item.kind === 'runtime' ? item.view : undefined,

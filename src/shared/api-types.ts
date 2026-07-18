@@ -91,14 +91,14 @@ export interface ServerWorkspaceState {
 
 export interface ClientWorkspaceState {
   /** Repo id restored when opening `/` — null when no repos were open. */
-  restoredRepoId: string | null
+  restoredWorkspaceId: string | null
   zenMode: boolean
   workspacePaneSize: number
   selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
   /** Per-repo, per-target workspace pane tab preference that session restore can make renderable. */
-  preferredWorkspacePaneTabByTargetByRepo: Record<string, Record<string, WorkspacePaneSessionTabType | null>>
+  preferredWorkspacePaneTabByTargetByWorkspace: Record<string, Record<string, WorkspacePaneSessionTabType | null>>
   /** Per-repo, per-worktree file tree view state. */
-  filetreeViewStateByWorktreeByRepo: Record<string, Record<string, FiletreeSessionViewState>>
+  filetreeViewStateByWorktreeByWorkspace: Record<string, Record<string, FiletreeSessionViewState>>
 }
 
 export type NativeClientWorkspaceReadResult = { kind: 'missing' } | { kind: 'loaded'; state: unknown }
@@ -164,7 +164,7 @@ export function isProjectedRestoredWorkspaceRuntime(
 export interface WorkspaceRuntimeRestoreSnapshot {
   workspaces: RestoredWorkspaceRuntime[]
   workspacePaneTabs: Array<{ workspaceId: string; workspaceRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>
-  restoredRepoId: string | null
+  restoredWorkspaceId: string | null
 }
 
 export interface WorkspaceRestoreResult {

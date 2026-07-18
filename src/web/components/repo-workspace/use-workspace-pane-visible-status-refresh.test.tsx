@@ -4,10 +4,10 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { useWorkspacePaneVisibleStatusRefresh } from '#/web/components/repo-workspace/use-workspace-pane-visible-status-refresh.ts'
-import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
+import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/workspaces/repo-refresh-actions.ts'
 
-vi.mock('#/web/stores/repos/repo-refresh-actions.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#/web/stores/repos/repo-refresh-actions.ts')>()
+vi.mock('#/web/stores/workspaces/repo-refresh-actions.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#/web/stores/workspaces/repo-refresh-actions.ts')>()
   return { ...actual, requestVisibleWorkspaceStatusRefresh: vi.fn(() => true) }
 })
 
@@ -24,7 +24,7 @@ function Harness({
   unavailable?: boolean
 }) {
   useWorkspacePaneVisibleStatusRefresh({
-    repoId: REPO_ID,
+    workspaceId: REPO_ID,
     workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     branchName,
     renderedTab,

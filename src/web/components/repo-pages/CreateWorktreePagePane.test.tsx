@@ -6,8 +6,8 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
 import { advanceTimersAndFlush, flushMicrotasks, renderInJsdom, useFakeTimers } from '#/test-utils/index.ts'
 import { CreateWorktreePagePane } from '#/web/components/repo-pages/CreateWorktreePagePane.tsx'
-import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
@@ -73,7 +73,7 @@ vi.mock('#/web/repo-client.ts', () => ({
 beforeEach(() => {
   vi.clearAllMocks()
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
   surfaceMocks.branchReadModel = {
     branches: [{ name: 'main' }],
     currentBranch: 'main',
@@ -297,7 +297,7 @@ describe('CreateWorktreePagePane', () => {
     const onCreated = vi.fn()
     const onCancel = vi.fn()
     let resolveAction!: (value: ExecResult) => void
-    useReposStore.setState({
+    useWorkspacesStore.setState({
       runBranchAction: vi.fn(
         () =>
           new Promise<ExecResult>((resolve) => {
@@ -337,8 +337,8 @@ describe('CreateWorktreePagePane', () => {
       expect(getRepoWorktreeBootstrapPreview).toHaveBeenCalledTimes(1)
     })
 
-    const repo = useReposStore.getState().repos[REPO_ID]
-    useReposStore.setState({ repos: { [REPO_ID]: { ...repo } } })
+    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
+    useWorkspacesStore.setState({ workspaces: { [REPO_ID]: { ...repo } } })
     rerender(
       <QueryClientProvider client={primaryWindowQueryClient}>
         <CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />
@@ -350,7 +350,7 @@ describe('CreateWorktreePagePane', () => {
 
   test('stays on the form when the action fails', async () => {
     const onCreated = vi.fn()
-    useReposStore.setState({ runBranchAction: vi.fn(async () => ({ ok: false, message: 'error.invalid-path' })) })
+    useWorkspacesStore.setState({ runBranchAction: vi.fn(async () => ({ ok: false, message: 'error.invalid-path' })) })
 
     const { container } = renderPane(
       <CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={onCreated} />,
@@ -365,7 +365,7 @@ describe('CreateWorktreePagePane', () => {
     })
 
     await waitFor(() => {
-      expect(useReposStore.getState().runBranchAction).toHaveBeenCalled()
+      expect(useWorkspacesStore.getState().runBranchAction).toHaveBeenCalled()
     })
     expect(onCreated).not.toHaveBeenCalled()
   })

@@ -6,7 +6,7 @@ import { TerminalActionDialogHost } from '#/web/components/TerminalActionDialogH
 import {
   resetTerminalActionDialogsStore,
   useTerminalActionDialogsStore,
-} from '#/web/stores/repos/terminal-action-dialogs.ts'
+} from '#/web/stores/workspaces/terminal-action-dialogs.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
@@ -44,7 +44,7 @@ describe('TerminalActionDialogHost', () => {
   test('retains the process message while the close animation runs after store state is cleared', () => {
     renderInJsdom(
       <TerminalActionDialogHost
-        currentRepoId="/repo"
+        currentWorkspaceId="/repo"
         currentWorkspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }}
         navigation={{} as PrimaryWindowNavigationActions}
       />,
@@ -52,7 +52,7 @@ describe('TerminalActionDialogHost', () => {
 
     act(() => {
       useTerminalActionDialogsStore.getState().openCloseConfirm({
-        repoId: '/repo',
+        workspaceId: '/repo',
         targetIdentity: 'terminal:term-111111111111111111111',
         selectedIdentity: 'terminal:term-111111111111111111111',
         workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },

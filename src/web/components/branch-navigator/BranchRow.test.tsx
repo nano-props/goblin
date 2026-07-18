@@ -43,7 +43,7 @@ import { createRef } from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { BranchRow } from '#/web/components/branch-navigator/BranchRow.tsx'
-import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { createRepoBranch, repoPresentationForTest } from '#/web/test-utils/bridge.ts'
 
 vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
@@ -563,7 +563,7 @@ function branchActionMenuShell(container: HTMLElement): HTMLDivElement | undefin
 }
 
 function branchRowRepo() {
-  return repoPresentationForTest(emptyRepo('/tmp/repo', 'repo', 'repo-runtime-test'), {
+  return repoPresentationForTest(emptyWorkspace('/tmp/repo', 'repo', 'repo-runtime-test'), {
     branches: [],
     currentBranch: '',
     status: [],

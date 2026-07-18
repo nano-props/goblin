@@ -7,7 +7,7 @@
 
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
-import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { createRepoBranch, repoPresentationForTest } from '#/web/test-utils/bridge.ts'
 
@@ -124,7 +124,7 @@ describe('BranchList', () => {
 })
 
 function branchListRepo(branches: ReturnType<typeof createRepoBranch>[], currentBranch: string) {
-  return repoPresentationForTest(emptyRepo('/tmp/repo', 'repo', 'repo-runtime-test'), {
+  return repoPresentationForTest(emptyWorkspace('/tmp/repo', 'repo', 'repo-runtime-test'), {
     branches,
     currentBranch,
     status: [],

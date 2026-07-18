@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { Check, Loader2, RefreshCw } from 'lucide-react'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { RepoEvent, RepoState } from '#/web/stores/repos/types.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import type { RepoEvent, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { Tip } from '#/web/components/Tip.tsx'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
-import { runManualRepoSync } from '#/web/stores/repos/refresh.ts'
+import { runManualRepoSync } from '#/web/stores/workspaces/refresh.ts'
 import type {
   RepoActivity,
   RepoActivityProjectionRepo,
@@ -20,9 +20,9 @@ import {
 import { useVisibleLoadingValue } from '#/web/hooks/useLoadingVisibility.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { Button } from '#/web/components/ui/button.tsx'
-import { repoEventActionSuccessLabel } from '#/web/stores/repos/action-labels.ts'
+import { repoEventActionSuccessLabel } from '#/web/stores/workspaces/action-labels.ts'
 import { formatRelativeTime } from '#/web/lib/dates.ts'
-import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
+import { latestRepoSyncTime } from '#/web/stores/workspaces/sync-time.ts'
 import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
 import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
 
@@ -34,7 +34,7 @@ const COMPLETION_VISIBLE_MS = 1500
 const EMPTY_EVENTS: RepoEvent[] = []
 
 type RepoActivityControlRepo = Pick<
-  RepoState,
+  WorkspaceState,
   'id' | 'workspaceRuntimeId' | 'dataLoads' | 'availability' | 'projection' | 'remote'
 > &
   RepoActivityProjectionRepo
@@ -68,9 +68,9 @@ function repoActivityControlRepoEqual(
 
 export function RepoActivityControl({ repoId }: Props) {
   const repo = useStoreWithEqualityFn(
-    useReposStore,
+    useWorkspacesStore,
     (s): RepoActivityControlRepo | undefined => {
-      const repo = s.repos[repoId]
+      const repo = s.workspaces[repoId]
       return repo
         ? {
             id: repo.id,
@@ -116,7 +116,7 @@ function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
 }
 
 function useRepoCompletion(repoId: string): RepoCompletion | null {
-  const events = useReposStore((s) => s.repos[repoId]?.events ?? EMPTY_EVENTS)
+  const events = useWorkspacesStore((s) => s.workspaces[repoId]?.events ?? EMPTY_EVENTS)
   const [completion, setCompletion] = useState<RepoCompletion | null>(null)
   const latestEventIdRef = useRef(0)
 
@@ -161,7 +161,7 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
     // Fire-and-forget so AsyncButton's internal pending state does not fight
     // the external manualSyncBusy prop. The visual loading state is owned by
     // the operation, not the click promise.
-    void runManualRepoSync({ get: useReposStore.getState, set: useReposStore.setState }, repo.id, { workspaceRuntimeId })
+    void runManualRepoSync({ get: useWorkspacesStore.getState, set: useWorkspacesStore.setState }, repo.id, { workspaceRuntimeId })
   }
 
   const fetchTooltipKey = repo.remote.hasRemotes === false ? 'action.fetch-local-title' : 'action.fetch-title'

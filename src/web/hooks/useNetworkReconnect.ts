@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import { runRemoteWorkspaceConnection } from '#/web/stores/repos/remote-workspace-connection-command.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
+import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import { goblinLog } from '#/web/logger.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-function reconnectRemoteRepo(set: ReposSet, get: ReposGet, repoId: string): void {
+function reconnectRemoteRepo(set: WorkspacesSet, get: WorkspacesGet, repoId: string): void {
   const workspaceId = canonicalWorkspaceLocator(repoId)
   if (!workspaceId) return
   void runRemoteWorkspaceConnection(set, get, workspaceId).then((outcome) => {
@@ -41,16 +41,16 @@ function reconnectRemoteRepo(set: ReposSet, get: ReposGet, repoId: string): void
  * next `online` event gives the next attempt.
  */
 export function useNetworkReconnect(): void {
-  const setRef = useRef<ReposSet>(useReposStore.setState)
-  const getRef = useRef<ReposGet>(useReposStore.getState)
-  setRef.current = useReposStore.setState
-  getRef.current = useReposStore.getState
+  const setRef = useRef<WorkspacesSet>(useWorkspacesStore.setState)
+  const getRef = useRef<WorkspacesGet>(useWorkspacesStore.getState)
+  setRef.current = useWorkspacesStore.setState
+  getRef.current = useWorkspacesStore.getState
 
   useEffect(() => {
     function onOnline() {
       const set = setRef.current
       const get = getRef.current
-      const repos = get().repos
+      const repos = get().workspaces
       for (const repo of Object.values(repos)) {
         if (!isRemoteRepoId(repo.id)) continue
         const lifecycle = repo.remote.lifecycle

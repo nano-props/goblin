@@ -8,7 +8,7 @@ import { BranchFilterAction, CreateWorktreeRowAction } from '#/web/components/re
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   createBranchSnapshot,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoShellForTest,
   seedRepoWithReadModelForTest,
@@ -20,7 +20,7 @@ const REPO_ID = 'goblin+file:///tmp/goblin-repo-toolbar-actions-test-repo'
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
   vi.clearAllMocks()
 })
 

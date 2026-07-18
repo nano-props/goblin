@@ -8,9 +8,9 @@ import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key
 import { workspaceLocatorForPath, canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
-import { useFiletreeInteractionStore } from '#/web/stores/repos/filetree-interaction-state.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { createBranchSnapshot, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { useFiletreeInteractionStore } from '#/web/stores/workspaces/filetree-interaction-state.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { createBranchSnapshot, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 const writePresentationMock = vi.fn()
 
@@ -20,7 +20,7 @@ vi.mock('#/web/client-workspace-state.ts', () => ({
 
 beforeEach(() => {
   vi.useRealTimers()
-  resetReposStore()
+  resetWorkspacesStore()
   useFiletreeInteractionStore.setState({ interactionByScope: {} })
   writePresentationMock.mockReset()
 })
@@ -32,10 +32,10 @@ describe('useClientWorkspacePersistence', () => {
       branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a' } })],
       currentBranchName: 'feature/a',
     })
-    useReposStore.setState({
-      repos: { [repo.id]: repo },
-      order: [repo.id],
-      restoredRepoId: repo.id,
+    useWorkspacesStore.setState({
+      workspaces: { [repo.id]: repo },
+      workspaceOrder: [repo.id],
+      restoredWorkspaceId: repo.id,
       zenMode: true,
       workspacePaneSize: 55,
       workspaceMembershipReady: true,
@@ -45,7 +45,7 @@ describe('useClientWorkspacePersistence', () => {
     renderInJsdom(<Harness routedRepoId={repo.id} />)
 
     expect(writePresentationMock).toHaveBeenCalledWith(
-      expect.objectContaining({ restoredRepoId: repo.id, zenMode: true, workspacePaneSize: 55 }),
+      expect.objectContaining({ restoredWorkspaceId: repo.id, zenMode: true, workspacePaneSize: 55 }),
     )
     const saved = writePresentationMock.mock.calls[0]?.[0]
     expect(saved).not.toHaveProperty('openWorkspaceEntries')
@@ -69,10 +69,10 @@ describe('useClientWorkspacePersistence', () => {
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/worktree': [workspacePaneStaticTabEntry('history')] },
     })
-    useReposStore.setState({
-      repos: { [repo.id]: repo },
-      order: [repo.id],
-      restoredRepoId: repo.id,
+    useWorkspacesStore.setState({
+      workspaces: { [repo.id]: repo },
+      workspaceOrder: [repo.id],
+      restoredWorkspaceId: repo.id,
       selectedTerminalSessionIdByTerminalWorktree: {
         [terminalWorktreeKey]: 'term-111111111111111111111',
       },
@@ -94,8 +94,8 @@ describe('useClientWorkspacePersistence', () => {
         selectedTerminalSessionIdByTerminalWorktree: {
           [terminalWorktreeKey]: 'term-111111111111111111111',
         },
-        preferredWorkspacePaneTabByTargetByRepo: { 'goblin+file:///tmp/repo': { [targetKey]: 'history' } },
-        filetreeViewStateByWorktreeByRepo: {
+        preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///tmp/repo': { [targetKey]: 'history' } },
+        filetreeViewStateByWorktreeByWorkspace: {
           'goblin+file:///tmp/repo': {
             [worktreeId]: {
               selectedKeys: ['src/index.ts'],
@@ -114,9 +114,9 @@ describe('useClientWorkspacePersistence', () => {
       branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a' } })],
       currentBranchName: 'feature/a',
     })
-    useReposStore.setState({
-      repos: { [repo.id]: repo },
-      order: [repo.id],
+    useWorkspacesStore.setState({
+      workspaces: { [repo.id]: repo },
+      workspaceOrder: [repo.id],
       workspaceMembershipReady: true,
       sessionPersistenceReady: false,
     })
@@ -132,10 +132,10 @@ describe('useClientWorkspacePersistence', () => {
       branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a' } })],
       currentBranchName: 'feature/a',
     })
-    useReposStore.setState({
-      repos: { [repo.id]: repo },
-      order: [repo.id],
-      restoredRepoId: repo.id,
+    useWorkspacesStore.setState({
+      workspaces: { [repo.id]: repo },
+      workspaceOrder: [repo.id],
+      restoredWorkspaceId: repo.id,
       workspaceMembershipReady: true,
       sessionPersistenceReady: true,
     })
@@ -143,12 +143,12 @@ describe('useClientWorkspacePersistence', () => {
     writePresentationMock.mockClear()
 
     act(() => {
-      useReposStore.setState({
+      useWorkspacesStore.setState({
         selectedTerminalSessionIdByTerminalWorktree: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-111111111111111111111',
         },
       })
-      useReposStore.setState({
+      useWorkspacesStore.setState({
         selectedTerminalSessionIdByTerminalWorktree: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-222222222222222222222',
         },
@@ -175,10 +175,10 @@ describe('useClientWorkspacePersistence', () => {
       branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a' } })],
       currentBranchName: 'feature/a',
     })
-    useReposStore.setState({
-      repos: { [repo.id]: repo },
-      order: [repo.id],
-      restoredRepoId: repo.id,
+    useWorkspacesStore.setState({
+      workspaces: { [repo.id]: repo },
+      workspaceOrder: [repo.id],
+      restoredWorkspaceId: repo.id,
       workspaceMembershipReady: true,
       sessionPersistenceReady: true,
     })
@@ -186,7 +186,7 @@ describe('useClientWorkspacePersistence', () => {
     writePresentationMock.mockClear()
 
     act(() => {
-      useReposStore.setState({
+      useWorkspacesStore.setState({
         selectedTerminalSessionIdByTerminalWorktree: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-333333333333333333333',
         },
@@ -212,10 +212,10 @@ describe('useClientWorkspacePersistence', () => {
       branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a' } })],
       currentBranchName: 'feature/a',
     })
-    useReposStore.setState({
-      repos: { [repo.id]: repo },
-      order: [repo.id],
-      restoredRepoId: repo.id,
+    useWorkspacesStore.setState({
+      workspaces: { [repo.id]: repo },
+      workspaceOrder: [repo.id],
+      restoredWorkspaceId: repo.id,
       workspaceMembershipReady: true,
       sessionPersistenceReady: true,
     })
@@ -233,10 +233,10 @@ describe('useClientWorkspacePersistence', () => {
       branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a' } })],
       currentBranchName: 'feature/a',
     })
-    useReposStore.setState({
-      repos: { [repo.id]: repo },
-      order: [repo.id],
-      restoredRepoId: repo.id,
+    useWorkspacesStore.setState({
+      workspaces: { [repo.id]: repo },
+      workspaceOrder: [repo.id],
+      restoredWorkspaceId: repo.id,
       zenMode: false,
       workspaceMembershipReady: true,
       sessionPersistenceReady: true,
@@ -258,8 +258,8 @@ describe('useClientWorkspacePersistence', () => {
       await Promise.resolve()
     })
 
-    act(() => useReposStore.setState({ zenMode: true }))
-    act(() => useReposStore.setState({ zenMode: false }))
+    act(() => useWorkspacesStore.setState({ zenMode: true }))
+    act(() => useWorkspacesStore.setState({ zenMode: false }))
 
     expect(writePresentationMock).toHaveBeenCalledTimes(3)
     expect(writePresentationMock.mock.calls.map(([state]) => state.zenMode)).toEqual([false, true, false])

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { SettingsSurface } from '#/web/components/SettingsSurface.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
-import { resetReposStore } from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const toastMocks = vi.hoisted(() => ({
@@ -43,7 +43,7 @@ function defaultIpcResult(path: string, input?: unknown) {
       lanEnabled: false,
       session: {
         openWorkspaceEntries: [],
-        restoredRepoId: null,
+        restoredWorkspaceId: null,
         zenMode: true,
         workspacePaneSize: 50,
       },
@@ -95,7 +95,7 @@ const fetchMock = mockFetch(async (input: RequestInfo | URL, init?: RequestInit)
 
 beforeEach(() => {
   setClientBridgeForTests(null)
-  resetReposStore()
+  resetWorkspacesStore()
   sendTestNotification.mockClear()
   toastMocks.success.mockClear()
   toastMocks.error.mockClear()

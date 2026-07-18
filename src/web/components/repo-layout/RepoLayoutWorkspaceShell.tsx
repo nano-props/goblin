@@ -4,7 +4,7 @@ import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 
 interface RepoWorkspaceShellBaseProps {
-  repoId?: string
+  workspaceId?: string
   compact: boolean
   zenMode: boolean
   repoWorkspaceActive: boolean
@@ -28,7 +28,7 @@ type RepoWorkspaceShellProps = RepoWorkspaceShellBaseProps &
   )
 
 export function RepoLayoutWorkspaceShell({
-  repoId,
+  workspaceId,
   compact,
   zenMode,
   repoWorkspaceActive,
@@ -60,7 +60,7 @@ export function RepoLayoutWorkspaceShell({
           activePane={activePane}
           sidebarPane={navigatorPane}
           repoWorkspacePane={workspacePane}
-          transitionScopeKey={repoId}
+          transitionScopeKey={workspaceId}
         />
       )
     }
@@ -84,7 +84,7 @@ export function RepoLayoutWorkspaceShell({
       {renderWorkspaceBody(repoWorkspacePane, sidebarPane)}
       {!compact && zenModeToggleEnabled ? (
         <ZenModeSidebarChrome
-          repoId={repoId}
+          workspaceId={workspaceId}
           sidebarPane={zenRevealSidebarPane}
           zenModeToggleEnabled
           revealEnabled={zenRevealEnabled}

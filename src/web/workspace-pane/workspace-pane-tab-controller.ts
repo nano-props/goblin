@@ -29,13 +29,13 @@ import {
   primaryWindowPresentationIsCurrent,
   type PrimaryWindowPresentationToken,
 } from '#/web/primary-window-presentation.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneTabsTargetWorktreePath } from '#/shared/workspace-pane-tabs-target.ts'
 import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 export type WorkspacePaneTabControllerRoute = WorkspacePaneRouteTarget
 export interface WorkspacePaneControllerTarget {
-  repoId: string
+  workspaceId: string
   workspaceRuntimeId: string
   branchName: string | null
   worktreePath: string | null
@@ -87,7 +87,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
   const toRoute = input.nextTab ? workspacePaneControllerRouteForTab(input.nextTab) : null
   if (toRoute === undefined) return null
   const target: WorkspacePaneControllerTarget = {
-    repoId: input.target.repoId,
+    workspaceId: input.target.workspaceId,
     workspaceRuntimeId: input.target.workspaceRuntimeId,
     branchName,
     worktreePath: input.target.worktreePath,
@@ -123,7 +123,7 @@ export async function selectWorkspacePaneControllerTab(
     if (isRepoWorkspaceRuntimeTab(tab) && tab.runtimeType === 'terminal') {
       return (
         navigation.showRepoWorktreeTerminalSession?.(
-          target.repoId,
+          target.workspaceId,
           target.paneTarget.worktreePath,
           tab.sessionId,
           { presentationToken },
@@ -134,7 +134,7 @@ export async function selectWorkspacePaneControllerTab(
     if (tab.kind !== 'static') return false
     return (
       navigation.showRepoWorktreeWorkspacePaneTab?.(
-        target.repoId,
+        target.workspaceId,
         target.paneTarget.worktreePath,
         tab.type,
         { presentationToken },
@@ -150,7 +150,7 @@ export async function selectWorkspacePaneControllerTab(
           ? { kind: 'static' as const, tab: tab.type }
           : null
     return presentation
-      ? (navigation.showWorkspaceRootPaneTab?.(target.repoId, presentation, { presentationToken }) ?? false)
+      ? (navigation.showWorkspaceRootPaneTab?.(target.workspaceId, presentation, { presentationToken }) ?? false)
       : false
   }
   if (target.paneTarget.kind === 'inactive') return false
@@ -174,7 +174,7 @@ export async function selectWorkspacePaneControllerTabEntry(
   if (target.paneTarget.kind === 'workspace-root') {
     return (
       navigation.showWorkspaceRootPaneTab?.(
-        target.repoId,
+        target.workspaceId,
         { kind: 'terminal', terminalSessionId: entry.runtimeSessionId },
         { presentationToken },
       ) ?? false
@@ -183,7 +183,7 @@ export async function selectWorkspacePaneControllerTabEntry(
   if (target.paneTarget.kind === 'git-worktree' && target.branchName === null) {
     return (
       navigation.showRepoWorktreeTerminalSession?.(
-        target.repoId,
+        target.workspaceId,
         target.paneTarget.worktreePath,
         entry.runtimeSessionId,
         { presentationToken },
@@ -215,7 +215,7 @@ export function commitWorkspacePaneControllerCloseBackTarget(
 }
 
 export function showWorkspacePaneControllerRoute(
-  repoId: string,
+  workspaceId: string,
   branchName: string,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerOptionalShowNavigation,
@@ -227,7 +227,7 @@ export function showWorkspacePaneControllerRoute(
       openRepoBranchTab: navigation.showRepoBranchWorkspacePaneTab ?? (() => false),
       openRepoBranchTerminal: navigation.showRepoBranchTerminalSession ?? (() => false),
     },
-    repoId,
+    workspaceId,
     branchName,
     route,
     options,
@@ -235,7 +235,7 @@ export function showWorkspacePaneControllerRoute(
 }
 
 export async function commitWorkspacePaneControllerRoute(
-  repoId: string,
+  workspaceId: string,
   branchName: string,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,
@@ -248,7 +248,7 @@ export async function commitWorkspacePaneControllerRoute(
   },
 ): Promise<boolean> {
   try {
-    return await navigation.commitWorkspacePaneRoute(repoId, branchName, route, options)
+    return await navigation.commitWorkspacePaneRoute(workspaceId, branchName, route, options)
   } catch {
     return false
   }
@@ -287,8 +287,10 @@ export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
     (candidate) =>
       candidate.branchName !== null &&
       workspacePaneCommittedRuntimeTargetIsCurrent({
-        ...candidate,
+        repoId: candidate.workspaceId,
+        workspaceRuntimeId: candidate.workspaceRuntimeId,
         branchName: candidate.branchName,
+        worktreePath: candidate.worktreePath,
       }),
     commitWorkspacePaneCommittedRuntimeRouteSupplement,
     false,
@@ -311,12 +313,17 @@ async function commitWorkspacePaneValidatedTargetRoute(
   const branchName = target.branchName
   if (!branchName || !targetIsCurrent(target)) return false
   let supplementCommitted = false
-  const committed = await commitWorkspacePaneControllerRoute(target.repoId, branchName, route, navigation, {
+  const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
     ...options,
     presentationToken,
     ...(useCurrentTargetPrecondition ? { routePrecondition: { kind: 'current-workspace-target' as const } } : {}),
     onCommit: () => {
-      supplementCommitted = commitSupplement({ ...target, branchName }, route)
+      supplementCommitted = commitSupplement({
+        repoId: target.workspaceId,
+        workspaceRuntimeId: target.workspaceRuntimeId,
+        branchName,
+        worktreePath: target.worktreePath,
+      }, route)
     },
   })
   if (!committed || !supplementCommitted) return false
@@ -338,12 +345,17 @@ export async function commitWorkspacePaneExactTargetRoute(
   const sourceRoute = workspacePaneTabControllerRouteFromParsed(fromRoute)
   if (fromRoute !== undefined && sourceRoute === undefined) return false
   let supplementCommitted = false
-  const committed = await commitWorkspacePaneControllerRoute(target.repoId, branchName, route, navigation, {
+  const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
     ...options,
     presentationToken,
     routePrecondition: sourceRoute === undefined ? undefined : { kind: 'exact-route', route: sourceRoute },
     onCommit: () => {
-      supplementCommitted = commitWorkspacePaneRouteSupplement({ ...target, branchName }, route)
+      supplementCommitted = commitWorkspacePaneRouteSupplement({
+        repoId: target.workspaceId,
+        workspaceRuntimeId: target.workspaceRuntimeId,
+        branchName,
+        worktreePath: target.worktreePath,
+      }, route)
     },
   })
   if (!committed || !supplementCommitted) return false
@@ -351,13 +363,18 @@ export async function commitWorkspacePaneExactTargetRoute(
 }
 
 export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneControllerTarget): boolean {
-  if (target.paneTarget.kind === 'inactive' || target.paneTarget.repoRoot !== target.repoId) return false
-  if (useReposStore.getState().repos[target.repoId]?.workspaceRuntimeId !== target.workspaceRuntimeId) return false
+  if (target.paneTarget.kind === 'inactive' || target.paneTarget.repoRoot !== target.workspaceId) return false
+  if (useWorkspacesStore.getState().workspaces[target.workspaceId]?.workspaceRuntimeId !== target.workspaceRuntimeId) return false
   if (target.paneTarget.kind === 'git-branch') {
     return (
       target.branchName === target.paneTarget.branchName &&
       target.worktreePath === null &&
-      workspacePaneTargetLeaseIsCurrent({ ...target, branchName: target.paneTarget.branchName })
+      workspacePaneTargetLeaseIsCurrent({
+        repoId: target.workspaceId,
+        workspaceRuntimeId: target.workspaceRuntimeId,
+        branchName: target.paneTarget.branchName,
+        worktreePath: target.worktreePath,
+      })
     )
   }
   const targetWorktreePath = workspacePaneTabsTargetWorktreePath(target.paneTarget)
@@ -365,8 +382,9 @@ export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneC
     if (target.worktreePath !== targetWorktreePath) return false
     return target.branchName === null
       ? true
-      : workspacePaneTargetLeaseIsCurrent({
-          ...target,
+        : workspacePaneTargetLeaseIsCurrent({
+          repoId: target.workspaceId,
+          workspaceRuntimeId: target.workspaceRuntimeId,
           branchName: target.branchName,
           worktreePath: target.paneTarget.worktreePath,
         })

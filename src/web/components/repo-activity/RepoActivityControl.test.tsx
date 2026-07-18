@@ -1,15 +1,15 @@
 import { describe, expect, test } from 'vitest'
 import { getRepoActivityControlView, isRepoPrimaryRefreshBusy } from '#/web/components/repo-activity/model.ts'
-import { seedRepoShellForTest, resetReposStore } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import { seedRepoShellForTest, resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
 
 const REPO_ID = 'goblin+file:///tmp/repo-activity-control'
 
 describe('RepoActivityControl', () => {
   test('marks the primary refresh button busy from server operation projection', () => {
-    resetReposStore()
+    resetWorkspacesStore()
     const repo = seedRepoShellForTest({ id: REPO_ID })
     const operations: RepoOperationsSnapshot = {
       operations: [
@@ -51,11 +51,11 @@ describe('RepoActivityControl', () => {
   })
 
   test('marks the primary refresh button busy during any fetch', () => {
-    resetReposStore()
+    resetWorkspacesStore()
     seedRepoShellForTest({ id: REPO_ID })
     markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'fetch', reason: 'fetch' }], 'running')
 
-    const repo = useReposStore.getState().repos[REPO_ID]!
+    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
     expect(isRepoPrimaryRefreshBusy(repo)).toBe(true)
     expect(
       getRepoActivityControlView({
@@ -67,7 +67,7 @@ describe('RepoActivityControl', () => {
   })
 
   test('marks the primary refresh button busy during manual refreshes', () => {
-    resetReposStore()
+    resetWorkspacesStore()
     seedRepoShellForTest({ id: REPO_ID })
     markRepoOperationTargets(
       REPO_ID,
@@ -76,7 +76,7 @@ describe('RepoActivityControl', () => {
       'running',
     )
 
-    const repo = useReposStore.getState().repos[REPO_ID]!
+    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
     expect(isRepoPrimaryRefreshBusy(repo)).toBe(true)
     expect(
       getRepoActivityControlView({
@@ -88,10 +88,10 @@ describe('RepoActivityControl', () => {
   })
 
   test('shows the primary refresh button for local-only repositories', () => {
-    resetReposStore()
+    resetWorkspacesStore()
     seedRepoShellForTest({ id: REPO_ID, remote: { hasRemotes: false } })
 
-    const repo = useReposStore.getState().repos[REPO_ID]!
+    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
     expect(
       getRepoActivityControlView({
         visibleActivity: null,

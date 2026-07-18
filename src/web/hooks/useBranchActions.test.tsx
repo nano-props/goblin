@@ -10,7 +10,7 @@ import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import {
   createRepoBranch,
   repoPresentationFromQueryForTest,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoWithReadModelForTest,
   type RepoPresentationForTest,
 } from '#/web/test-utils/bridge.ts'
@@ -42,7 +42,7 @@ const REPO_ID = 'goblin+file:///tmp/goblin-use-branch-actions-test-repo'
 
 describe('useBranchActions', () => {
   beforeEach(() => {
-    resetReposStore()
+    resetWorkspacesStore()
     mocks.getRepoPatch.mockReset()
     mocks.openRepoEditor.mockReset()
     mocks.openRepoInFinder.mockReset()

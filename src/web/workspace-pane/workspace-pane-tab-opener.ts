@@ -4,9 +4,9 @@ import {
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
-import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
+import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import type { WorkspacePaneTabTargetOptions } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
@@ -22,7 +22,7 @@ export function captureWorkspacePaneActiveTabIdentity(
   workspaceRuntimeId: string,
   options: WorkspacePaneTabTargetOptions,
 ): string | null {
-  const repo = useReposStore.getState().repos[target.repoRoot]
+  const repo = useWorkspacesStore.getState().workspaces[target.repoRoot]
   if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId) return null
   const projection = readWorkspacePaneTabsProjectionForTarget({ ...target, workspaceRuntimeId: workspaceRuntimeId })
   if (projection.phase !== 'ready') return null
@@ -51,8 +51,8 @@ export function recordWorkspacePaneTabOpener(
   childIdentity: string,
   openerIdentity: string,
 ): WorkspacePaneTabOpenerRecordResult {
-  const state = useReposStore.getState()
-  const repo = state.repos[target.repoRoot]
+  const state = useWorkspacesStore.getState()
+  const repo = state.workspaces[target.repoRoot]
   if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId) return 'missing'
   state.setTabOpener(runtimeScopedTabOpenerKey(target, workspaceRuntimeId), childIdentity, openerIdentity)
   return 'recorded'
@@ -64,7 +64,7 @@ export function workspacePaneTabOpener(
   closingIdentity: string,
 ): string | null {
   const scopeKey = runtimeScopedTabOpenerKey(target, workspaceRuntimeId)
-  return useReposStore.getState().tabOpenerIdentityByScope[scopeKey]?.[closingIdentity] ?? null
+  return useWorkspacesStore.getState().tabOpenerIdentityByScope[scopeKey]?.[closingIdentity] ?? null
 }
 
 export function clearWorkspacePaneTabOpener(
@@ -72,7 +72,7 @@ export function clearWorkspacePaneTabOpener(
   workspaceRuntimeId: string,
   childIdentity: string,
 ): void {
-  useReposStore.getState().clearTabOpener(runtimeScopedTabOpenerKey(target, workspaceRuntimeId), childIdentity)
+  useWorkspacesStore.getState().clearTabOpener(runtimeScopedTabOpenerKey(target, workspaceRuntimeId), childIdentity)
 }
 
 function runtimeScopedTabOpenerKey(target: WorkspacePaneTabsTarget, workspaceRuntimeId: string): string {

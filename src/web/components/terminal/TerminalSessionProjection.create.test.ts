@@ -890,28 +890,28 @@ describe('TerminalSessionProjection create flow', () => {
     document.body.appendChild(host)
     projection.registerHost(WORKTREE_KEY, host)
     const listener = vi.fn()
-    const unsubscribe = projection.subscribeRepoBellCount(REPO_ROOT, listener)
+    const unsubscribe = projection.subscribeWorkspaceBellCount(REPO_ROOT, listener)
 
     try {
       const terminalSessionId = await projection.createTerminal(terminalBase())
-      expect(projection.repoBellCount(REPO_ROOT)).toBe(0)
+      expect(projection.workspaceBellCount(REPO_ROOT)).toBe(0)
       expect(listener).not.toHaveBeenCalled()
 
       emitBellForKey(projection, terminalSessionId)
 
-      expect(projection.repoBellCount(REPO_ROOT)).toBe(1)
+      expect(projection.workspaceBellCount(REPO_ROOT)).toBe(1)
       expect(listener).toHaveBeenCalledTimes(1)
 
       listener.mockClear()
       projection.scrollToBottom(terminalSessionId)
 
-      expect(projection.repoBellCount(REPO_ROOT)).toBe(1)
+      expect(projection.workspaceBellCount(REPO_ROOT)).toBe(1)
       expect(listener).not.toHaveBeenCalled()
 
       listener.mockClear()
       projection.clearBell(terminalSessionId)
 
-      expect(projection.repoBellCount(REPO_ROOT)).toBe(0)
+      expect(projection.workspaceBellCount(REPO_ROOT)).toBe(0)
       expect(listener).toHaveBeenCalledTimes(1)
     } finally {
       unsubscribe()
@@ -926,10 +926,10 @@ describe('TerminalSessionProjection create flow', () => {
     emitBellForKey(projection, terminalSessionId)
 
     const listener = vi.fn()
-    const unsubscribe = projection.subscribeRepoBellCount(REPO_ROOT, listener)
+    const unsubscribe = projection.subscribeWorkspaceBellCount(REPO_ROOT, listener)
 
     try {
-      expect(projection.repoBellCount(REPO_ROOT)).toBe(1)
+      expect(projection.workspaceBellCount(REPO_ROOT)).toBe(1)
 
       projection.handleSessionClosed({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -937,7 +937,7 @@ describe('TerminalSessionProjection create flow', () => {
         terminalSessionId,
       })
 
-      expect(projection.repoBellCount(REPO_ROOT)).toBe(0)
+      expect(projection.workspaceBellCount(REPO_ROOT)).toBe(0)
       expect(listener).toHaveBeenCalledTimes(1)
     } finally {
       unsubscribe()

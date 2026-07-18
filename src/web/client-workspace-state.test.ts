@@ -14,11 +14,59 @@ afterEach(() => vi.restoreAllMocks())
 
 describe('client workspace persistence', () => {
   test('accepts canonical repo locators without Node path APIs', () => {
-    expect(normalizeClientWorkspaceState({ restoredRepoId: 'goblin+file:///repo' }).restoredRepoId).toBe(
+    expect(normalizeClientWorkspaceState({ restoredWorkspaceId: 'goblin+file:///repo' }).restoredWorkspaceId).toBe(
       'goblin+file:///repo',
     )
-    expect(normalizeClientWorkspaceState({ restoredRepoId: 'C:\\repo' }).restoredRepoId).toBeNull()
-    expect(normalizeClientWorkspaceState({ restoredRepoId: 'relative/repo' }).restoredRepoId).toBeNull()
+    expect(normalizeClientWorkspaceState({ restoredWorkspaceId: 'C:\\repo' }).restoredWorkspaceId).toBeNull()
+    expect(normalizeClientWorkspaceState({ restoredWorkspaceId: 'relative/repo' }).restoredWorkspaceId).toBeNull()
+  })
+
+  test('migrates legacy durable field names at the decode boundary', () => {
+    const state = normalizeClientWorkspaceState({
+      restoredRepoId: 'goblin+file:///legacy',
+      preferredWorkspacePaneTabByTargetByRepo: {
+        'goblin+file:///legacy': { 'goblin+file:///legacy\0workspace-root': 'files' },
+      },
+      filetreeViewStateByWorktreeByRepo: {
+        'goblin+file:///legacy': {
+          'goblin+file:///legacy': { selectedKeys: ['README.md'], expandedKeys: [], topVisibleRowIndex: 0 },
+        },
+      },
+    })
+
+    expect(state.restoredWorkspaceId).toBe('goblin+file:///legacy')
+    expect(state.preferredWorkspacePaneTabByTargetByWorkspace).toEqual({
+      'goblin+file:///legacy': { 'goblin+file:///legacy\0workspace-root': 'files' },
+    })
+    expect(state.filetreeViewStateByWorktreeByWorkspace).toEqual({
+      'goblin+file:///legacy': {
+        'goblin+file:///legacy': { selectedKeys: ['README.md'], expandedKeys: [], topVisibleRowIndex: 0 },
+      },
+    })
+    expect(state).not.toHaveProperty('restoredRepoId')
+    expect(state).not.toHaveProperty('preferredWorkspacePaneTabByTargetByRepo')
+    expect(state).not.toHaveProperty('filetreeViewStateByWorktreeByRepo')
+  })
+
+  test('treats present current fields as authoritative over legacy fields', () => {
+    const state = normalizeClientWorkspaceState({
+      restoredWorkspaceId: null,
+      restoredRepoId: 'goblin+file:///legacy',
+      preferredWorkspacePaneTabByTargetByWorkspace: {},
+      preferredWorkspacePaneTabByTargetByRepo: {
+        'goblin+file:///legacy': { 'goblin+file:///legacy\0workspace-root': 'files' },
+      },
+      filetreeViewStateByWorktreeByWorkspace: {},
+      filetreeViewStateByWorktreeByRepo: {
+        'goblin+file:///legacy': {
+          'goblin+file:///legacy': { selectedKeys: ['README.md'], expandedKeys: [], topVisibleRowIndex: 0 },
+        },
+      },
+    })
+
+    expect(state.restoredWorkspaceId).toBeNull()
+    expect(state.preferredWorkspacePaneTabByTargetByWorkspace).toEqual({})
+    expect(state.filetreeViewStateByWorktreeByWorkspace).toEqual({})
   })
 
   test('fails fast when native workspace state cannot be read', async () => {
@@ -38,16 +86,16 @@ describe('client workspace persistence', () => {
 
   test('round-trips client-owned presentation without server workspace fields', async () => {
     const presentation = normalizeClientWorkspaceState({
-      restoredRepoId: 'goblin+file:///repo-a',
+      restoredWorkspaceId: 'goblin+file:///repo-a',
       zenMode: true,
       workspacePaneSize: 52,
       selectedTerminalSessionIdByTerminalWorktree: {
         'goblin+file:///repo-a\0goblin+file:///worktree': 'term-111',
       },
-      preferredWorkspacePaneTabByTargetByRepo: {
+      preferredWorkspacePaneTabByTargetByWorkspace: {
         'goblin+file:///repo-a': { 'goblin+file:///repo-a\0workspace-root': 'history' },
       },
-      filetreeViewStateByWorktreeByRepo: {
+      filetreeViewStateByWorktreeByWorkspace: {
         'goblin+file:///repo-a': {
           'goblin+file:///worktree': { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 7 },
         },
@@ -67,22 +115,22 @@ describe('client workspace persistence', () => {
     localStorage.setItem(
       'goblin.workspace',
       JSON.stringify({
-        restoredRepoId: '',
+        restoredWorkspaceId: '',
         zenMode: 'yes',
         workspacePaneSize: Number.NaN,
         selectedTerminalSessionIdByTerminalWorktree: { broken: 12 },
-        preferredWorkspacePaneTabByTargetByRepo: { 'goblin+file:///repo-a': { target: 'unknown' } },
-        filetreeViewStateByWorktreeByRepo: [],
+      preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///repo-a': { target: 'unknown' } },
+      filetreeViewStateByWorktreeByWorkspace: [],
       }),
     )
 
     expect(await readClientWorkspaceState()).toEqual({
-      restoredRepoId: null,
+      restoredWorkspaceId: null,
       zenMode: false,
       workspacePaneSize: 70,
       selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByTargetByRepo: {},
-      filetreeViewStateByWorktreeByRepo: {},
+      preferredWorkspacePaneTabByTargetByWorkspace: {},
+      filetreeViewStateByWorktreeByWorkspace: {},
     })
   })
 
@@ -93,13 +141,13 @@ describe('client workspace persistence', () => {
           'goblin+file:///repo-a\0/worktree': 'term-legacy',
           'goblin+file:///repo-a\0goblin+ssh://dev/worktree': 'term-cross-transport',
         },
-        preferredWorkspacePaneTabByTargetByRepo: {
+        preferredWorkspacePaneTabByTargetByWorkspace: {
           'goblin+file:///repo-a': {
             target: 'history',
             'goblin+file:///repo-a\0worktree\0/worktree': 'files',
           },
         },
-        filetreeViewStateByWorktreeByRepo: {
+        filetreeViewStateByWorktreeByWorkspace: {
           'goblin+file:///repo-a': {
             '/worktree': { selectedKeys: ['README.md'], expandedKeys: [], topVisibleRowIndex: 0 },
             'goblin+ssh://dev/worktree': {
@@ -112,8 +160,8 @@ describe('client workspace persistence', () => {
       }),
     ).toMatchObject({
       selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByTargetByRepo: {},
-      filetreeViewStateByWorktreeByRepo: {},
+      preferredWorkspacePaneTabByTargetByWorkspace: {},
+      filetreeViewStateByWorktreeByWorkspace: {},
     })
   })
 })

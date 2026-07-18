@@ -53,13 +53,13 @@ interface ZenModeSidebarRevealProps {
 }
 
 interface ZenModeSidebarRevealTriggerProps {
-  repoId?: string
+  workspaceId?: string
   zenRevealTriggerEnabled?: boolean
   onZenRevealTriggerEnter?: () => void
 }
 
 interface ZenModeSidebarChromeProps {
-  repoId?: string
+  workspaceId?: string
   sidebarPane: ReactNode
   zenModeToggleEnabled: boolean
   revealEnabled: boolean
@@ -140,7 +140,7 @@ function useZenModeSidebarReveal(enabled: boolean): ZenModeSidebarRevealState {
 }
 
 export function ZenModeSidebarChrome({
-  repoId,
+  workspaceId,
   sidebarPane,
   zenModeToggleEnabled,
   revealEnabled,
@@ -165,7 +165,7 @@ export function ZenModeSidebarChrome({
       ) : null}
       {zenModeToggleEnabled ? (
         <ZenModeSidebarRevealTriggerLayer
-          repoId={repoId}
+          workspaceId={workspaceId}
           zenRevealTriggerEnabled={revealEnabled}
           onZenRevealTriggerEnter={reveal.onTriggerEnter}
         />
@@ -175,7 +175,7 @@ export function ZenModeSidebarChrome({
 }
 
 function ZenModeSidebarRevealTriggerLayer({
-  repoId,
+  workspaceId,
   zenRevealTriggerEnabled = false,
   onZenRevealTriggerEnter,
 }: ZenModeSidebarRevealTriggerProps) {
@@ -186,7 +186,7 @@ function ZenModeSidebarRevealTriggerLayer({
       style={{ height: TITLE_BAR_HEIGHT_PX }}
     >
       <ZenModeSidebarRevealTrigger
-        repoId={repoId}
+        workspaceId={workspaceId}
         zenRevealTriggerEnabled={zenRevealTriggerEnabled}
         onZenRevealTriggerEnter={onZenRevealTriggerEnter}
       />
@@ -195,14 +195,14 @@ function ZenModeSidebarRevealTriggerLayer({
 }
 
 function ZenModeSidebarRevealTrigger({
-  repoId,
+  workspaceId,
   zenRevealTriggerEnabled = false,
   onZenRevealTriggerEnter,
 }: ZenModeSidebarRevealTriggerProps) {
   return (
     <TitleBarInteractiveRegion>
       <WorkspaceNavigationControls
-        repoId={repoId}
+        workspaceId={workspaceId}
         zenRevealTriggerEnabled={zenRevealTriggerEnabled}
         onZenRevealTriggerEnter={onZenRevealTriggerEnter}
       />

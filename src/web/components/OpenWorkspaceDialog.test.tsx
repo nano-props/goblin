@@ -8,7 +8,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { OpenWorkspaceDialog } from '#/web/components/OpenWorkspaceDialog.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
-import type { OpenWorkspaceResult } from '#/web/stores/repos/types.ts'
+import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 
 let ipcCalls: Array<{ path: string; input?: unknown }> = []
 const testWindow = window as unknown as {

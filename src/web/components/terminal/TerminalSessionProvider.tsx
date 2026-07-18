@@ -1,7 +1,7 @@
 import { useEffect, useMemo, type ReactNode } from 'react'
 
 import '#/web/components/terminal/terminal-session.css'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import {
   TerminalSessionContext,
@@ -20,7 +20,7 @@ interface TerminalSessionProviderProps {
 
 export function TerminalSessionProvider({ children }: TerminalSessionProviderProps) {
   const runtimeMembershipIndex = useTerminalRuntimeMembershipIndex()
-  const selectedTerminalSessionIdByTerminalWorktree = useReposStore(
+  const selectedTerminalSessionIdByTerminalWorktree = useWorkspacesStore(
     (s) => s.selectedTerminalSessionIdByTerminalWorktree,
   )
 
@@ -71,7 +71,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     // keeps its projection visible until that close command settles.
     const offSessionClosed = terminalClient.onSessionClosed((event) => {
       projection.handleSessionClosed(event)
-      const workspaceRuntimeId = useReposStore.getState().repos[event.repoRoot]?.workspaceRuntimeId
+      const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[event.repoRoot]?.workspaceRuntimeId
       if (typeof workspaceRuntimeId === 'string') refreshWorkspacePaneTabs(event.repoRoot, workspaceRuntimeId)
     })
 
@@ -123,8 +123,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     () => ({
       terminalWorktreeSnapshot: projection.terminalWorktreeSnapshot,
       subscribeTerminalWorktree: projection.subscribeTerminalWorktree,
-      repoBellCount: projection.repoBellCount,
-      subscribeRepoBellCount: projection.subscribeRepoBellCount,
+      workspaceBellCount: projection.workspaceBellCount,
+      subscribeWorkspaceBellCount: projection.subscribeWorkspaceBellCount,
       snapshot: projection.snapshot,
       subscribeSnapshot: projection.subscribeSnapshot,
     }),

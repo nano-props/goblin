@@ -20,7 +20,7 @@ import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
 import { settingsSnapshotQueryOptions } from '#/web/settings-queries.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { projectBranchActionOperation, projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
@@ -50,8 +50,8 @@ export function CreateWorktreePagePane({
   onCancel,
   onCreated,
 }: CreateWorktreePagePaneProps) {
-  const liveRepo = useReposStore((s) => s.repos[repoId])
-  const runBranchAction = useReposStore((s) => s.runBranchAction)
+  const liveRepo = useWorkspacesStore((s) => s.workspaces[repoId])
+  const runBranchAction = useWorkspacesStore((s) => s.runBranchAction)
   const branchReadModel = useRepoBranchReadModel(liveRepo?.id ?? '', liveRepo?.workspaceRuntimeId ?? '', !!liveRepo)
   const operationsReadModel = useRepoOperationsReadModel(liveRepo?.id ?? '', liveRepo?.workspaceRuntimeId ?? '', {
     enabled: !!liveRepo,
@@ -163,7 +163,7 @@ export function CreateWorktreePagePane({
   }
 
   async function handleCreateWorktree(request: CreateWorktreeRequest): Promise<boolean> {
-    const currentRepo = useReposStore.getState().repos[repoId]
+    const currentRepo = useWorkspacesStore.getState().workspaces[repoId]
     if (!currentRepo || currentRepo.workspaceRuntimeId !== liveRepo.workspaceRuntimeId) return false
     const branchAction = projectBranchActionOperation(
       currentRepo.operations.branchAction,

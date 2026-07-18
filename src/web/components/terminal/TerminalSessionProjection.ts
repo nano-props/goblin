@@ -193,12 +193,12 @@ export class TerminalSessionProjection {
   private readonly snapshotCache = new Map<string, TerminalSnapshot>()
   private readonly worktreeSnapshotCache = new Map<string, TerminalWorktreeSnapshot>()
   private readonly worktreeListeners = new Map<string, Set<() => void>>()
-  private readonly repoBellCountListeners = new Map<string, Set<() => void>>()
+  private readonly workspaceBellCountListeners = new Map<string, Set<() => void>>()
   // Selector publication cache only. The unread bell source of truth
   // stays in `bellState`; this stores the last count delivered to
-  // repo-level subscribers so unrelated worktree events do not wake
-  // the repo picker.
-  private readonly lastPublishedRepoBellCountByRepo = new Map<string, number>()
+  // workspace-level subscribers so unrelated filesystem-target events do not
+  // wake the workspace picker.
+  private readonly lastPublishedWorkspaceBellCount = new Map<string, number>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
   private readonly terminalSessionIdsByTerminalWorktree = new Map<string, string[]>()
   private readonly pendingServerBellByRuntimeBindingKey = new Map<string, TerminalBellRealtimeEvent>()
@@ -212,7 +212,7 @@ export class TerminalSessionProjection {
         return
       }
       this.notifyAllWorktrees()
-      this.notifyAllRepoBellCounts()
+      this.notifyAllWorkspaceBellCounts()
     },
     (count) => terminalClient.setBadge(count),
   )
@@ -272,8 +272,8 @@ export class TerminalSessionProjection {
     this.snapshotCache.clear()
     this.worktreeSnapshotCache.clear()
     this.worktreeListeners.clear()
-    this.repoBellCountListeners.clear()
-    this.lastPublishedRepoBellCountByRepo.clear()
+    this.workspaceBellCountListeners.clear()
+    this.lastPublishedWorkspaceBellCount.clear()
     this.snapshotListeners.clear()
     this.terminalSessionIdsByTerminalWorktree.clear()
     this.pendingServerBellByRuntimeBindingKey.clear()
@@ -922,12 +922,12 @@ export class TerminalSessionProjection {
     return this.subscribeToKeyedListeners(this.worktreeListeners, terminalWorktreeKey, listener)
   }
 
-  repoBellCount = (repoRoot: string): number => {
+  workspaceBellCount = (workspaceId: string): number => {
     let count = 0
     for (const session of this.sessions.values()) {
       const terminalSessionId = session.descriptor.terminalSessionId
       if (
-        terminalSessionCoordinates(session.descriptor).repoRoot === repoRoot &&
+        terminalSessionCoordinates(session.descriptor).repoRoot === workspaceId &&
         this.bellState.hasBell(terminalSessionId)
       )
         count++
@@ -935,13 +935,13 @@ export class TerminalSessionProjection {
     return count
   }
 
-  subscribeRepoBellCount = (repoRoot: string, listener: () => void): (() => void) => {
-    if (!this.repoBellCountListeners.has(repoRoot))
-      this.lastPublishedRepoBellCountByRepo.set(repoRoot, this.repoBellCount(repoRoot))
-    const unsubscribe = this.subscribeToKeyedListeners(this.repoBellCountListeners, repoRoot, listener)
+  subscribeWorkspaceBellCount = (workspaceId: string, listener: () => void): (() => void) => {
+    if (!this.workspaceBellCountListeners.has(workspaceId))
+      this.lastPublishedWorkspaceBellCount.set(workspaceId, this.workspaceBellCount(workspaceId))
+    const unsubscribe = this.subscribeToKeyedListeners(this.workspaceBellCountListeners, workspaceId, listener)
     return () => {
       unsubscribe()
-      if (!this.repoBellCountListeners.has(repoRoot)) this.lastPublishedRepoBellCountByRepo.delete(repoRoot)
+      if (!this.workspaceBellCountListeners.has(workspaceId)) this.lastPublishedWorkspaceBellCount.delete(workspaceId)
     }
   }
 
@@ -1057,8 +1057,8 @@ export class TerminalSessionProjection {
         }
       }
     }
-    const repoRoot = parseTerminalWorktreeKey(terminalWorktreeKey)?.repoRoot
-    if (repoRoot) this.notifyRepoBellCountIfChanged(repoRoot)
+    const workspaceId = parseTerminalWorktreeKey(terminalWorktreeKey)?.repoRoot
+    if (workspaceId) this.notifyWorkspaceBellCountIfChanged(workspaceId)
   }
 
   private notifySnapshot(terminalSessionId: string): void {
@@ -1078,29 +1078,31 @@ export class TerminalSessionProjection {
       this.notifyWorktree(terminalWorktreeKey)
   }
 
-  private notifyRepoBellCountIfChanged(repoRoot: string): void {
-    if (!this.repoBellCountListeners.has(repoRoot)) return
-    const previous = this.lastPublishedRepoBellCountByRepo.get(repoRoot) ?? 0
-    const next = this.repoBellCount(repoRoot)
+  private notifyWorkspaceBellCountIfChanged(workspaceId: string): void {
+    if (!this.workspaceBellCountListeners.has(workspaceId)) return
+    const previous = this.lastPublishedWorkspaceBellCount.get(workspaceId) ?? 0
+    const next = this.workspaceBellCount(workspaceId)
     if (previous === next) return
-    this.lastPublishedRepoBellCountByRepo.set(repoRoot, next)
-    this.notifyRepoBellCount(repoRoot)
+    this.lastPublishedWorkspaceBellCount.set(workspaceId, next)
+    this.notifyWorkspaceBellCount(workspaceId)
   }
 
-  private notifyRepoBellCount(repoRoot: string): void {
-    const listeners = this.repoBellCountListeners.get(repoRoot)
+  private notifyWorkspaceBellCount(workspaceId: string): void {
+    const listeners = this.workspaceBellCountListeners.get(workspaceId)
     if (!listeners) return
     for (const listener of Array.from(listeners)) {
       try {
         listener()
       } catch (err) {
-        terminalSessionProviderLog.warn('repo bell count listener threw', { repoRoot, err })
+        terminalSessionProviderLog.warn('workspace bell count listener threw', { workspaceId, err })
       }
     }
   }
 
-  private notifyAllRepoBellCounts(): void {
-    for (const repoRoot of Array.from(this.repoBellCountListeners.keys())) this.notifyRepoBellCountIfChanged(repoRoot)
+  private notifyAllWorkspaceBellCounts(): void {
+    for (const workspaceId of Array.from(this.workspaceBellCountListeners.keys())) {
+      this.notifyWorkspaceBellCountIfChanged(workspaceId)
+    }
   }
 
   private subscribeToKeyedListeners(

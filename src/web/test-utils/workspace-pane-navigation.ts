@@ -6,11 +6,11 @@ import {
   workspacePanePreferenceTargetOptions,
   workspacePaneTabTargetForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 export interface WorkspacePaneNavigationObservation {
-  repoId: string
+  workspaceId: string
   workspaceRuntimeId: string
   branchName: string
   worktreePath: string | null
@@ -34,9 +34,9 @@ export function seedInitialObservedWorkspacePaneRouteForTest(
     return true
   }
   if (options.autoSeed === false) return false
-  const state = useReposStore.getState()
-  const repoId = state.restoredRepoId
-  const repo = repoId ? state.repos[repoId] : null
+  const state = useWorkspacesStore.getState()
+  const repoId = state.restoredWorkspaceId
+  const repo = repoId ? state.workspaces[repoId] : null
   if (!repoId || !repo) return false
   const branchName = readRepoBranchQueryProjection(repo)?.currentBranch
   if (!branchName) return false
@@ -50,7 +50,7 @@ export function seedInitialObservedWorkspacePaneRouteForTest(
         ? { kind: 'terminal', terminalSessionId: activeTab.sessionId }
         : null
   observeWorkspacePaneRouteForTest({
-    repoId: target.repoId,
+    workspaceId: target.workspaceId,
     workspaceRuntimeId: target.workspaceRuntimeId,
     branchName: target.branchName,
     worktreePath: target.worktreePath,
@@ -78,7 +78,7 @@ export function observedWorkspacePaneRouteCommitForTest(
     const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute: route })
     if (!target?.branchName) return
     const observation = {
-      repoId: target.repoId,
+      workspaceId: target.workspaceId,
       workspaceRuntimeId: target.workspaceRuntimeId,
       branchName: target.branchName,
       worktreePath: target.worktreePath,
@@ -151,7 +151,7 @@ export function observedWorkspacePaneRouteForTarget(
   if (!target?.branchName) return undefined
   const route = observedWorkspacePaneRoutes.get(
     workspacePaneObservationKey({
-      repoId: target.repoId,
+      workspaceId: target.workspaceId,
       workspaceRuntimeId: target.workspaceRuntimeId,
       branchName: target.branchName,
       worktreePath: target.worktreePath,
@@ -161,7 +161,12 @@ export function observedWorkspacePaneRouteForTarget(
 }
 
 function workspacePaneObservationKey(observation: Omit<WorkspacePaneNavigationObservation, 'route'>): string {
-  return [observation.repoId, observation.workspaceRuntimeId, observation.branchName, observation.worktreePath ?? ''].join(
+  return [
+    observation.workspaceId,
+    observation.workspaceRuntimeId,
+    observation.branchName,
+    observation.worktreePath ?? '',
+  ].join(
     '\0',
   )
 }

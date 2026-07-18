@@ -1,7 +1,7 @@
 import { type DragEvent, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { pathForDroppedFile } from '#/web/app-shell-client.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { openWorkspacePaths } from '#/web/lib/open-workspace-paths.ts'
@@ -24,7 +24,7 @@ function isDropBlocked(blocked: boolean): boolean {
 }
 
 export function useWorkspaceDrop({ blocked }: Options) {
-  const ensureWorkspaceOpen = useReposStore((s) => s.ensureWorkspaceOpen)
+  const ensureWorkspaceOpen = useWorkspacesStore((s) => s.ensureWorkspaceOpen)
   const navigation = usePrimaryWindowNavigation()
   const t = useT()
   const tRef = useRef(t)

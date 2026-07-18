@@ -33,10 +33,10 @@
 // the same source, and any future dialog slot added to the host
 // inherits the contract for free.
 //
-// Why `repos` is a parameter, not a subscription:
+// Why `workspaces` is a parameter, not a subscription:
 //
 // The host calls this hook five times (one per dialog slot). If each
-// call subscribed to `useReposStore((s) => s.repos)`, that would be
+// call subscribed to `useWorkspacesStore((s) => s.workspaces)`, that would be
 // five independent listeners plus five selector evaluations per
 // store update. The host hoists the subscription and passes the map
 // in — one listener, five consumers.
@@ -54,7 +54,7 @@
 // until Radix finishes its exit transition.
 //
 // What if the IPC completes within the close-animation window and
-// removes the branch from `useReposStore`? The retained context
+// removes the branch from `useWorkspacesStore`? The retained context
 // snapshot is from before the removal, so the body shows a
 // `hasUpstream` / `tracking` value that is now stale. We accept
 // this: the alternative — collapsing the body to empty mid-fade —
@@ -71,8 +71,8 @@ import {
   type BranchActionDialogEntry,
   type BranchCheckboxState,
   useBranchActionDialogsStore,
-} from '#/web/stores/repos/branch-action-dialogs.ts'
-import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
+} from '#/web/stores/workspaces/branch-action-dialogs.ts'
+import type { RepoBranchState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { projectBranchActionOperation, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
@@ -98,14 +98,14 @@ export interface BranchActionDialogDisplay<P> {
   entry: BranchActionDialogEntry<P> | null
   /**
    * The `(repo, branch)` resolved from the live slot. `null` when the
-   * slot is null or its branch is no longer present in `repos` (e.g.
+   * slot is null or its branch is no longer present in `workspaces` (e.g.
    * deleted upstream). Drives the `open` prop on `<AlertDialog>`.
    */
   liveContext: BranchActionDialogContext | null
   /**
    * The `(repo, branch)` resolved from the retained entry. `null`
    * when `entry` is null, or when the entry's branch is no longer
-   * present in `repos`. Drives the body's `hasUpstream` / `tracking`
+   * present in `workspaces`. Drives the body's `hasUpstream` / `tracking`
    * reads.
    */
   displayContext: BranchActionDialogContext | null
@@ -119,22 +119,22 @@ export interface BranchActionDialogDisplay<P> {
 
 export function useBranchActionDialogDisplay<P>(
   slot: BranchActionDialogEntry<P> | null,
-  repos: Record<string, RepoState>,
+  workspaces: Record<string, WorkspaceState>,
 ): BranchActionDialogDisplay<P> {
   const entry = useLastNonNull(slot)
-  const slotRepo = slot ? repos[slot.repoId] : null
+  const slotRepo = slot ? workspaces[slot.repoId] : null
   const branchReadModel = useRepoBranchReadModel(slot?.repoId ?? '', slotRepo?.workspaceRuntimeId ?? '', !!slotRepo)
   const operationsReadModel = useRepoOperationsReadModel(slot?.repoId ?? '', slotRepo?.workspaceRuntimeId ?? '', {
     enabled: !!slotRepo,
   })
-  const liveContext = slot ? resolveContext(repos, slot, branchReadModel, operationsReadModel.data?.operations) : null
+  const liveContext = slot ? resolveContext(workspaces, slot, branchReadModel, operationsReadModel.data?.operations) : null
   // Retain the last non-null `liveContext` for the close-animation
   // window. After the user clicks Confirm/Cancel, `slot` is null and
   // `liveContext` is null, but the host still needs a stable context
   // to render the body for the duration of Radix's exit transition.
   // Without this, the body would collapse to `''` mid-fade whenever
   // the backend IPC completed within the close-animation window and
-  // removed the branch from `repos` — visually contradicting the
+  // removed the branch from `workspaces` — visually contradicting the
   // static title that the host now keeps visible.
   const retainedLiveContext = useLastNonNull(liveContext)
   // While the dialog is open, `slot === entry` and the two contexts
@@ -142,7 +142,7 @@ export function useBranchActionDialogDisplay<P>(
   // `repo.branchModel.branches.find(...)` per render per slot. After close
   // `slot === null` and `entry` is the retained value — we use the
   // retained `liveContext` (which was resolved from `entry` before
-  // close) instead of re-resolving against the post-mutation `repos`.
+  // close) instead of re-resolving against the post-mutation `workspaces`.
   const displayContext = entry ? (entry === slot ? liveContext : retainedLiveContext) : null
   const displayCheckboxes = useBranchActionDialogsStore((s) =>
     entry ? branchCheckboxesFor(s, entry.repoId, entry.branchName) : EMPTY_CHECKBOXES,
@@ -151,12 +151,12 @@ export function useBranchActionDialogDisplay<P>(
 }
 
 function resolveContext<P>(
-  repos: Record<string, RepoState>,
+  workspaces: Record<string, WorkspaceState>,
   entry: BranchActionDialogEntry<P>,
   branchReadModel: RepoBranchReadModelData | null,
   operations: readonly RepoServerOperationState[] | undefined,
 ): BranchActionDialogContext | null {
-  const repoFromStore = repos[entry.repoId]
+  const repoFromStore = workspaces[entry.repoId]
   if (!repoFromStore || !branchReadModel) return null
   const repo: BranchActionDialogRepo = {
     id: repoFromStore.id,

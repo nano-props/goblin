@@ -4,17 +4,17 @@ import {
   restoreRestorableWorkspaceStateFromClientWorkspace,
   clientWorkspaceStateFromRestorableWorkspaceState,
 } from '#/web/restorable-workspace-state.ts'
-import { createBranchSnapshot, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { repoWorktreeStatusQueryKey } from '#/web/repo-data-query.ts'
 
 describe('restorable-workspace-state', () => {
   beforeEach(() => {
-    resetReposStore()
+    resetWorkspacesStore()
   })
 
   test('maps restorable workspace state into ClientWorkspaceState', () => {
@@ -32,10 +32,10 @@ describe('restorable-workspace-state', () => {
 
     expect(
       clientWorkspaceStateFromRestorableWorkspaceState({
-        repos: { [repo.id]: repo },
+        workspaces: { [repo.id]: repo },
         restorableWorkspaceState: {
-          order: [repo.id],
-          restoredRepoId: repo.id,
+          workspaceOrder: [repo.id],
+          restoredWorkspaceId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {
@@ -44,19 +44,19 @@ describe('restorable-workspace-state', () => {
         },
       }),
     ).toEqual({
-      restoredRepoId: 'goblin+file:///tmp/repo',
+      restoredWorkspaceId: 'goblin+file:///tmp/repo',
       zenMode: false,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {
         'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-222222222222222222222',
       },
-      preferredWorkspacePaneTabByTargetByRepo: { 'goblin+file:///tmp/repo': { [targetKey]: 'terminal' } },
-      filetreeViewStateByWorktreeByRepo: {},
+      preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///tmp/repo': { [targetKey]: 'terminal' } },
+      filetreeViewStateByWorktreeByWorkspace: {},
     })
   })
 
   test('persists workspace shell when an open repo has no branch read model', () => {
-    const repo = emptyRepo(
+    const repo = emptyWorkspace(
       'goblin+file:///tmp/repo-without-query-model',
       'repo-without-query-model',
       'repo-runtime-without-query',
@@ -80,10 +80,10 @@ describe('restorable-workspace-state', () => {
 
     expect(
       clientWorkspaceStateFromRestorableWorkspaceState({
-        repos: { [repo.id]: repo },
+        workspaces: { [repo.id]: repo },
         restorableWorkspaceState: {
-          order: [repo.id],
-          restoredRepoId: repo.id,
+          workspaceOrder: [repo.id],
+          restoredWorkspaceId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {
@@ -92,16 +92,16 @@ describe('restorable-workspace-state', () => {
         },
       }),
     ).toEqual({
-      restoredRepoId: repo.id,
+      restoredWorkspaceId: repo.id,
       zenMode: false,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {
         [terminalWorktreeKey]: 'term-workspaceroot0000001',
       },
-      preferredWorkspacePaneTabByTargetByRepo: {
+      preferredWorkspacePaneTabByTargetByWorkspace: {
         [repo.id]: { [workspaceRootTargetKey]: 'files' },
       },
-      filetreeViewStateByWorktreeByRepo: {},
+      filetreeViewStateByWorktreeByWorkspace: {},
     })
   })
 
@@ -117,7 +117,7 @@ describe('restorable-workspace-state', () => {
         'feature/active': [workspacePaneStaticTabEntry('status')],
       },
     })
-    const stubRepo = emptyRepo('goblin+file:///tmp/repo-b', 'repo-b', 'repo-runtime-b')
+    const stubRepo = emptyWorkspace('goblin+file:///tmp/repo-b', 'repo-b', 'repo-runtime-b')
     stubRepo.session = {
       entry: localWorkspaceSessionEntry(stubRepo.id),
       projectionState: 'stub',
@@ -125,10 +125,10 @@ describe('restorable-workspace-state', () => {
 
     expect(
       clientWorkspaceStateFromRestorableWorkspaceState({
-        repos: { [activeRepo.id]: activeRepo, [stubRepo.id]: stubRepo },
+        workspaces: { [activeRepo.id]: activeRepo, [stubRepo.id]: stubRepo },
         restorableWorkspaceState: {
-          order: [activeRepo.id, stubRepo.id],
-          restoredRepoId: activeRepo.id,
+          workspaceOrder: [activeRepo.id, stubRepo.id],
+          restoredWorkspaceId: activeRepo.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {
@@ -137,16 +137,16 @@ describe('restorable-workspace-state', () => {
           },
         },
         restoredClientWorkspaceBaseline: {
-          restoredRepoId: activeRepo.id,
+          restoredWorkspaceId: activeRepo.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {
             'goblin+file:///tmp/repo-b\0goblin+file:///tmp/stub-worktree': 'term-stub00000000000000',
           },
-          preferredWorkspacePaneTabByTargetByRepo: {
+          preferredWorkspacePaneTabByTargetByWorkspace: {
             [stubRepo.id]: { [stubTargetKey]: 'files' },
           },
-          filetreeViewStateByWorktreeByRepo: {
+          filetreeViewStateByWorktreeByWorkspace: {
             [stubRepo.id]: {
               '/tmp/stub-worktree': {
                 selectedKeys: ['src/index.ts'],
@@ -158,18 +158,18 @@ describe('restorable-workspace-state', () => {
         },
       }),
     ).toEqual({
-      restoredRepoId: activeRepo.id,
+      restoredWorkspaceId: activeRepo.id,
       zenMode: false,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {
         'goblin+file:///tmp/repo-a\0goblin+file:///tmp/active-worktree': 'term-active0000000000000',
         'goblin+file:///tmp/repo-b\0goblin+file:///tmp/stub-worktree': 'term-stub00000000000000',
       },
-      preferredWorkspacePaneTabByTargetByRepo: {
+        preferredWorkspacePaneTabByTargetByWorkspace: {
         [activeRepo.id]: { [activeTargetKey]: 'status' },
         [stubRepo.id]: { [stubTargetKey]: 'files' },
       },
-      filetreeViewStateByWorktreeByRepo: {
+        filetreeViewStateByWorktreeByWorkspace: {
         [stubRepo.id]: {
           '/tmp/stub-worktree': {
             selectedKeys: ['src/index.ts'],
@@ -195,17 +195,17 @@ describe('restorable-workspace-state', () => {
 
     expect(
       clientWorkspaceStateFromRestorableWorkspaceState({
-        repos: { [repo.id]: repo },
+        workspaces: { [repo.id]: repo },
         restorableWorkspaceState: {
-          order: [repo.id],
-          restoredRepoId: repo.id,
+          workspaceOrder: [repo.id],
+          restoredWorkspaceId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {},
         },
       }),
     ).toMatchObject({
-      preferredWorkspacePaneTabByTargetByRepo: { 'goblin+file:///tmp/repo': { [targetKey]: 'changes' } },
+      preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///tmp/repo': { [targetKey]: 'changes' } },
     })
   })
 
@@ -223,17 +223,17 @@ describe('restorable-workspace-state', () => {
 
     expect(
       clientWorkspaceStateFromRestorableWorkspaceState({
-        repos: { [repo.id]: repo },
+        workspaces: { [repo.id]: repo },
         restorableWorkspaceState: {
-          order: [repo.id],
-          restoredRepoId: repo.id,
+          workspaceOrder: [repo.id],
+          restoredWorkspaceId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {},
         },
       }),
     ).toMatchObject({
-      preferredWorkspacePaneTabByTargetByRepo: { 'goblin+file:///tmp/repo': { [targetKey]: null } },
+      preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///tmp/repo': { [targetKey]: null } },
     })
   })
 
@@ -251,40 +251,40 @@ describe('restorable-workspace-state', () => {
 
     expect(
       clientWorkspaceStateFromRestorableWorkspaceState({
-        repos: { [repo.id]: repo },
+        workspaces: { [repo.id]: repo },
         restorableWorkspaceState: {
-          order: [repo.id],
-          restoredRepoId: repo.id,
+          workspaceOrder: [repo.id],
+          restoredWorkspaceId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {},
         },
       }),
     ).toMatchObject({
-      preferredWorkspacePaneTabByTargetByRepo: {},
+      preferredWorkspacePaneTabByTargetByWorkspace: {},
     })
   })
 
   test('restores restorable workspace state from ClientWorkspaceState', () => {
     expect(
       restoreRestorableWorkspaceStateFromClientWorkspace({
-        restoredRepoId: 'goblin+file:///tmp/repo',
+        restoredWorkspaceId: 'goblin+file:///tmp/repo',
         zenMode: false,
         workspacePaneSize: 40,
         selectedTerminalSessionIdByTerminalWorktree: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-111111111111111111111',
         },
-        preferredWorkspacePaneTabByTargetByRepo: {},
-        filetreeViewStateByWorktreeByRepo: {},
+      preferredWorkspacePaneTabByTargetByWorkspace: {},
+      filetreeViewStateByWorktreeByWorkspace: {},
       }),
     ).toEqual({
-      restoredRepoId: 'goblin+file:///tmp/repo',
+      restoredWorkspaceId: 'goblin+file:///tmp/repo',
       zenMode: false,
       workspacePaneSize: 40,
       selectedTerminalSessionIdByTerminalWorktree: {
         'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-111111111111111111111',
       },
-      preferredWorkspacePaneTabByTargetByRepo: {},
+      preferredWorkspacePaneTabByTargetByWorkspace: {},
     })
   })
 
@@ -302,17 +302,17 @@ describe('restorable-workspace-state', () => {
 
     expect(
       clientWorkspaceStateFromRestorableWorkspaceState({
-        repos: { [repo.id]: repo },
+        workspaces: { [repo.id]: repo },
         restorableWorkspaceState: {
-          order: [repo.id],
-          restoredRepoId: repo.id,
+          workspaceOrder: [repo.id],
+          restoredWorkspaceId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {},
         },
       }),
     ).toMatchObject({
-      preferredWorkspacePaneTabByTargetByRepo: { 'goblin+file:///tmp/repo': { [targetKey]: 'files' } },
+      preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///tmp/repo': { [targetKey]: 'files' } },
     })
   })
 
@@ -329,17 +329,17 @@ describe('restorable-workspace-state', () => {
     })
 
     const sessionState = clientWorkspaceStateFromRestorableWorkspaceState({
-      repos: { [repo.id]: repo },
+      workspaces: { [repo.id]: repo },
       restorableWorkspaceState: {
-        order: [repo.id],
-        restoredRepoId: repo.id,
+        workspaceOrder: [repo.id],
+        restoredWorkspaceId: repo.id,
         zenMode: false,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
       },
     })
     const restored = restoreRestorableWorkspaceStateFromClientWorkspace(sessionState)
-    expect(restored.preferredWorkspacePaneTabByTargetByRepo).toEqual({
+    expect(restored.preferredWorkspacePaneTabByTargetByWorkspace).toEqual({
       'goblin+file:///tmp/repo': { [targetKey]: 'files' },
     })
   })
@@ -353,10 +353,10 @@ describe('restorable-workspace-state', () => {
 
     expect(
       clientWorkspaceStateFromRestorableWorkspaceState({
-        repos: { [repo.id]: repo },
+        workspaces: { [repo.id]: repo },
         restorableWorkspaceState: {
-          order: [repo.id],
-          restoredRepoId: repo.id,
+          workspaceOrder: [repo.id],
+          restoredWorkspaceId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {},
@@ -370,7 +370,7 @@ describe('restorable-workspace-state', () => {
         },
       }),
     ).toMatchObject({
-      filetreeViewStateByWorktreeByRepo: {
+      filetreeViewStateByWorktreeByWorkspace: {
         'goblin+file:///tmp/repo': {
           'goblin+file:///tmp/worktree': {
             selectedKeys: ['src/index.ts'],

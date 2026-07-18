@@ -23,12 +23,12 @@ import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/works
 import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
-import { useFiletreeActionDialogsStore } from '#/web/stores/repos/filetree-action-dialogs.ts'
+import { useFiletreeActionDialogsStore } from '#/web/stores/workspaces/filetree-action-dialogs.ts'
 import {
   emptyFiletreeInteractionSnapshot,
   filetreeInteractionScopeKey,
   useFiletreeInteractionStore,
-} from '#/web/stores/repos/filetree-interaction-state.ts'
+} from '#/web/stores/workspaces/filetree-interaction-state.ts'
 import { getRepositoryFileViewer } from '#/web/filetree-client.ts'
 import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/repo-workspace/file-read-command.ts'
 import { HistoryCommitGraph, HistoryCommitGraphSkeleton } from '#/web/components/repo-workspace/HistoryCommitGraph.tsx'
@@ -180,19 +180,22 @@ export function FiletreeTab({
 }: {
   target: WorkspacePaneFilesystemTarget
 }) {
-  const repoId = target.workspaceId
+  const workspaceId = target.workspaceId
   const workspaceRuntimeId = target.workspaceRuntimeId
   const worktreePath = target.rootPath
   const executionTarget = useMemo(
     () => workspacePaneFilesystemRuntimeTarget(target),
-    [repoId, workspaceRuntimeId, target.kind, worktreePath],
+    [workspaceId, workspaceRuntimeId, target.kind, worktreePath],
   )
   if (!executionTarget || executionTarget.kind === 'git-branch') throw new Error('filesystem target is invalid')
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
   const { createTerminalWithAdmission } = useTerminalSessionContext()
   const openTrashFileConfirm = useFiletreeActionDialogsStore((s) => s.openTrashFileConfirm)
-  const interactionScopeKey = useMemo(() => filetreeInteractionScopeKey(repoId, worktreePath), [repoId, worktreePath])
+  const interactionScopeKey = useMemo(
+    () => filetreeInteractionScopeKey(workspaceId, worktreePath),
+    [workspaceId, worktreePath],
+  )
   const selectedKeyList = useFiletreeInteractionStore(
     (s) => s.interactionByScope[interactionScopeKey]?.selectedKeys ?? emptyFiletreeInteractionSnapshot().selectedKeys,
   )
@@ -275,7 +278,7 @@ export function FiletreeTab({
           insertAfterIdentity: openerIdentity,
           options: {
             resolveStartupShellCommand: async () => {
-              const viewerResult = await getRepositoryFileViewer(repoId, worktreePath, { workspaceRuntimeId })
+              const viewerResult = await getRepositoryFileViewer(workspaceId, worktreePath, { workspaceRuntimeId })
               return fileReadCommand(viewerResult, absoluteFilePathForTerminal(viewerResult.executionRoot, node.path))
             },
           },
@@ -292,7 +295,7 @@ export function FiletreeTab({
       endOpeningFile,
       openingFileKeyPrefix,
       navigation,
-      repoId,
+      workspaceId,
       workspaceRuntimeId,
       t,
       worktreePath,
@@ -303,9 +306,9 @@ export function FiletreeTab({
   const requestTrashFile = useCallback(
     (node: RepoTreeNode) => {
       if (node.kind !== 'file') return
-      openTrashFileConfirm({ repoId, workspaceRuntimeId, worktreePath, path: node.path, name: node.name })
+      openTrashFileConfirm({ workspaceId, workspaceRuntimeId, worktreePath, path: node.path, name: node.name })
     },
-    [openTrashFileConfirm, repoId, workspaceRuntimeId, worktreePath],
+    [openTrashFileConfirm, workspaceId, workspaceRuntimeId, worktreePath],
   )
 
   return (

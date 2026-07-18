@@ -8,7 +8,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { workspacePaneRuntimeTabProjectionProviders } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 import { WORKSPACE_PANE_RUNTIME_TAB_TYPES } from '#/shared/workspace-pane.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 
 const REPO_ID = 'goblin+file:///repo'
@@ -18,7 +18,7 @@ const WORKTREE_KEY = formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH)
 afterEach(() => {
   setTerminalSessionCommandBridge(null)
   useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
-  useReposStore.setState({ selectedTerminalSessionIdByTerminalWorktree: {} })
+  useWorkspacesStore.setState({ selectedTerminalSessionIdByTerminalWorktree: {} })
 })
 
 describe('workspace pane runtime tab target projection', () => {
@@ -86,7 +86,7 @@ describe('workspace pane runtime tab target projection', () => {
       createPending: true,
     }))
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, 'repo-runtime-1')
-    useReposStore.setState({
+    useWorkspacesStore.setState({
       selectedTerminalSessionIdByTerminalWorktree: {
         [terminalWorktreeKey]: 'term-111111111111111111111',
       },
@@ -127,7 +127,7 @@ describe('workspace pane runtime tab target projection', () => {
       createTerminal: vi.fn(async () => 'term-333333333333333333333'),
       selectTerminal: vi.fn(),
     })
-    useReposStore.setState({
+    useWorkspacesStore.setState({
       selectedTerminalSessionIdByTerminalWorktree: {
         [terminalWorktreeKey]: 'term-222222222222222222222',
       },

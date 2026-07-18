@@ -18,7 +18,7 @@ function ReadSnapshot() {
   return (
     <>
       <span data-testid="count">{ctx.terminalWorktreeSnapshot('any').count}</span>
-      <span data-testid="bell">{ctx.repoBellCount('any')}</span>
+      <span data-testid="bell">{ctx.workspaceBellCount('any')}</span>
     </>
   )
 }
@@ -86,8 +86,8 @@ describe('useTerminalSessionReadContext', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => ({ ...EMPTY_TERMINAL_WORKTREE_SNAPSHOT, count: 7 }),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 3,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 3,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
       subscribeSnapshot: () => () => {},
     }

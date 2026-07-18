@@ -3,18 +3,18 @@ import type { ComponentProps } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { WorkspaceZenModeToggle } from '#/web/components/WorkspaceZenModeToggle.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
 
 interface WorkspaceNavigationControlsProps extends Omit<ComponentProps<'div'>, 'children'> {
-  repoId?: string
+  workspaceId?: string
   zenRevealTriggerEnabled?: boolean
   onZenRevealTriggerEnter?: () => void
 }
 
 export function WorkspaceNavigationControls({
-  repoId,
+  workspaceId,
   zenRevealTriggerEnabled = false,
   onZenRevealTriggerEnter,
   className,
@@ -22,7 +22,7 @@ export function WorkspaceNavigationControls({
 }: WorkspaceNavigationControlsProps) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
-  const history = useReposStore((s) => (repoId ? s.navigationHistoryByRepo[repoId] : undefined))
+  const history = useWorkspacesStore((s) => (workspaceId ? s.navigationHistoryByWorkspace[workspaceId] : undefined))
   const canGoBack = !!history?.backStack.length
   const canGoForward = !!history?.forwardStack.length
 
@@ -45,10 +45,10 @@ export function WorkspaceNavigationControls({
         type="button"
         variant="ghost"
         size="icon-lg"
-        disabled={!repoId || !canGoBack}
+        disabled={!workspaceId || !canGoBack}
         aria-label={t('workspace.navigation-back')}
         onClick={() => {
-          if (repoId) navigation.goBack(repoId)
+          if (workspaceId) navigation.goBack(workspaceId)
         }}
       >
         <ArrowLeft />
@@ -57,10 +57,10 @@ export function WorkspaceNavigationControls({
         type="button"
         variant="ghost"
         size="icon-lg"
-        disabled={!repoId || !canGoForward}
+        disabled={!workspaceId || !canGoForward}
         aria-label={t('workspace.navigation-forward')}
         onClick={() => {
-          if (repoId) navigation.goForward(repoId)
+          if (workspaceId) navigation.goForward(workspaceId)
         }}
       >
         <ArrowRight />

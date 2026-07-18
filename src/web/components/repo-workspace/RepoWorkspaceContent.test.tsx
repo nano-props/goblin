@@ -30,11 +30,11 @@ import type {
 import {
   createBranchSnapshot,
   installWorkspacePaneTabsTestBridge,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import {
@@ -46,7 +46,7 @@ import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { observedWorkspacePaneRouteCommitForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
-import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import {
   workspacePanePreferenceTargetOptions,
   workspacePaneTabTargetForBranch,
@@ -59,7 +59,7 @@ import {
 } from '#/web/primary-window-navigation.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 
 let workspacePaneTabsTestBridge: ReturnType<typeof installWorkspacePaneTabsTestBridge>
@@ -153,7 +153,7 @@ function getTestRepoWorkspacePresentation(repo: RepoWorkspaceRepo) {
   return buildRepoWorkspacePresentation(repo, { loading: false, error: null, stale: false })
 }
 
-function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
+function repoWorkspaceRepo(repo: WorkspaceState): RepoWorkspaceRepo {
   const branchModel = readRepoBranchQueryProjection(repo)
   if (!branchModel) throw new Error('missing branch read model')
   const currentBranchName = branchModel.currentBranch || branchModel.branches[0]?.name || null
@@ -175,7 +175,7 @@ function preferenceBackedWorkspacePaneTabModel(repoId: string, branchName: strin
 beforeEach(() => {
   responsiveMocks.compact = false
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
   useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
   repoClientMocks.getRepoLog.mockResolvedValue([])
@@ -437,7 +437,7 @@ describe('RepoWorkspaceContent', () => {
   test('opens files from the status row as a new tab and returns to status when it closes', async () => {
     const worktreePath = '/tmp/status-links-worktree'
     const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
-      useReposStore.getState().setWorkspacePaneTab(repoId, branch, tab)
+      useWorkspacesStore.getState().setWorkspacePaneTab(repoId, branch, tab)
       return true
     })
     const showRepoBranchEmptyWorkspacePane = vi.fn(() => true)
@@ -481,7 +481,7 @@ describe('RepoWorkspaceContent', () => {
 
     expect(pathButton).not.toBeNull()
     observeWorkspacePaneRouteForTest({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName: 'feature/status-links',
       worktreePath,
@@ -503,7 +503,7 @@ describe('RepoWorkspaceContent', () => {
 
     showRepoBranchWorkspacePaneTab.mockClear()
     observeWorkspacePaneRouteForTest({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName: 'feature/status-links',
       worktreePath,
@@ -512,7 +512,7 @@ describe('RepoWorkspaceContent', () => {
 
     expect(
       await runCloseWorkspacePaneTabCommand({
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         target: {
           kind: 'git-worktree',
           workspacePaneRoute: { kind: 'static', tab: 'files' },
@@ -568,7 +568,7 @@ describe('RepoWorkspaceContent', () => {
 
     expect(changesButton).not.toBeNull()
     observeWorkspacePaneRouteForTest({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName: 'feature/status-links',
       worktreePath,
@@ -1009,7 +1009,7 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: { [branchName]: [] },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, seededRepo.workspaceRuntimeId)
-    const repo = useReposStore.getState().repos[REPO_ID]!
+    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
     const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
@@ -1203,7 +1203,7 @@ describe('RepoWorkspaceContent', () => {
 
     const row = await screen.findByRole('treeitem', { name: 'README.md' })
     observeWorkspacePaneRouteForTest({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName,
       worktreePath,
@@ -1222,7 +1222,7 @@ describe('RepoWorkspaceContent', () => {
       await Promise.resolve()
     })
     expect(filetreeClientMocks.getRepositoryFileViewer).toHaveBeenCalledTimes(1)
-    useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/changes', 'status')
+    useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/changes', 'status')
     await act(async () => {
       resolveViewer({ viewer: 'bat', shell: 'posix', executionRoot: worktreePath })
       await Promise.resolve()
@@ -1361,7 +1361,7 @@ describe('RepoWorkspaceContent', () => {
       { insertAfterIdentity: 'workspace-pane:files' },
     )
     expect(
-      useReposStore.getState().repos[workspaceId]?.ui.preferredWorkspacePaneTabByTarget[`${workspaceId}\0workspace-root`],
+      useWorkspacesStore.getState().workspaces[workspaceId]?.ui.preferredWorkspacePaneTabByTarget[`${workspaceId}\0workspace-root`],
     ).toBe('terminal')
     expect(startupShellCommand).toBe(
       "bat --paging=never --style=plain '/Users/example/Workspace/sample-project/sample-document.md'\r",
@@ -1575,13 +1575,13 @@ const emptyTerminalSnapshot = EMPTY_TERMINAL_SNAPSHOT
 const emptyTerminalReadContext: TerminalSessionReadContextValue = {
   terminalWorktreeSnapshot: () => emptyWorktreeSnapshot,
   subscribeTerminalWorktree: () => () => {},
-  repoBellCount: () => 0,
-  subscribeRepoBellCount: () => () => {},
+  workspaceBellCount: () => 0,
+  subscribeWorkspaceBellCount: () => () => {},
   snapshot: () => emptyTerminalSnapshot,
   subscribeSnapshot: () => () => {},
 }
 
-function gitWorktreeFilesystemTarget(repo: RepoState, rootPath: string, branchName: string) {
+function gitWorktreeFilesystemTarget(repo: WorkspaceState, rootPath: string, branchName: string) {
   if (repo.workspaceProbe.status !== 'ready') throw new Error('expected ready workspace fixture')
   return {
     kind: 'git-worktree' as const,

@@ -13,13 +13,13 @@ import { getExternalAppsSnapshot, getSettingsSnapshot } from '#/web/settings-cli
 import { restoreWorkspaceAtBoot } from '#/web/settings-actions.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   filetreeInteractionScopeKey,
   resetFiletreeInteractionStore,
   useFiletreeInteractionStore,
-} from '#/web/stores/repos/filetree-interaction-state.ts'
-import { resetReposStore } from '#/web/test-utils/bridge.ts'
+} from '#/web/stores/workspaces/filetree-interaction-state.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -55,7 +55,7 @@ const mockedReadClientWorkspaceState = vi.mocked(readClientWorkspaceState)
 
 beforeEach(() => {
   vi.useRealTimers()
-  resetReposStore()
+  resetWorkspacesStore()
   resetFiletreeInteractionStore()
   primaryWindowQueryClient.clear()
   vi.restoreAllMocks()
@@ -99,14 +99,14 @@ describe('app bootstrap hooks', () => {
         },
       },
       {
-        restoredRepoId: 'goblin+file:///tmp/repo',
+        restoredWorkspaceId: 'goblin+file:///tmp/repo',
         zenMode: false,
         workspacePaneSize: 45,
         selectedTerminalSessionIdByTerminalWorktree: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-222222222222222222222',
         },
-        preferredWorkspacePaneTabByTargetByRepo: {},
-        filetreeViewStateByWorktreeByRepo: {
+        preferredWorkspacePaneTabByTargetByWorkspace: {},
+        filetreeViewStateByWorktreeByWorkspace: {
           'goblin+file:///tmp/repo': {
             'goblin+file:///tmp/worktree': {
               selectedKeys: ['src/index.ts'],
@@ -124,7 +124,7 @@ describe('app bootstrap hooks', () => {
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
     const hydrateRestoredRuntime = vi
-      .spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime')
+      .spyOn(useWorkspacesStore.getState(), 'hydrateRestoredWorkspaceRuntime')
       .mockResolvedValue(undefined)
 
     renderInJsdom(<Harness />)
@@ -132,7 +132,7 @@ describe('app bootstrap hooks', () => {
       expect(hydrateRestoredRuntime).toHaveBeenCalled()
     })
 
-    const state = useReposStore.getState()
+    const state = useWorkspacesStore.getState()
     expect(state.zenMode).toBe(false)
     expect(state.workspacePaneSize).toBe(45)
     expect(state.selectedTerminalSessionIdByTerminalWorktree).toEqual({
@@ -146,7 +146,7 @@ describe('app bootstrap hooks', () => {
       },
     })
     expect(hydrateRestoredRuntime).toHaveBeenCalledWith(
-      restoredRuntimeForWorkspace(session.serverWorkspace, session.clientWorkspace.restoredRepoId),
+      restoredRuntimeForWorkspace(session.serverWorkspace, session.clientWorkspace.restoredWorkspaceId),
       {
         signal: expect.any(AbortSignal),
         restoredClientWorkspace: session.clientWorkspace,
@@ -180,12 +180,12 @@ describe('app bootstrap hooks', () => {
         openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/repo' }],
       },
       {
-        restoredRepoId: 'goblin+file:///tmp/repo',
+        restoredWorkspaceId: 'goblin+file:///tmp/repo',
         zenMode: true,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
-        preferredWorkspacePaneTabByTargetByRepo: {},
-        filetreeViewStateByWorktreeByRepo: {},
+        preferredWorkspacePaneTabByTargetByWorkspace: {},
+        filetreeViewStateByWorktreeByWorkspace: {},
       },
     )
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
@@ -194,7 +194,7 @@ describe('app bootstrap hooks', () => {
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockRejectedValue(new Error('i18n unavailable'))
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockRejectedValue(new Error('host unavailable'))
     const hydrateRestoredRuntime = vi
-      .spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime')
+      .spyOn(useWorkspacesStore.getState(), 'hydrateRestoredWorkspaceRuntime')
       .mockResolvedValue(undefined)
 
     renderInJsdom(<Harness />)
@@ -203,14 +203,14 @@ describe('app bootstrap hooks', () => {
     })
 
     expect(hydrateRestoredRuntime).toHaveBeenCalledWith(
-      restoredRuntimeForWorkspace(session.serverWorkspace, session.clientWorkspace.restoredRepoId),
+      restoredRuntimeForWorkspace(session.serverWorkspace, session.clientWorkspace.restoredWorkspaceId),
       {
         signal: expect.any(AbortSignal),
         restoredClientWorkspace: session.clientWorkspace,
       },
     )
-    expect(useReposStore.getState().workspacePaneSize).toBe(55)
-    expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
+    expect(useWorkspacesStore.getState().workspacePaneSize).toBe(55)
+    expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(true)
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
   })
 
@@ -220,12 +220,12 @@ describe('app bootstrap hooks', () => {
         openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/repo' }],
       },
       {
-        restoredRepoId: 'goblin+file:///tmp/repo',
+        restoredWorkspaceId: 'goblin+file:///tmp/repo',
         zenMode: true,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
-        preferredWorkspacePaneTabByTargetByRepo: {},
-        filetreeViewStateByWorktreeByRepo: {},
+        preferredWorkspacePaneTabByTargetByWorkspace: {},
+        filetreeViewStateByWorktreeByWorkspace: {},
       },
     )
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
@@ -234,17 +234,17 @@ describe('app bootstrap hooks', () => {
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
     const hydrateRestoredRuntime = vi
-      .spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime')
+      .spyOn(useWorkspacesStore.getState(), 'hydrateRestoredWorkspaceRuntime')
       .mockResolvedValue(undefined)
 
     renderInJsdom(<Harness />)
     await vi.waitFor(() => {
-      expect(useReposStore.getState().sessionRestoreError).toBe('server workspace restore failed')
+      expect(useWorkspacesStore.getState().sessionRestoreError).toBe('server workspace restore failed')
     })
 
-    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
-    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
-    expect(useReposStore.getState().sessionRestoreError).toBe('server workspace restore failed')
+    expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(false)
+    expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useWorkspacesStore.getState().sessionRestoreError).toBe('server workspace restore failed')
     expect(hydrateRestoredRuntime).not.toHaveBeenCalled()
   })
 
@@ -254,21 +254,21 @@ describe('app bootstrap hooks', () => {
         openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/repo' }],
       },
       {
-        restoredRepoId: 'goblin+file:///tmp/repo',
+        restoredWorkspaceId: 'goblin+file:///tmp/repo',
         zenMode: true,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
-        preferredWorkspacePaneTabByTargetByRepo: {
+        preferredWorkspacePaneTabByTargetByWorkspace: {
           'goblin+file:///tmp/repo': {
             [branchTargetKey('goblin+file:///tmp/repo', 'main')]: 'files' as const,
           },
         },
-        filetreeViewStateByWorktreeByRepo: {},
+        filetreeViewStateByWorktreeByWorkspace: {},
       },
     )
     const rebuiltSession = workspaceRestoreFixture(persistedSession.serverWorkspace, {
       ...persistedSession.clientWorkspace,
-      preferredWorkspacePaneTabByTargetByRepo: {},
+      preferredWorkspacePaneTabByTargetByWorkspace: {},
     })
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     mockedRestoreWorkspaceAtBoot.mockResolvedValue({
@@ -276,7 +276,7 @@ describe('app bootstrap hooks', () => {
       openWorkspaceEntries: rebuiltSession.serverWorkspace.openWorkspaceEntries,
       runtime: restoredRuntimeForWorkspace(
         rebuiltSession.serverWorkspace,
-        rebuiltSession.clientWorkspace.restoredRepoId,
+        rebuiltSession.clientWorkspace.restoredWorkspaceId,
       ),
     })
     mockClientPresentation(rebuiltSession.clientWorkspace)
@@ -284,23 +284,23 @@ describe('app bootstrap hooks', () => {
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
     const hydrateRestoredRuntime = vi
-      .spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime')
+      .spyOn(useWorkspacesStore.getState(), 'hydrateRestoredWorkspaceRuntime')
       .mockResolvedValue(undefined)
 
     renderInJsdom(<Harness />)
     await vi.waitFor(() => {
-      expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
+      expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(true)
     })
 
     expect(hydrateRestoredRuntime).toHaveBeenCalledWith(
-      restoredRuntimeForWorkspace(rebuiltSession.serverWorkspace, rebuiltSession.clientWorkspace.restoredRepoId),
+      restoredRuntimeForWorkspace(rebuiltSession.serverWorkspace, rebuiltSession.clientWorkspace.restoredWorkspaceId),
       {
         signal: expect.any(AbortSignal),
         restoredClientWorkspace: rebuiltSession.clientWorkspace,
       },
     )
     expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).not.toHaveProperty('session')
-    expect(useReposStore.getState().sessionRestoreError).toBeNull()
+    expect(useWorkspacesStore.getState().sessionRestoreError).toBeNull()
   })
 
   test('blocks persistence when repo session hydration fails', async () => {
@@ -309,12 +309,12 @@ describe('app bootstrap hooks', () => {
         openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/missing-repo' }],
       },
       {
-        restoredRepoId: 'goblin+file:///tmp/missing-repo',
+        restoredWorkspaceId: 'goblin+file:///tmp/missing-repo',
         zenMode: true,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
-        preferredWorkspacePaneTabByTargetByRepo: {},
-        filetreeViewStateByWorktreeByRepo: {},
+        preferredWorkspacePaneTabByTargetByWorkspace: {},
+        filetreeViewStateByWorktreeByWorkspace: {},
       },
     )
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
@@ -322,18 +322,18 @@ describe('app bootstrap hooks', () => {
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
-    vi.spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockRejectedValue(
+    vi.spyOn(useWorkspacesStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockRejectedValue(
       new Error('session repo restore failed'),
     )
 
     renderInJsdom(<Harness />)
     await vi.waitFor(() => {
-      expect(useReposStore.getState().sessionRestoreError).toBe('session repo restore failed')
+      expect(useWorkspacesStore.getState().sessionRestoreError).toBe('session repo restore failed')
     })
 
-    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
-    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
-    expect(useReposStore.getState().sessionRestoreError).toBe('session repo restore failed')
+    expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(false)
+    expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useWorkspacesStore.getState().sessionRestoreError).toBe('session repo restore failed')
   })
 
   test('blocks persistence and enters an explicit failed state when boot session restore fails', async () => {
@@ -341,12 +341,12 @@ describe('app bootstrap hooks', () => {
 
     renderInJsdom(<Harness />)
     await vi.waitFor(() => {
-      expect(useReposStore.getState().sessionRestoreError).toBe('settings unavailable')
+      expect(useWorkspacesStore.getState().sessionRestoreError).toBe('settings unavailable')
     })
 
-    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
-    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
-    expect(useReposStore.getState().sessionRestoreError).toBe('settings unavailable')
+    expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(false)
+    expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useWorkspacesStore.getState().sessionRestoreError).toBe('settings unavailable')
   })
 
   test('retries the complete bootstrap workflow after an explicit failure', async () => {
@@ -361,9 +361,9 @@ describe('app bootstrap hooks', () => {
 
     await vi.waitFor(() => expect(result.container.textContent).toBe('ready'))
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(2)
-    expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
-    expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
-    expect(useReposStore.getState().sessionRestoreError).toBeNull()
+    expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(true)
+    expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(true)
+    expect(useWorkspacesStore.getState().sessionRestoreError).toBeNull()
   })
 
   test('times out authenticated workspace restore when settings hangs', async () => {
@@ -380,9 +380,9 @@ describe('app bootstrap hooks', () => {
     await flushMicrotasks(3)
 
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) })
-    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
-    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
-    expect(useReposStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
+    expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(false)
+    expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useWorkspacesStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
   })
 
   test('reports timeout when server workspace restore does not return after abort', async () => {
@@ -391,7 +391,7 @@ describe('app bootstrap hooks', () => {
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
-    vi.spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockResolvedValue(undefined)
+    vi.spyOn(useWorkspacesStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockResolvedValue(undefined)
     mockedRestoreWorkspaceAtBoot.mockImplementation(() => new Promise(() => {}))
 
     renderInJsdom(<Harness />)
@@ -399,9 +399,9 @@ describe('app bootstrap hooks', () => {
     await vi.advanceTimersByTimeAsync(30_000)
     await flushMicrotasks(3)
 
-    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
-    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
-    expect(useReposStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
+    expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(false)
+    expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useWorkspacesStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
   })
 
   test('reports timeout when repo session hydration does not return after abort', async () => {
@@ -411,12 +411,12 @@ describe('app bootstrap hooks', () => {
         openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/repo' }],
       },
       {
-        restoredRepoId: 'goblin+file:///tmp/repo',
+        restoredWorkspaceId: 'goblin+file:///tmp/repo',
         zenMode: true,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
-        preferredWorkspacePaneTabByTargetByRepo: {},
-        filetreeViewStateByWorktreeByRepo: {},
+        preferredWorkspacePaneTabByTargetByWorkspace: {},
+        filetreeViewStateByWorktreeByWorkspace: {},
       },
     )
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
@@ -424,7 +424,7 @@ describe('app bootstrap hooks', () => {
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
-    vi.spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockImplementation(
+    vi.spyOn(useWorkspacesStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockImplementation(
       () => new Promise(() => {}),
     )
 
@@ -433,9 +433,9 @@ describe('app bootstrap hooks', () => {
     await vi.advanceTimersByTimeAsync(30_000)
     await flushMicrotasks(3)
 
-    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
-    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
-    expect(useReposStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
+    expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(false)
+    expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useWorkspacesStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
   })
 
   test('aborts authenticated workspace restore on unmount without committing restore failure', async () => {
@@ -458,8 +458,8 @@ describe('app bootstrap hooks', () => {
     await flushMicrotasks(2)
 
     expect(signal?.aborted).toBe(true)
-    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
-    expect(useReposStore.getState().sessionRestoreError).toBeNull()
+    expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(false)
+    expect(useWorkspacesStore.getState().sessionRestoreError).toBeNull()
   })
 
   test('subscribes i18n invalidation without refetching public bootstrap state', async () => {
@@ -467,7 +467,7 @@ describe('app bootstrap hooks', () => {
     const subscribeI18n = vi.spyOn(useI18nStore.getState(), 'subscribeInvalidation').mockImplementation(() => {})
     const hydrateHostInfo = vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
-    vi.spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockResolvedValue(undefined)
+    vi.spyOn(useWorkspacesStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockResolvedValue(undefined)
 
     renderInJsdom(<Harness />)
     await flushMicrotasks(2)
@@ -488,7 +488,7 @@ describe('app bootstrap hooks', () => {
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
-    vi.spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockResolvedValue(undefined)
+    vi.spyOn(useWorkspacesStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockResolvedValue(undefined)
 
     const result = renderInJsdom(<Harness />)
     await flushMicrotasks(1)
@@ -497,12 +497,12 @@ describe('app bootstrap hooks', () => {
 
     renderInJsdom(<Harness />)
     await vi.waitFor(() => {
-      expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
+      expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(true)
     })
 
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(2)
-    expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
-    expect(useReposStore.getState().sessionRestoreError).toBeNull()
+    expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(true)
+    expect(useWorkspacesStore.getState().sessionRestoreError).toBeNull()
   })
 })
 
@@ -547,7 +547,7 @@ function mockServerRestore(fixture: WorkspaceRestoreFixture): void {
   mockedRestoreWorkspaceAtBoot.mockResolvedValue({
     status: 'restored',
     openWorkspaceEntries: serverWorkspace.openWorkspaceEntries,
-    runtime: restoredRuntimeForWorkspace(serverWorkspace, clientWorkspace.restoredRepoId),
+    runtime: restoredRuntimeForWorkspace(serverWorkspace, clientWorkspace.restoredWorkspaceId),
   })
   mockClientPresentation(clientWorkspace)
 }
@@ -558,7 +558,7 @@ function mockClientPresentation(clientWorkspace: ClientWorkspaceState): void {
 
 function restoredRuntimeForWorkspace(
   serverWorkspace: ServerWorkspaceState,
-  restoredRepoId: string | null,
+  restoredWorkspaceId: string | null,
 ): WorkspaceRuntimeRestoreSnapshot {
   return {
     workspaces: serverWorkspace.openWorkspaceEntries.map((entry) => ({
@@ -601,7 +601,7 @@ function restoredRuntimeForWorkspace(
       },
     })),
     workspacePaneTabs: [],
-    restoredRepoId,
+    restoredWorkspaceId,
   }
 }
 

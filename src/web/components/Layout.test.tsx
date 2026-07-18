@@ -7,7 +7,7 @@ import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx
 import { Layout, authenticatedAppShellMode } from '#/web/Layout.tsx'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { useRepoTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
+import { useWorkspaceTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 
@@ -78,8 +78,8 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
       createPending: false,
     }),
     subscribeTerminalWorktree: () => () => {},
-    repoBellCount: () => 4,
-    subscribeRepoBellCount: () => () => {},
+    workspaceBellCount: () => 4,
+    subscribeWorkspaceBellCount: () => () => {},
     snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
     subscribeSnapshot: () => () => {},
   }
@@ -137,7 +137,7 @@ beforeEach(() => {
 })
 
 function SettingsRetainedOutletTerminalConsumer() {
-  const bellCounts = useRepoTerminalBellCounts(['repo-a'])
+  const bellCounts = useWorkspaceTerminalBellCounts(['repo-a'])
   return <span data-testid="settings-retained-terminal-consumer">{bellCounts['repo-a']}</span>
 }
 

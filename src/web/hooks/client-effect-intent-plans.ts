@@ -1,7 +1,7 @@
 import { parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
@@ -60,14 +60,14 @@ export type WorkspaceIntentPlan =
   | { kind: 'open-clone-repo' }
   | { kind: 'open-remote-workspace' }
   | { kind: 'create-worktree' }
-  | { kind: 'new-terminal-tab'; repoId: string; target: WorkspacePaneCommandTarget }
-  | { kind: 'close-workspace-pane-tab-or-window'; repoId: string; target: WorkspacePaneCommandTarget }
+  | { kind: 'new-terminal-tab'; workspaceId: string; target: WorkspacePaneCommandTarget }
+  | { kind: 'close-workspace-pane-tab-or-window'; workspaceId: string; target: WorkspacePaneCommandTarget }
   | { kind: 'close-workspace'; workspaceId: string }
   | { kind: 'close-window' }
   | { kind: 'cycle-workspace'; direction: 1 | -1 }
   | { kind: 'refresh-repo'; repoId: string; workspaceRuntimeId: string }
-  | { kind: 'show-workspace-pane-tab'; repoId: string; target: WorkspacePaneCommandTarget; tab: WorkspacePaneTabType }
-  | { kind: 'terminal-primary-action'; repoId: string; target: WorkspacePaneCommandTarget }
+  | { kind: 'show-workspace-pane-tab'; workspaceId: string; target: WorkspacePaneCommandTarget; tab: WorkspacePaneTabType }
+  | { kind: 'terminal-primary-action'; workspaceId: string; target: WorkspacePaneCommandTarget }
   | { kind: 'toggle-zen-mode' }
 
 export type ExternalOpenDrainKickPlan = { kind: 'ignore' } | { kind: 'schedule-rerun' } | { kind: 'start-drain' }
@@ -81,12 +81,12 @@ interface WorkspaceIntentPlanContext {
   workspaceShortcutSuppressed: boolean
   terminalFocused: boolean
   currentWorkspaceId: string | null
-  currentRepo: Pick<RepoState, 'id' | 'workspaceRuntimeId' | 'workspaceProbe'> | null
+  currentRepo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId' | 'workspaceProbe'> | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
 }
 
 export function createTerminalBellIntentPlan(
-  repo: Pick<RepoState, 'id'> | undefined,
+  repo: Pick<WorkspaceState, 'id'> | undefined,
   branchReadModel: RepoBranchReadModelData | null,
   event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
 ): TerminalBellIntentPlan {
@@ -150,7 +150,7 @@ export function createWorkspaceIntentPlan(
     if (context.overlayBlocked || context.workspaceShortcutSuppressed) return { kind: 'noop' }
     return {
       kind: 'close-workspace-pane-tab-or-window',
-      repoId: context.currentWorkspaceId,
+      workspaceId: context.currentWorkspaceId,
       target: context.currentWorkspacePaneCommandTarget,
     }
   }
@@ -181,7 +181,7 @@ export function createWorkspaceIntentPlan(
         return { kind: 'noop' }
       return {
         kind: 'new-terminal-tab',
-        repoId: context.currentWorkspaceId,
+        workspaceId: context.currentWorkspaceId,
         target: context.currentWorkspacePaneCommandTarget,
       }
     case 'close-workspace-requested':
@@ -200,7 +200,7 @@ export function createWorkspaceIntentPlan(
         return { kind: 'noop' }
       return {
         kind: 'show-workspace-pane-tab',
-        repoId: context.currentWorkspaceId,
+        workspaceId: context.currentWorkspaceId,
         target: context.currentWorkspacePaneCommandTarget,
         tab: event.tab,
       }
@@ -214,7 +214,7 @@ export function createWorkspaceIntentPlan(
         return { kind: 'noop' }
       return {
         kind: 'terminal-primary-action',
-        repoId: context.currentWorkspaceId,
+        workspaceId: context.currentWorkspaceId,
         target: context.currentWorkspacePaneCommandTarget,
       }
     case 'workspace-zen-mode-toggle-requested':

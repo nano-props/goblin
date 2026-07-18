@@ -19,7 +19,7 @@ import {
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 stubI18n()
 
@@ -64,7 +64,7 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
 
 beforeEach(() => {
   resetWorkspacePaneActionQueueForTest()
-  resetReposStore()
+  resetWorkspacesStore()
   seedRepoWithReadModelForTest({
     id: 'goblin+file:///repo',
     workspaceRuntimeId: 'repo-runtime-1',
@@ -72,7 +72,7 @@ beforeEach(() => {
     currentBranchName: 'main',
   })
   observeWorkspacePaneRouteForTest({
-    repoId: 'goblin+file:///repo',
+    workspaceId: 'goblin+file:///repo',
     workspaceRuntimeId: 'repo-runtime-1',
     branchName: 'main',
     worktreePath: '/repo-worktree',
@@ -82,7 +82,7 @@ beforeEach(() => {
 
 afterEach(() => {
   resetWorkspacePaneActionQueueForTest()
-  resetReposStore()
+  resetWorkspacesStore()
   terminalSessionViewMocks.props.length = 0
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockClear()
   workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mockClear()

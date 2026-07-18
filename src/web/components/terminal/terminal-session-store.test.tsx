@@ -15,7 +15,7 @@ import {
 import {
   useTerminalSessionSummaries,
   useTerminalSnapshot,
-  useRepoTerminalBellCounts,
+  useWorkspaceTerminalBellCounts,
   useTerminalWorktreeBellCount,
   useTerminalWorktreeCount,
   useTerminalWorktreeCreatePending,
@@ -48,8 +48,8 @@ function makeReadContext(overrides: Partial<TerminalWorktreeSnapshot> = {}): Ter
     terminalWorktreeSnapshot: (key) =>
       key === WORKTREE_KEY ? snapshot : { ...snapshot, terminalWorktreeKey: key },
     subscribeTerminalWorktree: () => () => {},
-    repoBellCount: () => 0,
-    subscribeRepoBellCount: () => () => {},
+    workspaceBellCount: () => 0,
+    subscribeWorkspaceBellCount: () => () => {},
     snapshot: () => EMPTY_TERMINAL_SNAPSHOT,
     subscribeSnapshot: () => () => {},
   }
@@ -204,7 +204,7 @@ describe('null key returns empty-derived values', () => {
 
   test('empty repo bell count query still requires the read provider', () => {
     function Probe() {
-      useRepoTerminalBellCounts([])
+      useWorkspaceTerminalBellCounts([])
       return null
     }
     expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
@@ -228,7 +228,7 @@ describe('null key returns empty-derived values', () => {
 
   test('non-empty repo bell count query still requires the read provider', () => {
     function Probe() {
-      useRepoTerminalBellCounts(['/repo'])
+      useWorkspaceTerminalBellCounts(['/repo'])
       return null
     }
     expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')

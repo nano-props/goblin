@@ -19,7 +19,7 @@ test('persists client workspace independently of the embedded server origin', as
   const persistence = await import('#/main/client-workspace-state.ts')
   const state = {
     ...defaultClientWorkspaceState(),
-    restoredRepoId: 'goblin+file:///repo-d',
+    restoredWorkspaceId: 'goblin+file:///repo-d',
   }
 
   await persistence.writeNativeClientWorkspaceState(state)

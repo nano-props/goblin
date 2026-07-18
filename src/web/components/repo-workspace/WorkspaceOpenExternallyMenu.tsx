@@ -1,7 +1,7 @@
 import { ChevronDown, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { focusRing } from '#/web/components/ui/focus.ts'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'

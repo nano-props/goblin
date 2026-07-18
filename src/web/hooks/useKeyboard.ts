@@ -13,17 +13,17 @@
 // open would stack the Help modal on top.
 
 import { useEffect, useRef } from 'react'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useUiTransitionStore } from '#/web/stores/ui-transition.ts'
-import { visibleBranches } from '#/web/stores/repos/branch-view-mode.ts'
+import { visibleBranches } from '#/web/stores/workspaces/branch-view-mode.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
 import { matchClientKeyboardShortcut } from '#/shared/shortcut-definitions.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import type { RepoState } from '#/web/stores/repos/types.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { getRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
-import { keyboardRuntimeStateFromStore } from '#/web/stores/repos/selector-state.ts'
+import { keyboardRuntimeStateFromStore } from '#/web/stores/workspaces/selector-state.ts'
 import {
   runCloseWorkspacePaneTabOrWindowCommand,
   runMoveWorkspacePaneTabCommand,
@@ -102,7 +102,7 @@ function nextIndex(current: number, length: number, direction: MoveDirection): n
 
 function moveBranchSelection(
   input: {
-    repo: RepoState
+    repo: WorkspaceState
     currentBranchName: string | null
   },
   direction: MoveDirection,
@@ -170,7 +170,7 @@ export function useKeyboard({
       }
 
       if (!workspaceShortcutsSuppressed && !isTypingTarget(e.target)) {
-        const repoId = currentWorkspaceIdRef.current
+        const workspaceId = currentWorkspaceIdRef.current
         const navigationDirection =
           e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.code === 'ArrowLeft'
             ? -1
@@ -181,26 +181,26 @@ export function useKeyboard({
                 : macPrimaryModifierPressed(e) && !e.altKey && !e.shiftKey && e.code === 'BracketRight'
                   ? 1
                   : 0
-        if (repoId && navigationDirection !== 0) {
+        if (workspaceId && navigationDirection !== 0) {
           e.preventDefault()
-          if (navigationDirection === -1) navigation.goBack(repoId)
-          else navigation.goForward(repoId)
+          if (navigationDirection === -1) navigation.goBack(workspaceId)
+          else navigation.goForward(workspaceId)
           return
         }
       }
 
       if (primaryModifierPressed(e) && !e.altKey && !workspaceShortcutsSuppressed) {
-        const repoId = currentWorkspaceIdRef.current
+        const workspaceId = currentWorkspaceIdRef.current
         const paneTarget = currentWorkspacePaneCommandTargetRef.current
         const menuBackedShortcut = hasNativeMenuAccelerators()
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
           if (!paneTarget) return
-          const repo = repoId ? useReposStore.getState().repos[repoId] : null
-          if (!workspaceTerminalAvailable(repo?.workspaceProbe)) return
+          const workspace = workspaceId ? useWorkspacesStore.getState().workspaces[workspaceId] : null
+          if (!workspaceTerminalAvailable(workspace?.workspaceProbe)) return
           e.preventDefault()
           // Cmd+T is a generic entry → new terminal appends to the end.
           void runNewTerminalTabCommand({
-            repoId,
+            workspaceId,
             target: paneTarget,
             navigation,
             t: translate,
@@ -209,7 +209,7 @@ export function useKeyboard({
         }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
           e.preventDefault()
-          const repo = repoId ? useReposStore.getState().repos[repoId] : null
+          const repo = workspaceId ? useWorkspacesStore.getState().workspaces[workspaceId] : null
           if (!repo || !workspaceWorktreesAvailable(repo.workspaceProbe)) return
           const branchAction = projectBranchActionOperation(
             repo.operations.branchAction,
@@ -226,7 +226,7 @@ export function useKeyboard({
           if (!paneTarget) return
           e.preventDefault()
           void runCloseWorkspacePaneTabOrWindowCommand({
-            repoId,
+            workspaceId,
             target: paneTarget,
             navigation,
           })
@@ -237,7 +237,7 @@ export function useKeyboard({
           if (!paneTarget) return
           e.preventDefault()
           void runSelectWorkspacePaneTabByIndexCommand({
-            repoId,
+            workspaceId,
             target: paneTarget,
             tabIndex,
             navigation,
@@ -250,7 +250,7 @@ export function useKeyboard({
       if (e.metaKey || e.ctrlKey || e.altKey) return
       if (isTypingTarget(e.target)) return
 
-      const state = useReposStore.getState()
+      const state = useWorkspacesStore.getState()
       const keyboardState = keyboardRuntimeStateFromStore(state, currentWorkspaceIdRef.current)
       const repo = keyboardState.repo
       const overlayOpen = workspaceShortcutsSuppressed
@@ -299,7 +299,7 @@ export function useKeyboard({
           if (overlayOpen || !repo || !paneTarget) break
           e.preventDefault()
           void runMoveWorkspacePaneTabCommand({
-            repoId: repo.id,
+            workspaceId: repo.id,
             target: paneTarget,
             direction: action === 'next-workspace-pane-tab' ? 1 : -1,
             navigation,

@@ -7,13 +7,13 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspaceNavigationControls } from '#/web/components/WorkspaceNavigationControls.tsx'
 import { PrimaryWindowNavigationProvider } from '#/web/primary-window-navigation.tsx'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import { resetReposStore } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
 const REPO_ID = 'goblin+file:///tmp/navigation-controls-repo'
 
 beforeEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
 })
 
 describe('WorkspaceNavigationControls', () => {
@@ -45,10 +45,10 @@ describe('WorkspaceNavigationControls', () => {
     expect(forwardButton().disabled).toBe(true)
 
     act(() => {
-      useReposStore.getState().recordWorkspaceNavigation({ repoId: REPO_ID, route: { kind: 'dashboard' } })
-      useReposStore
+      useWorkspacesStore.getState().recordWorkspaceNavigation({ workspaceId: REPO_ID, route: { kind: 'dashboard' } })
+      useWorkspacesStore
         .getState()
-        .recordWorkspaceNavigation({ repoId: REPO_ID, route: { kind: 'newWorktree', returnTo: null } })
+        .recordWorkspaceNavigation({ workspaceId: REPO_ID, route: { kind: 'newWorktree', returnTo: null } })
     })
 
     expect(workspaceNavigationControls(container)?.className).toContain('goblin-workspace-navigation-controls')
@@ -56,7 +56,7 @@ describe('WorkspaceNavigationControls', () => {
     expect(forwardButton().disabled).toBe(true)
 
     act(() => {
-      const store = useReposStore.getState()
+      const store = useWorkspacesStore.getState()
       const traversal = store.peekWorkspaceNavigation(REPO_ID, 'back')
       if (traversal) store.commitWorkspaceNavigation(traversal)
     })
@@ -72,17 +72,17 @@ describe('WorkspaceNavigationControls', () => {
     renderControls({ navigation: navigationWith({ goBack, goForward }) })
 
     act(() => {
-      useReposStore.getState().recordWorkspaceNavigation({ repoId: REPO_ID, route: { kind: 'dashboard' } })
-      useReposStore
+      useWorkspacesStore.getState().recordWorkspaceNavigation({ workspaceId: REPO_ID, route: { kind: 'dashboard' } })
+      useWorkspacesStore
         .getState()
-        .recordWorkspaceNavigation({ repoId: REPO_ID, route: { kind: 'newWorktree', returnTo: null } })
+        .recordWorkspaceNavigation({ workspaceId: REPO_ID, route: { kind: 'newWorktree', returnTo: null } })
     })
 
     await user.click(backButton())
     expect(goBack).toHaveBeenCalledWith(REPO_ID)
 
     act(() => {
-      const store = useReposStore.getState()
+      const store = useWorkspacesStore.getState()
       const traversal = store.peekWorkspaceNavigation(REPO_ID, 'back')
       if (traversal) store.commitWorkspaceNavigation(traversal)
     })
@@ -93,12 +93,12 @@ describe('WorkspaceNavigationControls', () => {
 })
 
 function renderControls({
-  repoId = REPO_ID,
+  workspaceId = REPO_ID,
   zenRevealTriggerEnabled = false,
   onZenRevealTriggerEnter,
   navigation = navigationWith(),
 }: {
-  repoId?: string
+  workspaceId?: string
   zenRevealTriggerEnabled?: boolean
   onZenRevealTriggerEnter?: () => void
   navigation?: PrimaryWindowNavigationActions
@@ -106,7 +106,7 @@ function renderControls({
   return renderInJsdom(
     <PrimaryWindowNavigationProvider value={navigation}>
       <WorkspaceNavigationControls
-        repoId={repoId}
+        workspaceId={workspaceId}
         zenRevealTriggerEnabled={zenRevealTriggerEnabled}
         onZenRevealTriggerEnter={onZenRevealTriggerEnter}
       />

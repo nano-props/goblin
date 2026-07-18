@@ -45,7 +45,7 @@ const appDataClientMocks = vi.hoisted(() => ({
   restoreServerWorkspace: vi.fn<RestoreServerWorkspaceMock>(async () => ({
     status: 'restored' as const,
     openWorkspaceEntries: [],
-    runtime: { workspaces: [], workspacePaneTabs: [], restoredRepoId: null },
+    runtime: { workspaces: [], workspacePaneTabs: [], restoredWorkspaceId: null },
   })),
   restoreRepoWorkspaceTabs: vi.fn(async () => ({
     workspace: {
@@ -122,7 +122,7 @@ describe('settings actions', () => {
     appDataClientMocks.restoreServerWorkspace.mockResolvedValue({
       status: 'restored',
       openWorkspaceEntries: [],
-      runtime: { workspaces: [], workspacePaneTabs: [], restoredRepoId: null },
+      runtime: { workspaces: [], workspacePaneTabs: [], restoredWorkspaceId: null },
     })
     appDataClientMocks.restoreRepoWorkspaceTabs.mockReset()
     appDataClientMocks.restoreRepoWorkspaceTabs.mockResolvedValue({
@@ -191,13 +191,13 @@ describe('settings actions', () => {
     const session = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/repo-a' }],
-      restoredRepoId: 'goblin+file:///tmp/repo-a',
+      restoredWorkspaceId: 'goblin+file:///tmp/repo-a',
       workspacePaneSize: 333,
     }
     appDataClientMocks.restoreServerWorkspace.mockResolvedValue({
       status: 'repaired',
       openWorkspaceEntries: session.openWorkspaceEntries,
-      runtime: { workspaces: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
+      runtime: { workspaces: [], workspacePaneTabs: [], restoredWorkspaceId: session.restoredWorkspaceId },
     })
     const { restoreWorkspaceAtBoot } = await import('#/web/settings-actions.ts')
 
@@ -206,7 +206,7 @@ describe('settings actions', () => {
     expect(result).toEqual({
       status: 'repaired',
       openWorkspaceEntries: session.openWorkspaceEntries,
-      runtime: { workspaces: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
+      runtime: { workspaces: [], workspacePaneTabs: [], restoredWorkspaceId: session.restoredWorkspaceId },
     })
     expect(appDataClientMocks.restoreServerWorkspace).toHaveBeenCalledWith('client_test000000000000', undefined)
   })

@@ -7,7 +7,7 @@ import {
 import type { WorkspacePaneTabControllerCommitNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 
 export async function openWorkspacePaneTab(input: {
-  repoId: string
+  workspaceId: string
   branchName: string
   worktreePath: string | null | undefined
   type: WorkspacePaneStaticTabType

@@ -11,11 +11,11 @@
 
 import { ArrowDown, ArrowUp, FolderTree, GitBranch } from 'lucide-react'
 import { useI18nStore, useT, type Lang } from '#/web/stores/i18n.ts'
-import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
-import { getBranchWorktreeState, type BranchWorktreeRepo } from '#/web/stores/repos/worktree-state.ts'
+import { getBranchWorktreeState, type BranchWorktreeRepo } from '#/web/stores/workspaces/worktree-state.ts'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
 import { TerminalOutputActivityIndicator } from '#/web/components/terminal/TerminalOutputActivityIndicator.tsx'
 

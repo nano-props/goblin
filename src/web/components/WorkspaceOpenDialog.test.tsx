@@ -10,8 +10,8 @@ import {
 } from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { resetReposStore } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const testWindow = window as unknown as {
@@ -20,7 +20,7 @@ const testWindow = window as unknown as {
 }
 
 beforeEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
   setClientBridgeForTests(null)
   // The bootstrap is the source of truth for the tiny client
   // payload (runtime kind, initial server handoff). The preload
@@ -63,7 +63,7 @@ describe('WorkspaceOpenDialog', () => {
       ok: true as const,
       workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
     }))
-    useReposStore.setState({ ensureWorkspaceOpen })
+    useWorkspacesStore.setState({ ensureWorkspaceOpen })
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
 

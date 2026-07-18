@@ -58,7 +58,12 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
     return { kind: 'unsupported', reason: 'worktree-required' }
   }
   const presentation = beginWorkspacePaneDestinationPresentation(lease)
-  return await runWorkspacePaneAction(workspacePaneActionTargetFromCoordinates(lease), () =>
+  return await runWorkspacePaneAction(workspacePaneActionTargetFromCoordinates({
+    workspaceId: lease.repoId,
+    workspaceRuntimeId: lease.workspaceRuntimeId,
+    branchName: lease.branchName,
+    worktreePath: lease.worktreePath,
+  }), () =>
     commitWorkspacePaneDestinationRoute(presentation, input.route, input.navigation, input.options),
   )
 }

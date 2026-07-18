@@ -204,8 +204,8 @@ async function renderTerminalSession() {
   const readContext: TerminalSessionReadContextValue = {
     terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
     subscribeTerminalWorktree: () => () => {},
-    repoBellCount: () => 0,
-    subscribeRepoBellCount: () => () => {},
+    workspaceBellCount: () => 0,
+    subscribeWorkspaceBellCount: () => () => {},
     snapshot: () => snapshot,
     subscribeSnapshot: () => () => {},
   }
@@ -357,8 +357,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -461,8 +461,8 @@ describe('TerminalSessionView', () => {
         worktreeListeners.add(listener)
         return () => worktreeListeners.delete(listener)
       },
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -575,8 +575,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -646,8 +646,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => emptySnapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -724,8 +724,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -785,8 +785,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
       subscribeSnapshot: () => () => {},
     }
@@ -879,8 +879,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => activeSnapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -986,8 +986,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => activeSnapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1098,8 +1098,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1213,8 +1213,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1331,8 +1331,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1466,8 +1466,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1575,8 +1575,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1700,8 +1700,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -1981,8 +1981,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshot,
       subscribeSnapshot: () => () => {},
     }
@@ -2139,8 +2139,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(activeWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => snapshotOpen,
       subscribeSnapshot: () => () => {},
     }
@@ -2261,8 +2261,8 @@ describe('TerminalSessionView', () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
+      workspaceBellCount: () => 0,
+      subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => emptySnapshot,
       subscribeSnapshot: () => () => {},
     }

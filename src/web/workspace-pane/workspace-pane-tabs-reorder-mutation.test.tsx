@@ -8,7 +8,7 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -40,7 +40,7 @@ let controls: WorkspacePaneTabsReorderMutationResult | null = null
 
 beforeEach(() => {
   resetWorkspacePaneActionQueueForTest()
-  resetReposStore()
+  resetWorkspacesStore()
   seedWorkspacePaneTabsRepo(WORKSPACE_RUNTIME_ID)
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   controls = null
@@ -49,7 +49,7 @@ beforeEach(() => {
 afterEach(() => {
   resetWorkspacePaneActionQueueForTest()
   queryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
   setClientBridgeForTests(null)
   controls = null
 })

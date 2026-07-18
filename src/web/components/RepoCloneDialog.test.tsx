@@ -11,8 +11,8 @@ import {
 } from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { resetReposStore } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const mocks = vi.hoisted(() => ({
@@ -41,7 +41,7 @@ const fetchMock = mockFetch(async (input: RequestInfo | URL) => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  resetReposStore()
+  resetWorkspacesStore()
   setClientBridgeForTests(null)
   fetchMock.mockClear()
   testWindow.__GOBLIN_BOOTSTRAP__ = {
@@ -77,7 +77,7 @@ afterEach(() => {
 describe('RepoCloneDialog', () => {
   test('ensures the cloned workspace is open before delegating activation to navigation', async () => {
     const ensureWorkspaceOpen = vi.fn(async () => ({ ok: true as const, workspaceId: workspaceIdForTest('goblin+file:///tmp/cloned-repo') }))
-    useReposStore.setState({ ensureWorkspaceOpen })
+    useWorkspacesStore.setState({ ensureWorkspaceOpen })
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
 
@@ -103,7 +103,7 @@ describe('RepoCloneDialog', () => {
       workspaceId: workspaceIdForTest('goblin+file:///tmp/cloned-repo'),
       postOpenEffects: Promise.resolve([{ kind: 'recent-workspace' as const, message: 'recent write failed' }]),
     }))
-    useReposStore.setState({ ensureWorkspaceOpen })
+    useWorkspacesStore.setState({ ensureWorkspaceOpen })
 
     renderInJsdom(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>

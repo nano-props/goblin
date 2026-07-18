@@ -1,8 +1,8 @@
 import { toast } from 'sonner'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
-import { runManualRepoSync } from '#/web/stores/repos/refresh.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { runManualRepoSync } from '#/web/stores/workspaces/refresh.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { clearRecentWorkspaceHistory } from '#/web/settings-actions.ts'
@@ -25,7 +25,7 @@ import {
 } from '#/web/hooks/client-effect-intent-plans.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import type { OpenWorkspaceResult } from '#/web/stores/repos/types.ts'
+import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
@@ -68,7 +68,7 @@ export function handleTerminalBellClickIntent(
   event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
   deps: TerminalBellIntentDeps,
 ): void {
-  const repo = useReposStore.getState().repos[event.repoRoot]
+  const repo = useWorkspacesStore.getState().workspaces[event.repoRoot]
   const branchModel = repo && event.terminalWorktreeKey ? readRepoBranchQueryProjection(repo) : null
   const plan = createTerminalBellIntentPlan(repo, branchModel, event)
   if (plan.kind === 'noop' || plan.kind === 'unavailable') return
@@ -76,7 +76,7 @@ export function handleTerminalBellClickIntent(
   switch (plan.kind) {
     case 'show-worktree-terminal':
       void dispatchShowWorkspacePaneTerminalRouteAction({
-        repoId: plan.repoId,
+        workspaceId: plan.repoId,
         branchName: plan.branch,
         terminalSessionId: plan.terminalSessionId,
         navigation: deps.navigation,
@@ -132,7 +132,7 @@ export async function handleWorkspaceClientIntent(
 ): Promise<boolean> {
   // Workspace intents are route-aware and may be gated by overlays, shortcut
   // suppression, or terminal focus before they execute.
-  const currentRepo = deps.currentWorkspaceId ? (useReposStore.getState().repos[deps.currentWorkspaceId] ?? null) : null
+  const currentRepo = deps.currentWorkspaceId ? (useWorkspacesStore.getState().workspaces[deps.currentWorkspaceId] ?? null) : null
   const plan = createWorkspaceIntentPlan(event, {
     overlayBlocked: deps.isOverlayOpen() || isShortcutBlockingLayerOpen(),
     workspaceShortcutSuppressed: deps.isWorkspaceShortcutSuppressed(),
@@ -180,14 +180,14 @@ export async function handleWorkspaceClientIntent(
       // terminal should append to the end of the strip rather than being
       // anchored to the currently-active tab.
       return await runNewTerminalTabCommand({
-        repoId: plan.repoId,
+        workspaceId: plan.workspaceId,
         target: plan.target,
         navigation: deps.navigation,
         t: deps.t,
       })
     case 'close-workspace-pane-tab-or-window':
       return await runCloseWorkspacePaneTabOrWindowCommand({
-        repoId: plan.repoId,
+        workspaceId: plan.workspaceId,
         target: plan.target,
         navigation: deps.navigation,
       })
@@ -202,28 +202,28 @@ export async function handleWorkspaceClientIntent(
       deps.navigation.cycleWorkspace(plan.direction)
       return true
     case 'refresh-repo':
-      await runManualRepoSync({ get: useReposStore.getState, set: useReposStore.setState }, plan.repoId, {
+      await runManualRepoSync({ get: useWorkspacesStore.getState, set: useWorkspacesStore.setState }, plan.repoId, {
         workspaceRuntimeId: plan.workspaceRuntimeId,
       })
       return true
     case 'show-workspace-pane-tab':
       if (plan.tab === 'terminal') {
         return await runTerminalPrimaryActionCommand({
-          repoId: plan.repoId,
+          workspaceId: plan.workspaceId,
           target: plan.target,
           navigation: deps.navigation,
           t: deps.t,
         })
       }
       return await runShowWorkspacePaneTabCommand({
-        repoId: plan.repoId,
+        workspaceId: plan.workspaceId,
         target: plan.target,
         tab: plan.tab,
         navigation: deps.navigation,
       })
     case 'terminal-primary-action':
       return await runTerminalPrimaryActionCommand({
-        repoId: plan.repoId,
+        workspaceId: plan.workspaceId,
         target: plan.target,
         navigation: deps.navigation,
         t: deps.t,

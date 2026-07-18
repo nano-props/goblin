@@ -66,7 +66,7 @@ describe('settings-client', () => {
           lanEnabled: false,
           session: {
             openWorkspaceEntries: [],
-            restoredRepoId: null,
+            restoredWorkspaceId: null,
             zenMode: true,
             workspacePaneSize: 50,
             selectedTerminalSessionIdByTerminalWorktree: {},
@@ -154,7 +154,7 @@ describe('settings-client', () => {
         status: 'restored',
         openWorkspaceEntries: [],
         workspace,
-        runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
+        runtime: { workspaces: [], workspacePaneTabs: [], restoredWorkspaceId: null },
       }),
     }))
 
@@ -165,7 +165,7 @@ describe('settings-client', () => {
       status: 'restored',
       openWorkspaceEntries: [],
       workspace,
-      runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
+      runtime: { workspaces: [], workspacePaneTabs: [], restoredWorkspaceId: null },
     })
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]

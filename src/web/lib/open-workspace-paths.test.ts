@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { openWorkspacePaths } from '#/web/lib/open-workspace-paths.ts'
-import type { OpenWorkspaceResult } from '#/web/stores/repos/types.ts'
+import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('openWorkspacePaths', () => {

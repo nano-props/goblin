@@ -16,7 +16,7 @@ import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
 export interface WorkspacePaneRuntimeTabCommandContextInput {
-  repoId: string
+  workspaceId: string
   branchName: string | null
   filesystemTarget: WorkspacePaneFilesystemTarget | null
   workspacePaneRoute: WorkspacePaneCommandRoute

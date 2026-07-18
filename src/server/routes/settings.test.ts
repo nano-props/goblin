@@ -117,7 +117,7 @@ describe('settings routes', () => {
     const restored = {
       status: 'restored' as const,
       openWorkspaceEntries: [],
-      runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
+      runtime: { repos: [], workspacePaneTabs: [], restoredWorkspaceId: null },
     }
     mocks.restoreServerWorkspace.mockResolvedValue(restored)
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')

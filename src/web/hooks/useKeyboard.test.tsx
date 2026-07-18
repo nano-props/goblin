@@ -15,7 +15,7 @@ vi.mock('sonner', () => ({
 }))
 import {
   createRepoBranch,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
@@ -24,7 +24,7 @@ import {
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
@@ -61,7 +61,7 @@ interface HookHostOptions {
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
 })
 
 afterEach(() => {
@@ -113,7 +113,7 @@ describe('useKeyboard', () => {
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
     })
     seedInitialObservedWorkspacePaneRouteForTest({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: workspaceRuntimeIdForTest(),
       branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
@@ -145,7 +145,7 @@ describe('useKeyboard', () => {
       },
     })
     const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
-      useReposStore.getState().setWorkspacePaneTab(repoId, branch, tab)
+      useWorkspacesStore.getState().setWorkspacePaneTab(repoId, branch, tab)
       return true
     })
     await renderHookHost({
@@ -154,7 +154,7 @@ describe('useKeyboard', () => {
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
     })
     seedInitialObservedWorkspacePaneRouteForTest({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: workspaceRuntimeIdForTest(),
       branchName: 'feature/no-worktree',
       worktreePath: null,
@@ -245,7 +245,7 @@ describe('useKeyboard', () => {
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
     })
     seedInitialObservedWorkspacePaneRouteForTest({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: workspaceRuntimeIdForTest(),
       branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
@@ -442,12 +442,12 @@ describe('useKeyboard', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/worktree',
     })
-    useReposStore.setState((state) => {
-      const repo = state.repos[REPO_ID]
+    useWorkspacesStore.setState((state) => {
+      const repo = state.workspaces[REPO_ID]
       if (!repo) return state
       return {
-        repos: {
-          ...state.repos,
+        workspaces: {
+          ...state.workspaces,
           [REPO_ID]: {
             ...repo,
             operations: {
@@ -654,7 +654,7 @@ function serverOperation(
 }
 
 function HookHost(overrides: Partial<HookHostOptions>) {
-  const repo = overrides.currentWorkspaceId ? useReposStore.getState().repos[overrides.currentWorkspaceId] : null
+  const repo = overrides.currentWorkspaceId ? useWorkspacesStore.getState().workspaces[overrides.currentWorkspaceId] : null
   const branch =
     repo && overrides.currentBranchName
       ? readRepoBranchSnapshotQueryProjection(repo)?.branches.find(
@@ -720,7 +720,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
 }
 
 function workspaceRuntimeIdForTest(): string {
-  const repo = useReposStore.getState().repos[REPO_ID]
+  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
   if (!repo) throw new Error(`expected seeded repo ${REPO_ID}`)
   return repo.workspaceRuntimeId
 }

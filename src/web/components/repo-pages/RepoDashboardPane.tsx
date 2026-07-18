@@ -18,7 +18,7 @@ import { useI18nStore, useT, type Lang } from '#/web/stores/i18n.ts'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { repoBranchReadModelFromSnapshot, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import {
   useRepoProjectionReadModel,
@@ -26,13 +26,13 @@ import {
   useWorkspaceDirectoryOverview,
 } from '#/web/repo-data-query.ts'
 import type { PullRequestEntry } from '#/shared/api-types.ts'
-import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
-import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
+import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { workspaceGitAvailable, workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 import { DirectoryOverviewContent } from '#/web/components/repo-pages/DirectoryOverviewContent.tsx'
 import { DASHBOARD_CARD_CLASS_NAME, DashboardMetricCard } from '#/web/components/repo-pages/dashboard-ui.tsx'
-import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
+import { remoteRepoTarget } from '#/web/stores/workspaces/workspace-guards.ts'
 const DASHBOARD_BRANCH_ROW_CLASS_NAME =
   'w-full px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45'
 
@@ -70,9 +70,9 @@ export function RepoDashboardPane({
 }: RepoDashboardPaneProps) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
-  const repo = useReposStore(
+  const repo = useWorkspacesStore(
     useShallow((s) => {
-      const state = s.repos[repoId]
+      const state = s.workspaces[repoId]
       return state
         ? {
             id: state.id,
@@ -119,7 +119,7 @@ export function RepoDashboardPane({
   const statusStale = !!statusReadModel.data && statusReadModel.isError
   const retryStatus = () => {
     if (!repo) return
-    void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repo.id, repo.workspaceRuntimeId)
+    void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, repo.id, repo.workspaceRuntimeId)
   }
 
   return (
@@ -187,7 +187,7 @@ function DirectoryDashboard({
   overview,
   compact,
 }: {
-  repo: Pick<RepoState, 'name' | 'id' | 'remote'>
+  repo: Pick<WorkspaceState, 'name' | 'id' | 'remote'>
   overview: { topLevelFileCount: number; topLevelDirectoryCount: number; totalSizeBytes: number }
   compact: boolean
 }) {
@@ -287,7 +287,7 @@ function DashboardHeader({
   currentBranch,
   lang,
 }: {
-  repo: Pick<RepoState, 'name' | 'id' | 'projection' | 'remote'>
+  repo: Pick<WorkspaceState, 'name' | 'id' | 'projection' | 'remote'>
   currentBranch: string
   lang: Lang
 }) {
@@ -327,7 +327,7 @@ function DashboardHeader({
   )
 }
 
-function dashboardRemoteState(repo: Pick<RepoState, 'remote'>): {
+function dashboardRemoteState(repo: Pick<WorkspaceState, 'remote'>): {
   labelKey: string
   variant: 'outline' | 'success' | 'attention'
 } {

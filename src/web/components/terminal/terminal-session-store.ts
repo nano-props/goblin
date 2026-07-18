@@ -10,7 +10,7 @@ import {
   type TerminalProjectionHydrationEntry,
   type TerminalProjectionHydrationPhase,
 } from '#/web/stores/terminal-projection-hydration.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type {
   TerminalSnapshot,
   TerminalDescriptor,
@@ -94,22 +94,22 @@ export function useTerminalWorktreeBellCount(terminalWorktreeKey: string | null)
   return useTerminalWorktreeField(terminalWorktreeKey, (s) => s.bellCount)
 }
 
-export function useRepoTerminalBellCounts(repoIds: readonly string[]): Record<string, number> {
-  const { repoBellCount, subscribeRepoBellCount } = useTerminalSessionReadContext()
+export function useWorkspaceTerminalBellCounts(workspaceIds: readonly string[]): Record<string, number> {
+  const { workspaceBellCount, subscribeWorkspaceBellCount } = useTerminalSessionReadContext()
   const subscribe = useCallback(
     (listener: () => void) => {
-      const uniqueRepoIds = Array.from(new Set(repoIds))
-      if (uniqueRepoIds.length === 0) return () => {}
-      const unsubscribe = uniqueRepoIds.map((repoId) => subscribeRepoBellCount(repoId, listener))
+      const uniqueWorkspaceIds = Array.from(new Set(workspaceIds))
+      if (uniqueWorkspaceIds.length === 0) return () => {}
+      const unsubscribe = uniqueWorkspaceIds.map((workspaceId) => subscribeWorkspaceBellCount(workspaceId, listener))
       return () => {
         for (const off of unsubscribe) off()
       }
     },
-    [repoIds, subscribeRepoBellCount],
+    [workspaceIds, subscribeWorkspaceBellCount],
   )
   const getSnapshot = useCallback(() => {
-    return JSON.stringify(repoIds.map((repoId) => [repoId, repoBellCount(repoId)] as const))
-  }, [repoIds, repoBellCount])
+    return JSON.stringify(workspaceIds.map((workspaceId) => [workspaceId, workspaceBellCount(workspaceId)] as const))
+  }, [workspaceIds, workspaceBellCount])
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   return useMemo(() => {
     const entries = JSON.parse(snapshot) as Array<[string, number]>
@@ -165,12 +165,12 @@ export function useTerminalSessionSummaries(terminalWorktreeKey: string | null):
 }
 
 export function useTerminalRepoProjectionPhase(repoRoot: string | null): TerminalProjectionHydrationPhase {
-  const workspaceRuntimeId = useReposStore((s) => (repoRoot ? s.repos[repoRoot]?.workspaceRuntimeId : undefined))
+  const workspaceRuntimeId = useWorkspacesStore((s) => (repoRoot ? s.workspaces[repoRoot]?.workspaceRuntimeId : undefined))
   return useTerminalProjectionHydrationPhase(repoRoot, workspaceRuntimeId)
 }
 
 export function useTerminalRepoProjectionHydrationEntry(repoRoot: string | null): TerminalProjectionHydrationEntry {
-  const workspaceRuntimeId = useReposStore((s) => (repoRoot ? s.repos[repoRoot]?.workspaceRuntimeId : undefined))
+  const workspaceRuntimeId = useWorkspacesStore((s) => (repoRoot ? s.workspaces[repoRoot]?.workspaceRuntimeId : undefined))
   return useTerminalProjectionHydrationEntry(repoRoot, workspaceRuntimeId)
 }
 

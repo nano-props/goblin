@@ -6,8 +6,8 @@ import {
   useRepoProjectionReadModel,
   useRepoWorktreeStatusReadModel,
 } from '#/web/repo-data-query.ts'
-import { stripBranchWorktreeMetadata, worktreeStatesFromBranchReadModel } from '#/web/stores/repos/worktree-state.ts'
-import type { RepoBranchState, RepoState, RepoWorktreeState } from '#/web/stores/repos/types.ts'
+import { stripBranchWorktreeMetadata, worktreeStatesFromBranchReadModel } from '#/web/stores/workspaces/worktree-state.ts'
+import type { RepoBranchState, WorkspaceState, RepoWorktreeState } from '#/web/stores/workspaces/types.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
 
@@ -55,7 +55,7 @@ export function useRepoBranchReadModel(
 }
 
 export function readRepoBranchQueryProjection(
-  repo: Pick<RepoState, 'id' | 'workspaceRuntimeId'>,
+  repo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'>,
   queryClient?: QueryClient,
 ): RepoBranchReadModelData | null {
   const projection =
@@ -67,7 +67,7 @@ export function readRepoBranchQueryProjection(
 }
 
 export function readRepoBranchSnapshotQueryProjection(
-  repo: Pick<RepoState, 'id' | 'workspaceRuntimeId'>,
+  repo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'>,
   queryClient?: QueryClient,
 ): RepoBranchSnapshotData | null {
   const projection =
@@ -77,7 +77,7 @@ export function readRepoBranchSnapshotQueryProjection(
 }
 
 export function requireRepoBranchSnapshotQueryProjection(
-  repo: Pick<RepoState, 'id' | 'workspaceRuntimeId'>,
+  repo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'>,
   queryClient?: QueryClient,
 ): RepoBranchSnapshotData {
   const projection = readRepoBranchSnapshotQueryProjection(repo, queryClient)

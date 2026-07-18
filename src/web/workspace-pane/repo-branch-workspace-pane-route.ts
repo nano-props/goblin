@@ -10,8 +10,8 @@ import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-mo
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
-} from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+} from '#/web/stores/workspaces/workspace-pane-preferences.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
@@ -30,8 +30,8 @@ export function resolveWorkspacePaneRoute(
   repoId: string,
   branchName: string,
 ): WorkspacePaneRouteResolution {
-  const state = useReposStore.getState()
-  const repo = state.repos[repoId]
+  const state = useWorkspacesStore.getState()
+  const repo = state.workspaces[repoId]
   if (!repo) return { kind: 'missing' }
   const branchModel = readRepoBranchSnapshotQueryProjection(repo)
   if (!branchModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
@@ -53,7 +53,7 @@ export function resolveWorkspacePaneRoute(
     worktreePath: workspacePaneTabsTargetWorktreePath(target),
   })
   const model = createRepoWorkspaceTabModel({
-    repoId: repo.id,
+    workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreeHead: target.kind === 'git-worktree' ? { kind: 'branch', branchName } : undefined,
     paneTarget: target,

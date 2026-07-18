@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { openBranchExternalTarget, openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
-import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 
 const mocks = vi.hoisted(() => ({
   openExternalUrl: vi.fn(),
@@ -21,7 +21,7 @@ const REPO_ID = 'goblin+file:///tmp/goblin-open-upstream-test'
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-open-upstream-test'
 
 beforeEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
   mocks.openExternalUrl.mockReset()
   mocks.openRepoUrl.mockReset()
 })

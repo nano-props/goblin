@@ -13,21 +13,21 @@
 //     client bridge exposes, including `host`, `terminal`, `invokeIpc`,
 //     and `onEvent`.
 //   - `seedRepoShellForTest`, `seedRepoWithReadModelForTest`, and
-//     `resetReposStore` interact with the live `useReposStore`
+//     `resetWorkspacesStore` interact with the live `useWorkspacesStore`
 //     (Zustand) — they do not mock the store; they drive it. Tests
-//     that need a fresh store call `resetReposStore` in `beforeEach`.
+//     that need a fresh store call `resetWorkspacesStore` in `beforeEach`.
 
-import type { RepoState, RepoBranchState } from '#/web/stores/repos/types.ts'
+import type { WorkspaceState, RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import { readRepoBranchQueryProjection, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
-import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import { disposeAllRepoOperationSchedulers } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import { stripBranchWorktreeMetadata } from '#/web/stores/workspaces/worktree-state.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { disposeAllRepoOperationSchedulers } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { resetAcceptedRepoProjectionReadModelState } from '#/web/stores/repos/projection-read-model-effects.ts'
+import { resetAcceptedRepoProjectionReadModelState } from '#/web/stores/workspaces/projection-read-model-effects.ts'
 import { setRepoProjectionQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-data-query.ts'
 import {
   readWorkspacePaneTabsForTarget,
@@ -79,13 +79,13 @@ import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 export type IpcTestHandler = (input: any) => unknown
-export type RepoPresentationForTest = RepoState & {
-  branchAction: RepoState['operations']['branchAction']
+export type RepoPresentationForTest = WorkspaceState & {
+  branchAction: WorkspaceState['operations']['branchAction']
   branchModel: RepoBranchReadModelData
 }
 
 export function repoPresentationForTest(
-  repo: RepoState,
+  repo: WorkspaceState,
   branchReadModel: RepoBranchReadModelData,
 ): RepoPresentationForTest {
   return {
@@ -95,7 +95,7 @@ export function repoPresentationForTest(
   }
 }
 
-export function repoPresentationFromQueryForTest(repo: RepoState): RepoPresentationForTest {
+export function repoPresentationFromQueryForTest(repo: WorkspaceState): RepoPresentationForTest {
   const readModel = readRepoBranchQueryProjection(repo)
   if (!readModel) throw new Error(`missing branch read model for test repo: ${repo.id}`)
   return {
@@ -111,11 +111,11 @@ export function seedRepoShellForTest(options: {
   currentBranchName?: string | null
   preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType | null>
   workspaceRuntimeId?: string
-  remote?: Partial<RepoState['remote']>
+  remote?: Partial<WorkspaceState['remote']>
   workspaceProbe?: WorkspaceProbeState
-}): RepoState {
-  const base = emptyRepo(options.id, options.name ?? 'repo', options.workspaceRuntimeId ?? createOpaqueId('repo-runtime'))
-  const repo: RepoState = {
+}): WorkspaceState {
+  const base = emptyWorkspace(options.id, options.name ?? 'repo', options.workspaceRuntimeId ?? createOpaqueId('repo-runtime'))
+  const repo: WorkspaceState = {
     ...base,
     ui: {
       ...base.ui,
@@ -128,11 +128,11 @@ export function seedRepoShellForTest(options: {
     },
     workspaceProbe: options.workspaceProbe ?? base.workspaceProbe,
   }
-  useReposStore.setState({
-    repos: { [options.id]: repo },
+  useWorkspacesStore.setState({
+    workspaces: { [options.id]: repo },
     repoSnapshotCache: {},
-    order: [options.id],
-    restoredRepoId: options.id,
+    workspaceOrder: [options.id],
+    restoredWorkspaceId: options.id,
     workspaceMembershipReady: true,
     sessionPersistenceReady: true,
     sessionRestoreError: null,
@@ -569,15 +569,15 @@ function workspacePaneTabsWithIdentityOrder(
   return ordered
 }
 
-export function resetReposStore(): void {
+export function resetWorkspacesStore(): void {
   disposeAllRepoOperationSchedulers()
   resetAcceptedRepoProjectionReadModelState()
   primaryWindowQueryClient.clear()
-  useReposStore.setState({
-    repos: {},
+  useWorkspacesStore.setState({
+    workspaces: {},
     repoSnapshotCache: {},
-    order: [],
-    restoredRepoId: null,
+    workspaceOrder: [],
+    restoredWorkspaceId: null,
     workspaceMembershipReady: false,
     sessionPersistenceReady: false,
     sessionRestoreError: null,
@@ -586,7 +586,7 @@ export function resetReposStore(): void {
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionIdByTerminalWorktree: {},
     tabOpenerIdentityByScope: {},
-    navigationHistoryByRepo: {},
+    navigationHistoryByWorkspace: {},
   })
 }
 
@@ -1254,9 +1254,9 @@ export function seedRepoWithReadModelForTest(options: {
   workspacePaneTabsByBranch?: Record<string, WorkspacePaneTabEntry[]>
   workspaceRuntimeId?: string
   status?: WorktreeStatus[]
-  remote?: Partial<RepoState['remote']>
-  workspaceProbe?: RepoState['workspaceProbe']
-}): RepoState {
+  remote?: Partial<WorkspaceState['remote']>
+  workspaceProbe?: WorkspaceState['workspaceProbe']
+}): WorkspaceState {
   const branchesWithSnapshotWorktreeMetadata = options.branchSnapshots ?? options.branches ?? []
   const branches = options.branches ?? stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
   const status = options.status ?? []
@@ -1311,7 +1311,7 @@ export function seedRepoWithReadModelForTest(options: {
 }
 
 export function seedRepoReadModelQueryData(
-  repo: Pick<RepoState, 'id' | 'workspaceRuntimeId'>,
+  repo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'>,
   readModel: {
     branches: BranchSnapshotInfo[]
     currentBranch: string

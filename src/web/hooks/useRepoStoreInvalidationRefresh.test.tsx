@@ -8,7 +8,7 @@ import { repoDataQueryKey } from '#/web/repo-data-query.ts'
 
 const listeners = new Set<(event: any) => void>()
 const storeState = {
-  repos: {
+  workspaces: {
     'goblin+file:///tmp/repo': {
       id: 'goblin+file:///tmp/repo',
       availability: { phase: 'available' },
@@ -28,8 +28,8 @@ vi.mock('#/web/repo-query-invalidation-ingress.ts', () => ({
   },
 }))
 
-vi.mock('#/web/stores/repos/store.ts', () => ({
-  useReposStore: {
+vi.mock('#/web/stores/workspaces/store.ts', () => ({
+  useWorkspacesStore: {
     getState: () => storeState,
     setState: vi.fn(),
   },
@@ -46,7 +46,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
     listeners.clear()
     primaryWindowQueryClient.clear()
-    storeState.repos['goblin+file:///tmp/repo'] = {
+    storeState.workspaces['goblin+file:///tmp/repo'] = {
       id: 'goblin+file:///tmp/repo',
       availability: { phase: 'available' },
       workspaceRuntimeId: 'repo-runtime-test-7',

@@ -17,14 +17,14 @@ import {
   workspacePaneRuntimeTabCommandContext,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
 import { resolveWorkspacePaneTerminalExecutionTarget } from '#/web/workspace-pane/workspace-pane-terminal-execution-target.ts'
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import {
   captureWorkspacePaneActiveTabIdentity,
   recordWorkspacePaneTabOpener,
   workspacePaneTabOpener,
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 
 const terminalBase: TerminalSessionBase = {
@@ -43,7 +43,7 @@ const terminalCoordinates = terminalSessionCoordinates(terminalBase)
 describe('workspace pane runtime tab command actions', () => {
   beforeEach(() => {
     resetWorkspacePaneActionQueueForTest()
-    resetReposStore()
+    resetWorkspacesStore()
   })
 
   test('resolves the ordinary workspace root while pane tabs are still pending', () => {
@@ -53,7 +53,7 @@ describe('workspace pane runtime tab command actions', () => {
       branches: [],
       currentBranchName: null,
     })
-    useReposStore
+    useWorkspacesStore
       .getState()
       .setWorkspacePaneTabForTarget(
         { kind: 'workspace-root', repoRoot: repo.id },
@@ -121,7 +121,7 @@ describe('workspace pane runtime tab command actions', () => {
     const showCreatedRuntimeTab = vi.fn(() => true)
     const context = workspacePaneRuntimeTabCommandContext({
     filesystemTarget: terminalBase.target.kind === 'git-worktree' ? { kind: 'git-worktree', workspaceId: terminalBase.target.workspaceId, workspaceRuntimeId: terminalBase.target.workspaceRuntimeId, rootPath: terminalExecutionPath(terminalBase.target), head: terminalBase.presentation.kind === 'git-worktree' ? terminalBase.presentation.head : { kind: 'detached' }, capabilities: { files: { read: true, write: true }, terminal: { available: true }, git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } } } } : null,
-      repoId: terminalCoordinates.repoRoot,
+      workspaceId: terminalCoordinates.repoRoot,
       branchName: terminalPresentationBranch(terminalBase.presentation),
       workspacePaneRoute: null,
       showRuntimeTab: vi.fn(() => true),
@@ -189,7 +189,7 @@ describe('workspace pane runtime tab command actions', () => {
     const coordinatorBlocker = runWorkspacePaneAction(
       {
         kind: 'git-worktree' as const,
-        repoId: terminalCoordinates.repoRoot,
+        workspaceId: terminalCoordinates.repoRoot,
         workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
         worktreePath: terminalExecutionPath(terminalBase.target),
       },

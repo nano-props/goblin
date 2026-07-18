@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { runRepoProjectionPromotion } from '#/web/repo-projection-promotion-command.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
 export type RepoProjectionPromotionViewState =
   { phase: 'idle' } | { phase: 'promoting' } | { phase: 'failed'; message: string }
@@ -25,10 +25,10 @@ interface TargetPromotionViewState {
 const IDLE_PROMOTION_VIEW_STATE: RepoProjectionPromotionViewState = { phase: 'idle' }
 
 export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) {
-  const target = useReposStore(
+  const target = useWorkspacesStore(
     useShallow((state): LazyRestoreTarget | null => {
       if (!repoId) return null
-      const repo = state.repos[repoId]
+      const repo = state.workspaces[repoId]
       if (!repo) return null
       return {
         repoRoot: repo.id,
@@ -54,7 +54,7 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
         setTargetState({ target: targetIdentity, state: { phase: 'failed', message: result.message } })
         return
       }
-      useReposStore.getState().promoteRestoredWorkspaceRepo({
+      useWorkspacesStore.getState().promoteRestoredWorkspace({
         workspace: result.workspace,
         snapshot: result.snapshot,
       })

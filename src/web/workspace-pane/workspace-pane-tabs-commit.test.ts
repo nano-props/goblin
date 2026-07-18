@@ -13,7 +13,7 @@ import {
 import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -30,13 +30,13 @@ const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tabs-commit-worktree'
 
 beforeEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
   seedWorkspacePaneTabsRepo(WORKSPACE_RUNTIME_ID)
 })
 
 afterEach(() => {
   vi.restoreAllMocks()
-  resetReposStore()
+  resetWorkspacesStore()
   setClientBridgeForTests(null)
 })
 

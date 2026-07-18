@@ -2,10 +2,10 @@ import { useContext } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { GitBranchPlus, LayoutDashboard } from 'lucide-react'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
-import type { BranchViewMode } from '#/web/stores/repos/types.ts'
+import type { BranchViewMode } from '#/web/stores/workspaces/types.ts'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
@@ -25,7 +25,7 @@ interface CreateWorktreeRowActionProps extends Props {
   onCreateWorktree?: () => void
 }
 
-interface DashboardRowActionProps extends Props {
+interface DashboardRowActionProps {
   selected?: boolean
   onOpenDashboard?: () => void
 }
@@ -54,10 +54,10 @@ export function DashboardRowAction({ selected = false, onOpenDashboard }: Dashbo
 }
 
 function WorktreeFilterToggle({ repoId }: Props) {
-  const setBranchViewMode = useReposStore((s) => s.setBranchViewMode)
-  const repoView = useReposStore(
+  const setBranchViewMode = useWorkspacesStore((s) => s.setBranchViewMode)
+  const repoView = useWorkspacesStore(
     useShallow((s) => {
-      const repo = s.repos[repoId]
+      const repo = s.workspaces[repoId]
       return {
         id: repo?.id ?? '',
         workspaceRuntimeId: repo?.workspaceRuntimeId ?? '',
@@ -110,9 +110,9 @@ export function CreateWorktreeRowAction({
 function useCreateWorktreeTrigger(repoId: string) {
   const overlayActions = useContext(LayoutOverlayActions)
   const repoShell = useStoreWithEqualityFn(
-    useReposStore,
+    useWorkspacesStore,
     (s) => {
-      const repo = s.repos[repoId]
+      const repo = s.workspaces[repoId]
       return repo
         ? {
             id: repo.id,

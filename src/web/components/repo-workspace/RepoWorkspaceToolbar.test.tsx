@@ -41,7 +41,7 @@ import {
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import {
@@ -55,11 +55,11 @@ import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import {
   createBranchSnapshot,
   installWorkspacePaneTabsTestBridge,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
-import { workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import { workspacePaneTabsTargetForRepoBranch } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
@@ -156,7 +156,7 @@ function getTestRepoWorkspacePresentation(repo: RepoWorkspaceRepo) {
   return buildRepoWorkspacePresentation(repo, { loading: false, error: null, stale: false })
 }
 
-function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
+function repoWorkspaceRepo(repo: WorkspaceState): RepoWorkspaceRepo {
   const branchModel = readRepoBranchQueryProjection(repo)
   if (!branchModel) throw new Error('missing branch read model')
   return {
@@ -178,7 +178,7 @@ beforeEach(() => {
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test-host', pid: 1 },
     hydrated: true,
   })
-  resetReposStore()
+  resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
   // T6.1: the toolbar reads `isInitialSyncInFlight` from
   // useTerminalProjectionHydrationStore; existing tests assume the repo has been
@@ -1279,7 +1279,7 @@ function renderToolbar(options: {
   collapsed?: boolean
   createPending?: boolean
   trafficLightOffset?: boolean
-  remote?: Partial<RepoState['remote']>
+  remote?: Partial<WorkspaceState['remote']>
   workspaceRuntimeId?: string
   /**
    * When true, do NOT mark the repo ready before mounting. The toolbar
@@ -1389,8 +1389,8 @@ function renderToolbar(options: {
   const readContext: TerminalSessionReadContextValue = {
     terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
     subscribeTerminalWorktree: () => () => {},
-    repoBellCount: () => 0,
-    subscribeRepoBellCount: () => () => {},
+    workspaceBellCount: () => 0,
+    subscribeWorkspaceBellCount: () => () => {},
     snapshot: () => terminalSnapshot,
     subscribeSnapshot: () => () => {},
   }
@@ -1446,7 +1446,7 @@ function renderToolbar(options: {
     ...sessions.map((session) => terminalEntry(session.terminalSessionId)),
   ]
   if (workspacePaneTabs) {
-    const workspaceRuntimeId = useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId
+    const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId
     const workspacePaneTabsQueryInput = {
       repoRoot: REPO_ID,
       workspaceRuntimeId,
@@ -1503,7 +1503,7 @@ function renderToolbar(options: {
     setWorkspacePaneTabsForTargetQueryData(nextTabsInput)
     setWorkspacePaneTabsForTargetQueryData(nextTabsInput, queryClient)
     observeWorkspacePaneRouteForTest({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName,
       worktreePath,
@@ -1606,7 +1606,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
 }
 
 function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
-  const repo = useReposStore.getState().repos[REPO_ID]
+  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
   const target = repo
     ? workspacePaneTabsTargetForRepoBranch(
         { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
@@ -1617,7 +1617,7 @@ function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
 }
 
 function workspaceRuntimeIdForTest(): string {
-  const repo = useReposStore.getState().repos[REPO_ID]
+  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
   if (!repo) throw new Error(`expected seeded repo ${REPO_ID}`)
   return repo.workspaceRuntimeId
 }

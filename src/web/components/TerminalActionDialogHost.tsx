@@ -4,17 +4,17 @@ import { runConfirmCloseTerminalWorkspacePaneTabCommand } from '#/web/commands/w
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { useT } from '#/web/stores/i18n.ts'
-import { useTerminalActionDialogsStore } from '#/web/stores/repos/terminal-action-dialogs.ts'
+import { useTerminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 
 interface Props {
-  currentRepoId: string | null
+  currentWorkspaceId: string | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   navigation: PrimaryWindowNavigationActions
 }
 
 export function TerminalActionDialogHost({
-  currentRepoId,
+  currentWorkspaceId,
   currentWorkspacePaneRoute,
   navigation,
 }: Props) {
@@ -25,9 +25,9 @@ export function TerminalActionDialogHost({
   const displayCloseConfirm = useLastNonNull(closeConfirm)
 
   useEffect(() => {
-    if (currentRepoId) closeStaleDialogs(currentRepoId)
+    if (currentWorkspaceId) closeStaleDialogs(currentWorkspaceId)
     else closeCloseConfirm()
-  }, [currentRepoId, closeCloseConfirm, closeStaleDialogs])
+  }, [currentWorkspaceId, closeCloseConfirm, closeStaleDialogs])
 
   return (
     <ConfirmDialog
@@ -51,7 +51,7 @@ export function TerminalActionDialogHost({
         const payload = closeConfirm
         closeCloseConfirm()
         await runConfirmCloseTerminalWorkspacePaneTabCommand({
-          repoId: payload.repoId,
+          workspaceId: payload.workspaceId,
           workspacePaneRoute: payload.workspacePaneRoute,
           currentWorkspacePaneRoute,
           navigation,

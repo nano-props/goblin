@@ -9,10 +9,10 @@ import {
 import { resolveWorkspacePaneDestinationTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   createRepoBranch,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
@@ -33,7 +33,7 @@ const DESTINATION_ROUTE = { kind: 'static' as const, tab: 'status' as const }
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
   resetWorkspacePaneActionQueueForTest()
   resetWorkspacePaneDestinationPresentationForTest()
 })
@@ -42,7 +42,7 @@ describe('workspace pane destination navigation', () => {
   test('commits branch-scoped tabs for a destination without a worktree', async () => {
     seedNoWorktreeRepo()
     const commitWorkspacePaneRoute = acceptedRouteCommit()
-    const setWorkspacePaneTab = vi.spyOn(useReposStore.getState(), 'setWorkspacePaneTab')
+    const setWorkspacePaneTab = vi.spyOn(useWorkspacesStore.getState(), 'setWorkspacePaneTab')
 
     await expect(
       dispatchWorkspacePaneDestinationRoute({
@@ -74,10 +74,10 @@ describe('workspace pane destination navigation', () => {
   test('rejects a stale runtime lease before route commit', async () => {
     seedDestinationRepo()
     const presentation = beginPresentation('feature/destination')
-    useReposStore.setState((state) => {
-      const repo = state.repos[REPO_ID]
+    useWorkspacesStore.setState((state) => {
+      const repo = state.workspaces[REPO_ID]
       if (!repo) return state
-      return { repos: { ...state.repos, [REPO_ID]: { ...repo, workspaceRuntimeId: 'repo-runtime-reopened' } } }
+      return { workspaces: { ...state.workspaces, [REPO_ID]: { ...repo, workspaceRuntimeId: 'repo-runtime-reopened' } } }
     })
     const commitWorkspacePaneRoute = acceptedRouteCommit()
 
@@ -92,7 +92,7 @@ describe('workspace pane destination navigation', () => {
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
     const commitWorkspacePaneRoute = deferredRouteCommit(routeCommit.promise)
-    const setWorkspacePaneTab = vi.spyOn(useReposStore.getState(), 'setWorkspacePaneTab')
+    const setWorkspacePaneTab = vi.spyOn(useWorkspacesStore.getState(), 'setWorkspacePaneTab')
     const committed = commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, {
       commitWorkspacePaneRoute,
     })
@@ -218,7 +218,7 @@ describe('workspace pane destination navigation', () => {
 })
 
 function primaryNavigationActions() {
-  const store = useReposStore.getState()
+  const store = useWorkspacesStore.getState()
   const routeNavigation = {
     openHome: vi.fn(),
     openRepoDashboard: vi.fn(),
@@ -234,7 +234,7 @@ function primaryNavigationActions() {
     routeNavigation,
     actions: createPrimaryWindowNavigationActions({
       currentWorkspaceId: REPO_ID,
-      order: [REPO_ID],
+      workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
       peekWorkspaceNavigation: store.peekWorkspaceNavigation,
       commitWorkspaceNavigation: store.commitWorkspaceNavigation,

@@ -6,7 +6,7 @@ import type { ReactElement } from 'react'
 import { fireEvent } from '@testing-library/react'
 import { RepoLayoutSidebar } from '#/web/components/repo-layout/RepoLayoutSidebar.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 
 vi.mock('#/web/components/WorkspacePickerHost.tsx', () => ({
@@ -33,7 +33,7 @@ beforeEach(() => {
   workspaceCommandMocks.showTab.mockClear()
   workspaceCommandMocks.terminal.mockClear()
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
   seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
@@ -42,14 +42,14 @@ beforeEach(() => {
 
 afterEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
   vi.restoreAllMocks()
 })
 
 describe('RepoLayoutSidebar', () => {
   test('renders sidebar actions before the branch content without growing action rows', () => {
     const { container } = renderSidebar(
-      <RepoLayoutSidebar repoId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />,
+      <RepoLayoutSidebar workspaceId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />,
     )
 
     const sidebarTop = container.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
@@ -96,7 +96,7 @@ describe('RepoLayoutSidebar', () => {
     const onSelectWorkspaceRoot = vi.fn()
     const { container } = renderSidebar(
       <RepoLayoutSidebar
-        repoId={REPO_ID}
+        workspaceId={REPO_ID}
         compact={false}
         gitAvailable={false}
         onOpenDashboard={onOpenDashboard}
@@ -134,7 +134,7 @@ describe('RepoLayoutSidebar', () => {
     }
     fireEvent.click(statusAction)
     expect(workspaceCommandMocks.showTab).toHaveBeenCalledWith(
-      expect.objectContaining({ repoId: REPO_ID, tab: 'status' }),
+      expect.objectContaining({ workspaceId: REPO_ID, tab: 'status' }),
     )
 
     fireEvent.click(menuTrigger)
@@ -144,14 +144,14 @@ describe('RepoLayoutSidebar', () => {
     if (!(reopenedFilesAction instanceof HTMLButtonElement)) throw new Error('missing reopened Files action')
     fireEvent.click(reopenedFilesAction)
     expect(workspaceCommandMocks.showTab).toHaveBeenCalledWith(
-      expect.objectContaining({ repoId: REPO_ID, tab: 'files' }),
+      expect.objectContaining({ workspaceId: REPO_ID, tab: 'files' }),
     )
   })
 
   test('keeps the workspace row action menu visible in compact UI', () => {
     responsiveMocks.compact = true
     const { container } = renderSidebar(
-      <RepoLayoutSidebar repoId={REPO_ID} compact gitAvailable={false} />,
+      <RepoLayoutSidebar workspaceId={REPO_ID} compact gitAvailable={false} />,
     )
 
     const menuTrigger = container.querySelector('button[aria-label="action.menu"]')
@@ -163,7 +163,7 @@ describe('RepoLayoutSidebar', () => {
     const onCreateWorktree = vi.fn()
     const { container } = renderSidebar(
       <RepoLayoutSidebar
-        repoId={REPO_ID}
+        workspaceId={REPO_ID}
         compact={false}
         branchContent={<div />}
         onCreateWorktree={onCreateWorktree}
@@ -180,7 +180,7 @@ describe('RepoLayoutSidebar', () => {
 
   test('renders zen reveal top chrome as draggable without owning zen-toggle geometry', () => {
     const { container } = renderSidebar(
-      <RepoLayoutSidebar repoId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />,
+      <RepoLayoutSidebar workspaceId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />,
     )
 
     const sidebarTop = container.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
@@ -194,7 +194,7 @@ describe('RepoLayoutSidebar', () => {
   test('can render the top chrome as neutral when the docked sidebar is collapsed', () => {
     const { container } = renderSidebar(
       <RepoLayoutSidebar
-        repoId={REPO_ID}
+        workspaceId={REPO_ID}
         compact={false}
         chromeRegion="none"
         branchContent={<div data-testid="branch-content" />}

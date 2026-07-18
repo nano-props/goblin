@@ -11,8 +11,8 @@ import {
 } from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { resetReposStore } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const mocks = vi.hoisted(() => ({
@@ -39,7 +39,7 @@ const target = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  resetReposStore()
+  resetWorkspacesStore()
   setClientBridgeForTests(null)
   vi.stubGlobal(
     'fetch',
@@ -425,7 +425,7 @@ describe('OpenRemoteWorkspaceDialog', () => {
       ok: true as const,
       workspaceId: workspaceIdForTest(target.id),
     }))
-    useReposStore.setState({ ensureWorkspaceOpen })
+    useWorkspacesStore.setState({ ensureWorkspaceOpen })
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
 
@@ -461,7 +461,7 @@ describe('OpenRemoteWorkspaceDialog', () => {
       workspaceId: workspaceIdForTest(target.id),
       postOpenEffects: Promise.resolve([{ kind: 'recent-workspace' as const, message: 'recent write failed' }]),
     }))
-    useReposStore.setState({ ensureWorkspaceOpen })
+    useWorkspacesStore.setState({ ensureWorkspaceOpen })
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>

@@ -13,8 +13,8 @@ import { Layout, WorkspaceSessionRestoreGate } from '#/web/Layout.tsx'
 import { isSettingsPage } from '#/shared/settings-pages.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import { branchNameFromSlug, repoIdFromSlug, repoSlugFromId, worktreePathFromSlug } from '#/web/repo-route-slugs.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { ReposStore } from '#/web/stores/repos/types.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import type { WorkspacesStore } from '#/web/stores/workspaces/types.ts'
 import {
   usePrimaryWindowRouteActions,
   type PrimaryWindowRouteNavigation,
@@ -113,7 +113,7 @@ const settingsRoute = createRoute({
 })
 
 function IndexRoute() {
-  const firstRepoSlug = useReposStore(initialRepoRouteSlugFromStore)
+  const firstRepoSlug = useWorkspacesStore(initialRepoRouteSlugFromStore)
   const navigation = useRepoRouteNavigation()
   if (firstRepoSlug) return <Navigate to="/repo/$repoSlug/dashboard" params={{ repoSlug: firstRepoSlug }} replace />
   return (
@@ -124,13 +124,13 @@ function IndexRoute() {
 }
 
 export function initialRepoRouteSlugFromStore(
-  state: Pick<ReposStore, 'restoredRepoId' | 'order' | 'repos' | 'workspaceMembershipReady'>,
+  state: Pick<WorkspacesStore, 'restoredWorkspaceId' | 'workspaceOrder' | 'workspaces' | 'workspaceMembershipReady'>,
 ): string | null {
-  const restoredRepo = state.restoredRepoId ? state.repos[state.restoredRepoId] : null
+  const restoredRepo = state.restoredWorkspaceId ? state.workspaces[state.restoredWorkspaceId] : null
   if (restoredRepo) return repoSlugFromId(restoredRepo.id)
   if (!state.workspaceMembershipReady) return null
-  const firstRepoId = state.order[0]
-  const firstRepo = firstRepoId ? state.repos[firstRepoId] : null
+  const firstRepoId = state.workspaceOrder[0]
+  const firstRepo = firstRepoId ? state.workspaces[firstRepoId] : null
   return firstRepo ? repoSlugFromId(firstRepo.id) : null
 }
 
@@ -147,8 +147,8 @@ function RepoRoute() {
   const worktreeTabMatch = useMatch({ from: repoWorktreeTabRoute.id, shouldThrow: false })
   const navigation = useRepoRouteNavigation()
   const repoId = repoIdFromSlug(repoSlug)
-  const gitUnavailable = useReposStore((state) => {
-    const repo = repoId ? state.repos[repoId] : null
+  const gitUnavailable = useWorkspacesStore((state) => {
+    const repo = repoId ? state.workspaces[repoId] : null
     return workspaceGitUnavailable(repo?.workspaceProbe)
   })
   if (gitUnavailable && (branchMatch || worktreeMatch || newWorktreeMatch)) {

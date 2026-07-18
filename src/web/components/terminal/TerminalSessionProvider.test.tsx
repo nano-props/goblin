@@ -25,15 +25,15 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import {
   createRepoBranch,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
-} from '#/web/stores/repos/workspace-pane-preferences.ts'
+} from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type {
@@ -96,7 +96,7 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
 })
 
 function selectedWorkspacePaneTab(repoId: string, branchName = 'feature/worktree') {
-  const repo = useReposStore.getState().repos[repoId]
+  const repo = useWorkspacesStore.getState().workspaces[repoId]
   return repo
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
@@ -109,7 +109,7 @@ function selectedWorkspacePaneTab(repoId: string, branchName = 'feature/worktree
 }
 
 function repoTerminalBase() {
-  const workspaceRuntimeId = useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId
+  const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId
   const target = runtimeWorkspacePaneTargetForTest({
     repoRoot: REPO_ID,
     workspaceRuntimeId,
@@ -341,7 +341,7 @@ function terminalExitEvent(terminalSessionId: string): TerminalExitEvent {
     terminalRuntimeGeneration: 1,
     terminalSessionId,
     repoRoot: REPO_ID,
-    workspaceRuntimeId: useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId,
+    workspaceRuntimeId: useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
   }
 }
 
@@ -391,7 +391,7 @@ function terminalRuntimeTarget(workspaceRuntimeId: string) {
 }
 
 function currentTerminalSessionBase() {
-  const repo = useReposStore.getState().repos[REPO_ID]
+  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
   if (!repo) throw new Error('terminal test workspace is unavailable')
   return terminalSessionBaseForTest({
     repoRoot: REPO_ID,
@@ -406,7 +406,7 @@ function completeServerSessions(sessions: TestTerminalSessionSummary[]): Termina
 }
 
 function tabsFor(repoRoot: string, branchName: string): WorkspacePaneTabEntry[] {
-  const repo = useReposStore.getState().repos[repoRoot]
+  const repo = useWorkspacesStore.getState().workspaces[repoRoot]
   const target = repo
     ? workspacePaneTabsTargetForRepoBranch(
         { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
@@ -422,7 +422,7 @@ function normalizeTestSessionId(terminalSessionId: string): string {
 
 async function emitSessionsChanged(repoRoot = REPO_ID): Promise<void> {
   await act(async () => {
-    const workspaceRuntimeId = useReposStore.getState().repos[repoRoot]?.workspaceRuntimeId
+    const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[repoRoot]?.workspaceRuntimeId
     if (workspaceRuntimeId) sessionsChangedHandler?.({ repoRoot, workspaceRuntimeId, revision: ++sessionsChangedRevision })
     await waitForScheduledServerSync()
   })
@@ -567,7 +567,7 @@ beforeEach(() => {
       canonicalRows: 24,
     }
   })
-  resetReposStore()
+  resetWorkspacesStore()
   useTerminalProjectionHydrationStore.setState(useTerminalProjectionHydrationStore.getInitialState())
   window.sessionStorage.setItem('goblin:terminal-client-id', 'client_local')
   primaryWindowQueryClient.clear()
@@ -853,7 +853,7 @@ describe('TerminalSessionProvider', () => {
     try {
       const base = repoTerminalBase()
       await act(async () => {
-        useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/worktree', 'terminal')
+        useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/worktree', 'terminal')
         await getContext().createTerminal(base)
         await getContext().createTerminal(base)
       })
@@ -967,7 +967,7 @@ describe('TerminalSessionProvider', () => {
         ['term-111111111111111111111', true, false],
         ['term-222222222222222222222', false, false],
       ])
-      expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree).toMatchObject({
+      expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree).toMatchObject({
         [terminalWorktreeKey]: 'term-111111111111111111111',
       })
     } finally {
@@ -1197,21 +1197,21 @@ describe('TerminalSessionProvider', () => {
       })
 
       await act(async () => {
-        useReposStore.setState((state) => ({
-          repos: {
-            ...state.repos,
-            [REPO_ID]: state.repos[REPO_ID]
+        useWorkspacesStore.setState((state) => ({
+          workspaces: {
+            ...state.workspaces,
+            [REPO_ID]: state.workspaces[REPO_ID]
               ? {
-                  ...state.repos[REPO_ID],
+                  ...state.workspaces[REPO_ID],
                   ui: {
-                    ...state.repos[REPO_ID]!.ui,
+                    ...state.workspaces[REPO_ID]!.ui,
                     currentBranchName: 'feature/renamed',
                   },
                 }
-              : state.repos[REPO_ID],
+              : state.workspaces[REPO_ID],
           },
         }))
-        seedRepoReadModelQueryData(useReposStore.getState().repos[REPO_ID]!, {
+        seedRepoReadModelQueryData(useWorkspacesStore.getState().workspaces[REPO_ID]!, {
           branches: [createRepoBranch('feature/renamed', { worktree: { path: WORKTREE_PATH } })],
           currentBranch: 'feature/renamed',
         })
@@ -1330,7 +1330,7 @@ describe('TerminalSessionProvider', () => {
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'git-worktree' as const,
       repoRoot: REPO_ID,
-      workspaceRuntimeId: useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId,
+      workspaceRuntimeId: useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
       worktreePath: WORKTREE_PATH,
       tabs: [
         workspacePaneStaticTabEntry('status'),
@@ -1347,7 +1347,7 @@ describe('TerminalSessionProvider', () => {
           target: runtimeWorkspacePaneTargetForTest({
             kind: 'git-worktree' as const,
             repoRoot: REPO_ID,
-            workspaceRuntimeId: useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId,
+            workspaceRuntimeId: useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
             worktreePath: WORKTREE_PATH,
           }),
           tabs: [workspacePaneStaticTabEntry('history')],
@@ -1431,7 +1431,7 @@ describe('TerminalSessionProvider', () => {
       preferredWorkspacePaneTab: 'terminal',
     })
     const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH)
-    useReposStore.setState({
+    useWorkspacesStore.setState({
       selectedTerminalSessionIdByTerminalWorktree: {
         [terminalWorktreeKey]: 'term-111111111111111111111',
       },
@@ -1474,7 +1474,7 @@ describe('TerminalSessionProvider', () => {
         ['term-111111111111111111111', true],
         ['term-222222222222222222222', false],
       ])
-      expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree).toMatchObject({
+      expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree).toMatchObject({
         [terminalWorktreeKey]: 'term-111111111111111111111',
       })
     } finally {
@@ -1495,14 +1495,14 @@ describe('TerminalSessionProvider', () => {
       await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
       listSessionsMock.mockClear()
       await act(async () => {
-        useReposStore.setState((state) => ({
+        useWorkspacesStore.setState((state) => ({
           ...state,
-          repos: {
-            ...state.repos,
+          workspaces: {
+            ...state.workspaces,
             [REPO_ID]: {
-              ...state.repos[REPO_ID]!,
+              ...state.workspaces[REPO_ID]!,
               remote: {
-                ...state.repos[REPO_ID]!.remote,
+                ...state.workspaces[REPO_ID]!.remote,
                 fetchFailed: true,
               },
             },

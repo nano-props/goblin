@@ -1,7 +1,7 @@
 import { useCallback, useId, useMemo } from 'react'
 import { omit } from 'es-toolkit'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   getCurrentRepoWorkspacePresentation,
   type RepoWorkspaceRepo,
@@ -30,9 +30,9 @@ import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.ts
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { useWorkspacePaneRouteController } from '#/web/components/repo-workspace/workspace-pane-route-controller.ts'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
-import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
+import { isRepoUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { FiletreeTab } from '#/web/components/repo-workspace/panels.tsx'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
@@ -54,7 +54,7 @@ export type RepoWorkspacePaneRouteContext =
   | { kind: 'inactive' }
 
 interface Props {
-  repoId: string
+  workspaceId: string
   currentBranchName?: string | null
   workspacePaneRouteContext: RepoWorkspacePaneRouteContext
   shortcutsEnabled?: boolean
@@ -64,8 +64,8 @@ interface Props {
 
 // Keep this equality in sync with fields read by RepoWorkspace children.
 type RepoWorkspaceRepoShell = Omit<RepoWorkspaceRepo, 'branchModel' | 'branchAction'> & {
-  operations: Pick<RepoState['operations'], 'branchAction'>
-  workspaceProbe: RepoState['workspaceProbe']
+  operations: Pick<WorkspaceState['operations'], 'branchAction'>
+  workspaceProbe: WorkspaceState['workspaceProbe']
 }
 
 function repoWorkspaceRepoShellEqual(
@@ -93,7 +93,7 @@ function repoWorkspaceRepoShellEqual(
 }
 
 export function RepoWorkspace({
-  repoId,
+  workspaceId,
   currentBranchName,
   workspacePaneRouteContext,
   shortcutsEnabled = true,
@@ -102,9 +102,9 @@ export function RepoWorkspace({
 }: Props) {
   const workspacePaneId = useId()
   const repoShell = useStoreWithEqualityFn(
-    useReposStore,
+    useWorkspacesStore,
     (s) => {
-      const repo = s.repos[repoId]
+      const repo = s.workspaces[workspaceId]
       const currentBranch = repo ? (currentBranchName ?? null) : null
       return repo
         ? {
@@ -357,7 +357,7 @@ function GitRepoWorkspaceLoaded({
           messageKey={statusErrorKey}
           retrying={statusReadModel.isFetching}
           onRetry={() => {
-            void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repoShell.id, repoShell.workspaceRuntimeId)
+            void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, repoShell.id, repoShell.workspaceRuntimeId)
           }}
         />
       </section>
@@ -536,7 +536,7 @@ function RepoWorkspacePane({
   const routeControllerRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : null
   const workspacePaneTabModel = useRepoWorkspaceTabModel(repo, detail, workspacePaneRoute)
   useWorkspacePaneVisibleStatusRefresh({
-    repoId: repo.id,
+    workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     branchName: workspacePaneTabModel.branchName,
     renderedTab: workspacePaneTabModel.renderedTab,
@@ -544,7 +544,7 @@ function RepoWorkspacePane({
   })
   useWorkspacePaneRouteController({
     enabled: workspacePaneRouteContext.kind === 'routed',
-    repoId: repo.id,
+    workspaceId: repo.id,
     branchName: detail.branch?.name ?? null,
     worktreePath: detail.branch?.worktree?.path ?? null,
     route: routeControllerRoute,
@@ -570,7 +570,7 @@ function RepoWorkspacePane({
         workspacePaneTabModel={workspacePaneTabModel}
         onBackToBranchNavigator={onBackToBranchNavigator}
         onRetryStatus={() => {
-          void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repo.id, repo.workspaceRuntimeId)
+          void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, repo.id, repo.workspaceRuntimeId)
         }}
       />
     </>

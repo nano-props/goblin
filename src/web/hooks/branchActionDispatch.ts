@@ -22,14 +22,14 @@ import {
   deleteBranchNeedsForceConfirm,
   dispatchRepoBranchAction,
   removeWorktreeNeedsForceConfirm,
-} from '#/web/stores/repos/branch-action-write-paths.ts'
+} from '#/web/stores/workspaces/branch-action-write-paths.ts'
 import {
   useBranchActionDialogsStore,
   type RemoveWorktreeDialogPayload,
-} from '#/web/stores/repos/branch-action-dialogs.ts'
+} from '#/web/stores/workspaces/branch-action-dialogs.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { ExecResult } from '#/web/types.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 interface BranchActionDispatchContext {
@@ -60,7 +60,7 @@ export function dispatchDeleteBranch({
     actionRepo.id,
     actionRepo.workspaceRuntimeId,
     { kind: 'deleteBranch', branch: branchName, force, deleteUpstream },
-    useReposStore.getState().runBranchAction,
+    useWorkspacesStore.getState().runBranchAction,
     {
       deferResultMessages: force ? [] : ['error.branch-not-fully-merged'],
       handleResult: (result) => {
@@ -107,7 +107,7 @@ export async function dispatchRemoveWorktree({
       forceDeleteBranch,
       deleteUpstream,
     },
-    useReposStore.getState().runBranchAction,
+    useWorkspacesStore.getState().runBranchAction,
     {
       deferResultMessages: deleteBranch && !forceDeleteBranch ? ['error.cannot-remove-unpushed-worktree'] : [],
       handleResult: (result) => {
@@ -139,7 +139,7 @@ export function dispatchPush({
     actionRepo.id,
     actionRepo.workspaceRuntimeId,
     { kind: 'push', branch: branchName },
-    useReposStore.getState().runBranchAction,
+    useWorkspacesStore.getState().runBranchAction,
   )
 }
 
@@ -158,6 +158,6 @@ function repoForBranchActionDispatch(repo: BranchActionRepo): BranchActionRepo |
 
 function recordRepoDataUnavailable(repo: BranchActionRepo): ExecResult {
   const result = { ok: false as const, message: 'error.failed-read-repo' }
-  useReposStore.getState().setLastResult(repo.id, result, repo.workspaceRuntimeId)
+  useWorkspacesStore.getState().setLastResult(repo.id, result, repo.workspaceRuntimeId)
   return result
 }

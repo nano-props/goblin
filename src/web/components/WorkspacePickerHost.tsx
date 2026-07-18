@@ -3,7 +3,7 @@
 // labels, and open/switch actions.
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useShallow } from 'zustand/react/shallow'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
@@ -11,10 +11,10 @@ import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePickerItem, WorkspacePickerSurface } from '#/web/components/workspace-picker/types.ts'
 import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
 import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
-import { workspacePickerStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
-import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
+import { workspacePickerStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
+import { latestRepoSyncTime } from '#/web/stores/workspaces/sync-time.ts'
 import { useMemo } from 'react'
-import { useRepoTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
+import { useWorkspaceTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
 import { toast } from 'sonner'
 
 interface WorkspacePickerHostProps {
@@ -36,17 +36,17 @@ export function WorkspacePickerHost({
   const { shortcutsDisabled } = useShortcutSettings()
   // Build the summary array inside the selector but compare with our
   // explicit equality fn so re-derivations with identical contents
-  // don't trigger a re-render. Zustand v5's primary `useReposStore`
+  // don't trigger a re-render. Zustand v5's primary `useWorkspacesStore`
   // hook drops the second-arg equality fn — `useStoreWithEqualityFn`
   // from `zustand/traditional` is the v5 escape hatch for cases like
   // this where shallow on Object.is misses the structurally-equal
   // case.
   const summaries = useStoreWithEqualityFn(
-    useReposStore,
+    useWorkspacesStore,
     (s) =>
-      s.order
+      s.workspaceOrder
         .map<WorkspacePickerItem | null>((id) => {
-          const workspace = s.repos[id]
+          const workspace = s.workspaces[id]
           if (!workspace) return null
           return {
             id: workspace.id,
@@ -64,7 +64,7 @@ export function WorkspacePickerHost({
     workspacePickerItemsEqual,
   )
   const workspaceIds = useMemo(() => summaries.map((workspace) => workspace.id), [summaries])
-  const terminalBellCounts = useRepoTerminalBellCounts(workspaceIds)
+  const terminalBellCounts = useWorkspaceTerminalBellCounts(workspaceIds)
   const summariesWithTerminalBells = useMemo(
     () =>
       summaries.map((workspace) => ({
@@ -74,7 +74,7 @@ export function WorkspacePickerHost({
     [summaries, terminalBellCounts],
   )
   const navigation = usePrimaryWindowNavigation()
-  const { ensureWorkspaceOpen } = useReposStore(useShallow(workspacePickerStoreActionsFromStore))
+  const { ensureWorkspaceOpen } = useWorkspacesStore(useShallow(workspacePickerStoreActionsFromStore))
 
   async function handleOpenLocal() {
     await openWorkspaceFromDialog({

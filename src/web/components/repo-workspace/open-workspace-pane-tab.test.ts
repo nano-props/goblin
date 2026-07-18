@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   createBranchSnapshot,
   installWorkspacePaneTabsTestBridge,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
@@ -16,13 +16,13 @@ import {
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
-import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
+import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
-} from '#/web/stores/repos/workspace-pane-preferences.ts'
+} from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
@@ -34,10 +34,10 @@ import {
   seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
-import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
+import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/workspaces/repo-refresh-actions.ts'
 
-vi.mock('#/web/stores/repos/repo-refresh-actions.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#/web/stores/repos/repo-refresh-actions.ts')>()
+vi.mock('#/web/stores/workspaces/repo-refresh-actions.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#/web/stores/workspaces/repo-refresh-actions.ts')>()
   return { ...actual, requestVisibleWorkspaceStatusRefresh: vi.fn(() => true) }
 })
 
@@ -46,7 +46,7 @@ const WORKTREE_PATH = '/tmp/workspace-pane-tab-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
 beforeEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
   installWorkspacePaneTabsTestBridge()
   setTerminalSessionCommandBridge(null)
   vi.mocked(requestVisibleWorkspaceStatusRefresh).mockReset()
@@ -54,7 +54,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
   setClientBridgeForTests(null)
   setTerminalSessionCommandBridge(null)
 })
@@ -66,7 +66,7 @@ describe('openWorkspacePaneTab', () => {
     await expect(
       openWorkspacePaneTab({
         workspacePaneRoute: undefined,
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
         type: 'status',
@@ -84,7 +84,7 @@ describe('openWorkspacePaneTab', () => {
     await expect(
       openWorkspacePaneTab({
         workspacePaneRoute: undefined,
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
         type: 'changes',
@@ -112,7 +112,7 @@ describe('openWorkspacePaneTab', () => {
     await expect(
       openWorkspacePaneTab({
         workspacePaneRoute: undefined,
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
         type: 'changes',
@@ -141,7 +141,7 @@ describe('openWorkspacePaneTab', () => {
 
     await expect(
       dispatchShowWorkspacePaneStaticTabAction({
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/worktree',
         type: 'changes',
         workspacePaneRoute: { kind: 'static', tab: 'files' },
@@ -151,7 +151,7 @@ describe('openWorkspacePaneTab', () => {
 
     expect(openTabsFor('feature/worktree')).toEqual(['status', 'files', 'history', 'changes'])
     expect(
-      useReposStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.[
+      useWorkspacesStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.[
         'workspace-pane:changes'
       ],
     ).toBe('workspace-pane:files')
@@ -186,7 +186,7 @@ describe('openWorkspacePaneTab', () => {
     await expect(
       openWorkspacePaneTab({
         workspacePaneRoute: { kind: 'static', tab: 'status' },
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName,
         worktreePath: WORKTREE_PATH,
         type: 'files',
@@ -222,7 +222,7 @@ describe('openWorkspacePaneTab', () => {
     await expect(
       openWorkspacePaneTab({
         workspacePaneRoute: undefined,
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/no-worktree',
         worktreePath: null,
         type: 'changes',
@@ -247,9 +247,9 @@ describe('openWorkspacePaneTab', () => {
 
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
     const navigation = navigationWithStoreActions(showRepoBranchWorkspacePaneTab)
-    const workspaceRuntimeId = useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId
+    const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId
     observeWorkspacePaneRouteForTest({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId,
       branchName: 'feature/no-worktree',
       worktreePath: null,
@@ -258,7 +258,7 @@ describe('openWorkspacePaneTab', () => {
     await expect(
       openWorkspacePaneTab({
         workspacePaneRoute: undefined,
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/no-worktree',
         worktreePath: null,
         type: 'status',
@@ -276,7 +276,7 @@ describe('openWorkspacePaneTab', () => {
     await expect(
       openWorkspacePaneTab({
         workspacePaneRoute: undefined,
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
         type: 'history',
@@ -292,12 +292,12 @@ describe('openWorkspacePaneTab', () => {
     'refreshes repo-scoped visible status after opening %s',
     async (type) => {
       seedWorktreeRepo(type)
-      const workspaceRuntimeId = useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId
+      const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId
 
       await expect(
         openWorkspacePaneTab({
           workspacePaneRoute: undefined,
-          repoId: REPO_ID,
+          workspaceId: REPO_ID,
           branchName: 'feature/worktree',
           worktreePath: WORKTREE_PATH,
           type,
@@ -321,7 +321,7 @@ describe('openWorkspacePaneTab', () => {
     await expect(
       openWorkspacePaneTab({
         workspacePaneRoute: undefined,
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
         type: 'history',
@@ -345,7 +345,7 @@ describe('openWorkspacePaneTab', () => {
     await expect(
       openWorkspacePaneTab({
         workspacePaneRoute: undefined,
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
         type: 'history',
@@ -371,7 +371,7 @@ describe('openWorkspacePaneTab', () => {
     await expect(
       openWorkspacePaneTab({
         workspacePaneRoute: undefined,
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
         type: 'changes',
@@ -380,7 +380,7 @@ describe('openWorkspacePaneTab', () => {
     ).resolves.toBe(true)
 
     expect(
-      useReposStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.[
+      useWorkspacesStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.[
         'workspace-pane:changes'
       ],
     ).toBe('workspace-pane:files')
@@ -398,7 +398,7 @@ describe('openWorkspacePaneTab', () => {
     })
     await openWorkspacePaneTab({
       workspacePaneRoute: undefined,
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
       type: 'changes',
@@ -407,10 +407,10 @@ describe('openWorkspacePaneTab', () => {
 
     // Switch away, then "reopen" (i.e. just refocus) the already-open
     // changes tab from a different tab — the original opener must stick.
-    useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/worktree', 'history')
+    useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/worktree', 'history')
     await openWorkspacePaneTab({
       workspacePaneRoute: undefined,
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
       type: 'changes',
@@ -418,7 +418,7 @@ describe('openWorkspacePaneTab', () => {
     })
 
     expect(
-      useReposStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.[
+      useWorkspacesStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.[
         'workspace-pane:changes'
       ],
     ).toBe('workspace-pane:files')
@@ -453,7 +453,7 @@ describe('openWorkspacePaneTab', () => {
 
     const openPromise = openWorkspacePaneTab({
       workspacePaneRoute: undefined,
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       branchName: 'feature/a',
       worktreePath: WORKTREE_PATH,
       type: 'changes',
@@ -468,7 +468,7 @@ describe('openWorkspacePaneTab', () => {
     ])
     await openPromise
 
-    const openers = useReposStore.getState().tabOpenerIdentityByScope
+    const openers = useWorkspacesStore.getState().tabOpenerIdentityByScope
     // Recorded under feature/a's workspace pane target (the operation target)...
     expect(openers[openerScopeKey(REPO_ID, 'feature/a', WORKTREE_PATH)]?.['workspace-pane:changes']).toBe(
       'workspace-pane:files',
@@ -504,7 +504,7 @@ describe('openWorkspacePaneTab', () => {
 
     const openPromise = openWorkspacePaneTab({
       workspacePaneRoute: undefined,
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       branchName: 'feature/a',
       worktreePath: WORKTREE_PATH,
       type: 'changes',
@@ -512,12 +512,12 @@ describe('openWorkspacePaneTab', () => {
     })
     await commitStarted
 
-    await useReposStore.getState().closeWorkspace(REPO_ID)
+    await useWorkspacesStore.getState().closeWorkspace(REPO_ID)
     rejectCommit(new Error('error.workspace-runtime-stale'))
     await expect(openPromise).resolves.toBe(false)
 
     expect(
-      useReposStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/a', WORKTREE_PATH)],
+      useWorkspacesStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/a', WORKTREE_PATH)],
     ).toBeUndefined()
   })
 
@@ -546,15 +546,15 @@ describe('openWorkspacePaneTab', () => {
     })
 
     const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
-      const state = useReposStore.getState()
-      useReposStore.setState({ restoredRepoId: repoId })
+      const state = useWorkspacesStore.getState()
+      useWorkspacesStore.setState({ restoredWorkspaceId: repoId })
       state.setWorkspacePaneTab(repoId, branch, tab)
       return true
     })
 
     const openPromise = openWorkspacePaneTab({
       workspacePaneRoute: undefined,
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       branchName: 'feature/a',
       worktreePath: WORKTREE_PATH,
       type: 'changes',
@@ -562,7 +562,7 @@ describe('openWorkspacePaneTab', () => {
     })
     await commitStarted
 
-    await useReposStore.getState().closeWorkspace(REPO_ID)
+    await useWorkspacesStore.getState().closeWorkspace(REPO_ID)
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/reopened', { worktree: { path: WORKTREE_PATH } })],
@@ -605,15 +605,15 @@ describe('openWorkspacePaneTab', () => {
     })
 
     const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
-      const state = useReposStore.getState()
-      useReposStore.setState({ restoredRepoId: repoId })
+      const state = useWorkspacesStore.getState()
+      useWorkspacesStore.setState({ restoredWorkspaceId: repoId })
       state.setWorkspacePaneTab(repoId, branch, tab)
       return true
     })
 
     const openPromise = openWorkspacePaneTab({
       workspacePaneRoute: undefined,
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       branchName: 'feature/a',
       worktreePath: WORKTREE_PATH,
       type: 'changes',
@@ -621,7 +621,7 @@ describe('openWorkspacePaneTab', () => {
     })
     await commitStarted
 
-    await useReposStore.getState().closeWorkspace(REPO_ID)
+    await useWorkspacesStore.getState().closeWorkspace(REPO_ID)
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-reopened',
@@ -642,7 +642,7 @@ describe('openWorkspacePaneTab', () => {
 
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(
-      useReposStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/a', WORKTREE_PATH)],
+      useWorkspacesStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/a', WORKTREE_PATH)],
     ).toBeUndefined()
     expect(preferredWorkspacePaneTab('feature/reopened')).toBe('status')
   })
@@ -670,15 +670,15 @@ describe('openWorkspacePaneTab', () => {
         main: [workspacePaneStaticTabEntry('status')],
       },
     })
-    useReposStore.setState({
-      repos: { [REPO_ID]: repoA, [OTHER_REPO_ID]: repoB },
-      order: [REPO_ID, OTHER_REPO_ID],
-      restoredRepoId: REPO_ID,
+    useWorkspacesStore.setState({
+      workspaces: { [REPO_ID]: repoA, [OTHER_REPO_ID]: repoB },
+      workspaceOrder: [REPO_ID, OTHER_REPO_ID],
+      restoredWorkspaceId: REPO_ID,
     })
 
     await openWorkspacePaneTab({
       workspacePaneRoute: undefined,
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
       type: 'changes',
@@ -689,14 +689,14 @@ describe('openWorkspacePaneTab', () => {
     // so without scoping this would clobber the first repo's recorded opener.
     await openWorkspacePaneTab({
       workspacePaneRoute: undefined,
-      repoId: OTHER_REPO_ID,
+      workspaceId: OTHER_REPO_ID,
       branchName: 'main',
       worktreePath: OTHER_WORKTREE_PATH,
       type: 'changes',
       navigation: navigationWithStoreActions(),
     })
 
-    const openers = useReposStore.getState().tabOpenerIdentityByScope
+    const openers = useWorkspacesStore.getState().tabOpenerIdentityByScope
     expect(openers[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.['workspace-pane:changes']).toBe(
       'workspace-pane:files',
     )
@@ -712,7 +712,7 @@ describe('openWorkspacePaneTab', () => {
       Promise.all([
         openWorkspacePaneTab({
           workspacePaneRoute: undefined,
-          repoId: REPO_ID,
+          workspaceId: REPO_ID,
           branchName: 'feature/worktree',
           worktreePath: WORKTREE_PATH,
           type: 'changes',
@@ -720,7 +720,7 @@ describe('openWorkspacePaneTab', () => {
         }),
         openWorkspacePaneTab({
           workspacePaneRoute: undefined,
-          repoId: REPO_ID,
+          workspaceId: REPO_ID,
           branchName: 'feature/worktree',
           worktreePath: WORKTREE_PATH,
           type: 'history',
@@ -730,7 +730,7 @@ describe('openWorkspacePaneTab', () => {
     ).resolves.toEqual([true, true])
 
     expect(openTabsFor('feature/worktree')).toEqual(['status', 'history', 'changes'])
-    const openers = useReposStore.getState().tabOpenerIdentityByScope
+    const openers = useWorkspacesStore.getState().tabOpenerIdentityByScope
     const scope = openers[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]
     expect(scope?.['workspace-pane:changes']).toBe('workspace-pane:status')
     expect(scope?.['workspace-pane:history']).toBe('workspace-pane:status')
@@ -738,13 +738,13 @@ describe('openWorkspacePaneTab', () => {
 
   test('refreshes a committed open even when a newer presentation supersedes its route', async () => {
     seedWorktreeRepo('status')
-    const workspaceRuntimeId = useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId
+    const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId
     const mutation = Promise.withResolvers<WorkspacePaneTabEntry[]>()
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: async () => await mutation.promise })
 
     const opened = openWorkspacePaneTab({
       workspacePaneRoute: undefined,
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
       branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
       type: 'changes',
@@ -777,7 +777,7 @@ function seedWorktreeRepo(preferredWorkspacePaneTab: WorkspacePaneStaticTabType)
 }
 
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
-  const repo = useReposStore.getState().repos[REPO_ID]
+  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
   const target = repo
     ? workspacePaneTabsTargetForRepoBranch(
         { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
@@ -790,7 +790,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
 }
 
 function preferredWorkspacePaneTab(branchName = 'feature/worktree') {
-  const repo = useReposStore.getState().repos[REPO_ID]
+  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
   return repo
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
@@ -813,10 +813,10 @@ function openerScopeKey(repoRoot: string, branchName: string, worktreePath: stri
           head: { kind: 'branch' as const, branchName },
         }
   const baseKey = tabOpenerScopeKey(target)
-  const workspaceRuntimeId = useReposStore.getState().repos[repoRoot]?.workspaceRuntimeId
+  const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[repoRoot]?.workspaceRuntimeId
   if (workspaceRuntimeId) return `${baseKey}\0${workspaceRuntimeId}`
   return (
-    Object.keys(useReposStore.getState().tabOpenerIdentityByScope).find((key) => key.startsWith(`${baseKey}\0`)) ??
+    Object.keys(useWorkspacesStore.getState().tabOpenerIdentityByScope).find((key) => key.startsWith(`${baseKey}\0`)) ??
     `${baseKey}\0missing-runtime`
   )
 }
@@ -827,8 +827,8 @@ function navigationWithStoreActions(
     branch,
     tab,
   ) => {
-    const state = useReposStore.getState()
-    useReposStore.setState({ restoredRepoId: repoId })
+    const state = useWorkspacesStore.getState()
+    useWorkspacesStore.setState({ restoredWorkspaceId: repoId })
     state.setWorkspacePaneTab(repoId, branch, tab)
     return true
   },

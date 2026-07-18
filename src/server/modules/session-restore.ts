@@ -469,13 +469,13 @@ function openedWorkspaceByRoot<T extends RestoredWorkspaceRuntime>(opened: T[]):
 
 function runtimeSnapshotFromOpened(
   opened: OpenedWorkspaceRuntime[],
-  restoredRepoId: string | null,
+  restoredWorkspaceId: string | null,
   workspacePaneTabs: Array<{ workspaceId: string; workspaceRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>,
 ): WorkspaceRuntimeRestoreSnapshot {
   return {
     workspaces: opened.map((repo) => omit(repo, ['lease'])),
     workspacePaneTabs,
-    restoredRepoId,
+    restoredWorkspaceId,
   }
 }
 

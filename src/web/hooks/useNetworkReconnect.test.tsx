@@ -6,17 +6,17 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { normalizeRemoteTarget, type RemoteRepoConnectionLifecycle } from '#/shared/remote-repo.ts'
 import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
-import { runRemoteWorkspaceConnection } from '#/web/stores/repos/remote-workspace-connection-command.ts'
+import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import { goblinLog } from '#/web/logger.ts'
-import { resetLifecycleTest } from '#/web/stores/repos/repo-session-test-utils.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { resetLifecycleTest } from '#/web/stores/workspaces/workspace-session-test-utils.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 // Mock the server command adapter so the hook test doesn't depend on
 // the IPC bridge / network. Lifecycle projection behavior is covered by the
 // command and runtime-projection tests; this suite owns event submission.
-vi.mock('#/web/stores/repos/remote-workspace-connection-command.ts', () => ({
+vi.mock('#/web/stores/workspaces/remote-workspace-connection-command.ts', () => ({
   runRemoteWorkspaceConnection: vi.fn(async () => ({
     kind: 'superseded' as const,
     repoRoot: workspaceIdForTest('goblin+file:///tmp/remote-workspace'),
@@ -66,12 +66,12 @@ function remoteTargetFixture() {
 }
 
 function seedRepo(id: string, lifecycle: RemoteRepoConnectionLifecycle | null) {
-  const repo = emptyRepo(id, id, 'repo-runtime-test')
+  const repo = emptyWorkspace(id, id, 'repo-runtime-test')
   repo.remote.lifecycle = lifecycle
-  useReposStore.setState((s) => ({
+  useWorkspacesStore.setState((s) => ({
     ...s,
-    repos: {
-      ...s.repos,
+    workspaces: {
+      ...s.workspaces,
       [id]: repo,
     },
   }))
@@ -119,7 +119,7 @@ describe('useNetworkReconnect', () => {
     // Local repos don't have a lifecycle at all. The hook
     // must not call `runRemoteWorkspaceConnection` for them — which
     // means the repo remains untouched.
-    const repo = useReposStore.getState().repos['/tmp/local-repo']
+    const repo = useWorkspacesStore.getState().workspaces['/tmp/local-repo']
     expect(repo?.remote.lifecycle).toBeNull()
   })
 

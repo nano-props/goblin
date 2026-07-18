@@ -31,7 +31,7 @@ import {
   PrimaryWindowRouterProvider,
 } from '#/web/primary-window-router.tsx'
 import { repoSlugFromId, worktreeSlugFromPath } from '#/web/repo-route-slugs.ts'
-import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import {
   authenticatedAppShellMode,
   primaryWindowLayoutRouteCallbacks,
@@ -45,8 +45,8 @@ import {
   resetPrimaryWindowPresentationForTest,
 } from '#/web/primary-window-presentation.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
-import { resetReposStore } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
 beforeEach(() => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
@@ -60,40 +60,40 @@ afterEach(() => {
 
 describe('primary window initial route', () => {
   test('prefers the restored repo over the first repo in order', () => {
-    const repoA = emptyRepo('goblin+file:///repo-a', 'repo-a', 'repo-runtime-a')
-    const repoB = emptyRepo('goblin+file:///repo-b', 'repo-b', 'repo-runtime-b')
+    const repoA = emptyWorkspace('goblin+file:///repo-a', 'repo-a', 'repo-runtime-a')
+    const repoB = emptyWorkspace('goblin+file:///repo-b', 'repo-b', 'repo-runtime-b')
 
     expect(
       initialRepoRouteSlugFromStore({
-        restoredRepoId: 'goblin+file:///repo-b',
-        order: ['goblin+file:///repo-a', 'goblin+file:///repo-b'],
-        repos: { 'goblin+file:///repo-a': repoA, 'goblin+file:///repo-b': repoB },
+        restoredWorkspaceId: 'goblin+file:///repo-b',
+        workspaceOrder: ['goblin+file:///repo-a', 'goblin+file:///repo-b'],
+        workspaces: { 'goblin+file:///repo-a': repoA, 'goblin+file:///repo-b': repoB },
         workspaceMembershipReady: true,
       }),
     ).toBe(repoSlugFromId('goblin+file:///repo-b'))
   })
 
   test('waits for workspace membership restore instead of routing to the first partial repo', () => {
-    const repoA = emptyRepo('goblin+file:///repo-a', 'repo-a', 'repo-runtime-a')
+    const repoA = emptyWorkspace('goblin+file:///repo-a', 'repo-a', 'repo-runtime-a')
 
     expect(
       initialRepoRouteSlugFromStore({
-        restoredRepoId: null,
-        order: ['goblin+file:///repo-a'],
-        repos: { 'goblin+file:///repo-a': repoA },
+        restoredWorkspaceId: null,
+        workspaceOrder: ['goblin+file:///repo-a'],
+        workspaces: { 'goblin+file:///repo-a': repoA },
         workspaceMembershipReady: false,
       }),
     ).toBeNull()
   })
 
   test('falls back to the first ordered repo when restore has settled without a restored repo', () => {
-    const repoA = emptyRepo('goblin+file:///repo-a', 'repo-a', 'repo-runtime-a')
+    const repoA = emptyWorkspace('goblin+file:///repo-a', 'repo-a', 'repo-runtime-a')
 
     expect(
       initialRepoRouteSlugFromStore({
-        restoredRepoId: 'goblin+file:///missing',
-        order: ['goblin+file:///repo-a'],
-        repos: { 'goblin+file:///repo-a': repoA },
+        restoredWorkspaceId: 'goblin+file:///missing',
+        workspaceOrder: ['goblin+file:///repo-a'],
+        workspaces: { 'goblin+file:///repo-a': repoA },
         workspaceMembershipReady: true,
       }),
     ).toBe(repoSlugFromId('goblin+file:///repo-a'))
@@ -243,8 +243,8 @@ describe('repo route capability admission', () => {
 })
 
 function seedRepoCapability(repoId: string, gitStatus: 'available' | 'unavailable') {
-  resetReposStore()
-  const repo = emptyRepo(repoId, 'workspace', 'runtime-router-test')
+  resetWorkspacesStore()
+  const repo = emptyWorkspace(repoId, 'workspace', 'runtime-router-test')
   repo.workspaceProbe = {
     status: 'ready',
     name: 'workspace',
@@ -258,7 +258,7 @@ function seedRepoCapability(repoId: string, gitStatus: 'available' | 'unavailabl
     },
     diagnostics: [],
   }
-  useReposStore.setState({ repos: { [repoId]: repo }, order: [repoId], workspaceMembershipReady: true })
+  useWorkspacesStore.setState({ workspaces: { [repoId]: repo }, workspaceOrder: [repoId], workspaceMembershipReady: true })
 }
 
 function navigateBrowser(pathname: string) {

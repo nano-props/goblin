@@ -26,10 +26,10 @@ function createRepoWorkspaceTabModel(input: RouteModelInput) {
   return createRepoWorkspaceTabModelCore({
     ...modelInput,
     paneTarget: branchName
-      ? requiredGitWorkspacePaneTabsTarget(input.repoId, branchName, worktreePath)
-      : worktreePath === input.repoId
-        ? { kind: 'workspace-root', repoRoot: input.repoId }
-        : { kind: 'inactive', repoRoot: input.repoId },
+      ? requiredGitWorkspacePaneTabsTarget(input.workspaceId, branchName, worktreePath)
+      : worktreePath === input.workspaceId
+        ? { kind: 'workspace-root', repoRoot: input.workspaceId }
+        : { kind: 'inactive', repoRoot: input.workspaceId },
     worktreeHead: branchName && worktreePath ? { kind: 'branch', branchName } : undefined,
   })
 }
@@ -55,7 +55,7 @@ describe('workspace pane route reconciliation', () => {
 
   test('waits for tab entries before replacing a routed terminal session', () => {
     const model = createRepoWorkspaceTabModel({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
 
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
@@ -100,7 +100,7 @@ describe('workspace pane route reconciliation', () => {
 
   test('leaves a routed terminal session unverified while tab-entry projection has failed', () => {
     const model = createRepoWorkspaceTabModel({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
 
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
@@ -147,7 +147,7 @@ describe('workspace pane route reconciliation', () => {
 
   test('waits for tab entries before replacing a missing routed static tab', () => {
     const model = createRepoWorkspaceTabModel({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
 
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
@@ -166,7 +166,7 @@ describe('workspace pane route reconciliation', () => {
 
   test('leaves a static route unverified while tab-entry projection has failed', () => {
     const model = createRepoWorkspaceTabModel({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
 
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
@@ -185,7 +185,7 @@ describe('workspace pane route reconciliation', () => {
 
   test('does not verify a materialized static route while tab-entry projection has failed', () => {
     const model = createRepoWorkspaceTabModel({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
 
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
@@ -210,7 +210,7 @@ describe('workspace pane route reconciliation', () => {
 
   test('waits for terminal creation before replacing a missing routed static tab', () => {
     const model = createRepoWorkspaceTabModel({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
 
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
@@ -229,7 +229,7 @@ describe('workspace pane route reconciliation', () => {
 
   test('replaces an unmaterialized static route with the bare branch route', () => {
     const model = createRepoWorkspaceTabModel({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
 
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
@@ -250,7 +250,7 @@ describe('workspace pane route reconciliation', () => {
 
   test('replaces an invalid static route with the bare branch route', () => {
     const model = createRepoWorkspaceTabModel({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
 
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
@@ -271,7 +271,7 @@ describe('workspace pane route reconciliation', () => {
 
   test('leaves an invalid static route unverified while tab-entry projection has failed', () => {
     const model = createRepoWorkspaceTabModel({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
 
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
@@ -292,7 +292,7 @@ describe('workspace pane route reconciliation', () => {
 
   test('replaces an unmaterialized route with the bare branch route when the pane is empty', () => {
     const model = createRepoWorkspaceTabModel({
-      repoId: REPO_ID,
+      workspaceId: REPO_ID,
 
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
@@ -318,7 +318,7 @@ function terminalModel(input: {
   createPending?: boolean
 }) {
   return createRepoWorkspaceTabModel({
-    repoId: REPO_ID,
+    workspaceId: REPO_ID,
 
     workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     branchName: 'feature/route',

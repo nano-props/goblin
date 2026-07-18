@@ -11,7 +11,7 @@ import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.t
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { getRemoteSshHosts, resolveRemoteRepositoryTarget, testRemoteRepoConnection } from '#/web/remote-client.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { RemoteDiagnosticsPanel } from '#/web/components/RemoteDiagnosticsPanel.tsx'
 import { isResolvableRemotePathInput, remoteWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { cn } from '#/web/lib/cn.ts'
@@ -136,7 +136,7 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
           return
         }
       }
-      const openResult = await useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(nextTarget))
+      const openResult = await useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(nextTarget))
       if (!openResult.ok) {
         setActionError(formatRemoteDialogError(t, openResult.message))
         setLoading(false)

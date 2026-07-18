@@ -9,7 +9,7 @@
 // the zen-mode HoverCard popover) survives the surface unmounting.
 //
 // Every confirmation is resolved against the **dialog payload's**
-// `(repoId, branchName)`, looked up in `useReposStore` via
+// `(repoId, branchName)`, looked up in `useWorkspacesStore` via
 // `useBranchActionDialogDisplay`. The user can open a confirmation
 // for a non-selected branch row (e.g. a row in the zen-mode
 // HoverCard popover) and confirm against the right branch data, not
@@ -41,14 +41,14 @@ import {
   RemoveWorktreeConfirmBody,
 } from '#/web/components/branch-action-dialogs/bodies.tsx'
 import { formatWorktreePath } from '#/web/lib/paths.ts'
-import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
+import { remoteRepoTarget } from '#/web/stores/workspaces/workspace-guards.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
-import { useBranchActionDialogsStore } from '#/web/stores/repos/branch-action-dialogs.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useBranchActionDialogsStore } from '#/web/stores/workspaces/branch-action-dialogs.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { dispatchDeleteBranch, dispatchPush, dispatchRemoveWorktree } from '#/web/hooks/branchActionDispatch.ts'
 import { useBranchActionDialogDisplay } from '#/web/hooks/useBranchActionDialogDisplay.ts'
-import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 
 interface Props {
   /**
@@ -88,7 +88,7 @@ export function BranchActionDialogHost({ currentRepoId, currentBranchName }: Pro
   // Single subscription to `repos` shared by all five
   // `useBranchActionDialogDisplay` calls below — see the hook's
   // header for why.
-  const repos = useReposStore((s) => s.repos)
+  const repos = useWorkspacesStore((s) => s.workspaces)
 
   // Per-slot display view. Each view bundles:
   //   - `entry`: the retained slot entry. Drives title / message /

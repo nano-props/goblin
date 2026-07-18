@@ -40,14 +40,14 @@ export function workspacePaneCommandCoordinates(target: WorkspacePaneCommandTarg
 }
 
 export function workspacePaneCommandPaneTarget(
-  repoId: string,
+  workspaceId: string,
   target: WorkspacePaneCommandTarget,
 ): WorkspacePaneTabsTarget {
-  if (target.kind === 'workspace-root') return { kind: 'workspace-root', repoRoot: repoId }
+  if (target.kind === 'workspace-root') return { kind: 'workspace-root', repoRoot: workspaceId }
   if (target.kind === 'git-worktree') {
-    return { kind: 'git-worktree', repoRoot: repoId, worktreePath: target.filesystemTarget.rootPath }
+    return { kind: 'git-worktree', repoRoot: workspaceId, worktreePath: target.filesystemTarget.rootPath }
   }
-  return { kind: 'git-branch', repoRoot: repoId, branchName: target.branchName }
+  return { kind: 'git-branch', repoRoot: workspaceId, branchName: target.branchName }
 }
 
 export function workspacePaneCommandWorktreeHead(target: WorkspacePaneCommandTarget): GitHead | undefined {

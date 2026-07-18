@@ -42,13 +42,13 @@ Representative examples:
 
 Notes:
 
-- `useReposStore` is not a shared cross-window store.
-- `RuntimeCoherentRepoProjectionState` names the runtime-coherent repo projection slice.
-- `useReposStore.repos` is a client-local projection of runtime-coherent repo truth.
-- React Query is the client read model for server-owned workspace runtime projections. UI and command paths should read through query-backed helpers such as `useRepoBranchReadModel` or `readRepoBranchQueryProjection` instead of treating `useReposStore.repos[*]` fields as authoritative runtime truth.
+- `useWorkspacesStore` is not a shared cross-window store.
+- `RuntimeCoherentWorkspaceState` names the runtime-coherent workspace projection slice.
+- `useWorkspacesStore.workspaces` is a client-local projection of runtime-coherent workspace truth.
+- React Query is the client read model for server-owned workspace runtime projections. UI and command paths should read through query-backed helpers such as `useRepoBranchReadModel` or `readRepoBranchQueryProjection` instead of treating `useWorkspacesStore.workspaces[*]` fields as authoritative runtime truth.
 - React Query is also the client projection for server-owned settings snapshots and workspace pane tab lists. Mutation helpers should update or invalidate those caches from server-returned canonical data, not from client intent payloads.
 - Store repo data may still exist as a projection for UI orchestration, action state, warm restore, and in-place server response application. New runtime reads should prefer the query-backed projection unless they are explicitly write-side projection code.
-- `ReposStore` actions are also grouped by local, restorable, runtime-coherent, and mutation responsibilities.
+- `WorkspacesStore` actions are also grouped by local, restorable, runtime-coherent, and mutation responsibilities.
 - Transport payloads may bundle multiple classes together; consumers should split them back into runtime-coherent and restorable views before use.
 - A transport payload may also bundle multiple runtime-coherent projections,
   but each authoritative model keeps its own revision. Terminal session
@@ -91,14 +91,14 @@ Notes:
 
 Representative examples:
 
-- server-owned open-repo membership/order and durable static workspace-pane layout
+- server-owned open-workspace membership/order and durable static workspace-pane layout
 - client-local workspace state (active repo, route, layout, selection, and filetree view)
 - `repoSnapshotCache` for warm restore
 - boot-only `useSessionRestoreStore`
 
 Notes:
 
-- `ServerWorkspaceState` contains shared open-repo membership/order and
+- `ServerWorkspaceState` contains shared open-workspace membership/order and
   restart-durable static pane layout. Explicit server layout commands persist it.
 - `ClientWorkspaceState` is persisted in stable native `userData` storage for
   Electron and browser local storage for Web. Native storage must not depend
@@ -116,7 +116,7 @@ Notes:
 - Restorable helpers should focus on boot restore and persistence boundaries, not on live runtime convergence.
 - `repoSnapshotCache` is a startup affordance, not a runtime authority. Persist it from query-projected repo data when available; use it to paint placeholders during boot, then converge through normal server/query refresh.
 - `hydrateRestoredWorkspaceRuntime` belongs to the restorable boot path, while
-  `ensureWorkspaceOpen` and `closeWorkspace` belong to runtime repo lifecycle.
+  `ensureWorkspaceOpen` and `closeWorkspace` belong to runtime workspace lifecycle.
 - Restorable state is not runtime-coherent shared state.
 - Do not add a whole-session client -> server write. Each side persists only the state it owns.
 - Explicit workspace pane layout commands persist their durable static layout

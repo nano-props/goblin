@@ -1,7 +1,7 @@
 import { openRepoUrl } from '#/web/repo-client.ts'
 import { openExternalUrl } from '#/web/app-shell-client.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import type { ExecResult } from '#/web/types.ts'
 
 export async function openBranchExternalTarget(
@@ -18,7 +18,7 @@ export async function openUpstreamBranchExternalTarget(
   workspaceRuntimeId: string,
   tracking: string,
 ): Promise<ExecResult> {
-  const repo = useReposStore.getState().repos[repoId]
+  const repo = useWorkspacesStore.getState().workspaces[repoId]
   const remoteName = resolveTrackingRemoteName(
     tracking,
     repo?.remote.remotes ?? Object.keys(repo?.remote.remoteProviders ?? {}),

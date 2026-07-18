@@ -13,7 +13,7 @@ import {
 } from '#/web/components/terminal/terminal-session-store.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { RepoWorkspaceRuntimeTabStateInput } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import type { WorkspacePaneRuntimeProjectionState } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 
@@ -156,7 +156,7 @@ function readTerminalRuntimeTabProviderProjection(input: {
 }
 
 function readTerminalSelectedSessionId(terminalWorktreeKey: string): string | null {
-  return useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] ?? null
+  return useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] ?? null
 }
 
 function useTerminalRuntimeTabProviderProjection({
@@ -168,7 +168,7 @@ function useTerminalRuntimeTabProviderProjection({
   const terminalSessionSummaries = useTerminalSessionSummaries(targetKey)
   const terminalCreatePending = useTerminalWorktreeCreatePending(targetKey)
   const terminalProjectionHydration = useTerminalRepoProjectionHydrationEntry(repoRoot)
-  const selectedTerminalSessionId = useReposStore((s) =>
+  const selectedTerminalSessionId = useWorkspacesStore((s) =>
     targetKey ? s.selectedTerminalSessionIdByTerminalWorktree[targetKey] : undefined,
   )
 
@@ -205,7 +205,7 @@ function useSyncTerminalRuntimeTabSelection(
   },
   selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetSelectionByType,
 ): void {
-  const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
+  const setSelectedTerminal = useWorkspacesStore((s) => s.setSelectedTerminal)
   const activeTerminalSessionId = input.activeSessionIdByRuntimeType.terminal ?? null
   const selectedTerminalSessionId = selectedSessionIdByRuntimeType.terminal ?? undefined
   const terminalTargetKey = input.runtimeTabTargetKeyByType.terminal ?? null

@@ -1,25 +1,25 @@
 import { useEffect } from 'react'
 import { setBackgroundSyncRepos } from '#/web/repo-client.ts'
-import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
-import type { RepoState, ReposStore } from '#/web/stores/repos/types.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { isRepoUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
+import type { WorkspaceState, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { hasClientServerConfig } from '#/web/lib/server-config.ts'
 
-function isBackgroundSyncEligible(repo: RepoState | null | undefined): repo is RepoState {
+function isBackgroundSyncEligible(repo: WorkspaceState | null | undefined): repo is WorkspaceState {
   return !!repo && !isRepoUnavailable(repo) && repo.remote.hasRemotes === true
 }
 
 export function backgroundSyncRepoIdsFromStore(
-  state: Pick<ReposStore, 'repos'>,
+  state: Pick<WorkspacesStore, 'workspaces'>,
   hydratedRouteRepoId: string | null,
 ): string[] {
-  const currentRepo = hydratedRouteRepoId ? state.repos[hydratedRouteRepoId] : null
+  const currentRepo = hydratedRouteRepoId ? state.workspaces[hydratedRouteRepoId] : null
   return isBackgroundSyncEligible(currentRepo) ? [currentRepo.id] : []
 }
 
 export function useBackgroundFetch({ hydratedRouteRepoId }: { hydratedRouteRepoId: string | null }) {
-  const eligibleRepoIdsKey = useReposStore((s) => backgroundSyncRepoIdsFromStore(s, hydratedRouteRepoId).join('\0'))
+  const eligibleRepoIdsKey = useWorkspacesStore((s) => backgroundSyncRepoIdsFromStore(s, hydratedRouteRepoId).join('\0'))
   const { fetchIntervalSec } = useFetchSettings()
   const hasServer = hasClientServerConfig()
 

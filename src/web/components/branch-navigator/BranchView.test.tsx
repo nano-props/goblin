@@ -14,7 +14,7 @@ import {
   createBranchSnapshot,
   createRepoBranch,
   installGoblinTestBridge,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
@@ -60,15 +60,15 @@ const terminalReadContext: TerminalSessionReadContextValue = {
     createPending: false,
   }),
   subscribeTerminalWorktree: () => () => {},
-  repoBellCount: () => 0,
-  subscribeRepoBellCount: () => () => {},
+  workspaceBellCount: () => 0,
+  subscribeWorkspaceBellCount: () => () => {},
   snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
   subscribeSnapshot: () => () => {},
 }
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
   vi.clearAllMocks()
 })
 
@@ -106,7 +106,7 @@ describe('BranchView', () => {
 
     expect(mocks.dispatchShowWorkspacePaneStaticTabAction).toHaveBeenCalledWith(
       expect.objectContaining({
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/destination',
         type: 'status',
       }),

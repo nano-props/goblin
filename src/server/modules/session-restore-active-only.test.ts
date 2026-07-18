@@ -275,7 +275,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledOnce()
   })
 
-  test('uses activeRepoRoot instead of restoredRepoId to choose the eager restore repo', async () => {
+  test('uses activeRepoRoot instead of restoredWorkspaceId to choose the eager restore repo', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [

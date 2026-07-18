@@ -10,7 +10,7 @@ import { restoreRestorableWorkspaceStateFromClientWorkspace } from '#/web/restor
 import { restoreWorkspaceAtBoot } from '#/web/settings-actions.ts'
 import { externalAppsQueryOptions, settingsSnapshotQueryOptions } from '#/web/settings-queries.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
@@ -117,13 +117,13 @@ async function restoreBootSession(
   activeRepoRoot: string | null,
 ): Promise<WorkspaceRestoreOutcome> {
   try {
-    useReposStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
+    useWorkspacesStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
     const presentation = await readClientWorkspaceState()
     const snapshot = await abortable(settingsSnapshot, signal)
     if (signal.aborted) throw abortReason(signal)
     const restored = await abortable(
       restoreWorkspaceAtBoot(readOrCreateWebTerminalClientId(), {
-        activeRepoRoot: activeRepoRoot ?? presentation.restoredRepoId,
+        activeRepoRoot: activeRepoRoot ?? presentation.restoredWorkspaceId,
         signal,
       }),
       signal,
@@ -134,18 +134,18 @@ async function restoreBootSession(
     const clientWorkspace = composeRestoredClientWorkspace(
       restored.openWorkspaceEntries,
       presentation,
-      restored.runtime.restoredRepoId,
+      restored.runtime.restoredWorkspaceId,
     )
     applyRestoredClientWorkspace(clientWorkspace)
     await abortable(
-      useReposStore.getState().hydrateRestoredWorkspaceRuntime(restored.runtime, {
+      useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime(restored.runtime, {
         signal,
         restoredClientWorkspace: clientWorkspace,
       }),
       signal,
     )
     if (signal.aborted) throw abortReason(signal)
-    useReposStore.setState({
+    useWorkspacesStore.setState({
       sessionPersistenceReady: true,
       sessionRestoreError: null,
     })
@@ -168,8 +168,8 @@ function applyRestoredClientWorkspace(clientWorkspace: ClientWorkspaceState): vo
   // persisted client workspace with a partially hydrated one.
   const normalizedLayout = normalizeWorkspaceSessionLayoutState(clientWorkspace)
   const restoredWorkspaceState = restoreRestorableWorkspaceStateFromClientWorkspace(clientWorkspace)
-  const { applySessionLayoutState, applySessionSelectedTerminalState } = useReposStore.getState()
-  restoreFiletreeViewStateFromSession(clientWorkspace.filetreeViewStateByWorktreeByRepo)
+  const { applySessionLayoutState, applySessionSelectedTerminalState } = useWorkspacesStore.getState()
+  restoreFiletreeViewStateFromSession(clientWorkspace.filetreeViewStateByWorktreeByWorkspace)
   applySessionLayoutState(normalizedLayout)
   applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalWorktree)
 }
@@ -189,7 +189,7 @@ async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T
 }
 
 function blockSessionPersistenceAfterRestoreFailure(message: string): void {
-  useReposStore.setState({
+  useWorkspacesStore.setState({
     workspaceMembershipReady: false,
     sessionPersistenceReady: false,
     sessionRestoreError: message,
@@ -204,9 +204,9 @@ function composeRestoredClientWorkspace(
   const openRepoIds = new Set(openWorkspaceEntries.map(workspaceSessionEntryId))
   return {
     ...presentation,
-    restoredRepoId:
-      presentation.restoredRepoId && openRepoIds.has(presentation.restoredRepoId)
-        ? presentation.restoredRepoId
+    restoredWorkspaceId:
+      presentation.restoredWorkspaceId && openRepoIds.has(presentation.restoredWorkspaceId)
+        ? presentation.restoredWorkspaceId
         : serverRestoredRepoId,
   }
 }

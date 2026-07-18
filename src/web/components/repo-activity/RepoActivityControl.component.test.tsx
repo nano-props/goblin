@@ -5,10 +5,10 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
-import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
-import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
@@ -16,7 +16,7 @@ import type { RepoServerOperationState } from '#/shared/api-types.ts'
 const REPO_ID = 'goblin+file:///tmp/repo-activity-control-component'
 
 beforeEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
   // Empty dict so `t('key')` returns the key itself — lets the test
   // assert the exact key the tooltip wires up, independent of the
   // dictionary snapshot (which is hydrated over IPC in production).
@@ -107,9 +107,9 @@ describe('RepoActivityControl component', () => {
   test('shows the last-sync time in the refresh button tooltip when fetch has loaded', async () => {
     const loadedAt = Date.now() - 5_000
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
-    useReposStore.setState((state) => ({
-      repos: {
-        ...state.repos,
+    useWorkspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
         [REPO_ID]: {
           ...repo,
           // Use the fetch data load since `latestRepoSyncTime` reads

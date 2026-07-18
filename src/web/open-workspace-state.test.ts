@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import {
-  restoredRepoIdAfterWorkspaceHydration,
+  restoredWorkspaceIdAfterWorkspaceHydration,
   nextRestoredRepoIdAfterWorkspaceClose,
   persistedOpenWorkspaceEntries,
 } from '#/web/open-workspace-state.ts'
@@ -105,10 +105,10 @@ describe('nextRestoredRepoIdAfterWorkspaceClose', () => {
   })
 })
 
-describe('restoredRepoIdAfterWorkspaceHydration', () => {
+describe('restoredWorkspaceIdAfterWorkspaceHydration', () => {
   test('preserves a user-selected restored repo over the persisted restored repo', () => {
     expect(
-      restoredRepoIdAfterWorkspaceHydration(
+      restoredWorkspaceIdAfterWorkspaceHydration(
         'goblin+file:///tmp/repo-a',
         { 'goblin+file:///tmp/repo-a': {}, 'goblin+file:///tmp/repo-b': {} },
         ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
@@ -120,7 +120,7 @@ describe('restoredRepoIdAfterWorkspaceHydration', () => {
 
   test('falls back to the restored preferred repo and then the first open workspace when no preferred repo was restored', () => {
     expect(
-      restoredRepoIdAfterWorkspaceHydration(
+      restoredWorkspaceIdAfterWorkspaceHydration(
         null,
         { 'goblin+file:///tmp/repo-a': {}, 'goblin+file:///tmp/repo-b': {} },
         ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
@@ -129,7 +129,7 @@ describe('restoredRepoIdAfterWorkspaceHydration', () => {
       ),
     ).toBe('goblin+file:///tmp/repo-b')
     expect(
-      restoredRepoIdAfterWorkspaceHydration(
+      restoredWorkspaceIdAfterWorkspaceHydration(
         null,
         { 'goblin+file:///tmp/repo-a': {} },
         ['goblin+file:///tmp/repo-a'],
@@ -141,7 +141,7 @@ describe('restoredRepoIdAfterWorkspaceHydration', () => {
 
   test('does not select the first restored repo while the persisted restored repo is still unavailable', () => {
     expect(
-      restoredRepoIdAfterWorkspaceHydration(
+      restoredWorkspaceIdAfterWorkspaceHydration(
         null,
         { 'goblin+file:///tmp/repo-a': {} },
         ['goblin+file:///tmp/repo-a'],

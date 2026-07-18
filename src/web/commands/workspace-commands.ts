@@ -37,28 +37,28 @@ import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/worksp
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
 interface ShowWorkspacePaneTabCommandOptions {
-  repoId: string | null
+  workspaceId: string | null
   target: WorkspacePaneCommandTarget
   tab: WorkspacePaneTabType
   navigation: PrimaryWindowNavigationActions
 }
 
 interface TerminalPrimaryActionCommandOptions {
-  repoId: string | null
+  workspaceId: string | null
   target: WorkspacePaneCommandTarget
   navigation: PrimaryWindowNavigationActions
   t?: TerminalCreateTranslator
 }
 
 interface NewTerminalTabCommandOptions {
-  repoId: string | null
+  workspaceId: string | null
   target: WorkspacePaneCommandTarget
   navigation: PrimaryWindowNavigationActions
   t?: TerminalCreateTranslator
 }
 
 interface WorkspacePaneTabCommandTargetOptions {
-  repoId: string | null
+  workspaceId: string | null
   target: WorkspacePaneCommandTarget
   navigation: PrimaryWindowNavigationActions
   targetIdentity?: string
@@ -72,7 +72,7 @@ interface CloseWorkspacePaneTabCommandOptions extends WorkspacePaneTabCommandTar
 }
 
 interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions {
-  repoId: string | null
+  workspaceId: string | null
   workspacePaneRoute: WorkspacePaneCommandRoute
   navigation: PrimaryWindowNavigationActions
   targetIdentity?: string
@@ -92,41 +92,41 @@ type CloseWorkspaceSurfaceIntent =
   | { kind: 'noop' }
 
 interface SelectWorkspacePaneTabByIndexCommandOptions {
-  repoId: string | null
+  workspaceId: string | null
   target: WorkspacePaneCommandTarget
   tabIndex: number
   navigation: PrimaryWindowNavigationActions
 }
 
 interface MoveWorkspacePaneTabCommandOptions {
-  repoId: string | null
+  workspaceId: string | null
   target: WorkspacePaneCommandTarget
   direction: 1 | -1
   navigation: PrimaryWindowNavigationActions
 }
 
 export async function runShowWorkspacePaneTabCommand({
-  repoId,
+  workspaceId,
   target,
   tab,
   navigation,
 }: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
-  return await showWorkspacePaneTabCommand({ repoId, target, tab, navigation })
+  return await showWorkspacePaneTabCommand({ workspaceId, target, tab, navigation })
 }
 
 async function showWorkspacePaneTabCommand({
-  repoId,
+  workspaceId,
   target,
   tab,
   navigation,
 }: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
-  if (!repoId) return false
+  if (!workspaceId) return false
   const { branchName, filesystemTarget, workspacePaneRoute } = workspacePaneCommandCoordinates(target)
   const provider = workspacePaneTabProvider(tab)
   if (isWorkspacePaneStaticTabProvider(provider)) {
     const outcome = await dispatchOpenWorkspacePaneTargetStaticTabAction({
-      repoId,
-      paneTarget: workspacePaneCommandPaneTarget(repoId, target),
+      workspaceId,
+      paneTarget: workspacePaneCommandPaneTarget(workspaceId, target),
       worktreeHead: workspacePaneCommandWorktreeHead(target),
       type: provider.type,
       workspacePaneRoute,
@@ -137,7 +137,7 @@ async function showWorkspacePaneTabCommand({
   if (branchName === null) {
     return tab === 'terminal'
       ? await runTerminalPrimaryActionCommand({
-          repoId,
+          workspaceId,
           target,
           navigation,
         })
@@ -145,7 +145,7 @@ async function showWorkspacePaneTabCommand({
   }
   if (tab === 'terminal')
     return await runTerminalPrimaryActionCommand({
-      repoId,
+      workspaceId,
       target,
       navigation,
     })
@@ -171,11 +171,11 @@ export async function runNewTerminalTabCommand(options: NewTerminalTabCommandOpt
 }
 
 export async function runCloseWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptions): Promise<boolean> {
-  if (!options.repoId) return false
+  if (!options.workspaceId) return false
   return await dispatchCloseWorkspacePaneTabAction({
     ...options,
     ...workspacePaneCommandCoordinates(options.target),
-    paneTarget: workspacePaneCommandPaneTarget(options.repoId, options.target),
+    paneTarget: workspacePaneCommandPaneTarget(options.workspaceId, options.target),
     worktreeHead: workspacePaneCommandWorktreeHead(options.target),
   })
 }
@@ -221,20 +221,20 @@ export async function runCloseWorkspacePaneTabOrWindowCommand({
 export async function runSelectWorkspacePaneTabByIndexCommand(
   options: SelectWorkspacePaneTabByIndexCommandOptions,
 ): Promise<boolean> {
-  if (!options.repoId) return false
+  if (!options.workspaceId) return false
   return await dispatchSelectWorkspacePaneTabByIndexAction({
     ...options,
-    paneTarget: workspacePaneCommandPaneTarget(options.repoId, options.target),
+    paneTarget: workspacePaneCommandPaneTarget(options.workspaceId, options.target),
     worktreeHead: workspacePaneCommandWorktreeHead(options.target),
     workspacePaneRoute: options.target.workspacePaneRoute,
   })
 }
 
 export async function runMoveWorkspacePaneTabCommand(options: MoveWorkspacePaneTabCommandOptions): Promise<boolean> {
-  if (!options.repoId) return false
+  if (!options.workspaceId) return false
   return await dispatchMoveWorkspacePaneTabAction({
     ...options,
-    paneTarget: workspacePaneCommandPaneTarget(options.repoId, options.target),
+    paneTarget: workspacePaneCommandPaneTarget(options.workspaceId, options.target),
     worktreeHead: workspacePaneCommandWorktreeHead(options.target),
     workspacePaneRoute: options.target.workspacePaneRoute,
   })
@@ -243,13 +243,13 @@ export async function runMoveWorkspacePaneTabCommand(options: MoveWorkspacePaneT
 function resolveCloseWorkspaceSurfaceIntent(
   options: CloseWorkspacePaneTabOrWindowCommandOptions,
 ): CloseWorkspaceSurfaceIntent {
-  const { repoId, targetIdentity, target: commandTarget } = options
-  if (!repoId) return { kind: 'close-window' }
+  const { workspaceId, targetIdentity, target: commandTarget } = options
+  if (!workspaceId) return { kind: 'close-window' }
   if (!commandTarget) return { kind: 'close-window' }
   const branchName = workspacePaneCommandCoordinates(commandTarget).branchName
   const branchResolution =
     branchName
-      ? resolveWorkspacePaneTabTargetForBranch(repoId, branchName, {
+      ? resolveWorkspacePaneTabTargetForBranch(workspaceId, branchName, {
           workspacePaneRoute: commandTarget.workspacePaneRoute,
         })
       : null
@@ -259,9 +259,9 @@ function resolveCloseWorkspaceSurfaceIntent(
       ? branchResolution.target
       : null
     : commandTarget.kind === 'workspace-root'
-      ? workspacePaneTabTargetForWorkspace(repoId)
+      ? workspacePaneTabTargetForWorkspace(workspaceId)
       : workspacePaneTabTargetForPaneTarget(
-          workspacePaneCommandPaneTarget(repoId, commandTarget),
+          workspacePaneCommandPaneTarget(workspaceId, commandTarget),
           commandTarget.workspacePaneRoute,
           workspacePaneCommandWorktreeHead(commandTarget),
         )

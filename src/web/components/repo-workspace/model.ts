@@ -1,7 +1,7 @@
-import type { RepoState } from '#/web/stores/repos/types.ts'
-import { dataLoadInitialLoading } from '#/web/stores/repos/repo-data-load-state.ts'
-import { deriveConnectivity } from '#/web/stores/repos/repo-guards.ts'
-import { getBranchWorktreeState, selectedBranchStatus } from '#/web/stores/repos/worktree-state.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import { dataLoadInitialLoading } from '#/web/stores/workspaces/repo-data-load-state.ts'
+import { deriveConnectivity } from '#/web/stores/workspaces/workspace-guards.ts'
+import { getBranchWorktreeState, selectedBranchStatus } from '#/web/stores/workspaces/worktree-state.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 
@@ -10,7 +10,7 @@ export interface RepoWorkspacePresentation {
   initialLoading: boolean
 }
 
-export function getRepoWorkspacePresentation(repo: RepoState | undefined): RepoWorkspacePresentation {
+export function getRepoWorkspacePresentation(repo: WorkspaceState | undefined): RepoWorkspacePresentation {
   if (!repo) return { exists: false, initialLoading: false }
   // The repo read model is loading when either it never resolved or the SSH probe
   // hasn't settled yet for a remote repo with no cached data. The
@@ -32,10 +32,10 @@ export type CurrentRepoWorkspacePresentation = ReturnType<typeof getCurrentRepoW
 
 export interface RepoWorkspaceRepo extends BranchActionRepo {
   branchModel: RepoBranchReadModelData
-  workspaceProbe: RepoState['workspaceProbe']
-  ui: Pick<RepoState['ui'], 'preferredWorkspacePaneTabByTarget'> & { currentBranchName: string | null }
+  workspaceProbe: WorkspaceState['workspaceProbe']
+  ui: Pick<WorkspaceState['ui'], 'preferredWorkspacePaneTabByTarget'> & { currentBranchName: string | null }
   unavailable: boolean
-  remote: BranchActionRepo['remote'] & Pick<RepoState['remote'], 'lifecycle'>
+  remote: BranchActionRepo['remote'] & Pick<WorkspaceState['remote'], 'lifecycle'>
 }
 
 export function getCurrentRepoWorkspace(repo: RepoWorkspaceRepo) {
@@ -48,7 +48,7 @@ export function getCurrentRepoWorkspace(repo: RepoWorkspaceRepo) {
   // union via `remoteRepoTarget`; we don't mirror it on the
   // `remote` shape anymore (Phase 4 removed the legacy
   // `target` field). `repoId` is forwarded so consumers can
-  // re-resolve the live lifecycle via `useReposStore` (the
+  // re-resolve the live lifecycle via `useWorkspacesStore` (the
   // presentation object is a snapshot — it doesn't re-render on
   // lifecycle transitions).
   return { repoId: repo.id, branch, currentBranchStatus, statusCount, worktreeState }

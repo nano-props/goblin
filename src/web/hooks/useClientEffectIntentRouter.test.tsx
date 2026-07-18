@@ -10,14 +10,14 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import {
   createBranchSnapshot,
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import {
@@ -27,7 +27,7 @@ import {
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
-} from '#/web/stores/repos/workspace-pane-preferences.ts'
+} from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import {
@@ -77,7 +77,7 @@ const showRepoBranchTerminalSessionSpy = vi.fn()
 const consumeExternalOpenPathsSpy = vi.fn<() => Promise<string[]>>(async () => [])
 
 beforeEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
   setClientBridgeForTests(null)
   closeAllOverlays.mockClear()
   activateWorkspaceSpy.mockClear()
@@ -102,14 +102,14 @@ beforeEach(() => {
     },
     closeWorkspace: async (repoId) => {
       closeRepoSpy(repoId)
-      return await useReposStore.getState().closeWorkspace(repoId)
+      return await useWorkspacesStore.getState().closeWorkspace(repoId)
     },
     cycleWorkspace: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
       showRepoBranchWorkspacePaneTabSpy(repoId, branch, tab)
-      const state = useReposStore.getState()
+      const state = useWorkspacesStore.getState()
       state.setWorkspacePaneTab(repoId, branch, tab)
       return true
     },
@@ -212,7 +212,7 @@ describe('useClientEffectIntentRouter', () => {
 
     await renderHookHost()
     seedInitialObservedWorkspacePaneRouteForTest({
-      repoId: repo.id,
+      workspaceId: repo.id,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName: 'main',
       worktreePath: '/tmp/repo-main',
@@ -258,7 +258,7 @@ describe('useClientEffectIntentRouter', () => {
 
     await renderHookHost()
     seedInitialObservedWorkspacePaneRouteForTest({
-      repoId: repo.id,
+      workspaceId: repo.id,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName: 'main',
       worktreePath: '/tmp/repo-main',
@@ -292,7 +292,7 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     expect(closeRepoSpy).toHaveBeenCalledWith(repo.id)
-    expect(useReposStore.getState().repos[repo.id]).toBeUndefined()
+    expect(useWorkspacesStore.getState().workspaces[repo.id]).toBeUndefined()
   })
 
   test('close-repo menu action reports shared membership write failures', async () => {
@@ -311,7 +311,7 @@ describe('useClientEffectIntentRouter', () => {
       await Promise.resolve()
     })
 
-    expect(useReposStore.getState().repos[repo.id]).toBeDefined()
+    expect(useWorkspacesStore.getState().workspaces[repo.id]).toBeDefined()
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('error.failed-read-repo'))
   })
 
@@ -326,13 +326,13 @@ describe('useClientEffectIntentRouter', () => {
 
     await renderHookHost()
 
-    expect(useReposStore.getState().zenMode).toBe(false)
+    expect(useWorkspacesStore.getState().zenMode).toBe(false)
     await act(async () => {
       for (const listener of intentListeners) listener({ type: 'workspace-zen-mode-toggle-requested' })
       await Promise.resolve()
     })
 
-    expect(useReposStore.getState().zenMode).toBe(true)
+    expect(useWorkspacesStore.getState().zenMode).toBe(true)
   })
 
   test('current repo menu actions prefer the visible routed repo over restored repo id', async () => {
@@ -352,14 +352,14 @@ describe('useClientEffectIntentRouter', () => {
         createBranchSnapshot('feature', { isCurrent: true, worktree: { path: '/tmp/visible-repo-worktree' } }),
       ],
     })
-    useReposStore.setState((state) => ({
+    useWorkspacesStore.setState((state) => ({
       ...state,
-      repos: {
+      workspaces: {
         [restoredRepo.id]: restoredRepo,
         [visibleRepo.id]: visibleRepo,
       },
-      order: [restoredRepo.id, visibleRepo.id],
-      restoredRepoId: restoredRepo.id,
+      workspaceOrder: [restoredRepo.id, visibleRepo.id],
+      restoredWorkspaceId: restoredRepo.id,
       workspaceMembershipReady: true,
     }))
     currentWorkspaceId = visibleRepo.id
@@ -372,12 +372,12 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     expect(closeRepoSpy).toHaveBeenCalledWith(visibleRepo.id)
-    expect(useReposStore.getState().repos[visibleRepo.id]).toBeUndefined()
-    expect(useReposStore.getState().repos[restoredRepo.id]).toBeDefined()
+    expect(useWorkspacesStore.getState().workspaces[visibleRepo.id]).toBeUndefined()
+    expect(useWorkspacesStore.getState().workspaces[restoredRepo.id]).toBeDefined()
   })
 
   test('open-recent-workspace opens without store activation and then delegates activation to navigation', async () => {
-    useReposStore.setState({
+    useWorkspacesStore.setState({
       ensureWorkspaceOpen: vi.fn(async () => ({ ok: true as const, workspaceId: workspaceIdForTest('goblin+file:///tmp/recent-workspace') })),
     })
 
@@ -393,7 +393,7 @@ describe('useClientEffectIntentRouter', () => {
       await Promise.resolve()
     })
 
-    expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith({
+    expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith({
       kind: 'local',
       id: 'goblin+file:///tmp/recent-workspace',
     })
@@ -423,7 +423,7 @@ describe('useClientEffectIntentRouter', () => {
       await Promise.resolve()
     })
 
-    const state = useReposStore.getState()
+    const state = useWorkspacesStore.getState()
     expect(preferredWorkspacePaneTab(repo.id)).toBe('status')
     expect(state.zenMode).toBe(false)
     expect(closeRepoSpy).not.toHaveBeenCalled()
@@ -463,7 +463,7 @@ describe('useClientEffectIntentRouter', () => {
     const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(repo.id, '/tmp/repo-worktree')
     let visibleSessionIds = ['term-111111111111111111111']
     let workspacePaneTabsTestBridge!: ReturnType<typeof installWorkspacePaneTabsTestBridge>
-    useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-111111111111111111111')
+    useWorkspacesStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-111111111111111111111')
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-222222222222222222222'
       const coordinates = terminalSessionCoordinates(base)
@@ -477,7 +477,7 @@ describe('useClientEffectIntentRouter', () => {
         worktreePath: terminalExecutionPath(base.target),
         terminalSessionId,
       })
-      useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, terminalSessionId)
+      useWorkspacesStore.getState().setSelectedTerminal(terminalWorktreeKey, terminalSessionId)
       return terminalSessionId
     })
     const closeTerminalByDescriptor = vi.fn((terminalSessionId: string) => {
@@ -500,7 +500,7 @@ describe('useClientEffectIntentRouter', () => {
     })
     const host = renderInJsdom(<HookHost />)
     seedInitialObservedWorkspacePaneRouteForTest({
-      repoId: repo.id,
+      workspaceId: repo.id,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName: 'main',
       worktreePath: '/tmp/repo-worktree',
@@ -530,7 +530,7 @@ describe('useClientEffectIntentRouter', () => {
       })?.activeTab?.identity,
     ).toBe('terminal:term-222222222222222222222')
     seedInitialObservedWorkspacePaneRouteForTest({
-      repoId: repo.id,
+      workspaceId: repo.id,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName: 'main',
       worktreePath: '/tmp/repo-worktree',
@@ -559,7 +559,7 @@ describe('useClientEffectIntentRouter', () => {
   })
 
   test('drains externally opened repo paths through the centralized intent router', async () => {
-    useReposStore.setState({
+    useWorkspacesStore.setState({
       ensureWorkspaceOpen: vi.fn(async (path: string | { id: string }) => ({
         ok: true as const,
         workspaceId: workspaceIdForTest(typeof path === 'string' ? path : path.id),
@@ -576,8 +576,8 @@ describe('useClientEffectIntentRouter', () => {
       await Promise.resolve()
     })
 
-    expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
-    expect(useReposStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('goblin+file:///tmp/repo-b')
+    expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
+    expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('goblin+file:///tmp/repo-b')
     expect(activateWorkspaceSpy).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
   })
 
@@ -622,7 +622,7 @@ describe('useClientEffectIntentRouter', () => {
 })
 
 function preferredWorkspacePaneTab(repoId: string) {
-  const repo = useReposStore.getState().repos[repoId]
+  const repo = useWorkspacesStore.getState().workspaces[repoId]
   return repo
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
@@ -670,7 +670,7 @@ function terminalWorktreeSnapshot(
   terminalWorktreeKey: string,
   terminalSessionIds: readonly string[],
 ): TerminalWorktreeSnapshot {
-  const selectedKey = useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] ?? null
+  const selectedKey = useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] ?? null
   const sessions = terminalSessionIds.map((terminalSessionId, index) => ({
     type: 'terminal' as const,
     terminalSessionId,
@@ -692,7 +692,7 @@ function terminalWorktreeSnapshot(
           target: {
             kind: 'git-worktree' as const,
             workspaceId: canonicalWorkspaceLocator('goblin+file:///tmp/repo')!,
-            workspaceRuntimeId: useReposStore.getState().repos['goblin+file:///tmp/repo']?.workspaceRuntimeId ?? '',
+            workspaceRuntimeId: useWorkspacesStore.getState().workspaces['goblin+file:///tmp/repo']?.workspaceRuntimeId ?? '',
             root: canonicalWorkspaceLocator('goblin+file:///tmp/repo-worktree')!,
           },
           presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },

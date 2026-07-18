@@ -6,7 +6,7 @@ import { FiletreeActionDialogHost } from '#/web/components/FiletreeActionDialogH
 import {
   resetFiletreeActionDialogsStore,
   useFiletreeActionDialogsStore,
-} from '#/web/stores/repos/filetree-action-dialogs.ts'
+} from '#/web/stores/workspaces/filetree-action-dialogs.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const dialogProps = vi.hoisted(() => ({
@@ -40,11 +40,11 @@ afterEach(() => {
 
 describe('FiletreeActionDialogHost', () => {
   test('retains the file path message while the close animation runs after store state is cleared', () => {
-    renderInJsdom(<FiletreeActionDialogHost currentRepoId="/repo" />)
+    renderInJsdom(<FiletreeActionDialogHost currentWorkspaceId="/workspace" />)
 
     act(() => {
       useFiletreeActionDialogsStore.getState().openTrashFileConfirm({
-        repoId: '/repo',
+        workspaceId: '/workspace',
         workspaceRuntimeId: 'repo-runtime-filetree-action-test',
         worktreePath: '/repo-worktree',
         path: 'src/example.ts',

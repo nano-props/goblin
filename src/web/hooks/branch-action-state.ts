@@ -1,10 +1,10 @@
-import type { RepoBranchActionKind } from '#/web/stores/repos/branch-action-types.ts'
+import type { RepoBranchActionKind } from '#/web/stores/workspaces/branch-action-types.ts'
 import {
   branchActionKindFromReason,
   isBranchActionReason,
   type RepoOperationState,
-} from '#/web/stores/repos/operations.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
+} from '#/web/stores/workspaces/operations.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 export type BranchActionItemId =
@@ -23,18 +23,18 @@ export interface BranchCopyPatchAction {
 }
 
 export interface BranchActionRepo {
-  id: RepoState['id']
-  workspaceRuntimeId: RepoState['workspaceRuntimeId']
+  id: WorkspaceState['id']
+  workspaceRuntimeId: WorkspaceState['workspaceRuntimeId']
   branchModel: Pick<RepoBranchReadModelData, 'currentBranch' | 'status' | 'worktreesByPath'>
   branchAction: RepoOperationState
   remote: Pick<
-    RepoState['remote'],
+    WorkspaceState['remote'],
     'lifecycle' | 'hasRemotes' | 'hasBrowserRemote' | 'hasGitHubRemote' | 'browserRemoteProvider' | 'remoteProviders'
   >
 }
 
 interface BranchActionLocalFallbackRepo {
-  operations: Pick<RepoState['operations'], 'branchAction'>
+  operations: Pick<WorkspaceState['operations'], 'branchAction'>
 }
 
 export function isBranchActionBlocked(repo: Pick<BranchActionRepo, 'branchAction'>): boolean {

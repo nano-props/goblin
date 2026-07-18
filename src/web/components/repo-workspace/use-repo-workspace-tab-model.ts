@@ -9,7 +9,7 @@ import {
   type RepoWorkspaceTabModel,
   type RepoWorkspaceTabModelInput,
 } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
-import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import {
   useWorkspacePaneTabsQuery,
   workspacePaneTabsForTargetFromQueryData,
@@ -79,7 +79,7 @@ export function useRepoWorkspaceTabModelInput(
 
   const input = useMemo<RepoWorkspaceTabModelInput>(
     () => ({
-      repoId: repo.id,
+      workspaceId: repo.id,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       paneTarget: branchName
         ? requiredGitWorkspacePaneTabsTarget(repo.id, branchName, worktreePath)
@@ -129,7 +129,7 @@ export function useWorkspaceRootTabModel(
     tabEntries.length > 0 ? (preferredWorkspacePaneTabForTarget(repo.ui, target) ?? tabEntries[0]!.type) : null
   const input = useMemo<RepoWorkspaceTabModelInput>(
     () => ({
-      repoId: repo.id,
+      workspaceId: repo.id,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       paneTarget: target,
       preferredTab,
@@ -178,7 +178,7 @@ export function useFilesystemWorkspaceTabModel(
       : null
   const input = useMemo<RepoWorkspaceTabModelInput>(
     () => ({
-      repoId: repo.id,
+      workspaceId: repo.id,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       paneTarget: target,
       worktreeHead: target.kind === 'git-worktree' ? worktreeHead : undefined,

@@ -1,19 +1,19 @@
 import { useMutation } from '@tanstack/react-query'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import type { ExecResult } from '#/web/types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
 import { getRepoPatch, openRepoEditor, openRepoInFinder, openRepoTerminal } from '#/web/repo-client.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
-import { getBranchWorktreeState } from '#/web/stores/repos/worktree-state.ts'
+import { getBranchWorktreeState } from '#/web/stores/workspaces/worktree-state.ts'
 import {
   dispatchRepoBranchAction,
   dispatchRepoUiAction,
   isPushProtected,
-} from '#/web/stores/repos/branch-action-write-paths.ts'
-import { useBranchActionDialogsStore } from '#/web/stores/repos/branch-action-dialogs.ts'
+} from '#/web/stores/workspaces/branch-action-write-paths.ts'
+import { useBranchActionDialogsStore } from '#/web/stores/workspaces/branch-action-dialogs.ts'
 import {
   branchActionBusyItemId,
   type BranchActionRepo,
@@ -87,8 +87,8 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
  * dispatch functions the dialog uses to commit a confirmed action.
  */
 export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState): BranchActions {
-  const setLastResult = useReposStore((s) => s.setLastResult)
-  const runBranchAction = useReposStore((s) => s.runBranchAction)
+  const setLastResult = useWorkspacesStore((s) => s.setLastResult)
+  const runBranchAction = useWorkspacesStore((s) => s.runBranchAction)
   const copyPatchMutation = useMutation({
     mutationKey: ['repo-data', repo.id, repo.workspaceRuntimeId, 'patch'],
     mutationFn: async (worktreePath: string) => await getRepoPatch(repo.id, repo.workspaceRuntimeId, worktreePath),

@@ -3,7 +3,7 @@ import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
 import { SettingsPageScreen } from '#/web/components/SettingsPageScreen.tsx'
 import { RepoView } from '#/web/components/RepoView.tsx'
 import { RepoWorkspaceLayoutSkeleton } from '#/web/components/Skeleton.tsx'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
@@ -67,8 +67,8 @@ export function App({
   onCancelRepoNewWorktree,
   onReplaceRepoBranch,
 }: AppProps) {
-  const workspaceMembershipReady = useReposStore((s) => s.workspaceMembershipReady)
-  const zenMode = useReposStore((s) => s.zenMode)
+  const workspaceMembershipReady = useWorkspacesStore((s) => s.workspaceMembershipReady)
+  const zenMode = useWorkspacesStore((s) => s.zenMode)
   const uiMode = useResponsiveUiMode()
   const bootWorkspaceBehavior = repoWorkspaceBehavior({
     compact: uiMode === 'compact',
@@ -90,7 +90,7 @@ export function App({
       <ErrorBoundary resetKey={routeRepoView?.repoId ?? 'empty'}>
         {routeRepoView ? (
           <RepoView
-            repoId={routeRepoView.repoId}
+            workspaceId={routeRepoView.repoId}
             routeView={routeRepoView}
             onOpenSettings={() => onRouteSettingsPageChange?.('general')}
             onOpenRepoRoot={onOpenRepoRoot}

@@ -316,12 +316,12 @@ describe('main repo ipc cancellation', () => {
 
   test('routes native client workspace reads and writes', async () => {
     const workspace = {
-      restoredRepoId: 'goblin+file:///repo',
+      restoredWorkspaceId: 'goblin+file:///repo',
       zenMode: false,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByTargetByRepo: {},
-      filetreeViewStateByWorktreeByRepo: {},
+      preferredWorkspacePaneTabByTargetByWorkspace: {},
+      filetreeViewStateByWorktreeByWorkspace: {},
     }
     readNativeClientWorkspaceStateMock.mockResolvedValue({ kind: 'loaded', state: workspace })
 

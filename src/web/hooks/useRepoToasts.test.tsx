@@ -19,8 +19,8 @@ vi.mock(import('#/web/stores/i18n.ts'), async (importOriginal) => {
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
-import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -47,7 +47,7 @@ vi.mock('sonner', () => ({
 const REPO_ID = 'goblin+file:///tmp/repo-toasts-test'
 
 beforeEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
   toastMocks.success.mockClear()
   toastMocks.error.mockClear()
 })
@@ -55,7 +55,7 @@ beforeEach(() => {
 describe('useRepoToasts', () => {
   test('shows worktree bootstrap details on create-worktree success toasts', async () => {
     const workspaceRuntimeId = seedRepoShellForTest({ id: REPO_ID }).workspaceRuntimeId
-    useReposStore.getState().setLastResult(
+    useWorkspacesStore.getState().setLastResult(
       REPO_ID,
       {
         ok: true,

@@ -1,5 +1,5 @@
 import { type RefObject } from 'react'
-import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import { BranchActionsMenu } from '#/web/components/BranchActionsMenu.tsx'
 import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSummaryInline.tsx'
 import { cn } from '#/web/lib/cn.ts'

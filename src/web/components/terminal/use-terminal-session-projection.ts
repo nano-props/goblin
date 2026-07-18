@@ -3,10 +3,10 @@ import {
   getTerminalSessionProjection,
   type TerminalSessionProjection,
 } from '#/web/components/terminal/TerminalSessionProjection.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
 export function useTerminalSessionProjection(): TerminalSessionProjection {
-  const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
+  const setSelectedTerminal = useWorkspacesStore((s) => s.setSelectedTerminal)
   const [projection] = useState(() =>
     getTerminalSessionProjection({
       onSelectedWorktreeChange: setSelectedTerminal,

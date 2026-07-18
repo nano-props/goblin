@@ -55,17 +55,43 @@ export async function writeClientWorkspaceState(state: ClientWorkspaceState): Pr
 export function normalizeClientWorkspaceState(value: unknown): ClientWorkspaceState {
   const defaults = defaultClientWorkspaceState()
   if (!value || typeof value !== 'object' || Array.isArray(value)) return defaults
-  const raw = value as Partial<ClientWorkspaceState>
+  const raw = value as Partial<ClientWorkspaceState> & {
+    restoredRepoId?: unknown
+    preferredWorkspacePaneTabByTargetByRepo?: unknown
+    filetreeViewStateByWorktreeByRepo?: unknown
+  }
   const layout = normalizeWorkspaceSessionLayoutState(raw)
   return {
-    restoredRepoId: toSafeCanonicalRepoLocator(raw.restoredRepoId),
+    restoredWorkspaceId: toSafeCanonicalRepoLocator(
+      migratedClientWorkspaceField(raw, 'restoredWorkspaceId', 'restoredRepoId'),
+    ),
     ...layout,
     selectedTerminalSessionIdByTerminalWorktree: normalizeSelectedTerminals(
       raw.selectedTerminalSessionIdByTerminalWorktree,
     ),
-    preferredWorkspacePaneTabByTargetByRepo: normalizePreferredTabs(raw.preferredWorkspacePaneTabByTargetByRepo),
-    filetreeViewStateByWorktreeByRepo: normalizeFiletreeState(raw.filetreeViewStateByWorktreeByRepo),
+    preferredWorkspacePaneTabByTargetByWorkspace: normalizePreferredTabs(
+      migratedClientWorkspaceField(
+        raw,
+        'preferredWorkspacePaneTabByTargetByWorkspace',
+        'preferredWorkspacePaneTabByTargetByRepo',
+      ),
+    ),
+    filetreeViewStateByWorktreeByWorkspace: normalizeFiletreeState(
+      migratedClientWorkspaceField(
+        raw,
+        'filetreeViewStateByWorktreeByWorkspace',
+        'filetreeViewStateByWorktreeByRepo',
+      ),
+    ),
   }
+}
+
+function migratedClientWorkspaceField(
+  raw: Record<string, unknown>,
+  currentField: string,
+  legacyField: string,
+): unknown {
+  return Object.prototype.hasOwnProperty.call(raw, currentField) ? raw[currentField] : raw[legacyField]
 }
 
 function normalizeSelectedTerminals(value: unknown): Record<string, string> {
@@ -80,9 +106,9 @@ function normalizeSelectedTerminals(value: unknown): Record<string, string> {
   return result
 }
 
-function normalizePreferredTabs(value: unknown): ClientWorkspaceState['preferredWorkspacePaneTabByTargetByRepo'] {
+function normalizePreferredTabs(value: unknown): ClientWorkspaceState['preferredWorkspacePaneTabByTargetByWorkspace'] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  const result: ClientWorkspaceState['preferredWorkspacePaneTabByTargetByRepo'] = {}
+  const result: ClientWorkspaceState['preferredWorkspacePaneTabByTargetByWorkspace'] = {}
   for (const [repoRoot, rawByTarget] of Object.entries(value)) {
     const safeRepoRoot = toSafeCanonicalRepoLocator(repoRoot)
     if (!safeRepoRoot || !rawByTarget || typeof rawByTarget !== 'object' || Array.isArray(rawByTarget)) continue
@@ -101,9 +127,9 @@ function preferredTabFromUnknown(value: unknown): WorkspacePaneSessionTabType | 
   return value === null || (typeof value === 'string' && isWorkspacePaneSessionTabType(value)) ? value : undefined
 }
 
-function normalizeFiletreeState(value: unknown): ClientWorkspaceState['filetreeViewStateByWorktreeByRepo'] {
+function normalizeFiletreeState(value: unknown): ClientWorkspaceState['filetreeViewStateByWorktreeByWorkspace'] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  const result: ClientWorkspaceState['filetreeViewStateByWorktreeByRepo'] = {}
+  const result: ClientWorkspaceState['filetreeViewStateByWorktreeByWorkspace'] = {}
   for (const [repoRoot, rawByWorktree] of Object.entries(value)) {
     const safeRepoRoot = toSafeCanonicalRepoLocator(repoRoot)
     if (!safeRepoRoot || !rawByWorktree || typeof rawByWorktree !== 'object' || Array.isArray(rawByWorktree)) continue

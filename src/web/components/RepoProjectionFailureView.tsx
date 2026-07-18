@@ -4,14 +4,14 @@ import { EmptyState } from '#/web/components/Layout.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { useT } from '#/web/stores/i18n.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 
 export function RepoProjectionFailureView({
   repo,
   message,
   onRetry,
 }: {
-  repo: RepoState
+  repo: WorkspaceState
   message: string
   onRetry: () => void
 }) {

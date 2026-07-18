@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { backgroundSyncRepoIdsFromStore } from '#/web/hooks/useBackgroundFetch.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
-import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 
 describe('backgroundSyncRepoIdsFromStore', () => {
   test('keeps the visible remotely backed repo registered while local refresh data loads are busy', () => {
@@ -13,7 +13,7 @@ describe('backgroundSyncRepoIdsFromStore', () => {
     repo.dataLoads.repoReadModel.phase = 'refreshing'
     repo.operations.repoReadModel.phase = 'running'
 
-    expect(backgroundSyncRepoIdsFromStore({ repos: { 'goblin+file:///repo': repo } }, 'goblin+file:///repo')).toEqual([
+    expect(backgroundSyncRepoIdsFromStore({ workspaces: { 'goblin+file:///repo': repo } }, 'goblin+file:///repo')).toEqual([
       'goblin+file:///repo',
     ])
   })
@@ -33,7 +33,7 @@ describe('backgroundSyncRepoIdsFromStore', () => {
     expect(
       backgroundSyncRepoIdsFromStore(
         {
-          repos: { 'goblin+file:///local': localOnly, 'goblin+file:///down': unavailable },
+          workspaces: { 'goblin+file:///local': localOnly, 'goblin+file:///down': unavailable },
         },
         'goblin+file:///local',
       ),
@@ -41,7 +41,7 @@ describe('backgroundSyncRepoIdsFromStore', () => {
     expect(
       backgroundSyncRepoIdsFromStore(
         {
-          repos: { 'goblin+file:///local': localOnly, 'goblin+file:///down': unavailable },
+          workspaces: { 'goblin+file:///local': localOnly, 'goblin+file:///down': unavailable },
         },
         'goblin+file:///down',
       ),
@@ -52,9 +52,9 @@ describe('backgroundSyncRepoIdsFromStore', () => {
 function createRepo(input: {
   id: string
   remote: { hasRemotes: boolean; hasGitHubRemote: boolean }
-  availability: RepoState['availability']
-}): RepoState {
-  const repo = emptyRepo(input.id, 'repo', 'repo-runtime-test')
+  availability: WorkspaceState['availability']
+}): WorkspaceState {
+  const repo = emptyWorkspace(input.id, 'repo', 'repo-runtime-test')
   return {
     ...repo,
     remote: {

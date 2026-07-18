@@ -117,7 +117,7 @@ export type RepoWorkspaceSelection =
     }
 
 export interface RepoWorkspaceTabModel {
-  repoId: string
+  workspaceId: string
   workspaceRuntimeId: string
   branchName: string | null
   worktreePath: string | null
@@ -149,7 +149,7 @@ export interface RepoWorkspaceTabModel {
 }
 
 export interface RepoWorkspaceTabModelInput {
-  repoId: string
+  workspaceId: string
   workspaceRuntimeId: string
   paneTarget: RepoWorkspacePaneModelTarget
   worktreeHead?: GitHead
@@ -182,8 +182,8 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
             isWorkspacePaneRuntimeTabEntry(entry) || entry.type === 'status' || entry.type === 'files',
         )
       : normalizedTabEntries
-  const runtimeTabTargetKeyByType = workspacePaneRuntimeTabTargetKeyByType({ repoRoot: input.repoId, worktreePath })
-  const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ repoRoot: input.repoId, worktreePath })
+  const runtimeTabTargetKeyByType = workspacePaneRuntimeTabTargetKeyByType({ repoRoot: input.workspaceId, worktreePath })
+  const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ repoRoot: input.workspaceId, worktreePath })
   const hasWorktree = !!worktreePath
   const runtimeTabStateByType = runtimeTabStateByTypeFromInput(input)
   const runtimeViews = input.runtimeTabViews.filter((view) => !!runtimeTabTargetKeyByType[view.type])
@@ -231,7 +231,7 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
   })
 
   return {
-    repoId: input.repoId,
+    workspaceId: input.workspaceId,
     workspaceRuntimeId: input.workspaceRuntimeId,
     branchName,
     worktreePath,

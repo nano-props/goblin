@@ -18,12 +18,12 @@ vi.mock('sonner', () => ({
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import {
   createRepoBranch,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { observedWorkspacePaneRouteCommitForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
@@ -32,11 +32,11 @@ const REPO_ID = 'goblin+file:///tmp/goblin-client-intent-handlers-repo'
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
 })
 
 afterEach(() => {
-  resetReposStore()
+  resetWorkspacesStore()
 })
 
 describe('client effect intent handlers', () => {
@@ -106,12 +106,12 @@ describe('client effect intent handlers', () => {
 
   test('create-worktree-requested shows a busy toast while a branch action is running', async () => {
     seedRepoWithReadModelForTest({ id: REPO_ID, branches: [createRepoBranch('main')] })
-    useReposStore.setState((state) => {
-      const repo = state.repos[REPO_ID]
+    useWorkspacesStore.setState((state) => {
+      const repo = state.workspaces[REPO_ID]
       if (!repo) return state
       return {
-        repos: {
-          ...state.repos,
+        workspaces: {
+          ...state.workspaces,
           [REPO_ID]: {
             ...repo,
             operations: {
@@ -176,12 +176,12 @@ function navigationWithStoreActions(): PrimaryWindowNavigationActions {
   const navigation: PrimaryWindowNavigationActions = {
     currentWorkspacePaneRoute: () => undefined,
     activateWorkspace: vi.fn(),
-    closeWorkspace: (workspaceId) => useReposStore.getState().closeWorkspace(workspaceId),
+    closeWorkspace: (workspaceId) => useWorkspacesStore.getState().closeWorkspace(workspaceId),
     cycleWorkspace: vi.fn(),
     selectRepoBranch: vi.fn(),
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
-      const state = useReposStore.getState()
+      const state = useWorkspacesStore.getState()
       state.setWorkspacePaneTab(repoId, branch, tab)
       return true
     },

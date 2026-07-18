@@ -1,7 +1,7 @@
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import type { ReposStore } from '#/web/stores/repos/types.ts'
+import type { WorkspacesStore } from '#/web/stores/workspaces/types.ts'
 import type { TerminalRuntimeMembershipIndex } from '#/web/components/terminal/types.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
 export interface TerminalRuntimeMembershipEntry {
   id: string
@@ -10,8 +10,8 @@ export interface TerminalRuntimeMembershipEntry {
 
 export function useTerminalRuntimeMembershipIndex(): TerminalRuntimeMembershipIndex {
   const entries = useStoreWithEqualityFn(
-    useReposStore,
-    (s) => terminalRuntimeMembershipEntriesFromRepos(s.repos),
+    useWorkspacesStore,
+    (s) => terminalRuntimeMembershipEntriesFromRepos(s.workspaces),
     entriesEqual,
   )
   return runtimeMembershipIndexFromEntries(entries)
@@ -46,8 +46,8 @@ export function runtimeMembershipIndexEqual(
   return true
 }
 
-function terminalRuntimeMembershipEntriesFromRepos(repos: ReposStore['repos']): TerminalRuntimeMembershipEntry[] {
-  return Object.values(repos).map((repo) => ({
+function terminalRuntimeMembershipEntriesFromRepos(workspaces: WorkspacesStore['workspaces']): TerminalRuntimeMembershipEntry[] {
+  return Object.values(workspaces).map((repo) => ({
     id: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
   }))

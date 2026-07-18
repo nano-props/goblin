@@ -7,7 +7,7 @@ import {
   type WorkspaceSessionEntry,
 } from '#/shared/remote-repo.ts'
 
-/** Minimal shape this helper needs from a `RepoState`. Defined
+/** Minimal shape this helper needs from a `WorkspaceState`. Defined
  *  locally so the persistence / session layer doesn't have to
  *  depend on the full store types. */
 interface OpenWorkspaceRepoLike {
@@ -21,15 +21,15 @@ interface OpenWorkspaceRepoLike {
 }
 
 export function persistedOpenWorkspaceEntries(
-  order: string[],
-  repos: Record<string, OpenWorkspaceRepoLike | undefined>,
+  workspaceOrder: string[],
+  workspaces: Record<string, OpenWorkspaceRepoLike | undefined>,
 ): WorkspaceSessionEntry[] {
-  return order.flatMap<WorkspaceSessionEntry>((id) => {
-    const repo = repos[id]
+  return workspaceOrder.flatMap<WorkspaceSessionEntry>((id) => {
+    const repo = workspaces[id]
     if (!repo) return []
     if (repo.session?.entry) return [repo.session.entry]
     if (!isRemoteRepoId(repo.id)) return [{ kind: 'local', id: repo.id }]
-    // For remote repos, reconstruct the session entry from the
+    // For remote workspaces, reconstruct the session entry from the
     // last-known target (lifecycle.target). A failed lifecycle
     // may or may not have a retained target; without one we
     // can't reconstruct a session entry, so the repo is dropped
@@ -43,27 +43,27 @@ export function persistedOpenWorkspaceEntries(
 }
 
 export function nextRestoredRepoIdAfterWorkspaceClose(
-  order: string[],
-  restoredRepoId: string | null,
+  workspaceOrder: string[],
+  restoredWorkspaceId: string | null,
   closedId: string,
 ): string | null {
-  if (restoredRepoId !== closedId) return restoredRepoId
-  const idx = order.indexOf(closedId)
+  if (restoredWorkspaceId !== closedId) return restoredWorkspaceId
+  const idx = workspaceOrder.indexOf(closedId)
   if (idx === -1) return null
-  return order[idx + 1] ?? order[idx - 1] ?? null
+  return workspaceOrder[idx + 1] ?? workspaceOrder[idx - 1] ?? null
 }
 
-export function restoredRepoIdAfterWorkspaceHydration(
+export function restoredWorkspaceIdAfterWorkspaceHydration(
   currentRestoredRepoId: string | null,
-  repos: Record<string, unknown>,
-  order: string[],
+  workspaces: Record<string, unknown>,
+  workspaceOrder: string[],
   preferredActiveRepoId: string | null,
   managedRestoredRepoId: string | null,
 ): string | null {
-  if (currentRestoredRepoId && currentRestoredRepoId !== managedRestoredRepoId && repos[currentRestoredRepoId]) {
+  if (currentRestoredRepoId && currentRestoredRepoId !== managedRestoredRepoId && workspaces[currentRestoredRepoId]) {
     return currentRestoredRepoId
   }
-  if (preferredActiveRepoId && repos[preferredActiveRepoId]) return preferredActiveRepoId
+  if (preferredActiveRepoId && workspaces[preferredActiveRepoId]) return preferredActiveRepoId
   if (preferredActiveRepoId) return null
-  return order[0] ?? null
+  return workspaceOrder[0] ?? null
 }

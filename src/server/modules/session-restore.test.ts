@@ -148,7 +148,7 @@ describe('restoreServerWorkspace', () => {
       targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
     expect(result.runtime).toMatchObject({
-      restoredRepoId: 'goblin+file:///repo',
+      restoredWorkspaceId: 'goblin+file:///repo',
       workspaces: [
         {
           entry: { kind: 'local', id: 'goblin+file:///repo' },

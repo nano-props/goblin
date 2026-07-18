@@ -15,16 +15,16 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   createPullRequest,
   createRepoBranch,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
 const REPO_ID = 'goblin+file:///tmp/repo-dashboard-pane-test'
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
 })
 
 afterEach(() => {
@@ -35,10 +35,10 @@ afterEach(() => {
 describe('RepoDashboardPane', () => {
   test('does not admit Git or directory reads before workspace capability settles', () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, name: 'probing' })
-    useReposStore.setState((state) => ({
-      repos: {
-        ...state.repos,
-        [REPO_ID]: { ...state.repos[REPO_ID]!, workspaceProbe: { status: 'probing' } },
+    useWorkspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
+        [REPO_ID]: { ...state.workspaces[REPO_ID]!, workspaceProbe: { status: 'probing' } },
       },
     }))
     primaryWindowQueryClient.removeQueries({
@@ -67,11 +67,11 @@ describe('RepoDashboardPane', () => {
 
   test('shows directory metrics without mounting Git reads for a non-Git workspace', () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, name: 'notes' })
-    useReposStore.setState((state) => ({
-      repos: {
-        ...state.repos,
+    useWorkspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
         [REPO_ID]: {
-          ...state.repos[REPO_ID]!,
+          ...state.workspaces[REPO_ID]!,
           workspaceProbe: {
             status: 'ready',
             name: 'notes',

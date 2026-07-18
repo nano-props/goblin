@@ -3,8 +3,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { App } from '#/web/App.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const responsiveMocks = vi.hoisted(() => ({
@@ -34,12 +34,12 @@ vi.mock('#/web/components/ErrorBoundary.tsx', () => ({
 
 beforeEach(() => {
   responsiveMocks.mode = 'default'
-  resetReposStore()
+  resetWorkspacesStore()
 })
 
 describe('App workspace membership skeleton', () => {
   test('renders the empty repo shell while no repository is open', () => {
-    useReposStore.setState({ workspaceMembershipReady: true })
+    useWorkspacesStore.setState({ workspaceMembershipReady: true })
 
     const { container } = render(<App />)
 

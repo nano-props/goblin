@@ -4,7 +4,7 @@ import {
   type WorkspacePaneStaticTabType,
   type WorkspacePaneTabEntry,
 } from '#/shared/workspace-pane.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import {
@@ -32,7 +32,7 @@ export function beginWorkspacePaneTabEntryClose(
   }
   const closeTarget = target.worktreePath
     ? workspacePaneTerminalBaseFromCoordinates({
-        workspaceId: target.repoId,
+        workspaceId: target.workspaceId,
         workspaceRuntimeId: target.workspaceRuntimeId,
         branchName: target.branchName,
         rootPath: target.worktreePath,
@@ -56,7 +56,7 @@ export function beginWorkspacePaneTabEntryClose(
 
 function closeStaticTabWithCommit(target: RepoWorkspaceTabModel) {
   return async (type: WorkspacePaneStaticTabType): Promise<boolean> => {
-    const repo = useReposStore.getState().repos[target.repoId]
+    const repo = useWorkspacesStore.getState().workspaces[target.workspaceId]
     if (!repo) return false
     if (target.paneTarget.kind === 'inactive') return false
     const persistenceTarget = target.paneTarget

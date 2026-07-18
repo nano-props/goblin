@@ -204,11 +204,11 @@ It also shows a feature where a separate source layer makes sense.
 ### Repos
 
 - boundary: `src/server/routes/repo.ts`, `src/web/repo-client.ts`
-- read: `src/web/stores/repos/refresh.ts` (read-side refresh orchestration)
-- write: `src/web/stores/repos/repo-session-write-paths.ts`, `src/web/stores/repos/branch-actions.ts`
+- read: `src/web/stores/workspaces/refresh.ts` (read-side refresh orchestration)
+- write: `src/web/stores/workspaces/workspace-session-write-paths.ts`, `src/web/stores/workspaces/branch-actions.ts`
 - server write: `src/server/modules/repo-write-paths.ts` (to be extracted from `repo.ts`)
 - source: `src/server/modules/repo-source.ts`
-- runtime projection/facade: `src/web/stores/repos/store.ts`, related repo store slices
+- runtime projection/facade: `src/web/stores/workspaces/store.ts`, related repo store slices
 - restorable/runtime distinction: repo store types and lifecycle modules
 
 This is a good example of a feature that should stay feature-first, even when its runtime projection is store-heavy instead of query-heavy.

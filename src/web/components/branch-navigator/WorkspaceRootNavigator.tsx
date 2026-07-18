@@ -8,7 +8,7 @@ import {
 } from '#/web/components/branch-navigator/branch-row-metrics.ts'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { cn } from '#/web/lib/cn.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx'
@@ -22,14 +22,14 @@ import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
 import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 interface WorkspaceRootNavigatorProps {
-  repoId: string
+  workspaceId: string
   selected: boolean
   onSelect?: () => void
 }
 
 /** The non-Git workspace root is a first-class navigation target, not a synthetic branch. */
 export function WorkspaceRootNavigator({
-  repoId,
+  workspaceId,
   selected,
   onSelect,
 }: WorkspaceRootNavigatorProps) {
@@ -38,24 +38,24 @@ export function WorkspaceRootNavigator({
   const compact = useIsCompactUi()
   const [menuOpen, setMenuOpen] = useState(false)
   const actionVisible = compact || menuOpen
-  const workspace = useReposStore(
+  const workspace = useWorkspacesStore(
     useShallow((state) => {
-      const probe = state.repos[repoId]?.workspaceProbe
-      const repo = state.repos[repoId]
+      const probe = state.workspaces[workspaceId]?.workspaceProbe
+      const repo = state.workspaces[workspaceId]
       return {
-        name: probe?.status === 'ready' ? probe.name : formatWorkspaceDisplayLocation(repoId),
+        name: probe?.status === 'ready' ? probe.name : formatWorkspaceDisplayLocation(workspaceId),
         terminalAvailable: workspaceTerminalAvailable(probe),
         workspaceRuntimeId: repo?.workspaceRuntimeId ?? null,
         capabilities: probe?.status === 'ready' ? probe.capabilities : null,
       }
     }),
   )
-  const root = parseCanonicalWorkspaceLocator(repoId)
+  const root = parseCanonicalWorkspaceLocator(workspaceId)
   const filesystemTarget =
     root && workspace.workspaceRuntimeId && workspace.capabilities
       ? {
           kind: 'workspace-root' as const,
-          workspaceId: repoId,
+          workspaceId,
           workspaceRuntimeId: workspace.workspaceRuntimeId,
           rootPath: root.path,
           capabilities: workspace.capabilities,
@@ -67,7 +67,7 @@ export function WorkspaceRootNavigator({
 
   const showStaticTab = (tab: 'status' | 'files') => {
     if (!commandTarget) return
-    void runShowWorkspacePaneTabCommand({ repoId, target: commandTarget, tab, navigation })
+    void runShowWorkspacePaneTabCommand({ workspaceId, target: commandTarget, tab, navigation })
   }
 
   return (
@@ -119,7 +119,7 @@ export function WorkspaceRootNavigator({
                           close={close}
                           onSelect={() => {
                             void runTerminalPrimaryActionCommand({
-                              repoId,
+                              workspaceId,
                               target: commandTarget,
                               navigation,
                               t,

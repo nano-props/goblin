@@ -25,8 +25,8 @@ import {
   workspacePaneActionTargetFromFilesystemTarget,
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { currentWorkspaceRuntimeId } from '#/web/stores/repos/repo-guards.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { currentWorkspaceRuntimeId } from '#/web/stores/workspaces/workspace-guards.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
@@ -159,7 +159,7 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
   }
   return commitWorkspacePaneCurrentTargetRoute(
     {
-      repoId: coordinates.repoRoot,
+      workspaceId: coordinates.repoRoot,
       workspaceRuntimeId: coordinates.workspaceRuntimeId,
       branchName: workspaceRoot ? null : terminalPresentationBranch(resolvedBase.presentation),
       worktreePath: workspaceRoot ? null : terminalExecutionPath(resolvedBase.target),
@@ -232,7 +232,7 @@ function applyCreatedTerminalWorkspacePaneRuntimeTabs(
 
 function terminalCreateTargetRuntimeIsCurrent(base: TerminalSessionBase): boolean {
   const coordinates = terminalExecutionCoordinates(base.target)
-  return currentWorkspaceRuntimeId(useReposStore.getState(), coordinates.repoRoot) === coordinates.workspaceRuntimeId
+  return currentWorkspaceRuntimeId(useWorkspacesStore.getState(), coordinates.repoRoot) === coordinates.workspaceRuntimeId
 }
 
 function terminalRuntimeTabCreateAction(

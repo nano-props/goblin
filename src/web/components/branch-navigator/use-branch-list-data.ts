@@ -4,9 +4,9 @@
 // and remote metadata stay on one selector.
 
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { projectBranchActionRepo, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import type { RepoState, RepoUiState } from '#/web/stores/repos/types.ts'
+import type { WorkspaceState, WorkspaceUiState } from '#/web/stores/workspaces/types.ts'
 import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
 
@@ -15,11 +15,11 @@ import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
 // remote shell fields for the list.
 export type BranchListRepo = BranchActionRepo & {
   branchModel: Pick<RepoBranchReadModelData, 'branches' | 'currentBranch' | 'status' | 'worktreesByPath'>
-  ui: Pick<RepoUiState, 'branchViewMode'>
+  ui: Pick<WorkspaceUiState, 'branchViewMode'>
 }
 
 type BranchListRepoShell = Omit<BranchListRepo, 'branchModel' | 'branchAction'> & {
-  operations: Pick<RepoState['operations'], 'branchAction'>
+  operations: Pick<WorkspaceState['operations'], 'branchAction'>
 }
 
 const branchListRepoShellEqualFields: Array<keyof BranchListRepoShell> = [
@@ -59,9 +59,9 @@ function branchListRepoShellEqual(a: BranchListRepoShell | undefined, b: BranchL
 
 export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
   const repoShell = useStoreWithEqualityFn(
-    useReposStore,
+    useWorkspacesStore,
     (s) => {
-      const repo: RepoState | undefined = s.repos[repoId]
+      const repo: WorkspaceState | undefined = s.workspaces[repoId]
       return repo
         ? {
             id: repo.id,

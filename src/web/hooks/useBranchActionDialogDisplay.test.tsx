@@ -21,11 +21,11 @@ import {
   useBranchActionDialogsStore,
   type BranchActionDialogEntry,
   type RemoveWorktreeDialogPayload,
-} from '#/web/stores/repos/branch-action-dialogs.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+} from '#/web/stores/workspaces/branch-action-dialogs.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   createRepoBranch,
-  resetReposStore,
+  resetWorkspacesStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
@@ -39,7 +39,7 @@ const OTHER_REPO_ID = '/tmp/goblin-dialog-display-test-other'
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
-  resetReposStore()
+  resetWorkspacesStore()
   resetBranchActionDialogsStore()
 })
 
@@ -58,7 +58,7 @@ function mountHarness<P>(initial: BranchActionDialogEntry<P> | null): HarnessHan
     // production `BranchActionDialogHost` pattern. The helper takes
     // `repos` as a parameter precisely so multiple display hooks in
     // one host share a single subscription.
-    const repos = useReposStore((s) => s.repos)
+    const repos = useWorkspacesStore((s) => s.workspaces)
     handle.current = useBranchActionDialogDisplay(slot, repos)
     return null
   }
@@ -94,7 +94,7 @@ function setupRepo(): void {
 }
 
 function dropBranch(repoId: string, branchName: string): void {
-  const repo = useReposStore.getState().repos[repoId]
+  const repo = useWorkspacesStore.getState().workspaces[repoId]
   const readModel = repo ? readRepoBranchQueryProjection(repo) : null
   const nextBranches = readModel?.branches.filter((b) => b.name !== branchName) ?? []
   act(() => {

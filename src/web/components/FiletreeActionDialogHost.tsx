@@ -4,13 +4,13 @@ import { ConfirmDialog } from '#/web/components/ConfirmDialog.tsx'
 import { trashRepositoryFile } from '#/web/filetree-client.ts'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { useFiletreeActionDialogsStore } from '#/web/stores/repos/filetree-action-dialogs.ts'
+import { useFiletreeActionDialogsStore } from '#/web/stores/workspaces/filetree-action-dialogs.ts'
 
 interface Props {
-  readonly currentRepoId: string | null
+  readonly currentWorkspaceId: string | null
 }
 
-export function FiletreeActionDialogHost({ currentRepoId }: Props) {
+export function FiletreeActionDialogHost({ currentWorkspaceId }: Props) {
   const t = useT()
   const trashFileConfirm = useFiletreeActionDialogsStore((s) => s.trashFileConfirm)
   const closeTrashFileConfirm = useFiletreeActionDialogsStore((s) => s.closeTrashFileConfirm)
@@ -18,8 +18,8 @@ export function FiletreeActionDialogHost({ currentRepoId }: Props) {
   const displayTrashFileConfirm = useLastNonNull(trashFileConfirm)
 
   useEffect(() => {
-    closeStaleDialogs(currentRepoId ?? '')
-  }, [currentRepoId, closeStaleDialogs])
+    closeStaleDialogs(currentWorkspaceId ?? '')
+  }, [currentWorkspaceId, closeStaleDialogs])
 
   return (
     <ConfirmDialog
@@ -38,7 +38,7 @@ export function FiletreeActionDialogHost({ currentRepoId }: Props) {
       onConfirm={async () => {
         if (!trashFileConfirm) return
         const result = await trashRepositoryFile(
-          trashFileConfirm.repoId,
+          trashFileConfirm.workspaceId,
           trashFileConfirm.workspaceRuntimeId,
           trashFileConfirm.worktreePath,
           trashFileConfirm.path,

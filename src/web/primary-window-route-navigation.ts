@@ -1,7 +1,7 @@
 import { useRouter } from '@tanstack/react-router'
 import { useMemo } from 'react'
 import { branchSlugFromName, repoSlugFromId, worktreeSlugFromPath } from '#/web/repo-route-slugs.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import { isWorkspacePaneStaticTabType, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
@@ -87,7 +87,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
   return useMemo(() => {
     return {
       repoSlugForId(repoId) {
-        const repo = useReposStore.getState().repos[repoId]
+        const repo = useWorkspacesStore.getState().workspaces[repoId]
         return repo ? repoSlugFromId(repo.id) : null
       },
       currentWorkspacePaneRoute(repoId, branchName) {
@@ -607,7 +607,7 @@ export function workspacePaneRouteFromBranchHref(
 }
 
 function repoSlugForId(repoId: string): string | null {
-  const repo = useReposStore.getState().repos[repoId]
+  const repo = useWorkspacesStore.getState().workspaces[repoId]
   return repo ? repoSlugFromId(repo.id) : null
 }
 

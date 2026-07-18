@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest'
-import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
+import { latestRepoSyncTime } from '#/web/stores/workspaces/sync-time.ts'
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
 import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
-import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 
 describe('workspacePickerItemsEqual', () => {
   test('treats Git capability changes as unequal', () => {
@@ -165,7 +165,7 @@ describe('workspacePickerItemsEqual', () => {
   })
 
   test('does not treat warm cache read-model time as a sync time', () => {
-    const repo = emptyRepo('goblin+file:///tmp/repo', 'repo', 'repo-runtime-test')
+    const repo = emptyWorkspace('goblin+file:///tmp/repo', 'repo', 'repo-runtime-test')
     repo.projection = { source: 'cache', savedAt: 2_000 }
     repo.dataLoads.repoReadModel.loadedAt = 2_000
 
@@ -173,7 +173,7 @@ describe('workspacePickerItemsEqual', () => {
   })
 
   test('uses fresh read-model and fetch data-load times as sync candidates', () => {
-    const repo = emptyRepo('goblin+file:///tmp/repo', 'repo', 'repo-runtime-test')
+    const repo = emptyWorkspace('goblin+file:///tmp/repo', 'repo', 'repo-runtime-test')
     repo.projection = { source: 'fresh', savedAt: null }
     repo.dataLoads.repoReadModel.loadedAt = 2_000
     repo.dataLoads.fetch.loadedAt = 3_000

@@ -1,7 +1,7 @@
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneCommittedRuntimeTargetIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
@@ -16,8 +16,8 @@ export function commitWorkspacePaneRouteSupplement(
   target: WorkspacePaneRouteSupplementTarget,
   route: WorkspacePaneRouteTarget,
 ): boolean {
-  const state = useReposStore.getState()
-  const repo = state.repos[target.repoId]
+  const state = useWorkspacesStore.getState()
+  const repo = state.workspaces[target.repoId]
   if (!repo || repo.workspaceRuntimeId !== target.workspaceRuntimeId) return false
   const branchModel = readRepoBranchSnapshotQueryProjection(repo)
   const branch = branchModel?.branches.find((candidate) => candidate.name === target.branchName)
@@ -38,7 +38,7 @@ export function commitWorkspacePaneCommittedRuntimeRouteSupplement(
   route: WorkspacePaneRouteTarget,
 ): boolean {
   if (!workspacePaneCommittedRuntimeTargetIsCurrent(target)) return false
-  const state = useReposStore.getState()
+  const state = useWorkspacesStore.getState()
   state.setWorkspacePaneTabForTarget(
     requiredGitWorkspacePaneTabsTarget(target.repoId, target.branchName, target.worktreePath),
     route === null ? null : route.kind === 'static' ? route.tab : 'terminal',

@@ -26,8 +26,8 @@ interface ThemeStore extends ThemeState {
 }
 
 // `set` / `get` aliases keep helper signatures aligned with the
-// `I18nSet` / `ReposSet` / `ReposGet` precedent in
-// `src/web/stores/i18n.ts` and `src/web/stores/repos/types.ts` —
+// `I18nSet` / `WorkspacesSet` / `WorkspacesGet` precedent in
+// `src/web/stores/i18n.ts` and `src/web/stores/workspaces/types.ts` —
 // helpers wrap the actual Zustand setState/getState rather than a
 // narrowed alias of either.
 type ThemeSet = StoreApi<ThemeStore>['setState']

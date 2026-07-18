@@ -1,4 +1,4 @@
-import type { RepoBranchState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import {
   useBranchActionItems,

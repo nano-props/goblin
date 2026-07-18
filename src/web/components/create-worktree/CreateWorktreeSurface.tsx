@@ -21,9 +21,9 @@ import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.t
 import { ConfirmCheckbox } from '#/web/components/ConfirmCheckbox.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
-import type { RepoOperationState } from '#/web/stores/repos/operations.ts'
+import { remoteRepoTarget } from '#/web/stores/workspaces/workspace-guards.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { RepoOperationState } from '#/web/stores/workspaces/operations.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useRepoRemoteBranchesQuery } from '#/web/repo-data-query.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
@@ -42,11 +42,11 @@ const MODE_OPTIONS = [
 ] satisfies Array<{ id: CreateWorktreeMode; labelKey: string; icon: LucideIcon }>
 
 interface CreateWorktreeRepo {
-  id: RepoState['id']
-  workspaceRuntimeId: RepoState['workspaceRuntimeId']
+  id: WorkspaceState['id']
+  workspaceRuntimeId: WorkspaceState['workspaceRuntimeId']
   branchModel: RepoBranchReadModelData
   branchAction: RepoOperationState
-  remote: Pick<RepoState['remote'], 'lifecycle'>
+  remote: Pick<WorkspaceState['remote'], 'lifecycle'>
 }
 
 export interface WorktreeBootstrapPromptState {

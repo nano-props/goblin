@@ -20,7 +20,7 @@ const SIDEBAR_TOP_CLASS_NAME = 'flex shrink-0 items-center gap-1 bg-card text-sm
 type RepoShellSidebarChromeRegion = 'drag' | 'none'
 
 interface RepoShellSidebarProps {
-  repoId?: string
+  workspaceId?: string
   compact: boolean
   branchContent?: ReactNode
   chromeRegion?: RepoShellSidebarChromeRegion
@@ -37,7 +37,7 @@ interface RepoShellSidebarProps {
 }
 
 export function RepoLayoutSidebar({
-  repoId,
+  workspaceId,
   compact,
   branchContent,
   chromeRegion = 'drag',
@@ -71,27 +71,27 @@ export function RepoLayoutSidebar({
           />
         ))}
       <RepoShellPrimaryActions
-        repoId={repoId}
+        workspaceId={workspaceId}
         onCreateWorktree={onCreateWorktree}
         onOpenDashboard={onOpenDashboard}
         dashboardSelected={dashboardSelected}
         newWorktreeSelected={newWorktreeSelected}
         gitAvailable={gitAvailable}
       />
-      {repoId ? (
+      {workspaceId ? (
         <>
-          <RepoShellBranchHeader repoId={repoId} title={t(navigatorTitleKey)} gitAvailable={gitAvailable} />
+          <RepoShellBranchHeader workspaceId={workspaceId} title={t(navigatorTitleKey)} gitAvailable={gitAvailable} />
           <div className="flex min-h-0 flex-1 bg-card">
             {branchContent ??
               (gitAvailable ? (
                 <BranchNavigator
-                  repoId={repoId}
+                  repoId={workspaceId}
                   onSelectBranch={onSelectBranch}
                   currentBranchName={currentBranchName}
                 />
               ) : (
                 <WorkspaceRootNavigator
-                  repoId={repoId}
+                  workspaceId={workspaceId}
                   selected={workspaceRootSelected}
                   onSelect={onSelectWorkspaceRoot}
                 />
@@ -107,14 +107,14 @@ export function RepoLayoutSidebar({
 }
 
 function RepoShellPrimaryActions({
-  repoId,
+  workspaceId,
   onCreateWorktree,
   onOpenDashboard,
   dashboardSelected,
   newWorktreeSelected,
   gitAvailable,
 }: {
-  repoId?: string
+  workspaceId?: string
   onCreateWorktree?: () => void
   onOpenDashboard?: () => void
   dashboardSelected?: boolean
@@ -124,13 +124,13 @@ function RepoShellPrimaryActions({
   return (
     <div className="shrink-0 px-3 pt-4">
       <div className="flex min-w-0 flex-col gap-1">
-        <WorkspacePickerRow repoId={repoId} />
-        {repoId ? (
+        <WorkspacePickerRow workspaceId={workspaceId} />
+        {workspaceId ? (
           <>
-            <DashboardRowAction repoId={repoId} selected={dashboardSelected} onOpenDashboard={onOpenDashboard} />
+            <DashboardRowAction selected={dashboardSelected} onOpenDashboard={onOpenDashboard} />
             {gitAvailable ? (
               <CreateWorktreeRowAction
-                repoId={repoId}
+                repoId={workspaceId}
                 selected={newWorktreeSelected}
                 onCreateWorktree={onCreateWorktree}
               />
@@ -142,12 +142,12 @@ function RepoShellPrimaryActions({
   )
 }
 
-function WorkspacePickerRow({ repoId }: { repoId?: string }) {
+function WorkspacePickerRow({ workspaceId }: { workspaceId?: string }) {
   const overlayActions = useContext(LayoutOverlayActions)
   return (
     <div className="flex h-8 min-w-0 shrink-0 items-center">
       <WorkspacePickerHost
-        currentWorkspaceId={repoId ?? null}
+        currentWorkspaceId={workspaceId ?? null}
         onOpenWorkspacePathDialog={overlayActions?.openWorkspacePathDialog ?? NOOP}
         onOpenRemote={overlayActions?.openRemoteWorkspace ?? NOOP}
         onClone={overlayActions?.openCloneRepo ?? NOOP}
@@ -157,13 +157,21 @@ function WorkspacePickerRow({ repoId }: { repoId?: string }) {
   )
 }
 
-function RepoShellBranchHeader({ repoId, title, gitAvailable }: { repoId: string; title: string; gitAvailable: boolean }) {
+function RepoShellBranchHeader({
+  workspaceId,
+  title,
+  gitAvailable,
+}: {
+  workspaceId: string
+  title: string
+  gitAvailable: boolean
+}) {
   return (
     <div className="shrink-0 px-3 pb-2 pt-3">
       <div className="flex h-8 min-w-0 items-center gap-2 px-3">
         <div className="min-w-0 flex-1 truncate text-[13px] font-semibold text-muted-foreground">{title}</div>
-        {gitAvailable ? <BranchFilterAction repoId={repoId} /> : null}
-        {gitAvailable ? <RepoSyncAction repoId={repoId} /> : null}
+        {gitAvailable ? <BranchFilterAction repoId={workspaceId} /> : null}
+        {gitAvailable ? <RepoSyncAction repoId={workspaceId} /> : null}
       </div>
     </div>
   )

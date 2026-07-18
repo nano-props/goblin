@@ -1,11 +1,11 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   createPrimaryWindowNavigationActions,
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation-actions.ts'
-import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
+import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
 import { usePrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 export type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
 
@@ -25,8 +25,8 @@ export function usePrimaryWindowNavigation(): PrimaryWindowNavigationActions {
   const context = useContext(PrimaryWindowNavigationContext)
   if (context) return context
 
-  const order = useReposStore((s) => s.order)
-  const { closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation } = useReposStore(
+  const workspaceOrder = useWorkspacesStore((s) => s.workspaceOrder)
+  const { closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation } = useWorkspacesStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
   )
   const routeNavigation = usePrimaryWindowRouteNavigation()
@@ -34,7 +34,7 @@ export function usePrimaryWindowNavigation(): PrimaryWindowNavigationActions {
     () =>
       createPrimaryWindowNavigationActions({
         currentWorkspaceId: null,
-        order,
+        workspaceOrder,
         closeWorkspace,
         peekWorkspaceNavigation,
         commitWorkspaceNavigation,
@@ -44,7 +44,7 @@ export function usePrimaryWindowNavigation(): PrimaryWindowNavigationActions {
       closeWorkspace,
       peekWorkspaceNavigation,
       commitWorkspaceNavigation,
-      order,
+      workspaceOrder,
       routeNavigation,
     ],
   )

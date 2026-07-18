@@ -220,15 +220,15 @@ const FiletreeSessionViewStateSchema = v.object({
   topVisibleRowIndex: v.number(),
 })
 const ClientWorkspaceStateSchema = v.object({
-  restoredRepoId: v.nullable(v.string()),
+  restoredWorkspaceId: v.nullable(v.string()),
   zenMode: v.boolean(),
   workspacePaneSize: v.number(),
   selectedTerminalSessionIdByTerminalWorktree: v.record(v.string(), v.string()),
-  preferredWorkspacePaneTabByTargetByRepo: v.record(
+  preferredWorkspacePaneTabByTargetByWorkspace: v.record(
     v.string(),
     v.record(v.string(), v.nullable(v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
   ),
-  filetreeViewStateByWorktreeByRepo: v.record(v.string(), v.record(v.string(), FiletreeSessionViewStateSchema)),
+  filetreeViewStateByWorktreeByWorkspace: v.record(v.string(), v.record(v.string(), FiletreeSessionViewStateSchema)),
 })
 
 // Shared shape for the GitHub CLI state endpoints (`/api/settings/github-cli`

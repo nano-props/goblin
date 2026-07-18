@@ -14,7 +14,7 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const TARGET = {
   kind: 'git-worktree' as const,
-  repoId: 'goblin+file:///repo',
+  workspaceId: 'goblin+file:///repo',
   workspaceRuntimeId: 'repo-runtime-1',
   worktreePath: '/worktree-a',
 } as const
@@ -23,48 +23,48 @@ describe('workspace pane action queue', () => {
   beforeEach(() => resetWorkspacePaneActionQueueForTest())
 
   test('serializes the same complete resource target and cleans up on idle', async () => {
-    const order: string[] = []
+    const workspaceOrder: string[] = []
     const release = Promise.withResolvers<void>()
     const first = runWorkspacePaneAction(TARGET, async () => {
-      order.push('first-start')
+      workspaceOrder.push('first-start')
       await release.promise
-      order.push('first-end')
+      workspaceOrder.push('first-end')
     })
-    const second = runWorkspacePaneAction(TARGET, () => order.push('second'))
+    const second = runWorkspacePaneAction(TARGET, () => workspaceOrder.push('second'))
 
     await Promise.resolve()
-    expect(order).toEqual(['first-start'])
+    expect(workspaceOrder).toEqual(['first-start'])
     release.resolve()
     await Promise.all([first, second])
-    expect(order).toEqual(['first-start', 'first-end', 'second'])
+    expect(workspaceOrder).toEqual(['first-start', 'first-end', 'second'])
     await vi.waitFor(() => expect(workspacePaneActionQueueStatsForTest().targetQueues).toBe(0))
   })
 
   test('serializes workspace-scoped actions without inventing a branch', async () => {
     const workspaceTarget = {
       kind: 'workspace-root' as const,
-      repoId: 'goblin+file:///workspace',
+      workspaceId: 'goblin+file:///workspace',
       workspaceRuntimeId: 'repo-runtime-1',
     }
-    const order: string[] = []
+    const workspaceOrder: string[] = []
     const release = Promise.withResolvers<void>()
     const first = runWorkspacePaneAction(workspaceTarget, async () => {
-      order.push('first')
+      workspaceOrder.push('first')
       await release.promise
     })
-    const second = runWorkspacePaneAction(workspaceTarget, () => order.push('second'))
+    const second = runWorkspacePaneAction(workspaceTarget, () => workspaceOrder.push('second'))
 
     await Promise.resolve()
-    expect(order).toEqual(['first'])
+    expect(workspaceOrder).toEqual(['first'])
     release.resolve()
     await Promise.all([first, second])
-    expect(order).toEqual(['first', 'second'])
+    expect(workspaceOrder).toEqual(['first', 'second'])
   })
 
   test('identifies a detached worktree by its filesystem path instead of workspace-root scope', () => {
     expect(
       workspacePaneActionTargetFromCoordinates({
-        repoId: TARGET.repoId,
+        workspaceId: TARGET.workspaceId,
         workspaceRuntimeId: TARGET.workspaceRuntimeId,
         branchName: null,
         worktreePath: TARGET.worktreePath,
@@ -79,7 +79,7 @@ describe('workspace pane action queue', () => {
       'branch',
       {
         kind: 'git-branch' as const,
-        repoId: TARGET.repoId,
+        workspaceId: TARGET.workspaceId,
         workspaceRuntimeId: TARGET.workspaceRuntimeId,
         branchName: 'feature/b',
       },
@@ -101,14 +101,14 @@ describe('workspace pane action queue', () => {
     expect(
       workspacePaneActionTargetKey({
         kind: 'workspace-root',
-        repoId: 'goblin+file:///repo',
+        workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'runtime',
       }),
     ).toBe('goblin+file:///repo\0runtime\0workspace-root')
     expect(
       workspacePaneActionTargetKey({
         kind: 'git-branch',
-        repoId: 'goblin+file:///repo',
+        workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'runtime',
         branchName: 'main',
       }),
@@ -116,7 +116,7 @@ describe('workspace pane action queue', () => {
     expect(
       workspacePaneActionTargetKey({
         kind: 'git-worktree' as const,
-        repoId: 'goblin+file:///repo',
+        workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'runtime',
         worktreePath: '/repo-worktree',
       }),
@@ -137,13 +137,13 @@ describe('workspace pane action queue', () => {
       }),
     ).toEqual({
       kind: 'git-worktree',
-      repoId: workspaceId,
+      workspaceId: workspaceId,
       workspaceRuntimeId: 'runtime',
       worktreePath: '/repo-detached',
     })
     expect(
       workspacePaneActionTargetFromCoordinates({
-        repoId: workspaceId,
+        workspaceId: workspaceId,
         workspaceRuntimeId: 'runtime',
         branchName: null,
         worktreePath: '/repo-detached',

@@ -18,7 +18,7 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
-import type { BranchViewMode } from '#/web/stores/repos/types.ts'
+import type { BranchViewMode } from '#/web/stores/workspaces/types.ts'
 
 interface Props {
   value: BranchViewMode

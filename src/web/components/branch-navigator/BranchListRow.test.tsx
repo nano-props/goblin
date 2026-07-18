@@ -3,7 +3,7 @@
 import { createRef } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
-import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { createRepoBranch, repoPresentationForTest } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
@@ -89,7 +89,7 @@ function baseProps(
 }
 
 function branchListRowRepo(): BranchActionRepo {
-  const repo = repoPresentationForTest(emptyRepo('/tmp/repo', 'repo', 'repo-runtime-test'), {
+  const repo = repoPresentationForTest(emptyWorkspace('/tmp/repo', 'repo', 'repo-runtime-test'), {
     branches: [],
     currentBranch: '',
     status: [],
