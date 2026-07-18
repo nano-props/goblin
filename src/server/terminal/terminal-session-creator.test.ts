@@ -190,7 +190,7 @@ function committedResult(terminalRuntimeSessionId: string): TerminalSessionAdmis
   return {
     action: 'created' as const,
     presentation: { kind: 'git-worktree', branchName: BRANCH_NAME },
-    terminalSessionsRevision: 7,
+    terminalProjectionEffect: { kind: 'delta', revision: 7 },
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 1,
     processName: 'zsh',

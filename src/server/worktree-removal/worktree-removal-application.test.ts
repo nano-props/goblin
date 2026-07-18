@@ -105,12 +105,14 @@ describe('WorktreeRemovalApplication', () => {
       {
         userId: 'user-a',
         repoRoot: 'goblin+file:///repo',
+        repoRuntimeId: 'runtime-a',
         scope: 'goblin+file:///repo\0runtime-a',
         worktreePath: '/repo/worktree',
       },
       {
         userId: 'user-b',
         repoRoot: 'goblin+file:///repo',
+        repoRuntimeId: 'runtime-b',
         scope: 'goblin+file:///repo\0runtime-b',
         worktreePath: '/repo/worktree',
       },
@@ -361,8 +363,16 @@ describe('WorktreeRemovalApplication', () => {
     ).resolves.toEqual({ ok: true, message: '' })
 
     expect(retireTarget).not.toHaveBeenCalled()
-    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///repo')
-    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///linked-repo')
+    expect(broadcastSessionsChanged).toHaveBeenCalledWith(
+      'user-a',
+      'goblin+file:///repo',
+      'runtime-a',
+    )
+    expect(broadcastSessionsChanged).toHaveBeenCalledWith(
+      'user-a',
+      'goblin+file:///linked-repo',
+      'runtime-b',
+    )
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///repo')
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///linked-repo')
   })
@@ -372,19 +382,23 @@ function createApplication(
   options: {
     operations?: ReturnType<typeof createPhysicalWorktreeOperationCoordinator>
     physicalWorktrees?: typeof testPhysicalWorktrees
-    terminalScopes?: Array<{ userId: string; repoRoot: string; scope: string }>
+    terminalScopes?: Array<{ userId: string; repoRoot: string; repoRuntimeId: string; scope: string }>
     terminalQuiescence?:
-      | { ok: true; scopes: Array<{ userId: string; repoRoot: string; scope: string }> }
-      | { ok: false; scopes: Array<{ userId: string; repoRoot: string; scope: string }>; message: string }
+      | { ok: true; scopes: Array<{ userId: string; repoRoot: string; repoRuntimeId: string; scope: string }> }
+      | {
+          ok: false
+          scopes: Array<{ userId: string; repoRoot: string; repoRuntimeId: string; scope: string }>
+          message: string
+        }
     closeSessionsForPhysicalWorktree?: (
       identity: PhysicalWorktreeIdentity,
-    ) => Promise<Array<{ userId: string; repoRoot: string; scope: string }>>
+    ) => Promise<Array<{ userId: string; repoRoot: string; repoRuntimeId: string; scope: string }>>
     reconcilePhysicalWorktreeAfterRemovalFailure?: () => Promise<void>
     retireTarget?: (...args: never[]) => Promise<void>
     physicalWorktreeTargets?: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']>
     clearPhysicalWorktreeIndex?: WorkspacePaneTabsCoordinator['clearPhysicalWorktreeIndex']
     broadcastWorkspaceTabsChanged?: (userId: string, repoRoot: string) => void
-    broadcastSessionsChanged?: (userId: string, repoRoot: string) => void
+    broadcastSessionsChanged?: (userId: string, repoRoot: string, repoRuntimeId: string) => void
   } = {},
 ) {
   return createWorktreeRemovalApplication({

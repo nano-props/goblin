@@ -14,6 +14,7 @@ import {
   type TerminalRestartResult,
   type TerminalRuntimeMetadata,
   type TerminalSessionSummary,
+  type TerminalSessionsChangedEvent,
   type TerminalSessionsSnapshot,
   type TerminalTakeoverResult,
   type TerminalTitleEvent,
@@ -59,7 +60,7 @@ export type TerminalSessionCloseReason = 'session' | 'scope' | 'detached-user' |
 
 interface TerminalPtyRestartResult {
   generation: number
-  result: TerminalRestartResult
+  result: Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }> | { ok: false; message: string }
 }
 
 export type TerminalSessionPrepareResult =
@@ -121,12 +122,13 @@ export interface TerminalEventSink<TUser extends string | number> {
    * The authoritative sessions projection changed in a way that cannot be
    * reconstructed from incremental terminal events alone.
    */
-  onSessionsProjectionChanged?(userId: TUser, repoRoot: string): void
+  onSessionsProjectionChanged?(userId: TUser, event: TerminalSessionsChangedEvent): void
 }
 
 export interface TerminalPhysicalWorktreeScope<TUser extends string | number> {
   userId: TUser
   repoRoot: string
+  repoRuntimeId: string
   scope: string
 }
 
@@ -226,7 +228,9 @@ export class TerminalSessionManager<TUser extends string | number> {
             return {
               action,
               presentation,
-              terminalSessionsRevision: this.projectionRevision(userId, scope),
+              terminalProjectionEffect: presentationChanged
+                ? { kind: 'delta', revision: this.projectionRevision(userId, scope) }
+                : { kind: 'none' },
               ...this.runtimeMetadata(existing, stagedController.controller, processName),
             }
           },
@@ -235,10 +239,7 @@ export class TerminalSessionManager<TUser extends string | number> {
             effectsPublished = true
             if (committedEffect?.emitIdentity) this.emitIdentity(existing)
             if (presentationChanged) {
-              this.sink.onSessionsProjectionChanged?.(
-                existing.userId,
-                terminalExecutionCoordinates(existing.target).repoRoot,
-              )
+              this.sink.onSessionsProjectionChanged?.(existing.userId, this.sessionsChangedEvent(existing))
             }
           },
           abort: () => {
@@ -308,7 +309,7 @@ export class TerminalSessionManager<TUser extends string | number> {
         return {
           action: 'created',
           presentation,
-          terminalSessionsRevision: this.projectionRevision(userId, scope),
+          terminalProjectionEffect: { kind: 'delta', revision: this.projectionRevision(userId, scope) },
           ...this.runtimeMetadata(session, stagedController.controller, processName),
         }
       },
@@ -316,7 +317,7 @@ export class TerminalSessionManager<TUser extends string | number> {
         if (admissionState !== 'committed' || effectsPublished) return
         effectsPublished = true
         if (committedEffect?.emitIdentity) this.emitIdentity(session)
-        this.sink.onSessionsProjectionChanged?.(session.userId, terminalExecutionCoordinates(session.target).repoRoot)
+        this.sink.onSessionsProjectionChanged?.(session.userId, this.sessionsChangedEvent(session))
       },
       abort: () => {
         if (admissionState !== 'pending') return
@@ -446,25 +447,56 @@ export class TerminalSessionManager<TUser extends string | number> {
     clientId: string,
     signal?: AbortSignal,
   ): Promise<TerminalRestartResult> {
+    return (await this.restartSessionWithProjectionOutcome(userId, terminalRuntimeSessionId, cols, rows, clientId, signal))
+      .result
+  }
+
+  async restartSessionWithProjectionOutcome(
+    userId: TUser,
+    terminalRuntimeSessionId: string,
+    cols: number,
+    rows: number,
+    clientId: string,
+    signal?: AbortSignal,
+  ): Promise<{ result: TerminalRestartResult; projectionChanged: TerminalSessionsChangedEvent | null }> {
     if (!isValidTerminalRuntimeSessionId(terminalRuntimeSessionId))
-      return { ok: false, message: 'error.invalid-arguments' }
+      return { result: { ok: false, message: 'error.invalid-arguments' }, projectionChanged: null }
     const size = normalizeTerminalSize(cols, rows)
-    if (!size) return { ok: false, message: 'error.invalid-arguments' }
+    if (!size) return { result: { ok: false, message: 'error.invalid-arguments' }, projectionChanged: null }
     const session = this.getSession(userId, terminalRuntimeSessionId)
-    if (!session) return { ok: false, message: 'error.invalid-arguments' }
-    if (this.isSessionClosing(terminalRuntimeSessionId)) return { ok: false, message: 'error.unavailable' }
+    if (!session) return { result: { ok: false, message: 'error.invalid-arguments' }, projectionChanged: null }
+    if (this.isSessionClosing(terminalRuntimeSessionId))
+      return { result: { ok: false, message: 'error.unavailable' }, projectionChanged: null }
     registerTerminalClient(session, clientId, size.cols, size.rows)
     const denyReason = explainAuthority(session, clientId, 'restart', this.sessionPresence(session))
     if (denyReason !== null) {
-      return { ok: false, message: authorityReasonToMessage(denyReason) }
+      return { result: { ok: false, message: authorityReasonToMessage(denyReason) }, projectionChanged: null }
     }
     restartTerminalClientControl(session, clientId, this.sessionPresence(session))
-    if (signal?.aborted) return { ok: false, message: 'error.repo-runtime-stale' }
+    if (signal?.aborted) return { result: { ok: false, message: 'error.repo-runtime-stale' }, projectionChanged: null }
     const spawn = await this.restartAndAttachSession(session, size.cols, size.rows, signal)
     if (!spawn.result.ok && session.ptyBinding.isCurrentSpawn(session, spawn.generation)) {
       if (markTerminalSessionError(session, spawn.result.message)) this.emitLifecycle(session)
     }
-    return spawn.result
+    let projectionChanged: TerminalSessionsChangedEvent | null = null
+    if (this.isLiveSession(session) && session.ptyBinding.isCurrentSpawn(session, spawn.generation)) {
+      // Restart replaces the runtime binding represented by the full sessions
+      // projection. Advance its clock after the binding settles so the
+      // following sessions-changed event cannot be mistaken for an equal,
+      // already-applied catalog revision.
+      this.directory.touch(session)
+      projectionChanged = this.sessionsChangedEvent(session)
+    }
+    const result = spawn.result.ok
+      ? {
+          ...spawn.result,
+          terminalProjectionEffect: {
+            kind: 'delta' as const,
+            revision: this.projectionRevision(session.userId, session.scope),
+          },
+        }
+      : spawn.result
+    return { result, projectionChanged }
   }
 
   async closeSessionForUser(userId: TUser, terminalRuntimeSessionId: string): Promise<boolean> {
@@ -705,9 +737,11 @@ export class TerminalSessionManager<TUser extends string | number> {
       const sessionKey = physicalWorktreeIdentityKey(session.physicalWorktreeCapability.identity)
       if (sessionKey !== targetKey) continue
       const key = `${String(session.userId)}\0${session.scope}`
+      const coordinates = terminalExecutionCoordinates(session.target)
       affected.set(key, {
         userId: session.userId,
-        repoRoot: terminalExecutionCoordinates(session.target).repoRoot,
+        repoRoot: coordinates.repoRoot,
+        repoRuntimeId: coordinates.repoRuntimeId,
         scope: session.scope,
       })
       const closed = await this.requestSessionRetirement(session.id, 'scope')
@@ -805,6 +839,18 @@ export class TerminalSessionManager<TUser extends string | number> {
   terminalSessionsSnapshotForUser(userId: TUser, scope: string): TerminalSessionsSnapshot {
     const sessions = this.directory.entriesForScope(userId, scope).map((session) => this.sessionSummary(session))
     return { revision: this.projectionRevision(userId, scope), sessions }
+  }
+
+  terminalSessionsChangedEventForScope(
+    userId: TUser,
+    repoRoot: string,
+    repoRuntimeId: string,
+  ): TerminalSessionsChangedEvent {
+    return {
+      repoRoot,
+      repoRuntimeId,
+      revision: this.projectionRevision(userId, terminalSessionRuntimeScope(repoRoot, repoRuntimeId)),
+    }
   }
 
   getSessionSummaryForUser(userId: TUser, terminalRuntimeSessionId: string): TerminalSessionSummary | null {
@@ -913,12 +959,18 @@ export class TerminalSessionManager<TUser extends string | number> {
     return {
       ok: true,
       frame: 'stream',
+      terminalProjectionEffect: {
+        kind: 'delta',
+        revision: this.projectionRevision(session.userId, session.scope),
+      },
       ...this.runtimeMetadata(session),
       phase: 'open',
     }
   }
 
-  private async snapshotAttachResult(session: TerminalSessionView<TUser>): Promise<TerminalRestartResult> {
+  private async snapshotAttachResult(
+    session: TerminalSessionView<TUser>,
+  ): Promise<Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }> | { ok: false; message: string }> {
     const generation = session.terminalRuntimeGeneration
     const snap = await replaySnapshot(session.render)
     if (!snap) return { ok: false, message: 'error.unavailable' }
@@ -928,6 +980,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     return {
       ok: true,
       frame: 'snapshot',
+      terminalProjectionEffect: { kind: 'none' },
       snapshot: snap.snapshot,
       snapshotSeq: snap.snapshotSeq,
       outputEra: snap.outputEra,
@@ -1094,6 +1147,8 @@ export class TerminalSessionManager<TUser extends string | number> {
     // 1 events cannot safely activate sibling clients. Publish one complete
     // projection invalidation for every current fresh-generation outcome,
     // including spawn failure, so success and error converge identically.
+    this.directory.touch(session)
+    this.sink.onSessionsProjectionChanged?.(session.userId, this.sessionsChangedEvent(session))
     if (!spawn.result.ok) return { generation: spawn.generation, result: spawn.result }
     return { generation: spawn.generation, result: this.streamAttachResult(session) }
   }
@@ -1157,6 +1212,15 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   private projectionRevision(userId: TUser, scope: string): number {
     return this.directory.catalogRevision(userId, scope)
+  }
+
+  private sessionsChangedEvent(session: TerminalSessionView<TUser>): TerminalSessionsChangedEvent {
+    const coordinates = terminalExecutionCoordinates(session.target)
+    return {
+      repoRoot: coordinates.repoRoot,
+      repoRuntimeId: coordinates.repoRuntimeId,
+      revision: this.projectionRevision(session.userId, session.scope),
+    }
   }
 
   private getSession(userId: TUser, terminalRuntimeSessionId: string): TerminalSessionView<TUser> | undefined {

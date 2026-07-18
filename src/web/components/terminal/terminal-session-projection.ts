@@ -6,6 +6,7 @@ import {
   type TerminalExecutionTarget,
   type TerminalAttachResult,
   type TerminalCreateResult,
+  type TerminalRestartResult,
   type TerminalSessionBase,
   type TerminalSessionSummary as ServerTerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
@@ -17,7 +18,9 @@ import type {
   TerminalIdentityViewModel,
 } from '#/web/components/terminal/types.ts'
 
-export type TerminalAttachResultWithController = Extract<TerminalAttachResult, { ok: true }> & {
+type TerminalStartResult = Extract<TerminalAttachResult | TerminalRestartResult, { ok: true }>
+
+export type TerminalStartResultWithController = TerminalStartResult & {
   role: TerminalIdentityViewModel['role']
   controllerStatus: TerminalIdentityViewModel['controllerStatus']
 }
@@ -33,10 +36,10 @@ export interface ProjectedCreateTerminalSession {
   serverSession: ServerTerminalSessionSummary
 }
 
-export function projectTerminalAttachResultForClient(
-  result: Extract<TerminalAttachResult, { ok: true }>,
+export function projectTerminalStartResultForClient(
+  result: TerminalStartResult,
   clientId: string,
-): TerminalAttachResultWithController {
+): TerminalStartResultWithController {
   return {
     ...result,
     ...resolveTerminalController(result.controller, clientId),

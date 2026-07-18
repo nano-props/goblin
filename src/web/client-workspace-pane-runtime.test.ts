@@ -36,7 +36,7 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
         action: 'created' as const,
         presentation: { kind: 'git-worktree' as const, branchName: 'main' },
         terminalSessionId,
-        terminalSessionsRevision: 1,
+        terminalProjectionEffect: { kind: 'delta', revision: 1 },
         terminalRuntimeSessionId: 'pty_1234567890abcdef',
         terminalRuntimeGeneration: 1,
         processName: 'zsh',

@@ -7,6 +7,7 @@ import type {
   TerminalNotifyBellInput,
   TerminalOutputEvent,
   TerminalTestNotificationInput,
+  TerminalSessionsChangedEvent,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 import type { ClientTerminal } from '#/web/client-bridge-types.ts'
@@ -27,7 +28,7 @@ export function createServerTerminalClient(options: {
   const exitSubscribers = new Set<(event: TerminalExitEvent) => void>()
   const identitySubscribers = new Set<(event: TerminalIdentityRealtimeEvent) => void>()
   const lifecycleSubscribers = new Set<(event: TerminalLifecycleRealtimeEvent) => void>()
-  const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
+  const sessionsChangedSubscribers = new Set<(event: TerminalSessionsChangedEvent) => void>()
   const sessionClosedSubscribers = new Set<
     (event: {
       terminalRuntimeSessionId: string
@@ -181,7 +182,7 @@ export function createServerTerminalClient(options: {
         for (const subscriber of exitSubscribers) subscriber(message.event)
         return
       case 'sessions-changed':
-        for (const subscriber of sessionsChangedSubscribers) subscriber(message.repoRoot)
+        for (const subscriber of sessionsChangedSubscribers) subscriber(message)
         return
       case 'session-closed':
         for (const subscriber of sessionClosedSubscribers)

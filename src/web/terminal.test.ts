@@ -61,6 +61,7 @@ describe('terminal web host client', () => {
         payload: {
           ok: true,
           frame: 'snapshot',
+          terminalProjectionEffect: { kind: 'none' },
           terminalRuntimeSessionId: 'pty_1234567890123456',
           terminalRuntimeGeneration: 1,
           snapshot: '',
@@ -104,6 +105,7 @@ describe('terminal web host client', () => {
         payload: {
           ok: true,
           frame: 'snapshot',
+          terminalProjectionEffect: { kind: 'none' },
           terminalRuntimeSessionId: 'pty_1234567890123456',
           terminalRuntimeGeneration: 1,
           snapshot: '',
@@ -514,6 +516,8 @@ describe('terminal web host client', () => {
       JSON.stringify({
         type: 'sessions-changed',
         repoRoot: 'goblin+file:///tmp/repo',
+        repoRuntimeId: 'repo-runtime-test',
+        revision: 1,
       }),
     )
     socket.emitMessage(
@@ -572,7 +576,12 @@ describe('terminal web host client', () => {
       message: null,
       takeoverPending: false,
     })
-    expect(onSessionsChanged).toHaveBeenCalledWith('goblin+file:///tmp/repo')
+    expect(onSessionsChanged).toHaveBeenCalledWith({
+      type: 'sessions-changed',
+      repoRoot: 'goblin+file:///tmp/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      revision: 1,
+    })
     expect(onWorkspaceTabsChanged).toHaveBeenCalledWith({
       type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
       change: 'invalidation',

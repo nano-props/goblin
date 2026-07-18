@@ -738,7 +738,7 @@ function committedTerminalResult(action: 'created' | 'restored' | 'reused') {
   return {
     action,
     presentation: { kind: 'git-worktree' as const, branchName: request.branch },
-    terminalSessionsRevision: 1,
+    terminalProjectionEffect: { kind: 'delta' as const, revision: 1 },
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
     terminalRuntimeGeneration: 1,
     processName: 'zsh',

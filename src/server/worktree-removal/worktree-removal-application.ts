@@ -24,7 +24,7 @@ interface WorktreeRemovalApplicationDependencies {
     'physicalWorktreeTargets' | 'reconcilePhysicalWorktreeAfterRemovalFailure' | 'clearPhysicalWorktreeIndex'
   >
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
-  broadcastSessionsChanged(userId: string, repoRoot: string): void
+  broadcastSessionsChanged(userId: string, repoRoot: string, repoRuntimeId: string): void
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
 }
 
@@ -71,7 +71,13 @@ export class WorktreeRemovalApplication {
         async ({ signal }, permit) => {
           if (!this.isCurrentRuntime(userId, input)) return { ok: false, message: 'error.repo-runtime-stale' }
           signal.throwIfAborted()
-          let affectedScopes: Array<{ userId: string; repoRoot: string; scope: string; worktreePath: string }> = []
+          let affectedScopes: Array<{
+            userId: string
+            repoRoot: string
+            repoRuntimeId: string
+            scope: string
+            worktreePath: string
+          }> = []
           return await input.remove(
             physicalCapability,
             {
@@ -145,11 +151,11 @@ export class WorktreeRemovalApplication {
   ): Promise<
     | {
         ok: true
-        scopes: Array<{ userId: string; repoRoot: string; scope: string; worktreePath: string }>
+        scopes: Array<{ userId: string; repoRoot: string; repoRuntimeId: string; scope: string; worktreePath: string }>
       }
     | {
         ok: false
-        scopes: Array<{ userId: string; repoRoot: string; scope: string; worktreePath: string }>
+        scopes: Array<{ userId: string; repoRoot: string; repoRuntimeId: string; scope: string; worktreePath: string }>
         message: string
       }
   > {
@@ -160,6 +166,7 @@ export class WorktreeRemovalApplication {
       ...targets.map(({ userId, scope, target }) => ({
         userId,
         repoRoot: target.workspaceId,
+        repoRuntimeId: target.workspaceRuntimeId,
         scope,
         worktreePath: target.kind === 'git-worktree' ? nativeTargetPath(target.root) : worktreePath,
       })),
@@ -167,10 +174,17 @@ export class WorktreeRemovalApplication {
     return terminal.ok ? { ok: true, scopes } : { ok: false, scopes, message: terminal.message }
   }
 
-  private broadcast(scopes: readonly { userId: string; repoRoot: string }[]): void {
-    const targets = new Map(scopes.map(({ userId, repoRoot }) => [`${userId}\0${repoRoot}`, { userId, repoRoot }]))
-    for (const { userId, repoRoot } of targets.values()) {
-      this.deps.broadcastSessionsChanged(userId, repoRoot)
+  private broadcast(
+    scopes: readonly { userId: string; repoRoot: string; repoRuntimeId: string; scope: string }[],
+  ): void {
+    const targets = new Map(
+      scopes.map(({ userId, repoRoot, repoRuntimeId, scope }) => [
+        `${userId}\0${scope}`,
+        { userId, repoRoot, repoRuntimeId },
+      ]),
+    )
+    for (const { userId, repoRoot, repoRuntimeId } of targets.values()) {
+      this.deps.broadcastSessionsChanged(userId, repoRoot, repoRuntimeId)
       this.deps.broadcastWorkspaceTabsChanged(userId, repoRoot)
     }
   }
@@ -180,7 +194,13 @@ export class WorktreeRemovalApplication {
     worktreePath: string,
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,
-    scopes: readonly { userId: string; repoRoot: string; scope: string; worktreePath: string }[],
+    scopes: readonly {
+      userId: string
+      repoRoot: string
+      repoRuntimeId: string
+      scope: string
+      worktreePath: string
+    }[],
   ): Promise<void> {
     try {
       await this.deps.workspaceTabs.reconcilePhysicalWorktreeAfterRemovalFailure({
@@ -215,8 +235,14 @@ export function createWorktreeRemovalApplication(
 }
 
 function uniqueScopes(
-  scopes: readonly { userId: string; repoRoot: string; scope: string; worktreePath: string }[],
-): Array<{ userId: string; repoRoot: string; scope: string; worktreePath: string }> {
+  scopes: readonly {
+    userId: string
+    repoRoot: string
+    repoRuntimeId: string
+    scope: string
+    worktreePath: string
+  }[],
+): Array<{ userId: string; repoRoot: string; repoRuntimeId: string; scope: string; worktreePath: string }> {
   return Array.from(
     new Map(
       scopes.map((item) => [`${item.userId}\0${item.scope}\0${item.repoRoot}\0${item.worktreePath}`, item]),

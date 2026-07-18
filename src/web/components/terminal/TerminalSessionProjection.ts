@@ -10,6 +10,7 @@ import type {
   TerminalBellRealtimeEvent,
   TerminalExitEvent,
   TerminalOutputEvent,
+  TerminalProjectionEffect,
   TerminalSessionSummary as ServerTerminalSessionSummary,
   TerminalSessionsSnapshot,
   TerminalTitleEvent,
@@ -163,7 +164,7 @@ export class TerminalSessionProjection {
     string,
     { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number }
   >()
-  private readonly terminalSessionsProjectionRevisionByRepoRoot = new Map<
+  private readonly terminalSessionsCatalogCoverageByRepoRoot = new Map<
     string,
     { repoRuntimeId: string; revision: number }
   >()
@@ -262,7 +263,7 @@ export class TerminalSessionProjection {
     this.sessions.clear()
     this.terminalSessionIdByTerminalRuntimeSessionId.clear()
     this.terminalRuntimeBindingByTerminalSessionId.clear()
-    this.terminalSessionsProjectionRevisionByRepoRoot.clear()
+    this.terminalSessionsCatalogCoverageByRepoRoot.clear()
     this.selectedTerminalSessionIdByTerminalWorktree.clear()
     this.preferredSelectedTerminalSessionIdByTerminalWorktree.clear()
     this.hostByWorktree.clear()
@@ -487,25 +488,47 @@ export class TerminalSessionProjection {
     snapshot: TerminalSessionsSnapshot,
     clientId: string,
   ): boolean {
-    const current = this.terminalSessionsProjectionRevisionByRepoRoot.get(scope.repoRoot)
+    const current = this.terminalSessionsCatalogCoverageByRepoRoot.get(scope.repoRoot)
     if (current?.repoRuntimeId === scope.repoRuntimeId && snapshot.revision < current.revision) return false
     if (!this.reconcileServerSessions(scope, snapshot.sessions, clientId)) return false
-    this.terminalSessionsProjectionRevisionByRepoRoot.set(scope.repoRoot, {
+    this.terminalSessionsCatalogCoverageByRepoRoot.set(scope.repoRoot, {
       repoRuntimeId: scope.repoRuntimeId,
       revision: snapshot.revision,
     })
     return true
   }
 
-  private applyServerSessionEffect(
+  terminalSessionsCatalogCoverageRevision(scope: { repoRoot: string; repoRuntimeId: string }): number | null {
+    const current = this.terminalSessionsCatalogCoverageByRepoRoot.get(scope.repoRoot)
+    return current?.repoRuntimeId === scope.repoRuntimeId ? current.revision : null
+  }
+
+  applyTerminalSessionsDeltaRevision(
     scope: { repoRoot: string; repoRuntimeId: string },
     revision: number,
+  ): boolean {
+    if (this.runtimeMembershipIndex[scope.repoRoot]?.repoRuntimeId !== scope.repoRuntimeId) return false
+    const current = this.terminalSessionsCatalogCoverageByRepoRoot.get(scope.repoRoot)
+    const coverageRevision = current?.repoRuntimeId === scope.repoRuntimeId ? current.revision : 0
+    if (revision <= coverageRevision) return true
+    if (revision !== coverageRevision + 1) return true
+    this.terminalSessionsCatalogCoverageByRepoRoot.set(scope.repoRoot, {
+      repoRuntimeId: scope.repoRuntimeId,
+      revision,
+    })
+    return true
+  }
+
+  private applyServerSessionEffect(
+    scope: { repoRoot: string; repoRuntimeId: string },
+    effect: TerminalProjectionEffect,
     serverSession: ServerTerminalSessionSummary,
     clientId: string,
   ): boolean {
     if (this.runtimeMembershipIndex[scope.repoRoot]?.repoRuntimeId !== scope.repoRuntimeId) return false
-    const current = this.terminalSessionsProjectionRevisionByRepoRoot.get(scope.repoRoot)
-    if (current?.repoRuntimeId === scope.repoRuntimeId && revision < current.revision) return false
+    const current = this.terminalSessionsCatalogCoverageByRepoRoot.get(scope.repoRoot)
+    const coverageRevision = current?.repoRuntimeId === scope.repoRuntimeId ? current.revision : 0
+    if (effect.kind === 'delta' && effect.revision <= coverageRevision) return false
     const { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees } =
       this.materializeServerSessions(scope, [serverSession], clientId, {
         mergeIntoExisting: true,
@@ -513,10 +536,12 @@ export class TerminalSessionProjection {
       })
     this.resolveSelectedTerminalSessionIdsForTouchedWorktrees(touchedWorktrees, controllerTerminalSessionIdByWorktree)
     for (const terminalWorktreeKey of tabsChangedWorktrees) this.notifyWorktree(terminalWorktreeKey)
-    this.terminalSessionsProjectionRevisionByRepoRoot.set(scope.repoRoot, {
-      repoRuntimeId: scope.repoRuntimeId,
-      revision,
-    })
+    if (effect.kind === 'delta' && effect.revision === coverageRevision + 1) {
+      this.terminalSessionsCatalogCoverageByRepoRoot.set(scope.repoRoot, {
+        repoRuntimeId: scope.repoRuntimeId,
+        revision: effect.revision,
+      })
+    }
     return true
   }
 
@@ -745,7 +770,7 @@ export class TerminalSessionProjection {
             repoRoot: terminalSessionCoordinates(base).repoRoot,
             repoRuntimeId: terminalSessionCoordinates(base).repoRuntimeId,
           },
-          result.terminalSessionsRevision,
+          result.terminalProjectionEffect,
           projectedCreate.serverSession,
           clientId,
         )
@@ -1427,7 +1452,18 @@ export class TerminalSessionProjection {
     }
     const session = new TerminalSession(
       descriptor,
-      () => this.notifySession(descriptor.terminalSessionId),
+      (...notification) => {
+        const [reason, projectionDeltaRevision] = notification
+        if (reason === 'projection-delta-revision') {
+          if (projectionDeltaRevision === undefined) throw new Error('terminal projection delta revision missing')
+          this.applyTerminalSessionsDeltaRevision(
+            terminalSessionCoordinates(descriptor),
+            projectionDeltaRevision,
+          )
+          return
+        }
+        this.notifySession(descriptor.terminalSessionId)
+      },
       this.writeFailureReporter,
     )
     this.sessions.set(descriptor.terminalSessionId, session)

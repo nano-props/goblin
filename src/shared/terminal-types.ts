@@ -181,6 +181,10 @@ export interface TerminalSnapshotFrame {
   outputEra: number
 }
 
+export type TerminalProjectionNoneEffect = { kind: 'none' }
+export type TerminalProjectionDeltaEffect = { kind: 'delta'; revision: number }
+export type TerminalProjectionEffect = TerminalProjectionNoneEffect | TerminalProjectionDeltaEffect
+
 /**
  * Attach chooses its frame protocol from server-owned PTY history:
  * a prepared session with no PTY starts as `stream`, while an already-bound
@@ -188,13 +192,14 @@ export interface TerminalSnapshotFrame {
  * startup from being represented as a recovery replay.
  */
 export type TerminalAttachResult =
-  | ({ ok: true } & TerminalRuntimeMetadata & TerminalStreamFrame)
-  | ({ ok: true } & TerminalRuntimeMetadata & TerminalSnapshotFrame)
+  | ({ ok: true; terminalProjectionEffect: TerminalProjectionDeltaEffect } & TerminalRuntimeMetadata & TerminalStreamFrame)
+  | ({ ok: true; terminalProjectionEffect: TerminalProjectionNoneEffect } & TerminalRuntimeMetadata & TerminalSnapshotFrame)
   | { ok: false; message: string }
 
 /** Restart always replaces an existing binding and commits a reset snapshot. */
 export type TerminalRestartResult =
-  ({ ok: true } & TerminalRuntimeMetadata & TerminalSnapshotFrame) | { ok: false; message: string }
+  | ({ ok: true; terminalProjectionEffect: TerminalProjectionDeltaEffect } & TerminalRuntimeMetadata & TerminalSnapshotFrame)
+  | { ok: false; message: string }
 
 export type TerminalCreateAction = 'created' | 'restored' | 'reused'
 
@@ -207,8 +212,8 @@ export type TerminalCreateResult =
       /** Canonical presentation resolved at the admission commit boundary. */
       presentation: TerminalPresentation
       terminalSessionId: string
-      /** Exact terminal projection revision sampled with this metadata. */
-      terminalSessionsRevision: number
+      /** Catalog mutation committed by this admission operation. */
+      terminalProjectionEffect: TerminalProjectionEffect
     } & TerminalRuntimeMetadata)
   | { ok: false; message: string }
 
@@ -283,6 +288,12 @@ export type TerminalSessionSummary = TerminalSessionSummaryFor<TerminalSessionBa
 export interface TerminalSessionsSnapshot {
   revision: number
   sessions: TerminalSessionSummary[]
+}
+
+export interface TerminalSessionsChangedEvent {
+  repoRoot: string
+  repoRuntimeId: string
+  revision: number
 }
 
 export type TerminalMutationResult = boolean

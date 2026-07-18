@@ -18,6 +18,12 @@ export interface TerminalRuntimeBinding {
   terminalRuntimeGeneration: number
 }
 
+type TerminalRuntimeAttachFrame = Extract<TerminalAttachResult, { ok: true }> extends infer TResult
+  ? TResult extends { ok: true }
+    ? Omit<TResult, 'terminalProjectionEffect'>
+    : never
+  : never
+
 export type TerminalRuntimeBindingClassification = 'active' | 'retiring' | 'future' | 'foreign'
 
 export interface TerminalRuntimeAttemptToken {
@@ -210,7 +216,7 @@ export class TerminalSessionRuntime {
 
   commitAttachResult(
     attempt: TerminalRuntimeAttemptToken,
-    result: Extract<TerminalAttachResult, { ok: true }> & {
+    result: TerminalRuntimeAttachFrame & {
       role: TerminalIdentityViewModel['role']
       controllerStatus: TerminalIdentityViewModel['controllerStatus']
     },

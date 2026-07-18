@@ -5,6 +5,7 @@ import {
   terminalExecutionCoordinates,
   type TerminalExecutionTarget,
   type TerminalPresentation,
+  type TerminalProjectionEffect,
   type TerminalRuntimeMetadata,
 } from '#/shared/terminal-types.ts'
 import {
@@ -40,7 +41,7 @@ export type TerminalSessionPrepareManagerResult =
 export type TerminalSessionAdmissionCommitResult = {
   action: TerminalCreateAction
   presentation: TerminalPresentation
-  terminalSessionsRevision: number
+  terminalProjectionEffect: TerminalProjectionEffect
 } & TerminalRuntimeMetadata
 
 export interface TerminalSessionAdmission {

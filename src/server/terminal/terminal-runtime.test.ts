@@ -532,7 +532,7 @@ describe('server terminal runtime', () => {
 
     expect(result.ok).toBe(true)
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toEqual([
-      { type: 'sessions-changed', repoRoot: REPO_ROOT },
+      { type: 'sessions-changed', repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, revision: 1 },
     ])
     expect(
       sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
@@ -546,9 +546,15 @@ describe('server terminal runtime', () => {
         rows: 24,
         clientId: 'client_a',
       }),
-    ).resolves.toMatchObject({ ok: true, frame: 'stream', terminalRuntimeGeneration: 1 })
+    ).resolves.toMatchObject({
+      ok: true,
+      frame: 'stream',
+      terminalRuntimeGeneration: 1,
+      terminalProjectionEffect: { kind: 'delta', revision: 2 },
+    })
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toEqual([
-      { type: 'sessions-changed', repoRoot: REPO_ROOT },
+      { type: 'sessions-changed', repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, revision: 1 },
+      { type: 'sessions-changed', repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, revision: 2 },
     ])
 
     host.unregisterSocket('client_a', USER_1, socket)
@@ -1636,7 +1642,10 @@ describe('server terminal runtime', () => {
         message: 'pty spawn failed',
       }),
     ])
-    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
+    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toEqual([
+      { type: 'sessions-changed', repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, revision: 1 },
+      { type: 'sessions-changed', repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, revision: 2 },
+    ])
 
     // A never-spawned session has no exit event — lock in that
     // semantic so we don't regress to broadcasting a phantom exit.

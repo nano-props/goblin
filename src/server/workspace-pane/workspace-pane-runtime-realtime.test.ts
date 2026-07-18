@@ -6,6 +6,7 @@ import {
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
 import { WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS } from '#/shared/workspace-pane-runtime.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { BufferedAppRealtimeSocket } from '#/server/realtime/buffered-app-realtime-socket.ts'
 
 const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')
 const worktreeRoot = canonicalWorkspaceLocator('goblin+file:///repo/worktree')
@@ -74,5 +75,49 @@ describe('workspace pane runtime realtime', () => {
       action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
       error: 'runtime open failed',
     })
+  })
+
+  test('sends the open response before flushing committed realtime effects', async () => {
+    const socket = { send: vi.fn(), close: vi.fn() }
+    const buffered = new BufferedAppRealtimeSocket(socket)
+    buffered.pause()
+    await handleWorkspacePaneRuntimeRealtimeRequestMessage(
+      {
+        [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open]: async () => {
+          buffered.send(
+            JSON.stringify({
+              type: 'sessions-changed',
+              repoRoot: workspaceId,
+              repoRuntimeId: 'repo-runtime-test',
+              revision: 1,
+            }),
+          )
+          return { ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' }
+        },
+        [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close]: vi.fn(),
+      },
+      'client_a',
+      'user_a',
+      socket,
+      {
+        type: 'request',
+        requestId: 'request_order',
+        action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
+        input,
+      },
+      buffered,
+    )
+
+    expect(JSON.parse(socket.send.mock.calls[0]?.[0] ?? '')).toMatchObject({
+      type: 'response',
+      requestId: 'request_order',
+    })
+    expect(JSON.parse(socket.send.mock.calls[1]?.[0] ?? '')).toEqual({
+      type: 'sessions-changed',
+      repoRoot: workspaceId,
+      repoRuntimeId: 'repo-runtime-test',
+      revision: 1,
+    })
+    expect(socket.send).toHaveBeenCalledTimes(2)
   })
 })

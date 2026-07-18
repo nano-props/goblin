@@ -30,7 +30,7 @@ describe('TerminalDirectory', () => {
     expect(directory.catalogRevision('user_a', 'scope_b')).toBe(0)
   })
 
-  test('orders only membership changes and ignores mutable entry metadata', () => {
+  test('orders explicit projection changes and ignores uncommitted mutable metadata', () => {
     const directory = new TerminalDirectory<string, Entry>()
     const member = entry('pty_first', 'term_first', 'scope_a')
     expect(commit(directory, member)).toBe(true)
@@ -38,9 +38,11 @@ describe('TerminalDirectory', () => {
     member.mutableTitle = 'new title'
     expect(directory.catalogRevision('user_a', 'scope_a')).toBe(1)
 
+    expect(directory.touch(member)).toBe(2)
+
     expect(directory.remove(member)).toBe(true)
     expect(directory.remove(member)).toBe(false)
-    expect(directory.catalogRevision('user_a', 'scope_a')).toBe(2)
+    expect(directory.catalogRevision('user_a', 'scope_a')).toBe(3)
   })
 
   test('releases a scope clock only after membership is empty', () => {

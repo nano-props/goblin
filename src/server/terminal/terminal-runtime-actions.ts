@@ -79,7 +79,6 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      const session = manager.getSessionSummaryForUser(userId, terminalRuntimeSessionId)
       const physicalWorktreeCapability = manager.getPhysicalWorktreeExecutionCapabilityForUser(
         userId,
         terminalRuntimeSessionId,
@@ -89,7 +88,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       const operation = await worktreeOperations.runOperation(
         physicalWorktreeCapability,
         async (_permit, context) =>
-          await manager.restartSession(
+          await manager.restartSessionWithProjectionOutcome(
             userId,
             terminalRuntimeSessionId,
             input.cols,
@@ -99,8 +98,13 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
           ),
       )
       if (!operation.admitted) return { ok: false, message: 'error.worktree-removal-in-progress' }
-      const result = operation.value
-      if (session) broadcastRepoSessionsChanged(userId, terminalSessionCoordinates(session).repoRoot)
+      const { result, projectionChanged } = operation.value
+      if (projectionChanged) {
+        broker.broadcastToUser(userId, {
+          type: 'sessions-changed',
+          ...projectionChanged,
+        })
+      }
       return result
     },
 
@@ -200,10 +204,6 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
       return await sessionService.listSessions(userId, input.repoRoot, input.repoRuntimeId)
     },
-  }
-
-  function broadcastRepoSessionsChanged(userId: string, repoRoot: string): void {
-    broker.broadcastToUser(userId, { type: 'sessions-changed', repoRoot })
   }
 
   function assertCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): void {

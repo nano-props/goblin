@@ -54,7 +54,6 @@ interface TerminalSessionServiceOptions {
   isValidTerminalSessionId(value: unknown): value is string
   manager: TerminalSessionServiceManager
   workspaceTabsCoordinator: WorkspacePaneTabsCoordinator
-  broadcastSessionsChanged(userId: string, repoRoot: string): void
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
   gCommand?: TerminalSessionEnsurerOptions['gCommand']

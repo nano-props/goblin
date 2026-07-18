@@ -12,6 +12,7 @@ import type {
   TerminalRestartInput,
   TerminalRestartResult,
   TerminalSessionsSnapshot,
+  TerminalSessionsChangedEvent,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTitleEvent,
@@ -32,7 +33,7 @@ export type TerminalRealtimeMessage =
   // like a role change to the client.
   | { type: 'identity'; event: TerminalIdentityEvent }
   | { type: 'lifecycle'; event: TerminalLifecycleEvent }
-  | { type: 'sessions-changed'; repoRoot: string }
+  | ({ type: 'sessions-changed' } & TerminalSessionsChangedEvent)
   // Targeted per-session close. Emitted by the server after a
   // successful `close` request, alongside the existing
   // `sessions-changed` global broadcast. Multi-window clients use

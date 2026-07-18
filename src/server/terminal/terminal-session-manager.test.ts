@@ -1,5 +1,9 @@
 import { describe, expect, test, vi } from 'vitest'
-import { terminalExecutionPath, type TerminalAttachResult } from '#/shared/terminal-types.ts'
+import {
+  terminalExecutionPath,
+  type TerminalAttachResult,
+  type TerminalSessionsSnapshot,
+} from '#/shared/terminal-types.ts'
 import {
   createPtyHandle,
   type PtyHandle,
@@ -191,6 +195,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       cwd: '/tmp',
       cols: 80,
       rows: 24,
+      clientId: CLIENT_ID,
     }
     const prepared = manager.prepareSession(input)
     if (!prepared.ok) throw new Error(prepared.message)
@@ -242,7 +247,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     if (!retry.ok) throw new Error(retry.message)
     expect(retry.admission.commit({ presentation: { kind: 'git-worktree', branchName: BRANCH_NAME } })).toMatchObject({
       action: 'created',
-      terminalSessionsRevision: 1,
+      terminalProjectionEffect: { kind: 'delta', revision: 1 },
     })
   })
 
@@ -286,7 +291,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       retry.admission.commit({ presentation: { kind: 'git-worktree', branchName: 'renamed-branch' } }),
     ).toMatchObject({
       action: 'reused',
-      terminalSessionsRevision: before.revision + 1,
+      terminalProjectionEffect: { kind: 'delta', revision: before.revision + 1 },
     })
   })
 
@@ -342,10 +347,10 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(committed).toMatchObject({
       action: 'reused',
       controller: { clientId: CLIENT_ID },
-      terminalSessionsRevision: beforeRenameRevision + 1,
+      terminalProjectionEffect: { kind: 'delta', revision: beforeRenameRevision + 1 },
     })
     const renamedSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)
-    expect(renamedSnapshot.revision).toBe(committed.terminalSessionsRevision)
+    expect(committed.terminalProjectionEffect).toEqual({ kind: 'delta', revision: renamedSnapshot.revision })
     expect(renamedSnapshot.sessions[0]?.controller).toEqual({
       clientId: CLIENT_ID,
       status: 'connected',
@@ -358,6 +363,31 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       kind: 'git-worktree',
       branchName: 'renamed-branch',
     })
+  })
+
+  test('reports no catalog effect when reuse leaves presentation unchanged', () => {
+    const manager = createManager(createDeferredPtySupervisor())
+    const input = {
+      userId: USER_ID,
+      target: WORKTREE_TARGET,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+      cwd: '/tmp',
+      cols: 80,
+      rows: 24,
+    }
+    const created = manager.prepareSession(input)
+    if (!created.ok) throw new Error(created.message)
+    created.admission.commit({ presentation: { kind: 'git-worktree', branchName: BRANCH_NAME } })
+    const beforeReuse = manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).revision
+
+    const reused = manager.prepareSession({ ...input, clientId: CLIENT_ID })
+    if (!reused.ok) throw new Error(reused.message)
+    expect(reused.admission.commit({ presentation: { kind: 'git-worktree', branchName: BRANCH_NAME } })).toMatchObject({
+      action: 'reused',
+      terminalProjectionEffect: { kind: 'none' },
+    })
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).revision).toBe(beforeReuse)
   })
 
   test('rejects reuse under a different worktree path even with the same physical identity', () => {
@@ -512,6 +542,10 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     const onOutput = vi.fn()
     const onSessionsProjectionChanged = vi.fn()
     const manager = createManager(supervisor, { onOutput, onSessionsProjectionChanged })
+    const siblingSnapshots: TerminalSessionsSnapshot[] = []
+    onSessionsProjectionChanged.mockImplementation(() => {
+      siblingSnapshots.push(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE))
+    })
     const prepared = manager.prepareSession({
       userId: USER_ID,
       target: WORKTREE_TARGET,
@@ -540,6 +574,9 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     expect(onSessionsProjectionChanged).not.toHaveBeenCalled()
     prepared.admission.publishCommittedEffects()
     expect(onSessionsProjectionChanged).toHaveBeenCalledOnce()
+    expect(siblingSnapshots).toMatchObject([
+      { revision: 1, sessions: [{ terminalRuntimeGeneration: 0, phase: 'opening' }] },
+    ])
 
     const freshAttach = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 123, 41, CLIENT_ID)
     expect(supervisor.spawn).toHaveBeenCalledWith(
@@ -558,15 +595,24 @@ describe('TerminalSessionManager fresh stream boundary', () => {
       ok: true,
       frame: 'stream',
       terminalRuntimeGeneration: 1,
+      terminalProjectionEffect: { kind: 'delta', revision: 2 },
       canonicalCols: 123,
       canonicalRows: 41,
     })
-    expect(onSessionsProjectionChanged).toHaveBeenCalledOnce()
-    expect(onSessionsProjectionChanged).toHaveBeenCalledWith(USER_ID, WORKSPACE_ID)
+    expect(onSessionsProjectionChanged).toHaveBeenCalledTimes(2)
+    expect(onSessionsProjectionChanged).toHaveBeenLastCalledWith(USER_ID, {
+      repoRoot: WORKSPACE_ID,
+      repoRuntimeId: 'repo-runtime-test',
+      revision: 2,
+    })
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)).toMatchObject({
-      revision: 1,
+      revision: 2,
       sessions: [{ terminalRuntimeGeneration: 1, phase: 'open' }],
     })
+    expect(siblingSnapshots).toMatchObject([
+      { revision: 1, sessions: [{ terminalRuntimeGeneration: 0, phase: 'opening' }] },
+      { revision: 2, sessions: [{ terminalRuntimeGeneration: 1, phase: 'open' }] },
+    ])
 
     await expect(
       manager.writeSession(USER_ID, prepared.terminalRuntimeSessionId, 'input before output', CLIENT_ID),
@@ -673,8 +719,12 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([
       expect.objectContaining({ phase: 'error', message: 'spawn failed' }),
     ])
-    expect(onSessionsProjectionChanged).toHaveBeenCalledOnce()
-    expect(onSessionsProjectionChanged).toHaveBeenCalledWith(USER_ID, WORKSPACE_ID)
+    expect(onSessionsProjectionChanged).toHaveBeenCalledTimes(2)
+    expect(onSessionsProjectionChanged).toHaveBeenLastCalledWith(USER_ID, {
+      repoRoot: WORKSPACE_ID,
+      repoRuntimeId: 'repo-runtime-test',
+      revision: 2,
+    })
   })
 
   test('kills a PTY that resolves after its session was closed before binding', async () => {
@@ -983,7 +1033,10 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     expect(supervisor.spawns).toEqual([])
 
     acknowledgeKill()
-    await expect(quiescence).resolves.toEqual({ ok: true, scopes: [{ userId: USER_ID, repoRoot, scope }] })
+    await expect(quiescence).resolves.toEqual({
+      ok: true,
+      scopes: [{ userId: USER_ID, repoRoot, repoRuntimeId: 'repo-runtime-test', scope }],
+    })
     await expect(directClose).resolves.toBe(true)
     expect(onSessionClosed).toHaveBeenCalledOnce()
   })
@@ -1012,7 +1065,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(physicalWorktreePath)),
     ).resolves.toEqual({
       ok: true,
-      scopes: [{ userId: USER_ID, repoRoot: linkedRepoRoot, scope }],
+      scopes: [{ userId: USER_ID, repoRoot: linkedRepoRoot, repoRuntimeId: 'repo-runtime-linked', scope }],
     })
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
   })
@@ -1049,7 +1102,10 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     expect(quiesced).toBe(false)
 
     acknowledgeKill()
-    await expect(quiescence).resolves.toEqual({ ok: true, scopes: [{ userId: USER_ID, repoRoot, scope }] })
+    await expect(quiescence).resolves.toEqual({
+      ok: true,
+      scopes: [{ userId: USER_ID, repoRoot, repoRuntimeId: 'repo-runtime-test', scope }],
+    })
     await expect(pendingCreate).resolves.toEqual({ ok: false, message: 'error.unavailable' })
   })
 
@@ -1078,7 +1134,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)),
     ).resolves.toEqual({
       ok: false,
-      scopes: [{ userId: USER_ID, repoRoot, scope }],
+      scopes: [{ userId: USER_ID, repoRoot, repoRuntimeId: 'repo-runtime-test', scope }],
       message: 'PTY close timed out',
     })
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([
@@ -1090,7 +1146,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)),
     ).resolves.toEqual({
       ok: true,
-      scopes: [{ userId: USER_ID, repoRoot, scope }],
+      scopes: [{ userId: USER_ID, repoRoot, repoRuntimeId: 'repo-runtime-test', scope }],
     })
     expect(killAndWait).toHaveBeenCalledTimes(2)
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
@@ -1131,7 +1187,10 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     expect(quiesced).toBe(false)
 
     killAcknowledged.resolve()
-    await expect(quiescence).resolves.toEqual({ ok: true, scopes: [{ userId: USER_ID, repoRoot, scope }] })
+    await expect(quiescence).resolves.toEqual({
+      ok: true,
+      scopes: [{ userId: USER_ID, repoRoot, repoRuntimeId: 'repo-runtime-test', scope }],
+    })
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
   })
 
@@ -1166,7 +1225,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)),
     ).resolves.toEqual({
       ok: false,
-      scopes: [{ userId: USER_ID, repoRoot, scope }],
+      scopes: [{ userId: USER_ID, repoRoot, repoRuntimeId: 'repo-runtime-test', scope }],
       message: 'PTY close timed out',
     })
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([
@@ -1179,7 +1238,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)),
     ).resolves.toEqual({
       ok: true,
-      scopes: [{ userId: USER_ID, repoRoot, scope }],
+      scopes: [{ userId: USER_ID, repoRoot, repoRuntimeId: 'repo-runtime-test', scope }],
     })
     expect(killAndWait).toHaveBeenCalledTimes(2)
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
@@ -1263,7 +1322,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
 })
 
 describe('TerminalSessionManager membership catalog', () => {
-  test('does not advance the catalog revision when a published binding becomes ready', async () => {
+  test('advances the projection revision when a fresh binding outcome settles', async () => {
     const supervisor = createDeferredPtySupervisor()
     supervisor.processName = vi.fn(() => 'terminal')
     const manager = createManager(supervisor)
@@ -1285,11 +1344,15 @@ describe('TerminalSessionManager membership catalog', () => {
     if (!created.ok) throw new Error(created.message)
     const afterBinding = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
 
-    expect(afterBinding.revision).toBe(beforeBinding.revision)
-    expect(afterBinding.sessions[0]).toMatchObject({ terminalRuntimeGeneration: 1, processName: 'terminal' })
+    expect(afterBinding.revision).toBe(beforeBinding.revision + 1)
+    expect(afterBinding.sessions[0]).toMatchObject({
+      terminalRuntimeGeneration: 1,
+      processName: 'terminal',
+      phase: 'open',
+    })
   })
 
-  test('advances the catalog revision only for membership changes', async () => {
+  test('does not advance the projection revision for incremental runtime details', async () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = createManager(supervisor)
     const scope = terminalSessionRuntimeScope('goblin+file:///repo', 'repo-runtime-test')

@@ -10,7 +10,7 @@
 // to the route layer.
 
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
-import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
+import { terminalSessionCoordinates, type TerminalSessionsChangedEvent } from '#/shared/terminal-types.ts'
 import { serverLogger } from '#/server/logger.ts'
 import {
   createTerminalSessionService,
@@ -134,8 +134,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       onLifecycle(userId, event) {
         broker.broadcastToUser(userId, { type: 'lifecycle', event })
       },
-      onSessionsProjectionChanged(userId, repoRoot) {
-        broadcastRepoSessionsChanged(userId, repoRoot)
+      onSessionsProjectionChanged(userId, event) {
+        broadcastRepoSessionsChanged(userId, event)
       },
     },
     (userId, clientId) => broker.isClientOnline(userId, clientId),
@@ -160,9 +160,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     manager,
     workspaceTabsCoordinator,
     isCurrentRepoRuntime: isCurrentRepoRuntime,
-    broadcastSessionsChanged(userId, repoRoot) {
-      broadcastRepoSessionsChanged(userId, repoRoot)
-    },
     broadcastWorkspaceTabsChanged(userId, repoRoot) {
       broadcastRepoWorkspaceTabsChanged(userId, repoRoot)
     },
@@ -183,11 +180,16 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const unsubscribeRepoRuntimeClosed = onRepoRuntimeClosed((event) => {
     const scope = terminalSessionRuntimeScope(event.repoRoot, event.repoRuntimeId)
     const invalidation = manager.commitRepoRuntimeSessionInvalidation(event.userId, scope)
+    const sessionsChangedEvent = manager.terminalSessionsChangedEventForScope(
+      event.userId,
+      event.repoRoot,
+      event.repoRuntimeId,
+    )
     manager.releaseProjectionRevisionForScope(event.userId, scope)
     scheduleInvalidatedScopeRetirement({ ...event, scope })
     invalidation.publishEffects()
     try {
-      broadcastRepoSessionsChanged(event.userId, event.repoRoot)
+      broadcastRepoSessionsChanged(event.userId, sessionsChangedEvent)
     } catch (error) {
       terminalRuntimeLogger.warn(
         { userId: event.userId, repoRoot: event.repoRoot, repoRuntimeId: event.repoRuntimeId, err: error },
@@ -301,7 +303,12 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     terminalWorktree: manager,
     workspaceTabs: workspaceTabsCoordinator,
     isCurrentRepoRuntime,
-    broadcastSessionsChanged: broadcastRepoSessionsChanged,
+    broadcastSessionsChanged(userId, repoRoot, repoRuntimeId) {
+      broadcastRepoSessionsChanged(
+        userId,
+        manager.terminalSessionsChangedEventForScope(userId, repoRoot, repoRuntimeId),
+      )
+    },
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
   })
   const workspacePaneRuntimeHost: ServerWorkspacePaneRuntimeHost = {
@@ -438,7 +445,10 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       terminalInvalidation.publishEffects()
       if (durableLayoutChanged || terminalInvalidation.removedCount > 0) {
         try {
-          broadcastRepoSessionsChanged(userId, workspaceId)
+          broadcastRepoSessionsChanged(
+            userId,
+            manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
+          )
         } catch (error) {
           terminalRuntimeLogger.warn(
             { userId, workspaceId, workspaceRuntimeId, err: error },
@@ -462,8 +472,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
   }
 
-  function broadcastRepoSessionsChanged(userId: string, repoRoot: string): void {
-    broker.broadcastToUser(userId, { type: 'sessions-changed', repoRoot })
+  function broadcastRepoSessionsChanged(userId: string, event: TerminalSessionsChangedEvent): void {
+    broker.broadcastToUser(userId, { type: 'sessions-changed', ...event })
   }
 
   function broadcastRepoWorkspaceTabsChanged(userId: string, repoRoot: string): void {
@@ -486,7 +496,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   ): void {
     if (reason !== 'session') return
     const { repoRoot } = terminalSessionCoordinates(session)
-    broadcastRepoSessionsChanged(userId, repoRoot)
+    const coordinates = terminalSessionCoordinates(session)
+    broadcastRepoSessionsChanged(
+      userId,
+      manager.terminalSessionsChangedEventForScope(userId, coordinates.repoRoot, coordinates.repoRuntimeId),
+    )
     void sessionService
       .reconcileTerminalTabsForSession(userId, session)
       .then(() => {

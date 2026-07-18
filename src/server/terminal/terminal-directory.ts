@@ -114,6 +114,11 @@ export class TerminalDirectory<
   change(entry: TEntry, mutate: () => void): number {
     if (this.entriesByRuntimeId.get(entry.id) !== entry) throw new Error('terminal directory entry unavailable')
     mutate()
+    return this.touch(entry)
+  }
+
+  touch(entry: TEntry): number {
+    if (this.entriesByRuntimeId.get(entry.id) !== entry) throw new Error('terminal directory entry unavailable')
     this.advanceCatalogRevision(entry.userId, entry.scope)
     return this.catalogRevision(entry.userId, entry.scope)
   }

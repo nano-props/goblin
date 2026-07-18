@@ -22,6 +22,7 @@ import type {
   TerminalWriteInput,
   TerminalWriteResult,
   TerminalSessionsSnapshot,
+  TerminalSessionsChangedEvent,
 } from '#/shared/terminal-types.ts'
 import type {
   WorkspacePaneTabsChangedRealtimeMessage,
@@ -55,7 +56,7 @@ export interface ClientTerminal {
   onExit: (cb: (event: TerminalExitEvent) => void) => () => void
   onIdentity: (cb: (event: TerminalIdentityRealtimeEvent) => void) => () => void
   onLifecycle: (cb: (event: TerminalLifecycleRealtimeEvent) => void) => () => void
-  onSessionsChanged: (cb: (repoRoot: string) => void) => () => void
+  onSessionsChanged: (cb: (event: TerminalSessionsChangedEvent) => void) => () => void
   /**
    * Subscribe to per-session close broadcasts from the server. Emitted
    * after a successful `close` IPC alongside the broader

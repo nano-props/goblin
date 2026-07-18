@@ -52,6 +52,7 @@ import type {
   TerminalAttachResult,
   TerminalOutputEvent,
   TerminalSessionSummary,
+  TerminalSessionsChangedEvent,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
@@ -350,7 +351,8 @@ let bellHandler: ((event: TerminalBellRealtimeEvent) => void) | null = null
 let titleHandler: ((event: TerminalTitleEvent) => void) | null = null
 let identityHandler: ((event: TerminalIdentityRealtimeEvent) => void) | null = null
 let lifecycleHandler: ((event: TerminalLifecycleRealtimeEvent) => void) | null = null
-let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
+let sessionsChangedHandler: ((event: TerminalSessionsChangedEvent) => void) | null = null
+let sessionsChangedRevision = 0
 let workspaceTabsChangedHandler: ((message: WorkspacePaneTabsChangedRealtimeMessage) => void) | null = null
 let sessionClosedHandler:
   | ((event: {
@@ -420,7 +422,8 @@ function normalizeTestSessionId(terminalSessionId: string): string {
 
 async function emitSessionsChanged(repoRoot = REPO_ID): Promise<void> {
   await act(async () => {
-    sessionsChangedHandler?.(repoRoot)
+    const repoRuntimeId = useReposStore.getState().repos[repoRoot]?.repoRuntimeId
+    if (repoRuntimeId) sessionsChangedHandler?.({ repoRoot, repoRuntimeId, revision: ++sessionsChangedRevision })
     await waitForScheduledServerSync()
   })
 }
@@ -433,6 +436,7 @@ function attachResult(): Extract<TerminalAttachResult, { ok: true; frame: 'snaps
   return {
     ok: true,
     frame: 'snapshot',
+    terminalProjectionEffect: { kind: 'none' },
     terminalRuntimeSessionId: 'unused',
     terminalRuntimeGeneration: 1,
     snapshot: '',
@@ -449,6 +453,9 @@ function attachResult(): Extract<TerminalAttachResult, { ok: true; frame: 'snaps
 }
 
 beforeEach(() => {
+  // The provider's initial full catalog recovery establishes revision 1.
+  // Every subsequent mocked mutation must advance the same server clock.
+  sessionsChangedRevision = 1
   exitHandler = null
   outputHandler = null
   bellHandler = null
@@ -500,7 +507,7 @@ beforeEach(() => {
         ok: true,
         action: 'reused',
         presentation,
-        terminalSessionsRevision: 1,
+        terminalProjectionEffect: { kind: 'delta', revision: ++sessionsChangedRevision },
         terminalSessionId,
         terminalRuntimeSessionId: reused?.terminalRuntimeSessionId ?? 'term-111111111111111111111',
         terminalRuntimeGeneration: 1,
@@ -547,7 +554,7 @@ beforeEach(() => {
       ok: true,
       action: 'created',
       presentation,
-      terminalSessionsRevision: 1,
+      terminalProjectionEffect: { kind: 'delta', revision: ++sessionsChangedRevision },
       terminalSessionId,
       terminalRuntimeSessionId: terminalSessionId,
       terminalRuntimeGeneration: 1,
@@ -633,7 +640,7 @@ beforeEach(() => {
         setBadge: vi.fn(async () => {}),
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         recoverSessions: async (input: { repoRoot: string }) => ({
-          revision: 1,
+          revision: Math.max(1, sessionsChangedRevision),
           sessions: completeServerSessions(await listSessionsMock(input)),
         }),
         onOutput: vi.fn((cb: (event: TerminalOutputEvent) => void) => {
@@ -660,7 +667,7 @@ beforeEach(() => {
           lifecycleHandler = cb
           return () => {}
         }),
-        onSessionsChanged: vi.fn((cb: (repoRoot: string) => void) => {
+        onSessionsChanged: vi.fn((cb) => {
           sessionsChangedHandler = cb
           return () => {
             if (sessionsChangedHandler === cb) sessionsChangedHandler = null
@@ -726,7 +733,10 @@ beforeEach(() => {
     }),
     terminal: () => ({
       attach: vi.fn(async () => attachResult()),
-      restart: vi.fn(async () => attachResult()),
+      restart: vi.fn(async () => ({
+        ...attachResult(),
+        terminalProjectionEffect: { kind: 'delta' as const, revision: 1 },
+      })),
       write: vi.fn(async () => ({ status: 'accepted' as const })),
       resize: vi.fn(async () => true),
       takeover: vi.fn(async () => ({
@@ -743,7 +753,7 @@ beforeEach(() => {
       close: closeMock,
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       recoverSessions: async (input) => ({
-        revision: 1,
+        revision: Math.max(1, sessionsChangedRevision),
         sessions: completeServerSessions(await listSessionsMock(input)),
       }),
       notifyBell: window.goblinNative.terminal.notifyBell ?? vi.fn(async () => true),
@@ -773,7 +783,7 @@ beforeEach(() => {
         lifecycleHandler = cb
         return () => {}
       }),
-      onSessionsChanged: vi.fn((cb: (repoRoot: string) => void) => {
+      onSessionsChanged: vi.fn((cb) => {
         sessionsChangedHandler = cb
         return () => {
           if (sessionsChangedHandler === cb) sessionsChangedHandler = null
@@ -1720,7 +1730,7 @@ describe('TerminalSessionProvider', () => {
       action: 'created' as const,
       presentation: { kind: 'git-worktree', branchName: 'feature/worktree' },
       terminalSessionId: 'term-111111111111111111111',
-      terminalSessionsRevision: 1,
+      terminalProjectionEffect: { kind: 'delta', revision: 2 },
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       processName: 'zsh',

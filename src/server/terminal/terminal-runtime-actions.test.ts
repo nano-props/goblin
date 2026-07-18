@@ -79,9 +79,18 @@ function makeActions(
     // interface. Stub them with `vi.fn()` so TypeScript stays happy.
     attachSession: vi.fn(),
     restartSession: vi.fn(),
+    restartSessionWithProjectionOutcome: vi.fn(async () => ({
+      result: { ok: false, message: 'restart not configured' },
+      projectionChanged: null,
+    })),
     writeSession: vi.fn(() => false),
     resizeSession: vi.fn(() => false),
     takeoverSession: vi.fn(),
+    terminalSessionsChangedEventForScope: vi.fn((_userId, repoRoot, repoRuntimeId) => ({
+      repoRoot,
+      repoRuntimeId,
+      revision: 1,
+    })),
     terminalSessionsSnapshotForUser: vi.fn(() => ({ revision: 0, sessions: [] })),
   } as any
   const broker = { broadcastToUser: broadcasts as unknown as (userId: string, message: unknown) => void }
@@ -123,7 +132,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       ok: true,
       action: 'created',
       terminalSessionId: 'term-111111111111111111111',
-      terminalSessionsRevision: 1,
+      terminalProjectionEffect: { kind: 'delta', revision: 1 },
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
       terminalRuntimeGeneration: 1,
       processName: 'zsh',
@@ -400,7 +409,7 @@ describe('terminal-runtime-actions clientId gate', () => {
     expect(manager.writeSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 'x', CLIENT_ID)
     expect(manager.resizeSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 80, 24, CLIENT_ID)
     expect(manager.takeoverSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 80, 24, CLIENT_ID)
-    expect(manager.restartSession).toHaveBeenCalledWith(
+    expect(manager.restartSessionWithProjectionOutcome).toHaveBeenCalledWith(
       USER_ID,
       RUNTIME_SESSION_ID,
       80,
@@ -443,7 +452,7 @@ describe('terminal-runtime-actions clientId gate', () => {
     })
 
     expect(manager.getSessionSummaryForUser).not.toHaveBeenCalled()
-    expect(manager.restartSession).not.toHaveBeenCalled()
+    expect(manager.restartSessionWithProjectionOutcome).not.toHaveBeenCalled()
   })
 
   test('restart cannot spawn a replacement PTY while physical worktree removal is admitted', async () => {
@@ -470,9 +479,27 @@ describe('terminal-runtime-actions clientId gate', () => {
         rows: 24,
       } as never),
     ).resolves.toEqual({ ok: false, message: 'error.worktree-removal-in-progress' })
-    expect(manager.restartSession).not.toHaveBeenCalled()
+    expect(manager.restartSessionWithProjectionOutcome).not.toHaveBeenCalled()
     releaseRemoval.resolve()
     await removal
+  })
+
+  test('restart failure without a projection mutation does not broadcast sessions changed', async () => {
+    const { actions, manager, broadcasts } = makeActions({ closeSessionForUser: () => false })
+    manager.restartSessionWithProjectionOutcome.mockResolvedValueOnce({
+      result: { ok: false, message: 'restart rejected' },
+      projectionChanged: null,
+    })
+
+    await expect(
+      actions.restart(CLIENT_ID, USER_ID, {
+        terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+        cols: 80,
+        rows: 24,
+      } as never),
+    ).resolves.toEqual({ ok: false, message: 'restart rejected' })
+
+    expect(broadcasts).not.toHaveBeenCalledWith(USER_ID, expect.objectContaining({ type: 'sessions-changed' }))
   })
 
   test('removal waits for an admitted restart operation to settle', async () => {
@@ -484,20 +511,23 @@ describe('terminal-runtime-actions clientId gate', () => {
       physicalWorktreeCapability,
       worktreeOperations,
     })
-    const restartResult = Promise.withResolvers<{ ok: false; message: string }>()
-    manager.restartSession.mockImplementation(async () => await restartResult.promise)
+    const restartResult = Promise.withResolvers<{
+      result: { ok: false; message: string }
+      projectionChanged: null
+    }>()
+    manager.restartSessionWithProjectionOutcome.mockImplementation(async () => await restartResult.promise)
     const restart = actions.restart(CLIENT_ID, USER_ID, {
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
       cols: 80,
       rows: 24,
     } as never)
-    await vi.waitFor(() => expect(manager.restartSession).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(manager.restartSessionWithProjectionOutcome).toHaveBeenCalledOnce())
     const removalTask = vi.fn(async () => undefined)
     const removal = worktreeOperations.runRemoval(physicalWorktreeCapability, removalTask)
     await Promise.resolve()
     expect(removalTask).not.toHaveBeenCalled()
 
-    restartResult.resolve({ ok: false, message: 'restart stopped' })
+    restartResult.resolve({ result: { ok: false, message: 'restart stopped' }, projectionChanged: null })
     await expect(restart).resolves.toEqual({ ok: false, message: 'restart stopped' })
     await expect(removal).resolves.toEqual({ admitted: true, value: undefined })
     expect(removalTask).toHaveBeenCalledOnce()

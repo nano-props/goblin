@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   projectCreateResultForClient,
   projectServerTerminalSession,
-  projectTerminalAttachResultForClient,
+  projectTerminalStartResultForClient,
 } from '#/web/components/terminal/terminal-session-projection.ts'
 import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
 
@@ -171,10 +171,11 @@ describe('terminal session projection helpers', () => {
   })
 
   test('projects attach results into local controller state for the active attachment', () => {
-    const projected = projectTerminalAttachResultForClient(
+    const projected = projectTerminalStartResultForClient(
       {
         ok: true,
         frame: 'snapshot',
+        terminalProjectionEffect: { kind: 'none' },
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         snapshot: '',
@@ -206,7 +207,7 @@ describe('terminal session projection helpers', () => {
         action: 'created',
         presentation: { kind: 'git-worktree', branchName: 'feature/renamed' },
         terminalSessionId: 'term-111111111111111111111',
-        terminalSessionsRevision: 1,
+        terminalProjectionEffect: { kind: 'delta', revision: 1 },
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         processName: 'zsh',
@@ -246,7 +247,7 @@ describe('terminal session projection helpers', () => {
         action: 'created',
         presentation: { kind: 'git-worktree', branchName: 'main' },
         terminalSessionId: 'term-111111111111111111111',
-        terminalSessionsRevision: 1,
+        terminalProjectionEffect: { kind: 'delta', revision: 1 },
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         processName: 'new-shell',
@@ -298,7 +299,7 @@ describe('terminal session projection helpers', () => {
         action: 'restored',
         presentation: { kind: 'git-worktree', branchName: 'main' },
         terminalSessionId: 'term-111111111111111111111',
-        terminalSessionsRevision: 1,
+        terminalProjectionEffect: { kind: 'delta', revision: 1 },
         terminalRuntimeSessionId: 'pty_session_new_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         processName: 'zsh',

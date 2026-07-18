@@ -269,7 +269,7 @@ function preparedResult(
       commit: () => ({
         action: 'created',
         presentation: { kind: 'git-worktree', branchName: BRANCH_NAME },
-        terminalSessionsRevision: 7,
+        terminalProjectionEffect: { kind: 'delta', revision: 7 },
         terminalRuntimeSessionId: `pty_${terminalSessionId}`,
         terminalRuntimeGeneration: 1,
         processName: 'zsh',

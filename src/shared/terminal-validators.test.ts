@@ -396,7 +396,7 @@ describe('shared terminal validators', () => {
       action: 'created',
       presentation: { kind: 'git-worktree', branchName: 'main' },
       terminalSessionId: 'term-111111111111111111111',
-      terminalSessionsRevision: 11,
+      terminalProjectionEffect: { kind: 'delta', revision: 11 },
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       processName: 'zsh',
@@ -411,7 +411,7 @@ describe('shared terminal validators', () => {
     expect(normalizedCreateResult).toMatchObject({
       ok: true,
       terminalSessionId: 'term-111111111111111111111',
-      terminalSessionsRevision: 11,
+      terminalProjectionEffect: { kind: 'delta', revision: 11 },
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
     })
@@ -423,7 +423,7 @@ describe('shared terminal validators', () => {
         action: 'created',
         presentation: { kind: 'git-worktree', branchName: 'main' },
         terminalSessionId: 'term-111111111111111111111',
-        terminalSessionsRevision: 11,
+        terminalProjectionEffect: { kind: 'delta', revision: 11 },
       }),
     ).toBeNull()
     expect(normalizeTerminalCreateResult({ ok: false, message: 'error.spawn-failed' })).toEqual({
@@ -437,7 +437,7 @@ describe('shared terminal validators', () => {
       ok: true,
       action: 'created',
       terminalSessionId: 'term-111111111111111111111',
-      terminalSessionsRevision: 11,
+      terminalProjectionEffect: { kind: 'delta', revision: 11 },
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       processName: 'zsh',
@@ -660,7 +660,7 @@ describe('shared terminal validators', () => {
         action: 'created',
         presentation: { kind: 'git-worktree', branchName: 'main' },
         terminalSessionId: 'term-111111111111111111111',
-        terminalSessionsRevision: 11,
+        terminalProjectionEffect: { kind: 'delta', revision: 11 },
         terminalRuntimeSessionId: 'pty_1234567890abcdef',
         terminalRuntimeGeneration: 1,
         processName: 'zsh',
@@ -850,6 +850,7 @@ describe('shared terminal validators', () => {
         payload: {
           ok: true,
           frame: 'snapshot',
+          terminalProjectionEffect: { kind: 'none' },
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
           terminalRuntimeGeneration: 1,
           processName: 'zsh',
@@ -879,6 +880,7 @@ describe('shared terminal validators', () => {
         payload: {
           ok: true,
           frame: 'stream',
+          terminalProjectionEffect: { kind: 'delta', revision: 2 },
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
           terminalRuntimeGeneration: 1,
           processName: 'zsh',
@@ -1019,6 +1021,66 @@ describe('shared terminal validators', () => {
         worktreePath: '/repo/worktree',
       }),
     ).toBeNull()
+  })
+
+  test('rejects projection effects that contradict terminal frame ownership', () => {
+    const metadata = {
+      terminalRuntimeSessionId: 'pty_1234567890abcdef',
+      terminalRuntimeGeneration: 1,
+      processName: 'zsh',
+      canonicalTitle: null,
+      phase: 'open',
+      message: null,
+      controller: { clientId: 'client_a', status: 'connected' },
+      canonicalCols: 120,
+      canonicalRows: 40,
+    }
+    const invalidResponses = [
+      {
+        action: 'attach',
+        payload: { ok: true, frame: 'stream', terminalProjectionEffect: { kind: 'none' }, ...metadata },
+      },
+      {
+        action: 'attach',
+        payload: {
+          ok: true,
+          frame: 'snapshot',
+          terminalProjectionEffect: { kind: 'delta', revision: 2 },
+          snapshot: '',
+          snapshotSeq: 0,
+          outputEra: 0,
+          ...metadata,
+        },
+      },
+      {
+        action: 'restart',
+        payload: {
+          ok: true,
+          frame: 'snapshot',
+          terminalProjectionEffect: { kind: 'none' },
+          snapshot: '',
+          snapshotSeq: 0,
+          outputEra: 0,
+          ...metadata,
+        },
+      },
+    ]
+
+    for (const [index, response] of invalidResponses.entries()) {
+      expect(
+        normalizeAppRealtimeSocketServerMessage({
+          type: 'response',
+          requestId: `invalid_effect_${index}`,
+          ok: true,
+          ...response,
+        }),
+      ).toMatchObject({
+        type: 'response',
+        requestId: `invalid_effect_${index}`,
+        ok: false,
+        error: 'Invalid terminal socket response payload',
+      })
+    }
   })
 
   test('normalizes workspace tabs changed realtime messages', () => {

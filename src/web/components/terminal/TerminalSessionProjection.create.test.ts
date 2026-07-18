@@ -221,7 +221,7 @@ function makeCreateResult(overrides: Partial<TerminalCreateSuccess> = {}): Termi
     action: 'created' as const,
     presentation: { kind: 'git-worktree', branchName: BRANCH },
     terminalSessionId: 'term-111111111111111111111',
-    terminalSessionsRevision: 11,
+    terminalProjectionEffect: { kind: 'delta', revision: 11 },
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
     terminalRuntimeGeneration: 1,
     processName: 'zsh',
@@ -326,7 +326,7 @@ describe('TerminalSessionProjection create flow', () => {
     })
   })
 
-  test('advances the projection revision with create so a late same-base snapshot cannot evict it', async () => {
+  test('advances catalog coverage with a continuous create delta', async () => {
     projection.reconcileServerSessionsSnapshot(
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       { revision: 10, sessions: [] },
@@ -344,6 +344,26 @@ describe('TerminalSessionProjection create flow', () => {
       ),
     ).toBe(false)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+  })
+
+  test('materializes an unseen unchanged reuse without advancing catalog coverage', async () => {
+    const scope = { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }
+    projection.reconcileServerSessionsSnapshot(scope, { revision: 2, sessions: [] }, 'client_local')
+    mocks.createMock.mockResolvedValueOnce(
+      makeCreateResult({
+        action: 'reused',
+        terminalProjectionEffect: { kind: 'none' },
+      }),
+    )
+
+    await projection.createTerminal(terminalBase())
+
+    expect(projection.terminalSessionsCatalogCoverageRevision(scope)).toBe(2)
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+    expect((projection as any).sessions.get('term-111111111111111111111').currentRuntimeBinding()).toEqual({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+    })
   })
 
   test('opens terminal and workspace tab through the application operation', async () => {
@@ -366,6 +386,9 @@ describe('TerminalSessionProjection create flow', () => {
       },
       insertAfterIdentity: 'workspace-pane:status',
     })
+    expect(mocks.openRuntimeMock).toHaveBeenCalledOnce()
+    expect(mocks.writeWorkspaceTabsSnapshotMock).toHaveBeenCalledOnce()
+    expect(mocks.listWorkspaceTabsMock).not.toHaveBeenCalled()
   })
 
   test('passes a startup shell command through terminal create', async () => {

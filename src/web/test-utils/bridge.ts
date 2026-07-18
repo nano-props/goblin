@@ -337,7 +337,7 @@ export function installWorkspacePaneTabsTestBridge(
         ok: true as const,
         action: 'created' as const,
         terminalSessionId: 'term-testtesttesttesttest1',
-        terminalSessionsRevision: 1,
+        terminalProjectionEffect: { kind: 'delta', revision: 1 },
         terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         snapshot: '',
@@ -424,7 +424,7 @@ export function installWorkspacePaneTabsTestBridge(
                 ? { kind: 'workspace-root' as const }
                 : { kind: 'git-worktree' as const, branchName: 'main' },
             terminalSessionId,
-            terminalSessionsRevision: 1,
+            terminalProjectionEffect: { kind: 'delta', revision: 1 },
             terminalRuntimeSessionId,
             terminalRuntimeGeneration: 1,
             processName: 'zsh',

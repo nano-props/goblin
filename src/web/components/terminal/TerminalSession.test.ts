@@ -549,7 +549,7 @@ beforeEach(() => {
       },
       terminal: {
         attach: terminalCalls.attach.mockResolvedValue(attachResult('pty_session_1_aaaaaaaaa')),
-        restart: terminalCalls.restart.mockResolvedValue(attachResult('pty_session_2_aaaaaaaaa')),
+        restart: terminalCalls.restart.mockResolvedValue(restartResult('pty_session_2_aaaaaaaaa')),
         write: terminalCalls.write.mockResolvedValue({ status: 'accepted' }),
         resize: terminalCalls.resize.mockResolvedValue(true),
         takeover: terminalCalls.takeover.mockResolvedValue(takeoverResult('pty_session_1_aaaaaaaaa')),
@@ -598,7 +598,7 @@ beforeEach(() => {
     }),
     terminal: () => ({
       attach: terminalCalls.attach.mockResolvedValue(attachResult('pty_session_1_aaaaaaaaa')),
-      restart: terminalCalls.restart.mockResolvedValue(attachResult('pty_session_2_aaaaaaaaa')),
+      restart: terminalCalls.restart.mockResolvedValue(restartResult('pty_session_2_aaaaaaaaa')),
       write: terminalCalls.write.mockResolvedValue({ status: 'accepted' }),
       resize: terminalCalls.resize.mockResolvedValue(true),
       takeover: terminalCalls.takeover.mockResolvedValue(takeoverResult('pty_session_1_aaaaaaaaa')),
@@ -661,12 +661,14 @@ describe('TerminalSession', () => {
     terminalCalls.attach.mockResolvedValueOnce(streamAttachResult('pty_session_1_aaaaaaaaa'))
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
+    const notify = vi.fn()
+    const session = new TerminalSession(descriptor, notify)
     hydrateManagedSession(session, { phase: 'opening', terminalRuntimeGeneration: 0 })
 
     session.attach(host)
     await flushTerminalStart()
     const term = xtermMocks.terminals[0]!
+    expect(notify).toHaveBeenCalledWith('projection-delta-revision', 1)
     expect(term.reset).not.toHaveBeenCalled()
     expect(term.write).not.toHaveBeenCalled()
 
@@ -690,7 +692,8 @@ describe('TerminalSession', () => {
     terminalCalls.attach.mockReturnValueOnce(attach.promise)
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
+    const notify = vi.fn()
+    const session = new TerminalSession(descriptor, notify)
     hydrateManagedSession(session)
 
     expect(session.snapshot().phase).toBe('open')
@@ -707,6 +710,23 @@ describe('TerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
 
     expect(session.snapshot().phase).toBe('open')
+    expect(notify).not.toHaveBeenCalledWith('projection-delta-revision', expect.any(Number))
+  })
+
+  test('does not treat an existing error snapshot attach as an operation-owned delta', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('pty_session_1_aaaaaaaaa', { phase: 'error', message: 'process unavailable' }),
+    )
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const notify = vi.fn()
+    const session = new TerminalSession(descriptor, notify)
+    hydrateManagedSession(session)
+
+    session.attach(host)
+    await flushUntil(() => session.snapshot().phase === 'error')
+
+    expect(notify).not.toHaveBeenCalledWith('projection-delta-revision', expect.any(Number))
   })
 
   test('does not close the server session when deselected while attach is in flight', async () => {
@@ -714,7 +734,8 @@ describe('TerminalSession', () => {
     terminalCalls.attach.mockReturnValueOnce(attach.promise)
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const session = new TerminalSession(descriptor, vi.fn())
+    const notify = vi.fn()
+    const session = new TerminalSession(descriptor, notify)
     hydrateManagedSession(session)
 
     session.attach(host)
@@ -726,6 +747,7 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     expect(terminalCalls.close).not.toHaveBeenCalled()
+    expect(notify).not.toHaveBeenCalledWith('projection-delta-revision', expect.any(Number))
     expect(host.querySelector('.goblin-managed-terminal-frame')).toBeNull()
   })
 
@@ -2551,7 +2573,7 @@ describe('TerminalSession', () => {
     session.restart()
     await flushUntil(() => terminalCalls.restart.mock.calls.length === 1)
     session.dispose()
-    restart.resolve(attachResult('pty_session_2_aaaaaaaaa'))
+    restart.resolve(restartResult('pty_session_2_aaaaaaaaa'))
     await flushTerminalStart()
 
     expect(terminalCalls.close).not.toHaveBeenCalled()
@@ -2570,7 +2592,7 @@ describe('TerminalSession', () => {
     session.restart()
     await flushUntil(() => terminalCalls.restart.mock.calls.length === 1)
     session.detach(host)
-    restart.resolve(attachResult('pty_session_2_aaaaaaaaa'))
+    restart.resolve(restartResult('pty_session_2_aaaaaaaaa'))
     await flushTerminalStart()
 
     expect(terminalCalls.close).not.toHaveBeenCalled()
@@ -2919,10 +2941,13 @@ describe('TerminalSession', () => {
 
 function createFirstFrame(
   terminalRuntimeSessionId: string,
-  overrides: Partial<Omit<Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }>, 'ok' | 'frame'>> = {},
+  overrides: Partial<
+    Omit<Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }>, 'ok' | 'frame' | 'terminalProjectionEffect'>
+  > = {},
 ): Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }> {
   return {
     frame: 'snapshot',
+    terminalProjectionEffect: { kind: 'none' },
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 1,
     snapshot: '',
@@ -2942,10 +2967,13 @@ function createFirstFrame(
 
 function attachResult(
   terminalRuntimeSessionId: string,
-  overrides: Partial<Omit<Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }>, 'ok' | 'frame'>> = {},
+  overrides: Partial<
+    Omit<Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }>, 'ok' | 'frame' | 'terminalProjectionEffect'>
+  > = {},
 ): Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }> {
   const result: Extract<TerminalAttachResult, { ok: true; frame: 'snapshot' }> = {
     frame: 'snapshot',
+    terminalProjectionEffect: { kind: 'none' },
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 1,
     snapshot: '',
@@ -2970,6 +2998,7 @@ function streamAttachResult(
   return {
     ok: true,
     frame: 'stream',
+    terminalProjectionEffect: { kind: 'delta', revision: 1 },
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 1,
     processName: 'zsh',
@@ -2979,6 +3008,13 @@ function streamAttachResult(
     controller: { clientId: 'client_local', status: 'connected' },
     canonicalCols: 100,
     canonicalRows: 30,
+  }
+}
+
+function restartResult(terminalRuntimeSessionId: string): Extract<TerminalRestartResult, { ok: true }> {
+  return {
+    ...attachResult(terminalRuntimeSessionId),
+    terminalProjectionEffect: { kind: 'delta', revision: 1 },
   }
 }
 

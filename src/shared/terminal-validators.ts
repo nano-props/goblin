@@ -144,13 +144,22 @@ const TerminalRuntimeMetadataSchemaEntries = {
   canonicalCols: TerminalColsSchema,
   canonicalRows: TerminalRowsSchema,
 }
+const TerminalProjectionNoneEffectSchema = v.strictObject({ kind: v.literal('none') })
+const TerminalProjectionDeltaEffectSchema = v.strictObject({
+  kind: v.literal('delta'),
+  revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
+})
+const TerminalProjectionEffectSchema = v.variant('kind', [
+  TerminalProjectionNoneEffectSchema,
+  TerminalProjectionDeltaEffectSchema,
+])
 const TerminalCreateResultSchema = v.variant('ok', [
   v.strictObject({
     ok: v.literal(true),
     action: v.picklist(['created', 'restored', 'reused']),
     presentation: TerminalPresentationSchema,
     terminalSessionId: v.string(),
-    terminalSessionsRevision: v.pipe(v.number(), v.integer(), v.minValue(0)),
+    terminalProjectionEffect: TerminalProjectionEffectSchema,
     ...TerminalRuntimeMetadataSchemaEntries,
   }),
   v.strictObject({
@@ -163,12 +172,14 @@ const TerminalAttachResultSchema = v.variant('ok', [
     v.object({
       ok: v.literal(true),
       frame: v.literal('stream'),
+      terminalProjectionEffect: TerminalProjectionDeltaEffectSchema,
       ...TerminalRuntimeMetadataSchemaEntries,
       phase: v.literal('open'),
     }),
     v.object({
       ok: v.literal(true),
       frame: v.literal('snapshot'),
+      terminalProjectionEffect: TerminalProjectionNoneEffectSchema,
       snapshot: v.string(),
       snapshotSeq: v.number(),
       outputEra: v.number(),
@@ -184,6 +195,7 @@ const TerminalRestartResultSchema = v.variant('ok', [
   v.object({
     ok: v.literal(true),
     frame: v.literal('snapshot'),
+    terminalProjectionEffect: TerminalProjectionDeltaEffectSchema,
     snapshot: v.string(),
     snapshotSeq: v.number(),
     outputEra: v.number(),
@@ -286,7 +298,12 @@ const TerminalRealtimeMessageVariants = [
   v.object({ type: v.literal('exit'), event: TerminalExitEventSchema }),
   v.object({ type: v.literal('identity'), event: TerminalIdentityEventSchema }),
   v.object({ type: v.literal('lifecycle'), event: TerminalLifecycleEventSchema }),
-  v.object({ type: v.literal('sessions-changed'), repoRoot: WorkspaceIdSchema }),
+  v.object({
+    type: v.literal('sessions-changed'),
+    repoRoot: WorkspaceIdSchema,
+    repoRuntimeId: RepoRuntimeIdSchema,
+    revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  }),
   TerminalSessionClosedEventSchema,
 ] as const
 const TerminalRealtimeMessageSchema = v.variant('type', TerminalRealtimeMessageVariants)

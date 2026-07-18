@@ -252,6 +252,40 @@ describe('TerminalSessionProjection', () => {
       expect((projection as any).futureExitOrphans.size()).toBe(0)
     })
 
+    test('does not turn a gapped partial session delta into full catalog coverage', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      const scope = { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }
+      const sessionA = makeServerSession('pty_delta_a_aaaaaaaaaaaa', 'term-111111111111111111111')
+      const sessionB = makeServerSession('pty_delta_b_aaaaaaaaaaaa', 'term-222222222222222222222')
+      projection.reconcileServerSessionsSnapshot(scope, { revision: 1, sessions: [sessionA] }, 'client_local')
+
+      expect(
+        (projection as any).applyServerSessionEffect(
+          scope,
+          { kind: 'delta', revision: 3 },
+          sessionA,
+          'client_local',
+        ),
+      ).toBe(true)
+      expect(projection.terminalSessionsCatalogCoverageRevision(scope)).toBe(1)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+
+      projection.reconcileServerSessionsSnapshot(scope, { revision: 3, sessions: [sessionA, sessionB] }, 'client_local')
+      expect(projection.terminalSessionsCatalogCoverageRevision(scope)).toBe(3)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(2)
+    })
+
+    test('advances catalog coverage for one continuous origin delta but not across a gap', () => {
+      projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+      const scope = { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }
+      projection.reconcileServerSessionsSnapshot(scope, { revision: 1, sessions: [] }, 'client_local')
+
+      expect(projection.applyTerminalSessionsDeltaRevision(scope, 2)).toBe(true)
+      expect(projection.terminalSessionsCatalogCoverageRevision(scope)).toBe(2)
+      expect(projection.applyTerminalSessionsDeltaRevision(scope, 4)).toBe(true)
+      expect(projection.terminalSessionsCatalogCoverageRevision(scope)).toBe(2)
+    })
+
     test('does not let an older exact exit tombstone block a newer runtime generation', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       const scope = { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }
@@ -1595,13 +1629,13 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
 
     ;(projection as any).applyServerSessionEffect(
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
-      1,
+      { kind: 'delta', revision: 1 },
       makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 1 }),
       'client_local',
     )
     ;(projection as any).applyServerSessionEffect(
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
-      1,
+      { kind: 'delta', revision: 1 },
       makeServerSession(lineageB, terminalSessionId, { terminalRuntimeGeneration: 0 }),
       'client_local',
     )

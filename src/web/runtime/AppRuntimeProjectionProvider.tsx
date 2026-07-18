@@ -15,14 +15,13 @@ import {
   type RuntimeProjectionScopeRegistry,
 } from '#/web/runtime/runtime-projection-scope.ts'
 import { reconcileOpenRepoRuntimeMemberships } from '#/web/stores/repos/repo-session-write-paths.ts'
+import { TerminalProjectionRecoveryCoordinator } from '#/web/runtime/terminal-projection-recovery.ts'
 
 interface AppRuntimeProjectionProviderProps {
   children: ReactNode
   currentRepoId: string | null
 }
 
-const TERMINAL_RECOVERY_LANE = 'terminal-recovery'
-const TERMINAL_SESSIONS_CHANGED_TIMER_LANE = 'terminal-sessions-changed'
 const WORKSPACE_TABS_REFRESH_LANE = 'workspace-tabs-refresh'
 
 export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRuntimeProjectionProviderProps) {
@@ -31,6 +30,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
   )
   const workspaceMembershipReady = useReposStore((s) => s.workspaceMembershipReady)
   const terminalProjection = useTerminalSessionProjection()
+  const [terminalRecovery] = useState(() => new TerminalProjectionRecoveryCoordinator())
   const [scopeRegistry] = useState(() =>
     createRuntimeProjectionScopeRegistry(
       (target) =>
@@ -61,28 +61,46 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
   }, [])
 
   const recoverTerminalSessionsFromServer = useCallback(
-    (scope: RuntimeProjectionScope, options: { resynchronizeConnectedViews?: boolean } = {}): void => {
-      scope.runLatest(
-        TERMINAL_RECOVERY_LANE,
-        async () => ({
-          clientId: readOrCreateWebTerminalClientId(),
-          catalog: await terminalClient.recoverSessions(scope.target),
-        }),
-        ({ clientId, catalog }) => {
+    (
+      scope: RuntimeProjectionScope,
+      options: { resynchronizeConnectedViews?: boolean; minimumRevision?: number } = {},
+    ): void => {
+      const clientId = readOrCreateWebTerminalClientId()
+      terminalRecovery.request({
+        scope,
+        minimumRevision: options.minimumRevision ?? 0,
+        refresh: options.minimumRevision === undefined,
+        recover: async () => await terminalClient.recoverSessions(scope.target),
+        accept: (catalog) => {
+          if (!scope.isActive()) return { kind: 'inactive' }
+          const localRevision = terminalProjection.terminalSessionsCatalogCoverageRevision(scope.target)
+          if (localRevision !== null && localRevision > catalog.revision) {
+            return { kind: 'superseded', localRevision }
+          }
           const reconciled = terminalProjection.reconcileServerSessionsSnapshot(
             scope.target,
             catalog,
             clientId,
           )
-          if (!reconciled) return
-          if (options.resynchronizeConnectedViews) {
-            terminalProjection.resynchronizeConnectedViews(scope.target.repoRoot, scope.target.repoRuntimeId)
+          if (!reconciled) {
+            if (!scope.isActive()) return { kind: 'inactive' }
+            const currentRevision = terminalProjection.terminalSessionsCatalogCoverageRevision(scope.target)
+            if (currentRevision !== null && currentRevision > catalog.revision) {
+              return { kind: 'superseded', localRevision: currentRevision }
+            }
+            return { kind: 'membership-rejected' }
           }
+          return { kind: 'accepted' }
+        },
+        complete: () => {
           useTerminalProjectionHydrationStore
             .getState()
             .markProjectionReady(scope.target.repoRoot, scope.target.repoRuntimeId)
         },
-        (error) => {
+        afterAccept: options.resynchronizeConnectedViews
+          ? () => terminalProjection.resynchronizeConnectedViews(scope.target.repoRoot, scope.target.repoRuntimeId)
+          : undefined,
+        reject: (error) => {
           appRuntimeProjectionLog.debug('failed to reconcile terminal sessions from server', { error })
           const hydration = useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(scope.target.repoRoot)
           if (hydration?.repoRuntimeId !== scope.target.repoRuntimeId || hydration.phase !== 'pending') return
@@ -94,9 +112,9 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
               projectionHydrationFailureMessage(error),
             )
         },
-      )
+      })
     },
-    [terminalProjection],
+    [terminalProjection, terminalRecovery],
   )
 
   useEffect(() => () => scopeRegistry.disposeScopes(), [scopeRegistry])
@@ -149,10 +167,15 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
       return
     }
     const offSessionsChanged = scopeRegistry.track(
-      terminalClient.onSessionsChanged((repoRoot) => {
-        const scope = currentScopeForRepo(scopeRegistry, repoRoot)
+      terminalClient.onSessionsChanged((event) => {
+        const scope = currentScopeForRepo(scopeRegistry, event.repoRoot)
         if (!scope) return
-        scope.setTimer(TERMINAL_SESSIONS_CHANGED_TIMER_LANE, () => recoverTerminalSessionsFromServer(scope), 0)
+        if (scope.target.repoRuntimeId !== event.repoRuntimeId) return
+        const hydration = useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(event.repoRoot)
+        const ready = hydration?.repoRuntimeId === event.repoRuntimeId && hydration.phase === 'ready'
+        const localRevision = terminalProjection.terminalSessionsCatalogCoverageRevision(scope.target) ?? -1
+        if (ready && localRevision >= event.revision) return
+        recoverTerminalSessionsFromServer(scope, { minimumRevision: event.revision })
       }),
     )
     let membershipRecoveryGeneration = 0
