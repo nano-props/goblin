@@ -1,4 +1,8 @@
-import { runWithRepoSource, type RepoSourceRuntimeContext } from '#/server/modules/repo-source.ts'
+import {
+  runWithRepoSource,
+  type RepoSourceRuntimeContext,
+  type WorkspacePaneTargetIdentity,
+} from '#/server/modules/repo-source.ts'
 import { getRepoOperationsSnapshot } from '#/server/modules/repo-operation-registry.ts'
 import { listRepoWriteOperationsForRepo } from '#/server/modules/repo-write-operation-coordinator.ts'
 import { isValidRepoLocator } from '#/shared/input-validation.ts'
@@ -31,6 +35,20 @@ export async function getRepoSnapshot(
   return options.signal?.aborted
     ? null
     : await runWithRepoSource(cwd, async (source) => await source.getSnapshot(options.signal), repoReadRuntime(options))
+}
+
+export async function getWorkspacePaneTargetIdentities(
+  cwd: string,
+  options: { signal?: AbortSignal; repoRuntimeId?: string } = {},
+): Promise<WorkspacePaneTargetIdentity[]> {
+  options.signal?.throwIfAborted()
+  const identities = await runWithRepoSource(
+    cwd,
+    async (source) => await source.getWorkspacePaneTargetIdentities(options.signal),
+    repoReadRuntime(options),
+  )
+  options.signal?.throwIfAborted()
+  return identities
 }
 
 export async function getRepoStatus(

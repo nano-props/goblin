@@ -211,9 +211,12 @@ export class WorkspacePaneRuntimeApplication {
         error instanceof WorkspacePaneRuntimeStaleError ? 'error.repo-runtime-stale' : 'error.unavailable',
       )
     }
-    if (paneCommit.kind === 'runtime-stale') {
+    if (paneCommit.kind === 'runtime-stale' || paneCommit.kind === 'target-stale') {
       runtime.admission.abort()
-      return runtimeFailure('terminal', 'error.repo-runtime-stale')
+      return runtimeFailure(
+        'terminal',
+        paneCommit.kind === 'target-stale' ? 'error.workspace-target-stale' : 'error.repo-runtime-stale',
+      )
     }
 
     if (committedRuntime === null) throw new Error('terminal admission did not produce a committed result')

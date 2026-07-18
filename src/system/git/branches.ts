@@ -157,6 +157,28 @@ export async function getBranches(
   }
 }
 
+export interface BranchWorktreeIdentity {
+  branch: string
+  worktreePath: string | null
+}
+
+/** Strict, display-free branch membership read for admission/catalog paths. */
+export async function getBranchWorktreeIdentities(
+  cwd: string,
+  worktrees: readonly WorktreeInfo[],
+  options?: { signal?: AbortSignal },
+): Promise<BranchWorktreeIdentity[]> {
+  const output = await git(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/'], {
+    signal: options?.signal,
+  })
+  options?.signal?.throwIfAborted()
+  return output
+    .split('\n')
+    .map((branch) => branch.trim())
+    .filter(Boolean)
+    .map((branch) => ({ branch, worktreePath: worktrees.find((worktree) => worktree.branch === branch)?.path ?? null }))
+}
+
 export async function getLog(
   cwd: string,
   branch: string,

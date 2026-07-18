@@ -20,6 +20,7 @@ import {
   createWorkspacePaneTabsCoordinator,
   type WorkspacePaneTargetProjectionProvider,
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import { WorkspacePaneTargetCatalog } from '#/server/workspace-pane/workspace-pane-target-catalog.ts'
 import { WorkspacePaneLayoutAggregate } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import { workspacePaneDurableLayoutsEqual } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
@@ -56,14 +57,6 @@ import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts
 import { createWorktreeRemovalApplication } from '#/server/worktree-removal/worktree-removal-application.ts'
 import { createPhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
-import { getRepoSnapshot } from '#/server/modules/repo-read-paths.ts'
-import { workspaceRuntimeHasGitCapability } from '#/server/modules/repo-runtimes.ts'
-import {
-  canonicalWorkspaceLocator,
-  formatWorkspaceLocator,
-  parseCanonicalWorkspaceLocator,
-} from '#/shared/workspace-locator.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
@@ -80,63 +73,7 @@ const INVALIDATED_SCOPE_RETIREMENT_RETRY_BASE_MS = 100
 const INVALIDATED_SCOPE_RETIREMENT_RETRY_MAX_MS = 5_000
 const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })
 
-const serverWorkspacePaneTargetProjection: WorkspacePaneTargetProjectionProvider = {
-  async captureTargets(userId, repoRoot, scope) {
-    const separator = scope.lastIndexOf('\0')
-    if (separator < 0 || separator === scope.length - 1) throw new Error('invalid workspace pane runtime scope')
-    const repoRuntimeId = scope.slice(separator + 1)
-    const workspaceId = canonicalWorkspaceLocator(repoRoot)
-    if (!workspaceId) throw new Error('invalid workspace pane workspace id')
-    const workspace = parseCanonicalWorkspaceLocator(workspaceId)
-    if (!workspace) throw new Error('invalid workspace pane workspace id')
-    const workspaceTarget = {
-      target: { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: repoRuntimeId },
-      nativeWorktreePath: workspace.path,
-      canonicalBranch: null,
-    }
-    if (!workspaceRuntimeHasGitCapability(userId, repoRoot, repoRuntimeId)) return [workspaceTarget]
-    const snapshot = await getRepoSnapshot(repoRoot, { repoRuntimeId })
-    return [
-      workspaceTarget,
-      ...(snapshot?.branches ?? []).map((branch) =>
-        branch.worktree
-          ? {
-              target: {
-                kind: 'git-worktree' as const,
-                workspaceId,
-                workspaceRuntimeId: repoRuntimeId,
-                root: workspaceLocatorForNativePath(workspaceId, branch.worktree.path),
-              },
-              nativeWorktreePath: branch.worktree.path,
-              canonicalBranch: branch.name,
-            }
-          : {
-              target: {
-                kind: 'git-branch' as const,
-                workspaceId,
-                workspaceRuntimeId: repoRuntimeId,
-                branch: branch.name,
-              },
-              nativeWorktreePath: null,
-              canonicalBranch: branch.name,
-            },
-      ),
-    ]
-  },
-}
-
-function workspaceLocatorForNativePath(workspaceId: WorkspaceId, nativePath: string) {
-  const workspace = parseCanonicalWorkspaceLocator(workspaceId)
-  if (!workspace) throw new Error('invalid workspace pane workspace id')
-  const root = formatWorkspaceLocator(
-    workspace.transport === 'ssh'
-      ? { transport: 'ssh', profile: workspace.profile, path: nativePath }
-      : { transport: 'file', platform: workspace.platform, path: nativePath },
-    workspace.transport === 'file' ? workspace.platform : 'posix',
-  )
-  if (!root) throw new Error('invalid workspace pane worktree path')
-  return root
-}
+const serverWorkspacePaneTargetProjection = new WorkspacePaneTargetCatalog()
 
 export interface ServerTerminalRuntimeOptions {
   ptySupervisor: PtySupervisor

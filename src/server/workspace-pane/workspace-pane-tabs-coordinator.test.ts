@@ -65,7 +65,7 @@ describe('workspace pane tabs coordinator queues', () => {
 
     expect(admitted.admitted).toBe(true)
     if (!admitted.admitted) return
-    expect(admitted.value).toEqual({ kind: 'runtime-stale' })
+    expect(admitted.value).toEqual({ kind: 'target-stale' })
     expect(captureSnapshotForUser).not.toHaveBeenCalled()
     expect(commitAdmission).not.toHaveBeenCalled()
   })
@@ -134,7 +134,7 @@ describe('workspace pane tabs coordinator queues', () => {
       runtimeProviders: [],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets: async () => [projection] },
+      targetProjection: { captureTargets: async () => [projection], validateTargets: async () => true },
     })
 
     await expect(
@@ -199,7 +199,7 @@ describe('workspace pane tabs coordinator queues', () => {
       runtimeProviders: [],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets: async () => [projection] },
+      targetProjection: { captureTargets: async () => [projection], validateTargets: async () => true },
     })
 
     await expect(
@@ -243,7 +243,7 @@ describe('workspace pane tabs coordinator queues', () => {
       runtimeProviders: [],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets: async () => [projection] },
+      targetProjection: { captureTargets: async () => [projection], validateTargets: async () => true },
     })
 
     const admitted = await operations.runOperation(
@@ -304,7 +304,7 @@ describe('workspace pane tabs coordinator queues', () => {
       runtimeProviders: [],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets: async () => [projection] },
+      targetProjection: { captureTargets: async () => [projection], validateTargets: async () => true },
     })
 
     const admitted = await operations.runOperation(
@@ -363,7 +363,7 @@ describe('workspace pane tabs coordinator queues', () => {
       runtimeProviders: [],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets: async () => [projection] },
+      targetProjection: { captureTargets: async () => [projection], validateTargets: async () => true },
     })
 
     const admitted = await operations.runOperation(
@@ -382,7 +382,7 @@ describe('workspace pane tabs coordinator queues', () => {
         }),
     )
 
-    expect(admitted).toEqual({ admitted: true, value: { kind: 'runtime-stale' } })
+    expect(admitted).toEqual({ admitted: true, value: { kind: 'target-stale' } })
     expect(commitAdmission).not.toHaveBeenCalled()
   })
 
@@ -404,7 +404,7 @@ describe('workspace pane tabs coordinator queues', () => {
       runtimeProviders: [],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets: async () => [projection] },
+      targetProjection: { captureTargets: async () => [projection], validateTargets: async () => true },
     })
 
     const admitted = await operations.runOperation(
@@ -427,14 +427,16 @@ describe('workspace pane tabs coordinator queues', () => {
     expect(commitAdmission).not.toHaveBeenCalled()
   })
 
-  test('does not commit when the target disappears during placement preparation', async () => {
+  test('fences a runtime invalidated after the single target-catalog capture', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
       repoRuntimeId: 'runtime-a',
     })
-    let targets = [{ repoRoot: 'goblin+file:///repo', branchName: 'feature/current', worktreePath: '/repo/worktree' }]
+    const targets = [{ repoRoot: 'goblin+file:///repo', branchName: 'feature/current', worktreePath: '/repo/worktree' }]
+    const captureTargets = vi.fn(async () => targets.map(testRuntimeTargetProjection))
+    let runtimeCurrent = true
     let releaseProvider!: () => void
     const providerGate = new Promise<void>((resolve) => {
       releaseProvider = resolve
@@ -455,7 +457,7 @@ describe('workspace pane tabs coordinator queues', () => {
       ],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets: async () => targets.map(testRuntimeTargetProjection) },
+      targetProjection: { captureTargets, validateTargets: async () => true },
     })
 
     const admitted = operations.runOperation(
@@ -473,19 +475,20 @@ describe('workspace pane tabs coordinator queues', () => {
           sessionId: 'term-preparedprepared001',
           permit,
           physicalWorktreeCapability: capability,
-          isRuntimeCurrent: () => true,
+          isRuntimeCurrent: () => runtimeCurrent,
           commitAdmission,
         }),
     )
     await vi.waitFor(() => expect(providerStarted).toBe(true))
-    targets = []
+    runtimeCurrent = false
     releaseProvider()
 
     await expect(admitted).resolves.toEqual({ admitted: true, value: { kind: 'runtime-stale' } })
+    expect(captureTargets).toHaveBeenCalledOnce()
     expect(commitAdmission).not.toHaveBeenCalled()
   })
 
-  test('commits the latest canonical branch after placement preparation', async () => {
+  test('uses one immutable target-catalog capture throughout placement', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
@@ -493,6 +496,7 @@ describe('workspace pane tabs coordinator queues', () => {
       repoRuntimeId: 'runtime-a',
     })
     let targets = [{ repoRoot: 'goblin+file:///repo', branchName: 'feature/old', worktreePath: '/repo/worktree' }]
+    const captureTargets = vi.fn(async () => targets.map(testRuntimeTargetProjection))
     let releaseProvider!: () => void
     const providerGate = new Promise<void>((resolve) => {
       releaseProvider = resolve
@@ -513,7 +517,7 @@ describe('workspace pane tabs coordinator queues', () => {
       ],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets: async () => targets.map(testRuntimeTargetProjection) },
+      targetProjection: { captureTargets, validateTargets: async () => true },
     })
 
     const admitted = operations.runOperation(
@@ -549,7 +553,7 @@ describe('workspace pane tabs coordinator queues', () => {
             {
               target: testRuntimeTargetProjection({
                 repoRoot: 'goblin+file:///repo',
-                branchName: 'feature/renamed',
+                branchName: 'feature/old',
                 worktreePath: '/repo/worktree',
               }).target,
               tabs: [
@@ -561,7 +565,8 @@ describe('workspace pane tabs coordinator queues', () => {
         },
       },
     })
-    expect(commitAdmission).toHaveBeenCalledWith('feature/renamed')
+    expect(captureTargets).toHaveBeenCalledOnce()
+    expect(commitAdmission).toHaveBeenCalledWith('feature/old')
   })
 
   test('serializes repository reads with a later durable command', async () => {
@@ -1242,7 +1247,10 @@ function aggregateFor(
 function testTargetProjection(
   targets: readonly { repoRoot: string; branchName: string; worktreePath: string | null }[],
 ) {
-  return { captureTargets: async () => targets.map(testRuntimeTargetProjection) }
+  return {
+    captureTargets: async () => targets.map(testRuntimeTargetProjection),
+    validateTargets: async () => true,
+  }
 }
 
 function testRuntimeTargetProjection(target: {

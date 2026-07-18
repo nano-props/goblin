@@ -6,6 +6,7 @@ import {
   getRemoteBrowserUrl,
   getRemoteLog,
   getRemoteSnapshot,
+  getRemoteWorkspacePaneTargetIdentities,
   getRemoteStatusAndWorktrees,
   getRemoteTrackingBranches,
   getRemoteTreeWalk,
@@ -114,6 +115,50 @@ describe('remote git helpers', () => {
       browserRemoteProvider: 'gitlab',
       hasGitHubRemote: false,
     })
+  })
+
+  test('reads remote workspace-pane identity without status or remote display commands', async () => {
+    const run = vi.fn(async (command: { type: string }) =>
+      command.type === 'gitWorkspacePaneIdentities'
+        ? okRemoteResult(
+            'main\nfeature/no-worktree\n__GOBLIN_REMOTE_PANE_WORKTREES__\nworktree /srv/repo\nHEAD f00ba4\nbranch refs/heads/main\n',
+          )
+        : (() => {
+            throw new Error(`unexpected command: ${command.type}`)
+          })(),
+    )
+
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run as any })).resolves.toEqual([
+      { branch: 'main', worktreePath: '/srv/repo' },
+      { branch: 'feature/no-worktree', worktreePath: null },
+    ])
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(run).toHaveBeenCalledWith({ type: 'gitWorkspacePaneIdentities', path: '/srv/repo' }, TARGET, {
+      signal: undefined,
+    })
+  })
+
+  test('does not turn a failed remote worktree membership read into branch-only targets', async () => {
+    const run = vi.fn(async (command: { type: string }) =>
+      command.type === 'gitWorkspacePaneIdentities'
+        ? ({ ok: false, stdout: '', stderr: '', message: 'worktree list failed' } as RemoteCommandResult)
+        : okRemoteResult(''),
+    )
+
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run as any })).rejects.toThrow(
+      'worktree list failed',
+    )
+  })
+
+  test('returns no branch identities for an unborn repo with a detached worktree', async () => {
+    const run = vi.fn(async () =>
+      okRemoteResult(
+        '\n__GOBLIN_REMOTE_PANE_WORKTREES__\nworktree /srv/repo\nHEAD f00ba4\ndetached\n',
+      ),
+    )
+
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run as any })).resolves.toEqual([])
+    expect(run).toHaveBeenCalledOnce()
   })
 
   test('prefers stderr when converting remote exec failures', () => {

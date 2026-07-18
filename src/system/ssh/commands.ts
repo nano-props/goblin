@@ -53,6 +53,7 @@ function ensureControlDir(): Promise<void> {
 export const REMOTE_SNAPSHOT_CURRENT_MARKER = '__GOBLIN_REMOTE_CURRENT__'
 export const REMOTE_SNAPSHOT_DEFAULT_MARKER = '__GOBLIN_REMOTE_DEFAULT__'
 export const REMOTE_SNAPSHOT_BRANCHES_MARKER = '__GOBLIN_REMOTE_BRANCHES__'
+export const REMOTE_PANE_WORKTREES_MARKER = '__GOBLIN_REMOTE_PANE_WORKTREES__'
 
 export type RemoteCommandKind =
   | { type: 'printHome' }
@@ -65,6 +66,7 @@ export type RemoteCommandKind =
   | { type: 'revParseTopLevel'; path: string }
   | { type: 'resolvePhysicalWorktreeIdentity'; path: string }
   | { type: 'gitSnapshot'; path: string }
+  | { type: 'gitWorkspacePaneIdentities'; path: string }
   | { type: 'gitPatch'; path: string }
   | { type: 'gitWorktreeList'; path: string }
   | { type: 'gitWorktreeListAndStatus'; path: string }
@@ -426,6 +428,15 @@ function scriptForCommand(command: RemoteCommandKind): string {
         `git -C ${repo} symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##'`,
         `printf '%s\n' ${shellQuote(REMOTE_SNAPSHOT_BRANCHES_MARKER)}`,
         `git -C ${repo} for-each-ref --format=${shellQuote(branchFormat)} refs/heads/`,
+      ].join('\n')
+    }
+    case 'gitWorkspacePaneIdentities': {
+      const repo = shellQuote(command.path)
+      return [
+        'set -e',
+        `git -C ${repo} for-each-ref --format=${shellQuote('%(refname:short)')} refs/heads/`,
+        `printf '\\n%s\\n' ${shellQuote(REMOTE_PANE_WORKTREES_MARKER)}`,
+        `git -C ${repo} worktree list --porcelain`,
       ].join('\n')
     }
     case 'gitPatch':

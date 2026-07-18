@@ -18,6 +18,19 @@ const BASE: TerminalSessionBase = {
 }
 
 describe('terminal create command', () => {
+  test('surfaces a changed workspace target instead of treating it as cancellation', async () => {
+    const error = new Error('error.workspace-target-stale')
+    await expect(
+      runCreateTerminalTabCommand({
+        base: BASE,
+        createTerminal: vi.fn(async () => {
+          throw error
+        }),
+        commitCreatedTerminalTab: vi.fn(),
+      }),
+    ).resolves.toEqual({ ok: false, error, messageKey: 'error.workspace-target-stale' })
+  })
+
   test('commits the leader admission after the server creates the session', async () => {
     const admission = createAdmission()
     const createTerminal = vi.fn(async () => admission)

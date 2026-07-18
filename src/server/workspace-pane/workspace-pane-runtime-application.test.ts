@@ -658,6 +658,28 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(abort).toHaveBeenCalledOnce()
   })
 
+  test('surfaces target identity changes as a distinct fast-fail', async () => {
+    const runtime = terminalCreateSuccess()
+    const abort = vi.fn()
+    runtime.admission = { ...runtime.admission, kind: 'prepared', abort }
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
+      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminal: { createAdmitted: async () => runtime, close: () => false },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession: async () => ({ kind: 'target-stale' }) },
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged: vi.fn(),
+    })
+
+    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual({
+      ok: false,
+      runtimeType: 'terminal',
+      message: 'error.workspace-target-stale',
+    })
+    expect(abort).toHaveBeenCalledOnce()
+  })
+
   test('does not compensate an invariant failure after admission', async () => {
     const runtime = terminalCreateSuccess()
     const publish = vi.fn(() => committedTerminalResult('created'))

@@ -5,6 +5,7 @@ import { checkGitAvailable } from '#/system/git/git-exec.ts'
 import {
   deleteBranch,
   deleteUpstreamBranch,
+  getBranchWorktreeIdentities,
   getBranches,
   getCurrentBranch,
   getRepoCommonDir,
@@ -57,6 +58,7 @@ import {
   getRemoteLog,
   getRemotePatch,
   getRemoteRepoWorktreePaths,
+  getRemoteWorkspacePaneTargetIdentities,
   getRemoteRepoWriteGroupPath,
   getRemoteSnapshot,
   getRemoteStatus,
@@ -111,11 +113,17 @@ export interface RepoMutationResult extends ExecResult {
   affectedRepoIds?: readonly string[]
 }
 
+export interface WorkspacePaneTargetIdentity {
+  branch: string
+  worktreePath: string | null
+}
+
 export interface RepoSource {
   id: string
   kind: 'local' | 'remote'
   probe(): Promise<ProbeResult>
   getSnapshot(signal?: AbortSignal): Promise<RepoSnapshot | null>
+  getWorkspacePaneTargetIdentities(signal?: AbortSignal): Promise<WorkspacePaneTargetIdentity[]>
   getStatus(signal?: AbortSignal): Promise<WorktreeStatus[]>
   getPullRequests(
     branches?: string[],
@@ -421,6 +429,11 @@ function createLocalRepoSource(
         throw err
       }
     },
+    async getWorkspacePaneTargetIdentities(signal) {
+      const worktrees = await getWorktrees(repoId, { includeStatus: false, signal })
+      signal?.throwIfAborted()
+      return await getBranchWorktreeIdentities(repoId, worktrees, { signal })
+    },
     async getStatus(signal) {
       if (!isValidCwd(repoId)) throw new Error('error.invalid-path')
       const available = await probeGitRepo(repoId)
@@ -617,6 +630,9 @@ async function createRemoteRepoSource(
       const remoteSnapshot = await getRemoteSnapshot(target, { signal, run })
       if (signal?.aborted || !remoteSnapshot) return null
       return { branches: remoteSnapshot.branches, current: remoteSnapshot.current, remote: remoteSnapshot.remote }
+    },
+    async getWorkspacePaneTargetIdentities(signal) {
+      return await getRemoteWorkspacePaneTargetIdentities(target, { signal, run })
     },
     async getStatus(signal) {
       return await getRemoteStatus(target, { signal, run })

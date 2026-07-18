@@ -32,6 +32,7 @@ import {
 } from '#/shared/workspace-pane-runtime.ts'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
+import type { WorkspacePaneTargetProjectionProvider } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 // Under method 2 the host threads `userId` (derived from the
 // access token) alongside `clientId` (per-tab routing). Tests use
@@ -237,12 +238,17 @@ const testWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository = {
   },
 }
 
-function buildRuntime(): RuntimeHandle {
+function buildRuntime(
+  options: {
+    captureTargets?: WorkspacePaneTargetProjectionProvider['captureTargets']
+    validate?: WorkspacePaneTargetProjectionProvider['validateTargets']
+  } = {},
+): RuntimeHandle {
   const runtime = createServerTerminalRuntime({
     ptySupervisor: createInProcessPtySupervisor(),
     workspacePaneLayoutRepository: testWorkspacePaneLayoutRepository,
     workspacePaneTargetProjection: {
-      captureTargets: async (_userId, repoRoot, scope) => {
+      captureTargets: options.captureTargets ?? (async (_userId, repoRoot, scope) => {
         const workspaceId = canonicalWorkspaceLocator(repoRoot)
         if (!workspaceId) throw new Error('invalid test workspace id')
         const separator = scope.lastIndexOf('\0')
@@ -260,7 +266,8 @@ function buildRuntime(): RuntimeHandle {
             canonicalBranch: 'feature',
           },
         ]
-      },
+      }),
+      validateTargets: options.validate ?? (async () => true),
     },
   })
   REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_a')
@@ -423,6 +430,45 @@ function terminalCreateTarget(input: Pick<TerminalCreateFixtureInput, 'repoRoot'
 }
 
 describe('server terminal runtime', () => {
+  test('opens a Git terminal from one target-catalog capture', async () => {
+    const captureTargets = vi.fn(async (...args: Parameters<WorkspacePaneTargetProjectionProvider['captureTargets']>) => {
+      const scope = args[2]
+      return [
+        {
+          target: workspacePaneWorktreeTarget(scope.slice(scope.lastIndexOf('\0') + 1)),
+          nativeWorktreePath: '/repo-linked',
+          canonicalBranch: 'feature',
+        },
+      ]
+    })
+    const validateTargets = vi.fn(async () => true)
+    const { host, shutdown } = buildRuntime({ captureTargets, validate: validateTargets })
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+
+    await expect(
+      requestWorkspacePaneRuntime(
+        host,
+        socket,
+        {
+          runtimeType: 'terminal',
+          request: {
+            target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
+            kind: 'additional',
+            cols: 80,
+            rows: 24,
+          },
+        },
+        'req_open_single_catalog_capture',
+      ),
+    ).resolves.toMatchObject({ ok: true })
+    expect(captureTargets).toHaveBeenCalledOnce()
+    expect(validateTargets).toHaveBeenCalledOnce()
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
   test('create claims controller control for the provided attachment', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }

@@ -532,6 +532,7 @@ export const en = {
   'error.failed-trash-file': 'Could not move the file to Trash',
   'error.invalid-arguments': 'Invalid arguments',
   'error.repo-runtime-stale': 'Repository runtime is stale',
+  'error.workspace-target-stale': 'Workspace target changed. Please try again.',
   'error.worktree-removal-in-progress': 'This worktree is being removed',
   'error.not-controller': 'Another session is controlling this terminal',
   'error.network-op-in-progress': 'Another git network operation is already running.',

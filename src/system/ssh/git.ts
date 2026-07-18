@@ -26,6 +26,7 @@ import {
   REMOTE_SNAPSHOT_BRANCHES_MARKER,
   REMOTE_SNAPSHOT_CURRENT_MARKER,
   REMOTE_SNAPSHOT_DEFAULT_MARKER,
+  REMOTE_PANE_WORKTREES_MARKER,
   runRemoteCommand,
   type RemoteCommandKind,
   type RemoteCommandResult,
@@ -80,6 +81,11 @@ export interface RemoteWorktreeMutationResult extends ExecResult {
   affectedWorktreePaths?: readonly string[]
 }
 
+export interface RemoteWorkspacePaneTargetIdentity {
+  branch: string
+  worktreePath: string | null
+}
+
 interface SnapshotSections {
   current: string[]
   defaultBranch: string[]
@@ -100,6 +106,27 @@ export async function getRemoteSnapshot(
   if (!snapshot) return null
   const remote = await getRemoteRepoInfo(target, { signal: options.signal, run })
   return { ...snapshot, remote }
+}
+
+/** Narrow identity read for workspace-pane membership. It intentionally skips
+ * worktree status and remote display data: neither participates in target
+ * identity or terminal admission. */
+export async function getRemoteWorkspacePaneTargetIdentities(
+  target: RemoteRepoTarget,
+  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+): Promise<RemoteWorkspacePaneTargetIdentity[]> {
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const result = await run({ type: 'gitWorkspacePaneIdentities', path: target.remotePath }, target, {
+    signal: options.signal,
+  })
+  options.signal?.throwIfAborted()
+  if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
+  const separator = `\n${REMOTE_PANE_WORKTREES_MARKER}\n`
+  const index = result.stdout.lastIndexOf(separator)
+  if (index < 0) throw new Error('error.failed-read-repo')
+  const branches = result.stdout.slice(0, index).split('\n').map((branch) => branch.trim()).filter(Boolean)
+  const worktrees = parseUsableWorktrees(result.stdout.slice(index + separator.length))
+  return branches.map((branch) => ({ branch, worktreePath: worktrees.find((worktree) => worktree.branch === branch)?.path ?? null }))
 }
 
 export async function getRemoteStatus(
@@ -839,13 +866,21 @@ export function parseRemoteSnapshot(output: string, worktrees: WorktreeInfo[] = 
 
 async function getRemoteWorktrees(
   target: RemoteRepoTarget,
-  options: { signal?: AbortSignal; run: RemoteGitRunner },
+  options: { signal?: AbortSignal; run: RemoteGitRunner; includeStatus?: boolean; requireSuccess?: boolean },
 ): Promise<WorktreeInfo[]> {
   const result = await options.run({ type: 'gitWorktreeList', path: target.remotePath }, target, {
     signal: options.signal,
   })
-  if (!result.ok || options.signal?.aborted) return []
+  if (options.signal?.aborted) {
+    if (options.requireSuccess) options.signal.throwIfAborted()
+    return []
+  }
+  if (!result.ok) {
+    if (options.requireSuccess) throw new Error(result.message || 'error.failed-read-repo')
+    return []
+  }
   const worktrees = parseUsableWorktrees(result.stdout)
+  if (options.includeStatus === false) return worktrees
   await mapWithConcurrency(
     worktrees,
     REMOTE_WORKTREE_STATUS_CONCURRENCY,

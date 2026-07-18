@@ -68,6 +68,12 @@ export interface WorkspacePaneRuntimeTabsProvider {
 
 export interface WorkspacePaneTargetProjectionProvider {
   captureTargets(userId: string, repoRoot: string, scope: string): Promise<readonly WorkspacePaneTargetProjection[]>
+  validateTargets(
+    userId: string,
+    repoRoot: string,
+    scope: string,
+    captured: readonly WorkspacePaneTargetProjection[],
+  ): Promise<boolean>
 }
 
 export interface WorkspacePaneTabsCommandResult extends WorkspacePaneLayoutCommitResult {
@@ -77,6 +83,7 @@ export interface WorkspacePaneTabsCommandResult extends WorkspacePaneLayoutCommi
 export type WorkspacePaneRuntimeTabCommitResult =
   | { kind: 'committed'; snapshot: WorkspacePaneTabsSnapshot }
   | { kind: 'runtime-stale' }
+  | { kind: 'target-stale' }
 
 export interface WorkspaceRuntimeTabPlacementInput {
   userId: string
@@ -141,7 +148,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
         (projection) => projectionKey(projection) === runtimeTargetKey(input.target),
       )
       if (!capturedTarget || capturedTarget.nativeWorktreePath !== input.worktreePath) {
-        return { kind: 'runtime-stale' }
+        return { kind: 'target-stale' }
       }
       const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, runtimeScope)
       if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
@@ -150,18 +157,12 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
       const current = await layout.snapshot({ scope, validTargets: capturedTargets, providerSnapshots })
       if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
-      const commitTargets = await this.targetProjection.captureTargets(input.userId, repoRoot, runtimeScope)
-      if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
-      this.worktreeOperations.assertPermit(physicalCapability, input.permit)
-      const commitTarget = commitTargets.find(
-        (projection) => projectionKey(projection) === projectionKey(capturedTarget),
-      )
-      if (!commitTarget || commitTarget.nativeWorktreePath !== input.worktreePath) {
-        return { kind: 'runtime-stale' }
+      if (!(await this.targetProjection.validateTargets(input.userId, repoRoot, runtimeScope, capturedTargets))) {
+        return { kind: 'target-stale' }
       }
-      if (commitTarget.target.kind === 'workspace-root') {
-        if (commitTarget.canonicalBranch !== null) return { kind: 'runtime-stale' }
-      } else if (!commitTarget.canonicalBranch) {
+      if (capturedTarget.target.kind === 'workspace-root') {
+        if (capturedTarget.canonicalBranch !== null) return { kind: 'runtime-stale' }
+      } else if (!capturedTarget.canonicalBranch) {
         return { kind: 'runtime-stale' }
       }
       const entry = current.entries.find(
@@ -177,8 +178,8 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
       const pendingProviderSnapshots = providerSnapshotsWithPendingSession(providerSnapshots, {
         type: input.runtimeType,
         sessionId: input.sessionId,
-        target: commitTarget.target,
-        branch: commitTarget.canonicalBranch,
+        target: capturedTarget.target,
+        branch: capturedTarget.canonicalBranch,
         worktreePath: input.worktreePath,
       })
       if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
@@ -186,16 +187,16 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
       const snapshot = await layout.commitRuntimeTarget(
         {
           ...scope,
-          target: commitTarget.target,
+          target: capturedTarget.target,
           lease: physicalWorktreeAdmissionLease(physicalCapability),
           tabs,
-          validTargets: commitTargets,
+          validTargets: capturedTargets,
           providerSnapshots: pendingProviderSnapshots,
         },
         () => {
           if (!input.isRuntimeCurrent()) throw new WorkspacePaneRuntimeStaleError()
           this.worktreeOperations.assertPermit(physicalCapability, input.permit)
-          input.commitAdmission(commitTarget.canonicalBranch)
+          input.commitAdmission(capturedTarget.canonicalBranch)
         },
       )
       return { kind: 'committed', snapshot }

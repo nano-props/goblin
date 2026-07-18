@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   fsStat: vi.fn(),
   isGitRepo: vi.fn(),
   getBranches: vi.fn(),
+  getBranchWorktreeIdentities: vi.fn(),
   getBranchPullRequests: vi.fn(),
   getCurrentBranch: vi.fn(),
   getDefaultBranch: vi.fn(),
@@ -30,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   getRepoName: vi.fn(),
   getRepoRoot: vi.fn(),
   getRemoteInfo: vi.fn(),
+  getWorkingStatus: vi.fn(),
   getUpstream: vi.fn(),
   getWorktrees: vi.fn(),
   isAncestor: vi.fn(),
@@ -49,6 +51,7 @@ const mocks = vi.hoisted(() => ({
   fetchRemoteRepo: vi.fn(),
   getWorktreeBootstrapPreview: vi.fn(),
   getRemoteRepoWorktreePaths: vi.fn(),
+  getRemoteWorkspacePaneTargetIdentities: vi.fn(),
   getRemoteRepoWriteGroupPath: vi.fn(),
   getRemoteWorktreeBootstrapPreview: vi.fn(),
   removeRemoteWorktree: vi.fn(),
@@ -63,6 +66,7 @@ vi.mock('#/system/git/branches.ts', () => ({
   deleteBranch: mocks.deleteBranch,
   deleteUpstreamBranch: mocks.deleteUpstreamBranch,
   getBranches: mocks.getBranches,
+  getBranchWorktreeIdentities: mocks.getBranchWorktreeIdentities,
   getCurrentBranch: mocks.getCurrentBranch,
   getDefaultBranch: mocks.getDefaultBranch,
   getRepoCommonDir: mocks.getRepoCommonDir,
@@ -105,7 +109,7 @@ vi.mock('#/system/git/remote-refs.ts', () => ({
 }))
 
 vi.mock('#/system/git/status.ts', () => ({
-  getWorkingStatus: vi.fn(),
+  getWorkingStatus: mocks.getWorkingStatus,
 }))
 
 vi.mock('#/system/git/worktrees.ts', () => ({
@@ -149,6 +153,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
   getRemoteLog: vi.fn(),
   getRemotePatch: vi.fn(),
   getRemoteRepoWorktreePaths: mocks.getRemoteRepoWorktreePaths,
+  getRemoteWorkspacePaneTargetIdentities: mocks.getRemoteWorkspacePaneTargetIdentities,
   getRemoteRepoWriteGroupPath: mocks.getRemoteRepoWriteGroupPath,
   getRemoteSnapshot: vi.fn(),
   getRemoteStatus: vi.fn(),
@@ -329,6 +334,29 @@ describe('getRepoSnapshot', () => {
 
     expect(result).toEqual(snapshot)
     expectNoRepoSnapshotInvalidations()
+  })
+})
+
+describe('getWorkspacePaneTargetIdentities', () => {
+  test('reads only worktree and branch identity without status or remote display data', async () => {
+    const worktrees = [{ path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true }]
+    mocks.getWorktrees.mockResolvedValueOnce(worktrees)
+    mocks.getBranchWorktreeIdentities.mockResolvedValueOnce([
+      { branch: 'main', worktreePath: '/tmp/repo' },
+      { branch: 'feature/no-worktree', worktreePath: null },
+    ])
+
+    const { getWorkspacePaneTargetIdentities } = await import('#/server/modules/repo-read-paths.ts')
+    await expect(getWorkspacePaneTargetIdentities(REPO_ID)).resolves.toEqual([
+      { branch: 'main', worktreePath: '/tmp/repo' },
+      { branch: 'feature/no-worktree', worktreePath: null },
+    ])
+
+    expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false, signal: undefined })
+    expect(mocks.getBranchWorktreeIdentities).toHaveBeenCalledWith('/tmp/repo', worktrees, { signal: undefined })
+    expect(mocks.getBranches).not.toHaveBeenCalled()
+    expect(mocks.getWorkingStatus).not.toHaveBeenCalled()
+    expect(mocks.getRemoteInfo).not.toHaveBeenCalled()
   })
 })
 
