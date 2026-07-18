@@ -1,5 +1,6 @@
 import {
   parseWorkspacePaneTabsTargetIdentityKey,
+  gitWorktreeWorkspacePaneTabsTarget,
   type WorkspacePaneTabsTarget,
   workspacePaneTabsTargetIdentityKey,
 } from '#/shared/workspace-pane-tabs-target.ts'
@@ -21,11 +22,10 @@ export function workspacePaneTabsTargetForRepoBranch(
   if (!branchName) return null
   const branch = repo.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return null
-  return {
-    repoRoot: repo.repoRoot,
-    branchName: branch.name,
-    worktreePath: branch.worktree?.path ?? null,
+  if (!branch.worktree?.path) {
+    return { kind: 'git-branch', repoRoot: repo.repoRoot, branchName: branch.name }
   }
+  return gitWorktreeWorkspacePaneTabsTarget(repo.repoRoot, branch.worktree.path)
 }
 
 export function workspacePaneTabsTargetForRepoTargetKey(
@@ -35,23 +35,17 @@ export function workspacePaneTabsTargetForRepoTargetKey(
   const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
   if (!target || target.repoRoot !== repo.repoRoot) return null
   if (target.kind === 'workspace-root') {
-    return { kind: 'workspace-root', repoRoot: repo.repoRoot, branchName: null, worktreePath: null }
+    return { kind: 'workspace-root', repoRoot: repo.repoRoot }
   }
   if (target.kind === 'branch') {
     return repo.branches.some((branch) => branch.name === target.branchName)
-      ? { repoRoot: repo.repoRoot, branchName: target.branchName, worktreePath: null }
+      ? { kind: 'git-branch', repoRoot: repo.repoRoot, branchName: target.branchName }
       : null
   }
   const worktreePath = parseCanonicalWorkspaceLocator(target.worktreeId)?.path
   if (!worktreePath) return null
   const branch = repo.branches.find((candidate) => candidate.worktree?.path === worktreePath)
-  return branch
-    ? {
-        repoRoot: repo.repoRoot,
-        branchName: branch.name,
-        worktreePath,
-      }
-    : null
+  return branch ? gitWorktreeWorkspacePaneTabsTarget(repo.repoRoot, worktreePath) : null
 }
 
 export function preferredWorkspacePaneTabForTarget(

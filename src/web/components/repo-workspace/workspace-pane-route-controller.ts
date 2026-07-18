@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react'
-import type { ParsedRepoBranchWorkspacePaneRouteTarget, RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import {
   useWorkspaceNavigationHistory,
   type WorkspaceNavigationRouteContext,
@@ -7,6 +7,7 @@ import {
 import { usePrimaryWindowNavigation, type PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { useSyncRepoWorkspaceRuntimeTabSelection } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
 import {
@@ -32,7 +33,7 @@ export interface WorkspacePaneRouteControllerInput {
   repoId: string
   branchName: string | null
   worktreePath: string | null
-  route: ParsedRepoBranchWorkspacePaneRouteTarget
+  route: ParsedWorkspacePaneRouteTarget
   model: RepoWorkspaceTabModel
 }
 
@@ -122,7 +123,7 @@ function useReconcileWorkspacePaneRoute({
   repoRuntimeId: string
   branchName: string | null
   worktreePath: string | null
-  route: ParsedRepoBranchWorkspacePaneRouteTarget
+  route: ParsedWorkspacePaneRouteTarget
   reconciliation: WorkspacePaneRouteReconciliation
   routeIntentPending: boolean
   navigation: PrimaryWindowNavigationActions
@@ -157,7 +158,7 @@ function useWorkspacePaneNavigationHistory({
   repoId: string
   branchName: string | null
   worktreePath: string | null
-  route: ParsedRepoBranchWorkspacePaneRouteTarget
+  route: ParsedWorkspacePaneRouteTarget
   reconciliation: WorkspacePaneRouteReconciliation
 }): void {
   const historyRoute = workspacePaneRouteHistoryResolution(route ?? null, reconciliation)
@@ -182,8 +183,8 @@ function useWorkspacePaneNavigationHistory({
 }
 
 function workspacePaneValidRouteTarget(
-  route: ParsedRepoBranchWorkspacePaneRouteTarget,
-): RepoBranchWorkspacePaneRouteTarget {
+  route: ParsedWorkspacePaneRouteTarget,
+): WorkspacePaneRouteTarget {
   if (route?.kind === 'invalid-static') return null
   return route
 }
@@ -197,7 +198,7 @@ function workspacePaneHistoryRouteContext({
   repoId: string
   branchName: string
   worktreePath: string | null
-  route: RepoBranchWorkspacePaneRouteTarget
+  route: WorkspacePaneRouteTarget
 }): WorkspaceNavigationRouteContext {
   return {
     kind: 'branch',
@@ -237,7 +238,7 @@ function useSyncRoutedWorkspacePaneSelection({
   repoId: string
   branchName: string | null
   worktreePath: string | null
-  route: ParsedRepoBranchWorkspacePaneRouteTarget
+  route: ParsedWorkspacePaneRouteTarget
   reconciliation: WorkspacePaneRouteReconciliation
 }): void {
   const setWorkspacePaneTab = useReposStore((s) => s.setWorkspacePaneTab)
@@ -248,11 +249,7 @@ function useSyncRoutedWorkspacePaneSelection({
     const state = useReposStore.getState()
     const repo = state.repos[repoId]
     if (!repo) return
-    const target = {
-      repoRoot: repoId,
-      branchName,
-      worktreePath,
-    }
+    const target = requiredGitWorkspacePaneTabsTarget(repoId, branchName, worktreePath)
     if (route?.kind === 'invalid-static') return
     const routeTab = route === null ? null : route.kind === 'static' ? route.tab : 'terminal'
     if (preferredWorkspacePaneTabForTarget(repo.ui, target) !== routeTab) {

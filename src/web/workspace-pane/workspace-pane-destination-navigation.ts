@@ -1,4 +1,4 @@
-import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { terminalWorkspacePaneTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
@@ -21,7 +21,7 @@ import {
 
 export type WorkspacePaneDestinationNavigation = Pick<
   PrimaryWindowNavigationActions,
-  'commitRepoBranchWorkspacePaneRoute'
+  'commitWorkspacePaneRoute'
 >
 
 export interface WorkspacePaneDestinationPresentation {
@@ -48,7 +48,7 @@ export function resetWorkspacePaneDestinationPresentationForTest(): void {
 export async function dispatchWorkspacePaneDestinationRoute(input: {
   repoId: string
   branchName: string
-  route: RepoBranchWorkspacePaneRouteTarget
+  route: WorkspacePaneRouteTarget
   navigation: WorkspacePaneDestinationNavigation
   options?: { replace?: boolean }
 }): Promise<WorkspacePaneActionOutcome> {
@@ -72,7 +72,7 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
  */
 export async function commitWorkspacePaneDestinationRoute(
   presentation: WorkspacePaneDestinationPresentation,
-  route: RepoBranchWorkspacePaneRouteTarget,
+  route: WorkspacePaneRouteTarget,
   navigation: WorkspacePaneDestinationNavigation,
   options?: { replace?: boolean },
 ): Promise<WorkspacePaneActionOutcome> {
@@ -81,7 +81,7 @@ export async function commitWorkspacePaneDestinationRoute(
   let accepted = false
   let supplementCommitted = false
   try {
-    accepted = await navigation.commitRepoBranchWorkspacePaneRoute(lease.repoId, lease.branchName, route, {
+    accepted = await navigation.commitWorkspacePaneRoute(lease.repoId, lease.branchName, route, {
       ...options,
       presentationToken: presentation.token,
       onCommit: () => {
@@ -99,7 +99,7 @@ export async function commitWorkspacePaneDestinationRoute(
 
 function workspacePaneDestinationRouteSupported(
   lease: WorkspacePaneDestinationTargetLease,
-  route: RepoBranchWorkspacePaneRouteTarget,
+  route: WorkspacePaneRouteTarget,
 ): boolean {
   if (route === null) return true
   const availability = { hasWorktree: lease.worktreePath !== null }

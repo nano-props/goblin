@@ -1,5 +1,5 @@
 import type { TerminalCreateResult, TerminalSessionInput, TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import { terminalExecutionPath } from '#/shared/terminal-types.ts'
+import { terminalExecutionPath, terminalGitWorktreePresentation } from '#/shared/terminal-types.ts'
 import type {
   TerminalWorkspacePaneRuntimeOpenInput,
   WorkspacePaneRuntimeCloseInput,
@@ -27,6 +27,8 @@ import type { ServerTerminalCreateProvider } from '#/server/terminal/terminal-se
 import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure-settlement.ts'
 import { restorableWorkspacePaneTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import { runtimeWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-target.ts'
+import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
+import { workspaceProbeStateForRuntime } from '#/server/modules/repo-runtimes.ts'
 
 type MaybePromise<T> = T | Promise<T>
 const workspacePaneRuntimeApplicationLogger = serverLogger.child({ module: 'workspace-pane-runtime-application' })
@@ -75,6 +77,12 @@ export class WorkspacePaneRuntimeApplication {
     if (!this.deps.isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId)) {
       return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
     }
+    // Runtime admission is a server-owned capability boundary. The client may
+    // still render a terminal action from an older projection while a probe
+    // transition is in flight, so never admit PTY creation from UI state.
+    if (!this.terminalCapabilityAvailable(userId, repoRoot, repoRuntimeId)) {
+      return runtimeFailure(input.runtimeType, 'error.unavailable')
+    }
     let physicalCapability: PhysicalWorktreeExecutionCapability
     try {
       physicalCapability = await this.capturePhysicalWorktree(userId, { repoRoot, repoRuntimeId }, worktreePath)
@@ -85,6 +93,9 @@ export class WorkspacePaneRuntimeApplication {
     let result: { admitted: true; value: WorkspacePaneRuntimeOpenResult } | { admitted: false }
     try {
       result = await this.deps.worktreeOperations.runOperation(physicalCapability, async (permit) => {
+        if (!this.terminalCapabilityAvailable(userId, repoRoot, repoRuntimeId)) {
+          return runtimeFailure(input.runtimeType, 'error.unavailable')
+        }
         switch (input.runtimeType) {
           case 'terminal':
             return await this.openTerminal(
@@ -189,10 +200,7 @@ export class WorkspacePaneRuntimeApplication {
           const presentation =
             target.kind === 'workspace-root'
               ? ({ kind: 'workspace-root' } as const)
-              : canonicalBranch
-                ? ({ kind: 'git-worktree', branchName: canonicalBranch } as const)
-                : null
-          if (!presentation) throw new Error('terminal presentation unavailable')
+              : terminalGitWorktreePresentation(canonicalBranch)
           committedRuntime = {
             ok: true,
             terminalSessionId: runtime.terminalSessionId,
@@ -278,6 +286,10 @@ export class WorkspacePaneRuntimeApplication {
 
   private isCurrentTarget(userId: string, target: WorkspacePaneRuntimeCommandTarget): boolean {
     return this.deps.isCurrentRepoRuntime(userId, target.target.workspaceId, target.target.workspaceRuntimeId)
+  }
+
+  private terminalCapabilityAvailable(userId: string, workspaceId: string, workspaceRuntimeId: string): boolean {
+    return workspaceTerminalAvailable(workspaceProbeStateForRuntime(userId, workspaceId, workspaceRuntimeId))
   }
 
   private async capturePhysicalWorktree(

@@ -18,9 +18,13 @@ describe('getBranchWorktreeIdentities', () => {
         { path: '/worktrees/linked', branch: 'feature/linked', isBare: false, isPrimary: false },
       ]),
     ).resolves.toEqual([
-      { branch: 'main', worktreePath: '/repo' },
-      { branch: 'feature/linked', worktreePath: '/worktrees/linked' },
-      { branch: 'feature/free', worktreePath: null },
+      { kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'branch', branchName: 'main' } },
+      {
+        kind: 'git-worktree',
+        worktreePath: '/worktrees/linked',
+        head: { kind: 'branch', branchName: 'feature/linked' },
+      },
+      { kind: 'git-branch', branchName: 'feature/free' },
     ])
     expect(git).toHaveBeenCalledWith('/repo', ['for-each-ref', '--format=%(refname:short)', 'refs/heads/'], {
       signal: undefined,
@@ -30,5 +34,14 @@ describe('getBranchWorktreeIdentities', () => {
   test('does not turn a failed authority read into an empty catalog', async () => {
     vi.mocked(git).mockRejectedValueOnce(new Error('git unavailable'))
     await expect(getBranchWorktreeIdentities('/repo', [])).rejects.toThrow('git unavailable')
+  })
+
+  test('keeps a detached local worktree without a branch ref', async () => {
+    vi.mocked(git).mockResolvedValueOnce('')
+    await expect(
+      getBranchWorktreeIdentities('/repo', [
+        { path: '/repo', isBare: false, isPrimary: true },
+      ]),
+    ).resolves.toEqual([{ kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'detached' } }])
   })
 })

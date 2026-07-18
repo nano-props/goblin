@@ -198,11 +198,10 @@ export function useKeyboard({
           const repo = repoId ? useReposStore.getState().repos[repoId] : null
           if (!workspaceTerminalAvailable(repo?.workspaceProbe)) return
           e.preventDefault()
-          const target = workspacePaneCommandCoordinates(paneTarget)
           // Cmd+T is a generic entry → new terminal appends to the end.
           void runNewTerminalTabCommand({
             repoId,
-            ...target,
+            target: paneTarget,
             navigation,
             t: translate,
           })
@@ -226,10 +225,9 @@ export function useKeyboard({
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyW') {
           if (!paneTarget) return
           e.preventDefault()
-          const target = workspacePaneCommandCoordinates(paneTarget)
           void runCloseWorkspacePaneTabOrWindowCommand({
             repoId,
-            ...target,
+            target: paneTarget,
             navigation,
           })
           return
@@ -238,10 +236,9 @@ export function useKeyboard({
         if (tabIndex !== null) {
           if (!paneTarget) return
           e.preventDefault()
-          const target = workspacePaneCommandCoordinates(paneTarget)
           void runSelectWorkspacePaneTabByIndexCommand({
             repoId,
-            ...target,
+            target: paneTarget,
             tabIndex,
             navigation,
           })
@@ -301,10 +298,9 @@ export function useKeyboard({
           const paneTarget = currentWorkspacePaneCommandTargetRef.current
           if (overlayOpen || !repo || !paneTarget) break
           e.preventDefault()
-          const target = workspacePaneCommandCoordinates(paneTarget)
           void runMoveWorkspacePaneTabCommand({
             repoId: repo.id,
-            ...target,
+            target: paneTarget,
             direction: action === 'next-workspace-pane-tab' ? 1 : -1,
             navigation,
           })

@@ -1308,7 +1308,7 @@ describe('projection refresh request ordering', () => {
     updateRepoForTest((repo) => {
       repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
         repo.ui,
-        { repoRoot: REPO_ID, branchName: 'feature/a', worktreePath: null },
+        { kind: 'git-branch', repoRoot: REPO_ID, branchName: 'feature/a' },
         'terminal',
       )
     })
@@ -1337,7 +1337,7 @@ describe('projection refresh request ordering', () => {
     updateRepoForTest((repo) => {
       repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
         repo.ui,
-        { repoRoot: REPO_ID, branchName: 'feature/old', worktreePath: '/tmp/worktree-a' },
+        { kind: 'git-worktree', repoRoot: REPO_ID, worktreePath: '/tmp/worktree-a' },
         'terminal',
       )
     })

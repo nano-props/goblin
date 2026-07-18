@@ -17,7 +17,7 @@ export function showCreatedWorkspacePaneFilesystemTerminal(
     const state = useReposStore.getState()
     state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootPath), terminalSessionId)
     state.setWorkspacePaneTabForTarget(
-      { kind: 'workspace-root', repoRoot: target.workspaceId, branchName: null, worktreePath: null },
+      { kind: 'workspace-root', repoRoot: target.workspaceId },
       'terminal',
     )
     return true

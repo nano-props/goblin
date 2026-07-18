@@ -103,9 +103,9 @@ describe('restoreRepoTabsForRepo', () => {
 
   test('probes + projects + restores tabs for a single repo', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-branch',
       repoRoot: 'goblin+file:///repo',
       branchName: 'main',
-      worktreePath: null,
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
@@ -157,9 +157,9 @@ describe('restoreRepoTabsForRepo', () => {
 
   test('repairs invalid deferred tab state before initializing the runtime scope', async () => {
     const staleTargetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-branch',
       repoRoot: 'goblin+file:///repo',
       branchName: 'deleted-branch',
-      worktreePath: null,
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
@@ -399,9 +399,9 @@ describe('restoreRepoTabsForRepo', () => {
 
   test('does not repair pane tabs after repo membership is removed', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-branch',
       repoRoot: 'goblin+file:///repo',
       branchName: 'deleted',
-      worktreePath: null,
     })
     const workspace = {
       ...defaultServerWorkspaceState(),

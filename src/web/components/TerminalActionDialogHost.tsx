@@ -5,12 +5,12 @@ import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { useTerminalActionDialogsStore } from '#/web/stores/repos/terminal-action-dialogs.ts'
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 
 interface Props {
   currentRepoId: string | null
   currentBranchName: string | null
-  currentWorkspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   navigation: PrimaryWindowNavigationActions
 }
 
@@ -54,10 +54,6 @@ export function TerminalActionDialogHost({
         closeCloseConfirm()
         await runConfirmCloseTerminalWorkspacePaneTabCommand({
           repoId: payload.repoId,
-          branchName:
-            payload.terminalBase.presentation.kind === 'git-worktree'
-              ? payload.terminalBase.presentation.branchName
-              : null,
           workspacePaneRoute: payload.workspacePaneRoute,
           currentRepoId,
           currentBranchName,

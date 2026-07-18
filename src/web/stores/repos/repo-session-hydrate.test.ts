@@ -38,9 +38,9 @@ beforeEach(resetLifecycleTest)
 describe('repo session hydration', () => {
   test('restores a validated preferred tab for an eagerly projected repo', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-branch' as const,
       repoRoot: REPO_A,
       branchName: 'main',
-      worktreePath: null,
     })
     await useReposStore.getState().hydrateRestoredWorkspaceRuntime(
       {
@@ -69,10 +69,10 @@ describe('repo session hydration', () => {
               entries: [
                 {
                   target: runtimeWorkspacePaneTargetForTest({
+                    kind: 'git-branch' as const,
                     repoRoot: REPO_A,
                     repoRuntimeId: 'repo-runtime-server-a',
                     branchName: 'main',
-                    worktreePath: null,
                   }),
                   tabs: [workspacePaneStaticTabEntry('history')],
                 },
@@ -254,9 +254,9 @@ describe('repo session hydration', () => {
 
   test('restores preferred tabs when a lazy repo is promoted', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-branch' as const,
       repoRoot: REPO_A,
       branchName: 'main',
-      worktreePath: null,
     })
     await useReposStore.getState().hydrateRestoredWorkspaceRuntime(
       {
@@ -301,10 +301,10 @@ describe('repo session hydration', () => {
         entries: [
           {
             target: runtimeWorkspacePaneTargetForTest({
+              kind: 'git-branch' as const,
               repoRoot: REPO_A,
               repoRuntimeId: 'repo-runtime-server-a',
               branchName: 'main',
-              worktreePath: null,
             }),
             tabs: [workspacePaneStaticTabEntry('history')],
           },

@@ -10,6 +10,14 @@ import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-f
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 
 const WORKSPACE_ID = 'goblin+file:///tmp/repo'
+function treeTarget(workspaceRuntimeId: string) {
+  return {
+    kind: 'git-worktree' as const,
+    workspaceId: WORKSPACE_ID,
+    workspaceRuntimeId,
+    root: 'goblin+file:///tmp/repo/.worktrees/feature',
+  }
+}
 
 const mocks = vi.hoisted(() => ({
   probeRepo: vi.fn(),
@@ -865,9 +873,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       name: 'tree',
       path: '/tree',
       body: (repoId: string, repoRuntimeId: string) => ({
-        cwd: repoId,
-        repoRuntimeId,
-        worktreePath: '/home/alice/service/.worktrees/feature',
+        target: {
+          kind: 'git-worktree',
+          workspaceId: repoId,
+          workspaceRuntimeId: repoRuntimeId,
+          root: 'goblin+ssh://prod/home/alice/service/.worktrees/feature',
+        },
       }),
       mock: mocks.getRepositoryTree,
     },
@@ -998,9 +1009,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          cwd: WORKSPACE_ID,
-          repoRuntimeId,
-          worktreePath: '/tmp/repo/.worktrees/feature',
+          target: treeTarget(repoRuntimeId),
           prefix: 'src',
         }),
       }),
@@ -1009,13 +1018,14 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     const json = (await response.json()) as { nodes: Array<{ id: string }>; truncated: boolean }
     expect(json.nodes.map((n) => n.id)).toEqual(['src', 'src/index.ts'])
     expect(json.truncated).toBe(false)
-    expect(mocks.getRepositoryTree).toHaveBeenCalledWith(WORKSPACE_ID, '/tmp/repo/.worktrees/feature', {
+    expect(mocks.getRepositoryTree).toHaveBeenCalledWith(treeTarget(repoRuntimeId), {
       prefix: 'src',
       repoRuntimeId,
+      signal: expect.any(AbortSignal),
     })
   })
 
-  test('does not pass the HTTP request signal into /tree reads', async () => {
+  test('passes the HTTP request signal into /tree reads', async () => {
     mocks.getRepositoryTree.mockResolvedValueOnce({ nodes: [], truncated: false })
     const app = createTestRepoRoutes()
     const repoRuntimeId = await openTestRepoRuntime(app)
@@ -1023,14 +1033,13 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/tree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
+        body: JSON.stringify({ target: treeTarget(repoRuntimeId) }),
       }),
     )
 
     expect(response.status).toBe(200)
-    const options = mocks.getRepositoryTree.mock.calls[0]?.[2] as { signal?: AbortSignal } | undefined
-    expect(options).toEqual({ prefix: undefined, repoRuntimeId })
-    expect(options?.signal).toBeUndefined()
+    const options = mocks.getRepositoryTree.mock.calls[0]?.[1] as { signal?: AbortSignal } | undefined
+    expect(options).toEqual({ prefix: undefined, repoRuntimeId, signal: expect.any(AbortSignal) })
   })
 
   test('returns 400 when /tree prefix is invalid', async () => {
@@ -1040,9 +1049,31 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/tree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, worktreePath: '/tmp/repo', prefix: '../secret' }),
+        body: JSON.stringify({ target: treeTarget(repoRuntimeId), prefix: '../secret' }),
       }),
     )
+    expect(response.status).toBe(400)
+    expect(mocks.getRepositoryTree).not.toHaveBeenCalled()
+  })
+
+  test('returns 400 before the read layer for a cross-transport tree target', async () => {
+    const app = createTestRepoRoutes()
+    const repoRuntimeId = await openTestRepoRuntime(app)
+    const response = await app.request(
+      new Request('http://localhost/tree', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          target: {
+            kind: 'git-worktree',
+            workspaceId: WORKSPACE_ID,
+            workspaceRuntimeId: repoRuntimeId,
+            root: 'goblin+file:///C:/mock-worktree',
+          },
+        }),
+      }),
+    )
+
     expect(response.status).toBe(400)
     expect(mocks.getRepositoryTree).not.toHaveBeenCalled()
   })
@@ -1055,7 +1086,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/tree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, worktreePath: '/tmp/repo' }),
+        body: JSON.stringify({ target: treeTarget(repoRuntimeId) }),
       }),
     )
     expect(response.status).toBe(500)

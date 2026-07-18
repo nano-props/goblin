@@ -90,7 +90,10 @@ export function RepoView({
 
   const currentBranchName = routeView?.kind === 'branch' ? routeView.branchName : null
   const routeWorkspacePageActive =
-    routeView?.kind === 'workspace' || routeView?.kind === 'dashboard' || routeView?.kind === 'newWorktree'
+    routeView?.kind === 'workspace' ||
+    routeView?.kind === 'worktree' ||
+    routeView?.kind === 'dashboard' ||
+    routeView?.kind === 'newWorktree'
   const repoWorkspaceActive = currentBranchName !== null || routeWorkspacePageActive
   const singlePane = currentBranchName || routeWorkspacePageActive ? 'workspace' : 'navigator'
   const compactWorkspaceCurrentBranchName = useRetainedValueDuringExit({
@@ -148,7 +151,7 @@ export function RepoView({
     useReposStore
       .getState()
       .setWorkspacePaneTabForTarget(
-        { kind: 'workspace-root', repoRoot: repo.id, branchName: null, worktreePath: null },
+        { kind: 'workspace-root', repoRoot: repo.id },
         type,
       )
     onOpenRepoWorkspace?.(repo.id)
@@ -288,7 +291,20 @@ export function RepoView({
             <RepoWorkspace
               repoId={repoId}
               currentBranchName={null}
-              workspacePaneRouteContext={{ kind: 'routed', route: null }}
+              workspacePaneRouteContext={{ kind: 'workspace-root' }}
+              shortcutsEnabled={!compact || singlePane === 'workspace'}
+              toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+              onBackToBranchNavigator={() => onOpenRepoRoot?.(repo.id)}
+            />
+          ) : routeView?.kind === 'worktree' ? (
+            <RepoWorkspace
+              repoId={repoId}
+              currentBranchName={null}
+              workspacePaneRouteContext={{
+                kind: 'git-worktree',
+                worktreePath: routeView.worktreePath,
+                route: routeView.workspacePaneRoute,
+              }}
               shortcutsEnabled={!compact || singlePane === 'workspace'}
               toolbarTrafficLightOffset={workspaceTrafficLightOffset}
               onBackToBranchNavigator={() => onOpenRepoRoot?.(repo.id)}

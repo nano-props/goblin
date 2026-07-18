@@ -144,14 +144,26 @@ describe('remote ssh command builders', () => {
     expect(invocation.script).toContain('exec "${SHELL:-/bin/sh}" -l')
   })
 
-  test('remote tree walk uses directory listing for direct children', () => {
+  test('remote filesystem walk lists direct children without Git filtering', () => {
     const invocation = buildRemoteCommandInvocation(target(), {
-      type: 'gitTreeWalk',
+      type: 'directoryChildren',
       path: '/srv/repo worktree',
       prefix: 'src/app',
     })
 
     expect(invocation.script).toContain('find "$dir" -mindepth 1 -maxdepth 1')
+    expect(invocation.script).not.toContain('check-ignore')
+    expect(invocation.script).not.toContain('ls-files -- "$rel"')
+    expect(invocation.script).toContain('error.workspace-path-not-found')
+  })
+
+  test('remote Git worktree walk decorates direct children with ignore state', () => {
+    const invocation = buildRemoteCommandInvocation(target(), {
+      type: 'gitDirectoryChildren',
+      path: '/srv/repo worktree',
+      prefix: 'src/app',
+    })
+
     expect(invocation.script).toContain('check-ignore')
     expect(invocation.script).toContain('ls-files -- "$rel"')
     expect(invocation.script).not.toContain('ls-files -co --exclude-standard -z')

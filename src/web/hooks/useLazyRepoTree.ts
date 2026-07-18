@@ -15,11 +15,13 @@ import {
   type LazyRepoTreeState,
 } from '#/web/filetree-lazy-state.ts'
 import type { RepoTreeResult } from '#/shared/api-types.ts'
+import {
+  workspacePaneFilesystemExecutionPath,
+  type WorkspacePaneFilesystemExecutionTarget,
+} from '#/shared/workspace-runtime.ts'
 
 export interface UseLazyRepoTreeInput {
-  readonly repoId: string
-  readonly repoRuntimeId: string
-  readonly worktreePath: string
+  readonly target: WorkspacePaneFilesystemExecutionTarget
   readonly expandedKeys?: readonly string[]
 }
 
@@ -51,7 +53,10 @@ function repoTreeChildrenQueryKey(repoId: string, repoRuntimeId: string, worktre
 }
 
 export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeResult {
-  const { repoId, repoRuntimeId, worktreePath } = input
+  const { target } = input
+  const repoId = target.workspaceId
+  const repoRuntimeId = target.workspaceRuntimeId
+  const worktreePath = workspacePaneFilesystemExecutionPath(target)
   const expandedKeys = input.expandedKeys ?? EMPTY_EXPANDED_KEYS
   const queryClient = useQueryClient()
   const enabled = repoId.length > 0 && repoRuntimeId.length > 0 && worktreePath.length > 0
@@ -75,7 +80,7 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
     // The query cache owns this root read across transient panel observer lifetimes.
     // Runtime identity is part of the key and the server rejects stale runtimes, so
     // aborting when a tab briefly remounts only creates duplicate replacement reads.
-    queryFn: () => getRepositoryTree(repoId, worktreePath, { repoRuntimeId }),
+    queryFn: () => getRepositoryTree(target, {}),
     retry: false,
     staleTime: Infinity,
   })
@@ -127,7 +132,7 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
         const result = await queryClient.fetchQuery({
           queryKey: repoTreeChildrenQueryKey(repoId, repoRuntimeId, worktreePath, normalizedPrefix),
           queryFn: ({ signal }) =>
-            getRepositoryTree(repoId, worktreePath, { repoRuntimeId, prefix: normalizedPrefix || undefined, signal }),
+            getRepositoryTree(target, { prefix: normalizedPrefix || undefined, signal }),
           retry: false,
         })
         dispatchTreeState({ type: 'childrenLoaded', prefix: normalizedPrefix, result })
@@ -147,6 +152,7 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
       treeState.loadedPrefixes,
       treeState.loadingPrefixes,
       worktreePath,
+      target,
     ],
   )
 

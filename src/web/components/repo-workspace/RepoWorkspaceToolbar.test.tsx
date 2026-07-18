@@ -43,7 +43,7 @@ import {
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import {
   terminalExecutionPath,
   terminalPresentationBranch,
@@ -71,6 +71,7 @@ import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
 import {
+  observeWorkspacePaneRouteForTest,
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
@@ -143,7 +144,7 @@ function defaultRuntimeExternalAppSettings() {
 type RepoWorkspaceToolbarHarnessProps = Omit<
   ComponentProps<typeof RepoWorkspaceToolbar>,
   'workspacePaneTabModel' | 'branchActions'
-> & { workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined }
+> & { workspacePaneRoute: WorkspacePaneRoute | null | undefined }
 
 function RepoWorkspaceToolbarHarness(props: RepoWorkspaceToolbarHarnessProps) {
   const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail, props.workspacePaneRoute)
@@ -981,6 +982,27 @@ describe('RepoWorkspaceToolbar', () => {
     expect(mocks.selectTerminal).not.toHaveBeenCalled()
   })
 
+  test('selects a tab against the current worktree target after its path changes', async () => {
+    const nextWorktreePath = '/tmp/goblin-repo-workspace-toolbar-worktree-relocated'
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+    const { container: c, rerenderWorktreePath } = renderToolbar({
+      terminalCount: 0,
+      workspacePaneStaticTabs: ['status', 'files'],
+      navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
+    })
+
+    rerenderWorktreePath(nextWorktreePath)
+    const filesTab = c.querySelector<HTMLButtonElement>(
+      '[data-workspace-pane-tab-tooltip-id="workspace-pane:files"] button[role="tab"]',
+    )
+    expect(filesTab).not.toBeNull()
+
+    act(() => filesTab?.click())
+    await flush()
+
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'files')
+  })
+
   test('does not show branch actions in the workspace bar (actions moved to branch rows)', () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
@@ -1019,7 +1041,7 @@ describe('RepoWorkspaceToolbar', () => {
     const showRepoBranchTerminalSession = vi.fn<PrimaryWindowNavigationActions['showRepoBranchTerminalSession']>(
       () => true,
     )
-    const commitRepoBranchWorkspacePaneRoute: PrimaryWindowNavigationActions['commitRepoBranchWorkspacePaneRoute'] = (
+    const commitWorkspacePaneRoute: PrimaryWindowNavigationActions['commitWorkspacePaneRoute'] = (
       repoId,
       branchName,
       route,
@@ -1041,7 +1063,7 @@ describe('RepoWorkspaceToolbar', () => {
       navigation: navigationWith({
         showRepoBranchWorkspacePaneTab,
         showRepoBranchTerminalSession,
-        commitRepoBranchWorkspacePaneRoute,
+        commitWorkspacePaneRoute,
       }),
     })
 
@@ -1275,6 +1297,7 @@ function renderToolbar(options: {
   container: HTMLElement
   terminalTab: HTMLButtonElement
   rerender: ReturnType<typeof renderInJsdom>['rerender']
+  rerenderWorktreePath: (worktreePath: string) => void
   queryClient: QueryClient
   mocks: {
     createTerminal: ReturnType<typeof vi.fn>
@@ -1345,12 +1368,12 @@ function renderToolbar(options: {
         terminalSessionId: sessions[0].terminalSessionId,
         index: sessions[0].index,
         target: {
-          kind: 'git-worktree',
+          kind: 'git-worktree' as const,
           workspaceId: canonicalWorkspaceLocator(REPO_ID)!,
           workspaceRuntimeId: repo.repoRuntimeId,
           root: canonicalWorkspaceLocator(`goblin+file://${WORKTREE_PATH}`)!,
         },
-        presentation: { kind: 'git-worktree', branchName },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: branchName } },
       }
     : null
   const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
@@ -1461,6 +1484,50 @@ function renderToolbar(options: {
     </QueryClientProvider>,
   )
 
+  const rerenderWorktreePath = (worktreePath: string) => {
+    const nextBranch = createBranchSnapshot(branchName, { worktree: { path: worktreePath } })
+    const nextRepo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchSnapshots: [nextBranch],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab,
+    })
+    const nextTabsInput = {
+      repoRoot: REPO_ID,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName,
+      worktreePath,
+      tabs: workspacePaneTabs,
+    }
+    setWorkspacePaneTabsForTargetQueryData(nextTabsInput)
+    setWorkspacePaneTabsForTargetQueryData(nextTabsInput, queryClient)
+    observeWorkspacePaneRouteForTest({
+      repoId: REPO_ID,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName,
+      worktreePath,
+      route: workspacePaneRoute,
+    })
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={commandContext}>
+            <TerminalSessionReadContext value={readContext}>
+              <RepoWorkspaceToolbarHarness
+                repo={repoWorkspaceRepo(nextRepo)}
+                detail={getTestRepoWorkspacePresentation(repoWorkspaceRepo(nextRepo))}
+                workspacePaneId="workspace"
+                workspacePaneRoute={workspacePaneRoute}
+                trafficLightOffset={options.trafficLightOffset}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+  }
+
   const tabSelector =
     options.worktree === false
       ? '#workspace-status-tab'
@@ -1473,6 +1540,7 @@ function renderToolbar(options: {
     container,
     terminalTab: tab as HTMLButtonElement,
     rerender,
+    rerenderWorktreePath,
     queryClient,
     mocks: {
       createTerminal,
@@ -1488,7 +1556,7 @@ function renderToolbar(options: {
 function workspacePaneRouteForPreferredTab(
   preferredTab: WorkspacePaneTabType,
   sessions: readonly TerminalSessionSummary[],
-): RepoBranchWorkspacePaneRoute | null {
+): WorkspacePaneRoute | null {
   if (preferredTab === 'terminal') {
     return { kind: 'terminal', terminalSessionId: sessions[0]?.terminalSessionId ?? 'pending-terminal' }
   }
@@ -1505,16 +1573,16 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,
     showRepoBranchTerminalSession: () => true,
-    commitRepoBranchWorkspacePaneRoute: () => false,
+    commitWorkspacePaneRoute: () => false,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
-    currentRepoBranchWorkspacePaneRoute: overrides.currentRepoBranchWorkspacePaneRoute ?? (() => undefined),
+    currentWorkspacePaneRoute: overrides.currentWorkspacePaneRoute ?? (() => undefined),
   }
-  if (!overrides.commitRepoBranchWorkspacePaneRoute) {
-    navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+  if (!overrides.commitWorkspacePaneRoute) {
+    navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
   }
   return navigation
 }

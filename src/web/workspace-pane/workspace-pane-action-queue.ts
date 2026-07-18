@@ -1,4 +1,6 @@
 import PQueue from 'p-queue'
+import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 export type WorkspacePaneActionTarget =
   | { kind: 'workspace-root'; repoId: string; repoRuntimeId: string }
   | { kind: 'git-branch'; repoId: string; repoRuntimeId: string; branchName: string }
@@ -10,22 +12,38 @@ export function workspacePaneActionTargetFromCoordinates(coordinates: {
   branchName: string | null
   worktreePath: string | null
 }): WorkspacePaneActionTarget {
-  if (coordinates.branchName === null) {
-    return { kind: 'workspace-root', repoId: coordinates.repoId, repoRuntimeId: coordinates.repoRuntimeId }
+  if (coordinates.worktreePath !== null) {
+    return {
+      kind: 'git-worktree',
+      repoId: coordinates.repoId,
+      repoRuntimeId: coordinates.repoRuntimeId,
+      worktreePath: coordinates.worktreePath,
+    }
   }
-  return coordinates.worktreePath === null
-    ? {
+  return coordinates.branchName === null
+    ? { kind: 'workspace-root', repoId: coordinates.repoId, repoRuntimeId: coordinates.repoRuntimeId }
+    : {
         kind: 'git-branch',
         repoId: coordinates.repoId,
         repoRuntimeId: coordinates.repoRuntimeId,
         branchName: coordinates.branchName,
       }
-    : {
-        kind: 'git-worktree',
-        repoId: coordinates.repoId,
-        repoRuntimeId: coordinates.repoRuntimeId,
-        worktreePath: coordinates.worktreePath,
-      }
+}
+
+export function workspacePaneActionTargetFromFilesystemTarget(
+  target: WorkspacePaneFilesystemExecutionTarget,
+): WorkspacePaneActionTarget {
+  if (target.kind === 'workspace-root') {
+    return { kind: target.kind, repoId: target.workspaceId, repoRuntimeId: target.workspaceRuntimeId }
+  }
+  const root = parseCanonicalWorkspaceLocator(target.root)
+  if (!root) throw new Error('filesystem action target requires a canonical worktree root')
+  return {
+    kind: target.kind,
+    repoId: target.workspaceId,
+    repoRuntimeId: target.workspaceRuntimeId,
+    worktreePath: root.path,
+  }
 }
 
 const queuesByTarget = new Map<string, PQueue>()

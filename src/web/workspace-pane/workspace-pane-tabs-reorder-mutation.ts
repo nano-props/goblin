@@ -13,13 +13,16 @@ import {
   workspacePaneActionTargetFromCoordinates,
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { runtimeWorkspacePaneTarget, type WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  requiredGitWorkspacePaneTabsTarget,
+  runtimeWorkspacePaneTarget,
+  workspacePaneTabsBranchIdentity,
+  workspacePaneTabsTargetWorktreePath,
+  type WorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
 
-export interface WorkspacePaneTabsReorderMutationInput {
-  repoRoot: string
+export type WorkspacePaneTabsReorderMutationInput = WorkspacePaneTabsTarget & {
   repoRuntimeId: string
-  branchName: string | null
-  worktreePath: string | null
   canonicalTabs: readonly WorkspacePaneTabEntry[]
   onReorderRejected?: () => void
 }
@@ -34,17 +37,11 @@ export function useWorkspacePaneTabsReorderMutation(
   const queryClient = useQueryClient()
   const target = useMemo(() => {
     const paneTarget =
-      input.branchName === null
-        ? { kind: 'workspace-root' as const, repoRoot: input.repoRoot, branchName: null, worktreePath: null }
-        : {
-            repoRoot: input.repoRoot,
-            branchName: input.branchName,
-            worktreePath: input.worktreePath,
-          }
+      input
     return runtimeWorkspacePaneTarget(paneTarget, input.repoRuntimeId)
       ? { ...paneTarget, repoRuntimeId: input.repoRuntimeId }
       : null
-  }, [input.branchName, input.repoRuntimeId, input.repoRoot, input.worktreePath])
+  }, [input])
   const canonicalTabsIdentity = useMemo(
     () => workspacePaneTabEntryListIdentity(input.canonicalTabs),
     [input.canonicalTabs],
@@ -91,8 +88,8 @@ async function runWorkspacePaneTabsReorderInQueue(
     reportWorkspacePaneTabsFailure({
       operation: 'reorder',
       repoRoot: target.repoRoot,
-      branchName: target.branchName,
-      worktreePath: target.worktreePath,
+      branchName: workspacePaneTabsBranchIdentity(target),
+      worktreePath: workspacePaneTabsTargetWorktreePath(target),
       error: err,
     })
     onReorderRejected?.()
@@ -105,7 +102,7 @@ function workspacePaneReorderActionTarget(target: WorkspacePaneTabsReorderTarget
   return workspacePaneActionTargetFromCoordinates({
     repoId: target.repoRoot,
     repoRuntimeId: target.repoRuntimeId,
-    branchName: 'kind' in target ? null : target.branchName,
-    worktreePath: 'kind' in target ? null : target.worktreePath,
+    branchName: workspacePaneTabsBranchIdentity(target),
+    worktreePath: workspacePaneTabsTargetWorktreePath(target),
   })
 }

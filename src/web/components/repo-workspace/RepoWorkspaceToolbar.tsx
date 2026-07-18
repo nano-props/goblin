@@ -1,4 +1,4 @@
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import type { RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import type { CurrentRepoWorkspacePresentation, RepoWorkspaceRepo } from '#/web/components/repo-workspace/model.ts'
@@ -7,6 +7,7 @@ import {
   WorkspacePaneTargetToolbar,
 } from '#/web/components/workspace-pane/WorkspacePaneTargetToolbar.tsx'
 import type { WorkspacePaneSurfaceTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { gitHead } from '#/shared/git-head.ts'
 import {
   WorkspaceToolbar,
   WorkspaceToolbarLeadingSpacer,
@@ -18,7 +19,7 @@ interface Props {
   repo: RepoWorkspaceRepo
   detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   workspacePaneTabModel: RepoWorkspaceTabModel
   trafficLightOffset?: boolean
   branchActions?: BranchActions
@@ -51,7 +52,7 @@ export function RepoWorkspaceToolbar({
         kind: 'git-worktree',
         workspaceId: repo.id,
         workspaceRuntimeId: repo.repoRuntimeId,
-        branchName: branch.name,
+        head: gitHead(branch.name),
         rootPath: branch.worktree.path,
         capabilities: repo.workspaceProbe.capabilities,
       }

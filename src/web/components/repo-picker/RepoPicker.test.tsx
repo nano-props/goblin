@@ -123,10 +123,10 @@ describe('RepoPicker', () => {
   })
 
   test('renders canonical workspace ids as user-facing locations in the repo menu', async () => {
-    const workspaceId = 'goblin+file:///Users/example/Developer/GitHub/nano-props/goblin'
+    const workspaceId = 'goblin+file:///workspace/sample-project'
     render(
       <RepoPicker
-        repos={[repo('goblin', workspaceId), repo('other', 'goblin+file:///Users/example/Developer/other')]}
+        repos={[repo('sample-project', workspaceId), repo('other', 'goblin+file:///workspace/other')]}
         currentRepoId={workspaceId}
         labels={labels}
         onActivate={() => {}}
@@ -145,7 +145,7 @@ describe('RepoPicker', () => {
       await Promise.resolve()
     })
 
-    expect(document.body.textContent).toContain('/Users/example/Developer/GitHub/nano-props/goblin')
+    expect(document.body.textContent).toContain('/workspace/sample-project')
     expect(document.body.textContent).not.toContain('goblin+file://')
   })
 

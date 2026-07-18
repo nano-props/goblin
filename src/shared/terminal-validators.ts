@@ -19,7 +19,7 @@ import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 import { isValidBranch } from '#/shared/input-validation.ts'
 import {
   canonicalRuntimeWorkspacePaneTarget,
-  WorkspacePaneExecutionTargetSchema,
+  WorkspacePaneFilesystemExecutionTargetSchema,
   WorkspacePaneTabsSnapshotSchema,
 } from '#/shared/workspace-pane-tabs-validators.ts'
 
@@ -98,7 +98,7 @@ export const TerminalCreateInputSchema = v.strictObject({
   cols: v.optional(TerminalColsSchema),
   rows: v.optional(TerminalRowsSchema),
   clientId: TerminalOptionalClientIdSchema,
-  target: WorkspacePaneExecutionTargetSchema,
+  target: WorkspacePaneFilesystemExecutionTargetSchema,
 })
 const TerminalPruneInputSchema = v.object({
   repoRoot: WorkspaceIdSchema,
@@ -108,10 +108,16 @@ const TerminalPresentationSchema = v.variant('kind', [
   v.strictObject({ kind: v.literal('workspace-root') }),
   v.strictObject({
     kind: v.literal('git-worktree'),
-    branchName: v.pipe(
-      v.string(),
-      v.check((value: string) => isValidBranch(value)),
-    ),
+    head: v.variant('kind', [
+      v.strictObject({
+        kind: v.literal('branch'),
+        branchName: v.pipe(
+          v.string(),
+          v.check((value: string) => isValidBranch(value)),
+        ),
+      }),
+      v.strictObject({ kind: v.literal('detached') }),
+    ]),
   }),
 ])
 
@@ -127,7 +133,7 @@ export const TerminalSessionSummarySchema = v.strictObject({
   message: v.nullable(v.string()),
   cols: v.number(),
   rows: v.number(),
-  target: WorkspacePaneExecutionTargetSchema,
+  target: WorkspacePaneFilesystemExecutionTargetSchema,
 })
 export const TerminalSessionsSnapshotSchema = v.strictObject({
   revision: v.pipe(v.number(), v.integer(), v.minValue(0)),

@@ -13,12 +13,12 @@ const REPO_RUNTIME_ID = 'repo-runtime-test'
 const REPO_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/repo' }, 'posix')!
 const terminalBase: TerminalSessionBase = {
   target: {
-    kind: 'git-worktree',
+    kind: 'git-worktree' as const,
     workspaceId: REPO_ID,
     workspaceRuntimeId: REPO_RUNTIME_ID,
     root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
   },
-  presentation: { kind: 'git-worktree', branchName: 'main' },
+  presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
 }
 const closeTarget = terminalBase
 

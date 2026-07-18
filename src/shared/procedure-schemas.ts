@@ -20,6 +20,7 @@ import { GIT_HASH_RE } from '#/shared/git-types.ts'
 import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/repo-settings.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
+import { WorkspacePaneFilesystemExecutionTargetSchema } from '#/shared/workspace-pane-tabs-validators.ts'
 
 const StringArray = v.array(v.string())
 const TerminalAppSchema = v.picklist(['ghostty', 'terminal', 'windowsTerminal'])
@@ -155,15 +156,10 @@ export const REPO_PROCEDURE_SCHEMAS = {
     skip: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100_000))),
   }),
   patch: v.object({ cwd: WorkspaceIdSchema, repoRuntimeId: RepoRuntimeIdSchema, worktreePath: v.string() }),
-  // Worktree-scoped file tree (docs/filetree.md). The route returns
-  // direct children of `prefix`; omitted prefix means the worktree root.
-  // The perimeter rejects absolute paths, `..` segments, control
-  // characters and backslashes inside `prefix`, and the read layer
-  // still verifies `worktreePath` against the worktree list.
+  // Filesystem-target-scoped file tree (docs/filetree.md). The route
+  // returns direct children of `prefix`; omitted prefix means the root.
   tree: v.object({
-    cwd: WorkspaceIdSchema,
-    repoRuntimeId: RepoRuntimeIdSchema,
-    worktreePath: v.string(),
+    target: WorkspacePaneFilesystemExecutionTargetSchema,
     prefix: v.optional(RepoTreePrefixSchema),
   }),
   trashFile: v.object({

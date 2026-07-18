@@ -312,7 +312,10 @@ export function terminalWorkspacePaneRuntimeTabsProvider(
         liveSessions: snapshot.sessions.map((session) => ({
           sessionId: session.terminalSessionId,
           target: session.target,
-          branch: session.presentation.kind === 'git-worktree' ? session.presentation.branchName : null,
+          branch:
+            session.presentation.kind === 'git-worktree' && session.presentation.head.kind === 'branch'
+              ? session.presentation.head.branchName
+              : null,
           worktreePath: terminalExecutionPath(session.target),
         })),
       }

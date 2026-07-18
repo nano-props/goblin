@@ -27,6 +27,7 @@ import {
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
@@ -38,8 +39,14 @@ import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
 const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
 const REPO_ID = 'goblin+file:///tmp/keyboard-repo'
+const REPO_PATH = '/tmp/keyboard-repo'
 const WORKTREE_PATH = '/tmp/keyboard-worktree'
 const WORKTREE_KEY = formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH)
+const FILESYSTEM_CAPABILITIES = {
+  files: { read: true, write: true },
+  terminal: { available: true },
+  git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+} as const
 
 interface HookHostOptions {
   currentRepoId: string | null
@@ -289,9 +296,16 @@ describe('useKeyboard', () => {
       currentRepoId: REPO_ID,
       currentBranchName: 'feature/worktree',
       currentWorkspacePaneCommandTarget: {
-        kind: 'git-branch',
-        branchName: 'feature/worktree',
+        kind: 'git-worktree',
         workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+        filesystemTarget: {
+          kind: 'git-worktree',
+          workspaceId: REPO_ID,
+          workspaceRuntimeId: repoRuntimeIdForTest(),
+          rootPath: WORKTREE_PATH,
+          head: { kind: 'branch', branchName: 'feature/worktree' },
+          capabilities: FILESYSTEM_CAPABILITIES,
+        },
       },
     })
 
@@ -301,6 +315,73 @@ describe('useKeyboard', () => {
     })
 
     expect(createTerminal).toHaveBeenCalledTimes(1)
+  })
+
+  test('primary modifier plus t creates a terminal for a workspace root target', async () => {
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [],
+      currentBranchName: null,
+      workspaceProbe: {
+        status: 'ready',
+        name: 'plain-workspace',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'unavailable' },
+        },
+        diagnostics: [],
+      },
+    })
+    const createTerminal = vi.fn(async () => 'term-222222222222222222222')
+    setTerminalSessionCommandBridge({
+      terminalWorktreeSnapshot: (terminalWorktreeKey) => ({
+        terminalWorktreeKey,
+        selectedDescriptor: null,
+        sessions: [],
+        count: 0,
+        bellCount: 0,
+        outputActiveCount: 0,
+        createPending: false,
+      }),
+      createTerminal,
+      selectTerminal: vi.fn(),
+    })
+    await renderHookHost({
+      currentRepoId: REPO_ID,
+      currentBranchName: null,
+      currentWorkspacePaneCommandTarget: {
+        kind: 'workspace-root',
+        workspacePaneRoute: null,
+        filesystemTarget: {
+          kind: 'workspace-root',
+          workspaceId: REPO_ID,
+          workspaceRuntimeId: repoRuntimeIdForTest(),
+          rootPath: REPO_PATH,
+          capabilities: {
+            files: { read: true, write: true },
+            terminal: { available: true },
+            git: { status: 'unavailable' },
+          },
+        },
+      },
+    })
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', ctrlKey: true, bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(createTerminal).toHaveBeenCalledWith(
+      terminalSessionBaseForTest({
+        repoRoot: REPO_ID,
+        repoRuntimeId: repoRuntimeIdForTest(),
+        branch: null,
+        worktreePath: REPO_PATH,
+      }),
+      undefined,
+    )
   })
 
   test('primary modifier plus n opens the create worktree dialog', async () => {
@@ -506,8 +587,15 @@ describe('useKeyboard', () => {
       currentRepoId: REPO_ID,
       currentBranchName: 'feature/worktree',
       currentWorkspacePaneCommandTarget: {
-        kind: 'git-branch',
-        branchName: 'feature/worktree',
+        kind: 'git-worktree',
+        filesystemTarget: {
+          kind: 'git-worktree',
+          workspaceId: REPO_ID,
+          workspaceRuntimeId: repoRuntimeIdForTest(),
+          rootPath: WORKTREE_PATH,
+          head: { kind: 'branch', branchName: 'feature/worktree' },
+          capabilities: FILESYSTEM_CAPABILITIES,
+        },
         workspacePaneRoute: {
           kind: 'terminal',
           terminalSessionId: 'term-111111111111111111111',
@@ -566,15 +654,38 @@ function serverOperation(
 }
 
 function HookHost(overrides: Partial<HookHostOptions>) {
+  const repo = overrides.currentRepoId ? useReposStore.getState().repos[overrides.currentRepoId] : null
+  const branch =
+    repo && overrides.currentBranchName
+      ? readRepoBranchSnapshotQueryProjection(repo)?.branches.find(
+          (candidate) => candidate.name === overrides.currentBranchName,
+        )
+      : null
+  const defaultCommandTarget =
+    repo?.workspaceProbe.status === 'ready' && overrides.currentBranchName && branch?.worktree
+      ? {
+          kind: 'git-worktree' as const,
+          branchName: overrides.currentBranchName,
+          workspacePaneRoute: null,
+          filesystemTarget: {
+            kind: 'git-worktree' as const,
+            workspaceId: repo.id,
+            workspaceRuntimeId: repo.repoRuntimeId,
+            rootPath: branch.worktree.path,
+            head: { kind: 'branch' as const, branchName: overrides.currentBranchName },
+            capabilities: repo.workspaceProbe.capabilities,
+          },
+        }
+      : overrides.currentBranchName
+        ? { kind: 'git-branch' as const, branchName: overrides.currentBranchName, workspacePaneRoute: null }
+        : null
   useKeyboard({
     navigation: overrides.navigation ?? navigationWith(),
     currentRepoId: overrides.currentRepoId ?? null,
     currentBranchName: overrides.currentBranchName ?? null,
     currentWorkspacePaneCommandTarget:
       overrides.currentWorkspacePaneCommandTarget ??
-      (overrides.currentBranchName
-        ? { kind: 'git-branch', branchName: overrides.currentBranchName, workspacePaneRoute: null }
-        : null),
+      defaultCommandTarget,
     onShowHelp: () => {},
     isWorkspaceShortcutSuppressed: overrides.isWorkspaceShortcutSuppressed ?? (() => false),
     isSettingsOpen: overrides.isSettingsOpen ?? (() => false),
@@ -593,17 +704,17 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,
     showRepoBranchTerminalSession: () => true,
-    commitRepoBranchWorkspacePaneRoute: () => false,
+    commitWorkspacePaneRoute: () => false,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
-    currentRepoBranchWorkspacePaneRoute:
-      overrides.currentRepoBranchWorkspacePaneRoute ?? observedWorkspacePaneRouteForTarget,
+    currentWorkspacePaneRoute:
+      overrides.currentWorkspacePaneRoute ?? observedWorkspacePaneRouteForTarget,
   }
-  if (!overrides.commitRepoBranchWorkspacePaneRoute) {
-    navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+  if (!overrides.commitWorkspacePaneRoute) {
+    navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
   }
   return navigation
 }

@@ -173,7 +173,7 @@ function deps(currentRepoId: string | null, currentBranchName = 'feature/worktre
 
 function navigationWithStoreActions(): PrimaryWindowNavigationActions {
   const navigation: PrimaryWindowNavigationActions = {
-    currentRepoBranchWorkspacePaneRoute: () => undefined,
+    currentWorkspacePaneRoute: () => undefined,
     activateRepo: vi.fn(),
     closeRepo: (repoId) => useReposStore.getState().closeRepo(repoId),
     cycleRepo: vi.fn(),
@@ -185,13 +185,13 @@ function navigationWithStoreActions(): PrimaryWindowNavigationActions {
       return true
     },
     showRepoBranchTerminalSession: vi.fn(() => true),
-    commitRepoBranchWorkspacePaneRoute: () => false,
+    commitWorkspacePaneRoute: () => false,
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
   }
-  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+  navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
   return navigation
 }
 

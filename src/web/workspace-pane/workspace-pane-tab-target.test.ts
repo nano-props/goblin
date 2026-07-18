@@ -37,20 +37,19 @@ describe('workspace pane tab target read model', () => {
       kind: 'workspace-root',
       repoRoot: REPO_ID,
       repoRuntimeId: repo.repoRuntimeId,
-      branchName: null,
-      worktreePath: null,
+
       tabs: [workspacePaneStaticTabEntry('files')],
     })
     useReposStore
       .getState()
       .setWorkspacePaneTabForTarget(
-        { kind: 'workspace-root', repoRoot: REPO_ID, branchName: null, worktreePath: null },
+        { kind: 'workspace-root', repoRoot: REPO_ID },
         'files',
       )
 
     const target = workspacePaneTabTargetForWorkspace(REPO_ID)
 
-    expect(target).toMatchObject({ branchName: null, worktreePath: REPO_ID, renderedTab: 'files' })
+    expect(target).toMatchObject({ branchName: null, worktreePath: '/tmp/workspace-pane-target-repo', renderedTab: 'files' })
   })
 
   test('marks target resolution unavailable when the repo branch read model is unavailable', () => {
@@ -107,9 +106,9 @@ describe('workspace pane tab target read model', () => {
     })
     primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId) })
     setWorkspacePaneTabsForTargetQueryData({
+      kind: 'git-worktree' as const,
       repoRoot: REPO_ID,
       repoRuntimeId: repo.repoRuntimeId,
-      branchName: 'feature/query',
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
     })
@@ -133,9 +132,9 @@ describe('workspace pane tab target read model', () => {
       currentBranch: 'feature/old',
     })
     setWorkspacePaneTabsForTargetQueryData({
+      kind: 'git-worktree' as const,
       repoRoot: REPO_ID,
       repoRuntimeId: repo.repoRuntimeId,
-      branchName: 'feature/renamed',
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
     })
@@ -181,16 +180,15 @@ describe('workspace pane tab target read model', () => {
     })
 
     recordWorkspacePaneTabOpener(
-      REPO_ID,
+      { kind: 'git-branch', repoRoot: REPO_ID, branchName: 'feature/query' },
       repo.repoRuntimeId,
-      'feature/query',
       'workspace-pane:changes',
       'workspace-pane:status',
     )
 
     expect(
       useReposStore.getState().tabOpenerIdentityByScope[
-        `${tabOpenerScopeKey({ repoRoot: REPO_ID, branchName: 'feature/query', worktreePath: null })}\0${repo.repoRuntimeId}`
+        `${tabOpenerScopeKey({ kind: 'git-branch', repoRoot: REPO_ID, branchName: 'feature/query' })}\0${repo.repoRuntimeId}`
       ]?.['workspace-pane:changes'],
     ).toBe('workspace-pane:status')
   })
@@ -204,9 +202,12 @@ describe('workspace pane tab target read model', () => {
 
     expect(
       recordWorkspacePaneTabOpener(
-        REPO_ID,
+        {
+          kind: 'git-worktree',
+          repoRoot: REPO_ID,
+          worktreePath: WORKTREE_PATH,
+        },
         repo.repoRuntimeId,
-        'feature/old',
         'workspace-pane:changes',
         'workspace-pane:status',
       ),
@@ -216,12 +217,50 @@ describe('workspace pane tab target read model', () => {
       currentBranch: 'feature/new',
     })
 
-    expect(workspacePaneTabOpener(REPO_ID, repo.repoRuntimeId, 'feature/new', 'workspace-pane:changes')).toBe(
+    expect(workspacePaneTabOpener({
+      kind: 'git-worktree',
+      repoRoot: REPO_ID,
+      worktreePath: WORKTREE_PATH,
+    }, repo.repoRuntimeId, 'workspace-pane:changes')).toBe(
       'workspace-pane:status',
     )
   })
 
-  test('marks opener recording unavailable when the repo branch read model is unavailable', () => {
+  test('keeps detached worktree openers isolated from workspace-root and branch targets', () => {
+    const repo = emptyRepo(REPO_ID, 'workspace-pane-target-repo', 'repo-runtime-detached-opener')
+    useReposStore.setState((state) => ({
+      repos: { ...state.repos, [REPO_ID]: repo },
+      order: [...state.order, REPO_ID],
+      restoredRepoId: REPO_ID,
+    }))
+    const detachedTarget = {
+      kind: 'git-worktree' as const,
+      repoRoot: REPO_ID,
+      worktreePath: WORKTREE_PATH,
+    }
+    const workspaceTarget = { kind: 'workspace-root' as const, repoRoot: REPO_ID }
+    const branchTarget = { kind: 'git-branch' as const, repoRoot: REPO_ID, branchName: 'feature/query' }
+
+    expect(
+      recordWorkspacePaneTabOpener(
+        detachedTarget,
+        repo.repoRuntimeId,
+        'terminal:term-111111111111111111111',
+        'workspace-pane:files',
+      ),
+    ).toBe('recorded')
+    expect(
+      workspacePaneTabOpener(detachedTarget, repo.repoRuntimeId, 'terminal:term-111111111111111111111'),
+    ).toBe('workspace-pane:files')
+    expect(
+      workspacePaneTabOpener(workspaceTarget, repo.repoRuntimeId, 'terminal:term-111111111111111111111'),
+    ).toBeNull()
+    expect(
+      workspacePaneTabOpener(branchTarget, repo.repoRuntimeId, 'terminal:term-111111111111111111111'),
+    ).toBeNull()
+  })
+
+  test('records against a canonical branch target without requiring a branch read model', () => {
     const repo = emptyRepo(REPO_ID, 'workspace-pane-target-repo', 'repo-runtime-workspace-pane-no-query')
     useReposStore.setState((s) => ({
       repos: { ...s.repos, [REPO_ID]: repo },
@@ -231,12 +270,11 @@ describe('workspace pane tab target read model', () => {
 
     expect(
       recordWorkspacePaneTabOpener(
-        REPO_ID,
+        { kind: 'git-branch', repoRoot: REPO_ID, branchName: 'feature/query' },
         repo.repoRuntimeId,
-        'feature/query',
         'workspace-pane:changes',
         'workspace-pane:status',
       ),
-    ).toBe('unavailable')
+    ).toBe('recorded')
   })
 })

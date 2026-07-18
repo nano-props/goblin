@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { constants as fsConstants, promises as fs } from 'node:fs'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
+import type { GitHead } from '#/shared/git-head.ts'
 import { checkGitAvailable } from '#/system/git/git-exec.ts'
 import {
   deleteBranch,
@@ -113,10 +114,9 @@ export interface RepoMutationResult extends ExecResult {
   affectedRepoIds?: readonly string[]
 }
 
-export interface WorkspacePaneTargetIdentity {
-  branch: string
-  worktreePath: string | null
-}
+export type WorkspacePaneTargetIdentity =
+  | { kind: 'git-branch'; branchName: string }
+  | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
 
 export interface RepoSource {
   id: string
@@ -171,11 +171,12 @@ export interface RepoSourceRuntimeContext {
 export async function resolveRemoteRepoTarget(
   repoId: string,
   runtime?: RepoSourceRuntimeContext,
+  signal?: AbortSignal,
 ): Promise<RemoteRepoTarget> {
   try {
     const parsed = parseRemoteRepoId(repoId)
     if (!parsed) throw new Error('error.ssh-config-changed')
-    return (await resolveSshRemoteTarget(parsed)).target
+    return (await resolveSshRemoteTarget(parsed, signal)).target
   } catch (err) {
     if (!runtime) throw err
     throw remoteRuntimeFailureFromTargetResolutionError({

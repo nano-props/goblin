@@ -1,8 +1,8 @@
-import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
-export interface RepoBranchWorkspacePaneRouteNavigation {
+export interface WorkspacePaneRouteNavigation {
   openRepoBranch: (
     repoId: string,
     branchName: string,
@@ -22,11 +22,11 @@ export interface RepoBranchWorkspacePaneRouteNavigation {
   ) => boolean
 }
 
-export function openResolvedRepoBranchWorkspacePaneRoute(
-  routeNavigation: RepoBranchWorkspacePaneRouteNavigation,
+export function openResolvedWorkspacePaneRoute(
+  routeNavigation: WorkspacePaneRouteNavigation,
   repoId: string,
   branchName: string,
-  route: RepoBranchWorkspacePaneRouteTarget,
+  route: WorkspacePaneRouteTarget,
   options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
 ): boolean {
   if (!route) {

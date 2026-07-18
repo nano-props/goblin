@@ -129,8 +129,8 @@ describe('remote git helpers', () => {
     )
 
     await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run as any })).resolves.toEqual([
-      { branch: 'main', worktreePath: '/srv/repo' },
-      { branch: 'feature/no-worktree', worktreePath: null },
+      { kind: 'git-worktree', worktreePath: '/srv/repo', head: { kind: 'branch', branchName: 'main' } },
+      { kind: 'git-branch', branchName: 'feature/no-worktree' },
     ])
     expect(run).toHaveBeenCalledTimes(1)
     expect(run).toHaveBeenCalledWith({ type: 'gitWorkspacePaneIdentities', path: '/srv/repo' }, TARGET, {
@@ -150,14 +150,16 @@ describe('remote git helpers', () => {
     )
   })
 
-  test('returns no branch identities for an unborn repo with a detached worktree', async () => {
+  test('returns detached worktree identity for an unborn repository', async () => {
     const run = vi.fn(async () =>
       okRemoteResult(
         '\n__GOBLIN_REMOTE_PANE_WORKTREES__\nworktree /srv/repo\nHEAD f00ba4\ndetached\n',
       ),
     )
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run as any })).resolves.toEqual([])
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run as any })).resolves.toEqual([
+      { kind: 'git-worktree', worktreePath: '/srv/repo', head: { kind: 'detached' } },
+    ])
     expect(run).toHaveBeenCalledOnce()
   })
 
@@ -1110,7 +1112,7 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
     const run = vi.fn(async (command: { type: string }) => {
       const NUL = String.fromCharCode(0)
       switch (command.type) {
-        case 'gitTreeWalk':
+        case 'gitDirectoryChildren':
           return okRemoteResult(`/srv/repo-feature/README.md${NUL}/srv/repo-feature/src/foo.ts`)
         default:
           return failRemoteResult('should not be called')
@@ -1123,7 +1125,7 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
     })
 
     expect(result).toMatchObject({ ok: true })
-    const treeWalkCall = run.mock.calls.find(([command]) => command.type === 'gitTreeWalk')
+    const treeWalkCall = run.mock.calls.find(([command]) => command.type === 'gitDirectoryChildren')
     expect(treeWalkCall).toBeDefined()
     expect(run).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'gitWorktreeList' }),
@@ -1137,7 +1139,7 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
       switch (command.type) {
         case 'gitWorktreeList':
           return okRemoteResult(['worktree /srv/repo-feature', 'HEAD a', 'branch refs/heads/feat'].join('\n'))
-        case 'gitTreeWalk':
+        case 'gitDirectoryChildren':
           return okRemoteResult('')
         default:
           return failRemoteResult('unexpected')

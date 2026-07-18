@@ -1,7 +1,8 @@
-import type { ParsedRepoBranchWorkspacePaneRouteTarget, RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import {
   isRepoWorkspaceRuntimeTab,
+  type RepoWorkspacePaneModelTarget,
   type RepoWorkspaceTab,
   type RepoWorkspaceTabModel,
 } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
@@ -9,7 +10,7 @@ import {
   beginWorkspacePaneRouteIntent,
   workspacePaneActionTargetFromCoordinates,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
+import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import {
   commitWorkspacePaneCommittedRuntimeRouteSupplement,
   commitWorkspacePaneRouteSupplement,
@@ -25,23 +26,28 @@ import {
 } from '#/web/primary-window-presentation.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { workspacePaneTabsTargetWorktreePath } from '#/shared/workspace-pane-tabs-target.ts'
+import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-export type WorkspacePaneTabControllerRoute = RepoBranchWorkspacePaneRouteTarget
+export type WorkspacePaneTabControllerRoute = WorkspacePaneRouteTarget
 export interface WorkspacePaneControllerTarget {
   repoId: string
   repoRuntimeId: string
   branchName: string | null
   worktreePath: string | null
+  paneTarget: RepoWorkspacePaneModelTarget
 }
-export type WorkspacePaneTabControllerObservedRoute = ParsedRepoBranchWorkspacePaneRouteTarget
+export type WorkspacePaneTabControllerObservedRoute = ParsedWorkspacePaneRouteTarget
 export type WorkspacePaneTabControllerShowNavigation = Pick<
   PrimaryWindowNavigationActions,
   'showRepoBranchEmptyWorkspacePane' | 'showRepoBranchWorkspacePaneTab' | 'showRepoBranchTerminalSession'
 >
 export type WorkspacePaneTabControllerCommitNavigation = Pick<
   PrimaryWindowNavigationActions,
-  'commitRepoBranchWorkspacePaneRoute'
->
+  'commitWorkspacePaneRoute'
+> &
+  Pick<PrimaryWindowNavigationActions, 'showRepoWorktreeTerminalSession'> &
+  Pick<PrimaryWindowNavigationActions, 'showRepoWorktreeWorkspacePaneTab'>
 type WorkspacePaneTabControllerOptionalShowNavigation = Partial<WorkspacePaneTabControllerShowNavigation>
 
 export function workspacePaneControllerRouteForTab(tab: RepoWorkspaceTab): WorkspacePaneTabControllerRoute | undefined {
@@ -65,7 +71,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
   target: RepoWorkspaceTabModel
   closingTab: RepoWorkspaceTab
   nextTab: RepoWorkspaceTab | null
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRouteTarget | undefined
+  workspacePaneRoute: ParsedWorkspacePaneRouteTarget | undefined
   presentationToken?: PrimaryWindowPresentationToken
 }): WorkspacePaneControllerPresentationLease | null {
   const branchName = input.target.branchName
@@ -81,6 +87,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
     repoRuntimeId: input.target.repoRuntimeId,
     branchName,
     worktreePath: input.target.worktreePath,
+    paneTarget: input.target.paneTarget,
   }
   return {
     presentationToken: input.presentationToken ?? beginPrimaryWindowPresentation(),
@@ -106,18 +113,29 @@ export async function selectWorkspacePaneControllerTab(
   navigation: WorkspacePaneTabControllerCommitNavigation,
   presentationToken: PrimaryWindowPresentationToken = beginPrimaryWindowPresentation(),
 ): Promise<boolean> {
-  if (target.branchName === null) {
+  if (target.paneTarget.kind === 'git-worktree' && target.branchName === null) {
+    if (!workspacePaneTabControllerTargetIsCurrent(target) || tab.kind === 'pending') return false
+    if (isRepoWorkspaceRuntimeTab(tab) && tab.runtimeType === 'terminal') {
+      return (
+        navigation.showRepoWorktreeTerminalSession?.(target.repoId, target.paneTarget.worktreePath, tab.sessionId) ??
+        false
+      )
+    }
+    if (tab.kind !== 'static') return false
+    return (
+      navigation.showRepoWorktreeWorkspacePaneTab?.(target.repoId, target.paneTarget.worktreePath, tab.type) ?? false
+    )
+  }
+  if (target.paneTarget.kind === 'workspace-root') {
     if (!workspacePaneTabControllerTargetIsCurrent(target) || tab.kind === 'pending') return false
     const state = useReposStore.getState()
     if (isRepoWorkspaceRuntimeTab(tab) && tab.runtimeType === 'terminal') {
       state.setSelectedTerminal(formatTerminalWorktreeKey(target.repoId, target.repoId), tab.sessionId)
     }
-    state.setWorkspacePaneTabForTarget(
-      { kind: 'workspace-root', repoRoot: target.repoId, branchName: null, worktreePath: null },
-      tab.type,
-    )
+    state.setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: target.repoId }, tab.type)
     return workspacePaneTabControllerTargetIsCurrent(target)
   }
+  if (target.paneTarget.kind === 'inactive') return false
   const route = workspacePaneControllerRouteForTab(tab)
   if (route === undefined) return false
   return await commitWorkspacePaneCurrentTargetRoute(target, route, navigation, undefined, presentationToken)
@@ -144,7 +162,7 @@ export function showWorkspacePaneControllerRoute(
   navigation: WorkspacePaneTabControllerOptionalShowNavigation,
   options?: { replace?: boolean },
 ): boolean {
-  return openResolvedRepoBranchWorkspacePaneRoute(
+  return openResolvedWorkspacePaneRoute(
     {
       openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane ?? (() => false),
       openRepoBranchTab: navigation.showRepoBranchWorkspacePaneTab ?? (() => false),
@@ -171,7 +189,7 @@ export async function commitWorkspacePaneControllerRoute(
   },
 ): Promise<boolean> {
   try {
-    return await navigation.commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, options)
+    return await navigation.commitWorkspacePaneRoute(repoId, branchName, route, options)
   } catch {
     return false
   }
@@ -207,10 +225,12 @@ export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
     target,
     route,
     navigation,
-    (candidate) => candidate.branchName !== null && workspacePaneCommittedRuntimeTargetIsCurrent({
-      ...candidate,
-      branchName: candidate.branchName,
-    }),
+    (candidate) =>
+      candidate.branchName !== null &&
+      workspacePaneCommittedRuntimeTargetIsCurrent({
+        ...candidate,
+        branchName: candidate.branchName,
+      }),
     commitWorkspacePaneCommittedRuntimeRouteSupplement,
     false,
     options,
@@ -272,14 +292,34 @@ export async function commitWorkspacePaneExactTargetRoute(
 }
 
 export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneControllerTarget): boolean {
-  if (target.branchName === null) {
-    return useReposStore.getState().repos[target.repoId]?.repoRuntimeId === target.repoRuntimeId
+  if (target.paneTarget.kind === 'inactive' || target.paneTarget.repoRoot !== target.repoId) return false
+  if (useReposStore.getState().repos[target.repoId]?.repoRuntimeId !== target.repoRuntimeId) return false
+  if (target.paneTarget.kind === 'git-branch') {
+    return (
+      target.branchName === target.paneTarget.branchName &&
+      target.worktreePath === null &&
+      workspacePaneTargetLeaseIsCurrent({ ...target, branchName: target.paneTarget.branchName })
+    )
   }
-  return target.branchName !== null && workspacePaneTargetLeaseIsCurrent({ ...target, branchName: target.branchName })
+  const targetWorktreePath = workspacePaneTabsTargetWorktreePath(target.paneTarget)
+  if (target.paneTarget.kind === 'git-worktree') {
+    if (target.worktreePath !== targetWorktreePath) return false
+    return target.branchName === null
+      ? true
+      : workspacePaneTargetLeaseIsCurrent({
+          ...target,
+          branchName: target.branchName,
+          worktreePath: target.paneTarget.worktreePath,
+        })
+  }
+  return (
+    target.branchName === null &&
+    target.worktreePath === (parseCanonicalWorkspaceLocator(target.paneTarget.repoRoot)?.path ?? null)
+  )
 }
 
 function workspacePaneTabControllerRouteFromParsed(
-  route: ParsedRepoBranchWorkspacePaneRouteTarget | undefined,
+  route: ParsedWorkspacePaneRouteTarget | undefined,
 ): WorkspacePaneTabControllerRoute | undefined {
   if (route === undefined || route?.kind === 'invalid-static') return undefined
   return route

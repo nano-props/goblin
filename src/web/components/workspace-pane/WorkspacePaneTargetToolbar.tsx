@@ -3,7 +3,7 @@ import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { TerminalPresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import {
   isPendingWorkspacePaneTabItem,
@@ -29,12 +29,15 @@ import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspacePaneSurfaceTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { workspacePaneFilesystemTerminalBase } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { gitHeadBranch } from '#/shared/git-head.ts'
+import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 
 interface WorkspacePaneTargetToolbarProps {
   target: WorkspacePaneSurfaceTarget
   model: RepoWorkspaceTabModel
   workspacePaneId: string
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   statusCount: number
   trafficLightOffset?: boolean
   onBackToNavigator?: () => void
@@ -55,15 +58,32 @@ export function WorkspacePaneTargetToolbar({
 }: WorkspacePaneTargetToolbarProps) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
-  const branchName = target.kind === 'workspace-root' ? null : target.branchName
-  const persistenceTarget =
+  const branchName =
+    target.kind === 'workspace-root' ? null : target.kind === 'git-branch' ? target.branchName : gitHeadBranch(target.head)
+  const rootPath = target.kind === 'git-branch' ? null : target.rootPath
+  const commandTarget: WorkspacePaneCommandTarget =
     target.kind === 'workspace-root'
-      ? { kind: 'workspace-root' as const, repoRoot: target.workspaceId, branchName: null, worktreePath: null }
-      : {
-          repoRoot: target.workspaceId,
-          branchName: target.branchName,
-          worktreePath: target.kind === 'git-worktree' ? target.rootPath : null,
-        }
+      ? { kind: 'workspace-root', workspacePaneRoute: workspacePaneRoute ?? null, filesystemTarget: target }
+      : target.kind === 'git-branch'
+        ? { kind: 'git-branch', branchName: target.branchName, workspacePaneRoute: workspacePaneRoute ?? null }
+        : { kind: 'git-worktree', workspacePaneRoute: workspacePaneRoute ?? null, filesystemTarget: target }
+  const persistenceTarget = useMemo(
+    () =>
+      target.kind === 'workspace-root'
+        ? { kind: 'workspace-root' as const, repoRoot: target.workspaceId }
+        : target.kind === 'git-branch'
+          ? { kind: 'git-branch' as const, repoRoot: target.workspaceId, branchName: target.branchName }
+          : {
+              kind: 'git-worktree' as const,
+              repoRoot: target.workspaceId,
+              worktreePath: target.rootPath,
+            },
+    [branchName, rootPath, target.kind, target.workspaceId],
+  )
+  const worktreeHead = useMemo(
+    () => (target.kind === 'git-worktree' ? target.head : undefined),
+    [branchName, target.kind],
+  )
   const targetKey = workspacePaneTabsTargetIdentityKey(persistenceTarget)
   const showCreatedRuntimeTab = useCallback(
     (
@@ -100,15 +120,19 @@ export function WorkspacePaneTargetToolbar({
         state.setWorkspacePaneTabForTarget(persistenceTarget, 'terminal')
         return true
       }
-      return navigation.showRepoBranchTerminalSession(target.workspaceId, target.branchName, sessionId)
+      if (target.kind !== 'git-worktree') return false
+      const targetBranch = gitHeadBranch(target.head)
+      if (targetBranch) return navigation.showRepoBranchTerminalSession(target.workspaceId, targetBranch, sessionId)
+      const state = useReposStore.getState()
+      state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootPath), sessionId)
+      state.setWorkspacePaneTabForTarget(persistenceTarget, 'terminal')
+      return true
     },
     [navigation, persistenceTarget, target],
   )
   const runtimeActionContext = useWorkspacePaneRuntimeTabActionContext({ showRuntimeTab })
   const createAction = useWorkspacePaneRuntimeTabCreateAction({
-    repoRoot: target.workspaceId,
-    repoRuntimeId: target.workspaceRuntimeId,
-    branchName,
+    base: target.kind === 'git-branch' ? null : workspacePaneFilesystemTerminalBase(target),
     runtimeTabStateByType: model.runtimeTabStateByType,
     workspacePaneRoute,
     showCreatedRuntimeTab,
@@ -147,7 +171,8 @@ export function WorkspacePaneTargetToolbar({
       if (isPendingWorkspacePaneTabItem(item)) return
       void dispatchSelectWorkspacePaneTabByIdentityAction({
         repoId: target.workspaceId,
-        branchName,
+        paneTarget: persistenceTarget,
+        worktreeHead,
         workspacePaneRoute,
         identity: item.identity,
         navigation,
@@ -155,7 +180,7 @@ export function WorkspacePaneTargetToolbar({
         reselect,
       })
     },
-    [branchName, navigation, runtimeActionContext, target.workspaceId, workspacePaneRoute],
+    [navigation, persistenceTarget, runtimeActionContext, target.workspaceId, workspacePaneRoute, worktreeHead],
   )
   const activeTabIdentity = model.activeTab?.identity ?? activePendingTabIdentity(model)
 
@@ -175,8 +200,7 @@ export function WorkspacePaneTargetToolbar({
         if (isPendingWorkspacePaneTabItem(item)) return
         void runCloseWorkspacePaneTabCommand({
           repoId: target.workspaceId,
-          branchName,
-          workspacePaneRoute,
+          target: commandTarget,
           targetIdentity: item.identity,
           navigation,
         })

@@ -49,19 +49,25 @@ export const RuntimeWorkspacePaneTargetSchema = v.variant('kind', [
 ])
 
 /** Runtime targets that identify a concrete filesystem execution root. */
-export const WorkspacePaneExecutionTargetSchema = v.variant('kind', [
-  v.strictObject({
-    kind: v.literal('workspace-root'),
-    workspaceId: WorkspaceIdSchema,
-    workspaceRuntimeId: RepoRuntimeIdSchema,
-  }),
-  v.strictObject({
-    kind: v.literal('git-worktree'),
-    workspaceId: WorkspaceIdSchema,
-    workspaceRuntimeId: RepoRuntimeIdSchema,
-    root: v.string(),
-  }),
-])
+export const WorkspacePaneFilesystemExecutionTargetSchema = v.pipe(
+  v.variant('kind', [
+    v.strictObject({
+      kind: v.literal('workspace-root'),
+      workspaceId: WorkspaceIdSchema,
+      workspaceRuntimeId: RepoRuntimeIdSchema,
+    }),
+    v.strictObject({
+      kind: v.literal('git-worktree'),
+      workspaceId: WorkspaceIdSchema,
+      workspaceRuntimeId: RepoRuntimeIdSchema,
+      root: WorkspaceIdSchema,
+    }),
+  ]),
+  v.check(
+    (target) => target.kind === 'workspace-root' || workspaceLocatorsShareTransport(target.workspaceId, target.root),
+    'Filesystem execution target transport mismatch',
+  ),
+)
 
 export const WorkspacePaneStaticTabEntrySchema = v.variant('type', [
   v.strictObject({ type: v.literal('status'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.status) }),

@@ -621,5 +621,5 @@ function defaultExternalAppsSnapshot() {
 }
 
 function branchTargetKey(repoRoot: string, branchName: string): string {
-  return workspacePaneTabsTargetIdentityKey({ repoRoot, branchName, worktreePath: null })
+  return workspacePaneTabsTargetIdentityKey({ kind: 'git-branch', repoRoot, branchName })
 }

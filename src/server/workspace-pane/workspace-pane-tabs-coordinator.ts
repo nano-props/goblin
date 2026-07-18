@@ -66,12 +66,6 @@ export interface WorkspacePaneRuntimeTabsProvider {
 
 export interface WorkspacePaneTargetProjectionProvider {
   captureTargets(userId: string, repoRoot: string, scope: string): Promise<readonly WorkspacePaneTargetProjection[]>
-  validateTargets(
-    userId: string,
-    repoRoot: string,
-    scope: string,
-    captured: readonly WorkspacePaneTargetProjection[],
-  ): Promise<boolean>
 }
 
 export interface WorkspacePaneTabsCommandResult extends WorkspacePaneLayoutCommitResult {
@@ -152,13 +146,12 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
       if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
       const scope = aggregateScope(input.userId, repoRoot, runtimeScope)
-      if (!(await this.targetProjection.validateTargets(input.userId, repoRoot, runtimeScope, capturedTargets))) {
-        return { kind: 'target-stale' }
-      }
+      // The complete catalog is the authoritative before-set used by the
+      // atomic layout projection below. Re-reading this one worktree here did
+      // not make Git state atomic (HEAD can change after either command), but
+      // it did add a second SSH/Git round trip before PTY admission.
       if (capturedTarget.target.kind === 'workspace-root') {
         if (capturedTarget.canonicalBranch !== null) return { kind: 'runtime-stale' }
-      } else if (!capturedTarget.canonicalBranch) {
-        return { kind: 'runtime-stale' }
       }
       const pendingProviderSnapshots = providerSnapshotsWithPendingSession(providerSnapshots, {
         type: input.runtimeType,

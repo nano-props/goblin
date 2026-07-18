@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import { createRepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import {
+  createRepoWorkspaceTabModel as createRepoWorkspaceTabModelCore,
+  type RepoWorkspaceTabModelInput,
+} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
   reconcileWorkspacePaneRoute,
@@ -11,6 +15,24 @@ const REPO_ID = 'goblin+file:///tmp/goblin-route-reconciliation-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/tmp/goblin-route-reconciliation-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
+
+type RouteModelInput = Omit<RepoWorkspaceTabModelInput, 'paneTarget' | 'worktreeHead'> & {
+  branchName: string | null
+  worktreePath: string | null
+}
+
+function createRepoWorkspaceTabModel(input: RouteModelInput) {
+  const { branchName, worktreePath, ...modelInput } = input
+  return createRepoWorkspaceTabModelCore({
+    ...modelInput,
+    paneTarget: branchName
+      ? requiredGitWorkspacePaneTabsTarget(input.repoId, branchName, worktreePath)
+      : worktreePath === input.repoId
+        ? { kind: 'workspace-root', repoRoot: input.repoId }
+        : { kind: 'inactive', repoRoot: input.repoId },
+    worktreeHead: branchName && worktreePath ? { kind: 'branch', branchName } : undefined,
+  })
+}
 
 describe('workspace pane route reconciliation', () => {
   test('keeps a routed terminal session when it is materialized', () => {

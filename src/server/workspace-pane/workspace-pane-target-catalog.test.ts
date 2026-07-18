@@ -1,11 +1,12 @@
 import { describe, expect, test, vi } from 'vitest'
 import { WorkspacePaneTargetCatalog } from '#/server/workspace-pane/workspace-pane-target-catalog.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 describe('WorkspacePaneTargetCatalog', () => {
   test('captures only identity data for a Git runtime', async () => {
     const readIdentities = vi.fn(async () => [
-      { branch: 'main', worktreePath: '/repo' },
-      { branch: 'feature/no-worktree', worktreePath: null },
+      { kind: 'git-worktree' as const, worktreePath: '/repo', head: { kind: 'branch' as const, branchName: 'main' } },
+      { kind: 'git-branch' as const, branchName: 'feature/no-worktree' },
     ])
     const catalog = new WorkspacePaneTargetCatalog({
       hasGitCapability: () => true,
@@ -62,31 +63,36 @@ describe('WorkspacePaneTargetCatalog', () => {
     expect(readIdentities).not.toHaveBeenCalled()
   })
 
-  test('retains only the workspace root for a Git repo with no branch refs', async () => {
+  test('retains a detached worktree even when the repository has no branch refs', async () => {
     const catalog = new WorkspacePaneTargetCatalog({
       hasGitCapability: () => true,
-      readIdentities: async () => [],
+      readIdentities: async () => [
+        { kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'detached' } },
+      ],
     })
     await expect(
       catalog.captureTargets('user-a', 'goblin+file:///repo', 'goblin+file:///repo\0runtime-a'),
     ).resolves.toEqual([
       {
-        target: { kind: 'workspace-root', workspaceId: 'goblin+file:///repo', workspaceRuntimeId: 'runtime-a' },
+        target: {
+          kind: 'workspace-root',
+          workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
+          workspaceRuntimeId: 'runtime-a',
+        },
+        nativeWorktreePath: '/repo',
+        canonicalBranch: null,
+      },
+      {
+        target: {
+          kind: 'git-worktree',
+          workspaceId: 'goblin+file:///repo',
+          workspaceRuntimeId: 'runtime-a',
+          root: 'goblin+file:///repo',
+        },
         nativeWorktreePath: '/repo',
         canonicalBranch: null,
       },
     ])
   })
 
-  test('rejects a branch rename between capture and admission with one narrow validation read', async () => {
-    let identities = [{ branch: 'main', worktreePath: '/repo' }]
-    const readIdentities = vi.fn(async () => identities)
-    const catalog = new WorkspacePaneTargetCatalog({ hasGitCapability: () => true, readIdentities })
-    const captured = await catalog.captureTargets('user-a', 'goblin+file:///repo', 'goblin+file:///repo\0runtime-a')
-    identities = [{ branch: 'renamed', worktreePath: '/repo' }]
-    await expect(
-      catalog.validateTargets('user-a', 'goblin+file:///repo', 'goblin+file:///repo\0runtime-a', captured),
-    ).resolves.toBe(false)
-    expect(readIdentities).toHaveBeenCalledTimes(2)
-  })
 })

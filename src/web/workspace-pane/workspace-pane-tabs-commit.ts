@@ -8,7 +8,9 @@ import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/wo
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 import {
   runtimeWorkspacePaneTarget,
+  workspacePaneTabsBranchIdentity,
   workspacePaneTabsTargetIdentityKey,
+  workspacePaneTabsTargetWorktreePath,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 
@@ -158,8 +160,8 @@ async function commitWorkspacePaneTabsNow(
     return reportWorkspacePaneTabsFailure({
       operation: 'commit',
       repoRoot: input.repoRoot,
-      branchName: input.branchName,
-      worktreePath: input.worktreePath,
+      branchName: workspacePaneTabsBranchIdentity(input),
+      worktreePath: workspacePaneTabsTargetWorktreePath(input),
       error: err,
     })
   }
@@ -176,8 +178,8 @@ async function updateWorkspacePaneTabsNow(
     return reportWorkspacePaneTabsFailure({
       operation: 'update',
       repoRoot: input.repoRoot,
-      branchName: input.branchName,
-      worktreePath: input.worktreePath,
+      branchName: workspacePaneTabsBranchIdentity(input),
+      worktreePath: workspacePaneTabsTargetWorktreePath(input),
       error: err,
     })
   }

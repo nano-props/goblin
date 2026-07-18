@@ -40,6 +40,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import {
   runtimeWorkspacePaneTarget,
+  requiredGitWorkspacePaneTabsTarget,
   workspacePaneTabsTargetFromRuntime,
   workspacePaneTabsTargetIdentityKey,
   type WorkspacePaneTabsTarget,
@@ -57,6 +58,7 @@ import type {
   TerminalSessionsSnapshot,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
+import { terminalGitWorktreePresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type {
   WorkspacePaneTabsEntry,
@@ -220,6 +222,27 @@ export function createPullRequest(number: number, options: Partial<PullRequestIn
   }
 }
 
+type TestWorkspacePaneRuntimeTabInput =
+  | (WorkspacePaneTabsTarget & { repoRuntimeId: string; terminalSessionId: string })
+  | {
+      repoRoot: string
+      repoRuntimeId: string
+      branchName: string
+      worktreePath: string
+      terminalSessionId: string
+    }
+
+function testWorkspacePaneRuntimeTabTarget(
+  input: TestWorkspacePaneRuntimeTabInput,
+): WorkspacePaneTabsTarget & { repoRuntimeId: string } {
+  return 'kind' in input
+    ? input
+    : {
+        ...requiredGitWorkspacePaneTabsTarget(input.repoRoot, input.branchName, input.worktreePath),
+        repoRuntimeId: input.repoRuntimeId,
+      }
+}
+
 export function installWorkspacePaneTabsTestBridge(
   options: {
     replaceWorkspaceTabs?: (
@@ -234,17 +257,10 @@ export function installWorkspacePaneTabsTestBridge(
     onEffectIntent?: ClientBridge['onEffectIntent']
   } = {},
 ): {
-  addRuntimeTab: (input: WorkspacePaneTabsTarget & {
-    repoRoot: string
-    repoRuntimeId: string
-    terminalSessionId: string
+  addRuntimeTab: (input: TestWorkspacePaneRuntimeTabInput & {
     insertAfterIdentity?: string | null
   }) => void
-  removeRuntimeTab: (input: WorkspacePaneTabsTarget & {
-    repoRoot: string
-    repoRuntimeId: string
-    terminalSessionId: string
-  }) => void
+  removeRuntimeTab: (input: TestWorkspacePaneRuntimeTabInput) => void
 } {
   let serverEntries: WorkspacePaneTabsEntry[] = []
   let serverRevision = 0
@@ -422,7 +438,7 @@ export function installWorkspacePaneTabsTestBridge(
             presentation:
               input.request.target.kind === 'workspace-root'
                 ? { kind: 'workspace-root' as const }
-                : { kind: 'git-worktree' as const, branchName: 'main' },
+                : terminalGitWorktreePresentation('main'),
             terminalSessionId,
             terminalProjectionEffect: { kind: 'delta', revision: 1 },
             terminalRuntimeSessionId,
@@ -464,9 +480,10 @@ export function installWorkspacePaneTabsTestBridge(
   } satisfies ClientBridge)
   return {
     addRuntimeTab: (input) => {
+      const target = testWorkspacePaneRuntimeTabTarget(input)
       replaceServerTarget(
-        input,
-        workspacePaneTabsWithRuntimeTab(serverTabsForTarget(input), 'terminal', input.terminalSessionId, {
+        target,
+        workspacePaneTabsWithRuntimeTab(serverTabsForTarget(target), 'terminal', input.terminalSessionId, {
           insertAfterIdentity: input.insertAfterIdentity,
         }),
       )
@@ -474,9 +491,10 @@ export function installWorkspacePaneTabsTestBridge(
       writeWorkspacePaneTabsSnapshotQueryData(input.repoRoot, input.repoRuntimeId, snapshot)
     },
     removeRuntimeTab: (input) => {
+      const target = testWorkspacePaneRuntimeTabTarget(input)
       replaceServerTarget(
-        input,
-        serverTabsForTarget(input).filter(
+        target,
+        serverTabsForTarget(target).filter(
           (tab) => tab.type !== 'terminal' || tab.runtimeSessionId !== input.terminalSessionId,
         ),
       )
@@ -1233,13 +1251,14 @@ export function seedRepoWithReadModelForTest(options: {
     options.preferredWorkspacePaneTabByTarget ??
     (currentBranchName && options.preferredWorkspacePaneTab !== undefined
       ? {
-          [workspacePaneTabsTargetIdentityKey({
-            repoRoot: options.id,
-            branchName: currentBranchName,
-            worktreePath:
+          [workspacePaneTabsTargetIdentityKey(
+            requiredGitWorkspacePaneTabsTarget(
+              options.id,
+              currentBranchName,
               branchesWithSnapshotWorktreeMetadata.find((branch) => branch.name === currentBranchName)?.worktree
                 ?.path ?? null,
-          })]: options.preferredWorkspacePaneTab,
+            ),
+          )]: options.preferredWorkspacePaneTab,
         }
       : undefined)
   const repo = seedRepoShellForTest({
@@ -1269,10 +1288,8 @@ export function seedRepoWithReadModelForTest(options: {
     const branch = branchesWithSnapshotWorktreeMetadata.find((candidate) => candidate.name === branchName)
     if (!branch) continue
     setWorkspacePaneTabsForTargetQueryData({
-      repoRoot: options.id,
+      ...requiredGitWorkspacePaneTabsTarget(options.id, branchName, branch.worktree?.path ?? null),
       repoRuntimeId: repo.repoRuntimeId,
-      branchName,
-      worktreePath: branch.worktree?.path ?? null,
       tabs,
     })
   }

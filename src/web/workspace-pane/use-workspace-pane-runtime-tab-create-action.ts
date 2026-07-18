@@ -9,16 +9,15 @@ import {
   type WorkspacePaneRuntimeTabCreateStateByType,
   workspacePaneRuntimeTabCreateAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import { resolveWorkspacePaneTerminalExecutionTarget } from '#/web/workspace-pane/workspace-pane-terminal-execution-target.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface UseWorkspacePaneRuntimeTabCreateActionInput {
-  repoRoot: string
-  repoRuntimeId: string
-  branchName: string | null
+  base: TerminalSessionBase | null
   runtimeTabStateByType: WorkspacePaneRuntimeTabCreateStateByType
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   showCreatedRuntimeTab: (
     type: WorkspacePaneRuntimeTabType,
     sessionId: string,
@@ -29,25 +28,25 @@ export interface UseWorkspacePaneRuntimeTabCreateActionInput {
 }
 
 export function useWorkspacePaneRuntimeTabCreateAction({
-  repoRoot,
-  repoRuntimeId,
-  branchName,
+  base,
   runtimeTabStateByType,
   workspacePaneRoute,
   showCreatedRuntimeTab,
   t,
 }: UseWorkspacePaneRuntimeTabCreateActionInput): WorkspacePaneRuntimeTabCreateAction | null {
   const { createTerminalWithAdmission } = useTerminalSessionContext()
-  const terminalBase = useMemo(
-    () => resolveWorkspacePaneTerminalExecutionTarget(repoRoot, branchName),
-    [branchName, repoRuntimeId, repoRoot],
-  )
+  const terminalBase = base
   const captureOpenerIdentity = useCallback(
-    () =>
-      captureWorkspacePaneActiveTabIdentity(repoRoot, repoRuntimeId, branchName, {
-        workspacePaneRoute,
-      }),
-    [branchName, repoRoot, repoRuntimeId, workspacePaneRoute],
+    () => {
+      if (!terminalBase) return null
+      const paneTarget = workspacePaneTabsTargetFromRuntime(terminalBase.target)
+      return paneTarget
+        ? captureWorkspacePaneActiveTabIdentity(paneTarget, terminalBase.target.workspaceRuntimeId, {
+            workspacePaneRoute,
+          })
+        : null
+    },
+    [terminalBase, workspacePaneRoute],
   )
 
   return useMemo(

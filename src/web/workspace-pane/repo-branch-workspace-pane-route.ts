@@ -1,7 +1,7 @@
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
-import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
+import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import {
   createRepoWorkspaceTabModel,
   isRepoWorkspaceRuntimeTab,
@@ -14,19 +14,22 @@ import {
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import {
+  workspacePaneTabsTargetWorktreePath,
+} from '#/shared/workspace-pane-tabs-target.ts'
 
-export type RepoBranchWorkspacePaneRouteResolution =
+export type WorkspacePaneRouteResolution =
   | { kind: 'missing' }
   | {
       kind: 'unavailable'
       reason: 'branch-read-model-unavailable' | 'workspace-pane-tabs-pending' | 'workspace-pane-tabs-failed'
     }
-  | { kind: 'route'; route: RepoBranchWorkspacePaneRoute | null }
+  | { kind: 'route'; route: WorkspacePaneRoute | null }
 
-export function resolveRepoBranchWorkspacePaneRoute(
+export function resolveWorkspacePaneRoute(
   repoId: string,
   branchName: string,
-): RepoBranchWorkspacePaneRouteResolution {
+): WorkspacePaneRouteResolution {
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
   if (!repo) return { kind: 'missing' }
@@ -47,13 +50,13 @@ export function resolveRepoBranchWorkspacePaneRoute(
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     repoRoot: repo.id,
     repoRuntimeId: repo.repoRuntimeId,
-    worktreePath: target.worktreePath,
+    worktreePath: workspacePaneTabsTargetWorktreePath(target),
   })
   const model = createRepoWorkspaceTabModel({
     repoId: repo.id,
     repoRuntimeId: repo.repoRuntimeId,
-    branchName: target.branchName,
-    worktreePath: target.worktreePath,
+    worktreeHead: target.kind === 'git-worktree' ? { kind: 'branch', branchName } : undefined,
+    paneTarget: target,
     preferredTab: preferredWorkspacePaneTabForTarget(repo.ui, target),
     allowPreferredTabFallback: true,
     tabEntries: tabEntriesProjection.tabs,
@@ -72,7 +75,7 @@ export function resolveRepoBranchWorkspacePaneRoute(
   return { kind: 'route', route: { kind: 'static', tab: activeTab.type } }
 }
 
-export function openRepoBranchWorkspacePaneRoute(
+export function openWorkspacePaneRoute(
   routeNavigation: Pick<
     PrimaryWindowRouteNavigation,
     'openRepoBranch' | 'openRepoBranchTab' | 'openRepoBranchTerminal'
@@ -81,11 +84,11 @@ export function openRepoBranchWorkspacePaneRoute(
   branchName: string,
   options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
 ): boolean {
-  const resolution = resolveRepoBranchWorkspacePaneRoute(repoId, branchName)
+  const resolution = resolveWorkspacePaneRoute(repoId, branchName)
   if (resolution.kind === 'missing') return false
   if (resolution.kind === 'unavailable') {
     if (resolution.reason === 'branch-read-model-unavailable') return false
-    return openResolvedRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName, null, options)
+    return openResolvedWorkspacePaneRoute(routeNavigation, repoId, branchName, null, options)
   }
-  return openResolvedRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName, resolution.route, options)
+  return openResolvedWorkspacePaneRoute(routeNavigation, repoId, branchName, resolution.route, options)
 }

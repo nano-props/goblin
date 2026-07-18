@@ -6,7 +6,7 @@ import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
-import type { RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
+import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
 
@@ -36,6 +36,12 @@ export type TerminalBellIntentPlan =
       branch: string
       terminalSessionId: string
       terminalWorktreeKey: string
+    }
+  | {
+      kind: 'show-detached-worktree-terminal'
+      repoId: string
+      worktreePath: string
+      terminalSessionId: string
     }
 
 export type AppLevelIntentPlan =
@@ -81,7 +87,7 @@ interface WorkspaceIntentPlanContext {
 
 export function createTerminalBellIntentPlan(
   repo: Pick<RepoState, 'id'> | undefined,
-  branchReadModel: RepoBranchSnapshotData | null,
+  branchReadModel: RepoBranchReadModelData | null,
   event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
 ): TerminalBellIntentPlan {
   if (!repo) return { kind: 'noop' }
@@ -99,6 +105,14 @@ export function createTerminalBellIntentPlan(
         branch: branch.name,
         terminalSessionId: event.terminalSessionId,
         terminalWorktreeKey: event.terminalWorktreeKey!,
+      }
+    }
+    if (worktreePath && branchReadModel.worktreesByPath[worktreePath]) {
+      return {
+        kind: 'show-detached-worktree-terminal',
+        repoId: repo.id,
+        worktreePath,
+        terminalSessionId: event.terminalSessionId,
       }
     }
   }

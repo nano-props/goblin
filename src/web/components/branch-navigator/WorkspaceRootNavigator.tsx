@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import { FileText, FolderTree } from 'lucide-react'
+import { useShallow } from 'zustand/react/shallow'
+import { FileText, FolderTree, Terminal } from 'lucide-react'
 import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
 import {
   BRANCH_ROW_ACTION_BOX_CLASS,
@@ -12,6 +13,10 @@ import { useT } from '#/web/stores/i18n.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import { runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
+import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
+import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 interface WorkspaceRootNavigatorProps {
   repoId: string
@@ -30,13 +35,33 @@ export function WorkspaceRootNavigator({
   onOpenFiles,
 }: WorkspaceRootNavigatorProps) {
   const t = useT()
+  const navigation = usePrimaryWindowNavigation()
   const compact = useIsCompactUi()
   const [menuOpen, setMenuOpen] = useState(false)
   const actionVisible = compact || menuOpen
-  const name = useReposStore((state) => {
-    const probe = state.repos[repoId]?.workspaceProbe
-    return probe?.status === 'ready' ? probe.name : formatWorkspaceDisplayLocation(repoId)
-  })
+  const workspace = useReposStore(
+    useShallow((state) => {
+      const probe = state.repos[repoId]?.workspaceProbe
+      const repo = state.repos[repoId]
+      return {
+        name: probe?.status === 'ready' ? probe.name : formatWorkspaceDisplayLocation(repoId),
+        terminalAvailable: workspaceTerminalAvailable(probe),
+        repoRuntimeId: repo?.repoRuntimeId ?? null,
+        capabilities: probe?.status === 'ready' ? probe.capabilities : null,
+      }
+    }),
+  )
+  const root = parseCanonicalWorkspaceLocator(repoId)
+  const filesystemTarget =
+    root && workspace.repoRuntimeId && workspace.capabilities
+      ? {
+          kind: 'workspace-root' as const,
+          workspaceId: repoId,
+          workspaceRuntimeId: workspace.repoRuntimeId,
+          rootPath: root.path,
+          capabilities: workspace.capabilities,
+        }
+      : null
 
   return (
     <ScrollArea className="h-full min-h-0 flex-1" data-testid="workspace-root-navigator">
@@ -50,8 +75,8 @@ export function WorkspaceRootNavigator({
           content={
             <>
               <FolderTree size={16} className="shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate text-sm" title={name}>
-                {name}
+              <span className="min-w-0 flex-1 truncate text-sm" title={workspace.name}>
+                {workspace.name}
               </span>
             </>
           }
@@ -80,6 +105,21 @@ export function WorkspaceRootNavigator({
                         close={close}
                         onSelect={onOpenFiles}
                       />
+                      {workspace.terminalAvailable && filesystemTarget && (
+                        <WorkspaceAction
+                          label={t('tab.terminal')}
+                          icon={<Terminal />}
+                          close={close}
+                          onSelect={() => {
+                            void runTerminalPrimaryActionCommand({
+                              repoId,
+                              target: { kind: 'workspace-root', workspacePaneRoute: null, filesystemTarget },
+                              navigation,
+                              t,
+                            })
+                          }}
+                        />
+                      )}
                     </div>
                   )}
                 </ActionPopover>

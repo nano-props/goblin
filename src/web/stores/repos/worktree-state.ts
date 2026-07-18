@@ -63,6 +63,20 @@ export function worktreeStatesFromBranchReadModel(
       isLocked: snapshotWorktree.isLocked,
     }
   }
+  // The status snapshot comes from the complete authoritative `git worktree
+  // list`, whereas the branch projection necessarily omits detached HEADs.
+  // Preserve those filesystem members in the worktree catalog instead of
+  // making UI reachability depend on an associated branch.
+  for (const statusEntry of status) {
+    if (next[statusEntry.path]) continue
+    next[statusEntry.path] = {
+      path: statusEntry.path,
+      branch: statusEntry.branch,
+      isMain: statusEntry.isMain,
+      isDirty: statusEntry.entries.length > 0,
+      changeCount: statusEntry.entries.length,
+    }
+  }
   return next
 }
 

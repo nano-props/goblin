@@ -191,9 +191,9 @@ describe('updateWorkspacePaneTabs', () => {
 
 function target() {
   return {
+    kind: 'git-worktree' as const,
     repoRoot: REPO_ROOT,
     repoRuntimeId: REPO_RUNTIME_ID,
-    branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
   }
 }
@@ -215,9 +215,9 @@ function snapshot(revision: number, tabs: WorkspacePaneTabEntry[]): WorkspacePan
     revision,
     entries: [{
       target: runtimeWorkspacePaneTargetForTest({
+        kind: 'git-worktree' as const,
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
       }),
       tabs,

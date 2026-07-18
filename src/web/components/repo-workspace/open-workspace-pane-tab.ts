@@ -1,4 +1,4 @@
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import {
   dispatchOpenWorkspacePaneStaticTabAction,
@@ -11,7 +11,7 @@ export async function openWorkspacePaneTab(input: {
   branchName: string
   worktreePath: string | null | undefined
   type: WorkspacePaneStaticTabType
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   navigation: WorkspacePaneTabControllerCommitNavigation
 }): Promise<boolean> {
   return await dispatchOpenWorkspacePaneStaticTabAction(input satisfies OpenWorkspacePaneStaticTabActionOptions)

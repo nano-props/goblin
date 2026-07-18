@@ -14,6 +14,14 @@ export function branchNameFromSlug(slug: string): string | null {
   return textFromSlug(slug)
 }
 
+export function worktreeSlugFromPath(worktreePath: string): string {
+  return slugFromText(worktreePath)
+}
+
+export function worktreePathFromSlug(slug: string): string | null {
+  return textFromSlug(slug)
+}
+
 function slugFromText(value: string): string {
   const bytes = new TextEncoder().encode(value)
   let binary = ''

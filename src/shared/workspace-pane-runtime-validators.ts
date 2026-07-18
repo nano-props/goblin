@@ -8,7 +8,7 @@ import type {
 import {
   canonicalRuntimeWorkspacePaneTarget,
   normalizeWorkspacePaneTabsSnapshot,
-  WorkspacePaneExecutionTargetSchema,
+  WorkspacePaneFilesystemExecutionTargetSchema,
   WorkspacePaneOptionalTabIdentitySchema,
   WorkspacePaneTabsSnapshotSchema,
 } from '#/shared/workspace-pane-tabs-validators.ts'
@@ -25,7 +25,7 @@ export const WorkspacePaneRuntimeOpenInputSchema = v.variant('runtimeType', [
 ])
 
 const WorkspacePaneRuntimeCommandTargetSchema = v.strictObject({
-  target: WorkspacePaneExecutionTargetSchema,
+  target: WorkspacePaneFilesystemExecutionTargetSchema,
 })
 
 export const WorkspacePaneRuntimeCloseInputSchema = v.strictObject({

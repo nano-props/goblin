@@ -341,7 +341,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       routeNavigation: navigation,
     })
 
-    const accepted = actions.commitRepoBranchWorkspacePaneRoute(REPO_ID, BRANCH_NAME, {
+    const accepted = actions.commitWorkspacePaneRoute(REPO_ID, BRANCH_NAME, {
       kind: 'terminal',
       terminalSessionId: 'term-111111111111111111111',
     })
@@ -368,7 +368,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     })
     const routeCommit = Promise.withResolvers<boolean>()
     const navigation = routeNavigation()
-    navigation.commitRepoBranchWorkspacePaneRoute = vi.fn(() => routeCommit.promise)
+    navigation.commitWorkspacePaneRoute = vi.fn(() => routeCommit.promise)
     const actions = createPrimaryWindowNavigationActions({
       currentRepoId: REPO_ID,
       order: [REPO_ID],
@@ -376,7 +376,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       routeNavigation: navigation,
     })
 
-    const committed = actions.commitRepoBranchWorkspacePaneRoute(REPO_ID, BRANCH_NAME, {
+    const committed = actions.commitWorkspacePaneRoute(REPO_ID, BRANCH_NAME, {
       kind: 'static',
       tab: 'history',
     })
@@ -766,6 +766,42 @@ describe('createPrimaryWindowNavigationActions', () => {
     )
   })
 
+  test.each(['back', 'forward'] as const)('restores a saved bare worktree history entry when navigating %s', (direction) => {
+    const navigation = routeNavigation()
+    const target: WorkspaceNavigationHistoryEntry = {
+      repoId: REPO_ID,
+      route: {
+        kind: 'worktree',
+        worktreePath: WORKTREE_PATH,
+        workspacePaneTab: null,
+        terminalSessionId: null,
+      },
+    }
+    const traversal: WorkspaceNavigationHistoryTraversal = {
+      repoId: REPO_ID,
+      direction,
+      current: { repoId: REPO_ID, route: { kind: 'dashboard' } },
+      target,
+    }
+    const peekWorkspaceNavigation = vi.fn(() => traversal)
+    const commitWorkspaceNavigation = vi.fn(() => true)
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: REPO_ID,
+      order: [REPO_ID],
+      closeRepo: vi.fn(),
+      peekWorkspaceNavigation,
+      commitWorkspaceNavigation,
+      routeNavigation: navigation,
+    })
+
+    if (direction === 'back') actions.goBack(REPO_ID)
+    else actions.goForward(REPO_ID)
+
+    expect(peekWorkspaceNavigation).toHaveBeenCalledWith(REPO_ID, direction)
+    expect(navigation.openRepoWorktree).toHaveBeenCalledWith(REPO_ID, WORKTREE_PATH, presentationOptions())
+    expect(commitWorkspaceNavigation).toHaveBeenCalledWith(traversal)
+  })
+
   test('does not block bare branch history restore while tabs projection is pending', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -944,7 +980,7 @@ function createPrimaryWindowNavigationActions(options: PrimaryWindowNavigationAc
 function routeNavigation(): PrimaryWindowRouteNavigation {
   return {
     repoSlugForId: vi.fn(() => 'repo-slug'),
-    currentRepoBranchWorkspacePaneRoute: () => undefined,
+    currentWorkspacePaneRoute: () => undefined,
     openHome: vi.fn(),
     openSettings: vi.fn(),
     closeSettings: vi.fn(),
@@ -960,6 +996,10 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
       return true
     }),
     openRepoBranchTerminal: vi.fn((_repoId, _branchName, _sessionId, options) => {
+      options?.onCommit?.()
+      return true
+    }),
+    openRepoWorktree: vi.fn((_repoId, _worktreePath, options) => {
       options?.onCommit?.()
       return true
     }),

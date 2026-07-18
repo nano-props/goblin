@@ -6,6 +6,14 @@ import type {
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
 import {
+  workspacePaneTabsTargetWorktreePath,
+  type WorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
+import { gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
+import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+
+export type RepoWorkspacePaneModelTarget = WorkspacePaneTabsTarget | { kind: 'inactive'; repoRoot: string }
+import {
   WORKSPACE_PANE_RUNTIME_TAB_TYPES,
   isWorkspacePaneRuntimeTabEntry,
   isWorkspacePaneRuntimeTabType,
@@ -112,6 +120,7 @@ export interface RepoWorkspaceTabModel {
   repoRuntimeId: string
   branchName: string | null
   worktreePath: string | null
+  paneTarget: RepoWorkspacePaneModelTarget
   runtimeTabTargetKeyByType: WorkspacePaneRuntimeTabTargetKeyByType
   runtimeTabTargetKey: string | null
   /** Runtime-tab lifecycle, pending, and selection state keyed by runtime type. */
@@ -138,8 +147,8 @@ export interface RepoWorkspaceTabModel {
 export interface RepoWorkspaceTabModelInput {
   repoId: string
   repoRuntimeId: string
-  branchName: string | null
-  worktreePath: string | null
+  paneTarget: RepoWorkspacePaneModelTarget
+  worktreeHead?: GitHead
   preferredTab: WorkspacePaneTabType | null
   /**
    * Persisted preferences may fall back to the first materialized tab when
@@ -156,13 +165,19 @@ export interface RepoWorkspaceTabModelInput {
 }
 
 export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): RepoWorkspaceTabModel {
-  const hasWorkspaceTarget = input.branchName === null && input.worktreePath !== null
-  const hasPaneTarget = !!input.branchName || hasWorkspaceTarget
-  const worktreePath = hasPaneTarget ? input.worktreePath : null
-  const normalizedTabEntries = hasPaneTarget
-    ? normalizeWorkspacePaneTabs(input.tabEntries, { hasWorktree: worktreePath !== null })
-    : []
-  const tabEntries = normalizedTabEntries
+  const worktreePath = paneTargetFilesystemPath(input.paneTarget)
+  const branchName = paneTargetPresentationBranch(input.paneTarget, input.worktreeHead)
+  const normalizedTabEntries =
+    input.paneTarget.kind === 'inactive'
+      ? []
+      : normalizeWorkspacePaneTabs(input.tabEntries, { hasWorktree: worktreePath !== null })
+  const tabEntries =
+    input.paneTarget.kind === 'git-worktree' && input.worktreeHead?.kind === 'detached'
+      ? normalizedTabEntries.filter(
+          (entry) =>
+            isWorkspacePaneRuntimeTabEntry(entry) || entry.type === 'status' || entry.type === 'files',
+        )
+      : normalizedTabEntries
   const runtimeTabTargetKeyByType = workspacePaneRuntimeTabTargetKeyByType({ repoRoot: input.repoId, worktreePath })
   const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ repoRoot: input.repoId, worktreePath })
   const hasWorktree = !!worktreePath
@@ -208,8 +223,9 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
   return {
     repoId: input.repoId,
     repoRuntimeId: input.repoRuntimeId,
-    branchName: input.branchName,
+    branchName,
     worktreePath,
+    paneTarget: input.paneTarget,
     runtimeTabTargetKeyByType,
     runtimeTabTargetKey,
     runtimeTabStateByType,
@@ -223,6 +239,17 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
     renderedTab: selection?.tab ?? null,
     activeTab: selection?.kind === 'materialized-tab' ? selection.materializedTab : null,
   }
+}
+
+function paneTargetFilesystemPath(target: RepoWorkspacePaneModelTarget): string | null {
+  if (target.kind === 'inactive' || target.kind === 'git-branch') return null
+  if (target.kind === 'git-worktree') return workspacePaneTabsTargetWorktreePath(target)
+  return parseCanonicalWorkspaceLocator(target.repoRoot)?.path ?? null
+}
+
+function paneTargetPresentationBranch(target: RepoWorkspacePaneModelTarget, worktreeHead: GitHead | undefined): string | null {
+  if (target.kind === 'git-branch') return target.branchName
+  return target.kind === 'git-worktree' && worktreeHead ? gitHeadBranch(worktreeHead) : null
 }
 
 export function nextRepoWorkspaceTabAfterClose(

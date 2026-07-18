@@ -62,7 +62,8 @@ export type RemoteCommandKind =
   | { type: 'testDirectory'; path: string }
   | { type: 'listDirectories'; path: string; limit?: number }
   | { type: 'directoryOverview'; path: string }
-  | { type: 'gitTreeWalk'; path: string; prefix?: string }
+  | { type: 'directoryChildren'; path: string; prefix?: string }
+  | { type: 'gitDirectoryChildren'; path: string; prefix?: string }
   | { type: 'revParseTopLevel'; path: string }
   | { type: 'resolvePhysicalWorktreeIdentity'; path: string }
   | { type: 'gitSnapshot'; path: string }
@@ -399,9 +400,11 @@ function scriptForCommand(command: RemoteCommandKind): string {
         `printf '%s\\t%s\\t%s\\n' "$files" "$directories" "$bytes"`,
       ].join('\n')
     }
-    case 'gitTreeWalk': {
-      return remoteTreeChildrenScript(command.path, command.prefix)
+    case 'directoryChildren': {
+      return remoteDirectoryChildrenScript(command.path, command.prefix)
     }
+    case 'gitDirectoryChildren':
+      return remoteGitDirectoryChildrenScript(command.path, command.prefix)
     case 'revParseTopLevel':
       return [
         `root=$(git -C ${shellQuote(command.path)} rev-parse --show-toplevel) || exit $?`,
@@ -770,17 +773,33 @@ function remoteTrashFileScript(worktreePath: string, filePath: string): string {
   ].join('\n')
 }
 
-function remoteTreeChildrenScript(rootPath: string, prefix: string | undefined): string {
-  const root = shellQuote(rootPath)
-  const normalizedPrefix = (prefix ?? '')
-    .replace(/^\.\/+/, '')
-    .replace(/^\/+/, '')
-    .replace(/\/+$/u, '')
-  const dir = normalizedPrefix ? `${root}/${shellQuote(normalizedPrefix)}` : root
+function remoteDirectoryChildrenScript(rootPath: string, prefix: string | undefined): string {
+  const { root, dir } = remoteDirectoryPaths(rootPath, prefix)
   return [
     `root=${root}`,
     `dir=${dir}`,
-    'test -d "$dir" || exit 0',
+    'if [ ! -e "$dir" ]; then printf "%s\\n" "error.workspace-path-not-found" >&2; exit 66; fi',
+    'if [ ! -d "$dir" ]; then printf "%s\\n" "error.workspace-path-not-directory" >&2; exit 67; fi',
+    'if [ ! -r "$dir" ]; then printf "%s\\n" "error.workspace-permission-denied" >&2; exit 68; fi',
+    'find "$dir" -mindepth 1 -maxdepth 1 ! -name .git -exec sh -c \'',
+    'root=$1',
+    'shift',
+    'for entry do',
+    '  rel=${entry#"$root"/}',
+    '  if [ -d "$entry" ]; then printf "%s/\\0" "$rel"; else printf "%s\\0" "$rel"; fi',
+    'done',
+    '\' sh "$root" {} +',
+  ].join('\n')
+}
+
+function remoteGitDirectoryChildrenScript(rootPath: string, prefix: string | undefined): string {
+  const { root, dir } = remoteDirectoryPaths(rootPath, prefix)
+  return [
+    `root=${root}`,
+    `dir=${dir}`,
+    'if [ ! -e "$dir" ]; then printf "%s\\n" "error.workspace-path-not-found" >&2; exit 66; fi',
+    'if [ ! -d "$dir" ]; then printf "%s\\n" "error.workspace-path-not-directory" >&2; exit 67; fi',
+    'if [ ! -r "$dir" ]; then printf "%s\\n" "error.workspace-permission-denied" >&2; exit 68; fi',
     'find "$dir" -mindepth 1 -maxdepth 1 ! -name .git -exec sh -c \'',
     'root=$1',
     'shift',
@@ -789,14 +808,20 @@ function remoteTreeChildrenScript(rootPath: string, prefix: string | undefined):
     '  if git -C "$root" check-ignore -q -- "$rel"; then',
     '    git -C "$root" ls-files -- "$rel" | IFS= read -r _tracked || continue',
     '  fi',
-    '  if [ -d "$entry" ]; then',
-    '    printf "%s/\\0" "$rel"',
-    '  else',
-    '    printf "%s\\0" "$rel"',
-    '  fi',
+    '  if [ -d "$entry" ]; then printf "%s/\\0" "$rel"; else printf "%s\\0" "$rel"; fi',
     'done',
     '\' sh "$root" {} +',
   ].join('\n')
+}
+
+function remoteDirectoryPaths(rootPath: string, prefix: string | undefined): { root: string; dir: string } {
+  const root = shellQuote(rootPath)
+  const normalizedPrefix = (prefix ?? '')
+    .replace(/^\.\/+/, '')
+    .replace(/^\/+/, '')
+    .replace(/\/+$/u, '')
+  const dir = normalizedPrefix ? `${root}/${shellQuote(normalizedPrefix)}` : root
+  return { root, dir }
 }
 
 const REMOTE_COMMAND_NAME_RE = /^[A-Za-z0-9._+-]+$/

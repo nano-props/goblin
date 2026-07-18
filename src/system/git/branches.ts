@@ -10,6 +10,7 @@ import {
   type LogEntry,
   type WorktreeInfo,
 } from '#/shared/git-types.ts'
+import { gitHead, type GitHead } from '#/shared/git-head.ts'
 
 export async function isGitRepo(cwd: string): Promise<boolean> {
   try {
@@ -57,6 +58,7 @@ export async function getCurrentBranch(cwd: string, options?: { signal?: AbortSi
   }
 }
 
+/** Read only the current worktree's HEAD presentation identity. */
 export async function getHeadHash(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
   if (options?.signal?.aborted) return ''
   try {
@@ -157,10 +159,9 @@ export async function getBranches(
   }
 }
 
-export interface BranchWorktreeIdentity {
-  branch: string
-  worktreePath: string | null
-}
+export type BranchWorktreeIdentity =
+  | { kind: 'git-branch'; branchName: string }
+  | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
 
 /** Strict, display-free branch membership read for admission/catalog paths. */
 export async function getBranchWorktreeIdentities(
@@ -172,11 +173,24 @@ export async function getBranchWorktreeIdentities(
     signal: options?.signal,
   })
   options?.signal?.throwIfAborted()
-  return output
+  const branches = output
     .split('\n')
     .map((branch) => branch.trim())
     .filter(Boolean)
-    .map((branch) => ({ branch, worktreePath: worktrees.find((worktree) => worktree.branch === branch)?.path ?? null }))
+  const usableWorktrees = worktrees.filter((worktree) => !worktree.isBare && !worktree.isPrunable)
+  const checkedOutBranches = new Set(usableWorktrees.flatMap((worktree) => (worktree.branch ? [worktree.branch] : [])))
+  return [
+    ...usableWorktrees.map(
+      (worktree): BranchWorktreeIdentity => ({
+        kind: 'git-worktree',
+        worktreePath: worktree.path,
+        head: gitHead(worktree.branch ?? null),
+      }),
+    ),
+    ...branches
+      .filter((branch) => !checkedOutBranches.has(branch))
+      .map((branch): BranchWorktreeIdentity => ({ kind: 'git-branch', branchName: branch })),
+  ]
 }
 
 export async function getLog(

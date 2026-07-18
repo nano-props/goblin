@@ -18,14 +18,18 @@ describe('restorable workspace pane targets', () => {
 
   it('stores worktree roots as canonical locators and binds them to native runtime paths', () => {
     const workspaceId = 'goblin+ssh://server/srv/app'
-    const runtime = { repoRoot: workspaceId, branchName: 'feature/a', worktreePath: '/srv/app-feature' }
+    const runtime = {
+      kind: 'git-worktree' as const,
+      repoRoot: workspaceId,
+      worktreePath: '/srv/app-feature',
+    }
     const restorable = restorableWorkspacePaneTarget(runtime)
     expect(restorable).toEqual({ kind: 'git-worktree', root: 'goblin+ssh://server/srv/app-feature' })
     const key = restorableWorkspacePaneTargetKey(restorable!)
     expect(parseRestorableWorkspacePaneTargetKey(key)).toEqual(restorable)
     expect(workspacePaneTabsTargetFromRestorable(workspaceId, restorable!)).toEqual({
+      kind: 'git-worktree',
       repoRoot: workspaceId,
-      branchName: '',
       worktreePath: '/srv/app-feature',
     })
   })
@@ -37,8 +41,8 @@ describe('restorable workspace pane targets', () => {
 
   it('uses strict canonical identities for client target keys', () => {
     const key = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-worktree',
       repoRoot: 'goblin+ssh://server/srv/app',
-      branchName: 'feature/a',
       worktreePath: '/srv/app-feature',
     })
     expect(key).toBe('goblin+ssh://server/srv/app\0worktree\0goblin+ssh://server/srv/app-feature')
@@ -64,8 +68,8 @@ describe('restorable workspace pane targets', () => {
     }
     expect(parseRestorableWorkspacePaneTargetKey(restorableWorkspacePaneTargetKey(target))).toEqual(target)
     expect(workspacePaneTabsTargetFromRestorable('goblin+file:///C:/repo', target)).toEqual({
+      kind: 'git-worktree',
       repoRoot: 'goblin+file:///C:/repo',
-      branchName: '',
       worktreePath: 'C:\\repo\\worktree',
     })
   })

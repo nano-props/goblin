@@ -119,7 +119,7 @@ function repoTerminalBase() {
   if (target.kind !== 'git-worktree') throw new Error('expected git worktree target')
   return {
     target,
-    presentation: { kind: 'git-worktree' as const, branchName: 'feature/worktree' },
+    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/worktree' } },
   }
 }
 
@@ -383,9 +383,9 @@ function completeServerSession(session: TestTerminalSessionSummary): TerminalSes
 
 function terminalRuntimeTarget(workspaceRuntimeId: string) {
   return runtimeWorkspacePaneTargetForTest({
+    kind: 'git-worktree' as const,
     repoRoot: REPO_ID,
     repoRuntimeId: workspaceRuntimeId,
-    branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
   })
 }
@@ -480,7 +480,7 @@ beforeEach(() => {
     const presentation =
       input.target.kind === 'workspace-root'
         ? ({ kind: 'workspace-root' } as const)
-        : ({ kind: 'git-worktree', branchName: BRANCH_NAME } as const)
+        : ({ kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH_NAME } } as const)
     const currentSessions = await listSessionsMock({
       repoRoot,
       repoRuntimeId,
@@ -538,7 +538,7 @@ beforeEach(() => {
           branchName: BRANCH_NAME,
           worktreePath,
         }),
-        presentation: { kind: 'git-worktree', branchName: BRANCH_NAME },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH_NAME } },
         controller,
         processName: terminalSessionId,
         canonicalTitle: null,
@@ -1221,7 +1221,11 @@ describe('TerminalSessionProvider', () => {
       await waitFor(() => {
         const descriptor =
           readTerminalSessionCommandBridge()?.terminalWorktreeSnapshot(terminalWorktreeKey).selectedDescriptor
-        expect(descriptor?.presentation.kind === 'git-worktree' ? descriptor.presentation.branchName : null).toBe(
+        expect(
+          descriptor?.presentation.kind === 'git-worktree' && descriptor.presentation.head.kind === 'branch'
+            ? descriptor.presentation.head.branchName
+            : null,
+        ).toBe(
           'feature/worktree',
         )
       })
@@ -1324,9 +1328,9 @@ describe('TerminalSessionProvider', () => {
       },
     })
     setWorkspacePaneTabsForTargetQueryData({
+      kind: 'git-worktree' as const,
       repoRoot: REPO_ID,
       repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
-      branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
       tabs: [
         workspacePaneStaticTabEntry('status'),
@@ -1341,9 +1345,9 @@ describe('TerminalSessionProvider', () => {
       listWorkspaceTabsMock.mockResolvedValue([
         {
           target: runtimeWorkspacePaneTargetForTest({
+            kind: 'git-worktree' as const,
             repoRoot: REPO_ID,
             repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
-            branchName: 'feature/worktree',
             worktreePath: WORKTREE_PATH,
           }),
           tabs: [workspacePaneStaticTabEntry('history')],
@@ -1728,7 +1732,7 @@ describe('TerminalSessionProvider', () => {
     createTerminalMock.mockResolvedValueOnce({
       ok: true as const,
       action: 'created' as const,
-      presentation: { kind: 'git-worktree', branchName: 'feature/worktree' },
+      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/worktree' } },
       terminalSessionId: 'term-111111111111111111111',
       terminalProjectionEffect: { kind: 'delta', revision: 2 },
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',

@@ -40,7 +40,7 @@ import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
-import { branchNameFromSlug, repoIdFromSlug } from '#/web/repo-route-slugs.ts'
+import { branchNameFromSlug, repoIdFromSlug, worktreePathFromSlug } from '#/web/repo-route-slugs.ts'
 import { returnToFromHref, usePrimaryWindowRouteActions } from '#/web/primary-window-route-navigation.ts'
 import {
   usePrimaryWindowHistoryPresentationObserver,
@@ -51,10 +51,13 @@ import type {
   AuthenticatedAppBootstrapResult,
   AuthenticatedAppBootstrapState,
 } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { gitHead } from '#/shared/git-head.ts'
 
 const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapResult>({
   state: { status: 'restoring-workspace' },
@@ -147,18 +150,65 @@ function AuthenticatedWorkspaceShell() {
   const hydratedRouteRepoId = useReposStore((s) => {
     return routedRepoId && s.repos[routedRepoId] ? routedRepoId : null
   })
+  const commandRepo = useReposStore((s) => (hydratedRouteRepoId ? s.repos[hydratedRouteRepoId] : undefined))
   const currentBranchName = routeContext?.kind === 'branch' ? (routeContext.branchName ?? null) : null
   const currentWorkspacePaneRoute = routeContext?.kind === 'branch' ? (routeContext.workspacePaneRoute ?? null) : null
+  const commandCapabilities =
+    commandRepo?.workspaceProbe.status === 'ready' ? commandRepo.workspaceProbe.capabilities : null
+  const commandWorkspace = commandRepo ? parseCanonicalWorkspaceLocator(commandRepo.id) : null
+  const commandWorktreePath = routeContext?.kind === 'worktree' ? routeContext.worktreePath : null
+  const commandBranch =
+    commandRepo && routeContext?.kind === 'branch' && routeContext.branchName
+      ? (readRepoBranchSnapshotQueryProjection(commandRepo)?.branches.find(
+          (branch) => branch.name === routeContext.branchName,
+        ) ?? null)
+      : null
   const currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null =
     routeContext?.kind === 'branch' && routeContext.branchName
-      ? {
-          kind: 'git-branch',
-          branchName: routeContext.branchName,
-          workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
-        }
-      : routeContext?.kind === 'workspace'
-        ? { kind: 'workspace-root' }
-        : null
+      ? commandRepo && commandCapabilities && commandBranch?.worktree?.path
+        ? {
+            kind: 'git-worktree',
+            workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
+            filesystemTarget: {
+              kind: 'git-worktree',
+              workspaceId: commandRepo.id,
+              workspaceRuntimeId: commandRepo.repoRuntimeId,
+              rootPath: commandBranch.worktree.path,
+              head: gitHead(commandBranch.name),
+              capabilities: commandCapabilities,
+            },
+          }
+        : {
+            kind: 'git-branch',
+            branchName: routeContext.branchName,
+            workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
+          }
+      : routeContext?.kind === 'worktree' && commandRepo && commandCapabilities && commandWorktreePath
+        ? {
+            kind: 'git-worktree',
+            workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
+            filesystemTarget: {
+              kind: 'git-worktree',
+              workspaceId: commandRepo.id,
+              workspaceRuntimeId: commandRepo.repoRuntimeId,
+              rootPath: commandWorktreePath,
+              head: { kind: 'detached' },
+              capabilities: commandCapabilities,
+            },
+          }
+        : routeContext?.kind === 'workspace' && commandRepo && commandCapabilities && commandWorkspace
+          ? {
+              kind: 'workspace-root',
+              workspacePaneRoute: null,
+              filesystemTarget: {
+                kind: 'workspace-root',
+                workspaceId: commandRepo.id,
+                workspaceRuntimeId: commandRepo.repoRuntimeId,
+                rootPath: commandWorkspace.path,
+                capabilities: commandCapabilities,
+              },
+            }
+          : null
   const order = useReposStore((s) => s.order)
   const { closeRepo, peekWorkspaceNavigation, commitWorkspaceNavigation } = useReposStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
@@ -273,12 +323,10 @@ function WorkspaceSessionRestoreError({
   )
 }
 
-interface RepoRouteContext {
-  kind: 'empty' | 'workspace' | 'dashboard' | 'branch' | 'newWorktree'
-  repoSlug: string
-  branchName?: string
-  workspacePaneRoute?: ParsedRepoBranchWorkspacePaneRoute | null
-}
+type RepoRouteContext =
+  | { kind: 'empty' | 'workspace' | 'dashboard' | 'newWorktree'; repoSlug: string }
+  | { kind: 'branch'; repoSlug: string; branchName: string; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
+  | { kind: 'worktree'; repoSlug: string; worktreePath: string; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
 
 export function repoRouteContextFromMatches(
   matches: Array<{ routeId: string; params: Record<string, string> }>,
@@ -302,6 +350,14 @@ export function repoRouteContextFromMatches(
       : { kind: 'empty', repoSlug }
   }
 
+  const worktreeSlug = repoMatch.params.worktreeSlug
+  if (worktreeSlug) {
+    const worktreePath = worktreePathFromSlug(worktreeSlug)
+    return worktreePath
+      ? { kind: 'worktree', repoSlug, worktreePath, workspacePaneRoute: workspacePaneRouteFromMatches(matches) }
+      : { kind: 'empty', repoSlug }
+  }
+
   if (repoMatch.routeId.includes('/worktree/new')) return { kind: 'newWorktree', repoSlug }
   if (repoMatch.routeId.includes('/dashboard')) return { kind: 'dashboard', repoSlug }
   if (repoMatch.routeId.includes('/workspace')) return { kind: 'workspace', repoSlug }
@@ -310,7 +366,7 @@ export function repoRouteContextFromMatches(
 
 function workspacePaneRouteFromMatches(
   matches: Array<{ routeId: string; params: Record<string, string> }>,
-): ParsedRepoBranchWorkspacePaneRoute | null {
+): ParsedWorkspacePaneRoute | null {
   const terminalMatch = [...matches].reverse().find((match) => typeof match.params.terminalSessionId === 'string')
   const terminalSessionId = terminalMatch?.params.terminalSessionId
   if (terminalSessionId) return { kind: 'terminal', terminalSessionId }
@@ -327,7 +383,7 @@ interface PrimaryWindowOverlaysProps {
   navigation: PrimaryWindowNavigationActions
   hydratedRouteRepoId: string | null
   currentBranchName: string | null
-  currentWorkspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
 }
 
 function PrimaryWindowOverlays({
@@ -454,6 +510,15 @@ function workspaceNavigationRouteContext(
   if (!repoId) return null
   if (routeContext.kind === 'branch') {
     return null
+  }
+  if (routeContext.kind === 'worktree') {
+    return {
+      kind: 'worktree',
+      repoId,
+      worktreePath: routeContext.worktreePath,
+      workspacePaneRoute:
+        routeContext.workspacePaneRoute?.kind === 'invalid-static' ? null : (routeContext.workspacePaneRoute ?? null),
+    }
   }
   if (routeContext.kind === 'newWorktree') {
     return { kind: 'newWorktree', repoId, returnTo: returnToFromHref(routeHref) }

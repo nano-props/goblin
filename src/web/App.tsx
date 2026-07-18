@@ -30,26 +30,30 @@ interface AppProps {
 export type RepoRouteView =
   | { kind: 'empty'; repoId: string }
   | { kind: 'workspace'; repoId: string }
+  | {
+      kind: 'worktree'
+      repoId: string
+      worktreePath: string
+      workspacePaneRoute: ParsedWorkspacePaneRoute | null
+    }
   | { kind: 'dashboard'; repoId: string }
   | {
       kind: 'branch'
       repoId: string
       branchName: string
-      workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
+      workspacePaneRoute: ParsedWorkspacePaneRoute | null
     }
   | { kind: 'newWorktree'; repoId: string }
 
-export type RepoBranchWorkspacePaneRoute =
-  | { kind: 'static'; tab: WorkspacePaneStaticTabType }
-  | { kind: 'terminal'; terminalSessionId: string }
+export type WorkspacePaneRoute =
+  { kind: 'static'; tab: WorkspacePaneStaticTabType } | { kind: 'terminal'; terminalSessionId: string }
 
-export type RepoBranchWorkspacePaneRouteTarget = RepoBranchWorkspacePaneRoute | null
+export type WorkspacePaneRouteTarget = WorkspacePaneRoute | null
 
-export type ParsedRepoBranchWorkspacePaneRoute =
-  | RepoBranchWorkspacePaneRoute
-  | { kind: 'invalid-static'; tabKey: string }
+export type ParsedWorkspacePaneRoute =
+  WorkspacePaneRoute | { kind: 'invalid-static'; tabKey: string }
 
-export type ParsedRepoBranchWorkspacePaneRouteTarget = ParsedRepoBranchWorkspacePaneRoute | null
+export type ParsedWorkspacePaneRouteTarget = ParsedWorkspacePaneRoute | null
 
 export function App({
   routeSettingsPage = null,

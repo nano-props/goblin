@@ -36,6 +36,11 @@ import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 const REPO_ID = 'goblin+file:///tmp/workspace-pane-tab-close-repo'
 const BRANCH_NAME = 'feature/worktree-close'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-close-worktree'
+const WORKTREE_PANE_TARGET = {
+  kind: 'git-worktree' as const,
+  repoRoot: REPO_ID,
+  worktreePath: WORKTREE_PATH,
+}
 
 beforeEach(() => {
   resetWorkspacePaneActionQueueForTest()
@@ -61,19 +66,20 @@ test('commits active close-back route through command-owned navigation', async (
   })
   const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
   const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
-  const commitRepoBranchWorkspacePaneRoute = vi.fn(navigation.commitRepoBranchWorkspacePaneRoute)
-  navigation.commitRepoBranchWorkspacePaneRoute = commitRepoBranchWorkspacePaneRoute
+  const commitWorkspacePaneRoute = vi.fn(navigation.commitWorkspacePaneRoute)
+  navigation.commitWorkspacePaneRoute = commitWorkspacePaneRoute
 
   await expect(
     dispatchCloseWorkspacePaneTabAction({
+      paneTarget: WORKTREE_PANE_TARGET,
+      worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
       repoId: REPO_ID,
-      branchName: BRANCH_NAME,
       workspacePaneRoute: { kind: 'static', tab: 'files' },
       navigation,
     }),
   ).resolves.toBe(true)
 
-  expect(commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
+  expect(commitWorkspacePaneRoute).toHaveBeenCalledWith(
     REPO_ID,
     BRANCH_NAME,
     { kind: 'static', tab: 'status' },
@@ -88,8 +94,7 @@ test('closes a workspace-root static tab through the shared tab transaction', as
     kind: 'workspace-root' as const,
     repoRoot: REPO_ID,
     repoRuntimeId: repo.repoRuntimeId,
-    branchName: null,
-    worktreePath: null,
+
   }
   setWorkspacePaneTabsForTargetQueryData({
     ...target,
@@ -101,8 +106,8 @@ test('closes a workspace-root static tab through the shared tab transaction', as
 
   await expect(
     dispatchCloseWorkspacePaneTabAction({
+      paneTarget: { kind: 'workspace-root', repoRoot: REPO_ID },
       repoId: REPO_ID,
-      branchName: null,
       workspacePaneRoute: undefined,
       navigation: navigationWith(),
     }),
@@ -131,21 +136,22 @@ test('awaits close-back navigation and clears the transition when navigation rej
     },
   })
   const routeCommit = Promise.withResolvers<boolean>()
-  const commitRepoBranchWorkspacePaneRoute = vi.fn(() => routeCommit.promise)
+  const commitWorkspacePaneRoute = vi.fn(() => routeCommit.promise)
   const close = dispatchCloseWorkspacePaneTabAction({
+    paneTarget: WORKTREE_PANE_TARGET,
+      worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
     repoId: REPO_ID,
-    branchName: BRANCH_NAME,
     workspacePaneRoute: { kind: 'static', tab: 'files' },
-    navigation: navigationWith({ commitRepoBranchWorkspacePaneRoute }),
+    navigation: navigationWith({ commitWorkspacePaneRoute }),
   })
 
-  await vi.waitFor(() => expect(commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledOnce())
+  await vi.waitFor(() => expect(commitWorkspacePaneRoute).toHaveBeenCalledOnce())
 
   routeCommit.reject(new Error('navigation failed'))
   await expect(close).resolves.toBe(false)
 })
 
-test('clears the close transition when the server close command rejects', async () => {
+test('sends a detached worktree close to the server without requiring a branch', async () => {
   const terminalSessionId = 'term-111111111111111111111'
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
@@ -160,10 +166,13 @@ test('clears the close transition when the server close command rejects', async 
   })
   const terminalWorktreeKey = `${REPO_ID}\0${WORKTREE_PATH}`
   const runtimeTarget = runtimeWorkspacePaneTargetForTest({
+    kind: 'git-worktree' as const,
     repoRoot: REPO_ID,
     repoRuntimeId: repo.repoRuntimeId,
-    branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
+  })
+  const closeTerminalByDescriptor = vi.fn(async () => {
+    throw new Error('server close failed')
   })
   setTerminalSessionCommandBridgeForTest({
     terminalWorktreeSnapshot: () => ({
@@ -173,7 +182,7 @@ test('clears the close transition when the server close command rejects', async 
         terminalWorktreeKey,
         index: 1,
         target: runtimeTarget,
-        presentation: { kind: 'git-worktree', branchName: BRANCH_NAME },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'detached' as const } },
       },
       sessions: [
         {
@@ -195,30 +204,30 @@ test('clears the close transition when the server close command rejects', async 
     }),
     createTerminal: vi.fn(async () => terminalSessionId),
     selectTerminal: vi.fn(),
-    closeTerminalByDescriptor: vi.fn(async () => {
-      throw new Error('server close failed')
-    }),
+    closeTerminalByDescriptor,
   })
   const route = { kind: 'terminal' as const, terminalSessionId }
 
   await expect(
     dispatchConfirmCloseTerminalWorkspacePaneTabAction({
+    paneTarget: WORKTREE_PANE_TARGET,
+      worktreeHead: { kind: 'detached' },
       repoId: REPO_ID,
-      branchName: BRANCH_NAME,
       workspacePaneRoute: route,
       navigation: navigationWith(),
       currentRepoId: REPO_ID,
-      currentBranchName: BRANCH_NAME,
+      currentBranchName: null,
       currentWorkspacePaneRoute: route,
       confirmedTerminal: {
         terminalSessionId,
         base: {
           target: runtimeTarget,
-          presentation: { kind: 'git-worktree', branchName: BRANCH_NAME },
+          presentation: { kind: 'git-worktree' as const, head: { kind: 'detached' as const } },
         },
       },
     }),
   ).resolves.toBe(false)
+  expect(closeTerminalByDescriptor).toHaveBeenCalledOnce()
 })
 
 test('confirmed workspace terminal close selects Files without inventing a branch route', async () => {
@@ -228,8 +237,7 @@ test('confirmed workspace terminal close selects Files without inventing a branc
     kind: 'workspace-root' as const,
     repoRoot: REPO_ID,
     repoRuntimeId: repo.repoRuntimeId,
-    branchName: null,
-    worktreePath: null,
+
   }
   const runtimeTarget = runtimeWorkspacePaneTargetForTest(targetInput)
   setWorkspacePaneTabsForTargetQueryData({
@@ -280,8 +288,8 @@ test('confirmed workspace terminal close selects Files without inventing a branc
 
   await expect(
     dispatchConfirmCloseTerminalWorkspacePaneTabAction({
+      paneTarget: { kind: 'workspace-root', repoRoot: REPO_ID },
       repoId: REPO_ID,
-      branchName: null,
       workspacePaneRoute: undefined,
       navigation: navigationWith(),
       currentRepoId: REPO_ID,
@@ -315,9 +323,8 @@ test('does not let a late close from an old runtime navigate or clear the replac
   installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
   expect(
     recordWorkspacePaneTabOpener(
-      REPO_ID,
+      WORKTREE_PANE_TARGET,
       repo.repoRuntimeId,
-      BRANCH_NAME,
       'workspace-pane:files',
       'workspace-pane:status',
     ),
@@ -331,8 +338,9 @@ test('does not let a late close from an old runtime navigate or clear the replac
   })
   const navigation = navigationWith()
   const close = dispatchCloseWorkspacePaneTabAction({
+    paneTarget: WORKTREE_PANE_TARGET,
+      worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
     repoId: REPO_ID,
-    branchName: BRANCH_NAME,
     workspacePaneRoute: { kind: 'static', tab: 'files' },
     navigation,
   })
@@ -351,17 +359,16 @@ test('does not let a late close from an old runtime navigate or clear the replac
     currentBranch: BRANCH_NAME,
   })
   setWorkspacePaneTabsForTargetQueryData({
+    kind: 'git-worktree' as const,
     repoRoot: REPO_ID,
     repoRuntimeId: replacementRuntimeId,
-    branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
     tabs: [workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('status')],
   })
   expect(
     recordWorkspacePaneTabOpener(
-      REPO_ID,
+      WORKTREE_PANE_TARGET,
       replacementRuntimeId,
-      BRANCH_NAME,
       'workspace-pane:files',
       'workspace-pane:status',
     ),
@@ -376,8 +383,8 @@ test('does not let a late close from an old runtime navigate or clear the replac
 
   serverClose.resolve([workspacePaneStaticTabEntry('status')])
   await expect(close).resolves.toBe(true)
-  expect(navigation.commitRepoBranchWorkspacePaneRoute).not.toHaveBeenCalled()
-  expect(workspacePaneTabOpener(REPO_ID, replacementRuntimeId, BRANCH_NAME, 'workspace-pane:files')).toBe(
+  expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
+  expect(workspacePaneTabOpener(WORKTREE_PANE_TARGET, replacementRuntimeId, 'workspace-pane:files')).toBe(
     'workspace-pane:status',
   )
 })
@@ -392,16 +399,16 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     showRepoBranchEmptyWorkspacePane: vi.fn(() => true),
     showRepoBranchWorkspacePaneTab: vi.fn(() => true),
     showRepoBranchTerminalSession: vi.fn(() => true),
-    commitRepoBranchWorkspacePaneRoute: vi.fn(() => false),
+    commitWorkspacePaneRoute: vi.fn(() => false),
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
     ...overrides,
-    currentRepoBranchWorkspacePaneRoute: overrides.currentRepoBranchWorkspacePaneRoute ?? (() => undefined),
+    currentWorkspacePaneRoute: overrides.currentWorkspacePaneRoute ?? (() => undefined),
   }
-  if (!overrides.commitRepoBranchWorkspacePaneRoute) {
-    navigation.commitRepoBranchWorkspacePaneRoute = vi.fn(observedWorkspacePaneRouteCommitForTest(navigation))
+  if (!overrides.commitWorkspacePaneRoute) {
+    navigation.commitWorkspacePaneRoute = vi.fn(observedWorkspacePaneRouteCommitForTest(navigation))
   }
   return navigation
 }

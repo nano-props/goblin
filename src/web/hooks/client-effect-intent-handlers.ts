@@ -27,7 +27,7 @@ import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import { dispatchShowWorkspacePaneTerminalRouteAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
@@ -69,7 +69,7 @@ export function handleTerminalBellClickIntent(
   deps: TerminalBellIntentDeps,
 ): void {
   const repo = useReposStore.getState().repos[event.repoRoot]
-  const branchModel = repo && event.terminalWorktreeKey ? readRepoBranchSnapshotQueryProjection(repo) : null
+  const branchModel = repo && event.terminalWorktreeKey ? readRepoBranchQueryProjection(repo) : null
   const plan = createTerminalBellIntentPlan(repo, branchModel, event)
   if (plan.kind === 'noop' || plan.kind === 'unavailable') return
   deps.closeAllOverlays()
@@ -81,6 +81,9 @@ export function handleTerminalBellClickIntent(
         terminalSessionId: plan.terminalSessionId,
         navigation: deps.navigation,
       })
+      return
+    case 'show-detached-worktree-terminal':
+      deps.navigation.showRepoWorktreeTerminalSession?.(plan.repoId, plan.worktreePath, plan.terminalSessionId)
       return
   }
 }
@@ -178,14 +181,14 @@ export async function handleWorkspaceClientIntent(
       // anchored to the currently-active tab.
       return await runNewTerminalTabCommand({
         repoId: plan.repoId,
-        ...workspacePaneCommandCoordinates(plan.target),
+        target: plan.target,
         navigation: deps.navigation,
         t: deps.t,
       })
     case 'close-workspace-pane-tab-or-window':
       return await runCloseWorkspacePaneTabOrWindowCommand({
         repoId: plan.repoId,
-        ...workspacePaneCommandCoordinates(plan.target),
+        target: plan.target,
         navigation: deps.navigation,
       })
     case 'close-repo':
@@ -207,21 +210,21 @@ export async function handleWorkspaceClientIntent(
       if (plan.tab === 'terminal') {
         return await runTerminalPrimaryActionCommand({
           repoId: plan.repoId,
-          ...workspacePaneCommandCoordinates(plan.target),
+          target: plan.target,
           navigation: deps.navigation,
           t: deps.t,
         })
       }
       return await runShowWorkspacePaneTabCommand({
         repoId: plan.repoId,
-        ...workspacePaneCommandCoordinates(plan.target),
+        target: plan.target,
         tab: plan.tab,
         navigation: deps.navigation,
       })
     case 'terminal-primary-action':
       return await runTerminalPrimaryActionCommand({
         repoId: plan.repoId,
-        ...workspacePaneCommandCoordinates(plan.target),
+        target: plan.target,
         navigation: deps.navigation,
         t: deps.t,
       })

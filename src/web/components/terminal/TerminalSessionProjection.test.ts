@@ -53,7 +53,7 @@ function makeDescriptor(terminalSessionId: string, index: number): TerminalDescr
     terminalSessionId,
     index,
     target: RUNTIME_TARGET,
-    presentation: { kind: 'git-worktree', branchName: BRANCH },
+    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
   }
 }
 
@@ -85,7 +85,7 @@ function makeServerSession(
     terminalRuntimeGeneration: overrides.terminalRuntimeGeneration ?? 1,
     terminalSessionId,
     target: { ...RUNTIME_TARGET, workspaceRuntimeId: overrides.repoRuntimeId ?? REPO_RUNTIME_ID },
-    presentation: { kind: 'git-worktree', branchName: BRANCH },
+    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
     controller: overrides.controller ?? null,
     processName: overrides.processName ?? 'bash',
     canonicalTitle: overrides.canonicalTitle ?? null,
@@ -712,7 +712,7 @@ describe('TerminalSessionProjection', () => {
       const closePromise = projection
         .closeTerminalByDescriptor(terminalSessionId, {
           target: RUNTIME_TARGET,
-          presentation: { kind: 'git-worktree', branchName: BRANCH },
+          presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
         })
         .then((result) => {
           settled = true
@@ -745,7 +745,7 @@ describe('TerminalSessionProjection', () => {
 
       const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree', branchName: BRANCH },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       })
       await Promise.resolve()
 
@@ -777,7 +777,7 @@ describe('TerminalSessionProjection', () => {
 
       const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree', branchName: BRANCH },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       })
       await Promise.resolve()
 
@@ -899,7 +899,7 @@ describe('TerminalSessionProjection', () => {
       workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
       const close = projection.closeTerminalByDescriptor(terminalSessionId, {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree', branchName: BRANCH },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       })
       await Promise.resolve()
 
@@ -934,7 +934,7 @@ describe('TerminalSessionProjection', () => {
 
       const firstClose = projection.closeTerminalByDescriptor(terminalSessionId, {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree', branchName: BRANCH },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       })
       await Promise.resolve()
 
@@ -950,7 +950,7 @@ describe('TerminalSessionProjection', () => {
       )
       const secondClose = projection.closeTerminalByDescriptor(terminalSessionId, {
         target: { ...RUNTIME_TARGET, workspaceRuntimeId: replacementRepoRuntimeId },
-        presentation: { kind: 'git-worktree', branchName: BRANCH },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       })
       await Promise.resolve()
 
@@ -986,7 +986,7 @@ describe('TerminalSessionProjection', () => {
 
       const closePromise = projection.closeTerminalByDescriptor(activeSessionId, {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree', branchName: BRANCH },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       })
       await Promise.resolve()
 
@@ -1025,7 +1025,7 @@ describe('TerminalSessionProjection', () => {
       await expect(
         projection.closeTerminalByDescriptor('term-111111111111111111111', {
           target: RUNTIME_TARGET,
-          presentation: { kind: 'git-worktree', branchName: BRANCH },
+          presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
         }),
       ).resolves.toBe(true)
 
@@ -1048,7 +1048,7 @@ describe('TerminalSessionProjection', () => {
       await expect(
         projection.closeTerminalByDescriptor('term-111111111111111111111', {
           target: RUNTIME_TARGET,
-          presentation: { kind: 'git-worktree', branchName: BRANCH },
+          presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
         }),
       ).resolves.toBe(true)
 
@@ -1068,11 +1068,11 @@ describe('TerminalSessionProjection', () => {
 
       const firstClose = projection.closeTerminalByDescriptor(terminalSessionId, {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree', branchName: BRANCH },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       })
       const secondClose = projection.closeTerminalByDescriptor(terminalSessionId, {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree', branchName: BRANCH },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       })
       await Promise.resolve()
 
@@ -1100,7 +1100,7 @@ describe('TerminalSessionProjection', () => {
 
       const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree', branchName: BRANCH },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       })
       await Promise.resolve()
 
@@ -1130,7 +1130,7 @@ describe('TerminalSessionProjection', () => {
       await expect(
         projection.closeTerminalByDescriptor(terminalSessionId, {
           target: RUNTIME_TARGET,
-          presentation: { kind: 'git-worktree', branchName: BRANCH },
+          presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
         }),
       ).resolves.toBe(true)
 
@@ -1151,7 +1151,7 @@ describe('TerminalSessionProjection', () => {
       await expect(
         projection.closeTerminalByDescriptor('term-111111111111111111111', {
           target: RUNTIME_TARGET,
-          presentation: { kind: 'git-worktree', branchName: BRANCH },
+          presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
         }),
       ).resolves.toBe(true)
 
@@ -1176,7 +1176,7 @@ describe('TerminalSessionProjection', () => {
       await expect(
         projection.closeTerminalByDescriptor(terminalSessionId, {
           target: { ...RUNTIME_TARGET, workspaceRuntimeId: 'repo-runtime-new' },
-          presentation: { kind: 'git-worktree', branchName: BRANCH },
+          presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
         }),
       ).resolves.toBe(false)
 

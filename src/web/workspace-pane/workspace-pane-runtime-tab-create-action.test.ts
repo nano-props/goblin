@@ -6,11 +6,13 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
   commitCreatedTerminalWorkspacePaneRuntimeTab,
   dispatchCreateTerminalWorkspacePaneRuntimeTabAction,
+  showCreatedTerminalWorkspacePaneRuntimeTab,
   type WorkspacePaneRuntimeTabCreateStateByType,
   workspacePaneRuntimeTabCreateAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 
 const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-runtime-create-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-workspace-pane-create'
@@ -19,13 +21,14 @@ const WORKTREE_PATH = '/tmp/workspace-pane-runtime-create-worktree'
 const TERMINAL_SESSION_ID = 'term-111111111111111111111'
 const BASE: TerminalSessionBase = {
   target: {
-    kind: 'git-worktree',
+    kind: 'git-worktree' as const,
     workspaceId: canonicalWorkspaceLocator(REPO_ROOT)!,
     workspaceRuntimeId: REPO_RUNTIME_ID,
     root: canonicalWorkspaceLocator('goblin+file:///tmp/workspace-pane-runtime-create-worktree')!,
   },
-  presentation: { kind: 'git-worktree', branchName: BRANCH_NAME },
+  presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH_NAME } },
 }
+const PANE_TARGET = workspacePaneTabsTargetFromRuntime(BASE.target)!
 
 const terminalCreateCommandMocks = vi.hoisted(() => ({
   runCreateTerminalTabCommand: vi.fn(),
@@ -51,6 +54,22 @@ afterEach(() => {
 })
 
 describe('workspace pane runtime tab create action', () => {
+  test('navigates a detached worktree create to its real filesystem surface', () => {
+    const showRepoWorktreeTerminalSession = vi.fn(() => true)
+    const detachedBase: TerminalSessionBase = {
+      ...BASE,
+      presentation: { kind: 'git-worktree', head: { kind: 'detached' } },
+    }
+
+    expect(
+      showCreatedTerminalWorkspacePaneRuntimeTab(detachedBase, TERMINAL_SESSION_ID, {
+        commitWorkspacePaneRoute: vi.fn(async () => false),
+        showRepoWorktreeTerminalSession,
+      }),
+    ).toBe(true)
+    expect(showRepoWorktreeTerminalSession).toHaveBeenCalledWith(REPO_ROOT, WORKTREE_PATH, TERMINAL_SESSION_ID)
+  })
+
   test('returns no terminal create action without a runtime target', () => {
     const action = workspacePaneRuntimeTabCreateAction('terminal', {
       runtimeTabStateByType: runtimeTabState(),
@@ -94,8 +113,8 @@ describe('workspace pane runtime tab create action', () => {
     }
     await commandInput.commitCreatedTerminalTab(createAdmission())
     expect(showCreatedRuntimeTab).toHaveBeenCalledWith('terminal', TERMINAL_SESSION_ID, {
-      kind: 'git-worktree',
-      branchName: BRANCH_NAME,
+      kind: 'git-worktree' as const,
+      head: { kind: 'branch', branchName: BRANCH_NAME },
     })
   })
 
@@ -118,7 +137,7 @@ describe('workspace pane runtime tab create action', () => {
   test('records the opener and commits the exact route without another projection request', async () => {
     const admission = createAdmission()
     const showCreatedTerminalTab = vi.fn(() => {
-      expect(workspacePaneTabOpener(REPO_ROOT, REPO_RUNTIME_ID, BRANCH_NAME, `terminal:${TERMINAL_SESSION_ID}`)).toBe(
+      expect(workspacePaneTabOpener(PANE_TARGET, REPO_RUNTIME_ID, `terminal:${TERMINAL_SESSION_ID}`)).toBe(
         'workspace-pane:status',
       )
       return true
@@ -134,8 +153,8 @@ describe('workspace pane runtime tab create action', () => {
     ).resolves.toEqual({ status: 'committed' })
 
     expect(showCreatedTerminalTab).toHaveBeenCalledWith(TERMINAL_SESSION_ID, {
-      kind: 'git-worktree',
-      branchName: BRANCH_NAME,
+      kind: 'git-worktree' as const,
+      head: { kind: 'branch', branchName: BRANCH_NAME },
     })
   })
 
@@ -153,9 +172,7 @@ describe('workspace pane runtime tab create action', () => {
     ).resolves.toEqual({ status: 'superseded' })
 
     expect(showCreatedTerminalTab).not.toHaveBeenCalled()
-    expect(
-      workspacePaneTabOpener(REPO_ROOT, REPO_RUNTIME_ID, BRANCH_NAME, `terminal:${TERMINAL_SESSION_ID}`),
-    ).toBeNull()
+    expect(workspacePaneTabOpener(PANE_TARGET, REPO_RUNTIME_ID, `terminal:${TERMINAL_SESSION_ID}`)).toBeNull()
     expect(useReposStore.getState().repos[REPO_ROOT]?.repoRuntimeId).toBe('repo-runtime-replacement')
   })
 
@@ -174,7 +191,6 @@ describe('workspace pane runtime tab create action', () => {
     expect(pendingAction?.blocksTabInteraction).toBe(true)
     pendingAction?.onCreate()
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
-
   })
 })
 
@@ -185,7 +201,7 @@ function translate(key: string): string {
 function createAdmission(): TerminalCreateLeaderAdmissionResult {
   return {
     terminalSessionId: TERMINAL_SESSION_ID,
-    presentation: { kind: 'git-worktree', branchName: BRANCH_NAME },
+    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH_NAME } },
     requestRole: 'leader',
     resourceDisposition: 'created',
     runtimeProjectionApplied: true,

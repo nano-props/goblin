@@ -519,14 +519,14 @@ describe('repo lifecycle', () => {
     useReposStore
       .getState()
       .setTabOpener(
-        tabOpenerScopeKey({ repoRoot: REPO_A, branchName: 'feature/a', worktreePath: null }),
+        tabOpenerScopeKey({ kind: 'git-branch', repoRoot: REPO_A, branchName: 'feature/a' }),
         'workspace-pane:changes',
         'workspace-pane:status',
       )
     useReposStore
       .getState()
       .setTabOpener(
-        tabOpenerScopeKey({ repoRoot: REPO_B, branchName: 'feature/b', worktreePath: null }),
+        tabOpenerScopeKey({ kind: 'git-branch', repoRoot: REPO_B, branchName: 'feature/b' }),
         'workspace-pane:changes',
         'workspace-pane:status',
       )
@@ -535,10 +535,10 @@ describe('repo lifecycle', () => {
 
     const openers = useReposStore.getState().tabOpenerIdentityByScope
     expect(
-      openers[tabOpenerScopeKey({ repoRoot: REPO_A, branchName: 'feature/a', worktreePath: null })],
+      openers[tabOpenerScopeKey({ kind: 'git-branch', repoRoot: REPO_A, branchName: 'feature/a' })],
     ).toBeUndefined()
     expect(
-      openers[tabOpenerScopeKey({ repoRoot: REPO_B, branchName: 'feature/b', worktreePath: null })]?.[
+      openers[tabOpenerScopeKey({ kind: 'git-branch', repoRoot: REPO_B, branchName: 'feature/b' })]?.[
         'workspace-pane:changes'
       ],
     ).toBe('workspace-pane:status')

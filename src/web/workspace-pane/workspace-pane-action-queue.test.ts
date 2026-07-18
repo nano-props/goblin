@@ -5,12 +5,15 @@ import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
   workspacePaneActionTargetKey,
+  workspacePaneActionTargetFromFilesystemTarget,
+  workspacePaneActionTargetFromCoordinates,
   workspacePaneActionQueueStatsForTest,
   workspacePaneRouteIntentPending,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const TARGET = {
-  kind: 'git-worktree',
+  kind: 'git-worktree' as const,
   repoId: 'goblin+file:///repo',
   repoRuntimeId: 'repo-runtime-1',
   worktreePath: '/worktree-a',
@@ -58,6 +61,17 @@ describe('workspace pane action queue', () => {
     expect(order).toEqual(['first', 'second'])
   })
 
+  test('identifies a detached worktree by its filesystem path instead of workspace-root scope', () => {
+    expect(
+      workspacePaneActionTargetFromCoordinates({
+        repoId: TARGET.repoId,
+        repoRuntimeId: TARGET.repoRuntimeId,
+        branchName: null,
+        worktreePath: TARGET.worktreePath,
+      }),
+    ).toEqual(TARGET)
+  })
+
   test.each([
     ['runtime', { ...TARGET, repoRuntimeId: 'repo-runtime-2' }],
     ['worktree', { ...TARGET, worktreePath: '/worktree-b' }],
@@ -101,12 +115,40 @@ describe('workspace pane action queue', () => {
     ).toBe('goblin+file:///repo\0runtime\0git-branch\0main')
     expect(
       workspacePaneActionTargetKey({
-        kind: 'git-worktree',
+        kind: 'git-worktree' as const,
         repoId: 'goblin+file:///repo',
         repoRuntimeId: 'runtime',
         worktreePath: '/repo-worktree',
       }),
     ).toBe('goblin+file:///repo\0runtime\0git-worktree\0/repo-worktree')
+  })
+
+  test('keeps a detached Git worktree in its worktree queue', () => {
+    const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')
+    const root = canonicalWorkspaceLocator('goblin+file:///repo-detached')
+    if (!workspaceId || !root) throw new Error('invalid mock filesystem target')
+
+    expect(
+      workspacePaneActionTargetFromFilesystemTarget({
+        kind: 'git-worktree',
+        workspaceId,
+        workspaceRuntimeId: 'runtime',
+        root,
+      }),
+    ).toEqual({
+      kind: 'git-worktree',
+      repoId: workspaceId,
+      repoRuntimeId: 'runtime',
+      worktreePath: '/repo-detached',
+    })
+    expect(
+      workspacePaneActionTargetFromCoordinates({
+        repoId: workspaceId,
+        repoRuntimeId: 'runtime',
+        branchName: null,
+        worktreePath: '/repo-detached',
+      }),
+    ).toMatchObject({ kind: 'git-worktree', worktreePath: '/repo-detached' })
   })
 
   test('bounds a pending route intent to its target and explicit lifetime', () => {

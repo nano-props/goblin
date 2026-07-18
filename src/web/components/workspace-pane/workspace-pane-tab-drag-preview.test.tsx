@@ -47,9 +47,9 @@ describe('useWorkspacePaneTabDragPreview', () => {
     const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
     setWorkspacePaneTabsForTargetQueryData(
       {
+        kind: 'git-worktree' as const,
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         tabs: sourceTabs,
       },
@@ -205,8 +205,7 @@ function previewInput(input: PreviewInputOverrides = {}): WorkspacePaneTabDragPr
       kind: 'workspace-root',
       repoRoot,
       repoRuntimeId,
-      branchName: null,
-      worktreePath: null,
+
       canonicalTabs,
     }
   }
@@ -221,10 +220,10 @@ function previewInput(input: PreviewInputOverrides = {}): WorkspacePaneTabDragPr
     }
   }
   return {
+    kind: 'git-worktree',
     repoRoot,
     repoRuntimeId,
-    branchName: input.branchName ?? BRANCH_NAME,
-    worktreePath: input.worktreePath === undefined ? WORKTREE_PATH : input.worktreePath,
+    worktreePath: input.worktreePath ?? WORKTREE_PATH,
     canonicalTabs,
   }
 }
@@ -242,9 +241,9 @@ function currentControls(): WorkspacePaneTabDragPreviewState {
 function readWorkspacePaneTabsFromQueryCache(queryClient: QueryClient): WorkspacePaneTabEntry[] {
   return readWorkspacePaneTabsForTarget(
     {
+      kind: 'git-worktree' as const,
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
     },
     queryClient,

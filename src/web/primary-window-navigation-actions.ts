@@ -1,6 +1,6 @@
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
-import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import type { CloseRepoResult, WorkspaceNavigationHistoryTraversal } from '#/web/stores/repos/types.ts'
 import {
@@ -8,8 +8,8 @@ import {
   workspaceNavigationHistoryRestoreBlocked,
 } from '#/web/workspace-navigation-history.ts'
 import { workspacePaneRouteNavigationBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { openRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
-import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
+import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
+import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
@@ -27,7 +27,7 @@ export interface PrimaryWindowPresentationNavigationOptions {
   presentationToken?: PrimaryWindowPresentationToken
   onCommit?: () => void
   routePrecondition?:
-    { kind: 'exact-route'; route: RepoBranchWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
+    { kind: 'exact-route'; route: WorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
 }
 
 export interface PrimaryWindowNavigationActions {
@@ -48,16 +48,28 @@ export interface PrimaryWindowNavigationActions {
     terminalSessionId: string,
     options?: { replace?: boolean },
   ) => boolean
-  commitRepoBranchWorkspacePaneRoute: (
+  showRepoWorktreeTerminalSession?: (
+    repoId: string,
+    worktreePath: string,
+    terminalSessionId: string,
+    options?: { replace?: boolean },
+  ) => boolean
+  showRepoWorktreeWorkspacePaneTab?: (
+    repoId: string,
+    worktreePath: string,
+    tab: WorkspacePaneStaticTabType,
+    options?: { replace?: boolean },
+  ) => boolean
+  commitWorkspacePaneRoute: (
     repoId: string,
     branch: string,
-    route: RepoBranchWorkspacePaneRouteTarget,
+    route: WorkspacePaneRouteTarget,
     options?: PrimaryWindowPresentationNavigationOptions,
   ) => MaybePromise<boolean>
-  currentRepoBranchWorkspacePaneRoute: (
+  currentWorkspacePaneRoute: (
     repoId: string,
     branch: string,
-  ) => RepoBranchWorkspacePaneRouteTarget | undefined
+  ) => WorkspacePaneRouteTarget | undefined
   goBack: (repoId: string) => void
   goForward: (repoId: string) => void
   openSettings: (page: SettingsPage) => void
@@ -82,8 +94,8 @@ export function createPrimaryWindowNavigationActions({
   routeNavigation,
 }: CreatePrimaryWindowNavigationActionsOptions): PrimaryWindowNavigationActions {
   return {
-    currentRepoBranchWorkspacePaneRoute(repoId, branchName) {
-      return routeNavigation.currentRepoBranchWorkspacePaneRoute(repoId, branchName)
+    currentWorkspacePaneRoute(repoId, branchName) {
+      return routeNavigation.currentWorkspacePaneRoute(repoId, branchName)
     },
     activateRepo(repoId) {
       const presentationToken = beginPrimaryWindowPresentation()
@@ -110,7 +122,7 @@ export function createPrimaryWindowNavigationActions({
     },
     selectRepoBranch(repoId, branch, options) {
       const presentationToken = beginPrimaryWindowPresentation()
-      return openRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branch, { ...options, presentationToken })
+      return openWorkspacePaneRoute(routeNavigation, repoId, branch, { ...options, presentationToken })
     },
     showRepoBranchEmptyWorkspacePane(repoId, branch, options) {
       const token = beginPrimaryWindowPresentation()
@@ -151,8 +163,20 @@ export function createPrimaryWindowNavigationActions({
       if (!accepted) return false
       return true
     },
-    commitRepoBranchWorkspacePaneRoute(repoId, branch, route, options) {
-      return commitRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branch, route, options)
+    showRepoWorktreeTerminalSession(repoId, worktreePath, terminalSessionId, options) {
+      const open = routeNavigation.openRepoWorktreeTerminal
+      if (!open) return false
+      const token = beginPrimaryWindowPresentation()
+      return open(repoId, worktreePath, terminalSessionId, { ...options, presentationToken: token })
+    },
+    showRepoWorktreeWorkspacePaneTab(repoId, worktreePath, tab, options) {
+      const open = routeNavigation.openRepoWorktreeTab
+      if (!open) return false
+      const token = beginPrimaryWindowPresentation()
+      return open(repoId, worktreePath, tab, { ...options, presentationToken: token })
+    },
+    commitWorkspacePaneRoute(repoId, branch, route, options) {
+      return commitWorkspacePaneRoute(routeNavigation, repoId, branch, route, options)
     },
     goBack(repoId) {
       if (workspaceNavigationHistoryRestoreBlocked(repoId, 'back')) return
@@ -208,11 +232,11 @@ function rememberWorkspacePaneRouteSelection(
   state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(repoId, worktreePath), route.terminalSessionId)
 }
 
-function commitRepoBranchWorkspacePaneRoute(
+function commitWorkspacePaneRoute(
   routeNavigation: PrimaryWindowRouteNavigation,
   repoId: string,
   branchName: string,
-  route: RepoBranchWorkspacePaneRouteTarget,
+  route: WorkspacePaneRouteTarget,
   options?: PrimaryWindowPresentationNavigationOptions,
 ): MaybePromise<boolean> {
   const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
@@ -223,9 +247,9 @@ function commitRepoBranchWorkspacePaneRoute(
     onCommit: options?.onCommit,
     routePrecondition: options?.routePrecondition,
   }
-  return routeNavigation.commitRepoBranchWorkspacePaneRoute
-    ? routeNavigation.commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, routeOptions)
-    : openResolvedRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName, route, routeOptions)
+  return routeNavigation.commitWorkspacePaneRoute
+    ? routeNavigation.commitWorkspacePaneRoute(repoId, branchName, route, routeOptions)
+    : openResolvedWorkspacePaneRoute(routeNavigation, repoId, branchName, route, routeOptions)
 }
 
 function restoreRepoPresentationOrOpenDashboard(

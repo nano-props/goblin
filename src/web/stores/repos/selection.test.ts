@@ -225,7 +225,7 @@ describe('setWorkspacePaneTab', () => {
 
     expect(
       useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[
-        worktreeTargetKey('feature/query', '/tmp/query-worktree')
+        worktreeTargetKey('/tmp/query-worktree')
       ],
     ).toBe('changes')
   })
@@ -306,8 +306,8 @@ describe('setWorkspacePaneTab', () => {
   })
 })
 
-function worktreeTargetKey(branchName: string, worktreePath: string): string {
-  return workspacePaneTabsTargetIdentityKey({ repoRoot: REPO_ID, branchName, worktreePath })
+function worktreeTargetKey(worktreePath: string): string {
+  return workspacePaneTabsTargetIdentityKey({ kind: 'git-worktree', repoRoot: REPO_ID, worktreePath })
 }
 
 describe('workspace pane layout state', () => {

@@ -33,9 +33,14 @@ import { getRepositoryFileViewer } from '#/web/filetree-client.ts'
 import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/repo-workspace/file-read-command.ts'
 import { HistoryCommitGraph, HistoryCommitGraphSkeleton } from '#/web/components/repo-workspace/HistoryCommitGraph.tsx'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
-import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { terminalGitWorktreePresentation } from '#/shared/terminal-types.ts'
+import { gitHead } from '#/shared/git-head.ts'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import { workspacePaneFilesystemTerminalBase } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import {
+  workspacePaneFilesystemRuntimeTarget,
+  workspacePaneFilesystemTerminalBase,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { showCreatedWorkspacePaneFilesystemTerminal } from '#/web/workspace-pane/workspace-pane-filesystem-terminal.ts'
 
 const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
@@ -68,12 +73,12 @@ export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInpu
   const { type, selection, ...panelProps } = input
   if (isWorkspacePaneRuntimeTabType(type)) {
     const runtimeState = input.runtimeTabStateByType[type]
-    const branchName = input.detail.branch?.name ?? ''
-    const worktreePath = input.detail.branch?.worktree?.path ?? null
-    const runtimeTarget = runtimeWorkspacePaneTarget(
-      { repoRoot: input.repo.id, branchName, worktreePath },
-      input.repo.repoRuntimeId,
-    )
+    const branch = input.detail.branch
+    if (!branch?.worktree?.path) return null
+    const branchName = branch.name
+    const worktreePath = branch.worktree.path
+    const tabsTarget = gitWorktreeWorkspacePaneTabsTarget(input.repo.id, worktreePath)
+    const runtimeTarget = tabsTarget ? runtimeWorkspacePaneTarget(tabsTarget, input.repo.repoRuntimeId) : null
     if (!runtimeTarget || !worktreePath) return null
     return renderWorkspacePaneRuntimeTabPanel({
       type,
@@ -82,7 +87,7 @@ export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInpu
       selectedSessionId: selectedRuntimeSessionId(selection, type),
       target: {
         runtimeTarget,
-        presentation: { kind: 'git-worktree', branchName },
+        presentation: terminalGitWorktreePresentation(branchName),
         worktreePath,
       },
       runtimeState: {
@@ -161,7 +166,7 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
           kind: 'git-worktree',
           workspaceId: repo.id,
           workspaceRuntimeId: repo.repoRuntimeId,
-          branchName: branch.name,
+          head: gitHead(branch.name),
           rootPath: worktreePath,
           capabilities,
         }}
@@ -178,6 +183,11 @@ export function FiletreeTab({
   const repoId = target.workspaceId
   const repoRuntimeId = target.workspaceRuntimeId
   const worktreePath = target.rootPath
+  const executionTarget = useMemo(
+    () => workspacePaneFilesystemRuntimeTarget(target),
+    [repoId, repoRuntimeId, target.kind, worktreePath],
+  )
+  if (!executionTarget || executionTarget.kind === 'git-branch') throw new Error('filesystem target is invalid')
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
   const { createTerminalWithAdmission } = useTerminalSessionContext()
@@ -189,7 +199,7 @@ export function FiletreeTab({
   const expandedKeyList = useFiletreeInteractionStore(
     (s) => s.interactionByScope[interactionScopeKey]?.expandedKeys ?? emptyFiletreeInteractionSnapshot().expandedKeys,
   )
-  const result = useLazyRepoTree({ repoId, repoRuntimeId, worktreePath, expandedKeys: expandedKeyList })
+  const result = useLazyRepoTree({ target: executionTarget, expandedKeys: expandedKeyList })
   const setSelectedKeys = useFiletreeInteractionStore((s) => s.setSelectedKeys)
   const setExpandedKey = useFiletreeInteractionStore((s) => s.setExpandedKey)
   const setTopVisibleRowIndex = useFiletreeInteractionStore((s) => s.setTopVisibleRowIndex)

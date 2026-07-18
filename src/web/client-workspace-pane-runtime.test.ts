@@ -34,7 +34,7 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
       runtime: {
         ok: true as const,
         action: 'created' as const,
-        presentation: { kind: 'git-worktree' as const, branchName: 'main' },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
         terminalSessionId,
         terminalProjectionEffect: { kind: 'delta', revision: 1 },
         terminalRuntimeSessionId: 'pty_1234567890abcdef',

@@ -25,16 +25,18 @@ import {
   workspacePaneTabOpener,
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 
 const terminalBase: TerminalSessionBase = {
   target: {
-    kind: 'git-worktree',
+    kind: 'git-worktree' as const,
     workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
     workspaceRuntimeId: 'repo-runtime-1',
     root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
   },
-  presentation: { kind: 'git-worktree', branchName: 'main' },
+  presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
 }
+const terminalPaneTarget = workspacePaneTabsTargetFromRuntime(terminalBase.target)!
 
 const terminalCoordinates = terminalSessionCoordinates(terminalBase)
 
@@ -54,31 +56,33 @@ describe('workspace pane runtime tab command actions', () => {
     useReposStore
       .getState()
       .setWorkspacePaneTabForTarget(
-        { kind: 'workspace-root', repoRoot: repo.id, branchName: null, worktreePath: null },
+        { kind: 'workspace-root', repoRoot: repo.id },
         'files',
       )
 
-    expect(resolveWorkspacePaneTerminalExecutionTarget(repo.id, null)).toEqual({
-      target: {
-        kind: 'workspace-root',
-        workspaceId: canonicalWorkspaceLocator(repo.id),
-        workspaceRuntimeId: repo.repoRuntimeId,
-      },
+    const workspaceId = canonicalWorkspaceLocator(repo.id)
+    if (!workspaceId) throw new Error('expected canonical workspace fixture')
+    const target = { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: repo.repoRuntimeId }
+    expect(resolveWorkspacePaneTerminalExecutionTarget(target, { kind: 'workspace-root' })).toEqual({
+      target,
       presentation: { kind: 'workspace-root' },
     })
     expect(
-      captureWorkspacePaneActiveTabIdentity(repo.id, repo.repoRuntimeId, null, { workspacePaneRoute: undefined }),
+      captureWorkspacePaneActiveTabIdentity(
+        { kind: 'workspace-root', repoRoot: repo.id },
+        repo.repoRuntimeId,
+        { workspacePaneRoute: undefined },
+      ),
     ).toBeNull()
     expect(
       recordWorkspacePaneTabOpener(
-        repo.id,
+        { kind: 'workspace-root', repoRoot: repo.id },
         repo.repoRuntimeId,
-        null,
         'terminal:term-111111111111111111111',
         'workspace-pane:files',
       ),
     ).toBe('recorded')
-    expect(workspacePaneTabOpener(repo.id, repo.repoRuntimeId, null, 'terminal:term-111111111111111111111')).toBe(
+    expect(workspacePaneTabOpener({ kind: 'workspace-root', repoRoot: repo.id }, repo.repoRuntimeId, 'terminal:term-111111111111111111111')).toBe(
       'workspace-pane:files',
     )
   })
@@ -93,12 +97,13 @@ describe('workspace pane runtime tab command actions', () => {
       currentBranchName: branchName,
     })
 
-    expect(resolveWorkspacePaneTerminalExecutionTarget(terminalCoordinates.repoRoot, branchName)).toEqual(terminalBase)
+    expect(resolveWorkspacePaneTerminalExecutionTarget(terminalBase.target, terminalBase.presentation)).toEqual(
+      terminalBase,
+    )
     expect(
       captureWorkspacePaneActiveTabIdentity(
-        terminalCoordinates.repoRoot,
+        terminalPaneTarget,
         terminalCoordinates.repoRuntimeId,
-        branchName,
         { workspacePaneRoute: undefined },
       ),
     ).toBeNull()
@@ -115,6 +120,7 @@ describe('workspace pane runtime tab command actions', () => {
     })
     const showCreatedRuntimeTab = vi.fn(() => true)
     const context = workspacePaneRuntimeTabCommandContext({
+    filesystemTarget: terminalBase.target.kind === 'git-worktree' ? { kind: 'git-worktree', workspaceId: terminalBase.target.workspaceId, workspaceRuntimeId: terminalBase.target.workspaceRuntimeId, rootPath: terminalExecutionPath(terminalBase.target), head: terminalBase.presentation.kind === 'git-worktree' ? terminalBase.presentation.head : { kind: 'detached' }, capabilities: { files: { read: true, write: true }, terminal: { available: true }, git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } } } } : null,
       repoId: terminalCoordinates.repoRoot,
       branchName: terminalPresentationBranch(terminalBase.presentation),
       workspacePaneRoute: null,
@@ -123,14 +129,14 @@ describe('workspace pane runtime tab command actions', () => {
     })
 
     await context.terminal?.showCreatedTerminalSession('term-111111111111111111111', {
-      kind: 'git-worktree',
-      branchName: 'feature/renamed',
+      kind: 'git-worktree' as const,
+      head: { kind: 'branch', branchName: 'feature/renamed' },
     })
 
     expect(showCreatedRuntimeTab).toHaveBeenCalledWith(
       'terminal',
       'term-111111111111111111111',
-      { kind: 'git-worktree', branchName: 'feature/renamed' },
+      { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/renamed' } },
       terminalExecutionPath(terminalBase.target),
     )
   })
@@ -182,7 +188,7 @@ describe('workspace pane runtime tab command actions', () => {
     })
     const coordinatorBlocker = runWorkspacePaneAction(
       {
-        kind: 'git-worktree',
+        kind: 'git-worktree' as const,
         repoId: terminalCoordinates.repoRoot,
         repoRuntimeId: terminalCoordinates.repoRuntimeId,
         worktreePath: terminalExecutionPath(terminalBase.target),

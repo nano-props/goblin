@@ -30,6 +30,7 @@ import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navig
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import type { RepoState } from '#/web/stores/repos/types.ts'
 import {
   createPullRequest,
   createBranchSnapshot,
@@ -42,6 +43,7 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   repoWorktreeStatusQueryKey,
   setRepoProjectionQueryData,
+  setRepoWorktreeStatusQueryData,
   workspaceDirectoryOverviewQueryKey,
 } from '#/web/repo-data-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -53,11 +55,12 @@ import {
   terminalSessionContextForTest,
 } from '#/web/test-utils/terminal-session-context.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { gitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
@@ -103,7 +106,7 @@ const terminalCommandContext: TerminalSessionContextValue = terminalSessionConte
 })
 
 const navigation: PrimaryWindowNavigationActions = {
-  currentRepoBranchWorkspacePaneRoute: () => undefined,
+  currentWorkspacePaneRoute: () => undefined,
   activateRepo: vi.fn(),
   closeRepo: vi.fn(),
   cycleRepo: vi.fn(),
@@ -111,7 +114,7 @@ const navigation: PrimaryWindowNavigationActions = {
   showRepoBranchEmptyWorkspacePane: () => true,
   showRepoBranchWorkspacePaneTab: vi.fn(),
   showRepoBranchTerminalSession: vi.fn(),
-  commitRepoBranchWorkspacePaneRoute: vi.fn(() => false),
+  commitWorkspacePaneRoute: vi.fn(() => false),
   goBack: vi.fn(),
   goForward: vi.fn(),
   openSettings: vi.fn(),
@@ -147,9 +150,21 @@ function directoryWorkspaceProbe(name: string, options: { filesWritable?: boolea
   }
 }
 
+function gitWorktreeFilesystemTarget(repo: RepoState, rootPath: string, branchName: string) {
+  if (repo.workspaceProbe.status !== 'ready') throw new Error('expected ready workspace fixture')
+  return {
+    kind: 'git-worktree' as const,
+    workspaceId: repo.id,
+    workspaceRuntimeId: repo.repoRuntimeId,
+    rootPath,
+    head: { kind: 'branch' as const, branchName },
+    capabilities: repo.workspaceProbe.capabilities,
+  }
+}
+
 describe('RepoWorkspace', () => {
-  test('renders a non-Git workspace with workspace-scoped Status and Files tabs', async () => {
-    const workspaceId = 'goblin+file:///tmp/plain-workspace'
+  test('renders a remote non-Git workspace with canonical Status, Files, and Terminal targets', async () => {
+    const workspaceId = 'goblin+ssh://example/srv/workspace'
     const repo = seedRepoWithReadModelForTest({
       id: workspaceId,
       branches: [],
@@ -185,6 +200,108 @@ describe('RepoWorkspace', () => {
         undefined,
       )
     })
+  })
+
+  test('keeps the selected workspace-root pane when Git capability becomes available', async () => {
+    const workspaceId = 'goblin+ssh://example/workspace'
+    seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branches: [],
+      currentBranchName: null,
+      workspaceProbe: directoryWorkspaceProbe('remote-workspace'),
+    })
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace
+                repoId={workspaceId}
+                currentBranchName={null}
+                workspacePaneRouteContext={{ kind: 'workspace-root' }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByText('tab.files')).toBeTruthy()
+    act(() => {
+      useReposStore.setState((state) => {
+        const repo = state.repos[workspaceId]
+        if (!repo) return state
+        return {
+          repos: {
+            ...state.repos,
+            [workspaceId]: {
+              ...repo,
+              workspaceProbe: {
+                status: 'ready',
+                name: 'remote-workspace',
+                capabilities: {
+                  files: { read: true, write: true },
+                  terminal: { available: true },
+                  git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+                },
+                diagnostics: [],
+              },
+            },
+          },
+        }
+      })
+    })
+
+    await waitFor(() => expect(screen.getByText('tab.files')).toBeTruthy())
+    expect(screen.queryByText('branches.empty')).toBeNull()
+  })
+
+  test('restores a detached worktree terminal route into the shared runtime surface', async () => {
+    const repoId = 'goblin+file:///workspace/repo'
+    const worktreePath = '/workspace/detached'
+    const terminalSessionId = 'term-333333333333333333333'
+    const repo = seedRepoWithReadModelForTest({
+      id: repoId,
+      branches: [],
+      currentBranchName: null,
+    })
+    setRepoWorktreeStatusQueryData(repoId, repo.repoRuntimeId, {
+      repoRuntimeId: repo.repoRuntimeId,
+      status: [{ path: worktreePath, isMain: false, entries: [] }],
+      loadedAt: 1,
+    })
+    const target = gitWorktreeWorkspacePaneTabsTarget(repoId, worktreePath)
+    if (!target) throw new Error('expected canonical detached worktree fixture')
+    setWorkspacePaneTabsForTargetQueryData({
+      ...target,
+      repoRuntimeId: repo.repoRuntimeId,
+      tabs: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+    })
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(repoId, worktreePath)
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContextWithSession(terminalWorktreeKey, terminalSessionId)}>
+              <RepoWorkspace
+                repoId={repoId}
+                currentBranchName={null}
+                workspacePaneRouteContext={{
+                  kind: 'git-worktree',
+                  worktreePath,
+                  route: { kind: 'terminal', terminalSessionId },
+                }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByTestId('detached-worktree-pane')).toBeTruthy()
+    expect(screen.getByRole('tabpanel', { name: 'tab.terminal' })).toBeTruthy()
   })
 
   test('uses the shared compact workspace toolbar back action for a non-Git workspace', () => {
@@ -227,12 +344,7 @@ describe('RepoWorkspace', () => {
       workspaceProbe: directoryWorkspaceProbe('plain-status-workspace'),
     })
     const repo = useReposStore.getState().repos[workspaceId]!
-    useReposStore
-      .getState()
-      .setWorkspacePaneTabForTarget(
-        { kind: 'workspace-root', repoRoot: workspaceId, branchName: null, worktreePath: null },
-        'status',
-      )
+    useReposStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: workspaceId }, 'status')
     primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.repoRuntimeId), {
       topLevelFileCount: 7,
       topLevelDirectoryCount: 3,
@@ -299,8 +411,7 @@ describe('RepoWorkspace', () => {
       kind: 'workspace-root',
       repoRoot: workspaceId,
       repoRuntimeId: repo.repoRuntimeId,
-      branchName: null,
-      worktreePath: null,
+
       tabs: [],
     })
 
@@ -652,7 +763,7 @@ describe('RepoWorkspace', () => {
     }
 
     const workspace = (
-      workspacePaneRoute: RepoBranchWorkspacePaneRoute | null,
+      workspacePaneRoute: WorkspacePaneRoute | null,
       nextReadContext: TerminalSessionReadContextValue = readContext,
     ) => (
       <QueryClientProvider client={primaryWindowQueryClient}>
@@ -1084,9 +1195,9 @@ describe('RepoWorkspace', () => {
       expect(
         repo &&
           preferredWorkspacePaneTabForTarget(repo.ui, {
+            kind: 'git-branch' as const,
             repoRoot: REPO_ID,
             branchName,
-            worktreePath: null,
           }),
       ).toBe('history')
     })
@@ -1125,9 +1236,9 @@ describe('RepoWorkspace', () => {
       expect(
         repo &&
           preferredWorkspacePaneTabForTarget(repo.ui, {
+            kind: 'git-branch' as const,
             repoRoot: REPO_ID,
             branchName,
-            worktreePath: null,
           }),
       ).toBeNull()
     })
@@ -1183,16 +1294,19 @@ describe('RepoWorkspace', () => {
     })
     expect(
       recordWorkspacePaneTabOpener(
-        REPO_ID,
+        {
+          kind: 'git-worktree',
+          repoRoot: REPO_ID,
+          worktreePath,
+        },
         repo.repoRuntimeId,
-        branchName,
         'workspace-pane:files',
         'workspace-pane:status',
       ),
     ).toBe('recorded')
 
     function RoutedWorkspaceHarness() {
-      const [route, setRoute] = useState<RepoBranchWorkspacePaneRoute | null>({ kind: 'static', tab: 'status' })
+      const [route, setRoute] = useState<WorkspacePaneRoute | null>({ kind: 'static', tab: 'status' })
       const navigationWithRoute = useMemo<PrimaryWindowNavigationActions>(() => {
         const showRepoBranchEmptyWorkspacePane: PrimaryWindowNavigationActions['showRepoBranchEmptyWorkspacePane'] = (
           repoId,
@@ -1217,9 +1331,9 @@ describe('RepoWorkspace', () => {
           showRepoBranchEmptyWorkspacePane,
           showRepoBranchWorkspacePaneTab,
           showRepoBranchTerminalSession: () => false,
-          commitRepoBranchWorkspacePaneRoute: () => false,
+          commitWorkspacePaneRoute: () => false,
         }
-        routedNavigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(
+        routedNavigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(
           routedNavigation,
           { observeAcceptedRoute: () => {} },
         )
@@ -1260,9 +1374,12 @@ describe('RepoWorkspace', () => {
     await waitFor(() => {
       expect(screen.getByTestId('workspace-route').textContent).toBe('files')
     })
-    expect(workspacePaneTabOpener(REPO_ID, repo.repoRuntimeId, branchName, 'workspace-pane:files')).toBe(
-      'workspace-pane:status',
-    )
+    const paneTarget = {
+      kind: 'git-worktree' as const,
+      repoRoot: REPO_ID,
+      worktreePath,
+    }
+    expect(workspacePaneTabOpener(paneTarget, repo.repoRuntimeId, 'workspace-pane:files')).toBe('workspace-pane:status')
     const closeTarget = workspacePaneTabTargetForBranch(REPO_ID, branchName, {
       workspacePaneRoute: { kind: 'static', tab: 'files' },
     })
@@ -1272,7 +1389,7 @@ describe('RepoWorkspace', () => {
         ? nextRepoWorkspaceTabAfterClose(
             closeTarget.tabs,
             'workspace-pane:files',
-            workspacePaneTabOpener(REPO_ID, repo.repoRuntimeId, branchName, 'workspace-pane:files'),
+            workspacePaneTabOpener(paneTarget, repo.repoRuntimeId, 'workspace-pane:files'),
           )?.identity
         : null,
     ).toBe('workspace-pane:status')
@@ -1355,8 +1472,11 @@ describe('RepoWorkspace', () => {
 
     const closePromise = runCloseWorkspacePaneTabCommand({
       repoId: REPO_ID,
-      branchName,
-      workspacePaneRoute: { kind: 'static', tab: 'files' },
+      target: {
+        kind: 'git-worktree',
+        workspacePaneRoute: { kind: 'static', tab: 'files' },
+        filesystemTarget: gitWorktreeFilesystemTarget(repo, worktreePath, branchName),
+      },
       navigation: actions,
     })
     await commitStarted
@@ -1385,7 +1505,7 @@ describe('RepoWorkspace', () => {
   test('reconciles a closed active tab after close-back navigation rejects', async () => {
     const branchName = 'feature/close-route-rejected'
     const worktreePath = '/tmp/close-route-rejected-worktree'
-    seedRepoWithReadModelForTest({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot(branchName, { worktree: { path: worktreePath } })],
       currentBranchName: branchName,
@@ -1420,8 +1540,11 @@ describe('RepoWorkspace', () => {
     await expect(
       runCloseWorkspacePaneTabCommand({
         repoId: REPO_ID,
-        branchName,
-        workspacePaneRoute: { kind: 'static', tab: 'files' },
+        target: {
+          kind: 'git-worktree',
+          workspacePaneRoute: { kind: 'static', tab: 'files' },
+          filesystemTarget: gitWorktreeFilesystemTarget(repo, worktreePath, branchName),
+        },
         navigation: actions,
       }),
     ).resolves.toBe(false)
@@ -1531,9 +1654,9 @@ describe('RepoWorkspace', () => {
       expect(
         repo &&
           preferredWorkspacePaneTabForTarget(repo.ui, {
+            kind: 'git-branch' as const,
             repoRoot: REPO_ID,
             branchName,
-            worktreePath: null,
           }),
       ).toBe('status')
     })
@@ -1671,15 +1794,15 @@ function navigationWithStore(
     commitWorkspaceNavigation: store.commitWorkspaceNavigation,
     routeNavigation: routeNavigationOverrides,
   })
-  const commitRoute = navigation.commitRepoBranchWorkspacePaneRoute
-  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation, { commitRoute })
+  const commitRoute = navigation.commitWorkspacePaneRoute
+  navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation, { commitRoute })
   return navigation
 }
 
 function routeNavigation(): PrimaryWindowRouteNavigation {
   return {
     repoSlugForId: vi.fn(() => 'repo-workspace-container-repo'),
-    currentRepoBranchWorkspacePaneRoute: () => undefined,
+    currentWorkspacePaneRoute: () => undefined,
     openHome: vi.fn(),
     openSettings: vi.fn(),
     closeSettings: vi.fn(),
@@ -1695,6 +1818,10 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
       return true
     }),
     openRepoBranchTerminal: vi.fn((_repoId, _branchName, _sessionId, options) => {
+      options?.onCommit?.()
+      return true
+    }),
+    openRepoWorktree: vi.fn((_repoId, _worktreePath, options) => {
       options?.onCommit?.()
       return true
     }),

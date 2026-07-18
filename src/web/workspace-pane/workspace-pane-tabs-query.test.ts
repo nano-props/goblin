@@ -37,9 +37,9 @@ beforeEach(() => {
 test('test target construction rejects legacy raw workspace ids', () => {
   expect(() =>
     runtimeWorkspacePaneTargetForTest({
+      kind: 'git-worktree' as const,
       repoRoot: '/tmp/legacy-workspace-id',
       repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: 'main',
       worktreePath: '/tmp/legacy-workspace-id',
     }),
   ).toThrow('workspace pane test target requires a canonical target')
@@ -61,8 +61,7 @@ describe('workspace pane tabs revisioned query cache', () => {
             kind: 'workspace-root',
             repoRoot: REPO_ROOT,
             repoRuntimeId: REPO_RUNTIME_ID,
-            branchName: null,
-            worktreePath: null,
+
           }),
           tabs,
         },
@@ -76,8 +75,7 @@ describe('workspace pane tabs revisioned query cache', () => {
           kind: 'workspace-root',
           repoRoot: REPO_ROOT,
           repoRuntimeId: REPO_RUNTIME_ID,
-          branchName: null,
-          worktreePath: null,
+
         },
         queryClient,
       ),
@@ -207,10 +205,10 @@ describe('workspace pane tabs revisioned query cache', () => {
 
     setWorkspacePaneTabsForTargetQueryData(
       {
+        kind: 'git-branch' as const,
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
         branchName: 'feature/a',
-        worktreePath: null,
         tabs: [workspacePaneStaticTabEntry('status')],
       },
       queryClient,
@@ -223,14 +221,14 @@ describe('workspace pane tabs revisioned query cache', () => {
 
   test('persists worktree and branch-only entries under separate target identities', () => {
     const worktreeTargetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-worktree' as const,
       repoRoot: REPO_ROOT,
-      branchName: 'feature/current',
       worktreePath: '/tmp/worktree',
     })
     const branchTargetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-branch' as const,
       repoRoot: REPO_ROOT,
       branchName: 'feature/current',
-      worktreePath: null,
     })
 
     expect(
@@ -251,8 +249,16 @@ describe('workspace pane tabs revisioned query cache', () => {
 })
 
 function readTabs(queryClient: QueryClient, branchName: string, worktreePath: string | null) {
+  const target =
+    worktreePath === null
+      ? { kind: 'git-branch' as const, repoRoot: REPO_ROOT, branchName }
+      : {
+          kind: 'git-worktree' as const,
+          repoRoot: REPO_ROOT,
+          worktreePath,
+        }
   return readWorkspacePaneTabsForTarget(
-    { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branchName, worktreePath },
+    { ...target, repoRuntimeId: REPO_RUNTIME_ID },
     queryClient,
   )
 }
@@ -268,10 +274,14 @@ function entry(
 ): WorkspacePaneTabsEntry {
   return {
     target: runtimeWorkspacePaneTargetForTest({
-      repoRoot: REPO_ROOT,
+      ...(worktreePath === null
+        ? { kind: 'git-branch' as const, repoRoot: REPO_ROOT, branchName }
+        : {
+            kind: 'git-worktree' as const,
+            repoRoot: REPO_ROOT,
+            worktreePath,
+          }),
       repoRuntimeId: REPO_RUNTIME_ID,
-      branchName,
-      worktreePath,
     }),
     tabs,
   }

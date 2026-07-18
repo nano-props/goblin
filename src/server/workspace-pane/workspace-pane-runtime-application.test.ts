@@ -16,11 +16,29 @@ import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-f
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { WorkspacePaneRuntimeStaleError } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
+import type * as RepoRuntimesModule from '#/server/modules/repo-runtimes.ts'
 
 const failRemoteRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
+const workspaceProbeStateForRuntimeMock = vi.hoisted(() =>
+  vi.fn<() => WorkspaceProbeState>(() => ({
+    status: 'ready' as const,
+    name: 'Mock workspace',
+    capabilities: {
+      files: { read: true as const, write: true },
+      terminal: { available: true },
+      git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+    },
+    diagnostics: [],
+  })),
+)
 vi.mock('#/server/modules/remote-runtime-failure-settlement.ts', async (importActual) => {
   const actual = await importActual<typeof import('#/server/modules/remote-runtime-failure-settlement.ts')>()
   return { ...actual, failRemoteRuntimeIfNeeded: failRemoteRuntimeIfNeededMock }
+})
+vi.mock('#/server/modules/repo-runtimes.ts', async (importActual) => {
+  const actual = await importActual<typeof RepoRuntimesModule>()
+  return { ...actual, workspaceProbeStateForRuntime: workspaceProbeStateForRuntimeMock }
 })
 
 const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')
@@ -42,6 +60,98 @@ const request = {
 const paneTabsSnapshot = { revision: 1, entries: [] }
 
 describe('WorkspacePaneRuntimeApplication', () => {
+  test('rejects terminal creation from an unavailable authoritative capability', async () => {
+    workspaceProbeStateForRuntimeMock.mockReturnValueOnce({
+      status: 'ready',
+      name: 'Mock workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: false },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [],
+    })
+    const capture = vi.fn()
+    const createAdmitted = vi.fn()
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: { capture },
+      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminal: { createAdmitted, close: () => false },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged: vi.fn(),
+    })
+
+    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual({
+      ok: false,
+      runtimeType: 'terminal',
+      message: 'error.unavailable',
+    })
+    expect(capture).not.toHaveBeenCalled()
+    expect(createAdmitted).not.toHaveBeenCalled()
+  })
+
+  test('rejects terminal creation while the authoritative capability is transitioning', async () => {
+    workspaceProbeStateForRuntimeMock.mockReturnValueOnce({ status: 'probing' })
+    const capture = vi.fn()
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: { capture },
+      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminal: { createAdmitted: vi.fn(), close: () => false },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged: vi.fn(),
+    })
+
+    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toMatchObject({
+      ok: false,
+      message: 'error.unavailable',
+    })
+    expect(capture).not.toHaveBeenCalled()
+  })
+
+  test('rejects when terminal capability becomes unavailable during physical target capture', async () => {
+    workspaceProbeStateForRuntimeMock
+      .mockReturnValueOnce({
+        status: 'ready',
+        name: 'Mock workspace',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'unavailable' },
+        },
+        diagnostics: [],
+      })
+      .mockReturnValueOnce({
+        status: 'ready',
+        name: 'Mock workspace',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: false },
+          git: { status: 'unavailable' },
+        },
+        diagnostics: [],
+      })
+    const createAdmitted = vi.fn()
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: { capture: async () => testPhysicalWorktreeExecutionCapability(request.worktreePath) },
+      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminal: { createAdmitted, close: () => false },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged: vi.fn(),
+    })
+
+    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toMatchObject({
+      ok: false,
+      message: 'error.unavailable',
+    })
+    expect(createAdmitted).not.toHaveBeenCalled()
+  })
+
   test('returns the provider result and broadcasts the committed workspace revision', async () => {
     const runtime = terminalCreateSuccess()
     const create = vi.fn(async () => runtime)
@@ -404,7 +514,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const session = {
       ...terminalSession('term-targettargettarget001', 'pty_target_aaaaaaaaaaaa'),
       target: primaryWorktreeTarget,
-      presentation: { kind: 'git-worktree' as const, branchName: 'main' },
+      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
       worktreePath: '/repo',
     }
     const close = vi.fn(() => true)
@@ -446,7 +556,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const session = {
       ...terminalSession('term-targettargettarget002', 'pty_target_bbbbbbbbbbbb'),
       target: sessionTarget,
-      presentation: { kind: 'git-worktree' as const, branchName: 'main' },
+      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
     }
     const close = vi.fn(() => true)
     const application = createWorkspacePaneRuntimeApplication({
@@ -737,7 +847,7 @@ function terminalCreateSuccess(
 function committedTerminalResult(action: 'created' | 'restored' | 'reused') {
   return {
     action,
-    presentation: { kind: 'git-worktree' as const, branchName: request.branch },
+    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: request.branch } },
     terminalProjectionEffect: { kind: 'delta' as const, revision: 1 },
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
     terminalRuntimeGeneration: 1,
@@ -757,7 +867,7 @@ function publishedTerminalResult(
   return {
     ok: true,
     terminalSessionId: runtime.terminalSessionId,
-    ...runtime.admission.commit({ presentation: { kind: 'git-worktree', branchName: request.branch } }),
+    ...runtime.admission.commit({ presentation: { kind: 'git-worktree', head: { kind: 'branch' as const, branchName: request.branch } } }),
   }
 }
 
@@ -767,7 +877,7 @@ function terminalSession(terminalSessionId: string, terminalRuntimeSessionId: st
     terminalRuntimeGeneration: 1,
     terminalSessionId,
     target: request.target,
-    presentation: { kind: 'git-worktree' as const, branchName: request.branch },
+    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: request.branch } },
     nativeWorktreePath: request.worktreePath,
     controller: { clientId: 'client-test', status: 'connected' as const },
     processName: 'zsh',

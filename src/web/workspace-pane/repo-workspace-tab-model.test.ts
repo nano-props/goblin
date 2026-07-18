@@ -13,6 +13,7 @@ import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 const REPO_ID = 'goblin+file:///tmp/goblin-repo-workspace-tab-model-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
@@ -20,20 +21,36 @@ const WORKTREE_PATH = '/tmp/goblin-repo-workspace-tab-model-worktree'
 const WORKTREE_KEY = formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH)
 
 describe('repo workspace pane tab model', () => {
+  test('projects only tabs supported by a detached worktree surface and selects a valid fallback', () => {
+    const model = createRepoWorkspaceTabModel({
+      repoId: REPO_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
+      paneTarget: { kind: 'git-worktree', repoRoot: REPO_ID, worktreePath: WORKTREE_PATH },
+      worktreeHead: { kind: 'detached' },
+      preferredTab: 'history',
+      tabEntries: [staticEntry('status'), staticEntry('changes'), staticEntry('history'), staticEntry('files')],
+      runtimeTabViews: [],
+      runtimeTabStateByType: {},
+    })
+
+    expect(model.tabEntries.map((entry) => entry.type)).toEqual(['status', 'files'])
+    expect(model.tabs.map((tab) => tab.type)).toEqual(['status', 'files'])
+    expect(model.renderedTab).toBe('status')
+  })
+
   test('projects exactly the authoritative workspace tabs without resurrecting a closed tab', () => {
     const repoId = 'goblin+file:///tmp/plain-workspace'
     const model = createRepoWorkspaceTabModel({
       repoId,
       repoRuntimeId: 'repo-runtime-plain',
-      branchName: null,
-      worktreePath: repoId,
+      paneTarget: { kind: 'workspace-root', repoRoot: repoId },
       preferredTab: 'files',
       tabEntries: [workspacePaneStaticTabEntry('files')],
       runtimeTabViews: [],
       runtimeTabStateByType: {},
     })
 
-    expect(model.worktreePath).toBe(repoId)
+    expect(model.worktreePath).toBe('/tmp/plain-workspace')
     expect(model.tabs.map((tab) => tab.type)).toEqual(['files'])
     expect(model.renderedTab).toBe('files')
   })
@@ -43,8 +60,7 @@ describe('repo workspace pane tab model', () => {
     const model = createRepoWorkspaceTabModel({
       repoId,
       repoRuntimeId: 'repo-runtime-plain',
-      branchName: null,
-      worktreePath: repoId,
+      paneTarget: { kind: 'workspace-root', repoRoot: repoId },
       preferredTab: 'terminal',
       tabEntries: [
         workspacePaneStaticTabEntry('files'),
@@ -71,7 +87,6 @@ describe('repo workspace pane tab model', () => {
   test('projects a mixed tab list across static and terminal tabs', () => {
     const model = createModel({
       repoId: REPO_ID,
-
       repoRuntimeId: REPO_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
@@ -264,10 +279,9 @@ describe('repo workspace pane tab model', () => {
   test('defaults runtime tab state by runtime type when no input state is provided', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
-
       repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: 'feature/model',
-      worktreePath: WORKTREE_PATH,
+      paneTarget: requiredGitWorkspacePaneTabsTarget(REPO_ID, 'feature/model', WORKTREE_PATH),
+      worktreeHead: { kind: 'branch', branchName: 'feature/model' },
       preferredTab: 'status',
       tabEntries: [staticEntry('status')],
       runtimeTabViews: [],
@@ -852,7 +866,12 @@ describe('repo workspace pane tab model', () => {
   })
 })
 
-type RepoWorkspaceTabModelTestInput = Omit<RepoWorkspaceTabModelInput, 'repoRuntimeId' | 'runtimeTabStateByType'> & {
+type RepoWorkspaceTabModelTestInput = Omit<
+  RepoWorkspaceTabModelInput,
+  'repoRuntimeId' | 'runtimeTabStateByType' | 'paneTarget' | 'worktreeHead'
+> & {
+  branchName: string | null
+  worktreePath: string | null
   repoRuntimeId?: string
   runtimeTabStateByType?: RepoWorkspaceRuntimeTabStateInputByType
   terminalCreatePending?: boolean
@@ -863,6 +882,8 @@ type RepoWorkspaceTabModelTestInput = Omit<RepoWorkspaceTabModelInput, 'repoRunt
 
 function createModel(input: RepoWorkspaceTabModelTestInput): RepoWorkspaceTabModel {
   const {
+    branchName,
+    worktreePath,
     repoRuntimeId,
     runtimeTabStateByType,
     terminalCreatePending,
@@ -878,6 +899,12 @@ function createModel(input: RepoWorkspaceTabModelTestInput): RepoWorkspaceTabMod
   return createRepoWorkspaceTabModel({
     repoRuntimeId: repoRuntimeId ?? REPO_RUNTIME_ID,
     ...modelInput,
+    paneTarget: branchName
+      ? requiredGitWorkspacePaneTabsTarget(modelInput.repoId, branchName, worktreePath)
+      : worktreePath === modelInput.repoId
+        ? { kind: 'workspace-root', repoRoot: modelInput.repoId }
+        : { kind: 'inactive', repoRoot: modelInput.repoId },
+    worktreeHead: branchName && worktreePath ? { kind: 'branch', branchName } : undefined,
     runtimeTabStateByType: {
       ...runtimeTabStateByType,
       terminal: {

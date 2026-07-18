@@ -44,14 +44,14 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('passes the observed route as a compare-and-set precondition', async () => {
-    const commitRepoBranchWorkspacePaneRoute = vi.fn(() => false)
+    const commitWorkspacePaneRoute = vi.fn(() => false)
 
     await expect(
       commitWorkspacePaneExactTargetRoute(workspacePaneTarget(), SOURCE_ROUTE, TARGET_ROUTE, {
-        commitRepoBranchWorkspacePaneRoute,
+        commitWorkspacePaneRoute,
       }),
     ).resolves.toBe(false)
-    expect(commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
+    expect(commitWorkspacePaneRoute).toHaveBeenCalledWith(
       'goblin+file:///repo',
       'feature/a',
       TARGET_ROUTE,
@@ -60,17 +60,17 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('rebases an absolute selection to the current workspace target at execution time', async () => {
-    const commitRepoBranchWorkspacePaneRoute = vi.fn((_repoId, _branchName, _route, options) => {
+    const commitWorkspacePaneRoute = vi.fn((_repoId, _branchName, _route, options) => {
       options?.onCommit?.()
       return true
     })
 
     await expect(
       selectWorkspacePaneControllerTab(workspacePaneTarget(), staticTab('status'), {
-        commitRepoBranchWorkspacePaneRoute,
+        commitWorkspacePaneRoute,
       }),
     ).resolves.toBe(true)
-    expect(commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
+    expect(commitWorkspacePaneRoute).toHaveBeenCalledWith(
       'goblin+file:///repo',
       'feature/a',
       TARGET_ROUTE,
@@ -79,22 +79,25 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('selects a workspace-scoped tab without committing a branch route', async () => {
-    const navigation = { commitRepoBranchWorkspacePaneRoute: vi.fn(() => false) }
+    const navigation = { commitWorkspacePaneRoute: vi.fn(() => false) }
 
     await expect(
       selectWorkspacePaneControllerTab(
-        { ...workspacePaneTarget(), branchName: null, worktreePath: 'goblin+file:///repo' },
+        {
+          ...workspacePaneTarget(),
+          branchName: null,
+          worktreePath: '/repo',
+          paneTarget: { kind: 'workspace-root', repoRoot: 'goblin+file:///repo' },
+        },
         staticTab('files'),
         navigation,
       ),
     ).resolves.toBe(true)
 
-    expect(navigation.commitRepoBranchWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'workspace-root',
       repoRoot: 'goblin+file:///repo',
-      branchName: null,
-      worktreePath: null,
     })
     expect(useReposStore.getState().repos['goblin+file:///repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
       'files',
@@ -111,21 +114,26 @@ describe('workspace pane tab controller transactions', () => {
           repoRuntimeId: 'repo-runtime-1',
           branchName: 'feature/renamed',
           worktreePath: '/worktree-a',
+          paneTarget: {
+            kind: 'git-worktree',
+            repoRoot: 'goblin+file:///repo',
+            worktreePath: '/worktree-a',
+          },
         },
         { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
         navigation,
       ),
     ).resolves.toBe(true)
 
-    expect(navigation.commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
+    expect(navigation.commitWorkspacePaneRoute).toHaveBeenCalledWith(
       'goblin+file:///repo',
       'feature/renamed',
       { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
       expect.any(Object),
     )
     const targetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-worktree' as const,
       repoRoot: 'goblin+file:///repo',
-      branchName: 'feature/renamed',
       worktreePath: '/worktree-a',
     })
     expect(useReposStore.getState().repos['goblin+file:///repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
@@ -136,7 +144,7 @@ describe('workspace pane tab controller transactions', () => {
   test('rejects exact target completion after its runtime is replaced', async () => {
     const commit = Promise.withResolvers<boolean>()
     const navigation: WorkspacePaneTabControllerCommitNavigation = {
-      commitRepoBranchWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
+      commitWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
         options?.onCommit?.()
         return commit.promise
       }),
@@ -160,7 +168,7 @@ describe('workspace pane tab controller transactions', () => {
   test('normalizes a navigation rejection to false', async () => {
     await expect(
       commitWorkspacePaneExactTargetRoute(workspacePaneTarget(), SOURCE_ROUTE, TARGET_ROUTE, {
-        commitRepoBranchWorkspacePaneRoute: vi.fn(async () => {
+        commitWorkspacePaneRoute: vi.fn(async () => {
           throw new Error('router failed')
         }),
       }),
@@ -170,7 +178,7 @@ describe('workspace pane tab controller transactions', () => {
   test('rejects completion when the target worktree changes while navigation settles', async () => {
     const commit = Promise.withResolvers<boolean>()
     const navigation: WorkspacePaneTabControllerCommitNavigation = {
-      commitRepoBranchWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
+      commitWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
         options?.onCommit?.()
         return commit.promise
       }),
@@ -210,12 +218,13 @@ function workspacePaneTarget(): RepoWorkspaceTabModel {
     repoRuntimeId: 'repo-runtime-1',
     branchName: 'feature/a',
     worktreePath: '/worktree-a',
+    paneTarget: { kind: 'git-worktree', repoRoot: 'goblin+file:///repo', worktreePath: '/worktree-a' },
   } as RepoWorkspaceTabModel
 }
 
 function committingNavigation(): WorkspacePaneTabControllerCommitNavigation {
   return {
-    commitRepoBranchWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
+    commitWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
       options?.onCommit?.()
       return true
     }),

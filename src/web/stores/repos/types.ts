@@ -171,6 +171,12 @@ export type WorkspaceNavigationHistoryRoute =
   | { kind: 'dashboard' }
   | { kind: 'newWorktree'; returnTo: string | null }
   | {
+      kind: 'worktree'
+      worktreePath: string
+      workspacePaneTab: WorkspacePaneTabType | null
+      terminalSessionId: string | null
+    }
+  | {
       kind: 'branch'
       branchName: string
       workspacePaneTab: WorkspacePaneTabType | null

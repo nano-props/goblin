@@ -14,6 +14,13 @@ export function workspaceNavigationHistoryEntryEqual(
       return true
     case 'newWorktree':
       return b.route.kind === 'newWorktree' && a.route.returnTo === b.route.returnTo
+    case 'worktree':
+      return (
+        b.route.kind === 'worktree' &&
+        a.route.worktreePath === b.route.worktreePath &&
+        a.route.workspacePaneTab === b.route.workspacePaneTab &&
+        a.route.terminalSessionId === b.route.terminalSessionId
+      )
     case 'branch':
       return (
         b.route.kind === 'branch' &&
@@ -37,6 +44,19 @@ export function workspaceNavigationHistoryEntryCanReplaceCurrent(
     case 'dashboard':
     case 'newWorktree':
       return false
+    case 'worktree':
+      if (
+        b.route.kind !== 'worktree' ||
+        a.route.worktreePath !== b.route.worktreePath ||
+        a.route.workspacePaneTab !== b.route.workspacePaneTab
+      )
+        return false
+      return (
+        a.route.workspacePaneTab !== 'terminal' ||
+        !a.route.terminalSessionId ||
+        !b.route.terminalSessionId ||
+        a.route.terminalSessionId === b.route.terminalSessionId
+      )
     case 'branch': {
       if (
         b.route.kind !== 'branch' ||

@@ -42,7 +42,9 @@ import {
   type WorktreeInfo,
   type WorktreeStatus,
 } from '#/shared/git-types.ts'
+import { gitHead, type GitHead } from '#/shared/git-head.ts'
 import { validateBranchDeletionPolicy, validateRemovableWorktreeState } from '#/shared/repo-action-policy.ts'
+import { getRemoteGitDirectoryWalk } from '#/system/ssh/filesystem.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
@@ -81,10 +83,9 @@ export interface RemoteWorktreeMutationResult extends ExecResult {
   affectedWorktreePaths?: readonly string[]
 }
 
-export interface RemoteWorkspacePaneTargetIdentity {
-  branch: string
-  worktreePath: string | null
-}
+export type RemoteWorkspacePaneTargetIdentity =
+  | { kind: 'git-branch'; branchName: string }
+  | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
 
 interface SnapshotSections {
   current: string[]
@@ -126,9 +127,22 @@ export async function getRemoteWorkspacePaneTargetIdentities(
   if (index < 0) throw new Error('error.failed-read-repo')
   const branches = result.stdout.slice(0, index).split('\n').map((branch) => branch.trim()).filter(Boolean)
   const worktrees = parseUsableWorktrees(result.stdout.slice(index + separator.length))
-  return branches.map((branch) => ({ branch, worktreePath: worktrees.find((worktree) => worktree.branch === branch)?.path ?? null }))
+  const checkedOutBranches = new Set(worktrees.flatMap((worktree) => (worktree.branch ? [worktree.branch] : [])))
+  return [
+    ...worktrees.map(
+      (worktree): RemoteWorkspacePaneTargetIdentity => ({
+        kind: 'git-worktree',
+        worktreePath: worktree.path,
+        head: gitHead(worktree.branch ?? null),
+      }),
+    ),
+    ...branches
+      .filter((branch) => !checkedOutBranches.has(branch))
+      .map((branch): RemoteWorkspacePaneTargetIdentity => ({ kind: 'git-branch', branchName: branch })),
+  ]
 }
 
+/** Read only the selected worktree's HEAD identity in one SSH round trip. */
 export async function getRemoteStatus(
   target: RemoteRepoTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
@@ -229,12 +243,7 @@ export async function getRemoteTreeWalk(
     knownWorktrees: options.knownWorktrees,
   })
   if ('ok' in known) return known
-  const result = await run({ type: 'gitTreeWalk', path: known.path, prefix: options.prefix }, target, {
-    signal: options.signal,
-  })
-  if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
-  if (!result.ok) return remoteExecResult(result)
-  return { ok: true, message: result.stdout }
+  return await getRemoteGitDirectoryWalk(target, known.path, options)
 }
 
 export async function trashRemoteFile(

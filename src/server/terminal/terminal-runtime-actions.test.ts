@@ -58,7 +58,7 @@ function makeActions(
             terminalRuntimeGeneration: 1,
             terminalSessionId: 'term-111111111111111111111',
             target: worktreeTarget(REPO_RUNTIME_ID),
-            presentation: { kind: 'git-worktree', branchName: 'feature/worktree' },
+            presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/worktree' } },
             controller: null,
             processName: 'zsh',
             canonicalTitle: null,

@@ -86,6 +86,6 @@ export function useWorkspacePaneTabDragPreview(
 function workspacePaneTabDragPreviewTargetKey(
   input: WorkspacePaneTabDragPreviewTarget & { repoRuntimeId: string },
 ): string | null {
-  if ('kind' in input && input.kind === 'inactive') return null
+  if (input.kind === 'inactive') return null
   return `${workspacePaneTabsTargetIdentityKey(input)}::${input.repoRuntimeId}`
 }

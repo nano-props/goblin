@@ -62,7 +62,8 @@ vi.mock('#/web/components/RepoWorkspace.tsx', () => ({
     toolbarTrafficLightOffset = false,
   }: {
     currentBranchName?: string | null
-    workspacePaneRouteContext?: { kind: 'routed'; route: { kind: string } | null } | { kind: 'inactive' }
+    workspacePaneRouteContext?:
+      { kind: 'workspace-root' } | { kind: 'routed'; route: { kind: string } | null } | { kind: 'inactive' }
     shortcutsEnabled?: boolean
     toolbarTrafficLightOffset?: boolean
   }) => (
@@ -70,7 +71,9 @@ vi.mock('#/web/components/RepoWorkspace.tsx', () => ({
       data-testid="repo-workspace"
       data-current-branch-name={currentBranchName ?? ''}
       data-workspace-pane-route-kind={
-        workspacePaneRouteContext?.kind === 'routed' ? (workspacePaneRouteContext.route?.kind ?? 'bare') : 'inactive'
+        workspacePaneRouteContext?.kind === 'routed'
+          ? (workspacePaneRouteContext.route?.kind ?? 'bare')
+          : (workspacePaneRouteContext?.kind ?? 'inactive')
       }
       data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
       data-traffic-light-offset={toolbarTrafficLightOffset ? 'true' : 'false'}
@@ -293,7 +296,7 @@ describe('RepoView workspace navigation', () => {
     const { container } = render(<RepoView repoId={REPO_ID} routeView={{ kind: 'workspace', repoId: REPO_ID }} />)
 
     expect(repoWorkspace(container)?.dataset.currentBranchName).toBe('')
-    expect(repoWorkspace(container)?.dataset.workspacePaneRouteKind).toBe('bare')
+    expect(repoWorkspace(container)?.dataset.workspacePaneRouteKind).toBe('workspace-root')
     expect(branchNavigator(container)).toBeNull()
     expect(container.querySelector('[data-testid="dashboard-row-action"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="workspace-root-row"]')).not.toBeNull()
@@ -327,6 +330,34 @@ describe('RepoView workspace navigation', () => {
     expect(container.querySelector('[data-testid="repo-dashboard-page"]')).not.toBeNull()
     expect(repoWorkspace(container)).toBeNull()
     expect(branchNavigator(container)).toBeNull()
+  })
+
+  test('renders the shared directory Dashboard for a remote non-Git workspace', () => {
+    const workspaceId = 'goblin+ssh://example/srv%2Fworkspace'
+    seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branches: [],
+      currentBranchName: null,
+      workspaceProbe: {
+        status: 'ready',
+        name: 'remote-workspace',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'unavailable' },
+        },
+        diagnostics: [],
+      },
+    })
+
+    const { container } = render(
+      <RepoView repoId={workspaceId} routeView={{ kind: 'dashboard', repoId: workspaceId }} />,
+    )
+
+    expect(container.querySelector('[data-testid="repo-dashboard-page"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-root-row"]')).not.toBeNull()
+    expect(branchNavigator(container)).toBeNull()
+    expect(container.querySelector('[data-testid="repo-sync-action"]')).toBeNull()
   })
 
   test('keeps a routed repo on the restore skeleton until workspace membership is ready', () => {

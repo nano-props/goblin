@@ -9,7 +9,7 @@ import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-mo
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { isWorkspacePaneStaticTabType, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/repos/navigation-history-entry.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { workspacePaneRouteNavigationBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   observePrimaryWindowHistoryNavigation,
@@ -21,12 +21,13 @@ export type WorkspaceNavigationRouteContext =
   | { kind: 'workspace'; repoId: string }
   | { kind: 'dashboard'; repoId: string }
   | { kind: 'newWorktree'; repoId: string; returnTo: string | null }
+  | { kind: 'worktree'; repoId: string; worktreePath: string; workspacePaneRoute: WorkspacePaneRoute | null }
   | {
       kind: 'branch'
       repoId: string
       branchName: string
       worktreePath?: string | null
-      workspacePaneRoute: RepoBranchWorkspacePaneRoute | null
+      workspacePaneRoute: WorkspacePaneRoute | null
     }
 
 interface WorkspaceNavigationHistoryOptions {
@@ -136,6 +137,13 @@ type WorkspaceNavigationHistoryRouteSnapshot =
   | { repoId: string; kind: 'newWorktree'; returnTo: string | null }
   | {
       repoId: string
+      kind: 'worktree'
+      worktreePath: string
+      workspacePaneTab: WorkspacePaneTabType | null
+      terminalSessionId: string | null
+    }
+  | {
+      repoId: string
       kind: 'branch'
       branchName: string
       workspacePaneTab: WorkspacePaneTabType | null
@@ -159,6 +167,16 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
       return { repoId, kind: 'dashboard' }
     case 'newWorktree':
       return { repoId, kind: 'newWorktree', returnTo: routeContext.returnTo }
+    case 'worktree': {
+      const route = routeContext.workspacePaneRoute
+      return {
+        repoId,
+        kind: 'worktree',
+        worktreePath: routeContext.worktreePath,
+        workspacePaneTab: route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null,
+        terminalSessionId: route?.kind === 'terminal' ? route.terminalSessionId : null,
+      }
+    }
     case 'branch': {
       const repo = useReposStore.getState().repos[repoId]
       const branchModel = repo ? readRepoBranchSnapshotQueryProjection(repo) : null
@@ -191,6 +209,16 @@ function workspaceNavigationHistoryEntryFromSnapshot(
       return { repoId: snapshot.repoId, route: { kind: snapshot.kind } }
     case 'newWorktree':
       return { repoId: snapshot.repoId, route: { kind: 'newWorktree', returnTo: snapshot.returnTo } }
+    case 'worktree':
+      return {
+        repoId: snapshot.repoId,
+        route: {
+          kind: 'worktree',
+          worktreePath: snapshot.worktreePath,
+          workspacePaneTab: snapshot.workspacePaneTab,
+          terminalSessionId: snapshot.terminalSessionId,
+        },
+      }
     case 'branch':
       return {
         repoId: snapshot.repoId,
@@ -213,6 +241,13 @@ function workspaceNavigationHistoryRouteSnapshotEqual(
   if (!a || !b) return false
   if (a.repoId !== b.repoId || a.kind !== b.kind) return false
   if (a.kind === 'newWorktree' && b.kind === 'newWorktree') return a.returnTo === b.returnTo
+  if (a.kind === 'worktree' && b.kind === 'worktree') {
+    return (
+      a.worktreePath === b.worktreePath &&
+      a.workspacePaneTab === b.workspacePaneTab &&
+      a.terminalSessionId === b.terminalSessionId
+    )
+  }
   if (a.kind !== 'branch' || b.kind !== 'branch') return true
   return (
     a.branchName === b.branchName &&
@@ -241,6 +276,28 @@ export function restoreWorkspaceNavigationEntry(
     case 'newWorktree':
       routeNavigation.openRepoNewWorktree(entry.repoId, { ...options, returnTo: entry.route.returnTo })
       return { kind: 'accepted' }
+    case 'worktree':
+      if (entry.route.workspacePaneTab === 'terminal' && entry.route.terminalSessionId) {
+        const accepted = routeNavigation.openRepoWorktreeTerminal?.(
+          entry.repoId,
+          entry.route.worktreePath,
+          entry.route.terminalSessionId,
+          options,
+        )
+        return accepted ? { kind: 'accepted' } : { kind: 'unavailable' }
+      }
+      if (entry.route.workspacePaneTab && entry.route.workspacePaneTab !== 'terminal') {
+        const accepted = routeNavigation.openRepoWorktreeTab?.(
+          entry.repoId,
+          entry.route.worktreePath,
+          entry.route.workspacePaneTab,
+          options,
+        )
+        return accepted ? { kind: 'accepted' } : { kind: 'unavailable' }
+      }
+      return routeNavigation.openRepoWorktree(entry.repoId, entry.route.worktreePath, options)
+        ? { kind: 'accepted' }
+        : { kind: 'unavailable' }
     case 'branch':
       if (entry.route.workspacePaneTab === 'terminal' && entry.route.terminalSessionId) {
         const accepted = routeNavigation.openRepoBranchTerminal(

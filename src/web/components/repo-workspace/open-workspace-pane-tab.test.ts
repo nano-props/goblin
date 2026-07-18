@@ -172,9 +172,12 @@ describe('openWorkspacePaneTab', () => {
     })
     expect(
       recordWorkspacePaneTabOpener(
-        REPO_ID,
+        {
+          kind: 'git-worktree',
+          repoRoot: REPO_ID,
+          worktreePath: WORKTREE_PATH,
+        },
         repo.repoRuntimeId,
-        branchName,
         workspacePaneTabEntryIdentity(terminalEntry),
         'workspace-pane:status',
       ),
@@ -193,9 +196,9 @@ describe('openWorkspacePaneTab', () => {
 
     expect(
       readWorkspacePaneTabsForTarget({
+        kind: 'git-worktree' as const,
         repoRoot: REPO_ID,
         repoRuntimeId: repo.repoRuntimeId,
-        branchName,
         worktreePath: WORKTREE_PATH,
       }).map(workspacePaneTabEntryIdentity),
     ).toEqual([
@@ -800,7 +803,16 @@ function preferredWorkspacePaneTab(branchName = 'feature/worktree') {
 }
 
 function openerScopeKey(repoRoot: string, branchName: string, worktreePath: string | null): string {
-  const baseKey = tabOpenerScopeKey({ repoRoot, branchName, worktreePath })
+  const target =
+    worktreePath === null
+      ? { kind: 'git-branch' as const, repoRoot, branchName }
+      : {
+          kind: 'git-worktree' as const,
+          repoRoot,
+          worktreePath,
+          head: { kind: 'branch' as const, branchName },
+        }
+  const baseKey = tabOpenerScopeKey(target)
   const repoRuntimeId = useReposStore.getState().repos[repoRoot]?.repoRuntimeId
   if (repoRuntimeId) return `${baseKey}\0${repoRuntimeId}`
   return (
@@ -820,14 +832,14 @@ function navigationWithStoreActions(
     state.setWorkspacePaneTab(repoId, branch, tab)
     return true
   },
-): Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab' | 'commitRepoBranchWorkspacePaneRoute'> {
+): Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab' | 'commitWorkspacePaneRoute'> {
   seedInitialObservedWorkspacePaneRouteForTest()
   const navigation: Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab'> = {
     showRepoBranchWorkspacePaneTab,
   }
   return {
     ...navigation,
-    commitRepoBranchWorkspacePaneRoute: observedWorkspacePaneRouteCommitForTest({
+    commitWorkspacePaneRoute: observedWorkspacePaneRouteCommitForTest({
       showRepoBranchEmptyWorkspacePane: () => false,
       showRepoBranchWorkspacePaneTab: navigation.showRepoBranchWorkspacePaneTab,
       showRepoBranchTerminalSession: () => false,

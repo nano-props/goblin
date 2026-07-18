@@ -8,7 +8,12 @@
 // protocol types in `shared/terminal-types.ts`.
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { acquireRepoRuntime, clearRepoRuntimesForUser, releaseRepoRuntime } from '#/server/modules/repo-runtimes.ts'
+import {
+  acquireRepoRuntime,
+  clearRepoRuntimesForUser,
+  commitWorkspaceProbeState,
+  releaseRepoRuntime,
+} from '#/server/modules/repo-runtimes.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
@@ -66,6 +71,25 @@ function workspacePaneWorktreeTarget(workspaceRuntimeId: string) {
     workspaceRuntimeId,
     root: LINKED_REPO_ROOT,
   }
+}
+
+function commitTerminalReadyProbe(userId: string, repoRoot: string, repoRuntimeId: string): void {
+  const committed = commitWorkspaceProbeState({
+    userId,
+    repoRoot,
+    repoRuntimeId,
+    probe: {
+      status: 'ready',
+      name: 'Mock workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
+      diagnostics: [],
+    },
+  })
+  if (!committed) throw new Error('test runtime probe was not awaiting its authoritative initial result')
 }
 
 vi.mock('#/system/git/worktrees.ts', () => ({
@@ -241,7 +265,6 @@ const testWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository = {
 function buildRuntime(
   options: {
     captureTargets?: WorkspacePaneTargetProjectionProvider['captureTargets']
-    validate?: WorkspacePaneTargetProjectionProvider['validateTargets']
   } = {},
 ): RuntimeHandle {
   const runtime = createServerTerminalRuntime({
@@ -267,13 +290,16 @@ function buildRuntime(
           },
         ]
       }),
-      validateTargets: options.validate ?? (async () => true),
     },
   })
   REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_a')
   SSH_REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, 'goblin+ssh://prod/srv/repo', 'client_a')
   USER_2_REPO_RUNTIME_ID = acquireRepoRuntime(USER_2, REPO_ROOT, 'client_b')
-  acquireRepoRuntime(USER_2, 'goblin+ssh://prod/srv/repo', 'client_b')
+  const user2SshRepoRuntimeId = acquireRepoRuntime(USER_2, 'goblin+ssh://prod/srv/repo', 'client_b')
+  commitTerminalReadyProbe(USER_1, REPO_ROOT, REPO_RUNTIME_ID)
+  commitTerminalReadyProbe(USER_1, 'goblin+ssh://prod/srv/repo', SSH_REPO_RUNTIME_ID)
+  commitTerminalReadyProbe(USER_2, REPO_ROOT, USER_2_REPO_RUNTIME_ID)
+  commitTerminalReadyProbe(USER_2, 'goblin+ssh://prod/srv/repo', user2SshRepoRuntimeId)
   createTerminalApplications.set(runtime.host, runtime.workspacePaneRuntimeHost)
   const shutdown = () => {
     if (!activeRuntimeShutdowns.delete(shutdown)) return
@@ -441,8 +467,7 @@ describe('server terminal runtime', () => {
         },
       ]
     })
-    const validateTargets = vi.fn(async () => true)
-    const { host, shutdown } = buildRuntime({ captureTargets, validate: validateTargets })
+    const { host, shutdown } = buildRuntime({ captureTargets })
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
 
@@ -463,7 +488,6 @@ describe('server terminal runtime', () => {
       ),
     ).resolves.toMatchObject({ ok: true })
     expect(captureTargets).toHaveBeenCalledOnce()
-    expect(validateTargets).toHaveBeenCalledOnce()
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
@@ -1296,6 +1320,7 @@ describe('server terminal runtime', () => {
     })
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
     const nextRepoRuntimeId = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_a')
+    commitTerminalReadyProbe(USER_1, REPO_ROOT, nextRepoRuntimeId)
 
     await expect(
       host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: nextRepoRuntimeId }),
@@ -2193,6 +2218,7 @@ describe('server terminal runtime', () => {
     const socket2 = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_b', USER_1, socket2)
     REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_b')
+    commitTerminalReadyProbe(USER_1, REPO_ROOT, REPO_RUNTIME_ID)
     await expect(
       requestWorkspacePaneTabs(
         host,

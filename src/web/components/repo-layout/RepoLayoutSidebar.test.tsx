@@ -115,7 +115,14 @@ describe('RepoLayoutSidebar', () => {
     fireEvent.click(menuTrigger)
     const statusAction = [...document.querySelectorAll('button')].find((button) => button.textContent === 'tab.status')
     const filesAction = [...document.querySelectorAll('button')].find((button) => button.textContent === 'tab.files')
-    if (!(statusAction instanceof HTMLButtonElement) || !(filesAction instanceof HTMLButtonElement)) {
+    const terminalAction = [...document.querySelectorAll('button')].find(
+      (button) => button.textContent === 'tab.terminal',
+    )
+    if (
+      !(statusAction instanceof HTMLButtonElement) ||
+      !(filesAction instanceof HTMLButtonElement) ||
+      !(terminalAction instanceof HTMLButtonElement)
+    ) {
       throw new Error('missing workspace root actions')
     }
     fireEvent.click(statusAction)

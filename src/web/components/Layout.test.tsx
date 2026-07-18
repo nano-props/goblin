@@ -87,7 +87,7 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
     createTerminal: vi.fn(async () => ''),
     createTerminalWithAdmission: vi.fn(async () => ({
       terminalSessionId: '',
-      presentation: { kind: 'git-worktree', branchName: 'main' },
+      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
       resourceDisposition: 'created',
       runtimeProjectionApplied: false,
       requestRole: 'leader',

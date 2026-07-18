@@ -1,4 +1,4 @@
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -20,6 +20,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   captureWorkspacePaneActiveTabIdentity,
   recordWorkspacePaneTabOpener,
@@ -44,7 +45,7 @@ export interface OpenWorkspacePaneStaticTabActionOptions {
   branchName: string
   worktreePath: string | null | undefined
   type: WorkspacePaneStaticTabType
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   navigation: WorkspacePaneTabControllerCommitNavigation
 }
 
@@ -52,7 +53,7 @@ export interface ShowWorkspacePaneStaticTabActionOptions {
   repoId: string | null
   branchName: string | null
   type: WorkspacePaneStaticTabType
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   navigation: WorkspacePaneTabControllerCommitNavigation
 }
 
@@ -65,7 +66,7 @@ type ResolvedOpenWorkspacePaneStaticTabActionOptions = Omit<
 > & {
   repoRuntimeId: string
   worktreePath: string | null
-  sourceRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
+  sourceRoute: ParsedWorkspacePaneRoute | null | undefined
   placement: WorkspacePaneStaticTabPlacement
 }
 
@@ -84,7 +85,8 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
   if (!provider.canOpen({ hasWorktree: lease.worktreePath !== null })) {
     return { kind: 'unsupported', reason: 'worktree-required' }
   }
-  const openerIdentity = captureWorkspacePaneActiveTabIdentity(repoId, lease.repoRuntimeId, lease.branchName, {
+  const paneTarget = requiredGitWorkspacePaneTabsTarget(repoId, lease.branchName, lease.worktreePath)
+  const openerIdentity = captureWorkspacePaneActiveTabIdentity(paneTarget, lease.repoRuntimeId, {
     workspacePaneRoute,
   })
   const presentation = beginWorkspacePaneDestinationPresentation(lease)
@@ -112,7 +114,8 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
   const repoRuntimeId = currentRepoRuntimeId(useReposStore.getState(), input.repoId)
   if (!repoRuntimeId) return false
   const sourceRoute = input.workspacePaneRoute
-  const openerIdentity = captureWorkspacePaneActiveTabIdentity(input.repoId, repoRuntimeId, input.branchName, {
+  const paneTarget = requiredGitWorkspacePaneTabsTarget(input.repoId, input.branchName, input.worktreePath ?? null)
+  const openerIdentity = captureWorkspacePaneActiveTabIdentity(paneTarget, repoRuntimeId, {
     workspacePaneRoute: sourceRoute,
   })
   const placement: WorkspacePaneStaticTabPlacement = openerIdentity
@@ -189,10 +192,8 @@ async function openWorkspacePaneStaticTabAction(
   }
   const sourceRoute = input.sourceRoute
   const target = {
-    repoRoot: input.repoId,
+    ...requiredGitWorkspacePaneTabsTarget(input.repoId, branchName, input.worktreePath),
     repoRuntimeId: input.repoRuntimeId,
-    branchName,
-    worktreePath: input.worktreePath,
   }
   // Chrome-tab-style opener tracking: reopening/refocusing an already-open
   // static tab shouldn't overwrite its opener.
@@ -220,9 +221,8 @@ async function openWorkspacePaneStaticTabAction(
   }
   if (openerIdentity) {
     recordWorkspacePaneTabOpener(
-      input.repoId,
+      target,
       input.repoRuntimeId,
-      branchName,
       workspacePaneStaticTabId(input.type),
       openerIdentity,
     )
@@ -257,7 +257,7 @@ async function commitWorkspacePaneStaticTab(
     type: WorkspacePaneStaticTabType
     navigation: WorkspacePaneTabControllerCommitNavigation
   },
-  sourceRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined,
+  sourceRoute: ParsedWorkspacePaneRoute | null | undefined,
   transaction: WorkspacePaneStaticTabRouteTransaction,
 ): Promise<WorkspacePaneActionOutcome> {
   const route = { kind: 'static' as const, tab: input.type }
@@ -270,6 +270,7 @@ async function commitWorkspacePaneStaticTab(
       repoRuntimeId: input.repoRuntimeId,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
+      paneTarget: requiredGitWorkspacePaneTabsTarget(input.repoId, input.branchName, input.worktreePath),
     },
     route,
     input.navigation,

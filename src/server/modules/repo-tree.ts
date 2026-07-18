@@ -21,32 +21,38 @@ import {
   type RepoTreeSourceOptions,
   getRepoTreeSourceLocal,
   getRepoTreeSourceRemote,
+  getWorkspaceTreeSourceLocal,
+  getWorkspaceTreeSourceRemote,
 } from '#/server/modules/repo-tree-source.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
-import { parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { parseWorkspaceLocator, workspaceLocatorsShareTransport } from '#/shared/workspace-locator.ts'
+import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 
 export interface RepositoryTreeReadOptions extends RepoTreeSourceOptions {
   /** Optional worktree list from callers that already have one. */
   readonly precomputedWorktrees?: ReadonlyArray<WorktreeInfo>
   readonly repoRuntimeId?: string
+  readonly signal?: AbortSignal
 }
 
-/** Read the file tree rooted at `worktreePath`. An empty result is
+/** Read the file tree rooted at an explicit filesystem execution target. An empty result is
  *  authoritative only when the source successfully reads an empty
  *  directory; read, resolution, and membership failures throw so the
  *  client can surface an unavailable state instead of a fake empty tree. */
 export async function getRepositoryTree(
-  cwd: string,
-  worktreePath: string,
+  target: WorkspacePaneFilesystemExecutionTarget,
   options: RepositoryTreeReadOptions = {},
 ): Promise<RepoTreeResult> {
-  // F2 (shape): reject obviously-malformed paths before any I/O. The
-  // perimeter schema (`REPO_PROCEDURE_SCHEMAS.tree`) already
-  // enforces this, but treating this as defense-in-depth means a
-  // future caller that bypasses the schema (composite reads, IPC
-  // bridges) still gets the same short-circuit.
+  const cwd = target.workspaceId
+  const worktreePath = target.kind === 'workspace-root' ? target.workspaceId : target.root
+  // Reject malformed locators before any I/O. The
+  // perimeter schema already validates canonical workspace IDs; this keeps
+  // direct server callers on the same boundary.
   if (!hasUsableWorktreePath(worktreePath)) {
     throw new Error('invalid worktree path')
+  }
+  if (!workspaceLocatorsShareTransport(cwd, worktreePath)) {
+    throw new Error('error.workspace-target-transport-mismatch')
   }
 
   // Dispatch based on the cwd's repo kind. SSH remotes go through
@@ -57,12 +63,12 @@ export async function getRepositoryTree(
   const platform = process.platform === 'win32' ? 'win32' : 'posix'
   const locator = parseWorkspaceLocator(cwd, platform)
   if (!locator) throw new Error('error.workspace-locator-malformed')
-  const workspaceScoped = worktreePath === cwd
-  const resolvedWorktreePath = workspaceScoped
-    ? locator.transport === 'file'
-      ? locator.path
-      : locator.path
-    : worktreePath
+  const workspaceScoped = target.kind === 'workspace-root'
+  const worktreeLocator = workspaceScoped ? locator : parseWorkspaceLocator(target.root, platform)
+  if (!worktreeLocator) {
+    throw new Error('error.workspace-locator-malformed')
+  }
+  const resolvedWorktreePath = worktreeLocator.path
 
   // When the cwd is remote, resolve the SSH target once before
   // handing the worktree path to the remote source.
@@ -71,16 +77,19 @@ export async function getRepositoryTree(
     remoteTarget = await resolveRemoteRepoTarget(
       cwd,
       options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
+      options.signal,
     )
   }
 
-  const worktrees =
-    options.precomputedWorktrees ??
-    (workspaceScoped
-      ? [{ path: resolvedWorktreePath, branch: '', isBare: false, isPrimary: true }]
-      : isRemote
+  const worktrees = workspaceScoped
+    ? undefined
+    : options.precomputedWorktrees ??
+      (isRemote
         ? undefined
-        : await getWorktrees(locator.transport === 'file' ? locator.path : cwd, { includeStatus: false }))
+        : await getWorktrees(locator.transport === 'file' ? locator.path : cwd, {
+            includeStatus: false,
+            signal: options.signal,
+          }))
 
   // F2 (membership): validate that `worktreePath` is a known worktree
   // of this repo before we hand it to the source layer. The remote
@@ -92,23 +101,37 @@ export async function getRepositoryTree(
   // Bare worktrees are excluded because they have no working tree to
   // walk. Remote validation lives in `getRemoteTreeWalk`; local
   // validation is performed here using `git worktree list`.
-  if (!isRemote && !matchesKnownWorktree(worktrees, resolvedWorktreePath)) {
+  if (!workspaceScoped && !isRemote && !matchesKnownWorktree(worktrees, resolvedWorktreePath)) {
     throw new Error('unknown worktree path')
   }
 
-  const source = isRemote
-    ? await getRepoTreeSourceRemote({
-        target: remoteTarget as Awaited<ReturnType<typeof resolveRemoteRepoTarget>>,
+  let source
+  if (isRemote) {
+    const target = requiredRemoteTarget(remoteTarget)
+    const readRemoteTree = workspaceScoped ? getWorkspaceTreeSourceRemote : getRepoTreeSourceRemote
+    source = await readRemoteTree({
+        target,
         worktreePath: resolvedWorktreePath,
         options,
-        signal: undefined,
+        signal: options.signal,
         ...(options.repoRuntimeId
-          ? { run: remoteRuntimeAwareGitRunner(cwd, options.repoRuntimeId, remoteTarget as Awaited<ReturnType<typeof resolveRemoteRepoTarget>>) }
+          ? { run: remoteRuntimeAwareGitRunner(cwd, options.repoRuntimeId, target) }
           : {}),
         ...(worktrees ? { knownWorktrees: worktrees } : {}),
       })
-    : await getRepoTreeSourceLocal(resolvedWorktreePath, options, undefined)
+  } else {
+    source = workspaceScoped
+      ? await getWorkspaceTreeSourceLocal(resolvedWorktreePath, options, options.signal)
+      : await getRepoTreeSourceLocal(resolvedWorktreePath, options, options.signal)
+  }
   return { nodes: source.nodes, truncated: source.truncated }
+}
+
+function requiredRemoteTarget(
+  target: Awaited<ReturnType<typeof resolveRemoteRepoTarget>> | undefined,
+): Awaited<ReturnType<typeof resolveRemoteRepoTarget>> {
+  if (!target) throw new Error('error.workspace-transport-unavailable')
+  return target
 }
 
 /** Shape check for `worktreePath`. Empty strings and embedded NUL

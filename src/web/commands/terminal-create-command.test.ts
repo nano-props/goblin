@@ -9,12 +9,12 @@ const REPO_RUNTIME_ID = 'repo-runtime-terminal-create-command'
 const WORKTREE_PATH = '/tmp/goblin-terminal-create-command-worktree'
 const BASE: TerminalSessionBase = {
   target: {
-    kind: 'git-worktree',
+    kind: 'git-worktree' as const,
     workspaceId: canonicalWorkspaceLocator(REPO_ID)!,
     workspaceRuntimeId: REPO_RUNTIME_ID,
     root: canonicalWorkspaceLocator(`goblin+file://${WORKTREE_PATH}`)!,
   },
-  presentation: { kind: 'git-worktree', branchName: 'main' },
+  presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
 }
 
 describe('terminal create command', () => {
@@ -159,7 +159,7 @@ describe('terminal create command', () => {
 function createAdmission(overrides: Partial<TerminalCreateAdmissionResult> = {}): TerminalCreateAdmissionResult {
   return {
     terminalSessionId: 'term-111111111111111111111',
-    presentation: { kind: 'git-worktree', branchName: 'main' },
+    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
     requestRole: 'leader',
     resourceDisposition: 'created',
     runtimeProjectionApplied: true,

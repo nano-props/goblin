@@ -76,6 +76,34 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'unavailable', reason: 'branch-read-model-unavailable' })
   })
 
+  test('routes a detached worktree bell through its authoritative catalog entry', () => {
+    const worktreePath = '/workspace/detached'
+    const plan = createTerminalBellIntentPlan(
+      { id: 'goblin+file:///workspace/repo' },
+      {
+        branches: [],
+        currentBranch: 'main',
+        status: [{ path: worktreePath, isMain: false, entries: [] }],
+        worktreesByPath: {
+          [worktreePath]: { path: worktreePath, isMain: false, isDirty: false, changeCount: 0 },
+        },
+      },
+      {
+        type: 'terminal-bell-click',
+        repoRoot: 'goblin+file:///workspace/repo',
+        terminalSessionId: 'term-333333333333333333333',
+        terminalWorktreeKey: formatTerminalWorktreeKeyForPath('goblin+file:///workspace/repo', worktreePath),
+      },
+    )
+
+    expect(plan).toEqual({
+      kind: 'show-detached-worktree-terminal',
+      repoId: 'goblin+file:///workspace/repo',
+      worktreePath,
+      terminalSessionId: 'term-333333333333333333333',
+    })
+  })
+
   test('suppresses recent repo open when overlays block the action', () => {
     const plan = createAppLevelIntentPlan(
       { type: 'open-recent-repo-requested', entry: { kind: 'local', id: 'goblin+file:///tmp/repo' } },
@@ -178,7 +206,17 @@ describe('client effect intent plans', () => {
         terminalFocused: false,
         currentRepoId: CURRENT_DIRECTORY_REPO.id,
         currentRepo: CURRENT_DIRECTORY_REPO,
-        currentWorkspacePaneCommandTarget: { kind: 'workspace-root' },
+        currentWorkspacePaneCommandTarget: {
+          kind: 'workspace-root',
+          workspacePaneRoute: null,
+          filesystemTarget: {
+            kind: 'workspace-root',
+            workspaceId: CURRENT_DIRECTORY_REPO.id,
+            workspaceRuntimeId: CURRENT_DIRECTORY_REPO.repoRuntimeId,
+            rootPath: '/workspace/directory',
+            capabilities: CURRENT_DIRECTORY_REPO.workspaceProbe.capabilities,
+          },
+        },
       },
     )
 
@@ -278,7 +316,17 @@ describe('client effect intent plans', () => {
         terminalFocused: false,
         currentRepoId: CURRENT_DIRECTORY_REPO.id,
         currentRepo: CURRENT_DIRECTORY_REPO,
-        currentWorkspacePaneCommandTarget: { kind: 'workspace-root' },
+        currentWorkspacePaneCommandTarget: {
+          kind: 'workspace-root',
+          workspacePaneRoute: null,
+          filesystemTarget: {
+            kind: 'workspace-root',
+            workspaceId: CURRENT_DIRECTORY_REPO.id,
+            workspaceRuntimeId: CURRENT_DIRECTORY_REPO.repoRuntimeId,
+            rootPath: '/workspace/directory',
+            capabilities: CURRENT_DIRECTORY_REPO.workspaceProbe.capabilities,
+          },
+        },
       },
     )
 

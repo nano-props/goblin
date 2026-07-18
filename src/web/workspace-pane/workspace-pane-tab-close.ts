@@ -10,6 +10,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
 import { confirmWorkspacePaneRuntimeTabClose } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 import { workspacePaneTerminalBaseFromCoordinates } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 type WorkspacePaneTabCloseStart =
   { accepted: false; completion: null } | { accepted: true; completion: Promise<boolean> }
@@ -23,22 +24,22 @@ export function beginWorkspacePaneTabClose(
   const closeContext = readWorkspacePaneRuntimeTabCloseContext()
   const closeTarget = target.worktreePath
     ? workspacePaneTerminalBaseFromCoordinates({
-    workspaceId: target.repoId,
-    workspaceRuntimeId: target.repoRuntimeId,
-    branchName: target.branchName,
-    rootPath: target.worktreePath,
+        workspaceId: target.repoId,
+        workspaceRuntimeId: target.repoRuntimeId,
+        branchName: target.branchName,
+        rootPath: target.worktreePath,
       })
     : null
   if (
     isRepoWorkspaceRuntimeTab(tab) &&
     (!closeTarget ||
-    !canCloseWorkspacePaneRuntimeTabWithContext(
-      {
-        type: tab.runtimeType,
-        target: closeTarget,
-      },
-      closeContext,
-    ))
+      !canCloseWorkspacePaneRuntimeTabWithContext(
+        {
+          type: tab.runtimeType,
+          target: closeTarget,
+        },
+        closeContext,
+      ))
   ) {
     return { accepted: false, completion: null }
   }
@@ -68,12 +69,9 @@ function closeStaticTabWithCommit(target: RepoWorkspaceTabModel) {
   return async (type: WorkspacePaneStaticTabType): Promise<boolean> => {
     const repo = useReposStore.getState().repos[target.repoId]
     if (!repo) return false
-    const persistenceTarget =
-      target.branchName === null
-        ? { kind: 'workspace-root' as const, branchName: null, worktreePath: null }
-        : { branchName: target.branchName, worktreePath: target.worktreePath }
+    if (target.paneTarget.kind === 'inactive') return false
+    const persistenceTarget = target.paneTarget
     const result = await updateWorkspacePaneTabs({
-      repoRoot: target.repoId,
       repoRuntimeId: repo.repoRuntimeId,
       ...persistenceTarget,
       operation: { type: 'close-static', tabType: type },

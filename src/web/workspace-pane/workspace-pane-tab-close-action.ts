@@ -1,4 +1,5 @@
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { GitHead } from '#/shared/git-head.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import {
   terminalExecutionCoordinates,
@@ -31,13 +32,18 @@ import {
   workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForBranch,
   workspacePaneTabTargetForWorkspace,
+  workspacePaneTabTargetForPaneTarget,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { clearWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { useTerminalActionDialogsStore } from '#/web/stores/repos/terminal-action-dialogs.ts'
 import { workspacePaneTerminalBaseFromCoordinates } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  requiredGitWorkspacePaneTabsTarget,
+  workspacePaneTabsTargetIdentityKey,
+  type WorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import {
   canConfirmWorkspacePaneRuntimeTabCloseWithContext,
   readWorkspacePaneRuntimeTabCloseContext,
@@ -45,6 +51,7 @@ import {
 import type { WorkspacePaneRuntimeTabCloseConfirmRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 import {
   workspacePaneActionTargetFromCoordinates,
+  workspacePaneActionTargetFromFilesystemTarget,
   runWorkspacePaneAction,
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
@@ -57,8 +64,9 @@ import {
 
 export interface CloseWorkspacePaneTabActionOptions {
   repoId: string | null
-  branchName: string | null
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
+  paneTarget: WorkspacePaneTabsTarget
+  worktreeHead?: GitHead
   navigation: PrimaryWindowNavigationActions
   targetIdentity?: string
   skipTerminalCloseConfirm?: boolean
@@ -74,7 +82,7 @@ export interface ConfirmedTerminalWorkspacePaneTabClose {
 export interface ConfirmCloseTerminalWorkspacePaneTabActionOptions extends CloseWorkspacePaneTabActionOptions {
   currentRepoId: string | null
   currentBranchName: string | null
-  currentWorkspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   confirmedTerminal: ConfirmedTerminalWorkspacePaneTabClose
 }
 
@@ -94,11 +102,7 @@ export async function dispatchCloseWorkspacePaneTabAction(
   options: CloseWorkspacePaneTabActionOptions,
 ): Promise<boolean> {
   if (!options.repoId) return await closeWorkspacePaneTabAction(options)
-  const coordinatorTarget = resolveCloseWorkspacePaneTarget(
-    options.repoId,
-    options.branchName,
-    options.workspacePaneRoute,
-  )
+  const coordinatorTarget = resolveCloseWorkspacePaneTarget(options)
   if (!coordinatorTarget) return false
   const presentationToken = beginPrimaryWindowPresentation()
   return await runWorkspacePaneAction(
@@ -143,24 +147,8 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
   const coordinates = terminalExecutionCoordinates(base.target)
   const queueRepoId = options.repoId ?? coordinates.repoRoot
   const queueRepoRuntimeId = coordinates.repoRuntimeId
-  const workspaceRoot = base.target.kind === 'workspace-root'
-  const queueBranchName = workspaceRoot ? null : (options.branchName ?? terminalPresentationBranch(base.presentation))
-  let queueTarget: WorkspacePaneActionTarget
-  if (workspaceRoot) {
-    queueTarget = {
-      kind: 'workspace-root',
-      repoId: queueRepoId,
-      repoRuntimeId: queueRepoRuntimeId,
-    }
-  } else {
-    if (queueBranchName === null) return false
-    queueTarget = workspacePaneActionTargetFromCoordinates({
-      repoId: queueRepoId,
-      repoRuntimeId: queueRepoRuntimeId,
-      branchName: queueBranchName,
-      worktreePath: terminalExecutionPath(base.target),
-    })
-  }
+  if (queueRepoId !== coordinates.repoRoot) return false
+  const queueTarget = workspacePaneActionTargetFromFilesystemTarget(base.target)
   const presentationToken = beginPrimaryWindowPresentation()
   return await runWorkspacePaneAction(queueTarget, () =>
     confirmCloseTerminalWorkspacePaneTabAction({ ...options, presentationToken }),
@@ -174,27 +162,20 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
   const coordinates = terminalExecutionCoordinates(confirmedTerminal.base.target)
   const workspaceConfirmed = confirmedTerminal.base.target.kind === 'workspace-root'
   const gitBranchName = workspaceConfirmed ? null : terminalPresentationBranch(confirmedTerminal.base.presentation)
-  if (!workspaceConfirmed && !gitBranchName) return false
   const confirmed: ConfirmedWorkspacePaneRuntimeTabClose = {
     type: 'terminal',
     sessionId: confirmedTerminal.terminalSessionId,
     target: confirmedTerminal.base,
   }
   const confirmedIdentity = targetIdentity ?? workspacePaneRuntimeTabConfirmedCloseIdentity(confirmed)
-  const closeTarget = repoId
-    ? options.branchName
-      ? resolveCloseWorkspacePaneTarget(repoId, options.branchName, options.workspacePaneRoute)
-      : confirmedTerminal.base.target.kind === 'workspace-root'
-        ? workspacePaneTabTargetForWorkspace(repoId)
-        : null
-    : null
+  const closeTarget = repoId ? resolveCloseWorkspacePaneTarget(options) : null
   const currentTarget =
     options.currentRepoId && options.currentRepoId === repoId
-      ? options.currentBranchName
-        ? workspacePaneTabTargetForBranch(options.currentRepoId, options.currentBranchName, {
-            workspacePaneRoute: options.currentWorkspacePaneRoute,
-          })
-        : workspacePaneTabTargetForWorkspace(options.currentRepoId)
+      ? workspacePaneTabTargetForPaneTarget(
+          options.paneTarget,
+          options.currentWorkspacePaneRoute,
+          options.worktreeHead,
+        )
       : null
   if (closeTarget && workspacePaneTabTargetBlocksInteraction(closeTarget)) return false
   const tab = closeTarget?.tabs.find((candidate) => candidate.identity === confirmedIdentity) ?? null
@@ -208,8 +189,6 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
         workspacePaneTabsTargetIdentityKey({
           kind: 'workspace-root',
           repoRoot: coordinates.repoRoot,
-          branchName: null,
-          worktreePath: null,
         })
       ]
     : null
@@ -227,7 +206,7 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
   // the current routed pane is still showing that same tab.
   const openerIdentity =
     wasActive && closeTarget && tab
-      ? workspacePaneTabOpener(closeTarget.repoId, closeTarget.repoRuntimeId, closeTarget.branchName, tab.identity)
+      ? workspacePaneTabOpener(workspacePaneTabsTargetForModel(closeTarget), closeTarget.repoRuntimeId, tab.identity)
       : null
   const nextTab =
     wasActive && closeTarget && tab
@@ -271,8 +250,6 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
         {
           kind: 'workspace-root',
           repoRoot: coordinates.repoRoot,
-          branchName: null,
-          worktreePath: null,
         },
         'files',
       )
@@ -293,7 +270,7 @@ function beginCloseWorkspacePaneTabAction(
 ): CloseWorkspacePaneTabActionStart {
   const { repoId, targetIdentity } = options
   const skipRuntimeCloseConfirm = options.skipRuntimeCloseConfirm ?? options.skipTerminalCloseConfirm ?? false
-  const target = repoId ? resolveCloseWorkspacePaneTarget(repoId, options.branchName, options.workspacePaneRoute) : null
+  const target = repoId ? resolveCloseWorkspacePaneTarget(options) : null
   if (!target) return { kind: 'done', result: false }
   if (workspacePaneTabTargetBlocksInteraction(target)) return { kind: 'done', result: true }
   const tab = targetIdentity
@@ -318,7 +295,7 @@ function beginCloseWorkspacePaneTabAction(
   const closingIdentity = tab.identity
   const wasActive = target.activeTab?.identity === closingIdentity
   const openerIdentity = wasActive
-    ? workspacePaneTabOpener(target.repoId, target.repoRuntimeId, target.branchName, closingIdentity)
+    ? workspacePaneTabOpener(workspacePaneTabsTargetForModel(target), target.repoRuntimeId, closingIdentity)
     : null
   const nextTab = wasActive ? nextRepoWorkspaceTabAfterClose(target.tabs, closingIdentity, openerIdentity) : null
   const presentationLease = wasActive
@@ -365,7 +342,7 @@ function terminalBaseForPaneModel(target: RepoWorkspaceTabModel): TerminalSessio
 function openWorkspacePaneRuntimeCloseConfirm(
   repoId: string,
   request: WorkspacePaneRuntimeTabCloseConfirmRequest | null,
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined,
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
 ): boolean {
   if (!request) return false
   const terminalBase = request.type === 'terminal' ? terminalBaseForRuntimeTabCloseTarget(request.target) : null
@@ -384,17 +361,22 @@ function openWorkspacePaneRuntimeCloseConfirm(
 }
 
 function completeWorkspacePaneTabClose(target: RepoWorkspaceTabModel, identity: string): void {
-  clearWorkspacePaneTabOpener(target.repoId, target.repoRuntimeId, target.branchName, identity)
+  clearWorkspacePaneTabOpener(workspacePaneTabsTargetForModel(target), target.repoRuntimeId, identity)
+}
+
+function workspacePaneTabsTargetForModel(target: RepoWorkspaceTabModel): WorkspacePaneTabsTarget {
+  if (target.paneTarget.kind === 'inactive') throw new Error('inactive workspace pane has no persistence target')
+  return target.paneTarget
 }
 
 function resolveCloseWorkspacePaneTarget(
-  repoId: string,
-  branchName: string | null,
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined,
+  input: Pick<
+    CloseWorkspacePaneTabActionOptions,
+    'repoId' | 'workspacePaneRoute' | 'paneTarget' | 'worktreeHead'
+  >,
 ): RepoWorkspaceTabModel | null {
-  return branchName !== null
-    ? workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
-    : workspacePaneTabTargetForWorkspace(repoId, { workspacePaneRoute: undefined })
+  if (!input.repoId) return null
+  return workspacePaneTabTargetForPaneTarget(input.paneTarget, input.workspacePaneRoute, input.worktreeHead)
 }
 
 async function runWorkspacePaneCloseTransition(

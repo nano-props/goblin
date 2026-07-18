@@ -8,6 +8,8 @@ import {
   type RepoTreeSourceOptions,
   getRepoTreeSourceLocal,
   getRepoTreeSourceRemote,
+  getWorkspaceTreeSourceLocal,
+  getWorkspaceTreeSourceRemote,
 } from '#/server/modules/repo-tree-source.ts'
 import { buildChildNodes, buildLimitedChildNodes } from '#/server/modules/repo-tree-source-pure.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
@@ -58,6 +60,18 @@ describe('repo-tree-source — local direct children', () => {
       expect.objectContaining({ id: 'README.md', parentId: null, kind: 'file' }),
     ])
     expect(result.nodes.map((node) => node.id)).not.toContain('src/index.ts')
+  })
+
+  test('keeps files visible when a plain workspace is nested under a parent Git ignore rule', async () => {
+    worktree = await makeTempWorktree({
+      '.gitignore': 'plain-workspace/ignored.txt\n',
+      'plain-workspace/ignored.txt': 'visible to the plain workspace',
+      'plain-workspace/visible.txt': 'visible',
+    })
+
+    const result = await getWorkspaceTreeSourceLocal(path.join(worktree, 'plain-workspace'), {}, undefined)
+
+    expect(result.nodes.map((node) => node.name).sort()).toEqual(['ignored.txt', 'visible.txt'])
   })
 
   test('returns only prefix direct children', async () => {
@@ -164,11 +178,13 @@ describe('repo-tree-source — buildChildNodes pure helper', () => {
 
 const remoteMocks = vi.hoisted(() => ({
   getRemoteTreeWalk: vi.fn(),
+  getRemoteDirectoryWalk: vi.fn(),
 }))
 
 vi.mock('#/system/ssh/git.ts', () => ({
   getRemoteTreeWalk: remoteMocks.getRemoteTreeWalk,
 }))
+vi.mock('#/system/ssh/filesystem.ts', () => ({ getRemoteDirectoryWalk: remoteMocks.getRemoteDirectoryWalk }))
 
 function remoteTarget(): RemoteRepoTarget {
   return {
@@ -200,6 +216,7 @@ function makeRemoteInput(
 describe('repo-tree-source — remote direct children', () => {
   beforeEach(() => {
     remoteMocks.getRemoteTreeWalk.mockReset()
+    remoteMocks.getRemoteDirectoryWalk.mockReset()
   })
 
   test('rejects when the signal is already aborted', async () => {
@@ -224,6 +241,20 @@ describe('repo-tree-source — remote direct children', () => {
       expect.objectContaining({ id: 'src', parentId: null, kind: 'directory', hasChildren: true }),
       expect.objectContaining({ id: 'README.md', parentId: null, kind: 'file' }),
     ])
+  })
+
+  test('reads an authorized workspace root without invoking Git membership', async () => {
+    remoteMocks.getRemoteDirectoryWalk.mockResolvedValueOnce({ ok: true, message: 'README.md' })
+
+    const result = await getWorkspaceTreeSourceRemote(makeRemoteInput('/srv/workspace'))
+
+    expect(remoteMocks.getRemoteDirectoryWalk).toHaveBeenCalledWith(
+      remoteTarget(),
+      '/srv/workspace',
+      expect.any(Object),
+    )
+    expect(remoteMocks.getRemoteTreeWalk).not.toHaveBeenCalled()
+    expect(result.nodes).toHaveLength(1)
   })
 
   test('passes prefix to the remote tree walk', async () => {

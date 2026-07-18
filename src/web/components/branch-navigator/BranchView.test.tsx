@@ -34,7 +34,7 @@ const REPO_ID = 'goblin+file:///tmp/goblin-branch-view-test-repo'
 const WORKTREE_PATH = '/tmp/goblin-branch-view-test-worktree'
 
 const navigation: PrimaryWindowNavigationActions = {
-  currentRepoBranchWorkspacePaneRoute: () => undefined,
+  currentWorkspacePaneRoute: () => undefined,
   activateRepo: vi.fn(),
   closeRepo: vi.fn(),
   cycleRepo: vi.fn(),
@@ -42,7 +42,7 @@ const navigation: PrimaryWindowNavigationActions = {
   showRepoBranchEmptyWorkspacePane: () => true,
   showRepoBranchWorkspacePaneTab: vi.fn(),
   showRepoBranchTerminalSession: vi.fn(),
-  commitRepoBranchWorkspacePaneRoute: vi.fn(() => true),
+  commitWorkspacePaneRoute: vi.fn(() => true),
   goBack: vi.fn(),
   goForward: vi.fn(),
   openSettings: vi.fn(),

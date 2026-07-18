@@ -109,9 +109,9 @@ describe('restoreServerWorkspace', () => {
 
   test('restores server-owned workspace tabs only after strict validation succeeds', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-branch',
       repoRoot: 'goblin+file:///repo',
       branchName: 'main',
-      worktreePath: null,
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
@@ -204,9 +204,9 @@ describe('restoreServerWorkspace', () => {
 
   test('validates and projects workspace tabs into a canonical snapshot', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-branch',
       repoRoot: 'goblin+file:///repo',
       branchName: 'main',
-      worktreePath: null,
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
@@ -369,9 +369,9 @@ describe('restoreServerWorkspace', () => {
 
   test('releases opened runtimes when workspace tab commit fails unexpectedly', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-branch',
       repoRoot: 'goblin+file:///repo',
       branchName: 'main',
-      worktreePath: null,
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
@@ -410,9 +410,9 @@ describe('restoreServerWorkspace', () => {
 
   test('releases opened runtimes and skips tab commits when aborted after projection restore', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-branch',
       repoRoot: 'goblin+file:///repo',
       branchName: 'main',
-      worktreePath: null,
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
@@ -512,9 +512,9 @@ describe('restoreServerWorkspace', () => {
 
   test('releases opened runtimes when workspace repair persistence fails', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-branch',
       repoRoot: 'goblin+file:///repo',
       branchName: 'missing',
-      worktreePath: null,
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
@@ -553,14 +553,14 @@ describe('restoreServerWorkspace', () => {
 
   test('uses concurrently repaired repo tabs without overwriting them', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-branch',
       repoRoot: 'goblin+file:///repo',
       branchName: 'missing',
-      worktreePath: null,
     })
     const otherTargetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-branch',
       repoRoot: 'goblin+file:///other',
       branchName: 'main',
-      worktreePath: null,
     })
     const invalidWorkspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),

@@ -1,4 +1,4 @@
-import type { ParsedWorkspaceLocator, WorkspaceId } from '#/shared/workspace-locator.ts'
+import { parseCanonicalWorkspaceLocator, type ParsedWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type WorkspaceUnavailableReason =
   | 'error.workspace-locator-malformed'
@@ -62,6 +62,15 @@ export type RuntimeWorkspacePaneTarget =
   | { kind: 'workspace-root'; workspaceId: WorkspaceId; workspaceRuntimeId: string }
   | { kind: 'git-branch'; workspaceId: WorkspaceId; workspaceRuntimeId: string; branch: string }
   | { kind: 'git-worktree'; workspaceId: WorkspaceId; workspaceRuntimeId: string; root: WorkspaceId }
+
+/** Runtime targets that authorize operations against a concrete filesystem root. */
+export type WorkspacePaneFilesystemExecutionTarget = Exclude<RuntimeWorkspacePaneTarget, { kind: 'git-branch' }>
+
+export function workspacePaneFilesystemExecutionPath(target: WorkspacePaneFilesystemExecutionTarget): string {
+  const locator = parseCanonicalWorkspaceLocator(target.kind === 'workspace-root' ? target.workspaceId : target.root)
+  if (!locator) throw new Error('filesystem execution target locator is invalid')
+  return locator.path
+}
 
 export function capabilitiesFromGitProbe(
   git: WorkspaceGitProbeResult,

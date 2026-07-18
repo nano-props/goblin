@@ -11,6 +11,7 @@ import type { RepoTreeNode } from '#/shared/api-types.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import { getRemoteTreeWalk, type RemoteGitRunner } from '#/system/ssh/git.ts'
+import { getRemoteDirectoryWalk } from '#/system/ssh/filesystem.ts'
 import {
   buildLimitedChildNodes,
   parseNullSeparatedPaths,
@@ -40,6 +41,21 @@ export async function getRepoTreeSourceLocal(
   return await getRepoTreeDirectoryChildrenLocal(worktreePath, prefix, signal)
 }
 
+export async function getWorkspaceTreeSourceLocal(
+  workspacePath: string,
+  options: RepoTreeSourceOptions,
+  signal: AbortSignal | undefined,
+): Promise<RepoTreeSourceResult> {
+  if (signal?.aborted) throw new Error('aborted')
+  const prefix = normalizePrefix(options.prefix)
+  if (!isSafeNormalizedPrefix(prefix)) throw new Error('invalid tree prefix')
+  const entries = await readDirectoryEntriesLocal(workspacePath, prefix, signal)
+  return nodesFromDirectoryEntries(
+    prefix,
+    entries.map((entry) => entry.treeEntry),
+  )
+}
+
 export interface GetRepoTreeSourceRemoteInput {
   readonly target: RemoteRepoTarget
   readonly worktreePath: string
@@ -51,13 +67,26 @@ export interface GetRepoTreeSourceRemoteInput {
 }
 
 export async function getRepoTreeSourceRemote(input: GetRepoTreeSourceRemoteInput): Promise<RepoTreeSourceResult> {
+  return await readRepoTreeSourceRemote(input, getRemoteTreeWalk)
+}
+
+export async function getWorkspaceTreeSourceRemote(
+  input: Omit<GetRepoTreeSourceRemoteInput, 'knownWorktrees'>,
+): Promise<RepoTreeSourceResult> {
+  return await readRepoTreeSourceRemote(input, getRemoteDirectoryWalk)
+}
+
+async function readRepoTreeSourceRemote(
+  input: GetRepoTreeSourceRemoteInput,
+  readDirectory: typeof getRemoteTreeWalk | typeof getRemoteDirectoryWalk,
+): Promise<RepoTreeSourceResult> {
   const { target, worktreePath, options, signal, run, knownWorktrees } = input
   if (signal?.aborted) throw new Error('aborted')
 
   const prefix = normalizePrefix(options.prefix)
   if (!isSafeNormalizedPrefix(prefix)) throw new Error('invalid tree prefix')
 
-  const remoteResult = await getRemoteTreeWalk(target, worktreePath, {
+  const remoteResult = await readDirectory(target, worktreePath, {
     signal,
     prefix,
     ...(run ? { run } : {}),
@@ -82,10 +111,25 @@ async function getRepoTreeDirectoryChildrenLocal(
   prefix: string,
   signal: AbortSignal | undefined,
 ): Promise<RepoTreeSourceResult> {
-  const dirents = await readdir(path.join(worktreePath, ...prefix.split('/').filter(Boolean)), { withFileTypes: true })
+  const entries = await readDirectoryEntriesLocal(worktreePath, prefix, signal)
+  const visibleEntries = await visibleGitDirectoryEntries(worktreePath, entries, signal)
   if (signal?.aborted) throw new Error('aborted')
 
-  const entries = dirents
+  return nodesFromDirectoryEntries(
+    prefix,
+    visibleEntries.map((entry) => entry.treeEntry),
+  )
+}
+
+async function readDirectoryEntriesLocal(
+  rootPath: string,
+  prefix: string,
+  signal: AbortSignal | undefined,
+): Promise<DirectoryEntryCandidate[]> {
+  const dirents = await readdir(path.join(rootPath, ...prefix.split('/').filter(Boolean)), { withFileTypes: true })
+  if (signal?.aborted) throw new Error('aborted')
+
+  return dirents
     .filter((dirent) => dirent.name !== '.git')
     .map((dirent) => {
       const relative = prefix ? `${prefix}/${dirent.name}` : dirent.name
@@ -97,13 +141,6 @@ async function getRepoTreeDirectoryChildrenLocal(
       }
     })
 
-  const visibleEntries = await visibleGitDirectoryEntries(worktreePath, entries, signal)
-  if (signal?.aborted) throw new Error('aborted')
-
-  return nodesFromDirectoryEntries(
-    prefix,
-    visibleEntries.map((entry) => entry.treeEntry),
-  )
 }
 
 interface DirectoryEntryCandidate {

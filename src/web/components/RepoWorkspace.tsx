@@ -10,6 +10,7 @@ import {
 import { RepoWorkspaceToolbar } from '#/web/components/repo-workspace/RepoWorkspaceToolbar.tsx'
 import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
 import {
+  useFilesystemWorkspaceTabModel,
   useWorkspaceRootTabModel,
   useRepoWorkspaceTabModel,
 } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
@@ -26,7 +27,7 @@ import {
 import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { useWorkspacePaneRouteController } from '#/web/components/repo-workspace/workspace-pane-route-controller.ts'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
@@ -36,18 +37,21 @@ import { useT } from '#/web/stores/i18n.ts'
 import { FiletreeTab } from '#/web/components/repo-workspace/panels.tsx'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
-import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { WorkspacePaneTargetToolbar } from '#/web/components/workspace-pane/WorkspacePaneTargetToolbar.tsx'
 import { WorkspaceDirectoryStatus } from '#/web/components/repo-workspace/WorkspaceDirectoryStatus.tsx'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
-import {
-  workspaceGitAvailable,
-  workspaceGitUnavailable,
-  type WorkspaceReadyProbeState,
-} from '#/shared/workspace-runtime.ts'
+import { workspaceGitUnavailable, type WorkspaceReadyProbeState } from '#/shared/workspace-runtime.ts'
+import { gitHead, type GitHead } from '#/shared/git-head.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { StatusList } from '#/web/components/StatusList.tsx'
+import type { WorktreeStatus } from '#/web/types.ts'
 
 export type RepoWorkspacePaneRouteContext =
-  { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null } | { kind: 'inactive' }
+  | { kind: 'workspace-root' }
+  | { kind: 'git-worktree'; worktreePath: string; route: ParsedWorkspacePaneRoute | null }
+  | { kind: 'routed'; route: ParsedWorkspacePaneRoute | null }
+  | { kind: 'inactive' }
 
 interface Props {
   repoId: string
@@ -150,7 +154,29 @@ function RepoWorkspaceLoaded(props: {
   toolbarTrafficLightOffset: boolean
   onBackToBranchNavigator?: () => void
 }) {
-  if (workspaceGitUnavailable(props.repoShell.workspaceProbe)) {
+  if (props.repoShell.workspaceProbe.status !== 'ready') {
+    return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={props.toolbarTrafficLightOffset} />
+  }
+  if (props.workspacePaneRouteContext.kind === 'git-worktree') {
+    return (
+      <GitWorktreeFilesystemPane
+        repo={props.repoShell}
+        workspaceProbe={props.repoShell.workspaceProbe}
+        worktreePath={props.workspacePaneRouteContext.worktreePath}
+        route={props.workspacePaneRouteContext.route}
+        workspacePaneId={props.workspacePaneId}
+        toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
+        onBackToNavigator={props.onBackToBranchNavigator}
+      />
+    )
+  }
+  // The selected pane target owns presentation. Capability discovery may
+  // expose Git navigation, but it must not replace an already-open
+  // filesystem workspace with an unrelated branch surface.
+  if (
+    props.workspacePaneRouteContext.kind === 'workspace-root' ||
+    workspaceGitUnavailable(props.repoShell.workspaceProbe)
+  ) {
     return (
       <WorkspaceRootPane
         repo={{
@@ -165,10 +191,135 @@ function RepoWorkspaceLoaded(props: {
       />
     )
   }
-  if (!workspaceGitAvailable(props.repoShell.workspaceProbe)) {
-    return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={props.toolbarTrafficLightOffset} />
+  return <GitRepoWorkspaceLoaded {...props} workspacePaneRouteContext={props.workspacePaneRouteContext} />
+}
+
+function GitWorktreeFilesystemPane({
+  repo,
+  workspaceProbe,
+  worktreePath,
+  route,
+  workspacePaneId,
+  toolbarTrafficLightOffset,
+  onBackToNavigator,
+}: {
+  repo: RepoWorkspaceRepoShell
+  workspaceProbe: WorkspaceReadyProbeState
+  worktreePath: string
+  route: ParsedWorkspacePaneRoute | null
+  workspacePaneId: string
+  toolbarTrafficLightOffset: boolean
+  onBackToNavigator?: () => void
+}) {
+  const t = useT()
+  const statusReadModel = useRepoWorktreeStatusReadModel(repo.id, repo.repoRuntimeId, true)
+  const worktree = statusReadModel.data?.status.find((candidate) => candidate.path === worktreePath)
+  const target = gitWorktreeWorkspacePaneTabsTarget(repo.id, worktreePath)
+  if (statusReadModel.isPending) {
+    return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }
-  return <GitRepoWorkspaceLoaded {...props} />
+  if (statusReadModel.isError) {
+    return <EmptyState title={t('dashboard.directory.read-failed')} />
+  }
+  if (!target || !worktree) {
+    return <EmptyState title={t('repo-route.not-found-title')} />
+  }
+  return (
+    <GitWorktreeFilesystemPaneReady
+      repo={repo}
+      workspaceProbe={workspaceProbe}
+      worktreePath={worktreePath}
+      head={gitHead(worktree.branch ?? null)}
+      status={worktree}
+      target={target}
+      route={route}
+      workspacePaneId={workspacePaneId}
+      toolbarTrafficLightOffset={toolbarTrafficLightOffset}
+      onBackToNavigator={onBackToNavigator}
+    />
+  )
+}
+
+function GitWorktreeFilesystemPaneReady({
+  repo,
+  workspaceProbe,
+  worktreePath,
+  head,
+  status,
+  target,
+  route,
+  workspacePaneId,
+  toolbarTrafficLightOffset,
+  onBackToNavigator,
+}: {
+  repo: RepoWorkspaceRepoShell
+  workspaceProbe: WorkspaceReadyProbeState
+  worktreePath: string
+  head: GitHead
+  status: WorktreeStatus
+  target: WorkspacePaneTabsTarget
+  route: ParsedWorkspacePaneRoute | null
+  workspacePaneId: string
+  toolbarTrafficLightOffset: boolean
+  onBackToNavigator?: () => void
+}) {
+  const t = useT()
+  const requestedSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
+  const requestedTab = route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
+  const model = useFilesystemWorkspaceTabModel(repo, target, head, worktreePath, requestedTab, requestedSessionId)
+  const runtimeTarget = runtimeWorkspacePaneTarget(target, repo.repoRuntimeId)
+  const selectedTerminalSessionId =
+    model.selection?.kind === 'materialized-tab' && model.selection.materializedTab.kind === 'runtime'
+      ? model.selection.materializedTab.sessionId
+      : null
+  const surfaceTarget = {
+    kind: 'git-worktree' as const,
+    workspaceId: repo.id,
+    workspaceRuntimeId: repo.repoRuntimeId,
+    rootPath: worktreePath,
+    head,
+    capabilities: workspaceProbe.capabilities,
+  }
+  return (
+    <section className="flex min-h-0 flex-1 flex-col bg-background" data-testid="detached-worktree-pane">
+      <WorkspacePaneTargetToolbar
+        target={surfaceTarget}
+        model={model}
+        workspacePaneId={workspacePaneId}
+        workspacePaneRoute={route}
+        statusCount={status.entries.length}
+        trafficLightOffset={toolbarTrafficLightOffset}
+        onBackToNavigator={onBackToNavigator}
+        staticTabAvailable={(type) => type === 'status' || type === 'files'}
+      />
+      {model.selection?.tab === 'status' ? (
+        <WorkspacePanePanelFrame id={`${workspacePaneId}-status-panel`} label={t('tab.status')}>
+          <ScrollPane>
+            <StatusList status={[status]} />
+          </ScrollPane>
+        </WorkspacePanePanelFrame>
+      ) : model.selection?.tab === 'files' ? (
+        <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} label={t('tab.files')}>
+          <FiletreeTab target={surfaceTarget} />
+        </WorkspacePanePanelFrame>
+      ) : model.selection?.tab === 'terminal' && runtimeTarget ? (
+        renderWorkspacePaneRuntimeTabPanel({
+          type: 'terminal',
+          workspacePaneId,
+          panelLabel: { label: t('tab.terminal') },
+          target: {
+            runtimeTarget,
+            presentation: { kind: 'git-worktree', head },
+            worktreePath,
+          },
+          selectedSessionId: selectedTerminalSessionId,
+          runtimeState: model.runtimeTabStateByType.terminal,
+        })
+      ) : (
+        <EmptyState title={t('workspace-pane-tabs.empty')} />
+      )}
+    </section>
+  )
 }
 
 function GitRepoWorkspaceLoaded({
@@ -291,7 +442,7 @@ function WorkspaceRootPane({
 }) {
   const t = useT()
   const model = useWorkspaceRootTabModel(repo)
-  const target = { kind: 'workspace-root' as const, repoRoot: repo.id, branchName: null, worktreePath: null }
+  const target = { kind: 'workspace-root' as const, repoRoot: repo.id }
   const runtimeTarget = runtimeWorkspacePaneTarget(target, repo.repoRuntimeId)
   const terminalAvailable = repo.workspaceProbe.capabilities.terminal.available
   const activePanel = model.selection?.tab === 'terminal' && !terminalAvailable ? null : (model.selection?.tab ?? null)

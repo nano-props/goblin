@@ -11,6 +11,7 @@ import {
 } from '#/server/modules/repo-read-paths.ts'
 import { getRepositoryFileViewer } from '#/server/modules/repo-file-viewer.ts'
 import { getRepositoryTree } from '#/server/modules/repo-tree.ts'
+import { canonicalRuntimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-validators.ts'
 import { trashRepositoryFile } from '#/server/modules/repo-tree-trash.ts'
 import {
   abortRepoOperation,
@@ -85,10 +86,16 @@ export function createRepoRoutes(options: {
       return fallback
     }
   }
-  async function runtimeReadJsonOrThrow<T>(userId: string, run: () => Promise<T>, label: string): Promise<T> {
+  async function runtimeReadJsonOrThrow<T>(
+    userId: string,
+    run: () => Promise<T>,
+    label: string,
+    signal?: AbortSignal,
+  ): Promise<T> {
     try {
       return await run()
     } catch (err) {
+      if (signal?.aborted) throw err
       if (isRemoteRepoRuntimeFailure(err)) {
         settleRemoteRuntimeFailure(userId, err)
         serverRepoNodeLog.warn({ err, label }, 'failed')
@@ -199,17 +206,24 @@ export function createRepoRoutes(options: {
     )
   })
   app.post('/tree', async (c) => {
-    const { cwd, repoRuntimeId, worktreePath, prefix } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.tree, c)
+    const { target, prefix } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.tree, c)
+    const executionTarget = canonicalRuntimeWorkspacePaneTarget(target)
+    if (!executionTarget || executionTarget.kind === 'git-branch') {
+      throw new Error('error.workspace-target-transport-mismatch')
+    }
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
+    assertCurrentRepoRuntimeForRead(userId, executionTarget.workspaceId, executionTarget.workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        // Do not pipe the HTTP request signal into the git tree read.
-        // In the Electron/Vite proxy path that signal can abort while
-        // React Query is still settling the tab render.
-        () => getRepositoryTree(cwd, worktreePath, { prefix, repoRuntimeId }),
+        () =>
+          getRepositoryTree(executionTarget, {
+            prefix,
+            repoRuntimeId: executionTarget.workspaceRuntimeId,
+            signal: c.req.raw.signal,
+          }),
         'tree',
+        c.req.raw.signal,
       ),
     )
   })

@@ -88,10 +88,10 @@ export function workspacePaneTabsForTargetFromQueryData(
   data: WorkspacePaneTabsSnapshot,
   target: WorkspacePaneTabsReadTarget,
 ): WorkspacePaneTabEntry[] {
-  const resolvedTarget = 'kind' in target && target.kind === 'inactive' ? null : target
+  const resolvedTarget = target.kind === 'inactive' ? null : target
   if (!resolvedTarget) return []
   const entry = workspacePaneTabsEntryForTarget(data.entries, resolvedTarget)
-  return [...(entry?.tabs ?? defaultWorkspacePaneTabs('kind' in resolvedTarget ? 'workspace-root' : 'git'))]
+  return [...(entry?.tabs ?? defaultWorkspacePaneTabs(resolvedTarget.kind === 'workspace-root' ? 'workspace-root' : 'git'))]
 }
 
 /**
@@ -207,7 +207,7 @@ function normalizeWorkspacePaneTabsQueryEntries(entries: readonly WorkspacePaneT
   const byTarget = new Map<string, WorkspacePaneTabsEntry>()
   for (const entry of entries) {
     const target = workspacePaneTabsTargetFromRuntime(entry.target)
-    if (!target || (target.branchName && target.branchName.includes('\0'))) continue
+    if (!target || (target.kind === 'git-branch' && target.branchName.includes('\0'))) continue
     byTarget.set(workspacePaneTabsTargetIdentityKey(target), {
       target: entry.target,
       tabs: normalizeWorkspacePaneTabs(entry.tabs, {
@@ -219,7 +219,7 @@ function normalizeWorkspacePaneTabsQueryEntries(entries: readonly WorkspacePaneT
 }
 
 function workspacePaneTargetHasExecutionRoot(target: WorkspacePaneTabsTarget): boolean {
-  return 'kind' in target || target.worktreePath !== null
+  return target.kind !== 'git-branch'
 }
 
 function emptyWorkspacePaneTabsSnapshot(): WorkspacePaneTabsSnapshot {

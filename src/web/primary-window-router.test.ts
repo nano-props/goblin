@@ -30,7 +30,7 @@ import {
   applyPrimaryWindowSettingsRouteChange,
   PrimaryWindowRouterProvider,
 } from '#/web/primary-window-router.tsx'
-import { repoSlugFromId } from '#/web/repo-route-slugs.ts'
+import { repoSlugFromId, worktreeSlugFromPath } from '#/web/repo-route-slugs.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import {
   authenticatedAppShellMode,
@@ -191,6 +191,23 @@ describe('repo route view derivation', () => {
       workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
     })
   })
+
+  test('maps a detached worktree terminal URL to a filesystem surface', () => {
+    expect(
+      repoRouteViewFromChildRoute('goblin+file:///workspace/repo', {
+        dashboard: false,
+        branchSlug: null,
+        worktreeSlug: worktreeSlugFromPath('/workspace/detached'),
+        worktreeTerminalSessionId: 'term-333333333333333333333',
+        newWorktree: false,
+      }),
+    ).toEqual({
+      kind: 'worktree',
+      repoId: 'goblin+file:///workspace/repo',
+      worktreePath: '/workspace/detached',
+      workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-333333333333333333333' },
+    })
+  })
 })
 
 describe('repo route capability admission', () => {
@@ -211,7 +228,7 @@ describe('repo route capability admission', () => {
     expect(appMocks.render).not.toHaveBeenCalledWith('newWorktree')
   })
 
-  test('redirects a Git workspace route to Dashboard without mounting the workspace surface', async () => {
+  test('keeps an explicitly selected workspace surface when Git capability becomes available', async () => {
     const repoId = 'goblin+file:///tmp/git-router-workspace'
     seedRepoCapability(repoId, 'available')
     render(createElement(PrimaryWindowRouterProvider))
@@ -219,9 +236,9 @@ describe('repo route capability admission', () => {
 
     navigateBrowser(`/repo/${repoSlugFromId(repoId)}/workspace`)
 
-    await waitFor(() => expect(window.location.pathname).toBe(`/repo/${repoSlugFromId(repoId)}/dashboard`))
-    await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('dashboard'))
-    expect(appMocks.render).not.toHaveBeenCalledWith('workspace')
+    await waitFor(() => expect(window.location.pathname).toBe(`/repo/${repoSlugFromId(repoId)}/workspace`))
+    await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('workspace'))
+    expect(appMocks.render).not.toHaveBeenCalledWith('dashboard')
   })
 })
 

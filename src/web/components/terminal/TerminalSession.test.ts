@@ -464,12 +464,12 @@ const descriptor: TerminalDescriptor = {
   index: 1,
 
   target: {
-    kind: 'git-worktree',
+    kind: 'git-worktree' as const,
     workspaceId: requiredWorkspaceLocator('/repo'),
     workspaceRuntimeId: 'repo-runtime-test',
     root: requiredWorkspaceLocator('/worktree'),
   },
-  presentation: { kind: 'git-worktree', branchName: 'feature' },
+  presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature' } },
 }
 
 beforeEach(() => {

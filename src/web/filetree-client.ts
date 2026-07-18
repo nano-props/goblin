@@ -17,24 +17,21 @@
 import { postServerJson } from '#/web/lib/server-fetch.ts'
 import type { RepoFileViewerResult, RepoTreeResult } from '#/shared/api-types.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
+import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 
 export interface GetRepositoryTreeClientOptions {
-  readonly repoRuntimeId: string
   readonly prefix?: string
   readonly signal?: AbortSignal
 }
 
 export async function getRepositoryTree(
-  cwd: string,
-  worktreePath: string,
+  target: WorkspacePaneFilesystemExecutionTarget,
   options: GetRepositoryTreeClientOptions,
 ): Promise<RepoTreeResult> {
   return await postServerJson(
     '/api/repo/tree',
     {
-      cwd,
-      repoRuntimeId: options.repoRuntimeId,
-      worktreePath,
+      target,
       ...(options.prefix !== undefined ? { prefix: options.prefix } : {}),
     },
     { signal: options.signal },

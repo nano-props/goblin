@@ -140,9 +140,9 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
       <QueryClientProvider client={queryClient}>
         <HookHost
           input={{
+            kind: 'git-worktree' as const,
             repoRoot: REPO_ROOT,
             repoRuntimeId: NEXT_REPO_RUNTIME_ID,
-            branchName: BRANCH_NAME,
             worktreePath: WORKTREE_PATH,
             canonicalTabs: sourceTabs,
           }}
@@ -156,7 +156,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: NEXT_REPO_RUNTIME_ID,
         target: {
-          kind: 'git-worktree',
+          kind: 'git-worktree' as const,
           workspaceId: REPO_ROOT,
           workspaceRuntimeId: NEXT_REPO_RUNTIME_ID,
           root: 'goblin+file:///tmp/workspace-pane-tabs-reorder-mutation-worktree',
@@ -178,13 +178,12 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
         kind: 'workspace-root',
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: null,
-        worktreePath: null,
+
         tabs: sourceTabs,
       },
       queryClient,
     )
-    renderMutationHook({ branchName: null, worktreePath: REPO_ROOT, canonicalTabs: sourceTabs })
+    renderMutationHook({ kind: 'workspace-root', canonicalTabs: sourceTabs })
 
     act(() => currentControls().reorderTabs([...sourceTabs].reverse()))
 
@@ -206,17 +205,25 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
   })
 })
 
-function renderMutationHook(input: Partial<WorkspacePaneTabsReorderMutationInput> = {}) {
+function renderMutationHook(
+  input: { kind?: 'git-worktree' | 'workspace-root'; canonicalTabs?: WorkspacePaneTabEntry[]; onReorderRejected?: () => void } = {},
+) {
+  const target =
+    input.kind === 'workspace-root'
+      ? ({ kind: 'workspace-root' as const, repoRoot: REPO_ROOT })
+      : ({
+          kind: 'git-worktree' as const,
+          repoRoot: REPO_ROOT,
+          worktreePath: WORKTREE_PATH,
+        })
   return renderInJsdom(
     <QueryClientProvider client={queryClient}>
       <HookHost
         input={{
-          repoRoot: REPO_ROOT,
+          ...target,
           repoRuntimeId: REPO_RUNTIME_ID,
-          branchName: BRANCH_NAME,
-          worktreePath: WORKTREE_PATH,
-          canonicalTabs: [],
-          ...input,
+          canonicalTabs: input.canonicalTabs ?? [],
+          ...(input.onReorderRejected ? { onReorderRejected: input.onReorderRejected } : {}),
         }}
       />
     </QueryClientProvider>,
@@ -235,7 +242,12 @@ function currentControls(): WorkspacePaneTabsReorderMutationResult {
 
 function readWorkspacePaneTabs(repoRuntimeId: string = REPO_RUNTIME_ID): WorkspacePaneTabEntry[] {
   return readWorkspacePaneTabsForTarget(
-    { repoRoot: REPO_ROOT, repoRuntimeId, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+    {
+      kind: 'git-worktree',
+      repoRoot: REPO_ROOT,
+      repoRuntimeId,
+      worktreePath: WORKTREE_PATH,
+    },
     queryClient,
   )
 }

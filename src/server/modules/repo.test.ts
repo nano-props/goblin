@@ -254,6 +254,18 @@ beforeEach(async () => {
   mocks.isAncestor.mockResolvedValue(true)
 })
 
+describe('resolveRemoteRepoTarget', () => {
+  test('threads cancellation into SSH config resolution', async () => {
+    const signal = new AbortController().signal
+    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const { resolveRemoteRepoTarget } = await import('#/server/modules/repo-source.ts')
+
+    await resolveRemoteRepoTarget(repoId, { repoRuntimeId: 'runtime-test' }, signal)
+
+    expect(mocks.resolveRemoteTarget).toHaveBeenCalledWith({ alias: 'prod', remotePath: '/srv/repo' }, signal)
+  })
+})
+
 afterEach(() => {
   vi.resetModules()
 })

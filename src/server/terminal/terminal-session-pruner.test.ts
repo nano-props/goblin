@@ -132,7 +132,7 @@ function terminalSession(
     terminalRuntimeGeneration: 1,
     terminalSessionId,
     target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId: 'repo-runtime-test', root },
-    presentation: { kind: 'git-worktree', branchName: 'feature/worktree' },
+    presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/worktree' } },
     controller: null,
     processName: 'zsh',
     canonicalTitle: null,

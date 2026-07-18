@@ -106,6 +106,27 @@ describe('worktree state selectors', () => {
     })
   })
 
+  test('keeps detached worktrees from the authoritative status catalog', () => {
+    const worktreesByPath = worktreeStatesFromBranchReadModel(
+      [],
+      [
+        {
+          path: '/workspace/detached',
+          isMain: false,
+          entries: [{ x: 'M', y: ' ', path: 'changed.txt' }],
+        },
+      ],
+    )
+
+    expect(worktreesByPath['/workspace/detached']).toEqual({
+      path: '/workspace/detached',
+      branch: undefined,
+      isMain: false,
+      isDirty: true,
+      changeCount: 1,
+    })
+  })
+
   test('uses status metadata when branch state only has a worktree path', () => {
     const branches = [createRepoBranch('main', { worktree: { path: '/tmp/repo' } })]
 

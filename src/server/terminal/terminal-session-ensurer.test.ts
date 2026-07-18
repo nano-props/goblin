@@ -268,7 +268,7 @@ function preparedResult(
       kind: 'existing',
       commit: () => ({
         action: 'created',
-        presentation: { kind: 'git-worktree', branchName: BRANCH_NAME },
+        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
         terminalProjectionEffect: { kind: 'delta', revision: 7 },
         terminalRuntimeSessionId: `pty_${terminalSessionId}`,
         terminalRuntimeGeneration: 1,

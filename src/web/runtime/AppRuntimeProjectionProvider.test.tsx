@@ -220,18 +220,18 @@ describe('AppRuntimeProjectionProvider', () => {
   test('refreshes workspace tabs without recovering terminal sessions from workspace tab broadcasts', async () => {
     const repo = seedCurrentRepo()
     setWorkspacePaneTabsForTargetQueryData({
+      kind: 'git-worktree' as const,
       repoRoot: REPO_ID,
       repoRuntimeId: repo.repoRuntimeId,
-      branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
     })
     listWorkspaceTabsMock.mockResolvedValue([
       {
         target: runtimeWorkspacePaneTargetForTest({
+          kind: 'git-worktree' as const,
           repoRoot: REPO_ID,
           repoRuntimeId: repo.repoRuntimeId,
-          branchName: BRANCH_NAME,
           worktreePath: WORKTREE_PATH,
         }),
         tabs: [workspacePaneStaticTabEntry('history')],
@@ -444,9 +444,9 @@ describe('AppRuntimeProjectionProvider', () => {
   test('recovers terminal sessions and workspace tabs from server state when app realtime reconnects', async () => {
     const repo = seedCurrentRepo()
     setWorkspacePaneTabsForTargetQueryData({
+      kind: 'git-worktree' as const,
       repoRoot: REPO_ID,
       repoRuntimeId: repo.repoRuntimeId,
-      branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
     })
@@ -462,9 +462,9 @@ describe('AppRuntimeProjectionProvider', () => {
       listWorkspaceTabsMock.mockResolvedValue([
         {
           target: runtimeWorkspacePaneTargetForTest({
+            kind: 'git-worktree' as const,
             repoRoot: REPO_ID,
             repoRuntimeId: repo.repoRuntimeId,
-            branchName: BRANCH_NAME,
             worktreePath: WORKTREE_PATH,
           }),
           tabs: [workspacePaneStaticTabEntry('history')],
@@ -996,9 +996,9 @@ function completeServerSession(session: TestTerminalSessionSummary): TerminalSes
 
 function tabsFor(repoRuntimeId: string) {
   return readWorkspacePaneTabsForTarget({
+    kind: 'git-worktree',
     repoRoot: REPO_ID,
     repoRuntimeId,
-    branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
   })
 }

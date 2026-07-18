@@ -42,7 +42,7 @@ import {
   workspacePaneStaticTabEntry,
   workspacePaneRuntimeTabEntry,
 } from '#/shared/workspace-pane.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { observedWorkspacePaneRouteCommitForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
@@ -108,12 +108,20 @@ function RepoWorkspaceContentInner(props: RepoWorkspaceContentHarnessProps) {
 
 function useHarnessWorkspacePaneRoute(
   props: RepoWorkspaceContentHarnessProps,
-): RepoBranchWorkspacePaneRoute | null | undefined {
+): WorkspacePaneRoute | null | undefined {
   if (props.workspacePaneRouteMode === 'bare-branch') return undefined
   const branch = props.detail.branch
   const preferredTab = preferredWorkspacePaneTabForTarget(
     props.repo.ui,
-    branch ? { repoRoot: props.repo.id, branchName: branch.name, worktreePath: branch.worktree?.path ?? null } : null,
+    branch
+      ? branch.worktree?.path
+        ? {
+          kind: 'git-worktree' as const,
+          repoRoot: props.repo.id,
+          worktreePath: branch.worktree.path,
+        }
+        : { kind: 'git-branch' as const, repoRoot: props.repo.id, branchName: branch.name }
+      : null,
   )
   const readContext = useTerminalSessionReadContext()
   if (preferredTab === 'terminal') {
@@ -137,7 +145,7 @@ function useHarnessWorkspacePaneRoute(
 
 function workspacePaneRouteForStaticPreferredTab(
   tab: WorkspacePaneTabType | null,
-): RepoBranchWorkspacePaneRoute | null {
+): WorkspacePaneRoute | null {
   return isWorkspacePaneStaticTabType(tab) ? { kind: 'static', tab } : null
 }
 
@@ -485,7 +493,11 @@ describe('RepoWorkspaceContent', () => {
       await Promise.resolve()
     })
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'files')
-    expect(workspacePaneTabOpener(REPO_ID, repo.repoRuntimeId, 'feature/status-links', 'workspace-pane:files')).toBe(
+    expect(workspacePaneTabOpener({
+      kind: 'git-worktree',
+      repoRoot: REPO_ID,
+      worktreePath,
+    }, repo.repoRuntimeId, 'workspace-pane:files')).toBe(
       'workspace-pane:status',
     )
 
@@ -500,9 +512,12 @@ describe('RepoWorkspaceContent', () => {
 
     expect(
       await runCloseWorkspacePaneTabCommand({
-        workspacePaneRoute: { kind: 'static', tab: 'files' },
         repoId: REPO_ID,
-        branchName: 'feature/status-links',
+        target: {
+          kind: 'git-worktree',
+          workspacePaneRoute: { kind: 'static', tab: 'files' },
+          filesystemTarget: gitWorktreeFilesystemTarget(repo, worktreePath, 'feature/status-links'),
+        },
         targetIdentity: 'workspace-pane:files',
         navigation,
       }),
@@ -1148,7 +1163,7 @@ describe('RepoWorkspaceContent', () => {
         })
         return {
           terminalSessionId: 'term-111111111111111111111',
-          presentation: { kind: 'git-worktree' as const, branchName },
+          presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: branchName } },
           requestRole: 'leader' as const,
           resourceDisposition: 'created' as const,
           runtimeProjectionApplied: true,
@@ -1222,12 +1237,12 @@ describe('RepoWorkspaceContent', () => {
     expect(createTerminalWithAdmission).toHaveBeenCalledWith(
       {
         target: {
-          kind: 'git-worktree',
+          kind: 'git-worktree' as const,
           workspaceId: REPO_ID,
           workspaceRuntimeId: repo.repoRuntimeId,
           root: 'goblin+file:///tmp/filetree-open-worktree',
         },
-        presentation: { kind: 'git-worktree', branchName },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: branchName } },
       },
       {
         resolveStartupShellCommand: expect.any(Function),
@@ -1238,9 +1253,9 @@ describe('RepoWorkspaceContent', () => {
     )
     expect(
       readWorkspacePaneTabsForTarget({
+        kind: 'git-worktree' as const,
         repoRoot: REPO_ID,
         repoRuntimeId: repo.repoRuntimeId,
-        branchName,
         worktreePath,
       }),
     ).toEqual([staticEntry('files'), terminalEntry('term-111111111111111111111'), staticEntry('status')])
@@ -1252,7 +1267,11 @@ describe('RepoWorkspaceContent', () => {
     // Chrome-tab-style opener tracking: the terminal this opened should be
     // attributed to "files" (the only tab open, and active, when the file
     // was double-clicked), scoped to this workspace pane target.
-    expect(workspacePaneTabOpener(REPO_ID, repo.repoRuntimeId, branchName, 'terminal:term-111111111111111111111')).toBe(
+    expect(workspacePaneTabOpener({
+      kind: 'git-worktree',
+      repoRoot: REPO_ID,
+      worktreePath: '/tmp/filetree-open-worktree',
+    }, repo.repoRuntimeId, 'terminal:term-111111111111111111111')).toBe(
       'workspace-pane:files',
     )
   })
@@ -1286,8 +1305,7 @@ describe('RepoWorkspaceContent', () => {
           kind: 'workspace-root',
           repoRoot: workspaceId,
           repoRuntimeId: repo.repoRuntimeId,
-          branchName: null,
-          worktreePath: null,
+
           terminalSessionId: 'term-111111111111111111111',
           insertAfterIdentity: 'workspace-pane:files',
         })
@@ -1563,6 +1581,18 @@ const emptyTerminalReadContext: TerminalSessionReadContextValue = {
   subscribeSnapshot: () => () => {},
 }
 
+function gitWorktreeFilesystemTarget(repo: RepoState, rootPath: string, branchName: string) {
+  if (repo.workspaceProbe.status !== 'ready') throw new Error('expected ready workspace fixture')
+  return {
+    kind: 'git-worktree' as const,
+    workspaceId: repo.id,
+    workspaceRuntimeId: repo.repoRuntimeId,
+    rootPath,
+    head: { kind: 'branch' as const, branchName },
+    capabilities: repo.workspaceProbe.capabilities,
+  }
+}
+
 function terminalCommandContextWith(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
   return terminalSessionContextForTest({
     createTerminal: vi.fn(async () => 'term-111111111111111111111'),
@@ -1610,15 +1640,15 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,
     showRepoBranchTerminalSession: () => true,
-    commitRepoBranchWorkspacePaneRoute: () => false,
+    commitWorkspacePaneRoute: () => false,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
-    currentRepoBranchWorkspacePaneRoute: overrides.currentRepoBranchWorkspacePaneRoute ?? (() => undefined),
+    currentWorkspacePaneRoute: overrides.currentWorkspacePaneRoute ?? (() => undefined),
   }
-  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+  navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
   return navigation
 }
 

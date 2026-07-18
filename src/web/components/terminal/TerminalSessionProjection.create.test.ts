@@ -201,15 +201,15 @@ function makeRuntimeMembershipIndex() {
 
 function terminalBase() {
   const target = runtimeWorkspacePaneTargetForTest({
+    kind: 'git-worktree' as const,
     repoRoot: REPO_ROOT,
     repoRuntimeId: REPO_RUNTIME_ID,
-    branchName: BRANCH,
     worktreePath: WORKTREE_PATH,
   })
   if (target.kind !== 'git-worktree') throw new Error('expected git worktree target')
   return {
     target,
-    presentation: { kind: 'git-worktree' as const, branchName: BRANCH },
+    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
   }
 }
 
@@ -219,7 +219,7 @@ function makeCreateResult(overrides: Partial<TerminalCreateSuccess> = {}): Termi
   return {
     ok: true as const,
     action: 'created' as const,
-    presentation: { kind: 'git-worktree', branchName: BRANCH },
+    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
     terminalSessionId: 'term-111111111111111111111',
     terminalProjectionEffect: { kind: 'delta', revision: 11 },
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -242,7 +242,7 @@ function emitBellForKey(projection: TerminalSessionProjection, terminalSessionId
       terminalWorktreeKey: WORKTREE_KEY,
       index: 1,
       repoRoot: REPO_ROOT,
-      presentation: { kind: 'git-worktree', branchName: BRANCH },
+      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       worktreePath: WORKTREE_PATH,
     },
     { processName: 'zsh', visible: false },
@@ -495,14 +495,14 @@ describe('TerminalSessionProjection create flow', () => {
     })
     expect(firstResult).toEqual({
       terminalSessionId: 'term-111111111111111111111',
-      presentation: { kind: 'git-worktree', branchName: BRANCH },
+      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       requestRole: 'leader',
       resourceDisposition: 'created',
       runtimeProjectionApplied: true,
     })
     await expect(secondCreate).resolves.toEqual({
       terminalSessionId: 'term-111111111111111111111',
-      presentation: { kind: 'git-worktree', branchName: BRANCH },
+      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       requestRole: 'observer',
       resourceDisposition: 'created',
       runtimeProjectionApplied: true,
@@ -518,7 +518,7 @@ describe('TerminalSessionProjection create flow', () => {
 
       expect(admission).toEqual({
         terminalSessionId: 'term-111111111111111111111',
-        presentation: { kind: 'git-worktree', branchName: BRANCH },
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
         requestRole: 'leader',
         resourceDisposition,
         runtimeProjectionApplied: true,

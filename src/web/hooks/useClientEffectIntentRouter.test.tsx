@@ -38,9 +38,10 @@ import {
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
@@ -65,7 +66,8 @@ let overlayOpen = false
 let workspaceShortcutSuppressed = false
 let currentRepoId: string | null = null
 let currentBranchName: string | null = null
-let currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null = null
+let currentWorkspacePaneRoute: WorkspacePaneRoute | null = null
+let currentFilesystemTarget: WorkspacePaneFilesystemTarget | null = null
 let navigation!: PrimaryWindowNavigationActions
 const activateRepoSpy = vi.fn()
 const closeRepoSpy = vi.fn()
@@ -90,9 +92,10 @@ beforeEach(() => {
   currentRepoId = null
   currentBranchName = null
   currentWorkspacePaneRoute = null
+  currentFilesystemTarget = null
   setTerminalSessionCommandBridge(null)
   navigation = {
-    currentRepoBranchWorkspacePaneRoute: () => undefined,
+    currentWorkspacePaneRoute: () => undefined,
     activateRepo: (repoId) => {
       activateRepoSpy(repoId)
     },
@@ -113,13 +116,13 @@ beforeEach(() => {
       showRepoBranchTerminalSessionSpy(repoId, branch, terminalSessionId)
       return true
     },
-    commitRepoBranchWorkspacePaneRoute: () => false,
+    commitWorkspacePaneRoute: () => false,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
   }
-  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+  navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
@@ -247,7 +250,7 @@ describe('useClientEffectIntentRouter', () => {
         return true
       },
     }
-    navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+    navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
     currentRepoId = repo.id
     const terminalSessionId = 'term-222222222222222222222'
     const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(repo.id, '/tmp/repo-feature')
@@ -443,6 +446,18 @@ describe('useClientEffectIntentRouter', () => {
     currentRepoId = repo.id
     currentBranchName = 'main'
     currentWorkspacePaneRoute = { kind: 'static', tab: 'status' }
+    currentFilesystemTarget = {
+      kind: 'git-worktree',
+      workspaceId: repo.id,
+      workspaceRuntimeId: repo.repoRuntimeId,
+      rootPath: '/tmp/repo-worktree',
+      head: { kind: 'branch', branchName: 'main' },
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
+    }
     useTerminalProjectionHydrationStore.getState().markProjectionReady(repo.id, repo.repoRuntimeId)
     const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(repo.id, '/tmp/repo-worktree')
     let visibleSessionIds = ['term-111111111111111111111']
@@ -627,7 +642,17 @@ function HookHost() {
     navigation,
     currentRepoId,
     currentWorkspacePaneCommandTarget: currentBranchName
-      ? { kind: 'git-branch', branchName: currentBranchName, workspacePaneRoute: currentWorkspacePaneRoute }
+      ? currentFilesystemTarget?.kind === 'git-worktree'
+        ? {
+            kind: 'git-worktree',
+            workspacePaneRoute: currentWorkspacePaneRoute,
+            filesystemTarget: currentFilesystemTarget,
+          }
+        : {
+            kind: 'git-branch',
+            branchName: currentBranchName,
+            workspacePaneRoute: currentWorkspacePaneRoute,
+          }
       : null,
     closeAllOverlays,
     openRepoPathDialog: () => {},
@@ -664,12 +689,12 @@ function terminalWorktreeSnapshot(
           terminalSessionId: selectedSession.terminalSessionId,
           index: selectedSession.index,
           target: {
-            kind: 'git-worktree',
+            kind: 'git-worktree' as const,
             workspaceId: canonicalWorkspaceLocator('goblin+file:///tmp/repo')!,
             workspaceRuntimeId: useReposStore.getState().repos['goblin+file:///tmp/repo']?.repoRuntimeId ?? '',
             root: canonicalWorkspaceLocator('goblin+file:///tmp/repo-worktree')!,
           },
-          presentation: { kind: 'git-worktree', branchName: 'main' },
+          presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
         }
       : null,
     sessions,

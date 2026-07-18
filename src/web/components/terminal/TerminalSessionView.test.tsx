@@ -89,12 +89,12 @@ function terminalBaseForTest(
   }
   return {
     target: {
-      kind: 'git-worktree',
+      kind: 'git-worktree' as const,
       workspaceId,
       workspaceRuntimeId: repoRuntimeId,
       root: requiredWorkspaceLocator(worktreePath),
     },
-    presentation: { kind: 'git-worktree', branchName: branch },
+    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: branch } },
   }
 }
 
@@ -114,7 +114,7 @@ function terminalDescriptorTargetForTest() {
       workspaceRuntimeId: 'repo-runtime-test',
       root: requiredWorkspaceLocator('/worktree'),
     },
-    presentation: { kind: 'git-worktree' as const, branchName: 'feature' },
+    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature' } },
   }
 }
 

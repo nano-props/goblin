@@ -1,4 +1,6 @@
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { adjacentRepoWorkspaceTab, type RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import {
@@ -10,8 +12,7 @@ import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-
 import type { WorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
 import {
   workspacePaneTabTargetBlocksInteraction,
-  workspacePaneTabTargetForBranch,
-  workspacePaneTabTargetForWorkspace,
+  workspacePaneTabTargetForPaneTarget,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   workspacePaneActionTargetFromCoordinates,
@@ -24,24 +25,27 @@ import {
 
 export interface SelectWorkspacePaneTabByIndexActionOptions {
   repoId: string | null
-  branchName: string | null
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
+  paneTarget: WorkspacePaneTabsTarget
+  worktreeHead?: GitHead
   tabIndex: number
   navigation: PrimaryWindowNavigationActions
 }
 
 export interface MoveWorkspacePaneTabActionOptions {
   repoId: string | null
-  branchName: string | null
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
+  paneTarget: WorkspacePaneTabsTarget
+  worktreeHead?: GitHead
   direction: 1 | -1
   navigation: PrimaryWindowNavigationActions
 }
 
 export interface SelectWorkspacePaneTabByIdentityActionOptions {
   repoId: string | null
-  branchName: string | null
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
+  paneTarget: WorkspacePaneTabsTarget
+  worktreeHead?: GitHead
   identity: string
   navigation: PrimaryWindowNavigationActions
   runtimeActionContext?: WorkspacePaneRuntimeTabActionContext
@@ -68,13 +72,14 @@ export async function dispatchSelectWorkspacePaneTabByIndexAction(
 }
 
 async function selectWorkspacePaneTabByIndexAction(
-  { repoId, branchName, workspacePaneRoute, tabIndex, navigation }: SelectWorkspacePaneTabByIndexActionOptions,
+  options: SelectWorkspacePaneTabByIndexActionOptions,
   coordinatorTarget: RepoWorkspaceTabModel,
   presentationToken: PrimaryWindowPresentationToken,
 ): Promise<boolean> {
+  const { repoId, workspacePaneRoute, tabIndex, navigation } = options
   if (!repoId || tabIndex < 1) return false
   const sourceRoute = workspacePaneRoute
-  const target = resolveSelectableWorkspacePaneTarget(repoId, branchName, sourceRoute)
+  const target = resolveSelectableWorkspacePaneTarget(options, sourceRoute)
   const tab = target?.tabs[tabIndex - 1]
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(coordinatorTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
@@ -95,21 +100,14 @@ export async function dispatchSelectWorkspacePaneTabByIdentityAction(
 }
 
 async function selectWorkspacePaneTabByIdentityAction(
-  {
-    repoId,
-    branchName,
-    workspacePaneRoute,
-    identity,
-    navigation,
-    runtimeActionContext,
-    reselect,
-  }: SelectWorkspacePaneTabByIdentityActionOptions,
+  options: SelectWorkspacePaneTabByIdentityActionOptions,
   coordinatorTarget: RepoWorkspaceTabModel,
   presentationToken: PrimaryWindowPresentationToken,
 ): Promise<boolean> {
+  const { repoId, workspacePaneRoute, identity, navigation, runtimeActionContext, reselect } = options
   if (!repoId) return false
   const sourceRoute = workspacePaneRoute
-  const target = resolveSelectableWorkspacePaneTarget(repoId, branchName, sourceRoute)
+  const target = resolveSelectableWorkspacePaneTarget(options, sourceRoute)
   const tab = target?.tabs.find((candidate) => candidate.identity === identity) ?? null
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(coordinatorTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
@@ -143,13 +141,15 @@ export async function dispatchMoveWorkspacePaneTabAction(options: MoveWorkspaceP
 }
 
 async function moveWorkspacePaneTabAction(
-  { repoId, branchName, direction, navigation }: MoveWorkspacePaneTabActionOptions,
+  options: MoveWorkspacePaneTabActionOptions,
   queuedTarget: RepoWorkspaceTabModel,
 ): Promise<boolean> {
+  const { repoId, direction, navigation } = options
   if (!repoId) return false
-  const currentRoute = branchName ? navigation.currentRepoBranchWorkspacePaneRoute(repoId, branchName) : undefined
+  const branchName = paneTargetPresentationBranch(options.paneTarget, options.worktreeHead)
+  const currentRoute = branchName ? navigation.currentWorkspacePaneRoute(repoId, branchName) : undefined
   if (branchName && currentRoute === undefined) return false
-  const target = resolveSelectableWorkspacePaneTarget(repoId, branchName, currentRoute)
+  const target = resolveSelectableWorkspacePaneTarget(options, currentRoute)
   const tab = target ? adjacentRepoWorkspaceTab(target.tabs, target.activeTab?.identity, direction) : null
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(queuedTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
@@ -168,21 +168,29 @@ function queuedWorkspacePaneTargetMatches(queued: RepoWorkspaceTabModel, current
 
 function workspacePaneTabActionCoordinatorTarget(input: {
   repoId: string | null
-  branchName: string | null
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
+  paneTarget: WorkspacePaneTabsTarget
+  worktreeHead?: GitHead
 }): RepoWorkspaceTabModel | null {
   if (!input.repoId) return null
-  return resolveSelectableWorkspacePaneTarget(input.repoId, input.branchName, input.workspacePaneRoute)
+  return resolveSelectableWorkspacePaneTarget(input, input.workspacePaneRoute)
 }
 
 function resolveSelectableWorkspacePaneTarget(
-  repoId: string,
-  branchName: string | null,
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined,
+  input: {
+    repoId: string | null
+    paneTarget: WorkspacePaneTabsTarget
+    worktreeHead?: GitHead
+  },
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
 ): RepoWorkspaceTabModel | null {
-  return branchName !== null
-    ? workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
-    : workspacePaneTabTargetForWorkspace(repoId, { workspacePaneRoute: undefined })
+  if (!input.repoId) return null
+  return workspacePaneTabTargetForPaneTarget(input.paneTarget, workspacePaneRoute, input.worktreeHead)
+}
+
+function paneTargetPresentationBranch(target: WorkspacePaneTabsTarget, worktreeHead: GitHead | undefined): string | null {
+  if (target.kind === 'git-branch') return target.branchName
+  return target.kind === 'git-worktree' && worktreeHead ? gitHeadBranch(worktreeHead) : null
 }
 
 function workspacePaneQueuedActionTarget(model: RepoWorkspaceTabModel) {

@@ -55,8 +55,8 @@ describe('useClientWorkspacePersistence', () => {
   test('persists terminal selection, preferred tab, and filetree presentation', () => {
     const worktreePath = '/tmp/repo-worktree'
     const targetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-worktree',
       repoRoot: 'goblin+file:///tmp/repo',
-      branchName: 'feature/worktree',
       worktreePath,
     })
     const terminalWorktreeKey = formatTerminalWorktreeKeyForPath('goblin+file:///tmp/repo', worktreePath)

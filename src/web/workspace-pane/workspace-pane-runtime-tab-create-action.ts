@@ -22,12 +22,14 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import {
   workspacePaneActionTargetFromCoordinates,
+  workspacePaneActionTargetFromFilesystemTarget,
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
+import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface WorkspacePaneRuntimeTabCreateAction {
   label: string
@@ -139,13 +141,29 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
   const resolvedBase = terminalSessionBaseWithRuntime(base)
   if (!resolvedBase) return false
   const coordinates = terminalExecutionCoordinates(resolvedBase.target)
+  const paneTarget = workspacePaneTabsTargetFromRuntime(resolvedBase.target)
+  if (!paneTarget) return false
   const workspaceRoot = resolvedBase.target.kind === 'workspace-root'
+  if (
+    !workspaceRoot &&
+    resolvedBase.presentation.kind === 'git-worktree' &&
+    resolvedBase.presentation.head.kind === 'detached'
+  ) {
+    return (
+      navigation.showRepoWorktreeTerminalSession?.(
+        coordinates.repoRoot,
+        terminalExecutionPath(resolvedBase.target),
+        terminalSessionId,
+      ) ?? false
+    )
+  }
   return commitWorkspacePaneCurrentTargetRoute(
     {
       repoId: coordinates.repoRoot,
       repoRuntimeId: coordinates.repoRuntimeId,
       branchName: workspaceRoot ? null : terminalPresentationBranch(resolvedBase.presentation),
       worktreePath: workspaceRoot ? null : terminalExecutionPath(resolvedBase.target),
+      paneTarget,
     },
     { kind: 'terminal', terminalSessionId },
     navigation,
@@ -174,24 +192,18 @@ function recordCreatedTerminalWorkspacePaneRuntimeTabOpener(
 ): void {
   if (!options.openerIdentity || options.admission.resourceDisposition !== 'created') return
   const coordinates = terminalExecutionCoordinates(options.base.target)
+  const paneTarget = workspacePaneTabsTargetFromRuntime(options.base.target)
+  if (!paneTarget) return
   recordWorkspacePaneTabOpener(
-    coordinates.repoRoot,
+    paneTarget,
     coordinates.repoRuntimeId,
-    options.base.target.kind === 'workspace-root' ? null : terminalPresentationBranch(options.base.presentation),
     terminalWorkspacePaneTabProvider.identity(options.admission.terminalSessionId),
     options.openerIdentity,
   )
 }
 
 function terminalWorkspacePaneCoordinatorTarget(base: TerminalSessionBase) {
-  const coordinates = terminalExecutionCoordinates(base.target)
-  const workspaceRoot = base.target.kind === 'workspace-root'
-  return workspacePaneActionTargetFromCoordinates({
-    repoId: coordinates.repoRoot,
-    repoRuntimeId: coordinates.repoRuntimeId,
-    branchName: workspaceRoot ? null : terminalPresentationBranch(base.presentation),
-    worktreePath: workspaceRoot ? null : terminalExecutionPath(base.target),
-  })
+  return workspacePaneActionTargetFromFilesystemTarget(base.target)
 }
 
 function terminalSessionBaseWithRuntime(base: TerminalSessionBase): TerminalSessionBase {

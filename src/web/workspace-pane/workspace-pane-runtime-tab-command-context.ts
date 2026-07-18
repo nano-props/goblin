@@ -2,22 +2,23 @@ import {
   terminalExecutionCoordinates,
   terminalExecutionPath,
   type TerminalPresentation,
-  type TerminalSessionBase,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
-import { resolveWorkspacePaneTerminalExecutionTarget } from '#/web/workspace-pane/workspace-pane-terminal-execution-target.ts'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { workspacePaneFilesystemTerminalBase } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 
-type WorkspacePaneCommandRoute = ParsedRepoBranchWorkspacePaneRoute | null | undefined
+type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
 export interface WorkspacePaneRuntimeTabCommandContextInput {
   repoId: string
   branchName: string | null
+  filesystemTarget: WorkspacePaneFilesystemTarget | null
   workspacePaneRoute: WorkspacePaneCommandRoute
   showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean | Promise<boolean>
   showCreatedRuntimeTab: (
@@ -56,18 +57,16 @@ function assignTerminalRuntimeTabCommandContext(
   context: WorkspacePaneRuntimeTabCommandContext,
   input: WorkspacePaneRuntimeTabCommandContextInput,
 ): void {
-  const base = resolveWorkspacePaneTerminalExecutionTarget(input.repoId, input.branchName)
+  const base = input.filesystemTarget ? workspacePaneFilesystemTerminalBase(input.filesystemTarget) : null
+  const paneTarget = base ? workspacePaneTabsTargetFromRuntime(base.target) : null
   context.terminal = {
     base,
     bridge: readTerminalSessionCommandBridge(),
-    openerIdentity: captureWorkspacePaneActiveTabIdentity(
-      input.repoId,
-      useReposStore.getState().repos[input.repoId]?.repoRuntimeId ?? '',
-      input.branchName,
-      {
-        workspacePaneRoute: input.workspacePaneRoute,
-      },
-    ),
+    openerIdentity: base && paneTarget
+      ? captureWorkspacePaneActiveTabIdentity(paneTarget, base.target.workspaceRuntimeId, {
+          workspacePaneRoute: input.workspacePaneRoute,
+        })
+      : null,
     showTerminalSession: (terminalSessionId) => input.showRuntimeTab('terminal', terminalSessionId),
     showCreatedTerminalSession: (terminalSessionId, presentation) =>
       base

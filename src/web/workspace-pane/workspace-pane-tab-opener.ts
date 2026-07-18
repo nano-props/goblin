@@ -1,112 +1,80 @@
+import {
+  isWorkspacePaneRuntimeTabEntry,
+  workspacePaneStaticTabId,
+  workspacePaneTabEntryIdentity,
+} from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
-import { workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import {
-  workspacePaneTabTargetForBranch,
-  workspacePaneTabTargetForWorkspace,
-  type WorkspacePaneTabTargetOptions,
-} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import type { WorkspacePaneTabTargetOptions } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
-// Chrome-tab-style "opener" tracking, covering every workspace pane tab,
-// factored out of both the static/runtime tab-creation paths and the tab-close
-// commands so none of them need to duplicate this bookkeeping. Kept
-// dependency-free of command modules to avoid cycles between them.
+export type WorkspacePaneTabOpenerRecordResult = 'recorded' | 'missing'
 
-export type WorkspacePaneTabOpenerRecordResult = 'recorded' | 'missing' | 'unavailable'
-
-/** Snapshots the identity of the tab currently active for `repoId`. Callers
- *  must capture this *before* switching into the newly-opened tab (e.g.
- *  before calling `runShowWorkspacePaneTabCommand`), otherwise the "opener"
- *  would incorrectly resolve to the new tab itself. */
+/**
+ * Reads the active identity from one canonical pane target. The target is the
+ * authority for the tab strip: opener bookkeeping must never rediscover it
+ * through a branch snapshot, because worktrees can be detached or renamed.
+ */
 export function captureWorkspacePaneActiveTabIdentity(
-  repoId: string,
-  repoRuntimeId: string,
-  branchName: string | null,
+  target: WorkspacePaneTabsTarget,
+  workspaceRuntimeId: string,
   options: WorkspacePaneTabTargetOptions,
 ): string | null {
-  if (useReposStore.getState().repos[repoId]?.repoRuntimeId !== repoRuntimeId) return null
-  const target = branchName
-    ? workspacePaneTabTargetForBranch(repoId, branchName, options)
-    : workspacePaneTabTargetForWorkspace(repoId, options)
-  return target?.activeTab?.identity ?? null
+  const repo = useReposStore.getState().repos[target.repoRoot]
+  if (!repo || repo.repoRuntimeId !== workspaceRuntimeId) return null
+  const projection = readWorkspacePaneTabsProjectionForTarget({ ...target, repoRuntimeId: workspaceRuntimeId })
+  if (projection.phase !== 'ready') return null
+  const tabs = projection.tabs
+  const route = options.workspacePaneRoute
+  if (route === null) return null
+  if (route?.kind === 'static') {
+    const identity = workspacePaneStaticTabId(route.tab)
+    return tabs.some((entry) => workspacePaneTabEntryIdentity(entry) === identity) ? identity : null
+  }
+  if (route?.kind === 'terminal') {
+    const entry = tabs.find(
+      (candidate) =>
+        isWorkspacePaneRuntimeTabEntry(candidate) && candidate.runtimeSessionId === route.terminalSessionId,
+    )
+    return entry ? workspacePaneTabEntryIdentity(entry) : null
+  }
+  const preferred = preferredWorkspacePaneTabForTarget(repo.ui, target)
+  const entry = tabs.find((candidate) => candidate.type === preferred)
+  return entry ? workspacePaneTabEntryIdentity(entry) : null
 }
 
-/** Records that `childIdentity` (any static or runtime tab identity) was
- *  opened from `openerIdentity` on `repoId`/`branchName`'s tab strip.
- *  Closing the tab prefers reactivating that opener (see
- *  `runCloseWorkspacePaneTabCommand`) over the generic adjacent-tab
- *  fallback.
- *
- *  `branchName` must be the branch the operation actually targets, captured
- *  by the caller *before* any `await` — not re-derived from "the repo's
- *  current route branch" at call time, which could have changed across
- *  an intervening async gap (e.g. the user switched branches while a tab
- *  commit was in flight) and would silently record into the wrong scope. */
 export function recordWorkspacePaneTabOpener(
-  repoId: string,
-  repoRuntimeId: string,
-  branchName: string | null,
+  target: WorkspacePaneTabsTarget,
+  workspaceRuntimeId: string,
   childIdentity: string,
   openerIdentity: string,
 ): WorkspacePaneTabOpenerRecordResult {
   const state = useReposStore.getState()
-  const repo = state.repos[repoId]
-  if (!repo || repo.repoRuntimeId !== repoRuntimeId) return 'missing'
-  if (branchName !== null && !readRepoBranchSnapshotQueryProjection(repo)) return 'unavailable'
-  const target = workspacePaneTabOpenerTarget(repoId, branchName)
-  if (!target) return 'missing'
-  state.setTabOpener(runtimeScopedTabOpenerKey(target, repoRuntimeId), childIdentity, openerIdentity)
+  const repo = state.repos[target.repoRoot]
+  if (!repo || repo.repoRuntimeId !== workspaceRuntimeId) return 'missing'
+  state.setTabOpener(runtimeScopedTabOpenerKey(target, workspaceRuntimeId), childIdentity, openerIdentity)
   return 'recorded'
 }
 
-/** Reads the recorded opener for a closing tab's identity on `repoId`/`branchName`'s
- *  tab strip, if any. See `recordWorkspacePaneTabOpener` for why `branchName`
- *  must be passed explicitly rather than re-derived at call time. */
 export function workspacePaneTabOpener(
-  repoId: string,
-  repoRuntimeId: string,
-  branchName: string | null,
+  target: WorkspacePaneTabsTarget,
+  workspaceRuntimeId: string,
   closingIdentity: string,
 ): string | null {
-  const scopeKey = workspacePaneTabOpenerScopeKey(repoId, repoRuntimeId, branchName)
-  if (!scopeKey) return null
+  const scopeKey = runtimeScopedTabOpenerKey(target, workspaceRuntimeId)
   return useReposStore.getState().tabOpenerIdentityByScope[scopeKey]?.[closingIdentity] ?? null
 }
 
-/** Clears a tab's recorded opener, e.g. once the tab has actually closed. */
 export function clearWorkspacePaneTabOpener(
-  repoId: string,
-  repoRuntimeId: string,
-  branchName: string | null,
+  target: WorkspacePaneTabsTarget,
+  workspaceRuntimeId: string,
   childIdentity: string,
 ): void {
-  const scopeKey = workspacePaneTabOpenerScopeKey(repoId, repoRuntimeId, branchName)
-  if (!scopeKey) return
-  useReposStore.getState().clearTabOpener(scopeKey, childIdentity)
+  useReposStore.getState().clearTabOpener(runtimeScopedTabOpenerKey(target, workspaceRuntimeId), childIdentity)
 }
 
-function workspacePaneTabOpenerScopeKey(
-  repoId: string,
-  repoRuntimeId: string,
-  branchName: string | null,
-): string | null {
-  const target = workspacePaneTabOpenerTarget(repoId, branchName)
-  return target ? runtimeScopedTabOpenerKey(target, repoRuntimeId) : null
-}
-
-function runtimeScopedTabOpenerKey(target: WorkspacePaneTabsTarget, repoRuntimeId: string): string {
-  return `${tabOpenerScopeKey(target)}\0${repoRuntimeId}`
-}
-
-function workspacePaneTabOpenerTarget(repoId: string, branchName: string | null): WorkspacePaneTabsTarget | null {
-  const repo = useReposStore.getState().repos[repoId]
-  if (!repo) return null
-  if (branchName === null) {
-    return { kind: 'workspace-root', repoRoot: repo.id, branchName: null, worktreePath: null }
-  }
-  const branchModel = repo ? readRepoBranchSnapshotQueryProjection(repo) : null
-  if (!branchModel) return null
-  return workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
+function runtimeScopedTabOpenerKey(target: WorkspacePaneTabsTarget, workspaceRuntimeId: string): string {
+  return `${tabOpenerScopeKey(target)}\0${workspaceRuntimeId}`
 }

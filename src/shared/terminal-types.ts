@@ -1,6 +1,10 @@
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
-import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+import {
+  workspacePaneFilesystemExecutionPath,
+  type WorkspacePaneFilesystemExecutionTarget,
+} from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { gitHead, gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
 
 /**
  * `controllerStatus === 'connected'` while the broker reports the
@@ -25,7 +29,7 @@ export interface TerminalController {
   status: Exclude<TerminalControllerStatus, 'none'>
 }
 
-export type TerminalExecutionTarget = Exclude<RuntimeWorkspacePaneTarget, { kind: 'git-branch' }>
+export type TerminalExecutionTarget = WorkspacePaneFilesystemExecutionTarget
 
 export type TerminalSessionBase =
   | {
@@ -54,10 +58,7 @@ export function terminalExecutionCoordinates(target: TerminalExecutionTarget): T
 
 /** Transport-native execution path. This is execution data, never terminal identity. */
 export function terminalExecutionPath(target: TerminalExecutionTarget): string {
-  const locator = target.kind === 'workspace-root' ? target.workspaceId : target.root
-  const parsed = parseCanonicalWorkspaceLocator(locator)
-  if (!parsed) throw new Error('terminal execution target locator is invalid')
-  return parsed.path
+  return workspacePaneFilesystemExecutionPath(target)
 }
 
 export function terminalSessionCoordinates(session: Pick<TerminalSessionBase, 'target'>): TerminalExecutionCoordinates {
@@ -65,7 +66,7 @@ export function terminalSessionCoordinates(session: Pick<TerminalSessionBase, 't
 }
 
 export function terminalPresentationBranch(presentation: TerminalPresentation): string | null {
-  return presentation.kind === 'git-worktree' ? presentation.branchName : null
+  return presentation.kind === 'git-worktree' ? gitHeadBranch(presentation.head) : null
 }
 
 export interface RepoRuntimeInput {
@@ -203,7 +204,17 @@ export type TerminalRestartResult =
 
 export type TerminalCreateAction = 'created' | 'restored' | 'reused'
 
-export type TerminalPresentation = { kind: 'workspace-root' } | { kind: 'git-worktree'; branchName: string }
+export type TerminalPresentation = { kind: 'workspace-root' } | { kind: 'git-worktree'; head: GitHead }
+
+export function terminalGitWorktreePresentation(branchName: string | null): Extract<
+  TerminalPresentation,
+  { kind: 'git-worktree' }
+> {
+  return {
+    kind: 'git-worktree',
+    head: gitHead(branchName),
+  }
+}
 
 export type TerminalCreateResult =
   | ({
