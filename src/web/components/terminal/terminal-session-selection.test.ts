@@ -1,17 +1,17 @@
 import { describe, expect, test } from 'vitest'
 import { resolveSelectedTerminalSessionId } from '#/web/components/terminal/terminal-session-selection.ts'
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
+import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 
 function descriptor(terminalSessionId: string): TerminalDescriptor {
-  return {
+  return terminalDescriptorForTest({
     terminalSessionId,
-    terminalWorktreeKey: 'repo\0wt',
     index: 1,
     repoRoot: '/repo',
     repoRuntimeId: 'repo-runtime-test',
     branch: 'main',
     worktreePath: '/repo',
-  }
+  })
 }
 
 describe('terminal session selection helper', () => {

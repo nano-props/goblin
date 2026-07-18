@@ -33,6 +33,13 @@ import {
   type WorkspacePaneRuntimeTabsProviderSnapshot,
   workspaceRuntimeTabWorktreePaths,
 } from '#/server/workspace-pane/workspace-pane-runtime-tabs-projection.ts'
+
+export class WorkspacePaneRuntimeStaleError extends Error {
+  constructor() {
+    super('error.repo-runtime-stale')
+    this.name = 'WorkspacePaneRuntimeStaleError'
+  }
+}
 import type {
   WorkspacePaneLayoutAggregate,
   WorkspacePaneLayoutCommitResult,
@@ -44,7 +51,7 @@ import type {
 export interface WorkspacePaneRuntimeTabsLiveSession {
   sessionId: string
   target: RuntimeWorkspacePaneTarget
-  branch: string
+  branch: string | null
   worktreePath: string
 }
 
@@ -167,25 +174,30 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
         input.sessionId,
         { insertAfterIdentity: input.insertAfterIdentity ?? null },
       )
-      layout.commitRuntimeTarget({
-        ...scope,
-        target: capturedTarget.target,
-        lease: physicalWorktreeAdmissionLease(physicalCapability),
-        tabs,
-      })
       const pendingProviderSnapshots = providerSnapshotsWithPendingSession(providerSnapshots, {
         type: input.runtimeType,
         sessionId: input.sessionId,
         target: commitTarget.target,
-        branch: commitTarget.canonicalBranch ?? '',
+        branch: commitTarget.canonicalBranch,
         worktreePath: input.worktreePath,
       })
-      const snapshot = await layout.snapshot({
-        scope,
-        validTargets: commitTargets,
-        providerSnapshots: pendingProviderSnapshots,
-      })
-      input.commitAdmission(commitTarget.canonicalBranch)
+      if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
+      this.worktreeOperations.assertPermit(physicalCapability, input.permit)
+      const snapshot = await layout.commitRuntimeTarget(
+        {
+          ...scope,
+          target: commitTarget.target,
+          lease: physicalWorktreeAdmissionLease(physicalCapability),
+          tabs,
+          validTargets: commitTargets,
+          providerSnapshots: pendingProviderSnapshots,
+        },
+        () => {
+          if (!input.isRuntimeCurrent()) throw new WorkspacePaneRuntimeStaleError()
+          this.worktreeOperations.assertPermit(physicalCapability, input.permit)
+          input.commitAdmission(commitTarget.canonicalBranch)
+        },
+      )
       return { kind: 'committed', snapshot }
     })
   }
@@ -809,7 +821,11 @@ function requiredProjectionForRuntimeTarget(
     .flatMap((provider) => provider.liveSessions)
     .find((candidate) => runtimeTargetKey(candidate.target) === key)
   if (!session) throw new Error('error.workspace-tabs-target-invalid')
-  return { target: session.target, nativeWorktreePath: session.worktreePath, canonicalBranch: session.branch }
+  return {
+    target: session.target,
+    nativeWorktreePath: session.worktreePath,
+    canonicalBranch: session.branch,
+  }
 }
 
 function repoRuntimeIdFromScope(scope: string): string {

@@ -1,5 +1,5 @@
 import { useCallback, type ReactNode } from 'react'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { TerminalPresentation, TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import {
   dispatchCreateTerminalWorkspacePaneRuntimeTabAction,
@@ -21,6 +21,7 @@ export interface WorkspacePaneRuntimeTabPanelState {
 
 export interface WorkspacePaneRuntimeTabPanelTarget {
   runtimeTarget: RuntimeWorkspacePaneTarget
+  presentation: TerminalPresentation
   /** Native path used only by the terminal view execution adapter. */
   worktreePath: string
 }
@@ -77,11 +78,13 @@ function TerminalWorkspacePaneRuntimeTabPanel({
         base,
         createTerminal: createTerminalWithAdmission,
         openerIdentity: null,
-        showCreatedTerminalTab: (terminalSessionId, canonicalBranch) =>
-          base.target?.kind === 'workspace-root'
-            ? true
-            : showCreatedTerminalWorkspacePaneRuntimeTab(
-                { ...base, branch: canonicalBranch },
+        showCreatedTerminalTab: (terminalSessionId, presentation) =>
+          base.target.kind === 'workspace-root'
+            ? presentation.kind === 'workspace-root'
+            : base.target.kind === 'git-worktree' &&
+              presentation.kind === 'git-worktree' &&
+              showCreatedTerminalWorkspacePaneRuntimeTab(
+                { target: base.target, presentation },
                 terminalSessionId,
                 navigation,
               ),
@@ -92,20 +95,23 @@ function TerminalWorkspacePaneRuntimeTabPanel({
     [createTerminalWithAdmission, navigation, t],
   )
 
-  const { runtimeTarget } = target
-  const branch = runtimeTarget.kind === 'git-branch' ? runtimeTarget.branch : ''
+  const { runtimeTarget, presentation } = target
+  if (runtimeTarget.kind !== presentation.kind) return null
+  const base: TerminalSessionBase | null =
+    runtimeTarget.kind === 'workspace-root' && presentation.kind === 'workspace-root'
+      ? { target: runtimeTarget, presentation }
+      : runtimeTarget.kind === 'git-worktree' && presentation.kind === 'git-worktree'
+        ? { target: runtimeTarget, presentation }
+        : null
+  if (!base) return null
   return (
     <WorkspacePanePanelFrame id={`${workspacePaneId}-terminal-panel`} {...panelLabel}>
       <TerminalSessionView
-        repoRoot={runtimeTarget.workspaceId}
-        repoRuntimeId={runtimeTarget.workspaceRuntimeId}
-        branch={branch}
-        worktreePath={target.worktreePath}
+        base={base}
         selectedTerminalSessionId={selectedSessionId}
         projectionPhase={runtimeState.projectionPhase}
         projectionErrorMessage={runtimeState.projectionErrorMessage}
         createTerminalForSlot={createTerminalForSlot}
-        target={runtimeTarget}
       />
     </WorkspacePanePanelFrame>
   )

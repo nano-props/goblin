@@ -8,6 +8,7 @@ import {
   waitForMeasurableHost,
 } from '#/web/components/terminal/terminal-session-geometry.ts'
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
+import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 
 const geometryMocks = vi.hoisted(() => ({
   estimateTerminalGeometry: vi.fn(() => ({ cols: 120, rows: 40 })),
@@ -37,15 +38,14 @@ class MockResizeObserver {
 }
 
 function descriptor(): TerminalDescriptor {
-  return {
+  return terminalDescriptorForTest({
     terminalSessionId: 'term-111111111111111111111',
-    terminalWorktreeKey: '/repo\0/repo',
     index: 1,
     repoRoot: '/repo',
     repoRuntimeId: 'repo-runtime-test',
     branch: 'main',
     worktreePath: '/repo',
-  }
+  })
 }
 
 function makeHost(): HTMLDivElement {

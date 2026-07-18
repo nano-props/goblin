@@ -7,6 +7,7 @@ import {
   workspacePaneTabsTargetIdentityKey,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   type WorkspacePaneTabsQueryData,
@@ -63,6 +64,15 @@ function currentSnapshot(repoRoot: string, repoRuntimeId: string, queryClient: Q
   )
 }
 
+export function runtimeWorkspacePaneTargetForTest(
+  input: Extract<WorkspacePaneTabsTarget, { kind: 'workspace-root' }> & { repoRuntimeId: string },
+): Extract<RuntimeWorkspacePaneTarget, { kind: 'workspace-root' }>
+export function runtimeWorkspacePaneTargetForTest(
+  input: WorkspacePaneTabsTarget & { worktreePath: string; branchName: string; repoRuntimeId: string },
+): Extract<RuntimeWorkspacePaneTarget, { kind: 'git-worktree' }>
+export function runtimeWorkspacePaneTargetForTest(
+  input: WorkspacePaneTabsTarget & { repoRuntimeId: string },
+): RuntimeWorkspacePaneTarget
 export function runtimeWorkspacePaneTargetForTest(input: WorkspacePaneTabsTarget & { repoRuntimeId: string }) {
   const target = runtimeWorkspacePaneTarget(input, input.repoRuntimeId)
   if (!target) throw new Error('workspace pane test target requires a canonical target')

@@ -102,11 +102,13 @@ describe('app bootstrap hooks', () => {
         restoredRepoId: 'goblin+file:///tmp/repo',
         zenMode: false,
         workspacePaneSize: 45,
-        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'term-222222222222222222222' },
+        selectedTerminalSessionIdByTerminalWorktree: {
+          'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-222222222222222222222',
+        },
         preferredWorkspacePaneTabByTargetByRepo: {},
         filetreeViewStateByWorktreeByRepo: {
           'goblin+file:///tmp/repo': {
-            '/tmp/worktree': {
+            'goblin+file:///tmp/worktree': {
               selectedKeys: ['src/index.ts'],
               expandedKeys: ['src'],
               topVisibleRowIndex: 140,
@@ -134,7 +136,7 @@ describe('app bootstrap hooks', () => {
     expect(state.zenMode).toBe(false)
     expect(state.workspacePaneSize).toBe(45)
     expect(state.selectedTerminalSessionIdByTerminalWorktree).toEqual({
-      '/tmp/repo\0/tmp/worktree': 'term-222222222222222222222',
+      'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-222222222222222222222',
     })
     expect(useFiletreeInteractionStore.getState().interactionByScope).toMatchObject({
       [filetreeInteractionScopeKey('goblin+file:///tmp/repo', '/tmp/worktree')]: {

@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import {
-  createRuntimeProjectionScopeRegistry,
-  RuntimeProjectionScope,
-} from '#/web/runtime/runtime-projection-scope.ts'
+import { createRuntimeProjectionScopeRegistry, RuntimeProjectionScope } from '#/web/runtime/runtime-projection-scope.ts'
 
 const TARGET = { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-1' }
 
@@ -11,23 +8,28 @@ describe('RuntimeProjectionScope', () => {
     vi.useRealTimers()
   })
 
-  test('only lets the latest operation in a lane publish', async () => {
+  test('coalesces overlapping lane invalidations into one follow-up operation', async () => {
     const first = Promise.withResolvers<string>()
     const second = Promise.withResolvers<string>()
     const publish = vi.fn()
     const reject = vi.fn()
     const scope = new RuntimeProjectionScope(TARGET, () => true)
 
-    scope.runLatest('recovery', async () => await first.promise, publish, reject)
-    scope.runLatest('recovery', async () => await second.promise, publish, reject)
+    const runFirst = vi.fn(async () => await first.promise)
+    const runSecond = vi.fn(async () => await second.promise)
+    scope.runLatest('recovery', runFirst, publish, reject)
+    scope.runLatest('recovery', runSecond, publish, reject)
     second.resolve('new')
     await Promise.resolve()
     await Promise.resolve()
-    first.resolve('old')
-    await Promise.resolve()
-    await Promise.resolve()
+    expect(runFirst).toHaveBeenCalledOnce()
+    expect(runSecond).not.toHaveBeenCalled()
+    expect(publish).not.toHaveBeenCalled()
 
-    expect(publish).toHaveBeenCalledOnce()
+    first.resolve('old')
+    await vi.waitFor(() => expect(publish).toHaveBeenCalledOnce())
+
+    expect(runSecond).toHaveBeenCalledOnce()
     expect(publish).toHaveBeenCalledWith('new')
     expect(reject).not.toHaveBeenCalled()
   })

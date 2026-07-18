@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   parseRestorableWorkspacePaneTargetKey,
+  parseWorkspacePaneTabsTargetIdentityKey,
   restorableWorkspacePaneTarget,
   restorableWorkspacePaneTargetKey,
   workspacePaneTabsTargetFromRestorable,
   workspacePaneTabsTargetFromRuntime,
+  workspacePaneTabsTargetIdentityKey,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
@@ -31,6 +33,28 @@ describe('restorable workspace pane targets', () => {
   it('rejects legacy keys that duplicate a workspace id or contain raw worktree paths', () => {
     expect(parseRestorableWorkspacePaneTargetKey('goblin+file:///repo\0branch\0main')).toBeNull()
     expect(parseRestorableWorkspacePaneTargetKey('git-worktree\0/tmp/worktree')).toBeNull()
+  })
+
+  it('uses strict canonical identities for client target keys', () => {
+    const key = workspacePaneTabsTargetIdentityKey({
+      repoRoot: 'goblin+ssh://server/srv/app',
+      branchName: 'feature/a',
+      worktreePath: '/srv/app-feature',
+    })
+    expect(key).toBe('goblin+ssh://server/srv/app\0worktree\0goblin+ssh://server/srv/app-feature')
+    expect(parseWorkspacePaneTabsTargetIdentityKey(key)).toEqual({
+      kind: 'worktree',
+      repoRoot: 'goblin+ssh://server/srv/app',
+      worktreeId: 'goblin+ssh://server/srv/app-feature',
+    })
+    expect(parseWorkspacePaneTabsTargetIdentityKey('goblin+file:///repo\0worktree\0/tmp/worktree')).toBeNull()
+    expect(
+      parseWorkspacePaneTabsTargetIdentityKey(
+        'goblin+ssh://server/srv/app\0worktree\0goblin+ssh://other/srv/app-feature',
+      ),
+    ).toBeNull()
+    expect(parseWorkspacePaneTabsTargetIdentityKey('/repo\0workspace-root')).toBeNull()
+    expect(parseWorkspacePaneTabsTargetIdentityKey('goblin+file:///repo\0branch\0bad\nbranch')).toBeNull()
   })
 
   it('decodes canonical Windows worktree locators without consulting the browser platform', () => {

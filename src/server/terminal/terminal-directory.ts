@@ -88,6 +88,13 @@ export class TerminalDirectory<
     return true
   }
 
+  change(entry: TEntry, mutate: () => void): number {
+    if (this.entriesByRuntimeId.get(entry.id) !== entry) throw new Error('terminal directory entry unavailable')
+    mutate()
+    this.advanceCatalogRevision(entry.userId, entry.scope)
+    return this.catalogRevision(entry.userId, entry.scope)
+  }
+
   entries(): IterableIterator<TEntry> {
     return this.entriesByRuntimeId.values()
   }

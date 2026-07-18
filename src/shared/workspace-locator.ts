@@ -54,6 +54,23 @@ export function canonicalWorkspaceLocator(input: string): WorkspaceLocator | nul
   return parsed ? formatWorkspaceLocator(parsed, parsed.transport === 'file' ? parsed.platform : 'posix') : null
 }
 
+/** Bind an authoritative native path to the transport/platform of an existing workspace locator. */
+export function workspaceLocatorForPath(workspaceId: WorkspaceId, path: string): WorkspaceLocator | null {
+  const parsed = parseCanonicalWorkspaceLocator(workspaceId)
+  if (!parsed) return null
+  return parsed.transport === 'ssh'
+    ? formatWorkspaceLocator({ transport: 'ssh', profile: parsed.profile, path }, 'posix')
+    : formatWorkspaceLocator({ transport: 'file', platform: parsed.platform, path }, parsed.platform)
+}
+
+export function workspaceLocatorsShareTransport(workspaceId: string, targetId: string): boolean {
+  const workspace = parseCanonicalWorkspaceLocator(workspaceId)
+  const target = parseCanonicalWorkspaceLocator(targetId)
+  if (!workspace || !target || workspace.transport !== target.transport) return false
+  if (workspace.transport === 'ssh') return target.transport === 'ssh' && workspace.profile === target.profile
+  return target.transport === 'file' && workspace.platform === target.platform
+}
+
 export function formatWorkspaceLocator(
   locator: ParsedWorkspaceLocator,
   platform: WorkspaceLocatorPlatform,

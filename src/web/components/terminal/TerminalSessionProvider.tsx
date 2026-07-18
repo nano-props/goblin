@@ -11,7 +11,7 @@ import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry
 import { refreshWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { useTerminalSessionProjection } from '#/web/components/terminal/use-terminal-session-projection.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import { useTerminalRepoIndex } from '#/web/components/terminal/terminal-repo-index.ts'
+import { useTerminalRuntimeMembershipIndex } from '#/web/components/terminal/terminal-runtime-membership-index.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 
 interface TerminalSessionProviderProps {
@@ -19,7 +19,7 @@ interface TerminalSessionProviderProps {
 }
 
 export function TerminalSessionProvider({ children }: TerminalSessionProviderProps) {
-  const repoIndex = useTerminalRepoIndex()
+  const runtimeMembershipIndex = useTerminalRuntimeMembershipIndex()
   const selectedTerminalSessionIdByTerminalWorktree = useReposStore(
     (s) => s.selectedTerminalSessionIdByTerminalWorktree,
   )
@@ -38,9 +38,9 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
 
   // Projection state sync
   useEffect(() => {
-    projection.setRepoIndex(repoIndex)
+    projection.setRuntimeMembershipIndex(runtimeMembershipIndex)
     projection.setPreferredSelectedTerminalSessionIds(selectedTerminalSessionIdByTerminalWorktree)
-  }, [projection, repoIndex, selectedTerminalSessionIdByTerminalWorktree])
+  }, [projection, runtimeMembershipIndex, selectedTerminalSessionIdByTerminalWorktree])
 
   // Projection event wiring (singleton lifecycle, see terminal-roadmap.md P1.7).
   // The projection is client-level; we only subscribe / unsubscribe client

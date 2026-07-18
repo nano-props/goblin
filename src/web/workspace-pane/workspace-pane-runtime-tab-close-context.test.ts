@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
   createTerminalWithAdmissionForTest,
@@ -14,17 +15,15 @@ import { terminalRuntimeTabCloseContext } from '#/web/workspace-pane/workspace-p
 
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 const terminalBase: TerminalSessionBase = {
-  repoRoot: 'goblin+file:///repo',
-  repoRuntimeId: REPO_RUNTIME_ID,
-  branch: 'main',
-  worktreePath: '/repo-worktree',
+  target: {
+    kind: 'git-worktree',
+    workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
+    workspaceRuntimeId: REPO_RUNTIME_ID,
+    root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
+  },
+  presentation: { kind: 'git-worktree', branchName: 'main' },
 }
-const closeTarget = {
-  repoRoot: terminalBase.repoRoot,
-  repoRuntimeId: REPO_RUNTIME_ID,
-  branchName: terminalBase.branch,
-  worktreePath: terminalBase.worktreePath,
-}
+const closeTarget = terminalBase
 
 afterEach(() => {
   setTerminalSessionCommandBridge(null)
@@ -64,24 +63,6 @@ describe('workspace pane runtime tab close context', () => {
     ).toBe(false)
   })
 
-  test('rejects confirmed close when terminal base is missing', () => {
-    const closeTerminalByDescriptor = vi.fn(async () => true)
-    setTerminalSessionCommandBridge(terminalCommandBridge({ closeTerminalByDescriptor }))
-    const context = readWorkspacePaneRuntimeTabCloseContext()
-
-    expect(
-      canCloseWorkspacePaneRuntimeTabWithContext(
-        { type: 'terminal', target: { ...closeTarget, worktreePath: null } },
-        context,
-      ),
-    ).toBe(false)
-    expect(
-      canConfirmWorkspacePaneRuntimeTabCloseWithContext(
-        { type: 'terminal', sessionId: 'term-111111111111111111111', target: { ...closeTarget, worktreePath: null } },
-        context,
-      ),
-    ).toBe(false)
-  })
 })
 
 function terminalCommandBridge({

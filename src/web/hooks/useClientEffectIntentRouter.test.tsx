@@ -7,7 +7,8 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
@@ -28,7 +29,13 @@ import {
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import {
+  terminalExecutionPath,
+  terminalPresentationBranch,
+  terminalSessionCoordinates,
+  type TerminalSessionBase,
+} from '#/shared/terminal-types.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
@@ -197,7 +204,7 @@ describe('useClientEffectIntentRouter', () => {
     })
     currentRepoId = repo.id
     const terminalSessionId = 'term-222222222222222222222'
-    const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-feature')
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(repo.id, '/tmp/repo-feature')
 
     await renderHookHost()
     seedInitialObservedWorkspacePaneRouteForTest({
@@ -243,7 +250,7 @@ describe('useClientEffectIntentRouter', () => {
     navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
     currentRepoId = repo.id
     const terminalSessionId = 'term-222222222222222222222'
-    const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-feature')
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(repo.id, '/tmp/repo-feature')
 
     await renderHookHost()
     seedInitialObservedWorkspacePaneRouteForTest({
@@ -437,18 +444,21 @@ describe('useClientEffectIntentRouter', () => {
     currentBranchName = 'main'
     currentWorkspacePaneRoute = { kind: 'static', tab: 'status' }
     useTerminalProjectionHydrationStore.getState().markProjectionReady(repo.id, repo.repoRuntimeId)
-    const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-worktree')
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(repo.id, '/tmp/repo-worktree')
     let visibleSessionIds = ['term-111111111111111111111']
     let workspacePaneTabsTestBridge!: ReturnType<typeof installWorkspacePaneTabsTestBridge>
     useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-111111111111111111111')
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-222222222222222222222'
+      const coordinates = terminalSessionCoordinates(base)
+      const branchName = terminalPresentationBranch(base.presentation)
+      if (!branchName) throw new Error('expected Git worktree terminal fixture')
       visibleSessionIds = [...visibleSessionIds, terminalSessionId]
       workspacePaneTabsTestBridge.addRuntimeTab({
-        repoRoot: base.repoRoot,
-        repoRuntimeId: base.repoRuntimeId!,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
+        repoRoot: coordinates.repoRoot,
+        repoRuntimeId: coordinates.repoRuntimeId,
+        branchName,
+        worktreePath: terminalExecutionPath(base.target),
         terminalSessionId,
       })
       useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, terminalSessionId)
@@ -518,18 +528,15 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     await waitFor(() => {
-      expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', {
-        repoRoot: repo.id,
-        repoRuntimeId: repo.repoRuntimeId,
-        target: {
-          kind: 'git-worktree',
-          workspaceId: repo.id,
-          workspaceRuntimeId: repo.repoRuntimeId,
-          root: 'goblin+file:///tmp/repo-worktree',
-        },
+      expect(closeTerminalByDescriptor).toHaveBeenCalledWith(
+        'term-222222222222222222222',
+        terminalSessionBaseForTest({
+          repoRoot: repo.id,
+          repoRuntimeId: repo.repoRuntimeId,
         branch: 'main',
         worktreePath: '/tmp/repo-worktree',
-      })
+        }),
+      )
     })
     expect(showRepoBranchWorkspacePaneTabSpy).toHaveBeenCalledWith(repo.id, 'main', 'status')
     expect(showRepoBranchTerminalSessionSpy).not.toHaveBeenCalled()
@@ -655,12 +662,14 @@ function terminalWorktreeSnapshot(
     selectedDescriptor: selectedSession
       ? {
           terminalSessionId: selectedSession.terminalSessionId,
-          terminalWorktreeKey,
           index: selectedSession.index,
-          repoRoot: 'goblin+file:///tmp/repo',
-          repoRuntimeId: useReposStore.getState().repos['goblin+file:///tmp/repo']?.repoRuntimeId ?? '',
-          branch: 'main',
-          worktreePath: '/tmp/repo-worktree',
+          target: {
+            kind: 'git-worktree',
+            workspaceId: canonicalWorkspaceLocator('goblin+file:///tmp/repo')!,
+            workspaceRuntimeId: useReposStore.getState().repos['goblin+file:///tmp/repo']?.repoRuntimeId ?? '',
+            root: canonicalWorkspaceLocator('goblin+file:///tmp/repo-worktree')!,
+          },
+          presentation: { kind: 'git-worktree', branchName: 'main' },
         }
       : null,
     sessions,

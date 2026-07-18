@@ -10,10 +10,6 @@ import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/w
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { workspacePaneTabsInteractionBlockedForTarget } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import type {
-  GitWorkspacePaneActionTarget,
-  WorkspacePaneActionTarget,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 export type WorkspacePaneTabTargetResolution =
   | { kind: 'ready'; target: RepoWorkspaceTabModel }
@@ -34,9 +30,14 @@ export interface WorkspacePaneTabTargetOptions {
 
 export const workspacePanePreferenceTargetOptions: WorkspacePaneTabTargetOptions = { workspacePaneRoute: undefined }
 
-export type WorkspacePaneDestinationTargetLease = GitWorkspacePaneActionTarget & { branchName: string }
+export interface WorkspacePaneDestinationTargetLease {
+  repoId: string
+  repoRuntimeId: string
+  branchName: string
+  worktreePath: string | null
+}
 
-export type WorkspacePaneTargetLease = GitWorkspacePaneActionTarget & { branchName: string }
+export type WorkspacePaneTargetLease = WorkspacePaneDestinationTargetLease
 
 export type WorkspacePaneDestinationTargetResolution =
   { kind: 'ready'; lease: WorkspacePaneDestinationTargetLease } | { kind: 'missing' }
@@ -77,7 +78,7 @@ export function workspacePaneTargetLeaseIsCurrent(lease: WorkspacePaneTargetLeas
   )
 }
 
-export function workspacePaneCommittedRuntimeTargetIsCurrent(target: WorkspacePaneActionTarget): boolean {
+export function workspacePaneCommittedRuntimeTargetIsCurrent(target: WorkspacePaneTargetLease): boolean {
   if (!target.worktreePath) return false
   const repo = useReposStore.getState().repos[target.repoId]
   if (!repo || repo.repoRuntimeId !== target.repoRuntimeId) return false

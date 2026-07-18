@@ -1,7 +1,11 @@
 import path from 'node:path'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import {
+  terminalExecutionPath,
+  terminalSessionCoordinates,
+  type TerminalSessionSummary,
+} from '#/shared/terminal-types.ts'
 import { localWorkspaceNativePath } from '#/server/modules/workspace-path.ts'
 
 export interface TerminalSessionPruneManager {
@@ -36,8 +40,8 @@ class TerminalSessionPruner {
     const liveWorktreePaths = new Set(worktrees.map((worktree) => path.resolve(worktree.path)))
     let pruned = 0
     for (const session of allSessions) {
-      if (session.repoRoot !== input.repoRoot) continue
-      if (liveWorktreePaths.has(path.resolve(session.worktreePath))) continue
+      if (terminalSessionCoordinates(session).repoRoot !== input.repoRoot) continue
+      if (liveWorktreePaths.has(path.resolve(terminalExecutionPath(session.target)))) continue
       if (await this.manager.requestSessionRetirement(session.terminalRuntimeSessionId)) pruned += 1
     }
     const remaining = await this.manager

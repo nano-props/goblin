@@ -9,18 +9,17 @@ import type {
 import type { TerminalInput, TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
 import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
-import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 
-export interface TerminalDescriptor {
-  terminalWorktreeKey: string
+type TerminalDescriptorIdentity = {
   terminalSessionId: string
   index: number
-  repoRuntimeId: string
-  target?: RuntimeWorkspacePaneTarget
-  repoRoot: string
-  branch: string
-  worktreePath: string
 }
+
+type TerminalDescriptorFor<Session extends TerminalSessionBase> = Session extends TerminalSessionBase
+  ? Session & TerminalDescriptorIdentity
+  : never
+
+export type TerminalDescriptor = TerminalDescriptorFor<TerminalSessionBase>
 
 export interface TerminalProgressState {
   /** 1 = normal, 2 = error, 3 = indeterminate, 4 = paused/warning. State 0 clears the progress (not stored). */
@@ -143,12 +142,11 @@ export interface TerminalCreateOptions {
   resolveStartupShellCommand?: () => Promise<string>
 }
 
-export interface TerminalRepoSnapshot {
+export interface TerminalRuntimeMembership {
   repoRuntimeId: string
-  branchByWorktreePath: Record<string, string>
 }
 
-export type TerminalRepoIndex = Record<string, TerminalRepoSnapshot>
+export type TerminalRuntimeMembershipIndex = Record<string, TerminalRuntimeMembership>
 
 export interface TerminalSessionSummary {
   type: 'terminal'

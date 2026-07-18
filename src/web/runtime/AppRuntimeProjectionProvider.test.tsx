@@ -23,6 +23,7 @@ import {
   runtimeWorkspacePaneTargetForTest,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/test-utils/workspace-pane-tabs.ts'
+import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 
 const projectionMocks = vi.hoisted(() => ({
   reconcileServerSessionsSnapshot: vi.fn(() => true),
@@ -42,11 +43,7 @@ const REPO_ID = 'goblin+file:///tmp/goblin-runtime-provider-repo'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/goblin-runtime-provider-worktree'
 
-type TestTerminalSessionSummary = Omit<
-  TerminalSessionSummary,
-  'repoRuntimeId' | 'repoRoot' | 'branch' | 'worktreePath' | 'target'
-> &
-  Partial<Pick<TerminalSessionSummary, 'repoRuntimeId' | 'repoRoot' | 'branch' | 'worktreePath' | 'target'>>
+type TestTerminalSessionSummary = TerminalSessionSummary
 
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let workspaceTabsChangedHandler: ((message: WorkspacePaneTabsChangedRealtimeMessage) => void) | null = null
@@ -472,7 +469,12 @@ describe('AppRuntimeProjectionProvider', () => {
           sessions: [
             completeServerSession({
               ...serverSession('term-111111111111111111111'),
-              repoRuntimeId: firstRepo.repoRuntimeId,
+              ...terminalSessionBaseForTest({
+                repoRoot: REPO_ID,
+                repoRuntimeId: firstRepo.repoRuntimeId,
+                branch: BRANCH_NAME,
+                worktreePath: WORKTREE_PATH,
+              }),
             }),
           ],
         })
@@ -724,13 +726,21 @@ function attachResult(): Extract<TerminalAttachResult, { ok: true; frame: 'snaps
 }
 
 function serverSession(terminalSessionId: string): TestTerminalSessionSummary {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  if (!repo) throw new Error('runtime provider test workspace is unavailable')
+  const base = terminalSessionBaseForTest({
+    repoRoot: REPO_ID,
+    repoRuntimeId: repo.repoRuntimeId,
+    branch: BRANCH_NAME,
+    worktreePath: WORKTREE_PATH,
+  })
   return {
+    ...base,
     terminalRuntimeSessionId: `runtime-${terminalSessionId}`,
     terminalRuntimeGeneration: 1,
     terminalSessionId,
     processName: 'zsh',
     canonicalTitle: null,
-    cwd: WORKTREE_PATH,
     controller: null,
     phase: 'open',
     message: null,
@@ -740,22 +750,7 @@ function serverSession(terminalSessionId: string): TestTerminalSessionSummary {
 }
 
 function completeServerSession(session: TestTerminalSessionSummary): TerminalSessionSummary {
-  const repoRuntimeId = session.repoRuntimeId ?? useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
-  return {
-    ...session,
-    repoRuntimeId,
-    repoRoot: session.repoRoot ?? REPO_ID,
-    branch: session.branch ?? BRANCH_NAME,
-    worktreePath: session.worktreePath ?? WORKTREE_PATH,
-    target:
-      session.target ??
-      runtimeWorkspacePaneTargetForTest({
-        repoRoot: REPO_ID,
-        repoRuntimeId,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-      }),
-  }
+  return session
 }
 
 function tabsFor(repoRuntimeId: string) {

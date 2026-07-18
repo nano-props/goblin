@@ -2,15 +2,19 @@ import { describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const REPO_ID = 'goblin+file:///tmp/goblin-terminal-create-command-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-terminal-create-command'
 const WORKTREE_PATH = '/tmp/goblin-terminal-create-command-worktree'
 const BASE: TerminalSessionBase = {
-  repoRoot: REPO_ID,
-  repoRuntimeId: REPO_RUNTIME_ID,
-  branch: 'main',
-  worktreePath: WORKTREE_PATH,
+  target: {
+    kind: 'git-worktree',
+    workspaceId: canonicalWorkspaceLocator(REPO_ID)!,
+    workspaceRuntimeId: REPO_RUNTIME_ID,
+    root: canonicalWorkspaceLocator(`goblin+file://${WORKTREE_PATH}`)!,
+  },
+  presentation: { kind: 'git-worktree', branchName: 'main' },
 }
 
 describe('terminal create command', () => {
@@ -137,27 +141,12 @@ describe('terminal create command', () => {
     expect(commitCreatedTerminalTab).not.toHaveBeenCalled()
   })
 
-  test('fast-fails before server create when the trigger has no repo runtime id', async () => {
-    const createTerminal = vi.fn(async () => createAdmission())
-    const commitCreatedTerminalTab = vi.fn(() => ({ status: 'committed' as const }))
-
-    await expect(
-      runCreateTerminalTabCommand({
-        base: { repoRoot: REPO_ID, branch: 'main', worktreePath: WORKTREE_PATH },
-        createTerminal,
-        commitCreatedTerminalTab,
-      }),
-    ).resolves.toMatchObject({ ok: false, messageKey: 'error.terminal-create-failed' })
-
-    expect(createTerminal).not.toHaveBeenCalled()
-    expect(commitCreatedTerminalTab).not.toHaveBeenCalled()
-  })
 })
 
 function createAdmission(overrides: Partial<TerminalCreateAdmissionResult> = {}): TerminalCreateAdmissionResult {
   return {
     terminalSessionId: 'term-111111111111111111111',
-    branch: 'main',
+    presentation: { kind: 'git-worktree', branchName: 'main' },
     requestRole: 'leader',
     resourceDisposition: 'created',
     runtimeProjectionApplied: true,

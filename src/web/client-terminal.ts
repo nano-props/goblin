@@ -34,7 +34,6 @@ export function createServerTerminalClient(options: {
       terminalRuntimeGeneration: number
       terminalSessionId: string
       repoRoot: string
-      worktreePath: string
     }) => void
   >()
 
@@ -191,7 +190,6 @@ export function createServerTerminalClient(options: {
             terminalRuntimeGeneration: message.terminalRuntimeGeneration,
             terminalSessionId: message.terminalSessionId,
             repoRoot: message.repoRoot,
-            worktreePath: message.worktreePath,
           })
         return
       case 'identity': {

@@ -1,8 +1,11 @@
 import type { RestorableWorkspacePaneTarget, RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import { isValidBranch } from '#/shared/input-validation.ts'
 import {
   canonicalWorkspaceLocator,
   formatWorkspaceLocator,
   parseCanonicalWorkspaceLocator,
+  workspaceLocatorForPath,
+  workspaceLocatorsShareTransport,
 } from '#/shared/workspace-locator.ts'
 
 export interface GitWorkspacePaneTabsTarget {
@@ -33,7 +36,7 @@ export type WorkspacePaneTabsTargetIdentity =
   | {
       kind: 'worktree'
       repoRoot: string
-      worktreePath: string
+      worktreeId: string
     }
 
 export function workspacePaneTabsTargetIdentityKey(target: WorkspacePaneTabsTarget): string {
@@ -41,27 +44,54 @@ export function workspacePaneTabsTargetIdentityKey(target: WorkspacePaneTabsTarg
     'kind' in target
       ? target
       : target.worktreePath !== null
-        ? { kind: 'worktree', repoRoot: target.repoRoot, worktreePath: target.worktreePath }
+        ? worktreeTargetIdentity(target.repoRoot, target.worktreePath)
         : { kind: 'branch', repoRoot: target.repoRoot, branchName: target.branchName },
   )
 }
 
+function worktreeTargetIdentity(repoRoot: string, worktreePath: string): WorkspacePaneTabsTargetIdentity {
+  const workspaceId = canonicalWorkspaceLocator(repoRoot)
+  const worktreeId = workspaceId ? workspaceLocatorForPath(workspaceId, worktreePath) : null
+  if (!workspaceId || !worktreeId) throw new Error('workspace pane target requires canonical workspace coordinates')
+  return { kind: 'worktree', repoRoot: workspaceId, worktreeId }
+}
+
 export function workspacePaneTabsTargetIdentityKeyFromIdentity(target: WorkspacePaneTabsTargetIdentity): string {
-  if (target.kind === 'workspace-root') return `${target.repoRoot}\0workspace-root`
-  if (target.kind === 'worktree') return `${target.repoRoot}\0worktree\0${target.worktreePath}`
+  const repoRoot = canonicalWorkspaceLocator(target.repoRoot)
+  if (repoRoot !== target.repoRoot) throw new Error('workspace pane target requires a canonical workspace locator')
+  if (target.kind === 'workspace-root') return `${repoRoot}\0workspace-root`
+  if (target.kind === 'worktree') {
+    if (
+      canonicalWorkspaceLocator(target.worktreeId) !== target.worktreeId ||
+      !workspaceLocatorsShareTransport(repoRoot, target.worktreeId)
+    ) {
+      throw new Error('workspace pane worktree target requires a compatible canonical locator')
+    }
+    return `${repoRoot}\0worktree\0${target.worktreeId}`
+  }
+  if (!isValidBranch(target.branchName)) throw new Error('workspace pane branch target requires a valid branch')
   return `${target.repoRoot}\0branch\0${target.branchName}`
 }
 
 export function parseWorkspacePaneTabsTargetIdentityKey(key: string): WorkspacePaneTabsTargetIdentity | null {
   const parts = key.split('\0')
-  if (parts.length === 2 && parts[0] && parts[1] === 'workspace-root') {
-    return { kind: 'workspace-root', repoRoot: parts[0] }
+  if (parts.length === 2 && parts[1] === 'workspace-root') {
+    const repoRoot = canonicalWorkspaceLocator(parts[0])
+    return repoRoot === parts[0] ? { kind: 'workspace-root', repoRoot } : null
   }
   if (parts.length !== 3) return null
   const [repoRoot, kind, value] = parts
-  if (!repoRoot || !value) return null
-  if (kind === 'branch') return { kind, repoRoot, branchName: value }
-  if (kind === 'worktree') return { kind, repoRoot, worktreePath: value }
+  const canonicalRepoRoot = canonicalWorkspaceLocator(repoRoot)
+  if (canonicalRepoRoot !== repoRoot || !value) return null
+  if (kind === 'branch') {
+    return isValidBranch(value) ? { kind, repoRoot: canonicalRepoRoot, branchName: value } : null
+  }
+  if (kind === 'worktree') {
+    const worktreeId = canonicalWorkspaceLocator(value)
+    return worktreeId === value && workspaceLocatorsShareTransport(canonicalRepoRoot, worktreeId)
+      ? { kind, repoRoot: canonicalRepoRoot, worktreeId }
+      : null
+  }
   return null
 }
 

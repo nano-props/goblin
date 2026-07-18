@@ -179,7 +179,7 @@ describe('workspace pane tab providers', () => {
     expect(statusWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0 })).toBe(
       'workspace-pane-tabs.status-tooltip:{"branch":"main"}',
     )
-    expect(statusWorkspacePaneTabProvider.tooltip({ t, branchName: '', statusCount: 0 })).toBe('tab.status')
+    expect(statusWorkspacePaneTabProvider.tooltip({ t, branchName: null, statusCount: 0 })).toBe('tab.status')
     expect(historyWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0 })).toBe(
       'workspace-pane-tabs.history-tooltip:{"branch":"main"}',
     )
@@ -187,7 +187,7 @@ describe('workspace pane tab providers', () => {
     expect(filesWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0 })).toBe(
       'workspace-pane-tabs.files-tooltip:{"branch":"main"}',
     )
-    expect(filesWorkspacePaneTabProvider.tooltip({ t, branchName: '', statusCount: 0 })).toBe('tab.files')
+    expect(filesWorkspacePaneTabProvider.tooltip({ t, branchName: null, statusCount: 0 })).toBe('tab.files')
     expect(
       terminalWorkspacePaneTabProvider.tooltip({ t, branchName: 'main', statusCount: 0, view: terminalView }),
     ).toBe('Terminal 1 full')

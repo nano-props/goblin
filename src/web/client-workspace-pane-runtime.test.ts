@@ -11,10 +11,50 @@ const target = {
     workspaceRuntimeId: 'repo-runtime-test',
     root: canonicalWorkspaceLocator('goblin+file:///repo/worktree')!,
   },
-  nativeWorktreePath: '/repo/worktree',
 }
 
 describe('createServerWorkspacePaneRuntimeClient', () => {
+  test('rejects a runtime-open snapshot owned by a different execution target', async () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    const request = vi.fn(async () => ({
+      ok: true as const,
+      runtimeType: 'terminal' as const,
+      paneTabsSnapshot: {
+        revision: 1,
+        entries: [
+          {
+            target: {
+              ...target.target,
+              root: canonicalWorkspaceLocator('goblin+file:///repo/other-worktree')!,
+            },
+            tabs: [{ type: 'terminal' as const, runtimeSessionId: terminalSessionId }],
+          },
+        ],
+      },
+      runtime: {
+        ok: true as const,
+        action: 'created' as const,
+        presentation: { kind: 'git-worktree' as const, branchName: 'main' },
+        terminalSessionId,
+        terminalSessionsRevision: 1,
+        terminalRuntimeSessionId: 'pty_1234567890abcdef',
+        terminalRuntimeGeneration: 1,
+        processName: 'zsh',
+        canonicalTitle: null,
+        phase: 'open' as const,
+        message: null,
+        controller: null,
+        canonicalCols: 80,
+        canonicalRows: 24,
+      },
+    }))
+    const client = createServerWorkspacePaneRuntimeClient(realtimeWithRequest(request))
+
+    await expect(
+      client.open({ runtimeType: 'terminal', request: { kind: 'primary', target: target.target } }),
+    ).rejects.toThrow('invalid open response')
+  })
+
   test('routes close through its namespaced realtime action', async () => {
     const request = vi.fn(async () => ({
       ok: true as const,

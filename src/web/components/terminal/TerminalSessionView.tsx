@@ -31,34 +31,25 @@ import {
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
 import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
 
 interface TerminalSessionViewProps {
-  repoRoot: string
-  repoRuntimeId: string
-  branch: string
-  worktreePath: string
+  base: TerminalSessionBase
   selectedTerminalSessionId?: string | null
   projectionPhase?: TerminalProjectionHydrationPhase
   projectionErrorMessage?: string
   createTerminalForSlot: (base: TerminalSessionBase) => Promise<unknown>
-  target?: RuntimeWorkspacePaneTarget
 }
 
 export function TerminalSessionView({
-  repoRoot,
-  repoRuntimeId,
-  branch,
-  worktreePath,
+  base,
   selectedTerminalSessionId,
   projectionPhase = 'ready',
   projectionErrorMessage,
   createTerminalForSlot,
-  target,
 }: TerminalSessionViewProps) {
   const t = useT()
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -82,7 +73,8 @@ export function TerminalSessionView({
     restart,
     focusTerminal,
   } = context
-  const terminalWorktreeKey = formatTerminalWorktreeKey(repoRoot, worktreePath)
+  const { repoRoot, worktreeId } = terminalSessionCoordinates(base)
+  const terminalWorktreeKey = formatTerminalWorktreeKey(repoRoot, worktreeId)
   useLayoutEffect(() => {
     const host = hostRef.current
     if (!host) return
@@ -102,10 +94,7 @@ export function TerminalSessionView({
   const explicitDescriptor = useTerminalWorktreeSessionDescriptor({
     terminalWorktreeKey,
     terminalSessionId: selectedTerminalSessionId ?? null,
-    repoRoot,
-    repoRuntimeId,
-    branch,
-    worktreePath,
+    base,
   })
   const descriptor = selectedTerminalSessionId === undefined ? selectedDescriptor : explicitDescriptor
   const terminalSessionId =
@@ -536,7 +525,7 @@ export function TerminalSessionView({
         // loading state is still the right user signal).
         <EmptyTerminalCta
           onCreate={async () => {
-            await createTerminalForSlot({ repoRoot, repoRuntimeId, branch, worktreePath, target })
+            await createTerminalForSlot(base)
           }}
           emptyLabel={t('terminal.empty')}
           newTerminalLabel={t('terminal.new')}

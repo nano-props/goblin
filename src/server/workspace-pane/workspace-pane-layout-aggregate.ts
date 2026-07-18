@@ -116,8 +116,11 @@ export interface WorkspacePaneLayoutOperation {
       target: RuntimeWorkspacePaneTarget
       lease: PhysicalWorktreeAdmissionLease
       tabs: readonly WorkspacePaneTabEntry[]
+      validTargets: readonly WorkspacePaneTargetProjection[]
+      providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
     },
-  ): void
+    admissionCallback: () => void,
+  ): Promise<WorkspacePaneTabsSnapshot>
   closeEpoch(scope: WorkspacePaneEpochScope): void
   commitProjectionTargets(
     input: WorkspacePaneEpochScope & {
@@ -163,7 +166,8 @@ export class WorkspacePaneLayoutAggregate {
           snapshot: async (input) => await this.snapshot(input),
           projectEntriesForAdmission: async (input) => await this.projectEntriesForAdmission(input),
           validateMembershipAndSnapshot: async (input) => await this.validateMembershipAndSnapshot(input),
-          commitRuntimeTarget: (input) => this.commitRuntimeTarget(input),
+          commitRuntimeTarget: async (input, admissionCallback) =>
+            await this.commitRuntimeTarget(input, admissionCallback),
           closeEpoch: (scope) => this.closeEpoch(scope),
           commitProjectionTargets: (input) => this.commitProjectionTargets(input),
           indexedAdmissionLeases: (scope) => this.overlay.indexedAdmissionLeases(scope),
@@ -237,15 +241,49 @@ export class WorkspacePaneLayoutAggregate {
     this.clocks.delete(key)
   }
 
-  private commitRuntimeTarget(
+  private async commitRuntimeTarget(
     input: WorkspacePaneEpochScope & {
       target: RuntimeWorkspacePaneTarget
       lease: PhysicalWorktreeAdmissionLease
       tabs: readonly WorkspacePaneTabEntry[]
+      validTargets: readonly WorkspacePaneTargetProjection[]
+      providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
     },
-  ): void {
-    this.overlay.registerPhysicalTarget(input)
-    this.overlay.recordMixedOrder(input)
+    admissionCallback: () => void,
+  ): Promise<WorkspacePaneTabsSnapshot> {
+    const validTargets = targetMap(input.validTargets)
+    if (!validTargets.has(runtimeTargetKey(input.target))) throw new Error('error.workspace-tabs-target-invalid')
+    const layout = (await this.repository.load(input.repoRoot)).layout
+    const stagedOverlay = this.overlay.fork()
+    stagedOverlay.registerPhysicalTarget(input)
+    stagedOverlay.recordMixedOrder(input)
+    const stagedClocks = cloneCanonicalClocks(this.clocks)
+    const entries = projectCanonicalEntries(
+      input,
+      layout,
+      stagedOverlay,
+      validTargets,
+      input.providerSnapshots,
+    )
+    const snapshot = {
+      revision: revisionForState(
+        stagedClocks,
+        stagedOverlay,
+        input,
+        layout,
+        input.validTargets,
+        input.providerSnapshots,
+        entries,
+      ),
+      entries,
+    }
+    admissionCallback()
+    this.overlay.replaceEpochWith(stagedOverlay, input)
+    const key = epochKey(input)
+    const stagedClock = stagedClocks.get(key)
+    if (stagedClock) this.clocks.set(key, cloneCanonicalClock(stagedClock))
+    else this.clocks.delete(key)
+    return snapshot
   }
 
   physicalTargets(target: PhysicalWorktreeAdmissionLease | PhysicalWorktreeIdentity) {
@@ -321,48 +359,7 @@ export class WorkspacePaneLayoutAggregate {
     providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
     entries: WorkspacePaneTabsSnapshot['entries'],
   ): number {
-    const key = epochKey(scope)
-    const layoutToken = JSON.stringify(normalizeWorkspacePaneDurableLayout(scope.repoRoot, layout))
-    const providerRevisions = new Map(providerRevisionMap(providers))
-    const overlayRevision = this.overlay.revision(scope)
-    const targetProjectionToken = JSON.stringify([...targetMap(validTargets)])
-    const entriesToken = JSON.stringify(entries)
-    const current = this.clocks.get(key)
-    if (!current) {
-      this.clocks.set(key, {
-        layoutToken,
-        overlayRevision,
-        targetProjectionToken,
-        providerRevisions,
-        entriesToken,
-        revision: 0,
-      })
-      return 0
-    }
-    for (const [type, revision] of providerRevisions) {
-      if (revision < (current.providerRevisions.get(type) ?? 0)) {
-        throw new Error('error.workspace-tabs-provider-snapshot-stale')
-      }
-    }
-    const dependenciesChanged =
-      current.layoutToken !== layoutToken ||
-      current.overlayRevision !== overlayRevision ||
-      current.targetProjectionToken !== targetProjectionToken ||
-      !mapsEqual(current.providerRevisions, providerRevisions)
-    if (!dependenciesChanged) {
-      if (current.entriesToken !== entriesToken) throw new Error('error.workspace-tabs-provider-snapshot-inconsistent')
-      return current.revision
-    }
-    const next = {
-      layoutToken,
-      overlayRevision,
-      targetProjectionToken,
-      providerRevisions,
-      entriesToken,
-      revision: current.revision + 1,
-    }
-    this.clocks.set(key, next)
-    return next.revision
+    return revisionForState(this.clocks, this.overlay, scope, layout, validTargets, providers, entries)
   }
 
   private commitProjectionTargets(
@@ -410,6 +407,59 @@ export class WorkspacePaneLayoutAggregate {
     }
     return [...affected]
   }
+}
+
+function revisionForState(
+  clocks: Map<string, CanonicalClockState>,
+  overlay: WorkspacePaneEpochOverlay,
+  scope: WorkspacePaneEpochScope,
+  layout: WorkspacePaneDurableLayout,
+  validTargets: readonly WorkspacePaneTargetProjection[],
+  providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
+  entries: WorkspacePaneTabsSnapshot['entries'],
+): number {
+  const key = epochKey(scope)
+  const layoutToken = JSON.stringify(normalizeWorkspacePaneDurableLayout(scope.repoRoot, layout))
+  const providerRevisions = new Map(providerRevisionMap(providers))
+  const overlayRevision = overlay.revision(scope)
+  const targetProjectionToken = JSON.stringify([...targetMap(validTargets)])
+  const entriesToken = JSON.stringify(entries)
+  const current = clocks.get(key)
+  if (!current) {
+    clocks.set(key, {
+      layoutToken,
+      overlayRevision,
+      targetProjectionToken,
+      providerRevisions,
+      entriesToken,
+      revision: 0,
+    })
+    return 0
+  }
+  for (const [type, revision] of providerRevisions) {
+    if (revision < (current.providerRevisions.get(type) ?? 0)) {
+      throw new Error('error.workspace-tabs-provider-snapshot-stale')
+    }
+  }
+  const dependenciesChanged =
+    current.layoutToken !== layoutToken ||
+    current.overlayRevision !== overlayRevision ||
+    current.targetProjectionToken !== targetProjectionToken ||
+    !mapsEqual(current.providerRevisions, providerRevisions)
+  if (!dependenciesChanged) {
+    if (current.entriesToken !== entriesToken) throw new Error('error.workspace-tabs-provider-snapshot-inconsistent')
+    return current.revision
+  }
+  const next = {
+    layoutToken,
+    overlayRevision,
+    targetProjectionToken,
+    providerRevisions,
+    entriesToken,
+    revision: current.revision + 1,
+  }
+  clocks.set(key, next)
+  return next.revision
 }
 
 function projectCanonicalEntries(
@@ -538,4 +588,17 @@ function epochKey(scope: WorkspacePaneEpochScope): string {
 
 function mapsEqual(a: Map<string, number>, b: Map<string, number>): boolean {
   return a.size === b.size && Array.from(a).every(([key, value]) => b.get(key) === value)
+}
+
+function cloneCanonicalClocks(source: ReadonlyMap<string, CanonicalClockState>): Map<string, CanonicalClockState> {
+  return new Map(
+    [...source].map(([key, clock]) => [
+      key,
+      cloneCanonicalClock(clock),
+    ]),
+  )
+}
+
+function cloneCanonicalClock(clock: CanonicalClockState): CanonicalClockState {
+  return { ...clock, providerRevisions: new Map(clock.providerRevisions) }
 }

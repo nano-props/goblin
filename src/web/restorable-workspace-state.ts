@@ -8,6 +8,8 @@ import {
   workspacePaneTabRequiresWorktree,
 } from '#/shared/workspace-pane.ts'
 import { parseWorkspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import type { RestorableWorkspaceState, ReposStore } from '#/web/stores/repos/types.ts'
 import { persistedFiletreeViewStateByWorktreeByRepoForSession } from '#/web/filetree-session-state.ts'
 import type { FiletreeInteractionSnapshot } from '#/web/stores/repos/filetree-interaction-state.ts'
@@ -97,14 +99,16 @@ function clientWorkspaceRepoProjections(
     if (!repo) continue
     if (repo.session.projectionState === 'stub') continue
     const branchModel = readRepoBranchSnapshotQueryProjection(repo)
-    if (!branchModel) continue
+    const readyWithoutGit =
+      repo.workspaceProbe.status === 'ready' && repo.workspaceProbe.capabilities.git.status === 'unavailable'
+    if (!branchModel && !readyWithoutGit) continue
     projectedRepos[id] = {
       id: repo.id,
       remote: repo.remote,
       ui: {
         preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
       },
-      branches: branchModel.branches,
+      branches: branchModel?.branches ?? [],
     }
   }
   return projectedRepos
@@ -212,7 +216,9 @@ function preferredWorkspacePaneTabsForClientWorkspace(
       if (!target) continue
       if (tab !== null && !isWorkspacePaneSessionTabType(tab)) continue
       if (tab !== null && target.kind === 'branch' && workspacePaneTabRequiresWorktree(tab)) continue
-      const targetTabs = workspacePaneTabsByTargetByWorkspace[id]?.[targetKey] ?? defaultWorkspacePaneTabs()
+      const targetTabs =
+        workspacePaneTabsByTargetByWorkspace[id]?.[targetKey] ??
+        defaultWorkspacePaneTabs(target.kind === 'workspace-root' ? 'workspace-root' : 'git')
       if (
         tab !== null &&
         isWorkspacePaneStaticTabType(tab) &&
@@ -253,7 +259,8 @@ function workspacePaneTabsTargetKeyBelongsToRepo(
   if (target.kind === 'branch') {
     return repo.branches.some((branch) => branch.name === target.branchName) ? target : null
   }
-  return repo.branches.some((branch) => branch.worktree?.path === target.worktreePath) ? target : null
+  const worktreePath = parseCanonicalWorkspaceLocator(target.worktreeId)?.path
+  return worktreePath && repo.branches.some((branch) => branch.worktree?.path === worktreePath) ? target : null
 }
 
 function selectedTerminalSessionsForClientWorkspace(
@@ -262,12 +269,17 @@ function selectedTerminalSessionsForClientWorkspace(
 ): Record<string, string> {
   const persisted: Record<string, string> = {}
   for (const [terminalWorktreeKey, terminalSessionId] of Object.entries(selectedTerminalSessionIdByTerminalWorktree)) {
-    const parts = terminalWorktreeKey.split('\0')
-    if (parts.length !== 2) continue
-    const [repoRoot, worktreePath] = parts
-    if (!repoRoot || !worktreePath || !terminalSessionId) continue
-    const repo = repos[repoRoot]
-    if (!repo?.branches.some((branch) => branch.worktree?.path === worktreePath)) continue
+    const parsed = parseTerminalWorktreeKey(terminalWorktreeKey)
+    if (!parsed || !terminalSessionId) continue
+    const repo = repos[parsed.repoRoot]
+    if (!repo) continue
+    if (parsed.worktreeId === parsed.repoRoot) {
+      persisted[terminalWorktreeKey] = terminalSessionId
+      continue
+    }
+    const worktreePath = parseCanonicalWorkspaceLocator(parsed.worktreeId)?.path
+    if (!worktreePath) continue
+    if (!repo.branches.some((branch) => branch.worktree?.path === worktreePath)) continue
     persisted[terminalWorktreeKey] = terminalSessionId
   }
   return persisted

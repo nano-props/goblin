@@ -7,6 +7,7 @@ import {
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 
 const CURRENT_GIT_REPO = {
   id: 'goblin+file:///tmp/repo',
@@ -52,7 +53,7 @@ describe('client effect intent plans', () => {
       type: 'terminal-bell-click',
       repoRoot: repo.id,
       terminalSessionId: 'term-222222222222222222222',
-      terminalWorktreeKey: 'goblin+file:///tmp/repo\0/tmp/repo-feature',
+      terminalWorktreeKey: formatTerminalWorktreeKeyForPath('goblin+file:///tmp/repo', '/tmp/repo-feature'),
     })
 
     expect(plan).toEqual({
@@ -60,7 +61,7 @@ describe('client effect intent plans', () => {
       repoId: repo.id,
       branch: 'feature/test',
       terminalSessionId: 'term-222222222222222222222',
-      terminalWorktreeKey: 'goblin+file:///tmp/repo\0/tmp/repo-feature',
+      terminalWorktreeKey: formatTerminalWorktreeKeyForPath('goblin+file:///tmp/repo', '/tmp/repo-feature'),
     })
   })
 
@@ -69,7 +70,7 @@ describe('client effect intent plans', () => {
       type: 'terminal-bell-click',
       repoRoot: 'goblin+file:///tmp/repo',
       terminalSessionId: 'term-222222222222222222222',
-      terminalWorktreeKey: 'goblin+file:///tmp/repo\0/tmp/repo-feature',
+      terminalWorktreeKey: formatTerminalWorktreeKeyForPath('goblin+file:///tmp/repo', '/tmp/repo-feature'),
     })
 
     expect(plan).toEqual({ kind: 'unavailable', reason: 'branch-read-model-unavailable' })

@@ -159,6 +159,12 @@ test('clears the close transition when the server close command rejects', async 
     },
   })
   const terminalWorktreeKey = `${REPO_ID}\0${WORKTREE_PATH}`
+  const runtimeTarget = runtimeWorkspacePaneTargetForTest({
+    repoRoot: REPO_ID,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName: BRANCH_NAME,
+    worktreePath: WORKTREE_PATH,
+  })
   setTerminalSessionCommandBridgeForTest({
     terminalWorktreeSnapshot: () => ({
       terminalWorktreeKey,
@@ -166,10 +172,8 @@ test('clears the close transition when the server close command rejects', async 
         terminalSessionId,
         terminalWorktreeKey,
         index: 1,
-        repoRuntimeId: repo.repoRuntimeId,
-        repoRoot: REPO_ID,
-        branch: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
+        target: runtimeTarget,
+        presentation: { kind: 'git-worktree', branchName: BRANCH_NAME },
       },
       sessions: [
         {
@@ -209,10 +213,8 @@ test('clears the close transition when the server close command rejects', async 
       confirmedTerminal: {
         terminalSessionId,
         base: {
-          repoRoot: REPO_ID,
-          repoRuntimeId: repo.repoRuntimeId,
-          branch: BRANCH_NAME,
-          worktreePath: WORKTREE_PATH,
+          target: runtimeTarget,
+          presentation: { kind: 'git-worktree', branchName: BRANCH_NAME },
         },
       },
     }),
@@ -245,11 +247,8 @@ test('confirmed workspace terminal close selects Files without inventing a branc
         terminalSessionId,
         terminalWorktreeKey,
         index: 1,
-        repoRuntimeId: repo.repoRuntimeId,
-        repoRoot: REPO_ID,
-        branch: '',
-        worktreePath: REPO_ID,
         target: runtimeTarget,
+        presentation: { kind: 'workspace-root' },
       },
       sessions: [
         {
@@ -291,11 +290,8 @@ test('confirmed workspace terminal close selects Files without inventing a branc
       confirmedTerminal: {
         terminalSessionId,
         base: {
-          repoRoot: REPO_ID,
-          repoRuntimeId: repo.repoRuntimeId,
-          branch: '',
-          worktreePath: REPO_ID,
           target: runtimeTarget,
+          presentation: { kind: 'workspace-root' },
         },
       },
     }),

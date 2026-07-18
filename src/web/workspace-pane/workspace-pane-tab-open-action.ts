@@ -29,7 +29,10 @@ import {
   resolveWorkspacePaneDestinationTarget,
   workspacePaneTabInteractionBlockedForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import {
+  workspacePaneActionTargetFromCoordinates,
+  runWorkspacePaneAction,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
   beginPrimaryWindowPresentation,
   primaryWindowPresentationIsCurrent,
@@ -95,7 +98,7 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
     placement: { kind: 'append', openerIdentity },
     navigation,
   }
-  return await runWorkspacePaneAction(lease, () =>
+  return await runWorkspacePaneAction(workspacePaneActionTargetFromCoordinates(lease), () =>
     openWorkspacePaneStaticTabAction(input, {
       kind: 'destination',
       presentation,
@@ -127,12 +130,12 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
   }
   const presentationToken = beginPrimaryWindowPresentation()
   const outcome = await runWorkspacePaneAction(
-    {
+    workspacePaneActionTargetFromCoordinates({
       repoId: input.repoId,
       repoRuntimeId,
       branchName: input.branchName,
       worktreePath: resolvedInput.worktreePath,
-    },
+    }),
     () =>
       openWorkspacePaneStaticTabAction(resolvedInput, {
         kind: 'current',

@@ -12,23 +12,15 @@ import {
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 const REPO_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/repo' }, 'posix')!
 const terminalBase: TerminalSessionBase = {
-  repoRoot: REPO_ID,
-  repoRuntimeId: REPO_RUNTIME_ID,
   target: {
     kind: 'git-worktree',
     workspaceId: REPO_ID,
     workspaceRuntimeId: REPO_RUNTIME_ID,
     root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
   },
-  branch: 'main',
-  worktreePath: '/repo-worktree',
+  presentation: { kind: 'git-worktree', branchName: 'main' },
 }
-const closeTarget = {
-  repoRoot: terminalBase.repoRoot,
-  repoRuntimeId: REPO_RUNTIME_ID,
-  branchName: terminalBase.branch,
-  worktreePath: terminalBase.worktreePath,
-}
+const closeTarget = terminalBase
 
 const terminalView: WorkspacePaneTerminalTabSummary = {
   type: 'terminal',
@@ -96,8 +88,7 @@ describe('workspace pane runtime tab close actions', () => {
     ).toBe('terminal:term-111111111111111111111')
   })
 
-  test('builds terminal bases from runtime close targets', () => {
+  test('uses the canonical terminal base as the runtime close target', () => {
     expect(terminalBaseForRuntimeTabCloseTarget(closeTarget)).toEqual(terminalBase)
-    expect(terminalBaseForRuntimeTabCloseTarget({ ...closeTarget, worktreePath: null })).toBeNull()
   })
 })

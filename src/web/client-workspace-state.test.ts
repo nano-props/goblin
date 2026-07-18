@@ -41,11 +41,15 @@ describe('client workspace persistence', () => {
       restoredRepoId: 'goblin+file:///repo-a',
       zenMode: true,
       workspacePaneSize: 52,
-      selectedTerminalSessionIdByTerminalWorktree: { 'goblin+file:///repo-a\0/worktree': 'term-111' },
-      preferredWorkspacePaneTabByTargetByRepo: { 'goblin+file:///repo-a': { target: 'history' } },
+      selectedTerminalSessionIdByTerminalWorktree: {
+        'goblin+file:///repo-a\0goblin+file:///worktree': 'term-111',
+      },
+      preferredWorkspacePaneTabByTargetByRepo: {
+        'goblin+file:///repo-a': { 'goblin+file:///repo-a\0workspace-root': 'history' },
+      },
       filetreeViewStateByWorktreeByRepo: {
         'goblin+file:///repo-a': {
-          '/worktree': { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 7 },
+          'goblin+file:///worktree': { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 7 },
         },
       },
       workspacePaneTabsByTargetByWorkspace: { '/must-not-persist': {} },
@@ -76,6 +80,37 @@ describe('client workspace persistence', () => {
       restoredRepoId: null,
       zenMode: false,
       workspacePaneSize: 70,
+      selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      filetreeViewStateByWorktreeByRepo: {},
+    })
+  })
+
+  test('drops legacy raw-path and cross-transport persisted identities', () => {
+    expect(
+      normalizeClientWorkspaceState({
+        selectedTerminalSessionIdByTerminalWorktree: {
+          'goblin+file:///repo-a\0/worktree': 'term-legacy',
+          'goblin+file:///repo-a\0goblin+ssh://dev/worktree': 'term-cross-transport',
+        },
+        preferredWorkspacePaneTabByTargetByRepo: {
+          'goblin+file:///repo-a': {
+            target: 'history',
+            'goblin+file:///repo-a\0worktree\0/worktree': 'files',
+          },
+        },
+        filetreeViewStateByWorktreeByRepo: {
+          'goblin+file:///repo-a': {
+            '/worktree': { selectedKeys: ['README.md'], expandedKeys: [], topVisibleRowIndex: 0 },
+            'goblin+ssh://dev/worktree': {
+              selectedKeys: ['README.md'],
+              expandedKeys: [],
+              topVisibleRowIndex: 0,
+            },
+          },
+        },
+      }),
+    ).toMatchObject({
       selectedTerminalSessionIdByTerminalWorktree: {},
       preferredWorkspacePaneTabByTargetByRepo: {},
       filetreeViewStateByWorktreeByRepo: {},

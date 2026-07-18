@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import {
+  terminalExecutionPath,
+  terminalPresentationBranch,
+  terminalSessionCoordinates,
+  type TerminalSessionBase,
+} from '#/shared/terminal-types.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
@@ -23,18 +28,17 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
-const terminalBase: TerminalSessionBase & { repoRuntimeId: string } = {
-  repoRoot: 'goblin+file:///repo',
-  repoRuntimeId: 'repo-runtime-1',
+const terminalBase: TerminalSessionBase = {
   target: {
     kind: 'git-worktree',
     workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
     workspaceRuntimeId: 'repo-runtime-1',
     root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
   },
-  branch: 'main',
-  worktreePath: '/repo-worktree',
+  presentation: { kind: 'git-worktree', branchName: 'main' },
 }
+
+const terminalCoordinates = terminalSessionCoordinates(terminalBase)
 
 describe('workspace pane runtime tab command actions', () => {
   beforeEach(() => {
@@ -44,8 +48,8 @@ describe('workspace pane runtime tab command actions', () => {
 
   test('resolves the ordinary workspace root as the same terminal command target', () => {
     const repo = seedRepoWithReadModelForTest({
-      id: terminalBase.repoRoot,
-      repoRuntimeId: terminalBase.repoRuntimeId,
+      id: terminalCoordinates.repoRoot,
+      repoRuntimeId: terminalCoordinates.repoRuntimeId,
       branches: [],
       currentBranchName: null,
     })
@@ -65,15 +69,12 @@ describe('workspace pane runtime tab command actions', () => {
       )
 
     expect(selectedWorkspacePaneTerminalBase(repo.id, null, undefined)).toEqual({
-      repoRoot: repo.id,
-      repoRuntimeId: repo.repoRuntimeId,
-      branch: '',
-      worktreePath: repo.id,
       target: {
         kind: 'workspace-root',
         workspaceId: canonicalWorkspaceLocator(repo.id),
         workspaceRuntimeId: repo.repoRuntimeId,
       },
+      presentation: { kind: 'workspace-root' },
     })
     expect(
       captureWorkspacePaneActiveTabIdentity(repo.id, repo.repoRuntimeId, null, { workspacePaneRoute: undefined }),
@@ -93,29 +94,34 @@ describe('workspace pane runtime tab command actions', () => {
   })
 
   test('routes a committed create with its canonical admission branch', async () => {
+    const branchName = terminalPresentationBranch(terminalBase.presentation)
+    if (!branchName) throw new Error('expected Git worktree terminal fixture')
     seedRepoWithReadModelForTest({
-      id: terminalBase.repoRoot,
-      repoRuntimeId: terminalBase.repoRuntimeId,
-      branches: [createRepoBranch(terminalBase.branch, { worktree: { path: terminalBase.worktreePath } })],
-      currentBranchName: terminalBase.branch,
-      workspacePaneTabsByBranch: { [terminalBase.branch]: [workspacePaneStaticTabEntry('status')] },
+      id: terminalCoordinates.repoRoot,
+      repoRuntimeId: terminalCoordinates.repoRuntimeId,
+      branches: [createRepoBranch(branchName, { worktree: { path: terminalExecutionPath(terminalBase.target) } })],
+      currentBranchName: branchName,
+      workspacePaneTabsByBranch: { [branchName]: [workspacePaneStaticTabEntry('status')] },
     })
     const showCreatedRuntimeTab = vi.fn(() => true)
     const context = workspacePaneRuntimeTabCommandContext({
-      repoId: terminalBase.repoRoot,
-      branchName: terminalBase.branch,
+      repoId: terminalCoordinates.repoRoot,
+      branchName: terminalPresentationBranch(terminalBase.presentation),
       workspacePaneRoute: null,
       showRuntimeTab: vi.fn(() => true),
       showCreatedRuntimeTab,
     })
 
-    await context.terminal?.showCreatedTerminalSession('term-111111111111111111111', 'feature/renamed')
+    await context.terminal?.showCreatedTerminalSession('term-111111111111111111111', {
+      kind: 'git-worktree',
+      branchName: 'feature/renamed',
+    })
 
     expect(showCreatedRuntimeTab).toHaveBeenCalledWith(
       'terminal',
       'term-111111111111111111111',
-      'feature/renamed',
-      terminalBase.worktreePath,
+      { kind: 'git-worktree', branchName: 'feature/renamed' },
+      terminalExecutionPath(terminalBase.target),
     )
   })
 
@@ -166,10 +172,10 @@ describe('workspace pane runtime tab command actions', () => {
     })
     const coordinatorBlocker = runWorkspacePaneAction(
       {
-        repoId: terminalBase.repoRoot,
-        repoRuntimeId: terminalBase.repoRuntimeId,
-        branchName: terminalBase.branch,
-        worktreePath: terminalBase.worktreePath,
+        kind: 'git-worktree',
+        repoId: terminalCoordinates.repoRoot,
+        repoRuntimeId: terminalCoordinates.repoRuntimeId,
+        worktreePath: terminalExecutionPath(terminalBase.target),
       },
       async () => {
         markCoordinatorStarted()
@@ -260,7 +266,7 @@ describe('workspace pane runtime tab command actions', () => {
     const createTerminal = vi.fn(async () => 'created-session')
     const createTerminalWithAdmission = vi.fn(async () => ({
       terminalSessionId: 'created-session',
-      branch: terminalBase.branch,
+      presentation: terminalBase.presentation,
       requestRole: 'observer' as const,
       resourceDisposition: 'created' as const,
       runtimeProjectionApplied: true,

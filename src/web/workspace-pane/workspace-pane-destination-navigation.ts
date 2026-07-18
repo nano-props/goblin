@@ -14,7 +14,10 @@ import {
   workspacePaneTargetLeaseIsCurrent,
   type WorkspacePaneDestinationTargetLease,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import {
+  workspacePaneActionTargetFromCoordinates,
+  runWorkspacePaneAction,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 export type WorkspacePaneDestinationNavigation = Pick<
   PrimaryWindowNavigationActions,
@@ -55,7 +58,7 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
     return { kind: 'unsupported', reason: 'worktree-required' }
   }
   const presentation = beginWorkspacePaneDestinationPresentation(lease)
-  return await runWorkspacePaneAction(lease, () =>
+  return await runWorkspacePaneAction(workspacePaneActionTargetFromCoordinates(lease), () =>
     commitWorkspacePaneDestinationRoute(presentation, input.route, input.navigation, input.options),
   )
 }

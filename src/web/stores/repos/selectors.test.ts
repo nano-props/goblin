@@ -44,7 +44,7 @@ describe('repo selectors', () => {
         zenMode: false,
         workspacePaneSize: 50,
         selectedTerminalSessionIdByTerminalWorktree: {
-          '/tmp/repo\0/tmp/repo': 'term-111111111111111111111',
+          'goblin+file:///tmp/repo\0goblin+file:///tmp/repo': 'term-111111111111111111111',
         },
       }),
     ).toEqual({
@@ -53,7 +53,7 @@ describe('repo selectors', () => {
       zenMode: false,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {
-        '/tmp/repo\0/tmp/repo': 'term-111111111111111111111',
+        'goblin+file:///tmp/repo\0goblin+file:///tmp/repo': 'term-111111111111111111111',
       },
     })
   })

@@ -17,7 +17,10 @@ import {
 import {
   commitWorkspacePaneControllerRoute,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
-import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import {
+  workspacePaneActionTargetFromCoordinates,
+  runWorkspacePaneAction,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
   subscribeWorkspacePaneRouteIntents,
   workspacePaneRouteIntentPending,
@@ -56,7 +59,12 @@ export function useWorkspacePaneRouteController({
     () =>
       route?.kind !== 'invalid-static' &&
       workspacePaneRouteIntentPending(
-        { repoId, repoRuntimeId: model.repoRuntimeId, branchName, worktreePath },
+        workspacePaneActionTargetFromCoordinates({
+          repoId,
+          repoRuntimeId: model.repoRuntimeId,
+          branchName,
+          worktreePath,
+        }),
         workspacePaneRouteKey(route),
       ),
     () => false,
@@ -122,12 +130,15 @@ function useReconcileWorkspacePaneRoute({
   useEffect(() => {
     if (!enabled) return
     let cancelled = false
-    void runWorkspacePaneAction({ repoId, repoRuntimeId, branchName, worktreePath }, () => {
-      if (cancelled) return
-      if (!branchName) return
-      if (routeIntentPending && reconciliation.kind === 'replace-empty-pane') return
-      applyWorkspacePaneRouteReconciliation({ repoId, branchName, reconciliation, navigation })
-    })
+    void runWorkspacePaneAction(
+      workspacePaneActionTargetFromCoordinates({ repoId, repoRuntimeId, branchName, worktreePath }),
+      () => {
+        if (cancelled) return
+        if (!branchName) return
+        if (routeIntentPending && reconciliation.kind === 'replace-empty-pane') return
+        applyWorkspacePaneRouteReconciliation({ repoId, branchName, reconciliation, navigation })
+      },
+    )
     return () => {
       cancelled = true
     }

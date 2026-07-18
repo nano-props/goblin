@@ -1,7 +1,8 @@
-import { isValidBranch, isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
+import { isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
 import {
-  type TerminalCreateResult,
-  type TerminalCreateInput,
+  terminalExecutionCoordinates,
+  terminalExecutionPath,
+  terminalSessionCoordinates,
   type TerminalSessionSummary,
   type TerminalSessionsSnapshot,
 } from '#/shared/terminal-types.ts'
@@ -35,6 +36,7 @@ import {
 import { createTerminalSessionPruner } from '#/server/terminal/terminal-session-pruner.ts'
 import {
   createTerminalSessionCreator,
+  type ServerTerminalCreateInput,
   type ServerTerminalCreateResult,
 } from '#/server/terminal/terminal-session-creator.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
@@ -94,11 +96,10 @@ class TerminalSessionService {
     signal: AbortSignal,
   ): Promise<TerminalSessionEnsureResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
-    if (!isValidRepoLocator(input.repoRoot)) return { ok: false, message: 'error.invalid-arguments' }
-    if (input.target?.kind !== 'workspace-root' && !isValidBranch(input.branch)) {
-      return { ok: false, message: 'error.invalid-arguments' }
-    }
-    if (!isValidCwd(input.worktreePath)) return { ok: false, message: 'error.invalid-arguments' }
+    const coordinates = terminalExecutionCoordinates(input.target)
+    const worktreePath = terminalExecutionPath(input.target)
+    if (!isValidRepoLocator(coordinates.repoRoot)) return { ok: false, message: 'error.invalid-arguments' }
+    if (!isValidCwd(worktreePath)) return { ok: false, message: 'error.invalid-arguments' }
 
     const terminalSessionId = input.terminalSessionId ?? createTerminalSessionId()
     const cols = input.cols ?? 80
@@ -107,13 +108,10 @@ class TerminalSessionService {
       return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidTerminalSize(cols, rows)) return { ok: false, message: 'error.invalid-arguments' }
 
-    const sessionScope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
-    const scopedWorktreePath = terminalSessionWorktreePath(input.repoRoot, input.worktreePath)
     return await this.ensurer.ensure(userId, input, {
       terminalSessionId,
       cols,
       rows,
-      scopedWorktreePath,
       physicalWorktreeCapability,
       signal,
     })
@@ -122,16 +120,14 @@ class TerminalSessionService {
   async createAdmitted(
     clientId: string,
     userId: string,
-    input: TerminalCreateInput,
+    input: ServerTerminalCreateInput,
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     signal: AbortSignal,
   ): Promise<ServerTerminalCreateResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
-    if (!isValidRepoLocator(input.repoRoot)) return { ok: false, message: 'error.invalid-arguments' }
-    if (input.target?.kind !== 'workspace-root' && !isValidBranch(input.branch)) {
-      return { ok: false, message: 'error.invalid-arguments' }
-    }
-    if (!isValidCwd(input.worktreePath)) return { ok: false, message: 'error.invalid-arguments' }
+    const coordinates = terminalExecutionCoordinates(input.target)
+    if (!isValidRepoLocator(coordinates.repoRoot)) return { ok: false, message: 'error.invalid-arguments' }
+    if (!isValidCwd(terminalExecutionPath(input.target))) return { ok: false, message: 'error.invalid-arguments' }
     const terminalClientId = input.clientId ?? clientId
     if (!isValidTerminalClientId(terminalClientId)) return { ok: false, message: 'error.invalid-arguments' }
 
@@ -223,9 +219,7 @@ class TerminalSessionService {
     if (!isValidWorkspacePaneTabsOperation(input.operation)) return emptyWorkspacePaneTabsSnapshot()
     const scope = terminalSessionRuntimeScope(input.workspaceId, input.workspaceRuntimeId)
     const worktreePath =
-      nativeWorktreePath === null || nativeWorktreePath === input.workspaceId
-        ? nativeWorktreePath
-        : terminalSessionWorktreePath(input.workspaceId, nativeWorktreePath)
+      nativeWorktreePath === null ? null : terminalSessionWorktreePath(input.workspaceId, nativeWorktreePath)
     const result = await this.workspaceTabsCoordinator.updateTabs({
       userId,
       repoRoot: input.workspaceId,
@@ -240,12 +234,13 @@ class TerminalSessionService {
   }
 
   async reconcileTerminalTabsForSession(userId: string, session: TerminalSessionSummary): Promise<void> {
-    const scope = terminalSessionRuntimeScope(session.repoRoot, session.repoRuntimeId)
+    const coordinates = terminalSessionCoordinates(session)
+    const scope = terminalSessionRuntimeScope(coordinates.repoRoot, coordinates.repoRuntimeId)
     await this.workspaceTabsCoordinator.reconcileWorktree({
       userId,
-      repoRoot: session.repoRoot,
+      repoRoot: coordinates.repoRoot,
       scope,
-      worktreePath: session.worktreePath,
+      worktreePath: terminalExecutionPath(session.target),
     })
   }
 
@@ -316,8 +311,8 @@ export function terminalWorkspacePaneRuntimeTabsProvider(
         liveSessions: snapshot.sessions.map((session) => ({
           sessionId: session.terminalSessionId,
           target: session.target,
-          branch: session.branch,
-          worktreePath: session.worktreePath,
+          branch: session.presentation.kind === 'git-worktree' ? session.presentation.branchName : null,
+          worktreePath: terminalExecutionPath(session.target),
         })),
       }
     },

@@ -8,7 +8,6 @@ import {
   type TerminalSessionEnsureContext,
 } from '#/server/terminal/terminal-session-ensurer.ts'
 import { issueTestPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
-import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { resolveKnownWorktree } from '#/shared/worktree-guards.ts'
@@ -71,9 +70,6 @@ function remotePhysicalWorktreeExecutionCapability() {
       endpoint: REMOTE_WORKTREE_PATH,
     },
     userId: USER_ID,
-    repoRoot: REMOTE_REPO_ROOT,
-    repoRuntimeId: REPO_RUNTIME_ID,
-    worktreePath: REMOTE_WORKTREE_PATH,
     execution: {
       kind: 'remote',
       canonicalWorktreePath: REMOTE_WORKTREE_PATH,
@@ -121,17 +117,12 @@ describe('terminal session ensurer', () => {
       terminalSessionId: 'term-locallocallocallocal1',
       cols: 100,
       rows: 40,
-      scopedWorktreePath: path.resolve(WORKTREE_PATH),
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
     })
     const result = await ensurer.ensure(
       USER_ID,
       {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
         target: LOCAL_TARGET,
-        branch: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
         startupShellCommand: 'echo ready',
         clientId: 'client_terminal_ensurer',
       },
@@ -147,12 +138,7 @@ describe('terminal session ensurer', () => {
     expect(resolveKnownWorktree).not.toHaveBeenCalled()
     expect(prepareSession).toHaveBeenCalledWith({
       userId: USER_ID,
-      scope: terminalSessionRuntimeScope(REPO_ROOT, REPO_RUNTIME_ID),
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branch: BRANCH_NAME,
       terminalSessionId: 'term-locallocallocallocal1',
-      worktreePath: path.resolve(WORKTREE_PATH),
       physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: path.resolve(WORKTREE_PATH),
       cols: 100,
@@ -172,36 +158,31 @@ describe('terminal session ensurer', () => {
     const physicalPath = '/private/tmp/workspace'
     const capability = testPhysicalWorktreeExecutionCapability(physicalPath, {
       userId: USER_ID,
-      repoRoot: 'goblin+file:///tmp/workspace',
-      repoRuntimeId: REPO_RUNTIME_ID,
-      worktreePath: logicalPath,
     })
 
     await ensurer.ensure(
       USER_ID,
       {
-        repoRoot: 'goblin+file:///tmp/workspace',
-        repoRuntimeId: REPO_RUNTIME_ID,
         target: {
           kind: 'workspace-root',
           workspaceId: canonicalWorkspaceLocator('goblin+file:///tmp/workspace')!,
           workspaceRuntimeId: REPO_RUNTIME_ID,
         },
-        branch: '',
-        worktreePath: logicalPath,
         clientId: 'client_terminal_ensurer',
       },
       ensureContext({
         terminalSessionId: 'term-logicalphysical001',
         cols: 80,
         rows: 24,
-        scopedWorktreePath: logicalPath,
         physicalWorktreeCapability: capability,
       }),
     )
 
     expect(prepareSession).toHaveBeenCalledWith(
-      expect.objectContaining({ worktreePath: logicalPath, cwd: physicalPath }),
+      expect.objectContaining({
+        cwd: physicalPath,
+        target: expect.objectContaining({ workspaceId: canonicalWorkspaceLocator('goblin+file:///tmp/workspace') }),
+      }),
     )
   })
 
@@ -214,18 +195,13 @@ describe('terminal session ensurer', () => {
     const result = await ensurer.ensure(
       USER_ID,
       {
-        repoRoot: REMOTE_REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
         target: REMOTE_TARGET,
-        branch: BRANCH_NAME,
-        worktreePath: REMOTE_WORKTREE_PATH,
         startupShellCommand: 'pwd',
       },
       ensureContext({
         terminalSessionId: 'term-remoteremoteremote001',
         cols: 120,
         rows: 32,
-        scopedWorktreePath: REMOTE_WORKTREE_PATH,
         physicalWorktreeCapability: remotePhysicalWorktreeExecutionCapability(),
       }),
     )
@@ -240,12 +216,7 @@ describe('terminal session ensurer', () => {
     expect(input).toEqual(
       expect.objectContaining({
         userId: USER_ID,
-        scope: terminalSessionRuntimeScope(REMOTE_REPO_ROOT, REPO_RUNTIME_ID),
-        repoRoot: REMOTE_REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branch: BRANCH_NAME,
         terminalSessionId: 'term-remoteremoteremote001',
-        worktreePath: REMOTE_WORKTREE_PATH,
         physicalWorktreeCapability: remotePhysicalWorktreeExecutionCapability(),
         cwd: process.cwd(),
         cols: 120,
@@ -271,17 +242,12 @@ describe('terminal session ensurer', () => {
       ensurer.ensure(
         USER_ID,
         {
-          repoRoot: REMOTE_REPO_ROOT,
-          repoRuntimeId: REPO_RUNTIME_ID,
           target: REMOTE_TARGET,
-          branch: BRANCH_NAME,
-          worktreePath: REMOTE_WORKTREE_PATH,
         },
         ensureContext({
           terminalSessionId: 'term-remoteremoteremote001',
           cols: 80,
           rows: 24,
-          scopedWorktreePath: REMOTE_WORKTREE_PATH,
           physicalWorktreeCapability: remotePhysicalWorktreeExecutionCapability(),
         }),
       ),
@@ -302,7 +268,7 @@ function preparedResult(
       kind: 'existing',
       commit: () => ({
         action: 'created',
-        branch: BRANCH_NAME,
+        presentation: { kind: 'git-worktree', branchName: BRANCH_NAME },
         terminalSessionsRevision: 7,
         terminalRuntimeSessionId: `pty_${terminalSessionId}`,
         terminalRuntimeGeneration: 1,

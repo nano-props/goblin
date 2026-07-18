@@ -349,6 +349,7 @@ function WorkspaceRootPane({
           panelLabel: { label: t('tab.terminal') },
           target: {
             runtimeTarget,
+            presentation: { kind: 'workspace-root' },
             worktreePath: repo.id,
           },
           selectedSessionId: selectedTerminalSessionId,

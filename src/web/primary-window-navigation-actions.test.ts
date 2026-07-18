@@ -14,13 +14,14 @@ import {
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 
 const REPO_ID = 'goblin+file:///tmp/navigation-actions-repo'
 const BRANCH_NAME = 'feature/create-pending'
 const presentationOptions = (options: { replace?: boolean; returnTo?: string | null } = {}) =>
   expect.objectContaining({ ...options, presentationToken: expect.any(Object) })
 const WORKTREE_PATH = '/tmp/navigation-actions-worktree'
-const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
+const WORKTREE_KEY = formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH)
 
 beforeEach(() => {
   resetReposStore()
@@ -815,7 +816,7 @@ describe('createPrimaryWindowNavigationActions', () => {
         kind: 'branch' as const,
         branchName: 'feature/test',
         workspacePaneTab: 'terminal' as const,
-        terminalWorktreeKey: 'goblin+file:///tmp/repo-a\0/tmp/worktree',
+        terminalWorktreeKey: 'goblin+file:///tmp/repo-a\0goblin+file:///tmp/worktree',
         terminalSessionId: null,
       },
     }

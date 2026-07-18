@@ -10,6 +10,7 @@
 // to the route layer.
 
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
+import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
 import { serverLogger } from '#/server/logger.ts'
 import {
   createTerminalSessionService,
@@ -430,15 +431,16 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     reason: TerminalSessionCloseReason,
   ): void {
     if (reason !== 'session') return
-    broadcastRepoSessionsChanged(userId, session.repoRoot)
+    const { repoRoot } = terminalSessionCoordinates(session)
+    broadcastRepoSessionsChanged(userId, repoRoot)
     void sessionService
       .reconcileTerminalTabsForSession(userId, session)
       .then(() => {
-        broadcastRepoWorkspaceTabsChanged(userId, session.repoRoot)
+        broadcastRepoWorkspaceTabsChanged(userId, repoRoot)
       })
       .catch((err) => {
         terminalRuntimeLogger.warn(
-          { userId, terminalRuntimeSessionId: session.terminalRuntimeSessionId, repoRoot: session.repoRoot, err },
+          { userId, terminalRuntimeSessionId: session.terminalRuntimeSessionId, repoRoot, err },
           'failed to reconcile workspace tabs after terminal session close',
         )
       })

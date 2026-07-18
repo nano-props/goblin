@@ -5,6 +5,12 @@ import {
   useFiletreeInteractionStore,
   type FiletreeInteractionSnapshot,
 } from '#/web/stores/repos/filetree-interaction-state.ts'
+import {
+  canonicalWorkspaceLocator,
+  parseCanonicalWorkspaceLocator,
+  workspaceLocatorForPath,
+  workspaceLocatorsShareTransport,
+} from '#/shared/workspace-locator.ts'
 
 interface RepoWorktreeProjection {
   branches: ReadonlyArray<{ worktree?: { path?: string } | undefined }>
@@ -21,11 +27,14 @@ export function persistedFiletreeViewStateByWorktreeByRepoForSession(
     const scope = parseFiletreeInteractionScopeKey(scopeKey)
     if (!scope || !openRepoIds.has(scope.repoId)) continue
     const repo = repos[scope.repoId]
-    if (!repo || !knownWorktreePaths(repo).has(scope.worktreePath)) continue
+    if (!repo || !knownFilesystemRootPaths(scope.repoId, repo).has(scope.worktreePath)) continue
     const viewState = sessionViewStateFromInteractionSnapshot(snapshot)
     if (!hasRestorableFiletreeViewState(viewState)) continue
     byRepo[scope.repoId] ??= {}
-    byRepo[scope.repoId][scope.worktreePath] = viewState
+    const workspaceId = canonicalWorkspaceLocator(scope.repoId)
+    const worktreeId = workspaceId ? workspaceLocatorForPath(workspaceId, scope.worktreePath) : null
+    if (!worktreeId) continue
+    byRepo[scope.repoId][worktreeId] = viewState
   }
   return byRepo
 }
@@ -44,8 +53,10 @@ function interactionByScopeFromSessionViewState(
   const interactionByScope: Record<string, FiletreeInteractionSnapshot> = {}
   for (const [repoId, byWorktree] of Object.entries(filetreeViewStateByWorktreeByRepo)) {
     if (!repoId || repoId.includes('\0')) continue
-    for (const [worktreePath, viewState] of Object.entries(byWorktree)) {
-      if (!worktreePath || worktreePath.includes('\0')) continue
+    for (const [worktreeId, viewState] of Object.entries(byWorktree)) {
+      if (!workspaceLocatorsShareTransport(repoId, worktreeId)) continue
+      const worktreePath = parseCanonicalWorkspaceLocator(worktreeId)?.path
+      if (!worktreePath) continue
       interactionByScope[filetreeInteractionScopeKey(repoId, worktreePath)] = {
         selectedKeys: viewState.selectedKeys,
         expandedKeys: viewState.expandedKeys,
@@ -68,8 +79,12 @@ function hasRestorableFiletreeViewState(viewState: FiletreeSessionViewState): bo
   return viewState.selectedKeys.length > 0 || viewState.expandedKeys.length > 0 || viewState.topVisibleRowIndex > 0
 }
 
-function knownWorktreePaths(repo: RepoWorktreeProjection): ReadonlySet<string> {
-  return new Set(repo.branches.map((branch) => branch.worktree?.path).filter(isNonEmptyString))
+function knownFilesystemRootPaths(workspaceId: string, repo: RepoWorktreeProjection): ReadonlySet<string> {
+  const workspaceRoot = parseCanonicalWorkspaceLocator(workspaceId)?.path
+  return new Set([
+    ...(workspaceRoot ? [workspaceRoot] : []),
+    ...repo.branches.map((branch) => branch.worktree?.path).filter(isNonEmptyString),
+  ])
 }
 
 function isNonEmptyString(value: unknown): value is string {

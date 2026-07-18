@@ -38,7 +38,7 @@ export interface WorkspacePaneTabAvailabilityContext {
 
 export interface WorkspacePaneStaticTabMetadataInput {
   t: T
-  branchName: string
+  branchName: string | null
   statusCount: number
 }
 
@@ -46,7 +46,7 @@ export interface WorkspacePaneRuntimeTabMetadataInput<
   TType extends WorkspacePaneRuntimeTabType = WorkspacePaneRuntimeTabType,
 > {
   t: T
-  branchName: string
+  branchName: string | null
   statusCount: number
   view: Extract<WorkspacePaneTabSummary, { type: TType }>
 }

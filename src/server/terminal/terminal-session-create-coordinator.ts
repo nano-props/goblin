@@ -1,5 +1,5 @@
 import PQueue from 'p-queue'
-import type { TerminalCreateInput, TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import { terminalExecutionPath, type TerminalCreateInput, type TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { terminalSessionUserWorktreeKey } from '#/shared/terminal-session-keys.ts'
 
@@ -55,7 +55,7 @@ class TerminalSessionCreateCoordinator {
     input: TerminalSessionCreateAllocationInput,
   ): Promise<string> {
     const sessions = await this.manager.listSessionsForUser(input.userId, input.scope)
-    const existingSession = sessions.find((session) => session.worktreePath === input.worktreePath)
+    const existingSession = sessions.find((session) => terminalExecutionPath(session.target) === input.worktreePath)
     if (input.kind === 'primary' && existingSession) {
       return existingSession.terminalSessionId
     }

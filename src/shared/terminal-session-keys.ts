@@ -1,4 +1,3 @@
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 
 export interface TerminalSessionUserWorktreeKeyInput {
   userId: string | number
@@ -7,5 +6,5 @@ export interface TerminalSessionUserWorktreeKeyInput {
 }
 
 export function terminalSessionUserWorktreeKey(input: TerminalSessionUserWorktreeKeyInput): string {
-  return `${String(input.userId)}\0${formatTerminalWorktreeKey(input.scope, input.worktreePath)}`
+  return `${String(input.userId)}\0${input.scope}\0${input.worktreePath}`
 }

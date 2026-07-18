@@ -16,6 +16,7 @@ import type {
   TerminalWriteInput,
   TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
+import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
 import { isValidTerminalRuntimeSessionId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
@@ -99,7 +100,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       )
       if (!operation.admitted) return { ok: false, message: 'error.worktree-removal-in-progress' }
       const result = operation.value
-      if (session) broadcastRepoSessionsChanged(userId, session.repoRoot)
+      if (session) broadcastRepoSessionsChanged(userId, terminalSessionCoordinates(session).repoRoot)
       return result
     },
 
@@ -158,8 +159,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
           terminalRuntimeSessionId: input.terminalRuntimeSessionId,
           terminalRuntimeGeneration: session.terminalRuntimeGeneration,
           terminalSessionId: session.terminalSessionId,
-          repoRoot: session.repoRoot,
-          worktreePath: session.worktreePath,
+          repoRoot: terminalSessionCoordinates(session).repoRoot,
         })
       }
       return closed

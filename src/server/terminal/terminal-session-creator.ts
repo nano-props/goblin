@@ -1,5 +1,10 @@
-import type { TerminalCreateInput, TerminalCreateResult } from '#/shared/terminal-types.ts'
-import { terminalSessionRuntimeScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
+import {
+  terminalExecutionCoordinates,
+  terminalExecutionPath,
+  type TerminalCreateInput,
+  type TerminalCreateResult,
+} from '#/shared/terminal-types.ts'
+import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type {
   TerminalSessionEnsureInput,
   TerminalSessionEnsureResult,
@@ -17,6 +22,8 @@ export type ServerTerminalCreateResult =
       admission: Extract<TerminalSessionEnsureResult, { ok: true }>['admission']
     }
   | TerminalCreateFailure
+
+export type ServerTerminalCreateInput = TerminalCreateInput
 
 interface TerminalSessionCreatorOptions {
   createCoordinator: TerminalSessionCreateCoordinator
@@ -41,18 +48,19 @@ class TerminalSessionCreator {
     clientId: string
     terminalClientId: string
     userId: string
-    request: TerminalCreateInput
+    request: ServerTerminalCreateInput
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
     signal: AbortSignal
   }): Promise<ServerTerminalCreateResult> {
     const signal = input.signal
-    const sessionScope = terminalSessionRuntimeScope(input.request.repoRoot, input.request.repoRuntimeId)
-    const scopedWorktreePath = terminalSessionWorktreePath(input.request.repoRoot, input.request.worktreePath)
+    const coordinates = terminalExecutionCoordinates(input.request.target)
+    const sessionScope = terminalSessionRuntimeScope(coordinates.repoRoot, coordinates.repoRuntimeId)
+    const scopedWorktreePath = terminalExecutionPath(input.request.target)
     return await this.options.createCoordinator.runInWorktreeQueue(
       { userId: input.userId, scope: sessionScope, worktreePath: scopedWorktreePath },
       async () => {
         if (signal.aborted) return { ok: false, message: 'error.repo-runtime-stale' }
-        if (!this.options.isCurrentRepoRuntime(input.userId, input.request.repoRoot, input.request.repoRuntimeId)) {
+        if (!this.options.isCurrentRepoRuntime(input.userId, coordinates.repoRoot, coordinates.repoRuntimeId)) {
           return { ok: false, message: 'error.repo-runtime-stale' }
         }
         const createResult = await this.options.createCoordinator.withSessionIdAllocation(
@@ -71,7 +79,7 @@ class TerminalSessionCreator {
             ),
         )
         if (!createResult.ok) return { ok: false, message: createResult.message }
-        if (!this.options.isCurrentRepoRuntime(input.userId, input.request.repoRoot, input.request.repoRuntimeId)) {
+        if (!this.options.isCurrentRepoRuntime(input.userId, coordinates.repoRoot, coordinates.repoRuntimeId)) {
           createResult.admission.abort()
           return { ok: false, message: 'error.repo-runtime-stale' }
         }

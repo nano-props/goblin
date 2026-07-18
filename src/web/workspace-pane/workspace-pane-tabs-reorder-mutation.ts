@@ -10,6 +10,7 @@ import {
 import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import {
   runWorkspacePaneAction,
+  workspacePaneActionTargetFromCoordinates,
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { runtimeWorkspacePaneTarget, type WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
@@ -101,18 +102,10 @@ async function runWorkspacePaneTabsReorderInQueue(
 type WorkspacePaneTabsReorderTarget = WorkspacePaneTabsTarget & { repoRuntimeId: string }
 
 function workspacePaneReorderActionTarget(target: WorkspacePaneTabsReorderTarget): WorkspacePaneActionTarget {
-  return 'kind' in target
-    ? {
-        kind: 'workspace-root',
-        repoId: target.repoRoot,
-        repoRuntimeId: target.repoRuntimeId,
-        branchName: null,
-        worktreePath: null,
-      }
-    : {
-        repoId: target.repoRoot,
-        repoRuntimeId: target.repoRuntimeId,
-        branchName: target.branchName,
-        worktreePath: target.worktreePath,
-      }
+  return workspacePaneActionTargetFromCoordinates({
+    repoId: target.repoRoot,
+    repoRuntimeId: target.repoRuntimeId,
+    branchName: 'kind' in target ? null : target.branchName,
+    worktreePath: 'kind' in target ? null : target.worktreePath,
+  })
 }

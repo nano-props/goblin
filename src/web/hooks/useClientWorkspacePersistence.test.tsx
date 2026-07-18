@@ -4,6 +4,8 @@ import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { workspaceLocatorForPath, canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { useFiletreeInteractionStore } from '#/web/stores/repos/filetree-interaction-state.ts'
@@ -57,6 +59,9 @@ describe('useClientWorkspacePersistence', () => {
       branchName: 'feature/worktree',
       worktreePath,
     })
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath('goblin+file:///tmp/repo', worktreePath)
+    const workspaceId = canonicalWorkspaceLocator('goblin+file:///tmp/repo')!
+    const worktreeId = workspaceLocatorForPath(workspaceId, worktreePath)!
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
       branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: worktreePath } })],
@@ -69,7 +74,7 @@ describe('useClientWorkspacePersistence', () => {
       order: [repo.id],
       restoredRepoId: repo.id,
       selectedTerminalSessionIdByTerminalWorktree: {
-        [`goblin+file:///tmp/repo\0${worktreePath}`]: 'term-111111111111111111111',
+        [terminalWorktreeKey]: 'term-111111111111111111111',
       },
       workspaceMembershipReady: true,
       sessionPersistenceReady: true,
@@ -87,12 +92,12 @@ describe('useClientWorkspacePersistence', () => {
     expect(writePresentationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         selectedTerminalSessionIdByTerminalWorktree: {
-          [`goblin+file:///tmp/repo\0${worktreePath}`]: 'term-111111111111111111111',
+          [terminalWorktreeKey]: 'term-111111111111111111111',
         },
         preferredWorkspacePaneTabByTargetByRepo: { 'goblin+file:///tmp/repo': { [targetKey]: 'history' } },
         filetreeViewStateByWorktreeByRepo: {
           'goblin+file:///tmp/repo': {
-            [worktreePath]: {
+            [worktreeId]: {
               selectedKeys: ['src/index.ts'],
               expandedKeys: ['src'],
               topVisibleRowIndex: 12,
@@ -140,12 +145,12 @@ describe('useClientWorkspacePersistence', () => {
     act(() => {
       useReposStore.setState({
         selectedTerminalSessionIdByTerminalWorktree: {
-          'goblin+file:///tmp/repo\0/tmp/a': 'term-111111111111111111111',
+          'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-111111111111111111111',
         },
       })
       useReposStore.setState({
         selectedTerminalSessionIdByTerminalWorktree: {
-          'goblin+file:///tmp/repo\0/tmp/a': 'term-222222222222222222222',
+          'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-222222222222222222222',
         },
       })
     })
@@ -157,7 +162,7 @@ describe('useClientWorkspacePersistence', () => {
     expect(writePresentationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         selectedTerminalSessionIdByTerminalWorktree: {
-          'goblin+file:///tmp/repo\0/tmp/a': 'term-222222222222222222222',
+          'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-222222222222222222222',
         },
       }),
     )
@@ -183,7 +188,7 @@ describe('useClientWorkspacePersistence', () => {
     act(() => {
       useReposStore.setState({
         selectedTerminalSessionIdByTerminalWorktree: {
-          'goblin+file:///tmp/repo\0/tmp/a': 'term-333333333333333333333',
+          'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-333333333333333333333',
         },
       })
     })
@@ -195,7 +200,7 @@ describe('useClientWorkspacePersistence', () => {
     expect(writePresentationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         selectedTerminalSessionIdByTerminalWorktree: {
-          'goblin+file:///tmp/repo\0/tmp/a': 'term-333333333333333333333',
+          'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-333333333333333333333',
         },
       }),
     )

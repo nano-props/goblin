@@ -16,7 +16,12 @@ import type {
   TerminalSessionReadContextValue,
   TerminalWorktreeSnapshot,
 } from '#/web/components/terminal/types.ts'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import {
+  terminalExecutionPath,
+  terminalPresentationBranch,
+  terminalSessionCoordinates,
+  type TerminalSessionBase,
+} from '#/shared/terminal-types.ts'
 import {
   PrimaryWindowNavigationProvider,
   type PrimaryWindowNavigationActions,
@@ -41,7 +46,7 @@ import {
 } from '#/web/repo-data-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { nextRepoWorkspaceTabAfterClose } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   createTerminalWithAdmissionForContextTest,
@@ -174,10 +179,8 @@ describe('RepoWorkspace', () => {
     await waitFor(() => {
       expect(terminalCommandContext.createTerminalWithAdmission).toHaveBeenCalledWith(
         expect.objectContaining({
-          repoRoot: workspaceId,
-          branch: '',
-          worktreePath: workspaceId,
           target: expect.objectContaining({ kind: 'workspace-root', workspaceId }),
+          presentation: { kind: 'workspace-root' },
         }),
         undefined,
       )
@@ -590,7 +593,7 @@ describe('RepoWorkspace', () => {
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
-    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     const statusEntry = {
       repoId: REPO_ID,
       route: {
@@ -625,11 +628,14 @@ describe('RepoWorkspace', () => {
     }
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-111111111111111111111'
+      const coordinates = terminalSessionCoordinates(base)
+      const branchName = terminalPresentationBranch(base.presentation)
+      if (!branchName) throw new Error('expected Git worktree terminal fixture')
       workspacePaneTabsTestBridge.addRuntimeTab({
-        repoRoot: base.repoRoot,
-        repoRuntimeId: base.repoRuntimeId!,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
+        repoRoot: coordinates.repoRoot,
+        repoRuntimeId: coordinates.repoRuntimeId,
+        branchName,
+        worktreePath: terminalExecutionPath(base.target),
         terminalSessionId,
       })
       terminalCreated = true
@@ -715,7 +721,7 @@ describe('RepoWorkspace', () => {
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
-    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     const readContext = terminalReadContextWithSession(terminalWorktreeKey, 'term-111111111111111111111')
     const route = routeNavigation()
     const expectedCurrentEntry = {
@@ -780,7 +786,7 @@ describe('RepoWorkspace', () => {
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
-    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-111111111111111111111')
     const route = routeNavigation()
 
@@ -831,7 +837,7 @@ describe('RepoWorkspace', () => {
         ],
       },
     })
-    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-222222222222222222222')
     const route = routeNavigation()
 
@@ -887,7 +893,7 @@ describe('RepoWorkspace', () => {
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
     useReposStore.getState().recordWorkspaceNavigation({ repoId: REPO_ID, route: { kind: 'dashboard' } })
-    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     const route = routeNavigation()
 
     render(
@@ -947,7 +953,7 @@ describe('RepoWorkspace', () => {
         ],
       },
     })
-    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-222222222222222222222')
     const readContext = terminalReadContextWithSessions(
       terminalWorktreeKey,
@@ -1002,7 +1008,7 @@ describe('RepoWorkspace', () => {
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
-    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     const route = routeNavigation()
 
     render(
@@ -1337,7 +1343,7 @@ describe('RepoWorkspace', () => {
         kind: 'branch' as const,
         branchName,
         workspacePaneTab: 'files' as const,
-        terminalWorktreeKey: formatTerminalWorktreeKey(REPO_ID, worktreePath),
+        terminalWorktreeKey: formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath),
         terminalSessionId: null,
       },
     }

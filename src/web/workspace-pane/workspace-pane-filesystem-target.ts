@@ -30,13 +30,32 @@ export function workspacePaneFilesystemTerminalBase(
   target: WorkspacePaneFilesystemTarget,
 ): TerminalSessionBase | null {
   if (!target.capabilities.terminal.available) return null
-  const runtimeTarget = workspacePaneFilesystemRuntimeTarget(target)
+  return workspacePaneTerminalBaseFromCoordinates({
+    workspaceId: target.workspaceId,
+    workspaceRuntimeId: target.workspaceRuntimeId,
+    branchName: target.kind === 'git-worktree' ? target.branchName : null,
+    rootPath: target.rootPath,
+  })
+}
+
+export function workspacePaneTerminalBaseFromCoordinates(input: {
+  workspaceId: string
+  workspaceRuntimeId: string
+  branchName: string | null
+  rootPath: string
+}): TerminalSessionBase | null {
+  const runtimeTarget = runtimeWorkspacePaneTarget(
+    input.branchName === null
+      ? { kind: 'workspace-root', repoRoot: input.workspaceId, branchName: null, worktreePath: null }
+      : { repoRoot: input.workspaceId, branchName: input.branchName, worktreePath: input.rootPath },
+    input.workspaceRuntimeId,
+  )
   if (!runtimeTarget) return null
-  return {
-    repoRoot: target.workspaceId,
-    repoRuntimeId: target.workspaceRuntimeId,
-    branch: target.kind === 'git-worktree' ? target.branchName : '',
-    worktreePath: target.rootPath,
-    target: runtimeTarget,
+  if (input.branchName === null && runtimeTarget.kind === 'workspace-root') {
+    return { target: runtimeTarget, presentation: { kind: 'workspace-root' } }
   }
+  if (input.branchName !== null && runtimeTarget.kind === 'git-worktree') {
+    return { target: runtimeTarget, presentation: { kind: 'git-worktree', branchName: input.branchName } }
+  }
+  return null
 }

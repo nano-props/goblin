@@ -1,16 +1,18 @@
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
-import type {
-  TerminalAttachResult,
-  TerminalCreateResult,
-  TerminalSessionBase,
-  TerminalSessionSummary as ServerTerminalSessionSummary,
+import {
+  terminalExecutionCoordinates,
+  terminalSessionCoordinates,
+  type TerminalPresentation,
+  type TerminalExecutionTarget,
+  type TerminalAttachResult,
+  type TerminalCreateResult,
+  type TerminalSessionBase,
+  type TerminalSessionSummary as ServerTerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
-import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import type {
   TerminalDescriptor,
-  TerminalRepoIndex,
   TerminalSessionHydrationInput,
   TerminalIdentityViewModel,
 } from '#/web/components/terminal/types.ts'
@@ -45,40 +47,31 @@ export function projectCreateResultForClient(
   base: TerminalSessionBase,
   result: Extract<TerminalCreateResult, { ok: true }>,
 ): ProjectedCreateTerminalSession {
+  const target = base.target
+  if (target.kind !== result.presentation.kind) {
+    throw new Error('terminal create result does not match its execution target')
+  }
   return {
     serverSession: createSessionSummaryFromCreate(base, result),
   }
 }
 
 export function projectServerTerminalSession(input: {
-  repoIndex: TerminalRepoIndex
   repoRoot: string
   repoRuntimeId: string
   serverSession: ServerTerminalSessionSummary
   clientId: string
   index: number
 }): ProjectedServerTerminalSession | null {
-  if (input.serverSession.repoRoot !== input.repoRoot) return null
-  if (input.serverSession.repoRuntimeId !== input.repoRuntimeId) return null
-  const workspaceScoped = input.serverSession.target?.kind === 'workspace-root'
-  const branch = workspaceScoped
-    ? ''
-    : branchForTerminalWorktree(input.repoIndex, input.serverSession.repoRoot, input.serverSession.worktreePath) ||
-      input.serverSession.branch
-  if (!workspaceScoped && !branch) return null
-  const worktreePath = workspaceScoped ? input.serverSession.target!.workspaceId : input.serverSession.worktreePath
+  const coordinates = terminalExecutionCoordinates(input.serverSession.target)
+  if (coordinates.repoRoot !== input.repoRoot) return null
+  if (coordinates.repoRuntimeId !== input.repoRuntimeId) return null
   const descriptor = terminalDescriptor(
-    {
-      repoRoot: input.serverSession.repoRoot,
-      repoRuntimeId: input.serverSession.repoRuntimeId,
-      branch,
-      worktreePath,
-      target: input.serverSession.target,
-    },
+    terminalSessionBase(input.serverSession.target, input.serverSession.presentation),
     input.serverSession.terminalSessionId,
     input.index,
   )
-  const terminalWorktree = formatTerminalWorktreeKey(input.serverSession.repoRoot, worktreePath)
+  const terminalWorktree = formatTerminalWorktreeKey(coordinates.repoRoot, coordinates.worktreeId)
   const controller = resolveTerminalController(input.serverSession.controller, input.clientId)
   return {
     descriptor,
@@ -106,15 +99,11 @@ function createSessionSummaryFromCreate(
   base: TerminalSessionBase,
   result: Extract<TerminalCreateResult, { ok: true }>,
 ): ServerTerminalSessionSummary {
-  return {
+  const coordinates = terminalSessionCoordinates(base)
+  const common = {
     terminalRuntimeSessionId: result.terminalRuntimeSessionId,
     terminalRuntimeGeneration: result.terminalRuntimeGeneration,
     terminalSessionId: result.terminalSessionId,
-    repoRuntimeId: requireBaseRepoRuntimeId(base),
-    repoRoot: base.repoRoot,
-    branch: result.branch,
-    worktreePath: base.worktreePath,
-    cwd: base.worktreePath,
     controller: result.controller,
     processName: result.processName,
     canonicalTitle: result.canonicalTitle,
@@ -122,16 +111,19 @@ function createSessionSummaryFromCreate(
     message: result.message,
     cols: result.canonicalCols,
     rows: result.canonicalRows,
-    target: requireBaseRuntimeTarget(base),
   }
+  const target = base.target
+  if (target.kind === 'workspace-root' && result.presentation.kind === 'workspace-root') {
+    return { ...common, target, presentation: result.presentation }
+  }
+  if (target.kind === 'git-worktree' && result.presentation.kind === 'git-worktree') {
+    return { ...common, target, presentation: result.presentation }
+  }
+  throw new Error('terminal create target and presentation disagree')
 }
 
-function requireBaseRepoRuntimeId(base: TerminalSessionBase): string {
-  if (typeof base.repoRuntimeId === 'string' && base.repoRuntimeId.length > 0) return base.repoRuntimeId
-  throw new Error('error.repo-runtime-stale')
-}
-
-function requireBaseRuntimeTarget(base: TerminalSessionBase) {
-  if (base.target) return base.target
-  throw new Error('error.workspace-tabs-target-invalid')
+function terminalSessionBase(target: TerminalExecutionTarget, presentation: TerminalPresentation): TerminalSessionBase {
+  if (target.kind === 'workspace-root' && presentation.kind === 'workspace-root') return { target, presentation }
+  if (target.kind === 'git-worktree' && presentation.kind === 'git-worktree') return { target, presentation }
+  throw new Error('terminal target and presentation disagree')
 }

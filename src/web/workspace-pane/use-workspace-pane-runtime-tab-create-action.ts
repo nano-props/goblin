@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { TerminalPresentation, TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
@@ -24,7 +24,7 @@ export interface UseWorkspacePaneRuntimeTabCreateActionInput {
   showCreatedRuntimeTab: (
     type: WorkspacePaneRuntimeTabType,
     sessionId: string,
-    canonicalBranch: string,
+    presentation: TerminalPresentation,
     target: RuntimeWorkspacePaneTarget,
   ) => boolean | Promise<boolean>
   t: TerminalCreateTranslator
@@ -50,7 +50,11 @@ export function useWorkspacePaneRuntimeTabCreateAction({
         : { repoRoot, branchName, worktreePath }
     const target = runtimeWorkspacePaneTarget(paneTarget, repoRuntimeId)
     if (!target || (target.kind !== 'workspace-root' && !branchName)) return null
-    return { repoRoot, repoRuntimeId, branch: branchName ?? '', worktreePath, target }
+    if (target.kind === 'workspace-root') return { target, presentation: { kind: 'workspace-root' } }
+    if (target.kind === 'git-worktree' && branchName) {
+      return { target, presentation: { kind: 'git-worktree', branchName } }
+    }
+    return null
   }, [branchName, repoRuntimeId, repoRoot, worktreePath])
   const captureOpenerIdentity = useCallback(
     () =>
@@ -66,8 +70,8 @@ export function useWorkspacePaneRuntimeTabCreateAction({
         repoRoot,
         runtimeTabStateByType,
         initialRuntimeProjectionHydrating,
-        showCreatedRuntimeTab: (type, sessionId, canonicalBranch) =>
-          terminalBase?.target ? showCreatedRuntimeTab(type, sessionId, canonicalBranch, terminalBase.target) : false,
+        showCreatedRuntimeTab: (type, sessionId, presentation) =>
+          terminalBase?.target ? showCreatedRuntimeTab(type, sessionId, presentation, terminalBase.target) : false,
         t,
         terminal: {
           base: terminalBase,

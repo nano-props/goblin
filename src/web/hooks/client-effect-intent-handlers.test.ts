@@ -6,6 +6,7 @@ import {
   handleTerminalBellClickIntent,
   handleWorkspaceClientIntent,
 } from '#/web/hooks/client-effect-intent-handlers.ts'
+import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 
 vi.mock('sonner', () => ({
   toast: {
@@ -55,7 +56,7 @@ describe('client effect intent handlers', () => {
         type: 'terminal-bell-click',
         repoRoot: REPO_ID,
         terminalSessionId: 'term-queryqueryqueryquery1',
-        terminalWorktreeKey: `${REPO_ID}\0/tmp/bell-worktree`,
+        terminalWorktreeKey: formatTerminalWorktreeKeyForPath(REPO_ID, '/tmp/bell-worktree'),
       },
       d,
     )

@@ -16,9 +16,10 @@ import type {
   TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
+import { isValidBranch } from '#/shared/input-validation.ts'
 import {
   canonicalRuntimeWorkspacePaneTarget,
-  RuntimeWorkspacePaneTargetSchema,
+  WorkspacePaneExecutionTargetSchema,
   WorkspacePaneTabsSnapshotSchema,
 } from '#/shared/workspace-pane-tabs-validators.ts'
 
@@ -91,31 +92,34 @@ const TerminalListSessionsInputSchema = v.object({
   repoRoot: WorkspaceIdSchema,
   repoRuntimeId: RepoRuntimeIdSchema,
 })
-export const TerminalCreateInputSchema = v.object({
-  repoRoot: WorkspaceIdSchema,
-  repoRuntimeId: RepoRuntimeIdSchema,
-  branch: v.string(),
-  worktreePath: v.string(),
+export const TerminalCreateInputSchema = v.strictObject({
   kind: v.picklist(['primary', 'additional']),
   startupShellCommand: v.optional(TerminalWriteDataSchema),
   cols: v.optional(TerminalColsSchema),
   rows: v.optional(TerminalRowsSchema),
   clientId: TerminalOptionalClientIdSchema,
-  target: RuntimeWorkspacePaneTargetSchema,
+  target: WorkspacePaneExecutionTargetSchema,
 })
 const TerminalPruneInputSchema = v.object({
   repoRoot: WorkspaceIdSchema,
   repoRuntimeId: RepoRuntimeIdSchema,
 })
-export const TerminalSessionSummarySchema = v.object({
+const TerminalPresentationSchema = v.variant('kind', [
+  v.strictObject({ kind: v.literal('workspace-root') }),
+  v.strictObject({
+    kind: v.literal('git-worktree'),
+    branchName: v.pipe(
+      v.string(),
+      v.check((value: string) => isValidBranch(value)),
+    ),
+  }),
+])
+
+export const TerminalSessionSummarySchema = v.strictObject({
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   terminalSessionId: v.string(),
-  repoRuntimeId: RepoRuntimeIdSchema,
-  repoRoot: WorkspaceIdSchema,
-  branch: v.string(),
-  worktreePath: v.string(),
-  cwd: v.string(),
+  presentation: TerminalPresentationSchema,
   controller: v.nullable(TerminalControllerSchema),
   processName: v.string(),
   canonicalTitle: v.nullable(v.string()),
@@ -123,9 +127,9 @@ export const TerminalSessionSummarySchema = v.object({
   message: v.nullable(v.string()),
   cols: v.number(),
   rows: v.number(),
-  target: RuntimeWorkspacePaneTargetSchema,
+  target: WorkspacePaneExecutionTargetSchema,
 })
-export const TerminalSessionsSnapshotSchema = v.object({
+export const TerminalSessionsSnapshotSchema = v.strictObject({
   revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
   sessions: v.array(TerminalSessionSummarySchema),
 })
@@ -141,15 +145,15 @@ const TerminalRuntimeMetadataSchemaEntries = {
   canonicalRows: TerminalRowsSchema,
 }
 const TerminalCreateResultSchema = v.variant('ok', [
-  v.object({
+  v.strictObject({
     ok: v.literal(true),
     action: v.picklist(['created', 'restored', 'reused']),
-    branch: v.string(),
+    presentation: TerminalPresentationSchema,
     terminalSessionId: v.string(),
     terminalSessionsRevision: v.pipe(v.number(), v.integer(), v.minValue(0)),
     ...TerminalRuntimeMetadataSchemaEntries,
   }),
-  v.object({
+  v.strictObject({
     ok: v.literal(false),
     message: v.string(),
   }),
@@ -226,21 +230,19 @@ const TerminalOutputEventSchema = v.object({
   seq: v.number(),
   processName: v.string(),
 })
-const TerminalBellRealtimeEventSchema = v.object({
+const TerminalBellRealtimeEventSchema = v.strictObject({
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   terminalSessionId: v.string(),
   repoRoot: WorkspaceIdSchema,
-  worktreePath: v.string(),
   processName: v.string(),
   canonicalTitle: v.nullable(v.string()),
 })
-const TerminalTitleEventSchema = v.object({
+const TerminalTitleEventSchema = v.strictObject({
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   terminalSessionId: v.string(),
   repoRoot: WorkspaceIdSchema,
-  worktreePath: v.string(),
   canonicalTitle: v.nullable(v.string()),
 })
 const TerminalExitEventSchema = v.object({
@@ -250,13 +252,12 @@ const TerminalExitEventSchema = v.object({
   repoRoot: WorkspaceIdSchema,
   repoRuntimeId: RepoRuntimeIdSchema,
 })
-const TerminalSessionClosedEventSchema = v.object({
+const TerminalSessionClosedEventSchema = v.strictObject({
   type: v.literal('session-closed'),
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   terminalSessionId: v.string(),
   repoRoot: WorkspaceIdSchema,
-  worktreePath: v.string(),
 })
 
 export function isValidTerminalRuntimeSessionId(value: unknown): value is string {
@@ -438,10 +439,17 @@ export function isValidTerminalTestNotificationInput(value: unknown): value is T
 export function normalizeTerminalSessionsSnapshot(value: unknown): TerminalSessionsSnapshot | null {
   const parsed = v.safeParse(TerminalSessionsSnapshotSchema, value)
   if (!parsed.success) return null
-  const sessions = parsed.output.sessions.flatMap((session) => {
+  const sessions: TerminalSessionSummary[] = []
+  for (const session of parsed.output.sessions) {
     const target = canonicalRuntimeWorkspacePaneTarget(session.target)
-    return target ? [{ ...session, target }] : []
-  })
+    if (target?.kind === 'workspace-root' && session.presentation.kind === 'workspace-root') {
+      sessions.push({ ...session, target, presentation: session.presentation })
+      continue
+    }
+    if (target?.kind === 'git-worktree' && session.presentation.kind === 'git-worktree') {
+      sessions.push({ ...session, target, presentation: session.presentation })
+    }
+  }
   return sessions.length === parsed.output.sessions.length ? { revision: parsed.output.revision, sessions } : null
 }
 
@@ -486,7 +494,7 @@ function normalizeTerminalSocketResponsePayload(action: TerminalSocketRequestAct
     case 'takeover':
       return normalizeWithSchema(TerminalTakeoverResultSchema, payload)
     case 'recover-sessions':
-      return normalizeWithSchema(TerminalSessionsSnapshotSchema, payload)
+      return normalizeTerminalSessionsSnapshot(payload)
     case 'prune':
       return normalizeWithSchema(TerminalPruneResultSchema, payload)
   }

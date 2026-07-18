@@ -23,6 +23,7 @@ import {
   useTerminalWorktreeOutputActive,
   useTerminalWorktreeSelectedDescriptor,
 } from '#/web/components/terminal/terminal-session-store.ts'
+import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 import type {
   TerminalSessionReadContextValue,
   TerminalSnapshot,
@@ -100,15 +101,14 @@ describe('simplified worktree hooks read the right field', () => {
   })
 
   test('useTerminalWorktreeSelectedDescriptor returns snapshot.selectedDescriptor', () => {
-    const descriptor = {
-      terminalWorktreeKey: WORKTREE_KEY,
+    const descriptor = terminalDescriptorForTest({
       terminalSessionId: SESSION_ID,
       index: 0,
       repoRuntimeId: 'rt:1',
       repoRoot: '/r',
       branch: 'main',
       worktreePath: '/r',
-    }
+    })
     function Probe() {
       const d = useTerminalWorktreeSelectedDescriptor(WORKTREE_KEY)
       return <span data-testid="v">{d?.terminalSessionId ?? 'none'}</span>

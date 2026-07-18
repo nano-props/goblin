@@ -1,17 +1,18 @@
 import { describe, expect, test, vi } from 'vitest'
 import { buildTerminalWorktreeSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
 import type { TerminalSessionLike, TerminalDescriptor, TerminalSnapshot } from '#/web/components/terminal/types.ts'
+import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
+import { terminalDescriptorWorktreeKey } from '#/web/components/terminal/terminal-descriptor.ts'
 
 function makeDescriptor(terminalSessionId: string, index: number): TerminalDescriptor {
-  return {
+  return terminalDescriptorForTest({
     terminalSessionId: `/repo\0/repo\0${terminalSessionId}`,
-    terminalWorktreeKey: '/repo\0/repo',
     index,
     repoRoot: '/repo',
     repoRuntimeId: 'repo-runtime-test',
     branch: 'main',
     worktreePath: '/repo',
-  }
+  })
 }
 
 function makeSession(
@@ -58,7 +59,7 @@ describe('terminal session worktree snapshot helper', () => {
     const cache = new Map<string, TerminalSnapshot>()
 
     const snapshot = buildTerminalWorktreeSnapshot({
-      terminalWorktreeKey: descriptor.terminalWorktreeKey,
+      terminalWorktreeKey: terminalDescriptorWorktreeKey(descriptor),
       selectedDescriptor: descriptor,
       createPending: false,
       sessions: [session],
@@ -70,7 +71,7 @@ describe('terminal session worktree snapshot helper', () => {
     })
 
     expect(snapshot).toEqual({
-      terminalWorktreeKey: descriptor.terminalWorktreeKey,
+      terminalWorktreeKey: terminalDescriptorWorktreeKey(descriptor),
       selectedDescriptor: descriptor,
       sessions: [
         expect.objectContaining({
@@ -91,7 +92,7 @@ describe('terminal session worktree snapshot helper', () => {
     expect(session.snapshotSpy).toHaveBeenCalledTimes(1)
 
     buildTerminalWorktreeSnapshot({
-      terminalWorktreeKey: descriptor.terminalWorktreeKey,
+      terminalWorktreeKey: terminalDescriptorWorktreeKey(descriptor),
       selectedDescriptor: descriptor,
       createPending: false,
       sessions: [session],

@@ -12,11 +12,12 @@ import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pan
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
+import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 
 const REPO_ID = 'goblin+file:///tmp/goblin-repo-workspace-tab-model-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/tmp/goblin-repo-workspace-tab-model-worktree'
-const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
+const WORKTREE_KEY = formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH)
 
 describe('repo workspace pane tab model', () => {
   test('projects exactly the authoritative workspace tabs without resurrecting a closed tab', () => {

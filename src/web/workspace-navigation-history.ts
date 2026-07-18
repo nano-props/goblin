@@ -6,7 +6,7 @@ import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-na
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/repos/types.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { isWorkspacePaneStaticTabType, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/repos/navigation-history-entry.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
@@ -164,7 +164,7 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
       const branchModel = repo ? readRepoBranchSnapshotQueryProjection(repo) : null
       const branch = branchModel?.branches.find((candidate) => candidate.name === routeContext.branchName)
       const worktreePath = routeContext.worktreePath ?? branch?.worktree?.path ?? null
-      const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKey(repoId, worktreePath) : null
+      const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKeyForPath(repoId, worktreePath) : null
       const route = routeContext.workspacePaneRoute
       const workspacePaneTab: WorkspacePaneTabType | null =
         route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null

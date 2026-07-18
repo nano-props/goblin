@@ -82,6 +82,7 @@ export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInpu
       selectedSessionId: selectedRuntimeSessionId(selection, type),
       target: {
         runtimeTarget,
+        presentation: { kind: 'git-worktree', branchName },
         worktreePath,
       },
       runtimeState: {

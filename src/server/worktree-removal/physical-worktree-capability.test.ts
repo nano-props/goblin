@@ -39,22 +39,17 @@ describe('physical worktree capability boundaries', () => {
     await ensurer.ensure(
       'user-a',
       {
-        repoRoot: REMOTE_REPO,
-        repoRuntimeId: 'runtime-a',
         target: {
           kind: 'git-worktree',
           workspaceId: canonicalWorkspaceLocator(REMOTE_REPO)!,
           workspaceRuntimeId: 'runtime-a',
           root: canonicalWorkspaceLocator('goblin+ssh://prod/srv/worktrees/feature')!,
         },
-        branch: 'feature',
-        worktreePath: REMOTE_PATH,
       },
       {
         terminalSessionId: 'term-capabilitycapability01',
         cols: 80,
         rows: 24,
-        scopedWorktreePath: REMOTE_PATH,
         physicalWorktreeCapability: capability,
         signal: new AbortController().signal,
       },

@@ -17,6 +17,9 @@ import type {
   TerminalSnapshot,
   TerminalWorktreeSnapshot,
 } from '#/web/components/terminal/types.ts'
+import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 
 // Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
 // that delegates to the real module so `i18next.use(initReactI18next).
@@ -46,18 +49,73 @@ vi.mock('#/web/components/terminal/mobile-detection.ts', () => ({
 
 type TestTerminalSessionViewProps = Omit<
   ComponentProps<typeof TerminalSessionViewComponent>,
-  'createTerminalForSlot'
+  'createTerminalForSlot' | 'base'
 > & {
   createTerminalForSlot?: ComponentProps<typeof TerminalSessionViewComponent>['createTerminalForSlot']
+  repoRoot?: string
+  repoRuntimeId?: string
+  branch?: string | null
+  worktreePath?: string
 }
 
 const defaultCreateTerminalForSlot = vi.fn(async () => {})
 
 function TerminalSessionView({
   createTerminalForSlot = defaultCreateTerminalForSlot,
+  repoRoot = '/repo',
+  repoRuntimeId = 'repo-runtime-test',
+  branch = 'feature',
+  worktreePath = '/worktree',
   ...props
 }: TestTerminalSessionViewProps) {
-  return <TerminalSessionViewComponent {...props} createTerminalForSlot={createTerminalForSlot} />
+  return (
+    <TerminalSessionViewComponent
+      {...props}
+      base={terminalBaseForTest(repoRoot, repoRuntimeId, branch, worktreePath)}
+      createTerminalForSlot={createTerminalForSlot}
+    />
+  )
+}
+
+function terminalBaseForTest(
+  repoRoot: string,
+  repoRuntimeId: string,
+  branch: string | null,
+  worktreePath: string,
+): TerminalSessionBase {
+  const workspaceId = requiredWorkspaceLocator(repoRoot)
+  if (branch === null) {
+    return { target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: repoRuntimeId }, presentation: { kind: 'workspace-root' } }
+  }
+  return {
+    target: {
+      kind: 'git-worktree',
+      workspaceId,
+      workspaceRuntimeId: repoRuntimeId,
+      root: requiredWorkspaceLocator(worktreePath),
+    },
+    presentation: { kind: 'git-worktree', branchName: branch },
+  }
+}
+
+function requiredWorkspaceLocator(input: string) {
+  const locator =
+    canonicalWorkspaceLocator(input) ??
+    formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: input }, 'posix')
+  if (!locator) throw new Error('invalid workspace locator fixture')
+  return locator
+}
+
+function terminalDescriptorTargetForTest() {
+  return {
+    target: {
+      kind: 'git-worktree' as const,
+      workspaceId: requiredWorkspaceLocator('/repo'),
+      workspaceRuntimeId: 'repo-runtime-test',
+      root: requiredWorkspaceLocator('/worktree'),
+    },
+    presentation: { kind: 'git-worktree' as const, branchName: 'feature' },
+  }
 }
 
 type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'hasRecentOutput'> &
@@ -89,14 +147,7 @@ async function renderTerminalSession() {
     terminalSessionId: 'term-111111111111111111111',
     terminalWorktreeKey: '/repo\0/worktree',
     index: 1,
-
-    repoRoot: '/repo',
-
-    repoRuntimeId: 'repo-runtime-test',
-
-    branch: 'feature',
-
-    worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
   }
   const terminalWorktreeSnapshot = {
     terminalWorktreeKey: '/repo\0/worktree',
@@ -241,14 +292,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = completeWorktreeSnapshot({
       terminalWorktreeKey: '/repo\0/worktree',
@@ -338,14 +382,7 @@ describe('TerminalSessionView', () => {
         expect.objectContaining({
           terminalSessionId: 'term-222222222222222222222',
           index: 2,
-
-          repoRoot: '/repo',
-
-          repoRuntimeId: 'repo-runtime-test',
-
-          branch: 'feature',
-
-          worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
         }),
         expect.any(HTMLDivElement),
       )
@@ -363,14 +400,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
     }
     let terminalWorktreeSnapshot = completeWorktreeSnapshot({
       terminalWorktreeKey: '/repo\0/worktree',
@@ -499,14 +529,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -657,14 +680,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -803,14 +819,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -917,14 +926,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -1039,14 +1041,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -1159,14 +1154,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -1284,14 +1272,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -1428,14 +1409,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -1544,14 +1518,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -1676,14 +1643,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -1964,14 +1924,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -2101,28 +2054,17 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-
-      repoRoot: '/repo',
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature',
-
-      worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
     }
-    const descriptorB = {
+    const descriptorB = terminalDescriptorForTest({
       terminalSessionId: 'term-222222222222222222222',
-      terminalWorktreeKey: '/repo\0/worktree-other',
       index: 1,
 
-      repoRoot: '/repo',
-
       repoRuntimeId: 'repo-runtime-test',
-
       branch: 'feature',
-
       worktreePath: '/worktree-other',
-    }
+      repoRoot: '/repo',
+    })
     const worktreeSnapshotA = {
       terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: descriptorA,
@@ -2193,7 +2135,7 @@ describe('TerminalSessionView', () => {
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
     })
-    let activeWorktreeSnapshot = worktreeSnapshotA
+    let activeWorktreeSnapshot: TestWorktreeSnapshot = worktreeSnapshotA
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(activeWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
@@ -2359,10 +2301,7 @@ describe('TerminalSessionView', () => {
       expect(createTerminal).not.toHaveBeenCalled()
       expect(createTerminalForSlot).toHaveBeenCalledTimes(1)
       expect(createTerminalForSlot).toHaveBeenCalledWith({
-        repoRoot: '/repo',
-        repoRuntimeId: 'repo-runtime-test',
-        branch: 'feature',
-        worktreePath: '/worktree',
+        ...terminalDescriptorTargetForTest(),
       })
     } finally {
       unmount()

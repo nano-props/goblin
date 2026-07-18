@@ -116,6 +116,114 @@ describe('workspace pane tabs coordinator queues', () => {
     expect(commitAdmission).toHaveBeenCalledWith('feature/renamed')
   })
 
+  test('does not expose staged runtime state when terminal admission fails', async () => {
+    const operations = createPhysicalWorktreeOperationCoordinator()
+    const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
+      userId: 'user-a',
+      repoRoot: 'goblin+file:///repo',
+      repoRuntimeId: 'runtime-a',
+    })
+    const aggregate = aggregateFor(memoryRepository())
+    const projection = testRuntimeTargetProjection({
+      repoRoot: 'goblin+file:///repo',
+      branchName: 'main',
+      worktreePath: '/repo/worktree',
+    })
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      layoutAggregate: aggregate,
+      runtimeProviders: [],
+      worktreeOperations: operations,
+      physicalWorktrees: { capture: async () => capability },
+      targetProjection: { captureTargets: async () => [projection] },
+    })
+
+    await expect(
+      operations.runOperation(
+        capability,
+        async (permit) =>
+          await coordinator.ensureRuntimeTabForSession({
+            userId: 'user-a',
+            target: projection.target,
+            worktreePath: '/repo/worktree',
+            runtimeType: 'terminal',
+            sessionId: 'term-admissionfailure0001',
+            insertAfterIdentity: 'workspace-pane:status',
+            permit,
+            physicalWorktreeCapability: capability,
+            isRuntimeCurrent: () => true,
+            commitAdmission: () => {
+              throw new Error('terminal admission failed')
+            },
+          }),
+      ),
+    ).rejects.toThrow('terminal admission failed')
+    expect(aggregate.activeEpochs('goblin+file:///repo')).toEqual([])
+    expect(coordinator.physicalWorktreeTargets(capability.identity)).toEqual([])
+    await expect(
+      coordinator.listWorkspaceTabs({
+        userId: 'user-a',
+        repoRoot: 'goblin+file:///repo',
+        scope: 'goblin+file:///repo\0runtime-a',
+        assertCurrent: () => undefined,
+      }),
+    ).resolves.toMatchObject({
+      revision: 0,
+      entries: [],
+    })
+  })
+
+  test('does not commit admission or ghost runtime state when staged snapshot preparation fails', async () => {
+    let loads = 0
+    const repository = memoryRepository()
+    const originalLoad = repository.load
+    repository.load = async (repoRoot) => {
+      loads += 1
+      if (loads === 2) throw new Error('snapshot preparation failed')
+      return await originalLoad(repoRoot)
+    }
+    const operations = createPhysicalWorktreeOperationCoordinator()
+    const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
+      userId: 'user-a',
+      repoRoot: 'goblin+file:///repo',
+      repoRuntimeId: 'runtime-a',
+    })
+    const aggregate = aggregateFor(repository)
+    const projection = testRuntimeTargetProjection({
+      repoRoot: 'goblin+file:///repo',
+      branchName: 'main',
+      worktreePath: '/repo/worktree',
+    })
+    const commitAdmission = vi.fn()
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      layoutAggregate: aggregate,
+      runtimeProviders: [],
+      worktreeOperations: operations,
+      physicalWorktrees: { capture: async () => capability },
+      targetProjection: { captureTargets: async () => [projection] },
+    })
+
+    await expect(
+      operations.runOperation(
+        capability,
+        async (permit) =>
+          await coordinator.ensureRuntimeTabForSession({
+            userId: 'user-a',
+            target: projection.target,
+            worktreePath: '/repo/worktree',
+            runtimeType: 'terminal',
+            sessionId: 'term-snapshotfailure0001',
+            permit,
+            physicalWorktreeCapability: capability,
+            isRuntimeCurrent: () => true,
+            commitAdmission,
+          }),
+      ),
+    ).rejects.toThrow('snapshot preparation failed')
+    expect(commitAdmission).not.toHaveBeenCalled()
+    expect(aggregate.activeEpochs('goblin+file:///repo')).toEqual([])
+    expect(coordinator.physicalWorktreeTargets(capability.identity)).toEqual([])
+  })
+
   test('commits workspace terminal admission without inventing a branch', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo', {

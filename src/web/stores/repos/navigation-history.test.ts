@@ -269,7 +269,7 @@ function branchEntry({
       kind: 'branch',
       branchName: 'feature/a',
       workspacePaneTab: tab,
-      terminalWorktreeKey: '/tmp/repo\0/tmp/repo-worktree',
+      terminalWorktreeKey: 'goblin+file:///tmp/repo\0goblin+file:///tmp/repo-worktree',
       terminalSessionId,
     },
   }

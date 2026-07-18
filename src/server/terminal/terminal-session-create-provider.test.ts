@@ -23,7 +23,7 @@ describe('terminal session create provider', () => {
     })
     const expectedIdentity = testPhysicalWorktreeExecutionCapability('/repo/expected', {
       userId: 'user-test',
-      repoRoot: '/repo',
+      repoRoot: workspaceId,
       repoRuntimeId: 'repo-runtime-test',
     })
     const wrongIdentity = testPhysicalWorktreeExecutionCapability('/repo/wrong')
@@ -43,11 +43,7 @@ describe('terminal session create provider', () => {
 
 function createRequest() {
   return {
-    repoRoot: '/repo',
-    repoRuntimeId: 'repo-runtime-test',
     target: { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: 'repo-runtime-test', root: worktreeRoot },
-    branch: 'main',
-    worktreePath: '/repo/expected',
     kind: 'primary' as const,
     cols: 80,
     rows: 24,

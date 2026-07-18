@@ -19,7 +19,11 @@ import {
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
-import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import {
+  issueTestPhysicalWorktreeExecutionCapability,
+  testPhysicalWorktreeExecutionCapability,
+  testPhysicalWorktreeIdentity,
+} from '#/server/test-utils/physical-worktree-identity.ts'
 import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
@@ -66,6 +70,19 @@ const providers = [
     ],
   },
 ]
+
+function replacementCapability() {
+  const identity = testPhysicalWorktreeIdentity(target.worktreePath)
+  return issueTestPhysicalWorktreeExecutionCapability({
+    identity,
+    worktreePath: target.worktreePath,
+    execution: {
+      kind: 'local',
+      canonicalWorktreePath: identity.endpoint,
+      endpointMarker: { deviceId: 'replacement-device', inode: 'replacement-inode' },
+    },
+  })
+}
 
 describe('workspace pane layout aggregate', () => {
   test('splits a mixed command into durable static layout and epoch placement', async () => {
@@ -195,6 +212,154 @@ describe('workspace pane layout aggregate', () => {
       revision: 0,
       entries: [{ tabs: [workspacePaneStaticTabEntry('status'), terminal] }],
     })
+  })
+
+  test('keeps runtime target overlay, clock, and snapshot unchanged when admission fails', async () => {
+    const aggregate = aggregateFor(memoryRepository())
+    const validTargets = [worktreeProjection(target.branchName)]
+    const lease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
+    const baseline = await readSnapshot(aggregate, scope, validTargets, providers)
+
+    await aggregate.runExclusive(scope.repoRoot, async (operation) => {
+      await expect(
+        operation.commitRuntimeTarget(
+          {
+            ...scope,
+            target: runtimeWorktreeTarget,
+            lease,
+            tabs: [terminal, workspacePaneStaticTabEntry('status')],
+            validTargets,
+            providerSnapshots: providers,
+          },
+          () => {
+          throw new Error('runtime admission failed')
+          },
+        ),
+      ).rejects.toThrow('runtime admission failed')
+      expect(operation.indexedAdmissionLeases(scope)).toEqual([])
+      await expect(
+        operation.snapshot({ scope, validTargets, providerSnapshots: providers }),
+      ).resolves.toEqual(baseline)
+    })
+  })
+
+  test('atomically swaps the staged runtime target state after the commit callback succeeds', async () => {
+    const aggregate = aggregateFor(memoryRepository())
+    const validTargets = [worktreeProjection(target.branchName)]
+    const lease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
+    await readSnapshot(aggregate, scope, validTargets, providers)
+
+    await aggregate.runExclusive(scope.repoRoot, async (operation) => {
+      let callbackObservedUncommittedState = false
+      const snapshot = await operation.commitRuntimeTarget(
+        {
+          ...scope,
+          target: runtimeWorktreeTarget,
+          lease,
+          tabs: [terminal, workspacePaneStaticTabEntry('status')],
+          validTargets,
+          providerSnapshots: providers,
+        },
+        () => {
+          callbackObservedUncommittedState = operation.indexedAdmissionLeases(scope).length === 0
+        },
+      )
+
+      expect(callbackObservedUncommittedState).toBe(true)
+      expect(operation.indexedAdmissionLeases(scope)).toEqual([lease])
+      await expect(
+        operation.snapshot({ scope, validTargets, providerSnapshots: providers }),
+      ).resolves.toEqual(snapshot)
+    })
+  })
+
+  test('preserves an existing epoch and its physical index when a replacement admission fails', async () => {
+    const aggregate = aggregateFor(memoryRepository())
+    const validTargets = [worktreeProjection(target.branchName)]
+    const firstLease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
+    const replacementLease = physicalWorktreeAdmissionLease(replacementCapability())
+    const firstTabs = [workspacePaneStaticTabEntry('status'), terminal]
+
+    await aggregate.runExclusive(scope.repoRoot, async (operation) => {
+      await operation.commitRuntimeTarget(
+        { ...scope, target: runtimeWorktreeTarget, lease: firstLease, tabs: firstTabs, validTargets, providerSnapshots: providers },
+        () => undefined,
+      )
+    })
+    const baseline = await readSnapshot(aggregate, scope, validTargets, providers)
+
+    await expect(
+      aggregate.runExclusive(scope.repoRoot, async (operation) =>
+        await operation.commitRuntimeTarget(
+          {
+            ...scope,
+            target: runtimeWorktreeTarget,
+            lease: replacementLease,
+            tabs: [terminal, workspacePaneStaticTabEntry('status')],
+            validTargets,
+            providerSnapshots: providers,
+          },
+          () => {
+            throw new Error('replacement admission failed')
+          },
+        ),
+      ),
+    ).rejects.toThrow('replacement admission failed')
+
+    await expect(readSnapshot(aggregate, scope, validTargets, providers)).resolves.toEqual(baseline)
+    expect(aggregate.physicalTargets(firstLease)).toEqual([{ ...scope, target: runtimeWorktreeTarget }])
+    expect(aggregate.physicalTargets(replacementLease)).toEqual([])
+  })
+
+  test('replaces a target lease without retaining its old reverse index and leaves sibling epochs unchanged', async () => {
+    const aggregate = aggregateFor(memoryRepository())
+    const firstLease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
+    const replacementLease = physicalWorktreeAdmissionLease(replacementCapability())
+    const siblingScope = { ...scope, userId: 'user-b' }
+    const validTargets = [worktreeProjection(target.branchName)]
+
+    for (const [epochScope, lease] of [[scope, firstLease], [siblingScope, firstLease]] as const) {
+      await aggregate.runExclusive(scope.repoRoot, async (operation) => {
+        await operation.commitRuntimeTarget(
+          { ...epochScope, target: runtimeWorktreeTarget, lease, tabs: [terminal], validTargets, providerSnapshots: providers },
+          () => undefined,
+        )
+      })
+    }
+    const siblingBaseline = await readSnapshot(aggregate, siblingScope, validTargets, providers)
+
+    await aggregate.runExclusive(scope.repoRoot, async (operation) => {
+      await operation.commitRuntimeTarget(
+        { ...scope, target: runtimeWorktreeTarget, lease: replacementLease, tabs: [terminal], validTargets, providerSnapshots: providers },
+        () => undefined,
+      )
+    })
+
+    expect(aggregate.physicalTargets(firstLease)).toEqual([{ ...siblingScope, target: runtimeWorktreeTarget }])
+    expect(aggregate.physicalTargets(replacementLease)).toEqual([{ ...scope, target: runtimeWorktreeTarget }])
+    await expect(readSnapshot(aggregate, siblingScope, validTargets, providers)).resolves.toEqual(siblingBaseline)
+  })
+
+  test('rejects staging a runtime target outside the authoritative target projection', async () => {
+    const aggregate = aggregateFor(memoryRepository())
+    const lease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
+
+    await expect(
+      aggregate.runExclusive(scope.repoRoot, async (operation) =>
+        await operation.commitRuntimeTarget(
+          {
+            ...scope,
+            target: runtimeWorktreeTarget,
+            lease,
+            tabs: [terminal],
+            validTargets: [],
+            providerSnapshots: providers,
+          },
+          () => undefined,
+        ),
+      ),
+    ).rejects.toThrow('error.workspace-tabs-target-invalid')
+    expect(aggregate.activeEpochs(scope.repoRoot)).toEqual([])
   })
 
   test('uses one monotonic clock across durable, target, overlay, and provider dependencies', async () => {

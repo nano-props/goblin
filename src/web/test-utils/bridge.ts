@@ -404,7 +404,7 @@ export function installWorkspacePaneTabsTestBridge(
         const terminalRuntimeSessionId = 'pty_test_aaaaaaaaa'
         const projectedTarget = workspacePaneTabsTargetFromRuntime(input.request.target)
         if (!projectedTarget) throw new Error('invalid terminal runtime target')
-        const target = { ...projectedTarget, repoRuntimeId: input.request.repoRuntimeId }
+        const target = { ...projectedTarget, repoRuntimeId: input.request.target.workspaceRuntimeId }
         replaceServerTarget(
           target,
           workspacePaneTabsWithRuntimeTab(serverTabsForTarget(target), 'terminal', terminalSessionId, {
@@ -419,7 +419,10 @@ export function installWorkspacePaneTabsTestBridge(
           runtime: {
             ok: true,
             action: 'created',
-            branch: input.request.branch,
+            presentation:
+              input.request.target.kind === 'workspace-root'
+                ? { kind: 'workspace-root' as const }
+                : { kind: 'git-worktree' as const, branchName: 'main' },
             terminalSessionId,
             terminalSessionsRevision: 1,
             terminalRuntimeSessionId,

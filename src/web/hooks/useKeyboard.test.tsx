@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toast } from 'sonner'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
+import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 
 vi.mock('sonner', () => ({
   toast: {
@@ -29,6 +30,7 @@ import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
+import { terminalDescriptorForTest, terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
@@ -37,7 +39,7 @@ import type { RepoServerOperationState } from '#/shared/api-types.ts'
 const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
 const REPO_ID = 'goblin+file:///tmp/keyboard-repo'
 const WORKTREE_PATH = '/tmp/keyboard-worktree'
-const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
+const WORKTREE_KEY = formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH)
 
 interface HookHostOptions {
   currentRepoId: string | null
@@ -518,21 +520,15 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', {
-      repoRoot: REPO_ID,
-
-      repoRuntimeId: repoRuntimeIdForTest(),
-
-      target: {
-        kind: 'git-worktree',
-        workspaceId: REPO_ID,
-        workspaceRuntimeId: repoRuntimeIdForTest(),
-        root: 'goblin+file:///tmp/keyboard-worktree',
-      },
-
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-    })
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith(
+      'term-111111111111111111111',
+      terminalSessionBaseForTest({
+        repoRoot: REPO_ID,
+        repoRuntimeId: repoRuntimeIdForTest(),
+        branch: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
+      }),
+    )
   })
 })
 
@@ -633,9 +629,8 @@ function installNativeBridgeStub() {
 function terminalWorktreeSnapshot(): TerminalWorktreeSnapshot {
   return {
     terminalWorktreeKey: WORKTREE_KEY,
-    selectedDescriptor: {
+    selectedDescriptor: terminalDescriptorForTest({
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: WORKTREE_KEY,
       index: 1,
       repoRoot: REPO_ID,
 
@@ -643,7 +638,7 @@ function terminalWorktreeSnapshot(): TerminalWorktreeSnapshot {
 
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
-    },
+    }),
     sessions: [
       {
         type: 'terminal',

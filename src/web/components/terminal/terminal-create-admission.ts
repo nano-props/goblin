@@ -1,4 +1,4 @@
-import type { TerminalCreateAction } from '#/shared/terminal-types.ts'
+import type { TerminalCreateAction, TerminalPresentation } from '#/shared/terminal-types.ts'
 
 /**
  * Client admission result for a server-committed terminal runtime open.
@@ -10,7 +10,7 @@ import type { TerminalCreateAction } from '#/shared/terminal-types.ts'
  */
 export interface TerminalCreateAdmissionBase {
   terminalSessionId: string
-  branch: string
+  presentation: TerminalPresentation
   resourceDisposition: TerminalCreateAction
   runtimeProjectionApplied: boolean
 }

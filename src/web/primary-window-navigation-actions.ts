@@ -12,7 +12,7 @@ import { openRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-bran
 import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import {
   beginPrimaryWindowPresentation,
   primaryWindowPresentationIsCurrent,
@@ -205,7 +205,7 @@ function rememberWorkspacePaneRouteSelection(
   if (route.kind !== 'terminal') return
   const worktreePath = branch.worktree?.path ?? null
   if (!worktreePath) return
-  state.setSelectedTerminal(formatTerminalWorktreeKey(repoId, worktreePath), route.terminalSessionId)
+  state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(repoId, worktreePath), route.terminalSessionId)
 }
 
 function commitRepoBranchWorkspacePaneRoute(

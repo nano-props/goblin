@@ -71,7 +71,6 @@ export interface ClientTerminal {
       terminalRuntimeGeneration: number
       terminalSessionId: string
       repoRoot: string
-      worktreePath: string
     }) => void,
   ) => () => void
 }

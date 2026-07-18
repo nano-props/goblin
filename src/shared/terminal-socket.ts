@@ -46,7 +46,6 @@ export type TerminalRealtimeMessage =
       terminalRuntimeGeneration: number
       terminalSessionId: string
       repoRoot: string
-      worktreePath: string
     }
 
 export interface TerminalSocketRequestInputs {

@@ -3,9 +3,13 @@
 import path from 'node:path'
 import { describe, expect, test, vi } from 'vitest'
 import { createTerminalSessionCreator } from '#/server/terminal/terminal-session-creator.ts'
+import type { ServerTerminalCreateInput } from '#/server/terminal/terminal-session-creator.ts'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
-import type { TerminalCreateInput, TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import type { TerminalSessionEnsureResult } from '#/server/terminal/terminal-session-ensurer.ts'
+import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import type {
+  TerminalSessionAdmissionCommitResult,
+  TerminalSessionEnsureResult,
+} from '#/server/terminal/terminal-session-ensurer.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
@@ -131,22 +135,18 @@ describe('terminal session creator', () => {
   })
 })
 
-function createRequest(overrides: Partial<TerminalCreateInput> = {}): TerminalCreateInput {
+function createRequest(overrides: Partial<ServerTerminalCreateInput> = {}): ServerTerminalCreateInput {
   return {
-    repoRoot: REPO_ROOT,
-    repoRuntimeId: REPO_RUNTIME_ID,
-    target: {
+    ...overrides,
+    target: overrides.target ?? {
       kind: 'git-worktree',
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: REPO_RUNTIME_ID,
       root: WORKTREE_ROOT,
     },
-    branch: BRANCH_NAME,
-    worktreePath: WORKTREE_PATH,
-    kind: 'additional',
-    cols: 80,
-    rows: 24,
-    ...overrides,
+    kind: overrides.kind ?? 'additional',
+    cols: overrides.cols ?? 80,
+    rows: overrides.rows ?? 24,
   }
 }
 
@@ -155,17 +155,13 @@ function terminalSession(terminalSessionId: string): TerminalSessionSummary {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalRuntimeGeneration: 1,
     terminalSessionId,
-    repoRuntimeId: REPO_RUNTIME_ID,
     target: {
       kind: 'git-worktree',
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: REPO_RUNTIME_ID,
       root: WORKTREE_ROOT,
     },
-    repoRoot: path.resolve(REPO_ROOT),
-    branch: BRANCH_NAME,
-    worktreePath: path.resolve(WORKTREE_PATH),
-    cwd: path.resolve(WORKTREE_PATH),
+    presentation: { kind: 'git-worktree', branchName: BRANCH_NAME },
     controller: null,
     processName: 'zsh',
     canonicalTitle: null,
@@ -190,10 +186,10 @@ function ensureResult(terminalSessionId: string): Extract<TerminalSessionEnsureR
   }
 }
 
-function committedResult(terminalRuntimeSessionId: string) {
+function committedResult(terminalRuntimeSessionId: string): TerminalSessionAdmissionCommitResult {
   return {
     action: 'created' as const,
-    branch: BRANCH_NAME,
+    presentation: { kind: 'git-worktree', branchName: BRANCH_NAME },
     terminalSessionsRevision: 7,
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 1,

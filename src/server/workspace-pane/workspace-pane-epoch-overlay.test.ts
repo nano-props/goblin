@@ -118,7 +118,7 @@ describe('workspace pane epoch overlay', () => {
     overlay.registerPhysicalTarget({ ...linkedScope, target: linkedTarget, lease })
 
     expect(overlay.clearPhysicalIdentity('/repo', lease)).toEqual([scope])
-    expect(overlay.physicalTargets(identity)).toEqual([{ ...linkedScope, target: linkedTarget, lease }])
+    expect(overlay.physicalTargets(identity)).toEqual([{ ...linkedScope, target: linkedTarget }])
     expect(overlay.placementHints({ ...scope, target })).toHaveLength(1)
   })
 
@@ -149,7 +149,7 @@ describe('workspace pane epoch overlay', () => {
     overlay.registerPhysicalTarget({ ...scope, target, lease: rebound })
 
     expect(overlay.clearPhysicalIdentity('/repo', first)).toEqual([])
-    expect(overlay.physicalTargets(rebound)).toEqual([{ ...scope, target, lease: rebound }])
+    expect(overlay.physicalTargets(rebound)).toEqual([{ ...scope, target }])
   })
 
   test('rejects duplicate provider types and keys revisions by type', () => {

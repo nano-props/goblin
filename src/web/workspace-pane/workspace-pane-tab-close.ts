@@ -9,6 +9,7 @@ import {
   readWorkspacePaneRuntimeTabCloseContext,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
 import { confirmWorkspacePaneRuntimeTabClose } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
+import { workspacePaneTerminalBaseFromCoordinates } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
 type WorkspacePaneTabCloseStart =
   { accepted: false; completion: null } | { accepted: true; completion: Promise<boolean> }
@@ -20,25 +21,29 @@ export function beginWorkspacePaneTabClose(
   if (tab.kind === 'pending') return { accepted: false, completion: null }
   const provider = workspacePaneTabProvider(tab.type)
   const closeContext = readWorkspacePaneRuntimeTabCloseContext()
-  const closeTarget = {
-    repoRoot: target.repoId,
-    repoRuntimeId: target.repoRuntimeId,
+  const closeTarget = target.worktreePath
+    ? workspacePaneTerminalBaseFromCoordinates({
+    workspaceId: target.repoId,
+    workspaceRuntimeId: target.repoRuntimeId,
     branchName: target.branchName,
-    worktreePath: target.worktreePath,
-  }
+    rootPath: target.worktreePath,
+      })
+    : null
   if (
     isRepoWorkspaceRuntimeTab(tab) &&
+    (!closeTarget ||
     !canCloseWorkspacePaneRuntimeTabWithContext(
       {
         type: tab.runtimeType,
         target: closeTarget,
       },
       closeContext,
-    )
+    ))
   ) {
     return { accepted: false, completion: null }
   }
   if (isRepoWorkspaceRuntimeTab(tab)) {
+    if (!closeTarget) return { accepted: false, completion: null }
     return {
       accepted: true,
       completion: confirmWorkspacePaneRuntimeTabClose(

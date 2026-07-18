@@ -1,4 +1,9 @@
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import {
+  terminalExecutionCoordinates,
+  terminalExecutionPath,
+  type TerminalPresentation,
+  type TerminalSessionBase,
+} from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
@@ -22,7 +27,7 @@ export interface WorkspacePaneRuntimeTabCommandContextInput {
   showCreatedRuntimeTab: (
     type: WorkspacePaneRuntimeTabType,
     sessionId: string,
-    canonicalBranch: string,
+    presentation: TerminalPresentation,
     worktreePath: string,
   ) => boolean | Promise<boolean>
   terminalCreateTranslator?: TerminalCreateTranslator
@@ -68,8 +73,15 @@ function assignTerminalRuntimeTabCommandContext(
       },
     ),
     showTerminalSession: (terminalSessionId) => input.showRuntimeTab('terminal', terminalSessionId),
-    showCreatedTerminalSession: (terminalSessionId, canonicalBranch) =>
-      base ? input.showCreatedRuntimeTab('terminal', terminalSessionId, canonicalBranch, base.worktreePath) : false,
+    showCreatedTerminalSession: (terminalSessionId, presentation) =>
+      base
+        ? input.showCreatedRuntimeTab(
+            'terminal',
+            terminalSessionId,
+            presentation,
+            terminalExecutionPath(base.target),
+          )
+        : false,
     t: input.terminalCreateTranslator,
   }
 }
@@ -84,13 +96,13 @@ export function selectedWorkspacePaneTerminalBase(
   if (!repo || !target) return null
   const runtimeTarget = runtimeWorkspacePaneTarget(target.paneTarget, repo.repoRuntimeId)
   if (!runtimeTarget) return null
-  return {
-    repoRoot: repoId,
-    repoRuntimeId: repo.repoRuntimeId,
-    branch: target.terminalBranch,
-    worktreePath: target.worktreePath,
-    target: runtimeTarget,
+  if (runtimeTarget.kind === 'workspace-root') {
+    return { target: runtimeTarget, presentation: { kind: 'workspace-root' } }
   }
+  if (runtimeTarget.kind === 'git-worktree' && target.terminalBranch) {
+    return { target: runtimeTarget, presentation: { kind: 'git-worktree', branchName: target.terminalBranch } }
+  }
+  return null
 }
 
 function selectedWorkspacePaneTargetForRuntimeCommand(
@@ -99,7 +111,7 @@ function selectedWorkspacePaneTargetForRuntimeCommand(
   workspacePaneRoute: WorkspacePaneCommandRoute,
 ): {
   paneTarget: Parameters<typeof runtimeWorkspacePaneTarget>[0]
-  terminalBranch: string
+  terminalBranch: string | null
   worktreePath: string
 } | null {
   if (branchName === null) {
@@ -107,7 +119,7 @@ function selectedWorkspacePaneTargetForRuntimeCommand(
     return target
       ? {
           paneTarget: { kind: 'workspace-root', repoRoot: repoId, branchName: null, worktreePath: null },
-          terminalBranch: '',
+          terminalBranch: null,
           worktreePath: repoId,
         }
       : null

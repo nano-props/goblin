@@ -24,10 +24,7 @@ import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from 
 stubI18n()
 
 interface CapturedTerminalSessionViewProps {
-  repoRoot: string
-  repoRuntimeId: string
-  branch: string
-  worktreePath: string
+  base: TerminalSessionBase
   selectedTerminalSessionId?: string | null
   projectionPhase?: string
   projectionErrorMessage?: string
@@ -100,10 +97,15 @@ describe('workspace pane runtime tab panel', () => {
     expect(panel?.getAttribute('aria-label')).toBe('Terminal')
     expect(container.querySelector('[data-testid="terminal-session-view"]')).not.toBeNull()
     expect(terminalSessionViewMocks.props[0]).toMatchObject({
-      repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-1',
-      branch: 'main',
-      worktreePath: '/repo-worktree',
+      base: {
+        target: {
+          kind: 'git-worktree',
+          workspaceId: 'goblin+file:///repo',
+          workspaceRuntimeId: 'repo-runtime-1',
+          root: 'goblin+file:///repo-worktree',
+        },
+        presentation: { kind: 'git-worktree', branchName: 'main' },
+      },
       selectedTerminalSessionId: 'term-111111111111111111111',
       projectionPhase: 'failed',
       projectionErrorMessage: 'boom',
@@ -118,16 +120,13 @@ describe('workspace pane runtime tab panel', () => {
     })
 
     const base: TerminalSessionBase = {
-      repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-1',
       target: {
         kind: 'git-worktree',
         workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
         workspaceRuntimeId: 'repo-runtime-1',
         root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
       },
-      branch: 'stale-branch',
-      worktreePath: '/repo-worktree',
+      presentation: { kind: 'git-worktree', branchName: 'stale-branch' },
     }
 
     await act(async () => {
@@ -147,7 +146,7 @@ describe('workspace pane runtime tab panel', () => {
         {
           commitCreatedTerminalTab: (admission: {
             terminalSessionId: string
-            branch: string
+            presentation: { kind: 'git-worktree'; branchName: string }
             requestRole: 'leader'
             resourceDisposition: 'created'
             runtimeProjectionApplied: boolean
@@ -157,7 +156,7 @@ describe('workspace pane runtime tab panel', () => {
     >
     await commandCalls[0]?.[0].commitCreatedTerminalTab({
       terminalSessionId: 'term-111111111111111111111',
-      branch: 'main',
+      presentation: { kind: 'git-worktree', branchName: 'main' },
       requestRole: 'leader',
       resourceDisposition: 'created',
       runtimeProjectionApplied: true,
@@ -183,11 +182,12 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
           panelLabel: { label: 'Terminal' },
           target: {
             runtimeTarget: {
-              kind: 'git-branch',
+              kind: 'git-worktree',
               workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
               workspaceRuntimeId: 'repo-runtime-1',
-              branch: 'main',
+              root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
             },
+            presentation: { kind: 'git-worktree', branchName: 'main' },
             worktreePath: '/repo-worktree',
           },
           selectedSessionId: 'term-111111111111111111111',

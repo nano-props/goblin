@@ -556,7 +556,7 @@ describe('restoreServerWorkspace', () => {
       worktreePath: null,
     })
     const otherTargetKey = workspacePaneTabsTargetIdentityKey({
-      repoRoot: '/other',
+      repoRoot: 'goblin+file:///other',
       branchName: 'main',
       worktreePath: null,
     })

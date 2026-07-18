@@ -18,16 +18,13 @@ const BRANCH_NAME = 'main'
 const WORKTREE_PATH = '/tmp/workspace-pane-runtime-create-worktree'
 const TERMINAL_SESSION_ID = 'term-111111111111111111111'
 const BASE: TerminalSessionBase = {
-  repoRoot: REPO_ROOT,
-  repoRuntimeId: REPO_RUNTIME_ID,
   target: {
     kind: 'git-worktree',
     workspaceId: canonicalWorkspaceLocator(REPO_ROOT)!,
     workspaceRuntimeId: REPO_RUNTIME_ID,
     root: canonicalWorkspaceLocator('goblin+file:///tmp/workspace-pane-runtime-create-worktree')!,
   },
-  branch: BRANCH_NAME,
-  worktreePath: WORKTREE_PATH,
+  presentation: { kind: 'git-worktree', branchName: BRANCH_NAME },
 }
 
 const terminalCreateCommandMocks = vi.hoisted(() => ({
@@ -100,7 +97,10 @@ describe('workspace pane runtime tab create action', () => {
       commitCreatedTerminalTab: (admission: TerminalCreateLeaderAdmissionResult) => Promise<unknown>
     }
     await commandInput.commitCreatedTerminalTab(createAdmission())
-    expect(showCreatedRuntimeTab).toHaveBeenCalledWith('terminal', TERMINAL_SESSION_ID, BRANCH_NAME)
+    expect(showCreatedRuntimeTab).toHaveBeenCalledWith('terminal', TERMINAL_SESSION_ID, {
+      kind: 'git-worktree',
+      branchName: BRANCH_NAME,
+    })
   })
 
   test('dispatches immediately without holding the client workspace-pane operation queue', async () => {
@@ -137,7 +137,10 @@ describe('workspace pane runtime tab create action', () => {
       }),
     ).resolves.toEqual({ status: 'committed' })
 
-    expect(showCreatedTerminalTab).toHaveBeenCalledWith(TERMINAL_SESSION_ID, BRANCH_NAME)
+    expect(showCreatedTerminalTab).toHaveBeenCalledWith(TERMINAL_SESSION_ID, {
+      kind: 'git-worktree',
+      branchName: BRANCH_NAME,
+    })
   })
 
   test('does not navigate or record opener after the command target runtime is superseded', async () => {
@@ -202,7 +205,7 @@ function translate(key: string): string {
 function createAdmission(): TerminalCreateLeaderAdmissionResult {
   return {
     terminalSessionId: TERMINAL_SESSION_ID,
-    branch: BRANCH_NAME,
+    presentation: { kind: 'git-worktree', branchName: BRANCH_NAME },
     requestRole: 'leader',
     resourceDisposition: 'created',
     runtimeProjectionApplied: true,

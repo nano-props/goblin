@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { formatWorkspaceLocator, parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import {
+  canonicalWorkspaceLocator,
+  formatWorkspaceLocator,
+  parseWorkspaceLocator,
+  workspaceLocatorForPath,
+} from '#/shared/workspace-locator.ts'
 
 describe('workspace locator codec', () => {
   it.each([
@@ -24,6 +29,15 @@ describe('workspace locator codec', () => {
     expect(nfc).toBe('goblin+file:///caf%C3%A9')
     expect(nfd).toBe('goblin+file:///cafe%CC%81')
     expect(nfc).not.toBe(nfd)
+  })
+
+  it.each([
+    ['goblin+file:///repo', '/repo/worktree', 'goblin+file:///repo/worktree'],
+    ['goblin+ssh://dev/srv/repo', '/srv/repo/worktree', 'goblin+ssh://dev/srv/repo/worktree'],
+  ])('binds %s transport identity to an authoritative path', (workspace, path, expected) => {
+    const workspaceId = canonicalWorkspaceLocator(workspace)
+    expect(workspaceId).not.toBeNull()
+    expect(workspaceId && workspaceLocatorForPath(workspaceId, path)).toBe(expected)
   })
 
   it.each([

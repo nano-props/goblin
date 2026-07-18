@@ -6,7 +6,11 @@ import {
   WORKSPACE_PANE_STATIC_TAB_TYPES,
 } from '#/shared/workspace-pane.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
-import { formatWorkspaceLocator, parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import {
+  formatWorkspaceLocator,
+  parseCanonicalWorkspaceLocator,
+  workspaceLocatorsShareTransport,
+} from '#/shared/workspace-locator.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 
@@ -25,18 +29,33 @@ export const WorkspacePaneTabsListInputSchema = v.object({
 })
 
 export const RuntimeWorkspacePaneTargetSchema = v.variant('kind', [
-  v.object({
+  v.strictObject({
     kind: v.literal('workspace-root'),
     workspaceId: WorkspaceIdSchema,
     workspaceRuntimeId: RepoRuntimeIdSchema,
   }),
-  v.object({
+  v.strictObject({
     kind: v.literal('git-branch'),
     workspaceId: WorkspaceIdSchema,
     workspaceRuntimeId: RepoRuntimeIdSchema,
     branch: v.pipe(v.string(), v.minLength(1)),
   }),
-  v.object({
+  v.strictObject({
+    kind: v.literal('git-worktree'),
+    workspaceId: WorkspaceIdSchema,
+    workspaceRuntimeId: RepoRuntimeIdSchema,
+    root: v.string(),
+  }),
+])
+
+/** Runtime targets that identify a concrete filesystem execution root. */
+export const WorkspacePaneExecutionTargetSchema = v.variant('kind', [
+  v.strictObject({
+    kind: v.literal('workspace-root'),
+    workspaceId: WorkspaceIdSchema,
+    workspaceRuntimeId: RepoRuntimeIdSchema,
+  }),
+  v.strictObject({
     kind: v.literal('git-worktree'),
     workspaceId: WorkspaceIdSchema,
     workspaceRuntimeId: RepoRuntimeIdSchema,
@@ -45,13 +64,13 @@ export const RuntimeWorkspacePaneTargetSchema = v.variant('kind', [
 ])
 
 export const WorkspacePaneStaticTabEntrySchema = v.variant('type', [
-  v.object({ type: v.literal('status'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.status) }),
-  v.object({ type: v.literal('changes'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.changes) }),
-  v.object({ type: v.literal('history'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.history) }),
-  v.object({ type: v.literal('files'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.files) }),
+  v.strictObject({ type: v.literal('status'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.status) }),
+  v.strictObject({ type: v.literal('changes'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.changes) }),
+  v.strictObject({ type: v.literal('history'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.history) }),
+  v.strictObject({ type: v.literal('files'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.files) }),
 ])
 export const WorkspacePaneStaticTabTypeSchema = v.picklist(WORKSPACE_PANE_STATIC_TAB_TYPES)
-export const WorkspacePaneRuntimeTabEntrySchema = v.object({
+export const WorkspacePaneRuntimeTabEntrySchema = v.strictObject({
   type: v.picklist(WORKSPACE_PANE_RUNTIME_TAB_TYPES),
   runtimeSessionId: v.pipe(v.string(), v.minLength(1)),
 })
@@ -82,12 +101,12 @@ export const WorkspacePaneTabsUpdateInputSchema = v.object({
   ]),
 })
 
-export const WorkspacePaneTabsEntrySchema = v.object({
+export const WorkspacePaneTabsEntrySchema = v.strictObject({
   target: RuntimeWorkspacePaneTargetSchema,
   tabs: v.array(WorkspacePaneTabEntrySchema),
 })
 
-export const WorkspacePaneTabsSnapshotSchema = v.object({
+export const WorkspacePaneTabsSnapshotSchema = v.strictObject({
   revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
   entries: v.array(WorkspacePaneTabsEntrySchema),
 })
@@ -111,12 +130,7 @@ export function canonicalRuntimeWorkspacePaneTarget(
   if (target.kind === 'git-branch') return { ...target, workspaceId }
   const root = canonicalLocator(target.root)
   if (!root) return null
-  const workspace = parseCanonicalWorkspaceLocator(workspaceId)
-  const parsedRoot = parseCanonicalWorkspaceLocator(root)
-  if (!workspace || !parsedRoot || workspace.transport !== parsedRoot.transport) return null
-  if (workspace.transport === 'ssh' && (parsedRoot.transport !== 'ssh' || workspace.profile !== parsedRoot.profile)) {
-    return null
-  }
+  if (!workspaceLocatorsShareTransport(workspaceId, root)) return null
   return { ...target, workspaceId, root }
 }
 

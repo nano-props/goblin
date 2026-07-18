@@ -2,6 +2,8 @@ import { lastPathSegment } from '#/web/lib/paths.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import type { TerminalBellPolicyEvent, TerminalDescriptor } from '#/web/components/terminal/types.ts'
 import { getRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
+import { terminalPresentationBranch, terminalSessionCoordinates } from '#/shared/terminal-types.ts'
+import { terminalDescriptorWorktreeKey } from '#/web/components/terminal/terminal-descriptor.ts'
 const BELL_NOTIFICATION_THROTTLE_MS = 5000
 
 export interface TerminalBellState {
@@ -62,8 +64,8 @@ export function createTerminalBellState(
       // The in-app unread state above is published immediately.
       if (now - lastNotifiedAt < BELL_NOTIFICATION_THROTTLE_MS) return
       lastSystemNotificationAtByTerminalSessionId.set(descriptor.terminalSessionId, now)
-      const repoName = lastPathSegment(descriptor.repoRoot)
-      const bodyParts = [descriptor.branch]
+      const repoName = lastPathSegment(terminalSessionCoordinates(descriptor).repoRoot)
+      const bodyParts = terminalPresentationBranch(descriptor.presentation) ? [terminalPresentationBranch(descriptor.presentation)] : []
       const canonicalTitle = typeof event.canonicalTitle === 'string' ? event.canonicalTitle.trim() : ''
       if (canonicalTitle) bodyParts.push(canonicalTitle)
       else if (event.processName) bodyParts.push(event.processName)
@@ -72,8 +74,8 @@ export function createTerminalBellState(
           title: repoName,
           body: bodyParts.join('\n'),
           terminalSessionId: descriptor.terminalSessionId,
-          terminalWorktreeKey: descriptor.terminalWorktreeKey,
-          repoRoot: descriptor.repoRoot,
+          terminalWorktreeKey: terminalDescriptorWorktreeKey(descriptor),
+          repoRoot: terminalSessionCoordinates(descriptor).repoRoot,
         })
         .catch(() => {})
     },

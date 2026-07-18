@@ -172,7 +172,7 @@ import {
 const REPO_ROOT = 'goblin+file:///repo'
 const WORKTREE_PATH = '/repo'
 const BRANCH = 'main'
-const WORKTREE_KEY = `${REPO_ROOT}\0${WORKTREE_PATH}`
+const WORKTREE_KEY = `${REPO_ROOT}\0${REPO_ROOT}`
 
 class MockResizeObserver {
   static instances: MockResizeObserver[] = []
@@ -191,27 +191,25 @@ class MockResizeObserver {
 
 let originalResizeObserver: typeof ResizeObserver | undefined
 
-function makeRepoIndex() {
+function makeRuntimeMembershipIndex() {
   return {
     [REPO_ROOT]: {
       repoRuntimeId: REPO_RUNTIME_ID,
-      branchByWorktreePath: { [WORKTREE_PATH]: BRANCH },
     },
   }
 }
 
 function terminalBase() {
-  return {
+  const target = runtimeWorkspacePaneTargetForTest({
     repoRoot: REPO_ROOT,
     repoRuntimeId: REPO_RUNTIME_ID,
-    target: runtimeWorkspacePaneTargetForTest({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: BRANCH,
-      worktreePath: WORKTREE_PATH,
-    }),
-    branch: BRANCH,
+    branchName: BRANCH,
     worktreePath: WORKTREE_PATH,
+  })
+  if (target.kind !== 'git-worktree') throw new Error('expected git worktree target')
+  return {
+    target,
+    presentation: { kind: 'git-worktree' as const, branchName: BRANCH },
   }
 }
 
@@ -221,7 +219,7 @@ function makeCreateResult(overrides: Partial<TerminalCreateSuccess> = {}): Termi
   return {
     ok: true as const,
     action: 'created' as const,
-    branch: BRANCH,
+    presentation: { kind: 'git-worktree', branchName: BRANCH },
     terminalSessionId: 'term-111111111111111111111',
     terminalSessionsRevision: 11,
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -244,7 +242,7 @@ function emitBellForKey(projection: TerminalSessionProjection, terminalSessionId
       terminalWorktreeKey: WORKTREE_KEY,
       index: 1,
       repoRoot: REPO_ROOT,
-      branch: BRANCH,
+      presentation: { kind: 'git-worktree', branchName: BRANCH },
       worktreePath: WORKTREE_PATH,
     },
     { processName: 'zsh', visible: false },
@@ -286,7 +284,7 @@ describe('TerminalSessionProjection create flow', () => {
     mocks.estimateManagedTerminalGeometryMock.mockClear()
     mocks.clientIdMock.mockClear()
     projection = new TerminalSessionProjection()
-    projection.setRepoIndex(makeRepoIndex())
+    projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     setTerminalSessionProjectionForTests(projection)
     originalResizeObserver = globalThis.ResizeObserver
     Object.defineProperty(globalThis, 'ResizeObserver', {
@@ -320,11 +318,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect(mocks.estimateManagedTerminalGeometryMock).toHaveBeenCalledWith(host)
     expect(mocks.createMock).toHaveBeenCalledWith({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
       target: terminalBase().target,
-      branch: BRANCH,
-      worktreePath: WORKTREE_PATH,
       kind: 'primary',
       cols: 101,
       rows: 31,
@@ -364,11 +358,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.openRuntimeMock).toHaveBeenCalledWith({
       runtimeType: 'terminal',
       request: {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
         target: terminalBase().target,
-        branch: BRANCH,
-        worktreePath: WORKTREE_PATH,
         kind: 'primary',
         cols: 80,
         rows: 24,
@@ -386,11 +376,7 @@ describe('TerminalSessionProjection create flow', () => {
     await projection.createTerminal(terminalBase(), { startupShellCommand: "bat '/repo/README.md'\r" })
 
     expect(mocks.createMock).toHaveBeenCalledWith({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
       target: terminalBase().target,
-      branch: BRANCH,
-      worktreePath: WORKTREE_PATH,
       kind: 'additional',
       startupShellCommand: "bat '/repo/README.md'\r",
       cols: 101,
@@ -415,11 +401,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     await expect(create).resolves.toBe('term-111111111111111111111')
     expect(mocks.createMock).toHaveBeenCalledWith({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
       target: terminalBase().target,
-      branch: BRANCH,
-      worktreePath: WORKTREE_PATH,
       kind: 'additional',
       startupShellCommand: "bat '/repo/README.md'\r",
       cols: 80,
@@ -490,14 +472,14 @@ describe('TerminalSessionProjection create flow', () => {
     })
     expect(firstResult).toEqual({
       terminalSessionId: 'term-111111111111111111111',
-      branch: BRANCH,
+      presentation: { kind: 'git-worktree', branchName: BRANCH },
       requestRole: 'leader',
       resourceDisposition: 'created',
       runtimeProjectionApplied: true,
     })
     await expect(secondCreate).resolves.toEqual({
       terminalSessionId: 'term-111111111111111111111',
-      branch: BRANCH,
+      presentation: { kind: 'git-worktree', branchName: BRANCH },
       requestRole: 'observer',
       resourceDisposition: 'created',
       runtimeProjectionApplied: true,
@@ -513,7 +495,7 @@ describe('TerminalSessionProjection create flow', () => {
 
       expect(admission).toEqual({
         terminalSessionId: 'term-111111111111111111111',
-        branch: BRANCH,
+        presentation: { kind: 'git-worktree', branchName: BRANCH },
         requestRole: 'leader',
         resourceDisposition,
         runtimeProjectionApplied: true,
@@ -545,11 +527,7 @@ describe('TerminalSessionProjection create flow', () => {
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(2))
     await expect(secondCreate).resolves.toBe('term-222222222222222222222')
     expect(mocks.createMock).toHaveBeenLastCalledWith({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
       target: terminalBase().target,
-      branch: BRANCH,
-      worktreePath: WORKTREE_PATH,
       kind: 'additional',
       startupShellCommand: "bat '/repo/b.ts'\r",
       cols: 80,
@@ -601,10 +579,9 @@ describe('TerminalSessionProjection create flow', () => {
       const pending = projection.createTerminalWithAdmission(terminalBase())
       await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
 
-      projection.setRepoIndex({
+      projection.setRuntimeMembershipIndex({
         [REPO_ROOT]: {
           repoRuntimeId: 'repo-runtime-new',
-          branchByWorktreePath: { [WORKTREE_PATH]: BRANCH },
         },
       })
       createResponse.resolve(makeCreateResult({ action: resourceDisposition }))
@@ -627,11 +604,7 @@ describe('TerminalSessionProjection create flow', () => {
     await expect(pending).resolves.toBe('term-111111111111111111111')
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
     expect(mocks.createMock).toHaveBeenCalledWith({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
       target: terminalBase().target,
-      branch: BRANCH,
-      worktreePath: WORKTREE_PATH,
       kind: 'primary',
       cols: 80,
       rows: 24,
@@ -685,11 +658,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
     expect(mocks.createMock).toHaveBeenCalledWith({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
       target: terminalBase().target,
-      branch: BRANCH,
-      worktreePath: WORKTREE_PATH,
       kind: 'primary',
       cols: 80,
       rows: 24,
@@ -714,11 +683,7 @@ describe('TerminalSessionProjection create flow', () => {
     await expect(pending).resolves.toBe('term-111111111111111111111')
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
     expect(mocks.createMock).toHaveBeenCalledWith({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
       target: terminalBase().target,
-      branch: BRANCH,
-      worktreePath: WORKTREE_PATH,
       kind: 'primary',
       cols: 80,
       rows: 24,
@@ -789,7 +754,6 @@ describe('TerminalSessionProjection create flow', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: `term-${String(index).padStart(21, '0')}`,
         repoRoot: REPO_ROOT,
-        worktreePath: WORKTREE_PATH,
         processName: 'zsh',
         canonicalTitle: null,
       })
@@ -814,7 +778,6 @@ describe('TerminalSessionProjection create flow', () => {
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-unknownunknownunknown',
       repoRoot: REPO_ROOT,
-      worktreePath: WORKTREE_PATH,
       processName: 'zsh',
       canonicalTitle: null,
     })
@@ -852,7 +815,6 @@ describe('TerminalSessionProjection create flow', () => {
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-unknownunknownunknown',
       repoRoot: REPO_ROOT,
-      worktreePath: WORKTREE_PATH,
       processName: 'zsh',
       canonicalTitle: null,
     })
@@ -894,7 +856,7 @@ describe('TerminalSessionProjection create flow', () => {
     )
     expect(mocks.setBadgeMock).toHaveBeenLastCalledWith(1)
 
-    projection.setRepoIndex({})
+    projection.setRuntimeMembershipIndex({})
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
     expect(mocks.setBadgeMock).toHaveBeenLastCalledWith(0)
@@ -965,10 +927,9 @@ describe('TerminalSessionProjection create flow', () => {
     projection.registerHost(WORKTREE_KEY, host)
     await projection.createTerminal(terminalBase())
 
-    projection.setRepoIndex({
+    projection.setRuntimeMembershipIndex({
       [REPO_ROOT]: {
         repoRuntimeId: REPO_RUNTIME_ID,
-        branchByWorktreePath: {},
       },
     })
 

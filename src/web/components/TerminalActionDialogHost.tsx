@@ -54,7 +54,10 @@ export function TerminalActionDialogHost({
         closeCloseConfirm()
         await runConfirmCloseTerminalWorkspacePaneTabCommand({
           repoId: payload.repoId,
-          branchName: payload.terminalBase.branch,
+          branchName:
+            payload.terminalBase.presentation.kind === 'git-worktree'
+              ? payload.terminalBase.presentation.branchName
+              : null,
           workspacePaneRoute: payload.workspacePaneRoute,
           currentRepoId,
           currentBranchName,

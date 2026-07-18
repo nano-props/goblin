@@ -439,7 +439,6 @@ describe('terminal web host client', () => {
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: 'goblin+file:///tmp/repo',
-          worktreePath: '/tmp/repo-worktree',
           canonicalTitle: '~/Developer/goblin — npm run dev',
         },
       }),
@@ -466,7 +465,6 @@ describe('terminal web host client', () => {
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: 'goblin+file:///tmp/repo',
-          worktreePath: '/tmp/repo-worktree',
           processName: 'zsh',
           canonicalTitle: null,
         },
@@ -540,7 +538,6 @@ describe('terminal web host client', () => {
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       repoRoot: 'goblin+file:///tmp/repo',
-      worktreePath: '/tmp/repo-worktree',
       processName: 'zsh',
       canonicalTitle: null,
     })
@@ -549,7 +546,6 @@ describe('terminal web host client', () => {
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       repoRoot: 'goblin+file:///tmp/repo',
-      worktreePath: '/tmp/repo-worktree',
       canonicalTitle: '~/Developer/goblin — npm run dev',
     })
     expect(onExit).toHaveBeenCalledWith({

@@ -10,7 +10,7 @@ export function createServerWorkspacePaneRuntimeClient(realtime: ClientAppRealti
   return {
     open(input) {
       return realtime.request(WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open, input).then((value) => {
-        const result = normalizeWorkspacePaneRuntimeOpenResult(value)
+        const result = normalizeWorkspacePaneRuntimeOpenResult(value, input.request.target)
         if (!result) throw new Error('Workspace pane runtime socket response failed: invalid open response')
         return result
       })

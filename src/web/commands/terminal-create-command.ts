@@ -54,9 +54,6 @@ export async function runCreateTerminalTabCommand(input: {
   t?: TerminalCreateTranslator
   logMessage?: string
 }): Promise<TerminalCreateCommandResult> {
-  if (!input.base.repoRuntimeId) {
-    return { ok: false, error: new Error('repo runtime unavailable'), messageKey: 'error.terminal-create-failed' }
-  }
   try {
     const admission =
       input.insertAfterIdentity === undefined

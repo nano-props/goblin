@@ -7,7 +7,7 @@ import {
 } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import {
   beginWorkspacePaneRouteIntent,
-  type WorkspacePaneActionTarget,
+  workspacePaneActionTargetFromCoordinates,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import {
@@ -27,6 +27,12 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 
 export type WorkspacePaneTabControllerRoute = RepoBranchWorkspacePaneRouteTarget
+export interface WorkspacePaneControllerTarget {
+  repoId: string
+  repoRuntimeId: string
+  branchName: string | null
+  worktreePath: string | null
+}
 export type WorkspacePaneTabControllerObservedRoute = ParsedRepoBranchWorkspacePaneRouteTarget
 export type WorkspacePaneTabControllerShowNavigation = Pick<
   PrimaryWindowNavigationActions,
@@ -49,7 +55,7 @@ export function workspacePaneControllerRouteForTab(tab: RepoWorkspaceTab): Works
 
 export interface WorkspacePaneControllerPresentationLease {
   presentationToken: PrimaryWindowPresentationToken
-  target: WorkspacePaneActionTarget
+  target: WorkspacePaneControllerTarget
   fromRoute: WorkspacePaneTabControllerRoute
   toRoute: WorkspacePaneTabControllerRoute
   routeIntentId: number | null
@@ -70,7 +76,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
   if (!fromRoute) return null
   const toRoute = input.nextTab ? workspacePaneControllerRouteForTab(input.nextTab) : null
   if (toRoute === undefined) return null
-  const target = {
+  const target: WorkspacePaneControllerTarget = {
     repoId: input.target.repoId,
     repoRuntimeId: input.target.repoRuntimeId,
     branchName,
@@ -81,7 +87,10 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
     target,
     fromRoute,
     toRoute,
-    routeIntentId: beginWorkspacePaneRouteIntent(target, workspacePaneRouteKey(fromRoute)),
+    routeIntentId: beginWorkspacePaneRouteIntent(
+      workspacePaneActionTargetFromCoordinates(target),
+      workspacePaneRouteKey(fromRoute),
+    ),
   }
 }
 
@@ -169,7 +178,7 @@ export async function commitWorkspacePaneControllerRoute(
 }
 
 export async function commitWorkspacePaneCurrentTargetRoute(
-  target: WorkspacePaneActionTarget,
+  target: WorkspacePaneControllerTarget,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,
   options?: { replace?: boolean },
@@ -188,7 +197,7 @@ export async function commitWorkspacePaneCurrentTargetRoute(
 }
 
 export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
-  target: WorkspacePaneActionTarget,
+  target: WorkspacePaneControllerTarget,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,
   options?: { replace?: boolean },
@@ -198,7 +207,10 @@ export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
     target,
     route,
     navigation,
-    workspacePaneCommittedRuntimeTargetIsCurrent,
+    (candidate) => candidate.branchName !== null && workspacePaneCommittedRuntimeTargetIsCurrent({
+      ...candidate,
+      branchName: candidate.branchName,
+    }),
     commitWorkspacePaneCommittedRuntimeRouteSupplement,
     false,
     options,
@@ -207,10 +219,10 @@ export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
 }
 
 async function commitWorkspacePaneValidatedTargetRoute(
-  target: WorkspacePaneActionTarget,
+  target: WorkspacePaneControllerTarget,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,
-  targetIsCurrent: (target: WorkspacePaneActionTarget) => boolean,
+  targetIsCurrent: (target: WorkspacePaneControllerTarget) => boolean,
   commitSupplement: typeof commitWorkspacePaneRouteSupplement,
   useCurrentTargetPrecondition: boolean,
   options: { replace?: boolean } | undefined,
@@ -233,7 +245,7 @@ async function commitWorkspacePaneValidatedTargetRoute(
 }
 
 export async function commitWorkspacePaneExactTargetRoute(
-  target: WorkspacePaneActionTarget,
+  target: WorkspacePaneControllerTarget,
   fromRoute: WorkspacePaneTabControllerObservedRoute | undefined,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,
@@ -259,7 +271,7 @@ export async function commitWorkspacePaneExactTargetRoute(
   return primaryWindowPresentationIsCurrent(presentationToken) && workspacePaneTabControllerTargetIsCurrent(target)
 }
 
-export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneActionTarget): boolean {
+export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneControllerTarget): boolean {
   if (target.branchName === null) {
     return useReposStore.getState().repos[target.repoId]?.repoRuntimeId === target.repoRuntimeId
   }

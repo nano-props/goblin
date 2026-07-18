@@ -5,6 +5,7 @@ import {
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RepoUiState } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 export const INITIAL_WORKSPACE_PANE_TAB: WorkspacePaneTabType = 'status'
 
@@ -41,12 +42,14 @@ export function workspacePaneTabsTargetForRepoTargetKey(
       ? { repoRoot: repo.repoRoot, branchName: target.branchName, worktreePath: null }
       : null
   }
-  const branch = repo.branches.find((candidate) => candidate.worktree?.path === target.worktreePath)
+  const worktreePath = parseCanonicalWorkspaceLocator(target.worktreeId)?.path
+  if (!worktreePath) return null
+  const branch = repo.branches.find((candidate) => candidate.worktree?.path === worktreePath)
   return branch
     ? {
         repoRoot: repo.repoRoot,
         branchName: branch.name,
-        worktreePath: target.worktreePath,
+        worktreePath,
       }
     : null
 }

@@ -1,5 +1,6 @@
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 /**
  * `controllerStatus === 'connected'` while the broker reports the
@@ -24,12 +25,47 @@ export interface TerminalController {
   status: Exclude<TerminalControllerStatus, 'none'>
 }
 
-export interface TerminalSessionBase {
+export type TerminalExecutionTarget = Exclude<RuntimeWorkspacePaneTarget, { kind: 'git-branch' }>
+
+export type TerminalSessionBase =
+  | {
+      target: Extract<TerminalExecutionTarget, { kind: 'workspace-root' }>
+      presentation: Extract<TerminalPresentation, { kind: 'workspace-root' }>
+    }
+  | {
+      target: Extract<TerminalExecutionTarget, { kind: 'git-worktree' }>
+      presentation: Extract<TerminalPresentation, { kind: 'git-worktree' }>
+    }
+
+export interface TerminalExecutionCoordinates {
   repoRoot: string
-  branch: string
-  worktreePath: string
-  repoRuntimeId?: string
-  target?: RuntimeWorkspacePaneTarget
+  repoRuntimeId: string
+  worktreeId: string
+}
+
+/** Canonical execution coordinates. Callers must not cache a second copy beside the target. */
+export function terminalExecutionCoordinates(target: TerminalExecutionTarget): TerminalExecutionCoordinates {
+  return {
+    repoRoot: target.workspaceId,
+    repoRuntimeId: target.workspaceRuntimeId,
+    worktreeId: target.kind === 'workspace-root' ? target.workspaceId : target.root,
+  }
+}
+
+/** Transport-native execution path. This is execution data, never terminal identity. */
+export function terminalExecutionPath(target: TerminalExecutionTarget): string {
+  const locator = target.kind === 'workspace-root' ? target.workspaceId : target.root
+  const parsed = parseCanonicalWorkspaceLocator(locator)
+  if (!parsed) throw new Error('terminal execution target locator is invalid')
+  return parsed.path
+}
+
+export function terminalSessionCoordinates(session: Pick<TerminalSessionBase, 'target'>): TerminalExecutionCoordinates {
+  return terminalExecutionCoordinates(session.target)
+}
+
+export function terminalPresentationBranch(presentation: TerminalPresentation): string | null {
+  return presentation.kind === 'git-worktree' ? presentation.branchName : null
 }
 
 export interface RepoRuntimeInput {
@@ -52,10 +88,6 @@ export interface TerminalAttachInput {
 }
 
 export interface TerminalCreateInput {
-  repoRoot: string
-  repoRuntimeId: string
-  branch: string
-  worktreePath: string
   kind: 'primary' | 'additional'
   /**
    * Shell text to run as the terminal starts, before returning to an interactive shell.
@@ -66,7 +98,7 @@ export interface TerminalCreateInput {
   cols?: number
   rows?: number
   clientId?: string
-  target: RuntimeWorkspacePaneTarget
+  target: TerminalExecutionTarget
 }
 
 export interface TerminalRestartInput {
@@ -166,12 +198,14 @@ export type TerminalRestartResult =
 
 export type TerminalCreateAction = 'created' | 'restored' | 'reused'
 
+export type TerminalPresentation = { kind: 'workspace-root' } | { kind: 'git-worktree'; branchName: string }
+
 export type TerminalCreateResult =
   | ({
       ok: true
       action: TerminalCreateAction
-      /** Canonical branch label resolved at the admission commit boundary. */
-      branch: string
+      /** Canonical presentation resolved at the admission commit boundary. */
+      presentation: TerminalPresentation
       terminalSessionId: string
       /** Exact terminal projection revision sampled with this metadata. */
       terminalSessionsRevision: number
@@ -220,15 +254,10 @@ export interface TerminalPruneInput {
   repoRuntimeId: string
 }
 
-export interface TerminalSessionSummary {
+interface TerminalSessionSummaryFields {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
-  repoRuntimeId: string
-  repoRoot: string
-  branch: string
-  worktreePath: string
-  cwd: string
   controller: TerminalController | null
   processName: string
   canonicalTitle: string | null
@@ -236,8 +265,13 @@ export interface TerminalSessionSummary {
   message: string | null
   cols: number
   rows: number
-  target: RuntimeWorkspacePaneTarget
 }
+
+type TerminalSessionSummaryFor<Session extends TerminalSessionBase> = Session extends TerminalSessionBase
+  ? Session & TerminalSessionSummaryFields
+  : never
+
+export type TerminalSessionSummary = TerminalSessionSummaryFor<TerminalSessionBase>
 
 /**
  * Versioned full terminal projection for one user/repo-runtime scope.
@@ -290,7 +324,6 @@ export interface TerminalBellRealtimeEvent {
   terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
   repoRoot: string
-  worktreePath: string
   processName: string
   canonicalTitle: string | null
 }
@@ -300,7 +333,6 @@ export interface TerminalTitleEvent {
   terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
   repoRoot: string
-  worktreePath: string
   canonicalTitle: string | null
 }
 

@@ -1,5 +1,8 @@
-import type { TerminalCreateInput, TerminalCreateResult } from '#/shared/terminal-types.ts'
-import type { ServerTerminalCreateResult } from '#/server/terminal/terminal-session-creator.ts'
+import type {
+  ServerTerminalCreateInput,
+  ServerTerminalCreateResult,
+} from '#/server/terminal/terminal-session-creator.ts'
+import { terminalExecutionCoordinates, terminalExecutionPath } from '#/shared/terminal-types.ts'
 import {
   assertPhysicalWorktreeExecutionCapability,
   type PhysicalWorktreeExecutionCapability,
@@ -18,7 +21,7 @@ export interface ServerTerminalCreateProvider {
   createAdmitted(
     clientId: string,
     userId: string,
-    input: TerminalCreateInput,
+    input: ServerTerminalCreateInput,
     admission: TerminalCreateAdmission,
   ): Promise<ServerTerminalCreateResult>
 }
@@ -27,7 +30,7 @@ interface TerminalSessionAdmittedCreateService {
   createAdmitted(
     clientId: string,
     userId: string,
-    input: TerminalCreateInput,
+    input: ServerTerminalCreateInput,
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     signal: AbortSignal,
   ): Promise<ServerTerminalCreateResult>
@@ -39,11 +42,12 @@ export function createTerminalSessionCreateProvider(deps: {
 }): ServerTerminalCreateProvider {
   return {
     async createAdmitted(clientId, userId, input, admission) {
+      const coordinates = terminalExecutionCoordinates(input.target)
       assertPhysicalWorktreeExecutionCapability(admission.physicalWorktreeCapability, {
         userId,
-        repoRoot: input.repoRoot,
-        repoRuntimeId: input.repoRuntimeId,
-        worktreePath: input.worktreePath,
+        repoRoot: coordinates.repoRoot,
+        repoRuntimeId: coordinates.repoRuntimeId,
+        worktreePath: terminalExecutionPath(input.target),
       })
       const context = deps.worktreeOperations.assertPermit(admission.physicalWorktreeCapability, admission.permit)
       return await deps.sessionService.createAdmitted(

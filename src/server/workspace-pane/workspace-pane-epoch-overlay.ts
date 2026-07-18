@@ -41,6 +41,66 @@ export class WorkspacePaneEpochOverlay {
   private readonly targetsByPhysicalKey = new Map<string, Map<string, WorkspacePaneEpochTargetRef>>()
   private readonly epochsByRepoRoot = new Map<string, Map<string, WorkspacePaneEpochScope>>()
 
+  fork(): WorkspacePaneEpochOverlay {
+    const fork = new WorkspacePaneEpochOverlay()
+    fork.replaceWith(this)
+    return fork
+  }
+
+  replaceWith(source: WorkspacePaneEpochOverlay): void {
+    this.epochs.clear()
+    this.targetsByPhysicalKey.clear()
+    this.epochsByRepoRoot.clear()
+    for (const [key, state] of source.epochs) {
+      this.epochs.set(key, {
+        overlayRevision: state.overlayRevision,
+        placementsByTarget: new Map(
+          [...state.placementsByTarget].map(([targetKey, hints]) => [targetKey, hints.map(cloneHint)]),
+        ),
+        physicalLeasesByTarget: new Map(state.physicalLeasesByTarget),
+      })
+    }
+    for (const [physicalKey, refs] of source.targetsByPhysicalKey) {
+      this.targetsByPhysicalKey.set(
+        physicalKey,
+        new Map([...refs].map(([refKey, ref]) => [refKey, cloneTargetRef(ref)])),
+      )
+    }
+    for (const [repoRoot, epochs] of source.epochsByRepoRoot) {
+      this.epochsByRepoRoot.set(
+        repoRoot,
+        new Map([...epochs].map(([key, scope]) => [key, { ...scope }])),
+      )
+    }
+  }
+
+  replaceEpochWith(source: WorkspacePaneEpochOverlay, scope: WorkspacePaneEpochScope): void {
+    this.closeEpoch(scope)
+    const key = epochKey(scope)
+    const sourceState = source.epochs.get(key)
+    if (!sourceState) return
+    const state: EpochState = {
+      overlayRevision: sourceState.overlayRevision,
+      placementsByTarget: new Map(
+        [...sourceState.placementsByTarget].map(([targetKey, hints]) => [targetKey, hints.map(cloneHint)]),
+      ),
+      physicalLeasesByTarget: new Map(sourceState.physicalLeasesByTarget),
+    }
+    this.epochs.set(key, state)
+    const active = this.epochsByRepoRoot.get(scope.repoRoot) ?? new Map<string, WorkspacePaneEpochScope>()
+    active.set(key, { ...scope })
+    this.epochsByRepoRoot.set(scope.repoRoot, active)
+    const refPrefix = `${key}\0`
+    for (const [physicalKey, refs] of source.targetsByPhysicalKey) {
+      for (const [refKey, ref] of refs) {
+        if (!refKey.startsWith(refPrefix)) continue
+        const liveRefs = this.targetsByPhysicalKey.get(physicalKey) ?? new Map<string, WorkspacePaneEpochTargetRef>()
+        liveRefs.set(refKey, cloneTargetRef(ref))
+        this.targetsByPhysicalKey.set(physicalKey, liveRefs)
+      }
+    }
+  }
+
   recordMixedOrder(input: WorkspacePaneEpochTargetRef & { tabs: readonly WorkspacePaneTabEntry[] }): boolean {
     const state = this.state(input)
     const targetKey = canonicalTargetKey(input.target)
@@ -270,5 +330,10 @@ function cloneHint(hint: WorkspacePaneRuntimePlacementHint): WorkspacePaneRuntim
 }
 
 function cloneTargetRef(ref: WorkspacePaneEpochTargetRef): WorkspacePaneEpochTargetRef {
-  return { ...ref, target: { ...ref.target } }
+  return {
+    userId: ref.userId,
+    repoRoot: ref.repoRoot,
+    repoRuntimeId: ref.repoRuntimeId,
+    target: { ...ref.target },
+  }
 }

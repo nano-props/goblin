@@ -117,7 +117,7 @@ describe('terminal session pruner', () => {
 
 function terminalSession(
   terminalSessionId: string,
-  overrides: Partial<Pick<TerminalSessionSummary, 'repoRoot' | 'worktreePath'>> = {},
+  overrides: { repoRoot?: string; worktreePath?: string } = {},
 ): TerminalSessionSummary {
   const repoRoot = overrides.repoRoot ?? REPO_ROOT
   const worktreePath = overrides.worktreePath ?? LIVE_WORKTREE_PATH
@@ -131,12 +131,8 @@ function terminalSession(
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalRuntimeGeneration: 1,
     terminalSessionId,
-    repoRuntimeId: 'repo-runtime-test',
     target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId: 'repo-runtime-test', root },
-    repoRoot,
-    branch: 'feature/worktree',
-    worktreePath,
-    cwd: worktreePath,
+    presentation: { kind: 'git-worktree', branchName: 'feature/worktree' },
     controller: null,
     processName: 'zsh',
     canonicalTitle: null,

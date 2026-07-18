@@ -11,6 +11,8 @@ import {
   type RepoWorkspaceRepo,
 } from '#/web/components/repo-workspace/model.ts'
 import { useRepoWorkspaceTabModel } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
+import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import {
   EMPTY_TERMINAL_SNAPSHOT,
@@ -42,7 +44,13 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import {
+  terminalExecutionPath,
+  terminalPresentationBranch,
+  terminalSessionCoordinates,
+  type TerminalSessionBase,
+} from '#/shared/terminal-types.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import {
   createBranchSnapshot,
@@ -633,21 +641,15 @@ describe('RepoWorkspaceToolbar', () => {
     })
     await flush()
 
-    expect(mocks.closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', {
+    expect(mocks.closeTerminalByDescriptor).toHaveBeenCalledWith(
+      'term-111111111111111111111',
+      terminalSessionBaseForTest({
       repoRoot: REPO_ID,
-
       repoRuntimeId: repoRuntimeIdForTest(),
-
-      target: {
-        kind: 'git-worktree',
-        workspaceId: REPO_ID,
-        workspaceRuntimeId: repoRuntimeIdForTest(),
-        root: 'goblin+file:///tmp/goblin-repo-workspace-toolbar-worktree',
-      },
-
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
-    })
+      }),
+    )
   })
 
   test('closes a static tab without routing through runtime close', async () => {
@@ -1118,21 +1120,15 @@ describe('RepoWorkspaceToolbar', () => {
     })
     await flush()
 
-    expect(mocks.closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', {
+    expect(mocks.closeTerminalByDescriptor).toHaveBeenCalledWith(
+      'term-111111111111111111111',
+      terminalSessionBaseForTest({
       repoRoot: REPO_ID,
-
       repoRuntimeId: repoRuntimeIdForTest(),
-
-      target: {
-        kind: 'git-worktree',
-        workspaceId: REPO_ID,
-        workspaceRuntimeId: repoRuntimeIdForTest(),
-        root: 'goblin+file:///tmp/goblin-repo-workspace-toolbar-worktree',
-      },
-
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
-    })
+      }),
+    )
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes')
   })
 
@@ -1329,7 +1325,7 @@ function renderToolbar(options: {
   const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
     type: 'terminal',
     terminalSessionId: `term-${String(index + 1).repeat(21)}`,
-    terminalWorktreeKey: `${REPO_ID}\0${WORKTREE_PATH}`,
+    terminalWorktreeKey: formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH),
     index: index + 1,
     title: `term-${index + 1}`,
     fullTitle: `full-term-${index + 1}`,
@@ -1343,18 +1339,18 @@ function renderToolbar(options: {
   const selectedDescriptor: TerminalDescriptor | null = sessions[0]
     ? {
         terminalSessionId: sessions[0].terminalSessionId,
-        terminalWorktreeKey: sessions[0].terminalWorktreeKey,
         index: sessions[0].index,
-        repoRoot: REPO_ID,
-
-        repoRuntimeId: repo.repoRuntimeId,
-
-        branch: branchName,
-        worktreePath: WORKTREE_PATH,
+        target: {
+          kind: 'git-worktree',
+          workspaceId: canonicalWorkspaceLocator(REPO_ID)!,
+          workspaceRuntimeId: repo.repoRuntimeId,
+          root: canonicalWorkspaceLocator(`goblin+file://${WORKTREE_PATH}`)!,
+        },
+        presentation: { kind: 'git-worktree', branchName },
       }
     : null
   const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
-    terminalWorktreeKey: `${REPO_ID}\0${WORKTREE_PATH}`,
+    terminalWorktreeKey: formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH),
     selectedDescriptor,
     sessions,
     count: options.terminalCount,
@@ -1373,11 +1369,14 @@ function renderToolbar(options: {
   }
   const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
     const terminalSessionId = 'term-111111111111111111111'
+    const coordinates = terminalSessionCoordinates(base)
+    const branchName = terminalPresentationBranch(base.presentation)
+    if (!branchName) throw new Error('expected Git worktree terminal fixture')
     workspacePaneTabsTestBridge.addRuntimeTab({
-      repoRoot: base.repoRoot,
-      repoRuntimeId: base.repoRuntimeId!,
-      branchName: base.branch,
-      worktreePath: base.worktreePath,
+      repoRoot: coordinates.repoRoot,
+      repoRuntimeId: coordinates.repoRuntimeId,
+      branchName,
+      worktreePath: terminalExecutionPath(base.target),
       terminalSessionId,
     })
     return terminalSessionId

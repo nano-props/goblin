@@ -13,7 +13,10 @@ import {
   workspacePaneTabTargetForBranch,
   workspacePaneTabTargetForWorkspace,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import {
+  workspacePaneActionTargetFromCoordinates,
+  runWorkspacePaneAction,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
   beginPrimaryWindowPresentation,
   type PrimaryWindowPresentationToken,
@@ -183,19 +186,10 @@ function resolveSelectableWorkspacePaneTarget(
 }
 
 function workspacePaneQueuedActionTarget(model: RepoWorkspaceTabModel) {
-  if (model.branchName === null) {
-    return {
-      kind: 'workspace-root' as const,
-      repoId: model.repoId,
-      repoRuntimeId: model.repoRuntimeId,
-      branchName: null,
-      worktreePath: null,
-    }
-  }
-  return {
+  return workspacePaneActionTargetFromCoordinates({
     repoId: model.repoId,
     repoRuntimeId: model.repoRuntimeId,
     branchName: model.branchName,
     worktreePath: model.worktreePath,
-  }
+  })
 }

@@ -45,7 +45,7 @@ import {
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { observedWorkspacePaneRouteCommitForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
   workspacePanePreferenceTargetOptions,
@@ -118,7 +118,7 @@ function useHarnessWorkspacePaneRoute(
   const readContext = useTerminalSessionReadContext()
   if (preferredTab === 'terminal') {
     const terminalWorktreeKey = branch?.worktree?.path
-      ? formatTerminalWorktreeKey(props.repo.id, branch.worktree.path)
+      ? formatTerminalWorktreeKeyForPath(props.repo.id, branch.worktree.path)
       : null
     const terminalWorktreeSnapshot = terminalWorktreeKey
       ? readContext.terminalWorktreeSnapshot(terminalWorktreeKey)
@@ -943,7 +943,7 @@ describe('RepoWorkspaceContent', () => {
 
   test('mounts the terminal session while terminal creation is pending with no sessions', () => {
     const worktreePath = '/tmp/terminal-pending-worktree'
-    const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/terminal-pending', { worktree: { path: worktreePath } })],
@@ -984,7 +984,7 @@ describe('RepoWorkspaceContent', () => {
 
   test('mounts the terminal session while terminal creation is pending after every tab was closed', () => {
     const worktreePath = '/tmp/terminal-pending-empty-strip-worktree'
-    const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     const branchName = 'feature/terminal-pending-empty-strip'
     const seededRepo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -1022,7 +1022,7 @@ describe('RepoWorkspaceContent', () => {
 
   test('renders terminal loading without a create CTA while initial terminal sync is unresolved', () => {
     const worktreePath = '/tmp/terminal-loading-worktree'
-    const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/terminal-loading', { worktree: { path: worktreePath } })],
@@ -1064,7 +1064,7 @@ describe('RepoWorkspaceContent', () => {
 
   test('labels terminal panels from the mixed tab list, not runtime session list', () => {
     const worktreePath = '/tmp/terminal-reordered-worktree'
-    const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/terminal-reordered', { worktree: { path: worktreePath } })],
@@ -1148,7 +1148,7 @@ describe('RepoWorkspaceContent', () => {
         })
         return {
           terminalSessionId: 'term-111111111111111111111',
-          branch: branchName,
+          presentation: { kind: 'git-worktree' as const, branchName },
           requestRole: 'leader' as const,
           resourceDisposition: 'created' as const,
           runtimeProjectionApplied: true,
@@ -1221,16 +1221,13 @@ describe('RepoWorkspaceContent', () => {
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(createTerminalWithAdmission).toHaveBeenCalledWith(
       {
-        repoRoot: REPO_ID,
-        repoRuntimeId: repo.repoRuntimeId,
         target: {
           kind: 'git-worktree',
           workspaceId: REPO_ID,
           workspaceRuntimeId: repo.repoRuntimeId,
           root: 'goblin+file:///tmp/filetree-open-worktree',
         },
-        branch: branchName,
-        worktreePath,
+        presentation: { kind: 'git-worktree', branchName },
       },
       {
         resolveStartupShellCommand: expect.any(Function),
@@ -1296,7 +1293,7 @@ describe('RepoWorkspaceContent', () => {
         })
         return {
           terminalSessionId: 'term-111111111111111111111',
-          branch: base.branch,
+          presentation: { kind: 'workspace-root' as const },
           requestRole: 'leader' as const,
           resourceDisposition: 'created' as const,
           runtimeProjectionApplied: true,
@@ -1335,15 +1332,12 @@ describe('RepoWorkspaceContent', () => {
     await waitFor(() => expect(createTerminalWithAdmission).toHaveBeenCalledOnce())
     expect(createTerminalWithAdmission).toHaveBeenCalledWith(
       {
-        repoRoot: workspaceId,
-        repoRuntimeId: repo.repoRuntimeId,
-        branch: '',
-        worktreePath: workspaceId,
         target: {
           kind: 'workspace-root',
           workspaceId,
           workspaceRuntimeId: repo.repoRuntimeId,
         },
+        presentation: { kind: 'workspace-root' },
       },
       { resolveStartupShellCommand: expect.any(Function) },
       { insertAfterIdentity: 'workspace-pane:files' },

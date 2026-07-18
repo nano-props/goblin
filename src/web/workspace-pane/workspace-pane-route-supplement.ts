@@ -1,4 +1,4 @@
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -27,7 +27,7 @@ export function commitWorkspacePaneRouteSupplement(
     route === null ? null : route.kind === 'static' ? route.tab : 'terminal',
   )
   if (route?.kind === 'terminal' && target.worktreePath) {
-    state.setSelectedTerminal(formatTerminalWorktreeKey(target.repoId, target.worktreePath), route.terminalSessionId)
+    state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.repoId, target.worktreePath), route.terminalSessionId)
   }
   return true
 }
@@ -47,7 +47,7 @@ export function commitWorkspacePaneCommittedRuntimeRouteSupplement(
     route === null ? null : route.kind === 'static' ? route.tab : 'terminal',
   )
   if (route?.kind === 'terminal' && target.worktreePath) {
-    state.setSelectedTerminal(formatTerminalWorktreeKey(target.repoId, target.worktreePath), route.terminalSessionId)
+    state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.repoId, target.worktreePath), route.terminalSessionId)
   }
   return true
 }

@@ -26,7 +26,7 @@ export function workspacePaneTabItems(input: WorkspacePaneTabItemsInput): Worksp
       const type = tab.type as WorkspacePaneStaticTabType
       if (input.staticTabAvailable && !input.staticTabAvailable(type)) return []
       const provider = workspacePaneStaticTabProvider(type)
-      const metadata = { t: input.t, branchName: input.branchName ?? '', statusCount: input.statusCount }
+      const metadata = { t: input.t, branchName: input.branchName, statusCount: input.statusCount }
       return [
         createStaticWorkspacePaneTabItem({
           type,
@@ -55,7 +55,7 @@ export function workspacePaneTabItems(input: WorkspacePaneTabItemsInput): Worksp
         }),
       ]
     }
-    const metadata = { t: input.t, branchName: input.branchName ?? '', statusCount: input.statusCount, view: tab.view }
+    const metadata = { t: input.t, branchName: input.branchName, statusCount: input.statusCount, view: tab.view }
     return [
       createRuntimeWorkspacePaneTabItem({
         view: tab.view,

@@ -57,11 +57,8 @@ function makeActions(
             terminalRuntimeSessionId,
             terminalRuntimeGeneration: 1,
             terminalSessionId: 'term-111111111111111111111',
-            repoRuntimeId: REPO_RUNTIME_ID,
-            repoRoot: options.getSlotScope(userId, terminalRuntimeSessionId),
-            branch: 'feature/worktree',
-            worktreePath: '/repo',
-            cwd: '/repo',
+            target: worktreeTarget(REPO_RUNTIME_ID),
+            presentation: { kind: 'git-worktree', branchName: 'feature/worktree' },
             controller: null,
             processName: 'zsh',
             canonicalTitle: null,
@@ -153,11 +150,7 @@ describe('terminal-runtime-actions close broadcast', () => {
             CLIENT_ID,
             USER_ID,
             {
-              repoRoot: REPO_ROOT,
-              repoRuntimeId: REPO_RUNTIME_ID,
               target: worktreeTarget(REPO_RUNTIME_ID),
-              branch: 'feature/worktree',
-              worktreePath: '/repo',
               kind: 'additional',
             },
             { physicalWorktreeCapability, permit },
@@ -189,11 +182,7 @@ describe('terminal-runtime-actions close broadcast', () => {
             CLIENT_ID,
             USER_ID,
             {
-              repoRoot: REPO_ROOT,
-              repoRuntimeId: REPO_RUNTIME_ID,
               target: worktreeTarget(REPO_RUNTIME_ID),
-              branch: 'feature/worktree',
-              worktreePath: '/repo',
               kind: 'additional',
             },
             { physicalWorktreeCapability, permit },
@@ -216,7 +205,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const provider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: USER_ID,
-      repoRoot: '',
+      repoRoot: REPO_ROOT,
       repoRuntimeId: 'repo-runtime-stale',
     })
     await expect(
@@ -227,11 +216,7 @@ describe('terminal-runtime-actions close broadcast', () => {
             CLIENT_ID,
             USER_ID,
             {
-              repoRoot: '',
-              repoRuntimeId: 'repo-runtime-stale',
               target: worktreeTarget('repo-runtime-stale'),
-              branch: 'feature/worktree',
-              worktreePath: '/repo',
               kind: 'additional',
             },
             { physicalWorktreeCapability, permit },
@@ -267,7 +252,6 @@ describe('terminal-runtime-actions close broadcast', () => {
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       repoRoot: REPO_ROOT,
-      worktreePath: '/repo',
     })
   })
 

@@ -37,11 +37,15 @@ import type {
   TerminalCreateOptions,
   TerminalIdentityRealtimeEvent,
   TerminalLifecycleRealtimeEvent,
-  TerminalRepoIndex,
+  TerminalRuntimeMembershipIndex,
   TerminalWorktreeSnapshot,
   TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import {
+  terminalPresentationBranch,
+  terminalSessionCoordinates,
+  type TerminalSessionBase,
+} from '#/shared/terminal-types.ts'
 import { terminalCreateDedupeKey } from '#/web/components/terminal/terminal-create-dedupe.ts'
 import type {
   TerminalWorkspacePaneRuntimeCloseEffect,
@@ -50,12 +54,11 @@ import type {
 } from '#/shared/workspace-pane-runtime.ts'
 import { workspacePaneRuntimeClient } from '#/web/workspace-pane/workspace-pane-runtime-client.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
-import {
-  refreshWorkspacePaneTabsQueryData,
-} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { refreshWorkspacePaneTabsQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { FutureExitLedger } from '#/web/components/terminal/future-exit-ledger.ts'
 import { createTerminalWriteFailureReporter } from '#/web/components/terminal/terminal-write-failure-feedback.ts'
+import { terminalDescriptorWorktreeKey } from '#/web/components/terminal/terminal-descriptor.ts'
 
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   phase: 'opening',
@@ -105,7 +108,7 @@ interface ResolvedTerminalCreateOptions {
 interface TerminalRuntimeBindingIdentity {
   repoRoot: string
   repoRuntimeId: string
-  worktreePath: string
+  worktreeId: string
   terminalSessionId: string
   terminalRuntimeSessionId: string | null
   terminalRuntimeGeneration: number | null
@@ -120,7 +123,7 @@ function terminalRuntimeBindingKey(binding: TerminalRuntimeBindingIdentity): str
   return JSON.stringify([
     binding.repoRoot,
     binding.repoRuntimeId,
-    binding.worktreePath,
+    binding.worktreeId,
     binding.terminalSessionId,
     binding.terminalRuntimeSessionId,
     binding.terminalRuntimeGeneration,
@@ -135,20 +138,25 @@ function terminalRealtimeEventBindingKey(event: {
   return JSON.stringify([event.terminalSessionId, event.terminalRuntimeSessionId, event.terminalRuntimeGeneration])
 }
 
-function terminalRepoEpochKey(repoRoot: string, repoRuntimeId: string): string {
+function terminalRuntimeMembershipKey(repoRoot: string, repoRuntimeId: string): string {
   return JSON.stringify([repoRoot, repoRuntimeId])
 }
 
-function retiredTerminalRepoEpochKeys(previous: TerminalRepoIndex, next: TerminalRepoIndex): string[] {
+function retiredTerminalRuntimeMembershipKeys(
+  previous: TerminalRuntimeMembershipIndex,
+  next: TerminalRuntimeMembershipIndex,
+): string[] {
   return Object.entries(previous).flatMap(([repoRoot, repo]) =>
-    next[repoRoot]?.repoRuntimeId === repo.repoRuntimeId ? [] : [terminalRepoEpochKey(repoRoot, repo.repoRuntimeId)],
+    next[repoRoot]?.repoRuntimeId === repo.repoRuntimeId
+      ? []
+      : [terminalRuntimeMembershipKey(repoRoot, repo.repoRuntimeId)],
   )
 }
 
 export class TerminalSessionProjection {
   private readonly writeFailureReporter = createTerminalWriteFailureReporter()
   private readonly onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
-  private repoIndex: TerminalRepoIndex = {}
+  private runtimeMembershipIndex: TerminalRuntimeMembershipIndex = {}
   private readonly sessions = new Map<string, TerminalSession>()
   private readonly terminalSessionIdByTerminalRuntimeSessionId = new Map<string, Map<number, string>>()
   private readonly terminalRuntimeBindingByTerminalSessionId = new Map<
@@ -197,7 +205,8 @@ export class TerminalSessionProjection {
   private readonly bellState = createTerminalBellState(
     (terminalSessionId) => {
       if (terminalSessionId) {
-        const terminalWorktreeKey = this.sessions.get(terminalSessionId)?.descriptor.terminalWorktreeKey
+        const descriptor = this.sessions.get(terminalSessionId)?.descriptor
+        const terminalWorktreeKey = descriptor ? terminalDescriptorWorktreeKey(descriptor) : null
         if (terminalWorktreeKey) this.notifyWorktree(terminalWorktreeKey)
         return
       }
@@ -216,23 +225,15 @@ export class TerminalSessionProjection {
     this.onSelectedWorktreeChange = onSelectedWorktreeChange
   }
 
-  setRepoIndex(repoIndex: TerminalRepoIndex): void {
-    for (const retiredScopeKey of retiredTerminalRepoEpochKeys(this.repoIndex, repoIndex)) {
+  setRuntimeMembershipIndex(runtimeMembershipIndex: TerminalRuntimeMembershipIndex): void {
+    for (const retiredScopeKey of retiredTerminalRuntimeMembershipKeys(
+      this.runtimeMembershipIndex,
+      runtimeMembershipIndex,
+    )) {
       this.futureExitOrphans.retireSnapshotScope(retiredScopeKey)
     }
-    this.repoIndex = repoIndex
-    this.syncDescriptorsFromRepoIndex()
-    this.pruneSessionsMissingFromRepoIndex()
-  }
-
-  private syncDescriptorsFromRepoIndex(): void {
-    for (const session of this.sessions.values()) {
-      const repo = this.repoIndex[session.descriptor.repoRoot]
-      const branch = repo?.branchByWorktreePath[session.descriptor.worktreePath]
-      if (!branch || branch === session.descriptor.branch) continue
-      session.updateDescriptor({ ...session.descriptor, branch })
-      this.notifySession(session.descriptor.terminalSessionId)
-    }
+    this.runtimeMembershipIndex = runtimeMembershipIndex
+    this.pruneSessionsMissingFromRuntimeMembership()
   }
 
   /**
@@ -327,7 +328,10 @@ export class TerminalSessionProjection {
     const { session } = classified
     session.handleOutput(event)
     if (event.data.length > 0)
-      this.outputActivityState.markOutput(session.descriptor.terminalSessionId, session.descriptor.terminalWorktreeKey)
+      this.outputActivityState.markOutput(
+        session.descriptor.terminalSessionId,
+        terminalDescriptorWorktreeKey(session.descriptor),
+      )
   }
 
   handleServerBell(event: TerminalBellRealtimeEvent): void {
@@ -373,8 +377,8 @@ export class TerminalSessionProjection {
       return
     }
     if (
-      classified.session.descriptor.repoRoot !== event.repoRoot ||
-      classified.session.descriptor.repoRuntimeId !== event.repoRuntimeId
+      terminalSessionCoordinates(classified.session.descriptor).repoRoot !== event.repoRoot ||
+      terminalSessionCoordinates(classified.session.descriptor).repoRuntimeId !== event.repoRuntimeId
     ) {
       return
     }
@@ -449,18 +453,19 @@ export class TerminalSessionProjection {
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
   ): boolean {
-    if (this.repoIndex[scope.repoRoot]?.repoRuntimeId !== scope.repoRuntimeId) return false
+    if (this.runtimeMembershipIndex[scope.repoRoot]?.repoRuntimeId !== scope.repoRuntimeId) return false
 
     const { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees } =
       this.materializeServerSessions(scope, serverSessions, clientId)
 
-    const authoritativeServerSessions = serverSessions.filter(
-      (session) => session.repoRoot === scope.repoRoot && session.repoRuntimeId === scope.repoRuntimeId,
-    )
+    const authoritativeServerSessions = serverSessions.filter((session) => {
+      const coordinates = terminalSessionCoordinates(session)
+      return coordinates.repoRoot === scope.repoRoot && coordinates.repoRuntimeId === scope.repoRuntimeId
+    })
     const serverTerminalSessionIds = new Set(authoritativeServerSessions.map((session) => session.terminalSessionId))
     this.evictOrphanedLocalSessions(scope, serverTerminalSessionIds)
     this.futureExitOrphans.confirmAuthoritativeSnapshot(
-      terminalRepoEpochKey(scope.repoRoot, scope.repoRuntimeId),
+      terminalRuntimeMembershipKey(scope.repoRoot, scope.repoRuntimeId),
       authoritativeServerSessions.map((session) => ({
         terminalSessionId: session.terminalSessionId,
         terminalRuntimeSessionId: session.terminalRuntimeSessionId,
@@ -498,7 +503,7 @@ export class TerminalSessionProjection {
     serverSession: ServerTerminalSessionSummary,
     clientId: string,
   ): boolean {
-    if (this.repoIndex[scope.repoRoot]?.repoRuntimeId !== scope.repoRuntimeId) return false
+    if (this.runtimeMembershipIndex[scope.repoRoot]?.repoRuntimeId !== scope.repoRuntimeId) return false
     const current = this.terminalSessionsProjectionRevisionByRepoRoot.get(scope.repoRoot)
     if (current?.repoRuntimeId === scope.repoRuntimeId && revision < current.revision) return false
     const { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees } =
@@ -538,7 +543,8 @@ export class TerminalSessionProjection {
     const nextIndexByWorktree = new Map<string, number>()
 
     for (const serverSession of serverSessions) {
-      const terminalWorktreeKey = formatTerminalWorktreeKey(serverSession.repoRoot, serverSession.worktreePath)
+      const coordinates = terminalSessionCoordinates(serverSession)
+      const terminalWorktreeKey = formatTerminalWorktreeKey(coordinates.repoRoot, coordinates.worktreeId)
       const existingSessionIds = options.mergeIntoExisting
         ? (this.terminalSessionIdsByTerminalWorktree.get(terminalWorktreeKey) ?? [])
         : []
@@ -548,7 +554,6 @@ export class TerminalSessionProjection {
           ? existingIndex + 1
           : (nextIndexByWorktree.get(terminalWorktreeKey) ?? existingSessionIds.length) + 1
       const projected = projectServerTerminalSession({
-        repoIndex: this.repoIndex,
         repoRoot: scope.repoRoot,
         repoRuntimeId: scope.repoRuntimeId,
         serverSession,
@@ -594,8 +599,8 @@ export class TerminalSessionProjection {
     const orphanedTerminalSessionIds = Array.from(this.sessions.values())
       .filter(
         (session) =>
-          session.descriptor.repoRoot === scope.repoRoot &&
-          session.descriptor.repoRuntimeId === scope.repoRuntimeId &&
+          terminalSessionCoordinates(session.descriptor).repoRoot === scope.repoRoot &&
+          terminalSessionCoordinates(session.descriptor).repoRuntimeId === scope.repoRuntimeId &&
           !serverTerminalSessionIds.has(session.descriptor.terminalSessionId),
       )
       .map((session) => session.descriptor.terminalSessionId)
@@ -632,7 +637,10 @@ export class TerminalSessionProjection {
   }
 
   createTerminal = (base: TerminalSessionBase, options: TerminalCreateOptions = {}): Promise<string> => {
-    const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(
+      terminalSessionCoordinates(base).repoRoot,
+      terminalSessionCoordinates(base).worktreeId,
+    )
     const admission = this.enqueueCreateRequest(base, terminalWorktreeKey, {
       createOptions: options,
       dedupeKey: terminalCreateDedupeKey(options),
@@ -651,7 +659,10 @@ export class TerminalSessionProjection {
     options: TerminalCreateOptions = {},
     placement: WorkspacePaneRuntimeTabPlacement = {},
   ): Promise<TerminalCreateAdmissionResult> => {
-    const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(
+      terminalSessionCoordinates(base).repoRoot,
+      terminalSessionCoordinates(base).worktreeId,
+    )
     const admission = this.enqueueCreateRequest(base, terminalWorktreeKey, {
       createOptions: options,
       dedupeKey: terminalCreateDedupeKey(options),
@@ -708,23 +719,19 @@ export class TerminalSessionProjection {
     const openResult = await workspacePaneRuntimeClient.open({
       runtimeType: 'terminal',
       request: {
-        repoRoot: base.repoRoot,
-        repoRuntimeId: requireRepoRuntimeId(base),
-        branch: base.branch,
-        worktreePath: base.worktreePath,
         kind: createKind,
         ...(createOptions.startupShellCommand ? { startupShellCommand: createOptions.startupShellCommand } : {}),
         cols: geometry.cols,
         rows: geometry.rows,
         clientId,
-        target: requireRuntimeTarget(base),
+        target: base.target,
       },
       ...request.placement,
     })
     if (!openResult.ok) throw new Error(openResult.message)
     writeCanonicalWorkspacePaneTabsSnapshot(
-      base.repoRoot,
-      requireRepoRuntimeId(base),
+      terminalSessionCoordinates(base).repoRoot,
+      terminalSessionCoordinates(base).repoRuntimeId,
       openResult.paneTabsSnapshot,
     )
     const result = openResult.runtime
@@ -734,7 +741,10 @@ export class TerminalSessionProjection {
       const projectedCreate = projectCreateResultForClient(base, result)
       if (this.lifecycleQueues.getCreate(terminalWorktreeKey) === pending) {
         runtimeProjectionApplied = this.applyServerSessionEffect(
-          { repoRoot: base.repoRoot, repoRuntimeId: requireRepoRuntimeId(base) },
+          {
+            repoRoot: terminalSessionCoordinates(base).repoRoot,
+            repoRuntimeId: terminalSessionCoordinates(base).repoRuntimeId,
+          },
           result.terminalSessionsRevision,
           projectedCreate.serverSession,
           clientId,
@@ -746,7 +756,7 @@ export class TerminalSessionProjection {
     }
     return {
       terminalSessionId: result.terminalSessionId,
-      branch: result.branch,
+      presentation: result.presentation,
       resourceDisposition: result.action,
       runtimeProjectionApplied,
     }
@@ -891,7 +901,11 @@ export class TerminalSessionProjection {
     let count = 0
     for (const session of this.sessions.values()) {
       const terminalSessionId = session.descriptor.terminalSessionId
-      if (session.descriptor.repoRoot === repoRoot && this.bellState.hasBell(terminalSessionId)) count++
+      if (
+        terminalSessionCoordinates(session.descriptor).repoRoot === repoRoot &&
+        this.bellState.hasBell(terminalSessionId)
+      )
+        count++
     }
     return count
   }
@@ -908,7 +922,7 @@ export class TerminalSessionProjection {
 
   selectTerminal = (terminalWorktreeKey: string, terminalSessionId: string): void => {
     const session = this.sessions.get(terminalSessionId)
-    if (!session || session.descriptor.terminalWorktreeKey !== terminalWorktreeKey) return
+    if (!session || terminalDescriptorWorktreeKey(session.descriptor) !== terminalWorktreeKey) return
     const wasSelected = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) === terminalSessionId
     const hadBell = this.bellState.hasBell(terminalSessionId)
     if (wasSelected && !hadBell) return
@@ -929,7 +943,6 @@ export class TerminalSessionProjection {
   }
 
   closeTerminalByDescriptor = async (terminalSessionId: string, base: TerminalSessionBase): Promise<boolean> => {
-    if (!base.repoRuntimeId) return false
     return await this.closeTerminalRuntimeTab(terminalSessionId, base)
   }
 
@@ -948,7 +961,11 @@ export class TerminalSessionProjection {
 
   resynchronizeConnectedViews = (repoRoot: string, repoRuntimeId: string): void => {
     for (const session of this.sessions.values()) {
-      if (session.descriptor.repoRoot !== repoRoot || session.descriptor.repoRuntimeId !== repoRuntimeId) continue
+      if (
+        terminalSessionCoordinates(session.descriptor).repoRoot !== repoRoot ||
+        terminalSessionCoordinates(session.descriptor).repoRuntimeId !== repoRuntimeId
+      )
+        continue
       session.resynchronizeConnectedView()
     }
   }
@@ -1102,7 +1119,7 @@ export class TerminalSessionProjection {
       this.snapshotCache.delete(terminalSessionId)
     }
     this.notifySnapshot(terminalSessionId)
-    const terminalWorktreeKey = session?.descriptor.terminalWorktreeKey
+    const terminalWorktreeKey = session ? terminalDescriptorWorktreeKey(session.descriptor) : null
     if (terminalWorktreeKey) this.notifyWorktree(terminalWorktreeKey)
   }
 
@@ -1116,8 +1133,8 @@ export class TerminalSessionProjection {
     if (pendingBinding) {
       const pendingEventBinding = {
         terminalSessionId: session.descriptor.terminalSessionId,
-        repoRoot: session.descriptor.repoRoot,
-        repoRuntimeId: session.descriptor.repoRuntimeId,
+        repoRoot: terminalSessionCoordinates(session.descriptor).repoRoot,
+        repoRuntimeId: terminalSessionCoordinates(session.descriptor).repoRuntimeId,
         ...pendingBinding,
       }
       const pendingBindingKey = terminalRealtimeEventBindingKey(pendingEventBinding)
@@ -1136,8 +1153,8 @@ export class TerminalSessionProjection {
     if (!binding) return true
     const eventBinding = {
       terminalSessionId: session.descriptor.terminalSessionId,
-      repoRoot: session.descriptor.repoRoot,
-      repoRuntimeId: session.descriptor.repoRuntimeId,
+      repoRoot: terminalSessionCoordinates(session.descriptor).repoRoot,
+      repoRuntimeId: terminalSessionCoordinates(session.descriptor).repoRuntimeId,
       ...binding,
     }
     const bindingKey = terminalRealtimeEventBindingKey(eventBinding)
@@ -1162,7 +1179,7 @@ export class TerminalSessionProjection {
   ): boolean {
     const session = this.sessions.get(terminalSessionId)
     if (!session) return false
-    const terminalWorktreeKey = session.descriptor.terminalWorktreeKey
+    const terminalWorktreeKey = terminalDescriptorWorktreeKey(session.descriptor)
     const visibleTerminalSessionIdsBeforeRemoval = this.visibleSessionsForWorktree(terminalWorktreeKey).map(
       (item) => item.descriptor.terminalSessionId,
     )
@@ -1221,15 +1238,14 @@ export class TerminalSessionProjection {
     base: TerminalSessionBase,
     requestedBinding: TerminalRuntimeBindingIdentity,
   ): Promise<boolean> {
-    const repoRuntimeId = requireRepoRuntimeId(base)
+    const repoRuntimeId = terminalSessionCoordinates(base).repoRuntimeId
     let result: WorkspacePaneRuntimeCloseResult
     try {
       result = await workspacePaneRuntimeClient.close({
         runtimeType: 'terminal',
         sessionId: terminalSessionId,
         target: {
-          target: requireRuntimeTarget(base),
-          nativeWorktreePath: base.worktreePath,
+          target: base.target,
         },
       })
     } catch (err) {
@@ -1238,10 +1254,10 @@ export class TerminalSessionProjection {
     }
     if (!result.ok) return false
     this.applyClosedServerSessionEffect(base, result.runtime, requestedBinding)
-    void refreshWorkspacePaneTabsQueryData(base.repoRoot, repoRuntimeId).catch((err) => {
+    void refreshWorkspacePaneTabsQueryData(terminalSessionCoordinates(base).repoRoot, repoRuntimeId).catch((err) => {
       terminalSessionProviderLog.warn('terminal closed but workspace pane tabs refresh failed', {
         terminalSessionId,
-        repoRoot: base.repoRoot,
+        repoRoot: terminalSessionCoordinates(base).repoRoot,
         repoRuntimeId,
         err,
       })
@@ -1257,9 +1273,9 @@ export class TerminalSessionProjection {
     const session = this.sessions.get(effect.terminalSessionId)
     if (!session) return
     const effectBinding: TerminalRuntimeBindingIdentity = {
-      repoRoot: base.repoRoot,
-      repoRuntimeId: requireRepoRuntimeId(base),
-      worktreePath: base.worktreePath,
+      repoRoot: terminalSessionCoordinates(base).repoRoot,
+      repoRuntimeId: terminalSessionCoordinates(base).repoRuntimeId,
+      worktreeId: terminalSessionCoordinates(base).worktreeId,
       terminalSessionId: effect.terminalSessionId,
       terminalRuntimeSessionId:
         effect.terminalRuntimeSessionId ??
@@ -1296,18 +1312,18 @@ export class TerminalSessionProjection {
 
   private runtimeBindingForClose(terminalSessionId: string, base: TerminalSessionBase): TerminalRuntimeBindingIdentity {
     const session = this.sessions.get(terminalSessionId)
-    const repoRuntimeId = requireRepoRuntimeId(base)
+    const repoRuntimeId = terminalSessionCoordinates(base).repoRuntimeId
     const addressableBinding =
       session &&
-      session.descriptor.repoRoot === base.repoRoot &&
-      session.descriptor.repoRuntimeId === repoRuntimeId &&
-      session.descriptor.worktreePath === base.worktreePath
+      terminalSessionCoordinates(session.descriptor).repoRoot === terminalSessionCoordinates(base).repoRoot &&
+      terminalSessionCoordinates(session.descriptor).repoRuntimeId === repoRuntimeId &&
+      terminalSessionCoordinates(session.descriptor).worktreeId === terminalSessionCoordinates(base).worktreeId
         ? session.addressableRuntimeBinding()
         : null
     return {
-      repoRoot: base.repoRoot,
+      repoRoot: terminalSessionCoordinates(base).repoRoot,
       repoRuntimeId,
-      worktreePath: base.worktreePath,
+      worktreeId: terminalSessionCoordinates(base).worktreeId,
       terminalSessionId,
       terminalRuntimeSessionId: addressableBinding?.terminalRuntimeSessionId ?? null,
       terminalRuntimeGeneration: addressableBinding?.terminalRuntimeGeneration ?? null,
@@ -1319,12 +1335,12 @@ export class TerminalSessionProjection {
     terminalRuntimeSessionId: string,
     terminalRuntimeGeneration: number | null = session.currentRuntimeBinding()?.terminalRuntimeGeneration ?? null,
   ): TerminalRuntimeBindingIdentity | null {
-    const repoRuntimeId = session.descriptor.repoRuntimeId
+    const repoRuntimeId = terminalSessionCoordinates(session.descriptor).repoRuntimeId
     if (!repoRuntimeId) return null
     return {
-      repoRoot: session.descriptor.repoRoot,
+      repoRoot: terminalSessionCoordinates(session.descriptor).repoRoot,
       repoRuntimeId,
-      worktreePath: session.descriptor.worktreePath,
+      worktreeId: terminalSessionCoordinates(session.descriptor).worktreeId,
       terminalSessionId: session.descriptor.terminalSessionId,
       terminalRuntimeSessionId,
       terminalRuntimeGeneration,
@@ -1333,9 +1349,9 @@ export class TerminalSessionProjection {
 
   private sessionMatchesRuntimeBinding(session: TerminalSession, binding: TerminalRuntimeBindingIdentity): boolean {
     return (
-      session.descriptor.repoRoot === binding.repoRoot &&
-      session.descriptor.repoRuntimeId === binding.repoRuntimeId &&
-      session.descriptor.worktreePath === binding.worktreePath &&
+      terminalSessionCoordinates(session.descriptor).repoRoot === binding.repoRoot &&
+      terminalSessionCoordinates(session.descriptor).repoRuntimeId === binding.repoRuntimeId &&
+      terminalSessionCoordinates(session.descriptor).worktreeId === binding.worktreeId &&
       session.descriptor.terminalSessionId === binding.terminalSessionId &&
       session.currentRuntimeBinding()?.terminalRuntimeSessionId === binding.terminalRuntimeSessionId &&
       session.currentRuntimeBinding()?.terminalRuntimeGeneration === binding.terminalRuntimeGeneration
@@ -1347,9 +1363,9 @@ export class TerminalSessionProjection {
     for (const operation of this.closeOperationByRuntimeBindingKey.values()) {
       const binding = operation.binding
       if (
-        binding.repoRoot !== session.descriptor.repoRoot ||
-        binding.repoRuntimeId !== session.descriptor.repoRuntimeId ||
-        binding.worktreePath !== session.descriptor.worktreePath ||
+        binding.repoRoot !== terminalSessionCoordinates(session.descriptor).repoRoot ||
+        binding.repoRuntimeId !== terminalSessionCoordinates(session.descriptor).repoRuntimeId ||
+        binding.worktreeId !== terminalSessionCoordinates(session.descriptor).worktreeId ||
         binding.terminalSessionId !== session.descriptor.terminalSessionId
       ) {
         continue
@@ -1374,27 +1390,30 @@ export class TerminalSessionProjection {
     const candidateSession = this.sessions.get(terminalSessionId)
     if (candidateSession && this.hasPendingCloseForSession(candidateSession)) return
     const session = this.sessions.get(terminalSessionId)
-    const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
-    if (!session || session.descriptor.terminalWorktreeKey !== terminalWorktreeKey) return
+    const terminalWorktreeKey = formatTerminalWorktreeKey(
+      terminalSessionCoordinates(base).repoRoot,
+      terminalSessionCoordinates(base).worktreeId,
+    )
+    if (!session || terminalDescriptorWorktreeKey(session.descriptor) !== terminalWorktreeKey) return
     this.removeSession(terminalSessionId, { dispose: true, preserveFutureExits })
   }
 
-  private pruneSessionsMissingFromRepoIndex(): void {
+  private pruneSessionsMissingFromRuntimeMembership(): void {
     const sessionIdsToRemove = Array.from(this.sessions.entries())
-      .filter(([, session]) => !this.sessionBelongsToCurrentRepoIndex(session))
+      .filter(([, session]) => !this.sessionBelongsToCurrentRuntimeMembership(session))
       .map(([terminalSessionId]) => terminalSessionId)
     for (const terminalSessionId of sessionIdsToRemove) this.removeSession(terminalSessionId, { dispose: true })
   }
 
-  private sessionBelongsToCurrentRepoIndex(session: TerminalSession): boolean {
-    const current = this.repoIndex[session.descriptor.repoRoot]
+  private sessionBelongsToCurrentRuntimeMembership(session: TerminalSession): boolean {
+    const current = this.runtimeMembershipIndex[terminalSessionCoordinates(session.descriptor).repoRoot]
     if (!current) return false
-    return current.repoRuntimeId === session.descriptor.repoRuntimeId
+    return current.repoRuntimeId === terminalSessionCoordinates(session.descriptor).repoRuntimeId
   }
 
   private ensureSession(descriptor: TerminalDescriptor): TerminalSession {
     const current = this.sessions.get(descriptor.terminalSessionId)
-    this.appendTerminalSessionIdToWorktreeList(descriptor.terminalWorktreeKey, descriptor.terminalSessionId)
+    this.appendTerminalSessionIdToWorktreeList(terminalDescriptorWorktreeKey(descriptor), descriptor.terminalSessionId)
     if (current) {
       current.updateDescriptor(descriptor)
       this.syncTerminalRuntimeSessionIdIndex(
@@ -1403,7 +1422,7 @@ export class TerminalSessionProjection {
           this.terminalRuntimeBindingByTerminalSessionId.get(descriptor.terminalSessionId) ??
           null,
       )
-      this.notifyWorktree(descriptor.terminalWorktreeKey)
+      this.notifyWorktree(terminalDescriptorWorktreeKey(descriptor))
       return current
     }
     const session = new TerminalSession(
@@ -1414,12 +1433,16 @@ export class TerminalSessionProjection {
     this.sessions.set(descriptor.terminalSessionId, session)
     this.syncTerminalRuntimeSessionIdIndex(descriptor.terminalSessionId, session.currentRuntimeBinding())
     this.snapshotCache.set(descriptor.terminalSessionId, session.snapshot())
-    if (!this.selectedTerminalSessionIdByTerminalWorktree.has(descriptor.terminalWorktreeKey)) {
-      const preferred = this.preferredSelectedTerminalSessionIdByTerminalWorktree.get(descriptor.terminalWorktreeKey)
+    if (!this.selectedTerminalSessionIdByTerminalWorktree.has(terminalDescriptorWorktreeKey(descriptor))) {
+      const preferred = this.preferredSelectedTerminalSessionIdByTerminalWorktree.get(
+        terminalDescriptorWorktreeKey(descriptor),
+      )
       if (!preferred || preferred === descriptor.terminalSessionId)
-        this.selectTerminalSessionId(descriptor.terminalWorktreeKey, descriptor.terminalSessionId, { notify: false })
+        this.selectTerminalSessionId(terminalDescriptorWorktreeKey(descriptor), descriptor.terminalSessionId, {
+          notify: false,
+        })
     }
-    this.notifyWorktree(descriptor.terminalWorktreeKey)
+    this.notifyWorktree(terminalDescriptorWorktreeKey(descriptor))
     return session
   }
 
@@ -1456,7 +1479,8 @@ export class TerminalSessionProjection {
   }
 
   private isSelectedTerminalSessionIdValid(terminalWorktreeKey: string, terminalSessionId: string): boolean {
-    return this.sessions.get(terminalSessionId)?.descriptor.terminalWorktreeKey === terminalWorktreeKey
+    const descriptor = this.sessions.get(terminalSessionId)?.descriptor
+    return !!descriptor && terminalDescriptorWorktreeKey(descriptor) === terminalWorktreeKey
   }
 
   private visibleSessionsForWorktree(terminalWorktreeKey: string): TerminalSession[] {
@@ -1465,7 +1489,7 @@ export class TerminalSessionProjection {
 
   private sessionsForWorktreeList(terminalWorktreeKey: string): TerminalSession[] {
     const sessions = Array.from(this.sessions.values()).filter(
-      (session) => session.descriptor.terminalWorktreeKey === terminalWorktreeKey,
+      (session) => terminalDescriptorWorktreeKey(session.descriptor) === terminalWorktreeKey,
     )
     const terminalSessionByTerminalSessionId = new Map(
       sessions.map((session) => [session.descriptor.terminalSessionId, session]),
@@ -1516,16 +1540,6 @@ export class TerminalSessionProjection {
     }
     return changedWorktrees
   }
-}
-
-function requireRepoRuntimeId(base: TerminalSessionBase): string {
-  if (typeof base.repoRuntimeId === 'string' && base.repoRuntimeId.length > 0) return base.repoRuntimeId
-  throw new Error('error.repo-runtime-stale')
-}
-
-function requireRuntimeTarget(base: TerminalSessionBase) {
-  if (base.target) return base.target
-  throw new Error('error.workspace-tabs-target-invalid')
 }
 
 async function resolveTerminalCreateOptions(options: TerminalCreateOptions): Promise<ResolvedTerminalCreateOptions> {

@@ -3,14 +3,7 @@ import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneRuntimeTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
-import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
-
-export interface WorkspacePaneRuntimeTabCloseTarget {
-  repoRoot: string
-  repoRuntimeId: string
-  branchName: string | null
-  worktreePath: string | null
-}
+export type WorkspacePaneRuntimeTabCloseTarget = TerminalSessionBase
 
 export interface WorkspacePaneRuntimeTabCloseConfirmInput {
   type: WorkspacePaneRuntimeTabType
@@ -117,20 +110,6 @@ export function terminalRuntimeTabCloseContext(
 
 export function terminalBaseForRuntimeTabCloseTarget(
   target: WorkspacePaneRuntimeTabCloseTarget,
-): TerminalSessionBase | null {
-  if (!target.worktreePath) return null
-  const runtimeTarget = runtimeWorkspacePaneTarget(
-    target.branchName === null
-      ? { kind: 'workspace-root', repoRoot: target.repoRoot, branchName: null, worktreePath: null }
-      : { repoRoot: target.repoRoot, branchName: target.branchName, worktreePath: target.worktreePath },
-    target.repoRuntimeId,
-  )
-  if (!runtimeTarget || (runtimeTarget.kind !== 'workspace-root' && !target.branchName)) return null
-  return {
-    repoRoot: target.repoRoot,
-    repoRuntimeId: target.repoRuntimeId,
-    branch: target.branchName ?? '',
-    worktreePath: target.worktreePath,
-    target: runtimeTarget,
-  }
+): TerminalSessionBase {
+  return target
 }

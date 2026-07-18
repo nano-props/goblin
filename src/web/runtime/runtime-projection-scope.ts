@@ -6,6 +6,7 @@ export interface RuntimeProjectionTarget {
 interface RuntimeProjectionOperation {
   generation: number
   controller: AbortController
+  rerun: (() => void) | null
 }
 
 interface RuntimeProjectionTimer {
@@ -50,10 +51,15 @@ export class RuntimeProjectionScope {
     reject: (error: unknown) => void,
   ): void {
     if (!this.isActive()) return
-    this.operationsByLane.get(lane)?.controller.abort()
+    const current = this.operationsByLane.get(lane)
+    if (current) {
+      current.rerun = () => this.runLatest(lane, task, publish, reject)
+      return
+    }
     const operation: RuntimeProjectionOperation = {
       generation: this.nextGeneration++,
       controller: new AbortController(),
+      rerun: null,
     }
     this.operationsByLane.set(lane, operation)
     void this.executeLatest(lane, operation, task, publish, reject)
@@ -118,11 +124,13 @@ export class RuntimeProjectionScope {
   ): Promise<void> {
     try {
       const value = await task(operation.controller.signal)
-      this.commitLatest(lane, operation, () => publish(value), reject)
+      if (!operation.rerun) this.commitLatest(lane, operation, () => publish(value), reject)
     } catch (error) {
-      this.commitLatest(lane, operation, () => reject(error))
+      if (!operation.rerun) this.commitLatest(lane, operation, () => reject(error))
     } finally {
-      if (this.operationsByLane.get(lane) === operation) this.operationsByLane.delete(lane)
+      if (this.operationsByLane.get(lane) !== operation) return
+      this.operationsByLane.delete(lane)
+      operation.rerun?.()
     }
   }
 

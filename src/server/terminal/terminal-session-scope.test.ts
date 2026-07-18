@@ -13,19 +13,17 @@ describe('terminal session target worktree path', () => {
           workspaceId,
           workspaceRuntimeId: 'repo-runtime-current',
         },
-        'goblin+file:///tmp/workspace',
       ),
     ).toBe('/tmp/workspace')
   })
 
-  test('continues to validate a Git worktree path against its target root', () => {
+  test('derives a Git worktree execution path from its authoritative target root', () => {
     const target = {
       kind: 'git-worktree' as const,
       workspaceId,
       workspaceRuntimeId: 'repo-runtime-current',
       root: canonicalWorkspaceLocator('goblin+file:///tmp/worktree')!,
     }
-    expect(terminalSessionTargetWorktreePath(target, '/tmp/worktree')).toBe('/tmp/worktree')
-    expect(terminalSessionTargetWorktreePath(target, '/tmp/other')).toBeNull()
+    expect(terminalSessionTargetWorktreePath(target)).toBe('/tmp/worktree')
   })
 })

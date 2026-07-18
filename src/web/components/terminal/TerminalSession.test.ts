@@ -22,6 +22,8 @@ import type {
   TerminalWriteInput,
   TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
+import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
+import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const xtermMocks = vi.hoisted(() => {
   const terminals: any[] = []
@@ -449,18 +451,25 @@ const invokeIpc = vi.fn<Window['goblinNative']['invokeIpc']>()
 const hostOpenExternalUrl = vi.fn<NonNullable<Window['goblinNative']['host']>['openExternalUrl']>()
 const mockFonts = new MockFontFaceSet()
 
-const descriptor = {
+function requiredWorkspaceLocator(input: string) {
+  const locator =
+    canonicalWorkspaceLocator(input) ??
+    formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: input }, 'posix')
+  if (!locator) throw new Error('invalid workspace locator fixture')
+  return locator
+}
+
+const descriptor: TerminalDescriptor = {
   terminalSessionId: 'term-111111111111111111111',
-  terminalWorktreeKey: '/repo\0/worktree',
   index: 1,
 
-  repoRoot: '/repo',
-
-  repoRuntimeId: 'repo-runtime-test',
-
-  branch: 'feature',
-
-  worktreePath: '/worktree',
+  target: {
+    kind: 'git-worktree',
+    workspaceId: requiredWorkspaceLocator('/repo'),
+    workspaceRuntimeId: 'repo-runtime-test',
+    root: requiredWorkspaceLocator('/worktree'),
+  },
+  presentation: { kind: 'git-worktree', branchName: 'feature' },
 }
 
 beforeEach(() => {

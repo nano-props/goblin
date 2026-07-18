@@ -1,5 +1,9 @@
 import { useEffect, useMemo } from 'react'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import {
+  canonicalWorkspaceLocator,
+  workspaceLocatorForPath,
+} from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
@@ -120,7 +124,12 @@ export function useSyncWorkspacePaneRuntimeTabProviderSelection(
 function terminalRuntimeTabTargetKey(
   input: Pick<WorkspacePaneRuntimeTabTargetInput, 'repoRoot' | 'worktreePath'>,
 ): string | null {
-  return input.worktreePath ? formatTerminalWorktreeKey(input.repoRoot, input.worktreePath) : null
+  const workspaceId = canonicalWorkspaceLocator(input.repoRoot)
+  const worktreeId =
+    input.worktreePath && workspaceId
+      ? canonicalWorkspaceLocator(input.worktreePath) ?? workspaceLocatorForPath(workspaceId, input.worktreePath)
+      : null
+  return workspaceId && worktreeId ? formatTerminalWorktreeKey(workspaceId, worktreeId) : null
 }
 
 function readTerminalRuntimeTabProviderProjection(input: {

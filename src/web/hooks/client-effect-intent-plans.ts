@@ -1,4 +1,5 @@
 import { parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
@@ -87,7 +88,10 @@ export function createTerminalBellIntentPlan(
   const parsedKey = event.terminalWorktreeKey ? parseTerminalWorktreeKey(event.terminalWorktreeKey) : null
   if (parsedKey && parsedKey.repoRoot === repo.id && event.terminalSessionId) {
     if (!branchReadModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
-    const branch = branchReadModel.branches.find((candidate) => candidate.worktree?.path === parsedKey.worktreePath)
+    const worktreePath = parseCanonicalWorkspaceLocator(parsedKey.worktreeId)?.path
+    const branch = worktreePath
+      ? branchReadModel.branches.find((candidate) => candidate.worktree?.path === worktreePath)
+      : null
     if (branch) {
       return {
         kind: 'show-worktree-terminal',

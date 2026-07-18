@@ -387,12 +387,16 @@ async function createAdmittedTerminal(
   host: ServerTerminalHost,
   clientId: string,
   userId: string,
-  input: Omit<TerminalCreateInput, 'target'> & { target?: TerminalCreateInput['target'] },
+  input: TerminalCreateFixtureInput,
 ): Promise<TerminalCreateResult> {
   const application = createTerminalApplications.get(host)
   if (!application) throw new Error('missing workspace pane runtime application')
   const request: TerminalCreateInput = {
-    ...input,
+    kind: input.kind,
+    ...(input.startupShellCommand ? { startupShellCommand: input.startupShellCommand } : {}),
+    ...(input.cols === undefined ? {} : { cols: input.cols }),
+    ...(input.rows === undefined ? {} : { rows: input.rows }),
+    ...(input.clientId ? { clientId: input.clientId } : {}),
     target: input.target ?? terminalCreateTarget(input),
   }
   const result = await application.openRuntime(clientId, userId, {
@@ -402,7 +406,15 @@ async function createAdmittedTerminal(
   return result.ok ? result.runtime : { ok: false, message: result.message }
 }
 
-function terminalCreateTarget(input: Pick<TerminalCreateInput, 'repoRoot' | 'repoRuntimeId' | 'worktreePath'>) {
+interface TerminalCreateFixtureInput extends Omit<TerminalCreateInput, 'target'> {
+  repoRoot: string
+  repoRuntimeId: string
+  branch: string
+  worktreePath: string
+  target?: TerminalCreateInput['target']
+}
+
+function terminalCreateTarget(input: Pick<TerminalCreateFixtureInput, 'repoRoot' | 'repoRuntimeId' | 'worktreePath'>) {
   const workspaceId = requiredWorkspaceLocator(input.repoRoot)
   const root = input.repoRoot.startsWith('goblin+ssh://')
     ? workspaceId
@@ -742,7 +754,6 @@ describe('server terminal runtime', () => {
         terminalRuntimeSessionId,
         terminalSessionId: expect.any(String),
         repoRoot: REPO_ROOT,
-        worktreePath: '/repo-linked',
         processName: 'zsh',
         canonicalTitle: 'build running',
       },
@@ -757,7 +768,6 @@ describe('server terminal runtime', () => {
         terminalRuntimeSessionId,
         terminalSessionId: expect.any(String),
         repoRoot: REPO_ROOT,
-        worktreePath: '/repo-linked',
         canonicalTitle: 'devin: hello',
       },
     })
@@ -801,7 +811,6 @@ describe('server terminal runtime', () => {
         terminalRuntimeSessionId,
         terminalSessionId: expect.any(String),
         repoRoot: REPO_ROOT,
-        worktreePath: '/repo-linked',
         canonicalTitle: 'devin running',
       },
     })
@@ -874,11 +883,7 @@ describe('server terminal runtime', () => {
       {
         runtimeType: 'terminal',
         request: {
-          repoRoot: REPO_ROOT,
-          repoRuntimeId: REPO_RUNTIME_ID,
           target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
-          branch: 'feature',
-          worktreePath: '/repo-linked',
           kind: 'additional',
           cols: 80,
           rows: 24,
@@ -930,11 +935,7 @@ describe('server terminal runtime', () => {
       {
         runtimeType: 'terminal',
         request: {
-          repoRoot: REPO_ROOT,
-          repoRuntimeId: REPO_RUNTIME_ID,
           target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
-          branch: 'feature',
-          worktreePath: '/repo-linked',
           kind: 'additional',
           cols: 80,
           rows: 24,
@@ -1150,8 +1151,11 @@ describe('server terminal runtime', () => {
     ).resolves.toEqual([
       expect.objectContaining({
         terminalSessionId: result.terminalSessionId,
-        repoRoot: 'goblin+ssh://prod/srv/repo',
-        worktreePath: '/srv/repo',
+        target: expect.objectContaining({
+          kind: 'git-worktree',
+          workspaceId: 'goblin+ssh://prod/srv/repo',
+          root: 'goblin+ssh://prod/srv/repo',
+        }),
       }),
     ])
 
@@ -1707,11 +1711,7 @@ describe('server terminal runtime', () => {
           runtimeType: 'terminal',
           insertAfterIdentity: 'workspace-pane:status',
           request: {
-            repoRoot: REPO_ROOT,
-            repoRuntimeId: REPO_RUNTIME_ID,
             target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
-            branch: 'feature',
-            worktreePath: '/repo-linked',
             kind: 'primary',
             cols: 80,
             rows: 24,
@@ -1768,11 +1768,7 @@ describe('server terminal runtime', () => {
       {
         runtimeType: 'terminal',
         request: {
-          repoRoot: REPO_ROOT,
-          repoRuntimeId: REPO_RUNTIME_ID,
           target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
-          branch: 'feature',
-          worktreePath: '/repo-linked',
           kind: 'additional',
           cols: 80,
           rows: 24,
@@ -1793,7 +1789,6 @@ describe('server terminal runtime', () => {
           sessionId: opened.runtime.terminalSessionId,
           target: {
             target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
-            nativeWorktreePath: '/repo-linked',
           },
         },
         'req_runtime_close',
@@ -1817,7 +1812,6 @@ describe('server terminal runtime', () => {
           sessionId: opened.runtime.terminalSessionId,
           target: {
             target: workspacePaneWorktreeTarget(REPO_RUNTIME_ID),
-            nativeWorktreePath: '/repo-linked',
           },
         },
         'req_runtime_close_again',

@@ -17,6 +17,8 @@ import type {
   TerminalSessionSummary,
   TerminalWorktreeSnapshot,
 } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
 
 /**
  * Subscribe to a derived field of a single worktree's snapshot. The selector
@@ -130,17 +132,11 @@ const MISSING_TERMINAL_DESCRIPTOR_SNAPSHOT = ''
 export function useTerminalWorktreeSessionDescriptor({
   terminalWorktreeKey,
   terminalSessionId,
-  repoRoot,
-  repoRuntimeId,
-  branch,
-  worktreePath,
+  base,
 }: {
   terminalWorktreeKey: string | null
   terminalSessionId: string | null
-  repoRoot: string
-  repoRuntimeId: string
-  branch: string
-  worktreePath: string
+  base: TerminalSessionBase
 }): TerminalDescriptor | null {
   const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
   const subscribe = useCallback(
@@ -160,16 +156,8 @@ export function useTerminalWorktreeSessionDescriptor({
     if (!terminalWorktreeKey || !descriptorSnapshot) return null
     const [snapshotTerminalSessionId, indexText] = descriptorSnapshot.split('\0')
     if (!snapshotTerminalSessionId) return null
-    return {
-      terminalWorktreeKey,
-      terminalSessionId: snapshotTerminalSessionId,
-      index: Number(indexText) || 0,
-      repoRoot,
-      repoRuntimeId,
-      branch,
-      worktreePath,
-    }
-  }, [branch, descriptorSnapshot, repoRuntimeId, repoRoot, terminalWorktreeKey, worktreePath])
+    return terminalDescriptor(base, snapshotTerminalSessionId, Number(indexText) || 0)
+  }, [base, descriptorSnapshot, terminalWorktreeKey])
 }
 
 export function useTerminalSessionSummaries(terminalWorktreeKey: string | null): TerminalSessionSummary[] {
