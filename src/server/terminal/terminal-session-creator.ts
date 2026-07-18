@@ -1,6 +1,5 @@
 import {
   terminalExecutionCoordinates,
-  terminalExecutionPath,
   type TerminalCreateInput,
   type TerminalCreateResult,
 } from '#/shared/terminal-types.ts'
@@ -55,16 +54,16 @@ class TerminalSessionCreator {
     const signal = input.signal
     const coordinates = terminalExecutionCoordinates(input.request.target)
     const sessionScope = terminalSessionRuntimeScope(coordinates.repoRoot, coordinates.repoRuntimeId)
-    const scopedWorktreePath = terminalExecutionPath(input.request.target)
+    const worktreeId = coordinates.worktreeId
     return await this.options.createCoordinator.runInWorktreeQueue(
-      { userId: input.userId, scope: sessionScope, worktreePath: scopedWorktreePath },
+      { userId: input.userId, scope: sessionScope, worktreeId },
       async () => {
         if (signal.aborted) return { ok: false, message: 'error.repo-runtime-stale' }
         if (!this.options.isCurrentRepoRuntime(input.userId, coordinates.repoRoot, coordinates.repoRuntimeId)) {
           return { ok: false, message: 'error.repo-runtime-stale' }
         }
         const createResult = await this.options.createCoordinator.withSessionIdAllocation(
-          { userId: input.userId, scope: sessionScope, worktreePath: scopedWorktreePath, kind: input.request.kind },
+          { userId: input.userId, scope: sessionScope, worktreeId, kind: input.request.kind },
           async ({ terminalSessionId }) =>
             await this.options.ensureOrRestore(
               input.clientId,

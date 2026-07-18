@@ -33,7 +33,7 @@ describe('terminal session creator', () => {
   test('keeps the manager metadata revision when takeover advances current revision during stale validation', async () => {
     const sessions: TerminalSessionSummary[] = []
     const manager = {
-      listSessionsForUser: vi.fn(async () => sessions),
+      primaryTerminalSessionIdForWorktree: vi.fn(() => sessions[0]?.terminalSessionId ?? null),
     }
     const ensureOrRestore = vi.fn(async (_clientId, _userId, input) => {
       sessions.push(terminalSession(input.terminalSessionId ?? 'term-createdcreatedcreated'))
@@ -79,7 +79,7 @@ describe('terminal session creator', () => {
 
   test('rejects before ensuring when the repo runtime is already stale', async () => {
     const manager = {
-      listSessionsForUser: vi.fn(async () => []),
+      primaryTerminalSessionIdForWorktree: vi.fn(() => null),
     }
     const ensureOrRestore = vi.fn(async () => ensureResult('term-createdcreatedcreated'))
     const creator = createTerminalSessionCreator({
@@ -107,7 +107,7 @@ describe('terminal session creator', () => {
   test('stops the create when the service rejects a stale runtime', async () => {
     const sessions: TerminalSessionSummary[] = []
     const manager = {
-      listSessionsForUser: vi.fn(async () => sessions),
+      primaryTerminalSessionIdForWorktree: vi.fn(() => sessions[0]?.terminalSessionId ?? null),
     }
     const ensureOrRestore = vi.fn(async (_clientId, _userId, input) => {
       sessions.push(terminalSession(input.terminalSessionId ?? 'term-createdcreatedcreated'))

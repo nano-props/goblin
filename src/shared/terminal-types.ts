@@ -1,6 +1,6 @@
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 /**
  * `controllerStatus === 'connected'` while the broker reports the
@@ -38,9 +38,9 @@ export type TerminalSessionBase =
     }
 
 export interface TerminalExecutionCoordinates {
-  repoRoot: string
+  repoRoot: WorkspaceId
   repoRuntimeId: string
-  worktreeId: string
+  worktreeId: WorkspaceId
 }
 
 /** Canonical execution coordinates. Callers must not cache a second copy beside the target. */

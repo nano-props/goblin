@@ -48,6 +48,7 @@ import { TerminalDirectory } from '#/server/terminal/terminal-directory.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { TerminalSessionAdmission } from '#/server/terminal/terminal-session-ensurer.ts'
 import { serverLogger } from '#/server/logger.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 const INVALIDATED_SESSION_RETIREMENT_RETRY_BASE_MS = 100
@@ -84,6 +85,7 @@ interface TerminalSessionView<TUser extends string | number> extends TerminalPty
   scope: string
   presentation: TerminalPresentation | null
   terminalSessionId: string
+  readonly worktreeId: WorkspaceId
   target: TerminalExecutionTarget
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   ptyBinding: TerminalPtyBinding<TerminalSessionView<TUser>>
@@ -254,6 +256,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       scope,
       presentation: null,
       terminalSessionId: input.terminalSessionId,
+      worktreeId: coordinates.worktreeId,
       target: input.target,
       physicalWorktreeCapability: input.physicalWorktreeCapability,
       cwd,
@@ -281,6 +284,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       userId,
       scope,
       terminalSessionId: input.terminalSessionId,
+      worktreeId: coordinates.worktreeId,
     })
     if (!reservation) return { ok: false, message: 'error.unavailable' }
     let committedEffect: ReturnType<typeof attachTerminalClient> | null = null
@@ -792,6 +796,10 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   async listSessionsForUser(userId: TUser, scope: string): Promise<TerminalSessionSummary[]> {
     return this.directory.entriesForScope(userId, scope).map((session) => this.sessionSummary(session))
+  }
+
+  primaryTerminalSessionIdForWorktree(userId: TUser, scope: string, worktreeId: WorkspaceId): string | null {
+    return this.directory.primaryForWorktree(userId, scope, worktreeId)?.terminalSessionId ?? null
   }
 
   terminalSessionsSnapshotForUser(userId: TUser, scope: string): TerminalSessionsSnapshot {

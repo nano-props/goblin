@@ -1,12 +1,13 @@
 import PQueue from 'p-queue'
-import { terminalExecutionPath, type TerminalCreateInput, type TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import type { TerminalCreateInput } from '#/shared/terminal-types.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { terminalSessionUserWorktreeKey } from '#/shared/terminal-session-keys.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 type TerminalCreateKind = TerminalCreateInput['kind']
 
 interface TerminalSessionCreateManager {
-  listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
+  primaryTerminalSessionIdForWorktree(userId: string, scope: string, worktreeId: WorkspaceId): string | null
 }
 
 interface TerminalSessionCreateCoordinatorOptions {
@@ -17,7 +18,7 @@ interface TerminalSessionCreateCoordinatorOptions {
 interface TerminalSessionCreateWorktreeInput {
   userId: string
   scope: string
-  worktreePath: string
+  worktreeId: WorkspaceId
 }
 
 interface TerminalSessionCreateAllocationInput extends TerminalSessionCreateWorktreeInput {
@@ -54,10 +55,13 @@ class TerminalSessionCreateCoordinator {
   private async allocateSessionIdForCreate(
     input: TerminalSessionCreateAllocationInput,
   ): Promise<string> {
-    const sessions = await this.manager.listSessionsForUser(input.userId, input.scope)
-    const existingSession = sessions.find((session) => terminalExecutionPath(session.target) === input.worktreePath)
-    if (input.kind === 'primary' && existingSession) {
-      return existingSession.terminalSessionId
+    if (input.kind === 'primary') {
+      const existingSessionId = this.manager.primaryTerminalSessionIdForWorktree(
+        input.userId,
+        input.scope,
+        input.worktreeId,
+      )
+      if (existingSessionId) return existingSessionId
     }
     return this.createSessionId()
   }

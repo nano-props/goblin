@@ -40,11 +40,13 @@ import {
   type ServerTerminalCreateResult,
 } from '#/server/terminal/terminal-session-creator.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface TerminalSessionServiceManager extends TerminalSessionEnsureManager {
   listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
   terminalSessionsSnapshotForUser(userId: string, scope: string): TerminalSessionsSnapshot
   requestSessionRetirement(terminalRuntimeSessionId: string): Promise<boolean>
+  primaryTerminalSessionIdForWorktree(userId: string, scope: string, worktreeId: WorkspaceId): string | null
 }
 
 interface TerminalSessionServiceOptions {

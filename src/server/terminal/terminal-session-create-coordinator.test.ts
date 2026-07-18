@@ -2,14 +2,10 @@
 
 import { describe, expect, test, vi } from 'vitest'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
-import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const USER_ID = 'user_terminal_create_coordinator'
 const SCOPE = 'repo-runtime-terminal-create'
-const WORKTREE_PATH = '/repo/worktree'
-const OTHER_WORKTREE_PATH = '/repo/other-worktree'
-const WORKSPACE_ID = requiredWorkspaceLocator('goblin+file:///repo')
 const WORKTREE_ROOT = requiredWorkspaceLocator('goblin+file:///repo/worktree')
 
 function requiredWorkspaceLocator(input: string) {
@@ -20,27 +16,46 @@ function requiredWorkspaceLocator(input: string) {
 
 describe('terminal session create coordinator', () => {
   test('reuses an existing worktree session for primary creates', async () => {
+    const primaryTerminalSessionIdForWorktree = vi.fn(() => 'term-existingexisting00001')
     const createSessionId = vi.fn(() => 'term-newnewnewnewnewnewnew')
     const coordinator = createTerminalSessionCreateCoordinator({
       manager: {
-        listSessionsForUser: vi.fn(async () => [terminalSession('term-existingexisting00001')]),
+        primaryTerminalSessionIdForWorktree,
       },
       createSessionId,
     })
 
     await expect(
       coordinator.withSessionIdAllocation(
-        { userId: USER_ID, scope: SCOPE, worktreePath: WORKTREE_PATH, kind: 'primary' },
+        { userId: USER_ID, scope: SCOPE, worktreeId: WORKTREE_ROOT, kind: 'primary' },
         async ({ terminalSessionId }) => terminalSessionId,
       ),
     ).resolves.toBe('term-existingexisting00001')
     expect(createSessionId).not.toHaveBeenCalled()
+    expect(primaryTerminalSessionIdForWorktree).toHaveBeenCalledOnce()
+    expect(primaryTerminalSessionIdForWorktree).toHaveBeenCalledWith(USER_ID, SCOPE, WORKTREE_ROOT)
+  })
+
+  test('allocates an additional durable id without consulting the primary index', async () => {
+    const primaryTerminalSessionIdForWorktree = vi.fn(() => 'term-existingexisting00001')
+    const coordinator = createTerminalSessionCreateCoordinator({
+      manager: { primaryTerminalSessionIdForWorktree },
+      createSessionId: () => 'term-additionaladditional01',
+    })
+
+    await expect(
+      coordinator.withSessionIdAllocation(
+        { userId: USER_ID, scope: SCOPE, worktreeId: WORKTREE_ROOT, kind: 'additional' },
+        async ({ terminalSessionId }) => terminalSessionId,
+      ),
+    ).resolves.toBe('term-additionaladditional01')
+    expect(primaryTerminalSessionIdForWorktree).not.toHaveBeenCalled()
   })
 
   test('serializes creates for the same user scope and worktree', async () => {
     const coordinator = createTerminalSessionCreateCoordinator({
       manager: {
-        listSessionsForUser: vi.fn(async () => []),
+        primaryTerminalSessionIdForWorktree: vi.fn(() => null),
       },
       createSessionId: () => 'term-unusedunusedunused001',
     })
@@ -54,7 +69,7 @@ describe('terminal session create coordinator', () => {
       markFirstTaskStarted = resolve
     })
     const firstTask = coordinator.runInWorktreeQueue(
-      { userId: USER_ID, scope: SCOPE, worktreePath: WORKTREE_PATH },
+      { userId: USER_ID, scope: SCOPE, worktreeId: WORKTREE_ROOT },
       async () => {
         events.push('first-start')
         markFirstTaskStarted()
@@ -65,7 +80,7 @@ describe('terminal session create coordinator', () => {
 
     await firstTaskStarted
     const secondTask = coordinator.runInWorktreeQueue(
-      { userId: USER_ID, scope: SCOPE, worktreePath: WORKTREE_PATH },
+      { userId: USER_ID, scope: SCOPE, worktreeId: WORKTREE_ROOT },
       async () => {
         events.push('second-start')
       },
@@ -82,7 +97,7 @@ describe('terminal session create coordinator', () => {
   test('allows creates for different worktrees to run independently', async () => {
     const coordinator = createTerminalSessionCreateCoordinator({
       manager: {
-        listSessionsForUser: vi.fn(async () => []),
+        primaryTerminalSessionIdForWorktree: vi.fn(() => null),
       },
       createSessionId: () => 'term-unusedunusedunused001',
     })
@@ -96,7 +111,7 @@ describe('terminal session create coordinator', () => {
       markFirstTaskStarted = resolve
     })
     const firstTask = coordinator.runInWorktreeQueue(
-      { userId: USER_ID, scope: SCOPE, worktreePath: WORKTREE_PATH },
+      { userId: USER_ID, scope: SCOPE, worktreeId: WORKTREE_ROOT },
       async () => {
         events.push('first-start')
         markFirstTaskStarted()
@@ -107,7 +122,7 @@ describe('terminal session create coordinator', () => {
 
     await firstTaskStarted
     await coordinator.runInWorktreeQueue(
-      { userId: USER_ID, scope: SCOPE, worktreePath: OTHER_WORKTREE_PATH },
+      { userId: USER_ID, scope: SCOPE, worktreeId: requiredWorkspaceLocator('goblin+file:///repo/other-worktree') },
       async () => {
         events.push('second-start')
       },
@@ -120,25 +135,3 @@ describe('terminal session create coordinator', () => {
     expect(events).toEqual(['first-start', 'second-start', 'first-end'])
   })
 })
-
-function terminalSession(terminalSessionId: string): TerminalSessionSummary {
-  return {
-    terminalRuntimeSessionId: `pty_${terminalSessionId}`,
-    terminalRuntimeGeneration: 1,
-    terminalSessionId,
-    target: {
-      kind: 'git-worktree',
-      workspaceId: WORKSPACE_ID,
-      workspaceRuntimeId: 'repo-runtime-test',
-      root: WORKTREE_ROOT,
-    },
-    presentation: { kind: 'git-worktree', branchName: 'feature/worktree' },
-    controller: null,
-    processName: 'zsh',
-    canonicalTitle: null,
-    phase: 'open',
-    message: null,
-    cols: 80,
-    rows: 24,
-  }
-}

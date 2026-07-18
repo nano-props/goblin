@@ -1,15 +1,20 @@
+import { terminalSessionUserWorktreeKey } from '#/shared/terminal-session-keys.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+
 export interface TerminalDirectoryEntry<TUser extends string | number> {
-  id: string
-  userId: TUser
-  scope: string
-  terminalSessionId: string
+  readonly id: string
+  readonly userId: TUser
+  readonly scope: string
+  readonly terminalSessionId: string
+  readonly worktreeId: WorkspaceId
 }
 
 export interface TerminalDirectoryReservation<TUser extends string | number> {
-  id: string
-  userId: TUser
-  scope: string
-  terminalSessionId: string
+  readonly id: string
+  readonly userId: TUser
+  readonly scope: string
+  readonly terminalSessionId: string
+  readonly worktreeId: WorkspaceId
 }
 
 export class TerminalDirectory<
@@ -20,6 +25,7 @@ export class TerminalDirectory<
   private readonly runtimeIdByUserSession = new Map<string, string>()
   private readonly reservationsByRuntimeId = new Map<string, TerminalDirectoryReservation<TUser>>()
   private readonly reservedRuntimeIdByUserSession = new Map<string, string>()
+  private readonly runtimeIdsByUserWorktree = new Map<string, Set<string>>()
   private readonly catalogRevisionByScope = new Map<string, number>()
 
   private publish(entry: TEntry): void {
@@ -28,6 +34,13 @@ export class TerminalDirectory<
     if (this.runtimeIdByUserSession.has(durableKey)) throw new Error('terminal directory durable identity conflict')
     this.entriesByRuntimeId.set(entry.id, entry)
     this.runtimeIdByUserSession.set(durableKey, entry.id)
+    const worktreeKey = terminalSessionUserWorktreeKey(entry)
+    let runtimeIds = this.runtimeIdsByUserWorktree.get(worktreeKey)
+    if (!runtimeIds) {
+      runtimeIds = new Set()
+      this.runtimeIdsByUserWorktree.set(worktreeKey, runtimeIds)
+    }
+    runtimeIds.add(entry.id)
     this.advanceCatalogRevision(entry.userId, entry.scope)
   }
 
@@ -79,11 +92,21 @@ export class TerminalDirectory<
     return runtimeId ? this.entriesByRuntimeId.get(runtimeId) : undefined
   }
 
+  primaryForWorktree(userId: TUser, scope: string, worktreeId: WorkspaceId): TEntry | undefined {
+    const runtimeIds = this.runtimeIdsByUserWorktree.get(terminalSessionUserWorktreeKey({ userId, scope, worktreeId }))
+    const runtimeId = runtimeIds?.values().next().value
+    return runtimeId ? this.entriesByRuntimeId.get(runtimeId) : undefined
+  }
+
   remove(entry: TEntry): boolean {
     if (this.entriesByRuntimeId.get(entry.id) !== entry) return false
     this.entriesByRuntimeId.delete(entry.id)
     const durableKey = this.userSessionKey(entry.userId, entry.terminalSessionId)
     if (this.runtimeIdByUserSession.get(durableKey) === entry.id) this.runtimeIdByUserSession.delete(durableKey)
+    const worktreeKey = terminalSessionUserWorktreeKey(entry)
+    const runtimeIds = this.runtimeIdsByUserWorktree.get(worktreeKey)
+    runtimeIds?.delete(entry.id)
+    if (runtimeIds?.size === 0) this.runtimeIdsByUserWorktree.delete(worktreeKey)
     this.advanceCatalogRevision(entry.userId, entry.scope)
     return true
   }
@@ -138,6 +161,7 @@ function reservationMatchesEntry<TUser extends string | number>(
     entry.id === identity.id &&
     entry.userId === identity.userId &&
     entry.scope === identity.scope &&
-    entry.terminalSessionId === identity.terminalSessionId
+    entry.terminalSessionId === identity.terminalSessionId &&
+    entry.worktreeId === identity.worktreeId
   )
 }
