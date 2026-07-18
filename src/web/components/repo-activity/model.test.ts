@@ -5,7 +5,7 @@ import {
   type RepoActivityProjectionRepo,
   repoOperationsSnapshotHasPrimaryRefresh,
 } from '#/web/components/repo-activity/model.ts'
-import { seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { seedRepoShellForTest, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import {
@@ -48,7 +48,7 @@ describe('repo activity model', () => {
 
   test('projects branch action activity from server operations', () => {
     resetWorkspacesStore()
-    const repo = seedRepoShellForTest({ id: REPO_ID })
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID })
     const operations = operationsSnapshot([serverOperation({ kind: 'push', phase: 'queued', source: 'user' })])
 
     expect(getRepoActivity(activityRepo(repo), operations)).toMatchObject({
@@ -76,9 +76,10 @@ function operationsSnapshot(operations: RepoServerOperationState[]): RepoOperati
 }
 
 function activityRepo(repo: WorkspaceState): RepoActivityProjectionRepo {
+  if (repo.capability.kind !== 'git') throw new Error('expected Git workspace fixture')
   return {
     id: repo.id,
-    branchAction: repo.operations.branchAction,
+    branchAction: repo.capability.git.operations.branchAction,
   }
 }
 

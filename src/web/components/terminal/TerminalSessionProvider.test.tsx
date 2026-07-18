@@ -1495,19 +1495,26 @@ describe('TerminalSessionProvider', () => {
       await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
       listSessionsMock.mockClear()
       await act(async () => {
-        useWorkspacesStore.setState((state) => ({
-          ...state,
-          workspaces: {
-            ...state.workspaces,
-            [REPO_ID]: {
-              ...state.workspaces[REPO_ID]!,
-              remote: {
-                ...state.workspaces[REPO_ID]!.remote,
-                fetchFailed: true,
+        useWorkspacesStore.setState((state) => {
+          const workspace = state.workspaces[REPO_ID]
+          if (!workspace || workspace.capability.kind !== 'git') return state
+          return {
+            ...state,
+            workspaces: {
+              ...state.workspaces,
+              [REPO_ID]: {
+                ...workspace,
+                capability: {
+                  ...workspace.capability,
+                  git: {
+                    ...workspace.capability.git,
+                    remote: { ...workspace.capability.git.remote, fetchFailed: true },
+                  },
+                },
               },
             },
-          },
-        }))
+          }
+        })
       })
       await Promise.resolve()
       expect(listSessionsMock).not.toHaveBeenCalled()

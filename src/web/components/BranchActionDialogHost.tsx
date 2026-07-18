@@ -251,7 +251,7 @@ export function BranchActionDialogHost({ currentRepoId, currentBranchName }: Pro
                 removeConfirmView.entry.payload.path,
                 remoteRepoTarget(
                   removeConfirmView.displayContext.repo.id,
-                  removeConfirmView.displayContext.repo.remote.lifecycle,
+                  removeConfirmView.displayContext.repo.remoteLifecycle,
                 ),
               )}
               branchName={removeConfirmView.entry.payload.branch}
@@ -305,7 +305,7 @@ export function BranchActionDialogHost({ currentRepoId, currentBranchName }: Pro
                 forceRemoveConfirmView.entry.payload.path,
                 remoteRepoTarget(
                   forceRemoveConfirmView.displayContext.repo.id,
-                  forceRemoveConfirmView.displayContext.repo.remote.lifecycle,
+                  forceRemoveConfirmView.displayContext.repo.remoteLifecycle,
                 ),
               )}
               forceDeleteBody={t('action.confirm-force-delete-branch-body')}

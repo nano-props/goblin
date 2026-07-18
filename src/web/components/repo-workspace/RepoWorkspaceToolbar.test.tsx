@@ -58,7 +58,7 @@ import {
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
-import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { GitRemoteProjection, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { workspacePaneTabsTargetForRepoBranch } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -157,14 +157,18 @@ function getTestRepoWorkspacePresentation(repo: RepoWorkspaceRepo) {
 }
 
 function repoWorkspaceRepo(repo: WorkspaceState): RepoWorkspaceRepo {
+  if (repo.capability.kind !== 'git') throw new Error('expected Git workspace fixture')
   const branchModel = readRepoBranchQueryProjection(repo)
   if (!branchModel) throw new Error('missing branch read model')
   return {
     ...repo,
     ui: { ...repo.ui, currentBranchName: branchModel.branches[0]?.name ?? null },
-    branchAction: repo.operations.branchAction,
+    branchAction: repo.capability.git.operations.branchAction,
     branchModel,
     unavailable: false,
+    probe: repo.capability.probe,
+    remote: repo.capability.git.remote,
+    remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,
   }
 }
 
@@ -1279,7 +1283,7 @@ function renderToolbar(options: {
   collapsed?: boolean
   createPending?: boolean
   trafficLightOffset?: boolean
-  remote?: Partial<WorkspaceState['remote']>
+  remote?: Partial<GitRemoteProjection>
   workspaceRuntimeId?: string
   /**
    * When true, do NOT mark the repo ready before mounting. The toolbar

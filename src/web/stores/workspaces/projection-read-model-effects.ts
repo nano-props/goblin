@@ -7,6 +7,7 @@ import { applyRepoSnapshotShellState } from '#/web/stores/workspaces/refresh-sta
 import { finishDataLoadError } from '#/web/stores/workspaces/repo-data-load-state.ts'
 import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
+import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
 
 interface AcceptedRepoProjectionReadModel {
   repoRoot: string
@@ -92,13 +93,16 @@ export function acceptRepoProjectionReadModel(
   const acceptCoreReadModel = options.scope === 'repo-read-model' && coreProjection
   const repoBefore = get().workspaces[repoRoot]
   if (!repoBefore || repoBefore.workspaceRuntimeId !== workspaceRuntimeId) return
+  if (!isGitWorkspace(repoBefore)) return
   if (!acceptCoreReadModel) return
   if (!markCoreProjectionAccepted({ repoRoot, workspaceRuntimeId, projection })) return
 
   if (!projection.snapshot) {
     updateIfFresh(set, repoRoot, workspaceRuntimeId, (repo) => {
-      finishDataLoadError(repo.dataLoads.repoReadModel, 'error.failed-read-repo')
-      repo.events = appendRepoEvent(repo.events, errorEvent('error.failed-read-repo'))
+      if (!isGitWorkspace(repo)) return
+      const git = gitWorkspaceProjection(repo)
+      finishDataLoadError(git.dataLoads.repoReadModel, 'error.failed-read-repo')
+      git.events = appendRepoEvent(git.events, errorEvent('error.failed-read-repo'))
     })
     return
   }

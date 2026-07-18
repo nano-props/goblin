@@ -3,9 +3,9 @@ import {
   remoteRepoConnectionTarget,
   remoteRepoRefFromTarget,
   remoteWorkspaceSessionEntry,
-  type RemoteRepoConnectionLifecycle,
   type WorkspaceSessionEntry,
 } from '#/shared/remote-repo.ts'
+import type { WorkspaceAdmissionState } from '#/web/stores/workspaces/types.ts'
 
 /** Minimal shape this helper needs from a `WorkspaceState`. Defined
  *  locally so the persistence / session layer doesn't have to
@@ -15,9 +15,7 @@ interface OpenWorkspaceRepoLike {
   session?: {
     entry: WorkspaceSessionEntry | null
   }
-  remote: {
-    lifecycle: RemoteRepoConnectionLifecycle | null
-  }
+  admission: WorkspaceAdmissionState
 }
 
 export function persistedOpenWorkspaceEntries(
@@ -36,7 +34,8 @@ export function persistedOpenWorkspaceEntries(
     // from the recent-workspace list. This is the same
     // intentional trade-off: a placeholder with no target is just a
     // connecting spinner, not a repo the user explicitly opened.
-    const target = remoteRepoConnectionTarget(repo.remote.lifecycle)
+    if (repo.admission.kind !== 'remote') return []
+    const target = remoteRepoConnectionTarget(repo.admission.lifecycle)
     if (!target) return []
     return [remoteWorkspaceSessionEntry(remoteRepoRefFromTarget(target))]
   })

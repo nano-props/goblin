@@ -246,7 +246,11 @@ describe('WorkspacePicker', () => {
 
     render(
       <WorkspacePicker
-        workspaces={[workspace('workspace-a', '/tmp/workspace-a'), workspace('workspace-b', '/tmp/workspace-b'), workspace('workspace-c', '/tmp/workspace-c')]}
+        workspaces={[
+          workspace('workspace-a', '/tmp/workspace-a'),
+          workspace('workspace-b', '/tmp/workspace-b'),
+          workspace('workspace-c', '/tmp/workspace-c'),
+        ]}
         currentWorkspaceId="/tmp/workspace-b"
         labels={labels}
         onActivate={() => {}}
@@ -414,7 +418,14 @@ function render(element: React.ReactNode) {
 }
 
 function workspace(name: string, id: string, overrides: Partial<WorkspacePickerItem> = {}): WorkspacePickerItem {
-  return { id, name, gitCapability: 'available', remoteDetails: [], lastSyncedAt: null, lifecycle: null, ...overrides }
+  return {
+    id,
+    name,
+    gitCapability: 'available',
+    git: { remoteDetails: [], lastSyncedAt: null },
+    lifecycle: null,
+    ...overrides,
+  }
 }
 
 const labels = {

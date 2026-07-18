@@ -62,8 +62,8 @@ describe('useBranchActions', () => {
     const repo = seedRepoWithReadModelForTest({
       id: target!.id,
       branches: [branch],
+      remoteLifecycle: { kind: 'ready', target: target! },
       remote: {
-        lifecycle: { kind: 'ready', target: target! },
         remotes: ['origin'],
         hasRemotes: true,
         hasBrowserRemote: true,
@@ -127,8 +127,8 @@ describe('useBranchActions', () => {
     const repo = seedRepoWithReadModelForTest({
       id: target!.id,
       branches: [branch],
+      remoteLifecycle: { kind: 'ready', target: target! },
       remote: {
-        lifecycle: { kind: 'ready', target: target! },
         remotes: ['origin'],
         hasRemotes: true,
         hasBrowserRemote: true,
@@ -164,8 +164,8 @@ describe('useBranchActions', () => {
     const repo = seedRepoWithReadModelForTest({
       id: target!.id,
       branches: [branch],
+      remoteLifecycle: { kind: 'ready', target: target! },
       remote: {
-        lifecycle: { kind: 'ready', target: target! },
         remotes: ['origin'],
         hasRemotes: true,
         hasBrowserRemote: true,

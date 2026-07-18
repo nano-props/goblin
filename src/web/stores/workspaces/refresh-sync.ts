@@ -15,6 +15,7 @@ import { fetchRepo } from '#/web/repo-client.ts'
 import type { RepoOperationReason } from '#/web/stores/workspaces/operations.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import type { ExecResult } from '#/web/types.ts'
+import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
 
 export function createRefreshSyncHelpers(
   set: WorkspacesSet,
@@ -31,7 +32,9 @@ export function createRefreshSyncHelpers(
     const { repo: repoBefore, workspaceRuntimeId } = resolved
     if (!canRunRemoteFetchNow(repoBefore)) return { ok: false, message: 'error.network-op-in-progress' }
     updateIfFresh(set, id, workspaceRuntimeId, (r) => {
-      startDataLoad(r.dataLoads.fetch, { hasData: r.dataLoads.fetch.loadedAt !== null })
+      if (!isGitWorkspace(r)) return
+      const fetch = gitWorkspaceProjection(r).dataLoads.fetch
+      startDataLoad(fetch, { hasData: fetch.loadedAt !== null })
     })
     return runExclusiveOperation({
       set,

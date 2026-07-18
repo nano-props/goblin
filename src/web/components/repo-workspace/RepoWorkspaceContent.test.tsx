@@ -154,15 +154,19 @@ function getTestRepoWorkspacePresentation(repo: RepoWorkspaceRepo) {
 }
 
 function repoWorkspaceRepo(repo: WorkspaceState): RepoWorkspaceRepo {
+  if (repo.capability.kind !== 'git') throw new Error('expected Git workspace fixture')
   const branchModel = readRepoBranchQueryProjection(repo)
   if (!branchModel) throw new Error('missing branch read model')
   const currentBranchName = branchModel.currentBranch || branchModel.branches[0]?.name || null
   return {
     ...repo,
     ui: { ...repo.ui, currentBranchName },
-    branchAction: repo.operations.branchAction,
+    branchAction: repo.capability.git.operations.branchAction,
     branchModel,
     unavailable: false,
+    probe: repo.capability.probe,
+    remote: repo.capability.git.remote,
+    remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,
   }
 }
 
@@ -1582,14 +1586,14 @@ const emptyTerminalReadContext: TerminalSessionReadContextValue = {
 }
 
 function gitWorktreeFilesystemTarget(repo: WorkspaceState, rootPath: string, branchName: string) {
-  if (repo.workspaceProbe.status !== 'ready') throw new Error('expected ready workspace fixture')
+  if (repo.capability.kind !== 'git') throw new Error('expected Git workspace fixture')
   return {
     kind: 'git-worktree' as const,
     workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     rootPath,
     head: { kind: 'branch' as const, branchName },
-    capabilities: repo.workspaceProbe.capabilities,
+    capabilities: repo.capability.probe.capabilities,
   }
 }
 

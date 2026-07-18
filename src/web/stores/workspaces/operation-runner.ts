@@ -9,6 +9,7 @@ import {
 } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { isExpectedRepoOperationCancellation } from '#/web/stores/workspaces/operation-cancellation.ts'
 import { updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
+import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
 import {
   markRepoOperationViews,
   settleRepoOperationViews,
@@ -86,7 +87,8 @@ function markOperationState<T>(
 ) {
   markRepoOperationTargets(options.id, operationId, options.targets, phase, wasQueued)
   updateIfFresh(options.set, options.id, workspaceRuntimeId, (repo) => {
-    markRepoOperationViews(repo.operations, operationId, options.targets, phase, wasQueued)
+    if (!isGitWorkspace(repo)) return
+    markRepoOperationViews(gitWorkspaceProjection(repo).operations, operationId, options.targets, phase, wasQueued)
   })
 }
 
@@ -98,13 +100,14 @@ function settleOperationState<T>(
 ) {
   settleRepoOperationTargets(options.id, operationId, options.targets, error)
   updateIfFresh(options.set, options.id, workspaceRuntimeId, (repo) => {
-    settleRepoOperationViews(repo.operations, operationId, options.targets, error)
+    if (!isGitWorkspace(repo)) return
+    settleRepoOperationViews(gitWorkspaceProjection(repo).operations, operationId, options.targets, error)
   })
 }
 
 async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Promise<T | null> {
   const repoBefore = options.get().workspaces[options.id]
-  if (!repoBefore) return null
+  if (!repoBefore || !isGitWorkspace(repoBefore)) return null
   const workspaceRuntimeId = options.workspaceRuntimeId ?? repoBefore.workspaceRuntimeId
   if (repoBefore.workspaceRuntimeId !== workspaceRuntimeId) return null
   const primary = options.targets[0]

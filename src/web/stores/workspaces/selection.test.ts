@@ -25,6 +25,7 @@ import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspa
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
 const REPO_ID = 'goblin+file:///tmp/goblin-selection-test-repo'
 const ipcHandlers: Record<string, (input: any) => unknown> = {}
 
@@ -123,7 +124,7 @@ describe('setBranchViewMode', () => {
     useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(repo?.ui.branchViewMode).toBe('worktrees')
+    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
     expect(useWorkspacesStore.getState().repoSnapshotCache[REPO_ID]?.ui).toMatchObject({
       branchViewMode: 'worktrees',
     })
@@ -135,7 +136,7 @@ describe('setBranchViewMode', () => {
     useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(repo?.ui.branchViewMode).toBe('worktrees')
+    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
     expect(readRepoBranchQueryProjection(repo!)?.currentBranch).toBe('feature/worktree')
   })
 
@@ -145,7 +146,7 @@ describe('setBranchViewMode', () => {
     useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(repo?.ui.branchViewMode).toBe('worktrees')
+    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
     expect(readRepoBranchQueryProjection(repo!)?.currentBranch).toBe('main')
   })
 
@@ -163,7 +164,7 @@ describe('setBranchViewMode', () => {
     useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     const updatedRepo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(updatedRepo?.ui.branchViewMode).toBe('worktrees')
+    expect(requireGitWorkspaceForTest(updatedRepo).capability.git.ui.branchViewMode).toBe('worktrees')
     expect(readRepoBranchQueryProjection(updatedRepo!)?.currentBranch).toBe('main')
     expect(readRepoBranchQueryProjection(updatedRepo!)?.branches.map((repoBranch) => repoBranch.name)).toEqual([
       'main',

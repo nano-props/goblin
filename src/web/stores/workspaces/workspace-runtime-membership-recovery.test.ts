@@ -40,9 +40,7 @@ describe('workspace runtime membership recovery', () => {
     })
     const repo = useWorkspacesStore.getState().workspaces[REPO_ROOT]
     expect(repo?.workspaceRuntimeId).toBe('repo-runtime-123456789012345678901')
-    expect(repo?.dataLoads.repoReadModel.stale).toBe(true)
-    expect(repo?.operations.repoReadModel.phase).toBe('idle')
-    expect(repo?.events).toEqual([])
+    expect(repo?.capability).toEqual({ kind: 'probing', probe: { status: 'probing' } })
   })
 
   test('redeclares the latest window membership when a repo closes during recovery', async () => {

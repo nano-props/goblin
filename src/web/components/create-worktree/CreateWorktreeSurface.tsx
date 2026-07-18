@@ -22,7 +22,7 @@ import { ConfirmCheckbox } from '#/web/components/ConfirmCheckbox.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { remoteRepoTarget } from '#/web/stores/workspaces/workspace-guards.ts'
-import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { WorkspaceAdmissionState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { RepoOperationState } from '#/web/stores/workspaces/operations.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useRepoRemoteBranchesQuery } from '#/web/repo-data-query.ts'
@@ -46,7 +46,7 @@ interface CreateWorktreeRepo {
   workspaceRuntimeId: WorkspaceState['workspaceRuntimeId']
   branchModel: RepoBranchReadModelData
   branchAction: RepoOperationState
-  remote: Pick<WorkspaceState['remote'], 'lifecycle'>
+  remoteLifecycle: Extract<WorkspaceAdmissionState, { kind: 'remote' }>['lifecycle']
 }
 
 export interface WorktreeBootstrapPromptState {
@@ -100,7 +100,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
   const remoteBranches = remoteBranchesQuery.data ?? []
   const remoteBranchesLoading = remoteBranchesQuery.isLoading
 
-  const remoteTarget = remoteRepoTarget(repo.id, repo.remote.lifecycle)
+  const remoteTarget = remoteRepoTarget(repo.id, repo.remoteLifecycle)
   const derived = deriveCreateWorktreeForm(
     { mode, base, branch, existingBranch, remoteRef, localBranch, worktreePath, remoteBranches },
     repo,

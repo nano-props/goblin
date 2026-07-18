@@ -66,7 +66,12 @@ export type WorkspaceIntentPlan =
   | { kind: 'close-window' }
   | { kind: 'cycle-workspace'; direction: 1 | -1 }
   | { kind: 'refresh-repo'; repoId: string; workspaceRuntimeId: string }
-  | { kind: 'show-workspace-pane-tab'; workspaceId: string; target: WorkspacePaneCommandTarget; tab: WorkspacePaneTabType }
+  | {
+      kind: 'show-workspace-pane-tab'
+      workspaceId: string
+      target: WorkspacePaneCommandTarget
+      tab: WorkspacePaneTabType
+    }
   | { kind: 'terminal-primary-action'; workspaceId: string; target: WorkspacePaneCommandTarget }
   | { kind: 'toggle-zen-mode' }
 
@@ -81,7 +86,8 @@ interface WorkspaceIntentPlanContext {
   workspaceShortcutSuppressed: boolean
   terminalFocused: boolean
   currentWorkspaceId: string | null
-  currentRepo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId' | 'workspaceProbe'> | null
+  currentWorkspaceRuntimeId: string | null
+  currentWorkspaceCapability: Pick<WorkspaceState['capability'], 'kind' | 'probe'> | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
 }
 
@@ -166,7 +172,8 @@ export function createWorkspaceIntentPlan(
       if (
         context.workspaceShortcutSuppressed ||
         !context.currentWorkspaceId ||
-        !workspaceWorktreesAvailable(context.currentRepo?.workspaceProbe)
+        context.currentWorkspaceCapability?.kind !== 'git' ||
+        !workspaceWorktreesAvailable(context.currentWorkspaceCapability.probe)
       )
         return { kind: 'noop' }
       return { kind: 'create-worktree' }
@@ -176,7 +183,7 @@ export function createWorkspaceIntentPlan(
       if (
         !context.currentWorkspaceId ||
         !context.currentWorkspacePaneCommandTarget ||
-        !workspaceTerminalAvailable(context.currentRepo?.workspaceProbe)
+        !workspaceTerminalAvailable(context.currentWorkspaceCapability?.probe)
       )
         return { kind: 'noop' }
       return {
@@ -190,13 +197,29 @@ export function createWorkspaceIntentPlan(
         ? { kind: 'close-workspace', workspaceId: context.currentWorkspaceId }
         : { kind: 'close-window' }
     case 'cycle-workspace-requested':
-      return context.workspaceShortcutSuppressed ? { kind: 'noop' } : { kind: 'cycle-workspace', direction: event.direction }
+      return context.workspaceShortcutSuppressed
+        ? { kind: 'noop' }
+        : { kind: 'cycle-workspace', direction: event.direction }
     case 'repo-refresh-requested':
-      if (context.workspaceShortcutSuppressed || context.terminalFocused || !context.currentRepo)
+      if (
+        context.workspaceShortcutSuppressed ||
+        context.terminalFocused ||
+        !context.currentWorkspaceId ||
+        !context.currentWorkspaceRuntimeId ||
+        context.currentWorkspaceCapability?.kind !== 'git'
+      )
         return { kind: 'noop' }
-      return { kind: 'refresh-repo', repoId: context.currentRepo.id, workspaceRuntimeId: context.currentRepo.workspaceRuntimeId }
+      return {
+        kind: 'refresh-repo',
+        repoId: context.currentWorkspaceId,
+        workspaceRuntimeId: context.currentWorkspaceRuntimeId,
+      }
     case 'show-workspace-pane-tab-requested':
-      if (context.workspaceShortcutSuppressed || !context.currentWorkspaceId || !context.currentWorkspacePaneCommandTarget)
+      if (
+        context.workspaceShortcutSuppressed ||
+        !context.currentWorkspaceId ||
+        !context.currentWorkspacePaneCommandTarget
+      )
         return { kind: 'noop' }
       return {
         kind: 'show-workspace-pane-tab',
@@ -209,7 +232,7 @@ export function createWorkspaceIntentPlan(
         context.workspaceShortcutSuppressed ||
         !context.currentWorkspaceId ||
         !context.currentWorkspacePaneCommandTarget ||
-        !workspaceTerminalAvailable(context.currentRepo?.workspaceProbe)
+        !workspaceTerminalAvailable(context.currentWorkspaceCapability?.probe)
       )
         return { kind: 'noop' }
       return {

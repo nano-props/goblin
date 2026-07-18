@@ -4,11 +4,25 @@ import { runExclusiveOperation, runLatestOperation } from '#/web/stores/workspac
 import { repoOperation, repoOperationBusy } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
 const REPO_ID = 'goblin+file:///tmp/goblin-operation-runner-test-repo'
 
 beforeEach(() => {
   resetWorkspacesStore()
-  seedRepoShellForTest({ id: REPO_ID, workspaceRuntimeId: 'repo-runtime-test' })
+  seedRepoShellForTest({
+    id: REPO_ID,
+    workspaceRuntimeId: 'repo-runtime-test',
+    workspaceProbe: {
+      status: 'ready',
+      name: 'workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
+      diagnostics: [],
+    },
+  })
 })
 
 describe('runLatestOperation', () => {
@@ -60,7 +74,7 @@ describe('runLatestOperation', () => {
     })
 
     expect(repoOperation(REPO_ID, 'repoReadModel').phase).toBe('queued')
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.repoReadModel.phase).toBe('queued')
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.repoReadModel.phase).toBe('queued')
     releaseActive()
 
     await expect(active).resolves.toBeNull()
@@ -68,7 +82,7 @@ describe('runLatestOperation', () => {
     await expect(latest).resolves.toBe('latest')
     expect(starts).toEqual(['active', 'latest'])
     expect(repoOperation(REPO_ID, 'repoReadModel').phase).toBe('idle')
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.repoReadModel.phase).toBe('idle')
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.repoReadModel.phase).toBe('idle')
   })
 })
 
@@ -135,12 +149,12 @@ describe('runExclusiveOperation', () => {
     expect(repoOperation(REPO_ID, 'branchAction').target).toBe('feature/a')
     expect(repoOperation(REPO_ID, 'fetch').target).toBeNull()
     expect(repoOperationBusy(REPO_ID, 'branchAction')).toBe(true)
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.branchAction).toMatchObject({
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction).toMatchObject({
       phase: 'running',
       reason: 'branch:pull',
       target: 'feature/a',
     })
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.fetch).toMatchObject({
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.fetch).toMatchObject({
       phase: 'running',
       reason: 'pull',
       target: null,
@@ -152,11 +166,11 @@ describe('runExclusiveOperation', () => {
     expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('idle')
     expect(repoOperation(REPO_ID, 'fetch').phase).toBe('idle')
     expect(repoOperation(REPO_ID, 'branchAction').target).toBeNull()
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.branchAction).toMatchObject({
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction).toMatchObject({
       phase: 'idle',
       target: null,
     })
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.fetch).toMatchObject({
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.fetch).toMatchObject({
       phase: 'idle',
       target: null,
     })
@@ -216,7 +230,7 @@ describe('runExclusiveOperation', () => {
     })
 
     expect(result).toEqual({ ok: false, message: 'fetch failed' })
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.fetch).toMatchObject({
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.fetch).toMatchObject({
       phase: 'idle',
       reason: 'fetch',
       target: null,
@@ -521,7 +535,7 @@ describe('runLatestOperation active-task cancellation', () => {
     await expect(readModel).resolves.toBeNull()
     expect(onError).not.toHaveBeenCalled()
     expect(onStale).toHaveBeenCalledTimes(1)
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.repoReadModel).toMatchObject({
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.repoReadModel).toMatchObject({
       phase: 'idle',
       error: null,
     })

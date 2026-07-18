@@ -11,6 +11,7 @@ import {
 import type { RepoOperationTarget } from '#/web/stores/workspaces/operation-runner.ts'
 import type { WorkspaceState, WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import type { RepoOperationLane } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
+import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
 type RepoDraft = Draft<WorkspaceState>
 
 interface RunLatestDataLoadOperationOptions<T> {
@@ -39,6 +40,8 @@ interface RunLatestDataLoadOperationOptions<T> {
 }
 
 export async function runLatestDataLoadOperation<T>(options: RunLatestDataLoadOperationOptions<T>): Promise<void> {
+  const workspace = options.get().workspaces[options.id]
+  if (!workspace || workspace.workspaceRuntimeId !== options.workspaceRuntimeId || !isGitWorkspace(workspace)) return
   updateIfFresh(options.set, options.id, options.workspaceRuntimeId, (repo) => {
     const startOptions = options.start?.(repo)
     startDataLoad(options.selectDataLoad(repo), startOptions ?? undefined)
@@ -64,9 +67,11 @@ export async function runLatestDataLoadOperation<T>(options: RunLatestDataLoadOp
     onError: (message) => {
       options.onErrorLog?.(message)
       updateIfFresh(options.set, options.id, options.workspaceRuntimeId, (repo) => {
+        if (!isGitWorkspace(repo)) return
         finishDataLoadError(options.selectDataLoad(repo), message)
         options.onError?.(message, repo)
-        repo.events = appendRepoEvent(repo.events, errorEvent(message))
+        const git = gitWorkspaceProjection(repo)
+        git.events = appendRepoEvent(git.events, errorEvent(message))
       })
     },
   })

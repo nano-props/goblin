@@ -10,8 +10,6 @@ import {
   type WorktreeBootstrapPathSummary,
   type WorktreeBootstrapSummary,
 } from '#/shared/worktree-bootstrap-summary.ts'
-const EMPTY_EVENTS: RepoEvent[] = []
-
 type Translator = ReturnType<typeof useT>
 type WorktreeBootstrapSummaryPathKind = 'copy' | 'symlink' | 'hardlink' | 'skippedMissing'
 type WorktreeBootstrapSummaryCountKind = 'one' | 'other'
@@ -42,7 +40,10 @@ const WORKTREE_BOOTSTRAP_SETUP_KEY = 'worktree-bootstrap.summary.setup'
 
 export function useRepoToasts(repoId: string) {
   const t = useT()
-  const events = useWorkspacesStore((s) => s.workspaces[repoId]?.events ?? EMPTY_EVENTS)
+  const events = useWorkspacesStore((s) => {
+    const workspace = s.workspaces[repoId]
+    return workspace?.capability.kind === 'git' ? workspace.capability.git.events : null
+  })
 
   // `t` is read through a ref so a language flip doesn't re-fire these
   // effects (which would already be no-ops after the store clear, but
@@ -54,7 +55,7 @@ export function useRepoToasts(repoId: string) {
   tRef.current = t
 
   useEffect(() => {
-    if (!events.length) return
+    if (!events?.length) return
     for (const event of events) {
       if (event.kind === 'result') {
         const result = event.result

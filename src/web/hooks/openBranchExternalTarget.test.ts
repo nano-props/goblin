@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { openBranchExternalTarget, openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
-import { resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 const mocks = vi.hoisted(() => ({
   openExternalUrl: vi.fn(),
@@ -55,7 +55,7 @@ describe('openBranchExternalTarget', () => {
 describe('openUpstreamBranchExternalTarget', () => {
   test('parses `remote/branch` and opens the named remote', async () => {
     mocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
-    seedRepoShellForTest({ id: REPO_ID, remote: { remotes: ['origin'] } })
+    seedRepoWithReadModelForTest({ id: REPO_ID, remote: { remotes: ['origin'] } })
 
     await openUpstreamBranchExternalTarget(REPO_ID, WORKSPACE_RUNTIME_ID, 'origin/main')
 
@@ -68,7 +68,7 @@ describe('openUpstreamBranchExternalTarget', () => {
 
   test('preserves slashes in the branch name', async () => {
     mocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
-    seedRepoShellForTest({ id: REPO_ID, remote: { remotes: ['origin'] } })
+    seedRepoWithReadModelForTest({ id: REPO_ID, remote: { remotes: ['origin'] } })
 
     await openUpstreamBranchExternalTarget(REPO_ID, WORKSPACE_RUNTIME_ID, 'origin/feature/foo')
 
@@ -81,7 +81,7 @@ describe('openUpstreamBranchExternalTarget', () => {
 
   test('uses the longest matching remote name when remote names contain slashes', async () => {
     mocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
-    seedRepoShellForTest({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       remote: {
         remotes: ['origin', 'origin/team'],

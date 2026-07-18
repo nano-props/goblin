@@ -5,6 +5,8 @@ import {
   persistRepoSnapshotCacheEntry,
   seedRepoProjectionQueryFromCacheEntry,
 } from '#/web/stores/workspaces/persistence.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
+import { requireGitWorkspaceProjection } from '#/web/stores/workspaces/git-workspace-projection.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import {
   createBranchSnapshot,
@@ -165,13 +167,21 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
       }),
     ]
 
-    const repo = restoreRepoProjectionFromCacheEntry(
-      emptyWorkspace('goblin+file:///repo', 'repo', 'repo-runtime-test'),
-      cached,
-    )
+    const workspace = emptyWorkspace('goblin+file:///repo', 'repo', 'repo-runtime-test')
+    acceptWorkspaceProbeState(workspace, {
+      status: 'ready',
+      name: 'repo',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
+      diagnostics: [],
+    })
+    const repo = restoreRepoProjectionFromCacheEntry(workspace, cached)
 
     expect(repo.name).toBe('cached-name')
-    expect(repo.projection).toEqual({ source: 'cache', savedAt: now })
+    expect(requireGitWorkspaceProjection(repo).projection).toEqual({ source: 'cache', savedAt: now })
   })
 
   test('seeds cached branch references as runtime projections', () => {

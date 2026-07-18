@@ -8,6 +8,11 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { removeWorkspaceRuntimeFromCache, workspaceRuntimesQueryKey } from '#/web/workspace-runtime-query.ts'
 import type { WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
+import { requireRemoteAdmissionForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
+import { markRemoteLifecycleReady } from '#/web/stores/workspaces/availability.ts'
+import { addResolvedWorkspace } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import {
   branchSnapshot,
   flushIpc,
@@ -20,6 +25,56 @@ import {
 beforeEach(resetLifecycleTest)
 
 describe('repo lifecycle', () => {
+  test('accepts a capability change for an unchanged ready remote target', () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.test',
+      user: 'developer',
+      port: 22,
+      remotePath: '/workspace',
+    })
+    if (!target) throw new Error('expected normalized remote target')
+    const workspaceRuntimeId = 'workspace-runtime-test'
+    const workspace = emptyWorkspace(target.id, target.displayName, workspaceRuntimeId)
+    workspace.session = { entry: remoteWorkspaceSessionEntry(target), projectionState: 'projected' }
+    acceptWorkspaceProbeState(workspace, {
+      status: 'ready',
+      name: target.displayName,
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
+      diagnostics: [],
+    })
+    markRemoteLifecycleReady(workspace, target)
+
+    const result = addResolvedWorkspace(
+      { workspaces: { [target.id]: workspace }, repoSnapshotCache: {}, workspaceOrder: [target.id] },
+      {
+        id: target.id,
+        name: target.displayName,
+        target,
+        workspaceProbe: {
+          status: 'ready',
+          name: target.displayName,
+          capabilities: {
+            files: { read: true, write: true },
+            terminal: { available: true },
+            git: { status: 'unavailable' },
+          },
+          diagnostics: [],
+        },
+        session: { entry: remoteWorkspaceSessionEntry(target), projectionState: 'projected' },
+      },
+      workspaceRuntimeId,
+    )
+
+    expect(result.changed).toBe(true)
+    expect(result.workspaces[target.id]?.capability.kind).toBe('filesystem')
+    expect(requireRemoteAdmissionForTest(result.workspaces[target.id]).lifecycle).toEqual({ kind: 'ready', target })
+  })
+
   test('ensureWorkspaceOpen opens the resolved repo, records it as recent, and starts initial local refresh', async () => {
     const calls = installGoblin()
 
@@ -325,7 +380,7 @@ describe('repo lifecycle', () => {
     if (result.ok) await result.postOpenEffects
 
     expect(result).toMatchObject({ ok: true, workspaceId: target!.id })
-    expect(useWorkspacesStore.getState().workspaces[target!.id]?.remote.lifecycle).toEqual({ kind: 'ready', target })
+    expect(requireRemoteAdmissionForTest(useWorkspacesStore.getState().workspaces[target!.id]).lifecycle).toEqual({ kind: 'ready', target })
     expect(calls.recent).toEqual([remoteWorkspaceSessionEntry(target!)])
   })
 
@@ -475,7 +530,7 @@ describe('repo lifecycle', () => {
 
     const first = await useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(oldTarget!))
     expect(first).toMatchObject({ ok: true, workspaceId: oldTarget!.id })
-    expect(useWorkspacesStore.getState().workspaces[oldTarget!.id]?.remote.lifecycle).toEqual({
+    expect(requireRemoteAdmissionForTest(useWorkspacesStore.getState().workspaces[oldTarget!.id]).lifecycle).toEqual({
       kind: 'ready',
       target: oldTarget,
     })
@@ -489,7 +544,7 @@ describe('repo lifecycle', () => {
     })
     const second = await useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(newTarget!))
     expect(second).toMatchObject({ ok: true, workspaceId: newTarget!.id })
-    expect(useWorkspacesStore.getState().workspaces[newTarget!.id]?.remote.lifecycle).toEqual({
+    expect(requireRemoteAdmissionForTest(useWorkspacesStore.getState().workspaces[newTarget!.id]).lifecycle).toEqual({
       kind: 'ready',
       target: newTarget,
     })

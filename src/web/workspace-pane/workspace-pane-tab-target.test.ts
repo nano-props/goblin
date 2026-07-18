@@ -21,6 +21,7 @@ import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/work
 import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { repoWorktreeStatusQueryKey } from '#/web/repo-data-query.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 
 const REPO_ID = 'goblin+file:///tmp/workspace-pane-target-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-target-worktree'
@@ -54,6 +55,7 @@ describe('workspace pane tab target read model', () => {
 
   test('marks target resolution unavailable when the repo branch read model is unavailable', () => {
     const repo = emptyWorkspace(REPO_ID, 'workspace-pane-target-repo', 'repo-runtime-workspace-pane-no-query')
+    markGitAvailable(repo)
     useWorkspacesStore.setState((s) => ({
       workspaces: { ...s.workspaces, [REPO_ID]: repo },
       workspaceOrder: [...s.workspaceOrder, REPO_ID],
@@ -71,6 +73,7 @@ describe('workspace pane tab target read model', () => {
 
   test('marks target resolution unavailable while workspace pane tabs projection is not ready', () => {
     const repo = emptyWorkspace(REPO_ID, 'workspace-pane-target-repo', 'repo-runtime-workspace-pane-no-tabs')
+    markGitAvailable(repo)
     useWorkspacesStore.setState((s) => ({
       workspaces: { ...s.workspaces, [REPO_ID]: repo },
       workspaceOrder: [...s.workspaceOrder, REPO_ID],
@@ -278,3 +281,16 @@ describe('workspace pane tab target read model', () => {
     ).toBe('recorded')
   })
 })
+
+function markGitAvailable(repo: ReturnType<typeof emptyWorkspace>): void {
+  acceptWorkspaceProbeState(repo, {
+    status: 'ready',
+    name: repo.name,
+    capabilities: {
+      files: { read: true, write: true },
+      terminal: { available: true },
+      git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+    },
+    diagnostics: [],
+  })
+}

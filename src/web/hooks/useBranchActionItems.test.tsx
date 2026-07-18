@@ -175,13 +175,13 @@ function repo(): BranchActionRepo {
     },
     branchAction: idleOperation(),
     remote: {
-      lifecycle: null,
       hasRemotes: true,
       hasBrowserRemote: true,
       hasGitHubRemote: true,
       browserRemoteProvider: 'github',
       remoteProviders: { origin: 'github' },
     },
+    remoteLifecycle: null,
   }
 }
 

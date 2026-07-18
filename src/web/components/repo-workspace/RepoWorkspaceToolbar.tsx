@@ -46,7 +46,7 @@ export function RepoWorkspaceToolbar({
       </WorkspaceToolbar>
     )
   }
-  if (repo.workspaceProbe.status !== 'ready') return null
+  if (repo.probe.status !== 'ready') return null
   const target: WorkspacePaneSurfaceTarget = branch.worktree
     ? {
         kind: 'git-worktree',
@@ -54,14 +54,14 @@ export function RepoWorkspaceToolbar({
         workspaceRuntimeId: repo.workspaceRuntimeId,
         head: gitHead(branch.name),
         rootPath: branch.worktree.path,
-        capabilities: repo.workspaceProbe.capabilities,
+        capabilities: repo.probe.capabilities,
       }
     : {
         kind: 'git-branch',
         workspaceId: repo.id,
         workspaceRuntimeId: repo.workspaceRuntimeId,
         branchName: branch.name,
-        capabilities: repo.workspaceProbe.capabilities,
+        capabilities: repo.probe.capabilities,
       }
 
   return (

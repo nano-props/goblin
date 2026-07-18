@@ -17,6 +17,7 @@ import {
   createRepoBranch,
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
+  setWorkspaceProbeForTest,
 } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
@@ -35,12 +36,7 @@ afterEach(() => {
 describe('RepoDashboardPane', () => {
   test('does not admit Git or directory reads before workspace capability settles', () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, name: 'probing' })
-    useWorkspacesStore.setState((state) => ({
-      workspaces: {
-        ...state.workspaces,
-        [REPO_ID]: { ...state.workspaces[REPO_ID]!, workspaceProbe: { status: 'probing' } },
-      },
-    }))
+    setWorkspaceProbeForTest(REPO_ID, { status: 'probing' })
     primaryWindowQueryClient.removeQueries({
       queryKey: repoProjectionQueryKey(REPO_ID, repo.workspaceRuntimeId, null, 'summary'),
     })
@@ -55,7 +51,9 @@ describe('RepoDashboardPane', () => {
     const projectionState = primaryWindowQueryClient.getQueryState(
       repoProjectionQueryKey(REPO_ID, repo.workspaceRuntimeId, null, 'summary'),
     )
-    const statusState = primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId))
+    const statusState = primaryWindowQueryClient.getQueryState(
+      repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
+    )
     const overviewState = primaryWindowQueryClient.getQueryState(
       workspaceDirectoryOverviewQueryKey(REPO_ID, repo.workspaceRuntimeId),
     )
@@ -67,24 +65,16 @@ describe('RepoDashboardPane', () => {
 
   test('shows directory metrics without mounting Git reads for a non-Git workspace', () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, name: 'notes' })
-    useWorkspacesStore.setState((state) => ({
-      workspaces: {
-        ...state.workspaces,
-        [REPO_ID]: {
-          ...state.workspaces[REPO_ID]!,
-          workspaceProbe: {
-            status: 'ready',
-            name: 'notes',
-            capabilities: {
-              files: { read: true, write: true },
-              terminal: { available: true },
-              git: { status: 'unavailable' },
-            },
-            diagnostics: [],
-          },
-        },
+    setWorkspaceProbeForTest(REPO_ID, {
+      status: 'ready',
+      name: 'notes',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
       },
-    }))
+      diagnostics: [],
+    })
     primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(REPO_ID, repo.workspaceRuntimeId), {
       topLevelFileCount: 4,
       topLevelDirectoryCount: 2,

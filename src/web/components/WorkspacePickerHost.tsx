@@ -48,16 +48,23 @@ export function WorkspacePickerHost({
         .map<WorkspacePickerItem | null>((id) => {
           const workspace = s.workspaces[id]
           if (!workspace) return null
+          const git = workspace.capability.kind === 'git' ? workspace.capability.git : null
           return {
             id: workspace.id,
             name: workspace.name,
             gitCapability:
-              workspace.workspaceProbe.status === 'ready'
-                ? workspace.workspaceProbe.capabilities.git.status
-                : 'unknown',
-            remoteDetails: workspace.remote.remoteDetails ?? [],
-            lastSyncedAt: latestRepoSyncTime(workspace),
-            lifecycle: workspace.remote.lifecycle,
+              workspace.capability.kind === 'git'
+                ? 'available'
+                : workspace.capability.kind === 'filesystem'
+                  ? 'unavailable'
+                  : 'unknown',
+            git: git
+              ? {
+                  remoteDetails: git.remote.remoteDetails,
+                  lastSyncedAt: latestRepoSyncTime(git),
+                }
+              : null,
+            lifecycle: workspace.admission.kind === 'remote' ? workspace.admission.lifecycle : null,
           }
         })
         .filter((x): x is WorkspacePickerItem => x !== null),

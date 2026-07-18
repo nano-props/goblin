@@ -19,9 +19,11 @@ export async function openUpstreamBranchExternalTarget(
   tracking: string,
 ): Promise<ExecResult> {
   const repo = useWorkspacesStore.getState().workspaces[repoId]
+  if (repo?.capability.kind !== 'git') return { ok: false, message: 'error.invalid-upstream-ref' }
+  const gitRemote = repo.capability.git.remote
   const remoteName = resolveTrackingRemoteName(
     tracking,
-    repo?.remote.remotes ?? Object.keys(repo?.remote.remoteProviders ?? {}),
+    gitRemote.remotes ?? Object.keys(gitRemote.remoteProviders ?? {}),
   )
   if (!remoteName) {
     return { ok: false, message: 'error.invalid-upstream-ref' }

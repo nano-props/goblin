@@ -179,7 +179,7 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
     }
     case 'branch': {
       const repo = useWorkspacesStore.getState().workspaces[workspaceId]
-      const branchModel = repo ? readRepoBranchSnapshotQueryProjection(repo) : null
+      const branchModel = repo?.capability.kind === 'git' ? readRepoBranchSnapshotQueryProjection(repo) : null
       const branch = branchModel?.branches.find((candidate) => candidate.name === routeContext.branchName)
       const worktreePath = routeContext.worktreePath ?? branch?.worktree?.path ?? null
       const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKeyForPath(workspaceId, worktreePath) : null

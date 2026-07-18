@@ -61,8 +61,8 @@ function WorktreeFilterToggle({ repoId }: Props) {
       return {
         id: repo?.id ?? '',
         workspaceRuntimeId: repo?.workspaceRuntimeId ?? '',
-        branchViewMode: repo?.ui.branchViewMode ?? 'all',
-        exists: !!repo,
+        branchViewMode: repo?.capability.kind === 'git' ? repo.capability.git.ui.branchViewMode : 'all',
+        exists: repo?.capability.kind === 'git',
       }
     }),
   )
@@ -113,12 +113,12 @@ function useCreateWorktreeTrigger(repoId: string) {
     useWorkspacesStore,
     (s) => {
       const repo = s.workspaces[repoId]
-      return repo
+      return repo?.capability.kind === 'git'
         ? {
             id: repo.id,
             workspaceRuntimeId: repo.workspaceRuntimeId,
             operations: {
-              branchAction: repo.operations.branchAction,
+              branchAction: repo.capability.git.operations.branchAction,
             },
           }
         : null

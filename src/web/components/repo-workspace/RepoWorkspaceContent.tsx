@@ -18,7 +18,7 @@ import { RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.ts
 import { Button } from '#/web/components/ui/button.tsx'
 
 interface Props {
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'workspaceRuntimeId' | 'branchModel' | 'ui' | 'workspaceProbe'>
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'workspaceRuntimeId' | 'branchModel' | 'ui' | 'probe'>
   detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
   workspacePaneTabModel: RepoWorkspaceTabModel

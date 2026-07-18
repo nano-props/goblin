@@ -9,6 +9,7 @@ import {
   seedRepoShellForTest,
   seedRepoWithReadModelForTest,
   createRepoBranch,
+  setWorkspaceProbeForTest,
 } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
@@ -25,6 +26,7 @@ const createWorktreePageMocks = vi.hoisted(() => ({
 }))
 const restoreRepoTabsMocks = vi.hoisted(() => ({
   useRestoreRepoTabsOnView: vi.fn(),
+  useRepoToasts: vi.fn(),
 }))
 
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
@@ -33,7 +35,7 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
 }))
 
 vi.mock('#/web/hooks/useRepoToasts.tsx', () => ({
-  useRepoToasts: () => {},
+  useRepoToasts: restoreRepoTabsMocks.useRepoToasts,
 }))
 
 vi.mock('#/web/hooks/useRestoreRepoTabsOnView.ts', () => ({
@@ -236,9 +238,25 @@ vi.mock('#/web/components/Layout.tsx', () => ({
 
 const REPO_ID = 'goblin+file:///tmp/repo-view-test'
 
+function filesystemWorkspaceProbe() {
+  return {
+    status: 'ready' as const,
+    name: 'workspace',
+    capabilities: {
+      files: { read: true as const, write: true },
+      terminal: { available: true as const },
+      git: { status: 'unavailable' as const },
+    },
+    diagnostics: [],
+  }
+}
+
 function branchRepoView(branchName = 'feature/a') {
   return (
-    <RepoView workspaceId={REPO_ID} routeView={{ kind: 'branch', repoId: REPO_ID, branchName, workspacePaneRoute: null }} />
+    <RepoView
+      workspaceId={REPO_ID}
+      routeView={{ kind: 'branch', repoId: REPO_ID, branchName, workspacePaneRoute: null }}
+    />
   )
 }
 
@@ -252,6 +270,7 @@ beforeEach(() => {
   })
   branchNavigatorMocks.activate.mockImplementation(() => {})
   restoreRepoTabsMocks.useRestoreRepoTabsOnView.mockClear()
+  restoreRepoTabsMocks.useRepoToasts.mockClear()
   restoreRepoTabsMocks.useRestoreRepoTabsOnView.mockReturnValue({ state: { phase: 'idle' }, retry: vi.fn() })
 })
 
@@ -274,24 +293,7 @@ describe('RepoView workspace navigation', () => {
   })
 
   test('renders a non-Git workspace in the shared shell without mounting Git-only actions', () => {
-    useWorkspacesStore.setState((state) => ({
-      workspaces: {
-        ...state.workspaces,
-        [REPO_ID]: {
-          ...state.workspaces[REPO_ID]!,
-          workspaceProbe: {
-            status: 'ready',
-            name: 'workspace',
-            capabilities: {
-              files: { read: true, write: true },
-              terminal: { available: true },
-              git: { status: 'unavailable' },
-            },
-            diagnostics: [],
-          },
-        },
-      },
-    }))
+    setWorkspaceProbeForTest(REPO_ID, filesystemWorkspaceProbe())
 
     const { container } = render(
       <RepoView workspaceId={REPO_ID} routeView={{ kind: 'workspace-root', repoId: REPO_ID }} />,
@@ -305,27 +307,12 @@ describe('RepoView workspace navigation', () => {
     expect(container.querySelector('[data-testid="create-worktree-row-action"]')).toBeNull()
     expect(container.querySelector('[data-testid="branch-filter-action"]')).toBeNull()
     expect(container.querySelector('[data-testid="repo-sync-action"]')).toBeNull()
+    expect(restoreRepoTabsMocks.useRestoreRepoTabsOnView).not.toHaveBeenCalled()
+    expect(restoreRepoTabsMocks.useRepoToasts).not.toHaveBeenCalled()
   })
 
   test('renders the directory Dashboard for a non-Git dashboard route without Git navigation', () => {
-    useWorkspacesStore.setState((state) => ({
-      workspaces: {
-        ...state.workspaces,
-        [REPO_ID]: {
-          ...state.workspaces[REPO_ID]!,
-          workspaceProbe: {
-            status: 'ready',
-            name: 'workspace',
-            capabilities: {
-              files: { read: true, write: true },
-              terminal: { available: true },
-              git: { status: 'unavailable' },
-            },
-            diagnostics: [],
-          },
-        },
-      },
-    }))
+    setWorkspaceProbeForTest(REPO_ID, filesystemWorkspaceProbe())
 
     const { container } = render(<RepoView workspaceId={REPO_ID} routeView={{ kind: 'dashboard', repoId: REPO_ID }} />)
 
@@ -574,7 +561,11 @@ describe('RepoView workspace navigation', () => {
     const onOpenRepoRoot = vi.fn()
 
     const { container } = render(
-      <RepoView workspaceId={REPO_ID} routeView={{ kind: 'dashboard', repoId: REPO_ID }} onOpenRepoRoot={onOpenRepoRoot} />,
+      <RepoView
+        workspaceId={REPO_ID}
+        routeView={{ kind: 'dashboard', repoId: REPO_ID }}
+        onOpenRepoRoot={onOpenRepoRoot}
+      />,
     )
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
@@ -589,7 +580,9 @@ describe('RepoView workspace navigation', () => {
   test('compact new worktree page shows the workspace pane with compact page chrome', () => {
     responsiveMocks.mode = 'compact'
 
-    const { container } = render(<RepoView workspaceId={REPO_ID} routeView={{ kind: 'newWorktree', repoId: REPO_ID }} />)
+    const { container } = render(
+      <RepoView workspaceId={REPO_ID} routeView={{ kind: 'newWorktree', repoId: REPO_ID }} />,
+    )
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
     expect(container.querySelector<HTMLElement>('[data-testid="create-worktree-page"]')?.dataset.compact).toBe('true')
@@ -1300,19 +1293,24 @@ function domRect({ left, top, width, height }: { left: number; top: number; widt
 function setReadModelLoading(repoId: string) {
   const repo = useWorkspacesStore.getState().workspaces[repoId]
   if (!repo) throw new Error(`missing repo ${repoId}`)
+  if (repo.capability.kind !== 'git') throw new Error(`expected Git repo ${repoId}`)
+  const dataLoads = {
+    ...repo.capability.git.dataLoads,
+    repoReadModel: {
+      ...repo.capability.git.dataLoads.repoReadModel,
+      phase: 'loading' as const,
+      loadedAt: null,
+      error: null,
+      stale: false,
+    },
+  }
   useWorkspacesStore.setState({
     workspaces: {
       [repoId]: {
         ...repo,
-        dataLoads: {
-          ...repo.dataLoads,
-          repoReadModel: {
-            ...repo.dataLoads.repoReadModel,
-            phase: 'loading' as const,
-            loadedAt: null,
-            error: null,
-            stale: false,
-          },
+        capability: {
+          ...repo.capability,
+          git: { ...repo.capability.git, dataLoads },
         },
       },
     },

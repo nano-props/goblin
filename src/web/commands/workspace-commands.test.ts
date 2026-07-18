@@ -60,7 +60,7 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
     const branch = repo
       ? readRepoBranchSnapshotQueryProjection(repo)?.branches.find((candidate) => candidate.name === options.branchName)
       : null
-    if (repo?.workspaceProbe.status === 'ready' && branch?.worktree) {
+    if (repo?.capability.probe.status === 'ready' && branch?.worktree) {
       return {
         kind: 'git-worktree',
         workspacePaneRoute: options.workspacePaneRoute,
@@ -70,14 +70,14 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
           workspaceRuntimeId: repo.workspaceRuntimeId,
           rootPath: branch.worktree.path,
           head: { kind: 'branch', branchName: options.branchName },
-          capabilities: repo.workspaceProbe.capabilities,
+          capabilities: repo.capability.probe.capabilities,
         },
       }
     }
     return { kind: 'git-branch', branchName: options.branchName, workspacePaneRoute: options.workspacePaneRoute }
   }
   const repo = options.workspaceId ? useWorkspacesStore.getState().workspaces[options.workspaceId] : null
-  if (!repo || repo.workspaceProbe.status !== 'ready') throw new Error('expected ready workspace command fixture')
+  if (!repo || repo.capability.probe.status !== 'ready') throw new Error('expected ready workspace command fixture')
   return {
     kind: 'workspace-root',
     workspacePaneRoute: options.workspacePaneRoute,
@@ -86,7 +86,7 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
       workspaceId: repo.id,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       rootPath: repo.id,
-      capabilities: repo.workspaceProbe.capabilities,
+      capabilities: repo.capability.probe.capabilities,
     },
   }
 }

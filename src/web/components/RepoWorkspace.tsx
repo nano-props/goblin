@@ -31,7 +31,7 @@ import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { useWorkspacePaneRouteController } from '#/web/components/repo-workspace/workspace-pane-route-controller.ts'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { isRepoUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
-import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { GitWorkspaceProjection, WorkspaceCapabilityState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { FiletreeTab } from '#/web/components/repo-workspace/panels.tsx'
@@ -41,7 +41,7 @@ import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '
 import { WorkspacePaneTargetToolbar } from '#/web/components/workspace-pane/WorkspacePaneTargetToolbar.tsx'
 import { WorkspaceDirectoryStatus } from '#/web/components/repo-workspace/WorkspaceDirectoryStatus.tsx'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
-import { workspaceGitUnavailable, type WorkspaceReadyProbeState } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceReadyProbeState } from '#/shared/workspace-runtime.ts'
 import { gitHead, type GitHead } from '#/shared/git-head.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { StatusList } from '#/web/components/StatusList.tsx'
@@ -64,14 +64,20 @@ interface Props {
 
 // Keep this equality in sync with fields read by RepoWorkspace children.
 type RepoWorkspaceRepoShell = Omit<RepoWorkspaceRepo, 'branchModel' | 'branchAction'> & {
-  operations: Pick<WorkspaceState['operations'], 'branchAction'>
-  workspaceProbe: WorkspaceState['workspaceProbe']
+  operations: Pick<GitWorkspaceProjection['operations'], 'branchAction'>
+  probe: WorkspaceReadyProbeState
 }
 
-function repoWorkspaceRepoShellEqual(
-  a: RepoWorkspaceRepoShell | undefined,
-  b: RepoWorkspaceRepoShell | undefined,
-): boolean {
+interface WorkspacePaneShell {
+  id: string
+  workspaceRuntimeId: string
+  ui: Pick<WorkspaceState['ui'], 'preferredWorkspacePaneTabByTarget'> & { currentBranchName: string | null }
+  unavailable: boolean
+  capability: WorkspaceCapabilityState
+  admission: WorkspaceState['admission']
+}
+
+function workspacePaneShellEqual(a: WorkspacePaneShell | undefined, b: WorkspacePaneShell | undefined): boolean {
   return (
     a === b ||
     (!!a &&
@@ -81,14 +87,8 @@ function repoWorkspaceRepoShellEqual(
       a.ui.currentBranchName === b.ui.currentBranchName &&
       a.ui.preferredWorkspacePaneTabByTarget === b.ui.preferredWorkspacePaneTabByTarget &&
       a.unavailable === b.unavailable &&
-      a.workspaceProbe === b.workspaceProbe &&
-      a.operations.branchAction === b.operations.branchAction &&
-      a.remote.lifecycle === b.remote.lifecycle &&
-      a.remote.hasRemotes === b.remote.hasRemotes &&
-      a.remote.hasBrowserRemote === b.remote.hasBrowserRemote &&
-      a.remote.hasGitHubRemote === b.remote.hasGitHubRemote &&
-      a.remote.browserRemoteProvider === b.remote.browserRemoteProvider &&
-      a.remote.remoteProviders === b.remote.remoteProviders)
+      a.capability === b.capability &&
+      a.admission === b.admission)
   )
 }
 
@@ -115,22 +115,12 @@ export function RepoWorkspace({
               preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
             },
             unavailable: isRepoUnavailable(repo),
-            workspaceProbe: repo.workspaceProbe,
-            operations: {
-              branchAction: repo.operations.branchAction,
-            },
-            remote: {
-              lifecycle: repo.remote.lifecycle,
-              hasRemotes: repo.remote.hasRemotes,
-              hasBrowserRemote: repo.remote.hasBrowserRemote,
-              hasGitHubRemote: repo.remote.hasGitHubRemote,
-              browserRemoteProvider: repo.remote.browserRemoteProvider,
-              remoteProviders: repo.remote.remoteProviders,
-            },
+            capability: repo.capability,
+            admission: repo.admission,
           }
         : undefined
     },
-    repoWorkspaceRepoShellEqual,
+    workspacePaneShellEqual,
   )
   if (!repoShell) return null
 
@@ -147,21 +137,22 @@ export function RepoWorkspace({
 }
 
 function RepoWorkspaceLoaded(props: {
-  repoShell: RepoWorkspaceRepoShell
+  repoShell: WorkspacePaneShell
   workspacePaneRouteContext: RepoWorkspacePaneRouteContext
   workspacePaneId: string
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset: boolean
   onBackToBranchNavigator?: () => void
 }) {
-  if (props.repoShell.workspaceProbe.status !== 'ready') {
+  if (props.repoShell.capability.kind === 'probing' || props.repoShell.capability.kind === 'unavailable') {
     return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={props.toolbarTrafficLightOffset} />
   }
-  if (props.workspacePaneRouteContext.kind === 'git-worktree') {
+  if (props.workspacePaneRouteContext.kind === 'git-worktree' && props.repoShell.capability.kind === 'git') {
+    const repo = gitRepoWorkspaceShell(props.repoShell, props.repoShell.capability)
     return (
       <GitWorktreeFilesystemPane
-        repo={props.repoShell}
-        workspaceProbe={props.repoShell.workspaceProbe}
+        repo={repo}
+        workspaceProbe={props.repoShell.capability.probe}
         worktreePath={props.workspacePaneRouteContext.worktreePath}
         route={props.workspacePaneRouteContext.route}
         workspacePaneId={props.workspacePaneId}
@@ -173,17 +164,14 @@ function RepoWorkspaceLoaded(props: {
   // The selected pane target owns presentation. Capability discovery may
   // expose Git navigation, but it must not replace an already-open
   // filesystem workspace with an unrelated branch surface.
-  if (
-    props.workspacePaneRouteContext.kind === 'workspace-root' ||
-    workspaceGitUnavailable(props.repoShell.workspaceProbe)
-  ) {
+  if (props.workspacePaneRouteContext.kind === 'workspace-root' || props.repoShell.capability.kind === 'filesystem') {
     return (
       <WorkspaceRootPane
         repo={{
           id: props.repoShell.id,
           workspaceRuntimeId: props.repoShell.workspaceRuntimeId,
           ui: props.repoShell.ui,
-          workspaceProbe: props.repoShell.workspaceProbe,
+          probe: props.repoShell.capability.probe,
         }}
         workspacePaneId={props.workspacePaneId}
         toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
@@ -191,7 +179,33 @@ function RepoWorkspaceLoaded(props: {
       />
     )
   }
-  return <GitRepoWorkspaceLoaded {...props} workspacePaneRouteContext={props.workspacePaneRouteContext} />
+  if (props.repoShell.capability.kind !== 'git') {
+    return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={props.toolbarTrafficLightOffset} />
+  }
+  return (
+    <GitRepoWorkspaceLoaded
+      {...props}
+      repoShell={gitRepoWorkspaceShell(props.repoShell, props.repoShell.capability)}
+      workspacePaneRouteContext={props.workspacePaneRouteContext}
+    />
+  )
+}
+
+function gitRepoWorkspaceShell(
+  workspace: WorkspacePaneShell,
+  capability: Extract<WorkspaceCapabilityState, { kind: 'git' }>,
+): RepoWorkspaceRepoShell {
+  const git = capability.git
+  return {
+    id: workspace.id,
+    workspaceRuntimeId: workspace.workspaceRuntimeId,
+    ui: workspace.ui,
+    unavailable: workspace.unavailable,
+    probe: capability.probe,
+    operations: { branchAction: git.operations.branchAction },
+    remote: git.remote,
+    remoteLifecycle: workspace.admission.kind === 'remote' ? workspace.admission.lifecycle : null,
+  }
 }
 
 function GitWorktreeFilesystemPane({
@@ -357,7 +371,11 @@ function GitRepoWorkspaceLoaded({
           messageKey={statusErrorKey}
           retrying={statusReadModel.isFetching}
           onRetry={() => {
-            void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, repoShell.id, repoShell.workspaceRuntimeId)
+            void refreshRepoWorktreeStatus(
+              { get: useWorkspacesStore.getState },
+              repoShell.id,
+              repoShell.workspaceRuntimeId,
+            )
           }}
         />
       </section>
@@ -385,7 +403,7 @@ function GitRepoWorkspaceLoaded({
   const presentationRepo: RepoWorkspaceRepo = {
     ...projectBranchActionRepo(repoShell, projection.operations.operations, currentBranchName),
     branchModel: presentationBranchModel,
-    workspaceProbe: repoShell.workspaceProbe,
+    probe: repoShell.probe,
   }
   const statusError = statusReadModel.error
   const statusErrorKey = statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
@@ -435,7 +453,7 @@ function WorkspaceRootPane({
   toolbarTrafficLightOffset,
   onBackToNavigator,
 }: {
-  repo: Pick<RepoWorkspaceRepoShell, 'id' | 'workspaceRuntimeId' | 'ui'> & { workspaceProbe: WorkspaceReadyProbeState }
+  repo: Pick<RepoWorkspaceRepoShell, 'id' | 'workspaceRuntimeId' | 'ui'> & { probe: WorkspaceReadyProbeState }
   workspacePaneId: string
   toolbarTrafficLightOffset: boolean
   onBackToNavigator?: () => void
@@ -444,7 +462,7 @@ function WorkspaceRootPane({
   const model = useWorkspaceRootTabModel(repo)
   const target = { kind: 'workspace-root' as const, repoRoot: repo.id }
   const runtimeTarget = runtimeWorkspacePaneTarget(target, repo.workspaceRuntimeId)
-  const terminalAvailable = repo.workspaceProbe.capabilities.terminal.available
+  const terminalAvailable = repo.probe.capabilities.terminal.available
   const activePanel = model.selection?.tab === 'terminal' && !terminalAvailable ? null : (model.selection?.tab ?? null)
   const overviewReadModel = useWorkspaceDirectoryOverview(repo.id, repo.workspaceRuntimeId, activePanel === 'status')
   const selectedTerminalSessionId =
@@ -459,7 +477,7 @@ function WorkspaceRootPane({
           workspaceId: repo.id,
           workspaceRuntimeId: repo.workspaceRuntimeId,
           rootPath: repo.id,
-          capabilities: repo.workspaceProbe.capabilities,
+          capabilities: repo.probe.capabilities,
         }}
         model={model}
         workspacePaneId={workspacePaneId}
@@ -489,7 +507,7 @@ function WorkspaceRootPane({
               workspaceId: repo.id,
               workspaceRuntimeId: repo.workspaceRuntimeId,
               rootPath: repo.id,
-              capabilities: repo.workspaceProbe.capabilities,
+              capabilities: repo.probe.capabilities,
             }}
           />
         </WorkspacePanePanelFrame>

@@ -17,15 +17,22 @@
 //     (Zustand) — they do not mock the store; they drive it. Tests
 //     that need a fresh store call `resetWorkspacesStore` in `beforeEach`.
 
-import type { WorkspaceState, RepoBranchState } from '#/web/stores/workspaces/types.ts'
+import type {
+  GitRemoteProjection,
+  GitWorkspaceProjection,
+  WorkspaceState,
+  RepoBranchState,
+} from '#/web/stores/workspaces/types.ts'
 import { readRepoBranchQueryProjection, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { stripBranchWorktreeMetadata } from '#/web/stores/workspaces/worktree-state.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { disposeAllRepoOperationSchedulers } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
+import type { RemoteRepoConnectionLifecycle, RemoteRepoRuntimeLifecycle } from '#/shared/remote-repo.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { resetAcceptedRepoProjectionReadModelState } from '#/web/stores/workspaces/projection-read-model-effects.ts'
 import { setRepoProjectionQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-data-query.ts'
@@ -49,7 +56,6 @@ import { workspacePaneTabEntryIdentity, workspacePaneTabsWithRuntimeTab } from '
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
-import type { RemoteRepoRuntimeLifecycle } from '#/shared/remote-repo.ts'
 import type {
   TerminalAttachResult,
   TerminalRestartResult,
@@ -80,7 +86,11 @@ import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 export type IpcTestHandler = (input: any) => unknown
 export type RepoPresentationForTest = WorkspaceState & {
-  branchAction: WorkspaceState['operations']['branchAction']
+  operations: GitWorkspaceProjection['operations']
+  remote: GitRemoteProjection
+  remoteLifecycle: Extract<WorkspaceState['admission'], { kind: 'remote' }>['lifecycle']
+  ui: WorkspaceState['ui'] & GitWorkspaceProjection['ui']
+  branchAction: GitWorkspaceProjection['operations']['branchAction']
   branchModel: RepoBranchReadModelData
 }
 
@@ -88,19 +98,39 @@ export function repoPresentationForTest(
   repo: WorkspaceState,
   branchReadModel: RepoBranchReadModelData,
 ): RepoPresentationForTest {
+  if (repo.capability.kind !== 'git') throw new Error(`test repo is not Git-capable: ${repo.id}`)
+  const git = repo.capability.git
   return {
     ...repo,
-    branchAction: repo.operations.branchAction,
+    operations: git.operations,
+    remote: git.remote,
+    remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,
+    ui: { ...repo.ui, ...git.ui },
+    branchAction: git.operations.branchAction,
     branchModel: branchReadModel,
   }
 }
 
+export function createGitRepoPresentationForTest(
+  repo: WorkspaceState,
+  branchReadModel: RepoBranchReadModelData,
+): RepoPresentationForTest {
+  acceptWorkspaceProbeState(repo, createGitWorkspaceProbeForTest(repo.name))
+  return repoPresentationForTest(repo, branchReadModel)
+}
+
 export function repoPresentationFromQueryForTest(repo: WorkspaceState): RepoPresentationForTest {
+  if (repo.capability.kind !== 'git') throw new Error(`test repo is not Git-capable: ${repo.id}`)
+  const git = repo.capability.git
   const readModel = readRepoBranchQueryProjection(repo)
   if (!readModel) throw new Error(`missing branch read model for test repo: ${repo.id}`)
   return {
     ...repo,
-    branchAction: repo.operations.branchAction,
+    operations: git.operations,
+    remote: git.remote,
+    remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,
+    ui: { ...repo.ui, ...git.ui },
+    branchAction: git.operations.branchAction,
     branchModel: readModel,
   }
 }
@@ -111,10 +141,15 @@ export function seedRepoShellForTest(options: {
   currentBranchName?: string | null
   preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType | null>
   workspaceRuntimeId?: string
-  remote?: Partial<WorkspaceState['remote']>
+  remote?: Partial<GitRemoteProjection>
+  remoteLifecycle?: RemoteRepoConnectionLifecycle | null
   workspaceProbe?: WorkspaceProbeState
 }): WorkspaceState {
-  const base = emptyWorkspace(options.id, options.name ?? 'repo', options.workspaceRuntimeId ?? createOpaqueId('repo-runtime'))
+  const base = emptyWorkspace(
+    options.id,
+    options.name ?? 'repo',
+    options.workspaceRuntimeId ?? createOpaqueId('repo-runtime'),
+  )
   const repo: WorkspaceState = {
     ...base,
     ui: {
@@ -122,11 +157,13 @@ export function seedRepoShellForTest(options: {
       preferredWorkspacePaneTabByTarget:
         options.preferredWorkspacePaneTabByTarget ?? base.ui.preferredWorkspacePaneTabByTarget,
     },
-    remote: {
-      ...base.remote,
-      ...options.remote,
-    },
-    workspaceProbe: options.workspaceProbe ?? base.workspaceProbe,
+  }
+  acceptWorkspaceProbeState(repo, options.workspaceProbe ?? base.capability.probe)
+  if (repo.capability.kind === 'git' && options.remote) {
+    repo.capability.git.remote = { ...repo.capability.git.remote, ...options.remote }
+  }
+  if (options.remoteLifecycle !== undefined && repo.admission.kind === 'remote') {
+    repo.admission.lifecycle = options.remoteLifecycle
   }
   useWorkspacesStore.setState({
     workspaces: { [options.id]: repo },
@@ -141,6 +178,16 @@ export function seedRepoShellForTest(options: {
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
   })
   return repo
+}
+
+export function setWorkspaceProbeForTest(workspaceId: string, workspaceProbe: WorkspaceProbeState): void {
+  useWorkspacesStore.setState((state) => {
+    const workspace = state.workspaces[workspaceId]
+    if (!workspace) throw new Error(`Missing workspace fixture: ${workspaceId}`)
+    const next = { ...workspace }
+    acceptWorkspaceProbeState(next, workspaceProbe)
+    return { workspaces: { ...state.workspaces, [workspaceId]: next } }
+  })
 }
 
 interface TerminalClientTestOutputs {
@@ -212,6 +259,19 @@ export function createRepoBranch(name: string, options: Partial<RepoBranchState>
   return stripBranchWorktreeMetadata([createBranchSnapshot(name, options)])[0]!
 }
 
+export function createGitWorkspaceProbeForTest(name = 'workspace'): WorkspaceProbeState {
+  return {
+    status: 'ready',
+    name,
+    capabilities: {
+      files: { read: true, write: true },
+      terminal: { available: true },
+      git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+    },
+    diagnostics: [],
+  }
+}
+
 export function createPullRequest(number: number, options: Partial<PullRequestInfo> = {}): PullRequestInfo {
   return {
     number,
@@ -257,16 +317,20 @@ export function installWorkspacePaneTabsTestBridge(
     onEffectIntent?: ClientBridge['onEffectIntent']
   } = {},
 ): {
-  addRuntimeTab: (input: TestWorkspacePaneRuntimeTabInput & {
-    insertAfterIdentity?: string | null
-  }) => void
+  addRuntimeTab: (
+    input: TestWorkspacePaneRuntimeTabInput & {
+      insertAfterIdentity?: string | null
+    },
+  ) => void
   removeRuntimeTab: (input: TestWorkspacePaneRuntimeTabInput) => void
 } {
   let serverEntries: WorkspacePaneTabsEntry[] = []
   let serverRevision = 0
   const targetKey = (input: WorkspacePaneTabsTarget) => workspacePaneTabsTargetIdentityKey(input)
   const entryTarget = (entry: WorkspacePaneTabsEntry) => workspacePaneTabsTargetFromRuntime(entry.target)
-  const serverTabsForTarget = (input: WorkspacePaneTabsTarget & { workspaceRuntimeId: string }): WorkspacePaneTabEntry[] => {
+  const serverTabsForTarget = (
+    input: WorkspacePaneTabsTarget & { workspaceRuntimeId: string },
+  ): WorkspacePaneTabEntry[] => {
     const entry = serverEntries.find((candidate) => {
       const target = entryTarget(candidate)
       return target && targetKey(target) === targetKey(input)
@@ -972,7 +1036,8 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         return normalizeProjection(await call('repo.projection', payload))
       }
       const openWorkspaceRuntime = async (payload: unknown) => {
-        const workspaceId = typeof payload === 'object' && payload && 'workspaceId' in payload ? payload.workspaceId : null
+        const workspaceId =
+          typeof payload === 'object' && payload && 'workspaceId' in payload ? payload.workspaceId : null
         const workspaceInput =
           typeof payload === 'object' && payload && 'workspaceInput' in payload ? payload.workspaceInput : null
         const clientId = typeof payload === 'object' && payload && 'clientId' in payload ? payload.clientId : null
@@ -991,7 +1056,10 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
               reason: probe.message ?? 'error.workspace-git-unavailable',
             }
           }
-          const state = workspaceRuntimeState.get(probe.root) ?? { currentWorkspaceRuntimeId: null, members: new Set<string>() }
+          const state = workspaceRuntimeState.get(probe.root) ?? {
+            currentWorkspaceRuntimeId: null,
+            members: new Set<string>(),
+          }
           if (!state.currentWorkspaceRuntimeId) state.currentWorkspaceRuntimeId = createOpaqueId('workspace-runtime')
           state.members.add(clientId)
           state.workspaceProbe = {
@@ -1031,7 +1099,8 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         return { ok: true as const, workspaceRuntimeId }
       }
       const closeWorkspaceRuntime = (payload: unknown) => {
-        const workspaceId = typeof payload === 'object' && payload && 'workspaceId' in payload ? payload.workspaceId : null
+        const workspaceId =
+          typeof payload === 'object' && payload && 'workspaceId' in payload ? payload.workspaceId : null
         const workspaceRuntimeId =
           typeof payload === 'object' && payload && 'workspaceRuntimeId' in payload ? payload.workspaceRuntimeId : null
         const clientId = typeof payload === 'object' && payload && 'clientId' in payload ? payload.clientId : null
@@ -1039,7 +1108,8 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           throw new Error('runtime-close requires workspaceId, workspaceRuntimeId, and clientId')
         }
         const state = workspaceRuntimeState.get(workspaceId)
-        const released = !!state && state.currentWorkspaceRuntimeId === workspaceRuntimeId && state.members.delete(clientId)
+        const released =
+          !!state && state.currentWorkspaceRuntimeId === workspaceRuntimeId && state.members.delete(clientId)
         const runtimeClosed = released && !!state && state.members.size === 0
         if (runtimeClosed) state.currentWorkspaceRuntimeId = null
         return { ok: true as const, released, runtimeClosed }
@@ -1254,8 +1324,9 @@ export function seedRepoWithReadModelForTest(options: {
   workspacePaneTabsByBranch?: Record<string, WorkspacePaneTabEntry[]>
   workspaceRuntimeId?: string
   status?: WorktreeStatus[]
-  remote?: Partial<WorkspaceState['remote']>
-  workspaceProbe?: WorkspaceState['workspaceProbe']
+  remote?: Partial<GitRemoteProjection>
+  remoteLifecycle?: RemoteRepoConnectionLifecycle | null
+  workspaceProbe?: WorkspaceProbeState
 }): WorkspaceState {
   const branchesWithSnapshotWorktreeMetadata = options.branchSnapshots ?? options.branches ?? []
   const branches = options.branches ?? stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
@@ -1282,6 +1353,7 @@ export function seedRepoWithReadModelForTest(options: {
     currentBranchName,
     ...(preferredWorkspacePaneTabByTarget ? { preferredWorkspacePaneTabByTarget } : {}),
     remote: options.remote,
+    remoteLifecycle: options.remoteLifecycle,
     workspaceProbe: options.workspaceProbe ?? {
       status: 'ready',
       name: options.name ?? 'repo',

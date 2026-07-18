@@ -53,7 +53,8 @@ export function useNetworkReconnect(): void {
       const repos = get().workspaces
       for (const repo of Object.values(repos)) {
         if (!isRemoteRepoId(repo.id)) continue
-        const lifecycle = repo.remote.lifecycle
+        if (repo.admission.kind !== 'remote') continue
+        const lifecycle = repo.admission.lifecycle
         // `ready` is the success terminus — no re-probe needed.
         // `failed` and `connecting` repos both get a fresh probe.
         // For `connecting`, the server runtime's latest-wins abort

@@ -1,5 +1,5 @@
 import type { WorkspaceRuntimeEntry, WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
-import { updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
+import { acceptWorkspaceProbeState, updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 
 export function acceptWorkspaceProbeProjection(
@@ -11,7 +11,7 @@ export function acceptWorkspaceProbeProjection(
   if (!current || current.workspaceRuntimeId !== entry.workspaceRuntimeId) return false
   let accepted = false
   updateIfFresh(set, entry.workspaceId, entry.workspaceRuntimeId, (repo) => {
-    repo.workspaceProbe = entry.workspaceProbe
+    acceptWorkspaceProbeState(repo, entry.workspaceProbe)
     accepted = true
   })
   return accepted

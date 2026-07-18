@@ -9,7 +9,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { createRepoBranch, repoPresentationForTest } from '#/web/test-utils/bridge.ts'
+import { createGitRepoPresentationForTest, createRepoBranch } from '#/web/test-utils/bridge.ts'
 
 // Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
 // that delegates to the real module so `i18next.use(initReactI18next).
@@ -124,7 +124,7 @@ describe('BranchList', () => {
 })
 
 function branchListRepo(branches: ReturnType<typeof createRepoBranch>[], currentBranch: string) {
-  return repoPresentationForTest(emptyWorkspace('/tmp/repo', 'repo', 'repo-runtime-test'), {
+  return createGitRepoPresentationForTest(emptyWorkspace('/tmp/repo', 'repo', 'repo-runtime-test'), {
     branches,
     currentBranch,
     status: [],

@@ -108,21 +108,20 @@ describe('client effect intent handlers', () => {
     seedRepoWithReadModelForTest({ id: REPO_ID, branches: [createRepoBranch('main')] })
     useWorkspacesStore.setState((state) => {
       const repo = state.workspaces[REPO_ID]
-      if (!repo) return state
+      if (repo?.capability.kind !== 'git') return state
+      const branchAction = {
+        ...repo.capability.git.operations.branchAction,
+        phase: 'running' as const,
+        reason: 'branch:pull' as const,
+        target: 'main',
+      }
+      const operations = { ...repo.capability.git.operations, branchAction }
       return {
         workspaces: {
           ...state.workspaces,
           [REPO_ID]: {
             ...repo,
-            operations: {
-              ...repo.operations,
-              branchAction: {
-                ...repo.operations.branchAction,
-                phase: 'running',
-                reason: 'branch:pull',
-                target: 'main',
-              },
-            },
+            capability: { ...repo.capability, git: { ...repo.capability.git, operations } },
           },
         },
       }

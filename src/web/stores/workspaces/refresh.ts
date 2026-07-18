@@ -1,5 +1,5 @@
 import { appendRepoEvent, errorEvent } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
+import { acceptWorkspaceProbeState, updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
 import { isRepoUnavailableReason, markRepoUnavailable } from '#/web/stores/workspaces/availability.ts'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { resolveActionWorkspaceRuntimeId } from '#/web/stores/workspaces/refresh-state.ts'
@@ -12,6 +12,7 @@ import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-stat
 import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import { refreshWorkspace } from '#/web/workspace-client.ts'
+import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
 
 export interface RepoRefreshStoreAccess {
   set: WorkspacesSet
@@ -24,7 +25,8 @@ async function runRepoProjectionReadModelRefresh(
   workspaceRuntimeId: string,
 ): Promise<void> {
   updateIfFresh(store.set, id, workspaceRuntimeId, (r) => {
-    startDataLoad(r.dataLoads.repoReadModel, {
+    if (!isGitWorkspace(r)) return
+    startDataLoad(gitWorkspaceProjection(r).dataLoads.repoReadModel, {
       hasData: (readRepoBranchSnapshotQueryProjection(r)?.branches.length ?? 0) > 0,
     })
   })
@@ -51,16 +53,19 @@ async function runRepoProjectionReadModelRefresh(
     onError: (message, ctx) => {
       const ownsReadModelLoad = ctx.ownsTarget('repoReadModel')
       updateIfFresh(store.set, id, workspaceRuntimeId, (r) => {
+        if (!isGitWorkspace(r)) return
+        const git = gitWorkspaceProjection(r)
         if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
-        if (ownsReadModelLoad) finishDataLoadError(r.dataLoads.repoReadModel, message)
-        r.events = appendRepoEvent(r.events, errorEvent(message))
+        if (ownsReadModelLoad) finishDataLoadError(git.dataLoads.repoReadModel, message)
+        git.events = appendRepoEvent(git.events, errorEvent(message))
       })
     },
     onStale: (ctx) => {
       const ownsReadModelLoad = ctx.ownsTarget('repoReadModel')
       if (!ownsReadModelLoad) return
       updateIfFresh(store.set, id, workspaceRuntimeId, (r) => {
-        if (ownsReadModelLoad) cancelDataLoad(r.dataLoads.repoReadModel)
+        if (!isGitWorkspace(r)) return
+        if (ownsReadModelLoad) cancelDataLoad(gitWorkspaceProjection(r).dataLoads.repoReadModel)
       })
     },
   })
@@ -72,7 +77,7 @@ export async function requestRepoProjectionReadModelRefresh(
   options?: { workspaceRuntimeId?: string },
 ): Promise<void> {
   const resolved = resolveActionWorkspaceRuntimeId(store.get, id, options?.workspaceRuntimeId)
-  if (!resolved) return
+  if (!resolved || !isGitWorkspace(resolved.repo)) return
   const { workspaceRuntimeId } = resolved
   await Promise.all([
     runRepoProjectionReadModelRefresh(store, id, workspaceRuntimeId),
@@ -91,7 +96,7 @@ export async function runManualRepoSync(
   options?: { workspaceRuntimeId?: string },
 ): Promise<void> {
   const resolved = resolveActionWorkspaceRuntimeId(store.get, id, options?.workspaceRuntimeId)
-  if (!resolved) return
+  if (!resolved || !isGitWorkspace(resolved.repo)) return
   const { workspaceRuntimeId } = resolved
   const { runManualSyncPipeline } = createRefreshSyncHelpers(store.set, store.get, {
     refreshProjectionReadModel: async (repoId, nextWorkspaceRuntimeId) => {
@@ -114,7 +119,7 @@ export async function runManualRepoSync(
         throw new Error(diagnostic ?? 'error.failed-read-repo')
       }
       updateIfFresh(store.set, id, workspaceRuntimeId, (repo) => {
-        repo.workspaceProbe = refreshed.probe
+        acceptWorkspaceProbeState(repo, refreshed.probe)
       })
       if (
         refreshed.probe.status === 'ready' &&
@@ -126,7 +131,9 @@ export async function runManualRepoSync(
     },
     onError: (message) => {
       updateIfFresh(store.set, id, workspaceRuntimeId, (repo) => {
-        repo.events = appendRepoEvent(repo.events, errorEvent(message))
+        if (!isGitWorkspace(repo)) return
+        const git = gitWorkspaceProjection(repo)
+        git.events = appendRepoEvent(git.events, errorEvent(message))
       })
     },
   })

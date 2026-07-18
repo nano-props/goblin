@@ -27,7 +27,6 @@ import {
 
 interface ClientWorkspaceRepoProjection {
   id: string
-  remote: WorkspacesStore['workspaces'][string]['remote']
   ui: Pick<WorkspacesStore['workspaces'][string]['ui'], 'preferredWorkspacePaneTabByTarget'>
   branches: RepoBranchSnapshotData['branches']
 }
@@ -98,13 +97,11 @@ function clientWorkspaceRepoProjections(
     const repo = workspaces[id]
     if (!repo) continue
     if (repo.session.projectionState === 'stub') continue
-    const branchModel = readRepoBranchSnapshotQueryProjection(repo)
-    const readyWithoutGit =
-      repo.workspaceProbe.status === 'ready' && repo.workspaceProbe.capabilities.git.status === 'unavailable'
+    const branchModel = repo.capability.kind === 'git' ? readRepoBranchSnapshotQueryProjection(repo) : null
+    const readyWithoutGit = repo.capability.kind === 'filesystem'
     if (!branchModel && !readyWithoutGit) continue
     projectedRepos[id] = {
       id: repo.id,
-      remote: repo.remote,
       ui: {
         preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
       },

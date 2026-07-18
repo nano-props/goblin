@@ -47,7 +47,7 @@ const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
 export interface WorkspacePanePanelRenderInput {
   type: WorkspacePaneTabType
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'workspaceRuntimeId' | 'branchModel' | 'ui' | 'workspaceProbe'> & {
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'workspaceRuntimeId' | 'branchModel' | 'ui' | 'probe'> & {
     branchModel: RepoWorkspaceRepo['branchModel']
   }
   detail: CurrentRepoWorkspacePresentation
@@ -151,7 +151,7 @@ function ChangesWorkspacePanePanel({ detail, workspacePaneId, panelLabel }: Work
 function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: WorkspacePanePanelProps) {
   const branch = detail.branch
   const worktreePath = branch?.worktree?.path
-  const capabilities = repo.workspaceProbe.status === 'ready' ? repo.workspaceProbe.capabilities : null
+  const capabilities = repo.probe.capabilities
   if (!worktreePath || !capabilities) {
     return (
       <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} {...panelLabel}>

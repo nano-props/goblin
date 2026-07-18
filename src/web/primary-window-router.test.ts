@@ -32,6 +32,7 @@ import {
 } from '#/web/primary-window-router.tsx'
 import { repoSlugFromId, worktreeSlugFromPath } from '#/web/repo-route-slugs.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
   authenticatedAppShellMode,
   primaryWindowLayoutRouteCallbacks,
@@ -245,7 +246,7 @@ describe('repo route capability admission', () => {
 function seedRepoCapability(repoId: string, gitStatus: 'available' | 'unavailable') {
   resetWorkspacesStore()
   const repo = emptyWorkspace(repoId, 'workspace', 'runtime-router-test')
-  repo.workspaceProbe = {
+  acceptWorkspaceProbeState(repo, {
     status: 'ready',
     name: 'workspace',
     capabilities: {
@@ -257,8 +258,12 @@ function seedRepoCapability(repoId: string, gitStatus: 'available' | 'unavailabl
           : { status: 'unavailable' },
     },
     diagnostics: [],
-  }
-  useWorkspacesStore.setState({ workspaces: { [repoId]: repo }, workspaceOrder: [repoId], workspaceMembershipReady: true })
+  })
+  useWorkspacesStore.setState({
+    workspaces: { [repoId]: repo },
+    workspaceOrder: [repoId],
+    workspaceMembershipReady: true,
+  })
 }
 
 function navigateBrowser(pathname: string) {

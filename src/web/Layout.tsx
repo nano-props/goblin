@@ -154,7 +154,9 @@ function AuthenticatedWorkspaceShell() {
   const currentBranchName = routeContext?.kind === 'branch' ? (routeContext.branchName ?? null) : null
   const currentWorkspacePaneRoute = routeContext?.kind === 'branch' ? (routeContext.workspacePaneRoute ?? null) : null
   const commandCapabilities =
-    commandRepo?.workspaceProbe.status === 'ready' ? commandRepo.workspaceProbe.capabilities : null
+    commandRepo?.capability.kind === 'git' || commandRepo?.capability.kind === 'filesystem'
+      ? commandRepo.capability.probe.capabilities
+      : null
   const commandWorkspace = commandRepo ? parseCanonicalWorkspaceLocator(commandRepo.id) : null
   const commandWorktreePath = routeContext?.kind === 'worktree' ? routeContext.worktreePath : null
   const commandBranch =
@@ -225,7 +227,14 @@ function AuthenticatedWorkspaceShell() {
         commitWorkspaceNavigation,
         routeNavigation,
       }),
-    [closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation, workspaceOrder, routeNavigation, hydratedRouteRepoId],
+    [
+      closeWorkspace,
+      peekWorkspaceNavigation,
+      commitWorkspaceNavigation,
+      workspaceOrder,
+      routeNavigation,
+      hydratedRouteRepoId,
+    ],
   )
 
   const workspaceDrop = useWorkspaceDrop({ blocked: modalOpen })

@@ -5,7 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
-import { resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
@@ -107,6 +107,12 @@ describe('RepoActivityControl component', () => {
   test('shows the last-sync time in the refresh button tooltip when fetch has loaded', async () => {
     const loadedAt = Date.now() - 5_000
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
+    if (repo.capability.kind !== 'git') throw new Error('Expected Git repo fixture')
+    const capability = repo.capability
+    const dataLoads = {
+      ...capability.git.dataLoads,
+      fetch: { ...capability.git.dataLoads.fetch, loadedAt },
+    }
     useWorkspacesStore.setState((state) => ({
       workspaces: {
         ...state.workspaces,
@@ -116,9 +122,10 @@ describe('RepoActivityControl component', () => {
           // `dataLoads.fetch.loadedAt` directly; setting the read model
           // requires `projection.source === 'fresh'` which would also
           // work but couples this test to a second code path.
-          dataLoads: {
-            ...repo.dataLoads,
-            fetch: { ...repo.dataLoads.fetch, loadedAt },
+          dataLoads,
+          capability: {
+            ...capability,
+            git: { ...capability.git, dataLoads },
           },
         },
       },
@@ -155,8 +162,8 @@ function renderControl() {
   )
 }
 
-function seedRepoForControl(input: Parameters<typeof seedRepoShellForTest>[0]) {
-  const repo = seedRepoShellForTest(input)
+function seedRepoForControl(input: Parameters<typeof seedRepoWithReadModelForTest>[0]) {
+  const repo = seedRepoWithReadModelForTest(input)
   setRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId, false, { operations: [], loadedAt: 0 })
   return repo
 }

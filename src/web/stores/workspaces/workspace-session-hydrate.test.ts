@@ -83,7 +83,9 @@ describe('repo session hydration', () => {
       },
     )
 
-    expect(useWorkspacesStore.getState().workspaces[REPO_A]?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe('terminal')
+    const restoredWorkspace = useWorkspacesStore.getState().workspaces[REPO_A]
+    expect(restoredWorkspace?.capability.kind).toBe('filesystem')
+    expect(restoredWorkspace?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe('terminal')
     expect(
       useWorkspacesStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[REPO_A],
     ).toBeUndefined()
@@ -142,6 +144,8 @@ describe('repo session hydration', () => {
         },
       },
     )
+
+    expect(useWorkspacesStore.getState().workspaces[REPO_A]?.capability.kind).toBe('git')
 
     expect(useWorkspacesStore.getState().workspaces[REPO_A]?.ui.preferredWorkspacePaneTabByTarget).toEqual({
       [targetKey]: 'history',
@@ -254,7 +258,7 @@ describe('repo session hydration', () => {
       entry: localWorkspaceSessionEntry(REPO_A),
       projectionState: 'stub',
     })
-    expect(repo?.dataLoads.repoReadModel.loadedAt).toBe(savedAt)
+    expect(repo?.capability.kind === 'git' ? repo.capability.git.dataLoads.repoReadModel.loadedAt : null).toBe(savedAt)
   })
 
   test('promotes only the matching existing stub without changing workspace membership', async () => {
@@ -475,7 +479,8 @@ describe('repo session hydration', () => {
     ).toBe(true)
 
     expect(useWorkspacesStore.getState().workspaces[entry.id]?.session.projectionState).toBe('projected')
-    expect(useWorkspacesStore.getState().workspaces[entry.id]?.remote).toMatchObject({
+    expect(useWorkspacesStore.getState().workspaces[entry.id]?.admission).toMatchObject({
+      kind: 'remote',
       lifecycleAttemptId: 5,
       lifecycle: { kind: 'failed', reason: 'unreachable', target },
     })

@@ -21,7 +21,6 @@ import {
 } from '#/web/primary-window-route-navigation.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
-import { workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 
 const rootRoute = createRootRoute()
 
@@ -149,7 +148,7 @@ function RepoRoute() {
   const repoId = repoIdFromSlug(repoSlug)
   const gitUnavailable = useWorkspacesStore((state) => {
     const repo = repoId ? state.workspaces[repoId] : null
-    return workspaceGitUnavailable(repo?.workspaceProbe)
+    return repo?.capability.kind === 'filesystem'
   })
   if (gitUnavailable && (branchMatch || worktreeMatch || newWorktreeMatch)) {
     return <Navigate to="/repo/$repoSlug/dashboard" params={{ repoSlug }} replace />
@@ -262,8 +261,7 @@ export function primaryWindowRouterCallbacks(routeActions: PrimaryWindowRouteNav
     onOpenRepoRoot: (repoId: string) => routeActions.openRepoRoot(repoId),
     onOpenWorkspaceRoot: (workspaceId: string) => routeActions.openWorkspaceRootPane(workspaceId),
     onOpenRepoDashboard: (repoId: string) => routeActions.openRepoDashboard(repoId),
-    onOpenRepoBranch: (repoId: string, branchName: string) =>
-      openWorkspacePaneRoute(routeActions, repoId, branchName),
+    onOpenRepoBranch: (repoId: string, branchName: string) => openWorkspacePaneRoute(routeActions, repoId, branchName),
     onOpenRepoNewWorktree: (repoId: string) => routeActions.openRepoNewWorktree(repoId),
     onCancelRepoNewWorktree: (repoId: string) => routeActions.cancelRepoNewWorktree(repoId),
     onReplaceRepoBranch: (repoId: string, branchName: string) =>

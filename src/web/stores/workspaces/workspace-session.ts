@@ -176,7 +176,7 @@ function applyRestoredPreferredWorkspacePaneTabs(
   const restoredPreferred = state.restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[repoRoot]
   if (!repo || !restoredPreferred) return
   const branchProjection = readRepoBranchSnapshotQueryProjection(repo)?.branches
-  const branches = branchProjection ?? (workspaceGitUnavailable(repo.workspaceProbe) ? [] : null)
+  const branches = branchProjection ?? (repo.capability.kind === 'filesystem' ? [] : null)
   if (!branches) return
   const preferredWorkspacePaneTabByTarget = restoredPreferredWorkspacePaneTabByTarget(
     repoRoot,

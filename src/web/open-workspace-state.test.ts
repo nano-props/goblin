@@ -20,11 +20,13 @@ describe('persistedOpenWorkspaceEntries', () => {
 
     expect(
       persistedOpenWorkspaceEntries(['goblin+file:///tmp/repo-a', target!.id, '/tmp/missing'], {
-        'goblin+file:///tmp/repo-a': { id: 'goblin+file:///tmp/repo-a', remote: { lifecycle: null } },
+        'goblin+file:///tmp/repo-a': { id: 'goblin+file:///tmp/repo-a', admission: { kind: 'local' } },
         [target!.id]: {
           id: target!.id,
-          remote: {
+          admission: {
+            kind: 'remote',
             lifecycle: { kind: 'ready', target: target! },
+            lifecycleAttemptId: 1,
           },
         },
       }),
@@ -60,9 +62,7 @@ describe('persistedOpenWorkspaceEntries', () => {
         [target!.id]: {
           id: target!.id,
           session: { entry },
-          remote: {
-            lifecycle: null,
-          },
+          admission: { kind: 'remote', lifecycle: null, lifecycleAttemptId: null },
         },
       }),
     ).toEqual([entry])

@@ -32,7 +32,7 @@ export function resolveWorkspacePaneRoute(
 ): WorkspacePaneRouteResolution {
   const state = useWorkspacesStore.getState()
   const repo = state.workspaces[repoId]
-  if (!repo) return { kind: 'missing' }
+  if (!repo || repo.capability.kind !== 'git') return { kind: 'missing' }
   const branchModel = readRepoBranchSnapshotQueryProjection(repo)
   if (!branchModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
   const target = workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)

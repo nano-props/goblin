@@ -6,7 +6,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
 import { advanceTimersAndFlush, flushMicrotasks, renderInJsdom, useFakeTimers } from '#/test-utils/index.ts'
 import { CreateWorktreePagePane } from '#/web/components/repo-pages/CreateWorktreePagePane.tsx'
-import { resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
@@ -85,7 +85,7 @@ beforeEach(() => {
     message: 'error.failed-read-repo',
   }))
   primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ repoSettings: [] }))
-  seedRepoShellForTest({ id: REPO_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
+  seedRepoWithReadModelForTest({ id: REPO_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
 })
 
 afterEach(() => {

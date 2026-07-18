@@ -16,6 +16,7 @@ import {
   workspaceNavigationHistoryEntryEqual,
 } from '#/web/stores/workspaces/navigation-history-entry.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   preferredWorkspacePaneTabForTarget,
@@ -160,11 +161,12 @@ function createRuntimeWorkspacePreferenceActions(set: WorkspacesSet, get: Worksp
       let workspaceRuntimeId: string | undefined
       set((s) => {
         const repo = s.workspaces[id]
-        if (!repo || repo.ui.branchViewMode === viewMode) return s
+        if (!repo || !isGitWorkspace(repo) || gitWorkspaceProjection(repo).ui.branchViewMode === viewMode) return s
         changed = true
         workspaceRuntimeId = repo.workspaceRuntimeId
         return replaceWorkspaceState(s, repo, (r) => {
-          r.ui.branchViewMode = viewMode
+          if (!isGitWorkspace(r)) return
+          gitWorkspaceProjection(r).ui.branchViewMode = viewMode
         })
       })
       if (changed && workspaceRuntimeId !== undefined) afterWorkspacePreferenceChange(id, workspaceRuntimeId)

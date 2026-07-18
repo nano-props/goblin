@@ -28,7 +28,7 @@ export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
       zenModeToggleEnabled={false}
       sidebarPane={
         <RepoWorkspacePane>
-          <RepoLayoutSidebar compact={compact} onOpenSettings={onOpenSettings} />
+          <RepoLayoutSidebar git={null} compact={compact} onOpenSettings={onOpenSettings} />
         </RepoWorkspacePane>
       }
       repoWorkspacePane={

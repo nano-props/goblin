@@ -27,6 +27,16 @@ export type WorkspaceProbeState =
 
 export type WorkspaceSettledProbeState = Exclude<WorkspaceProbeState, { status: 'probing' }>
 export type WorkspaceReadyProbeState = Extract<WorkspaceProbeState, { status: 'ready' }>
+export type WorkspaceGitReadyProbeState = WorkspaceReadyProbeState & {
+  capabilities: WorkspaceReadyProbeState['capabilities'] & {
+    git: Extract<WorkspaceCapabilities['git'], { status: 'available' }>
+  }
+}
+export type WorkspaceFilesystemReadyProbeState = WorkspaceReadyProbeState & {
+  capabilities: WorkspaceReadyProbeState['capabilities'] & {
+    git: Extract<WorkspaceCapabilities['git'], { status: 'unavailable' }>
+  }
+}
 
 export type WorkspaceRefreshResult =
   | { kind: 'committed'; probe: WorkspaceSettledProbeState }
@@ -92,13 +102,13 @@ export function capabilitiesFromGitProbe(
 
 export function workspaceGitAvailable(
   probe: WorkspaceProbeState | null | undefined,
-): probe is WorkspaceReadyProbeState {
+): probe is WorkspaceGitReadyProbeState {
   return probe?.status === 'ready' && probe.capabilities.git.status === 'available'
 }
 
 export function workspaceGitUnavailable(
   probe: WorkspaceProbeState | null | undefined,
-): probe is WorkspaceReadyProbeState {
+): probe is WorkspaceFilesystemReadyProbeState {
   return probe?.status === 'ready' && probe.capabilities.git.status === 'unavailable'
 }
 

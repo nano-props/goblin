@@ -4,7 +4,7 @@ import { act, cleanup } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
-import { normalizeRemoteTarget, type RemoteRepoConnectionLifecycle } from '#/shared/remote-repo.ts'
+import { isRemoteRepoId, normalizeRemoteTarget, type RemoteRepoConnectionLifecycle } from '#/shared/remote-repo.ts'
 import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import { goblinLog } from '#/web/logger.ts'
@@ -67,7 +67,7 @@ function remoteTargetFixture() {
 
 function seedRepo(id: string, lifecycle: RemoteRepoConnectionLifecycle | null) {
   const repo = emptyWorkspace(id, id, 'repo-runtime-test')
-  repo.remote.lifecycle = lifecycle
+  repo.admission = isRemoteRepoId(id) ? { kind: 'remote', lifecycle, lifecycleAttemptId: null } : { kind: 'local' }
   useWorkspacesStore.setState((s) => ({
     ...s,
     workspaces: {
@@ -120,7 +120,7 @@ describe('useNetworkReconnect', () => {
     // must not call `runRemoteWorkspaceConnection` for them — which
     // means the repo remains untouched.
     const repo = useWorkspacesStore.getState().workspaces['/tmp/local-repo']
-    expect(repo?.remote.lifecycle).toBeNull()
+    expect(repo?.admission).toEqual({ kind: 'local' })
   })
 
   test('cleans up the window listener on unmount', async () => {

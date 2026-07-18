@@ -102,7 +102,8 @@ function nextIndex(current: number, length: number, direction: MoveDirection): n
 
 function moveBranchSelection(
   input: {
-    repo: WorkspaceState
+    repo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'>
+    git: Extract<WorkspaceState['capability'], { kind: 'git' }>['git']
     currentBranchName: string | null
   },
   direction: MoveDirection,
@@ -112,7 +113,7 @@ function moveBranchSelection(
   if (!branchModel) return false
   const branches = visibleBranches({
     branches: branchModel.branches,
-    viewMode: input.repo.ui.branchViewMode,
+    viewMode: input.git.ui.branchViewMode,
   })
   if (branches.length === 0) return false
   const index = branches.findIndex((branch) => branch.name === input.currentBranchName)
@@ -196,7 +197,7 @@ export function useKeyboard({
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
           if (!paneTarget) return
           const workspace = workspaceId ? useWorkspacesStore.getState().workspaces[workspaceId] : null
-          if (!workspaceTerminalAvailable(workspace?.workspaceProbe)) return
+          if (!workspaceTerminalAvailable(workspace?.capability.probe)) return
           e.preventDefault()
           // Cmd+T is a generic entry → new terminal appends to the end.
           void runNewTerminalTabCommand({
@@ -210,9 +211,9 @@ export function useKeyboard({
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
           e.preventDefault()
           const repo = workspaceId ? useWorkspacesStore.getState().workspaces[workspaceId] : null
-          if (!repo || !workspaceWorktreesAvailable(repo.workspaceProbe)) return
+          if (!repo || repo.capability.kind !== 'git' || !workspaceWorktreesAvailable(repo.capability.probe)) return
           const branchAction = projectBranchActionOperation(
-            repo.operations.branchAction,
+            repo.capability.git.operations.branchAction,
             getRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId)?.operations,
           )
           if (branchAction.phase === 'idle') {
@@ -282,14 +283,14 @@ export function useKeyboard({
           break
         }
         case 'next-branch': {
-          if (overlayOpen || !repo) break
-          if (moveBranchSelection({ repo, currentBranchName: currentBranchNameRef.current }, 1, navigation))
+          if (overlayOpen || !repo || repo.capability.kind !== 'git') break
+          if (moveBranchSelection({ repo, git: repo.capability.git, currentBranchName: currentBranchNameRef.current }, 1, navigation))
             e.preventDefault()
           break
         }
         case 'prev-branch': {
-          if (overlayOpen || !repo) break
-          if (moveBranchSelection({ repo, currentBranchName: currentBranchNameRef.current }, -1, navigation))
+          if (overlayOpen || !repo || repo.capability.kind !== 'git') break
+          if (moveBranchSelection({ repo, git: repo.capability.git, currentBranchName: currentBranchNameRef.current }, -1, navigation))
             e.preventDefault()
           break
         }

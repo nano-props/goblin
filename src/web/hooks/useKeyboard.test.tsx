@@ -444,21 +444,20 @@ describe('useKeyboard', () => {
     })
     useWorkspacesStore.setState((state) => {
       const repo = state.workspaces[REPO_ID]
-      if (!repo) return state
+      if (repo?.capability.kind !== 'git') return state
+      const branchAction = {
+        ...repo.capability.git.operations.branchAction,
+        phase: 'running' as const,
+        reason: 'branch:createWorktree' as const,
+        target: 'feature/worktree',
+      }
+      const operations = { ...repo.capability.git.operations, branchAction }
       return {
         workspaces: {
           ...state.workspaces,
           [REPO_ID]: {
             ...repo,
-            operations: {
-              ...repo.operations,
-              branchAction: {
-                ...repo.operations.branchAction,
-                phase: 'running',
-                reason: 'branch:createWorktree',
-                target: 'feature/worktree',
-              },
-            },
+            capability: { ...repo.capability, git: { ...repo.capability.git, operations } },
           },
         },
       }
@@ -654,7 +653,9 @@ function serverOperation(
 }
 
 function HookHost(overrides: Partial<HookHostOptions>) {
-  const repo = overrides.currentWorkspaceId ? useWorkspacesStore.getState().workspaces[overrides.currentWorkspaceId] : null
+  const repo = overrides.currentWorkspaceId
+    ? useWorkspacesStore.getState().workspaces[overrides.currentWorkspaceId]
+    : null
   const branch =
     repo && overrides.currentBranchName
       ? readRepoBranchSnapshotQueryProjection(repo)?.branches.find(
@@ -662,7 +663,7 @@ function HookHost(overrides: Partial<HookHostOptions>) {
         )
       : null
   const defaultCommandTarget =
-    repo?.workspaceProbe.status === 'ready' && overrides.currentBranchName && branch?.worktree
+    repo?.capability.kind === 'git' && overrides.currentBranchName && branch?.worktree
       ? {
           kind: 'git-worktree' as const,
           branchName: overrides.currentBranchName,
@@ -673,7 +674,7 @@ function HookHost(overrides: Partial<HookHostOptions>) {
             workspaceRuntimeId: repo.workspaceRuntimeId,
             rootPath: branch.worktree.path,
             head: { kind: 'branch' as const, branchName: overrides.currentBranchName },
-            capabilities: repo.workspaceProbe.capabilities,
+            capabilities: repo.capability.probe.capabilities,
           },
         }
       : overrides.currentBranchName
@@ -683,9 +684,7 @@ function HookHost(overrides: Partial<HookHostOptions>) {
     navigation: overrides.navigation ?? navigationWith(),
     currentWorkspaceId: overrides.currentWorkspaceId ?? null,
     currentBranchName: overrides.currentBranchName ?? null,
-    currentWorkspacePaneCommandTarget:
-      overrides.currentWorkspacePaneCommandTarget ??
-      defaultCommandTarget,
+    currentWorkspacePaneCommandTarget: overrides.currentWorkspacePaneCommandTarget ?? defaultCommandTarget,
     onShowHelp: () => {},
     isWorkspaceShortcutSuppressed: overrides.isWorkspaceShortcutSuppressed ?? (() => false),
     isSettingsOpen: overrides.isSettingsOpen ?? (() => false),
@@ -710,8 +709,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
-    currentWorkspacePaneRoute:
-      overrides.currentWorkspacePaneRoute ?? observedWorkspacePaneRouteForTarget,
+    currentWorkspacePaneRoute: overrides.currentWorkspacePaneRoute ?? observedWorkspacePaneRouteForTarget,
   }
   if (!overrides.commitWorkspacePaneRoute) {
     navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)

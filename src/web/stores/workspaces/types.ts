@@ -11,7 +11,11 @@ import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-targe
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/workspaces/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/workspaces/operations.ts'
 import type { RepoDataLoadBundle } from '#/web/stores/workspaces/repo-data-load-state.ts'
-import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
+import type {
+  WorkspaceFilesystemReadyProbeState,
+  WorkspaceGitReadyProbeState,
+  WorkspaceProbeState,
+} from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 export type BranchViewMode = 'all' | 'worktrees'
 type RepoDataSource = 'cache' | 'fresh'
@@ -58,7 +62,6 @@ export interface RepoWorktreeState {
 }
 
 export interface WorkspaceUiState {
-  branchViewMode: BranchViewMode
   /** Target-scoped selected workspace pane tab. Worktree-backed panes are keyed by
    *  worktree path; branch-only panes are keyed by branch name. `null` is an
    *  intentional empty workspace pane, not a missing preference. */
@@ -70,17 +73,7 @@ interface RepoProjectionMeta {
   savedAt: number | null
 }
 
-export interface WorkspaceRemoteState {
-  /**
-   * Single source-of-truth lifecycle for a remote repo. `null` for local
-   * repos. The lifecycle union owns `target` — code MUST read the target
-   * from `lifecycle.target` (ready / failed-with-target). Call
-   * `remoteRepoTarget(repo)` from `web/stores/workspaces/workspace-guards.ts`
-   * instead of inferring target state from other remote fields.
-   */
-  lifecycle: RemoteRepoConnectionLifecycle | null
-  /** Highest server-owned remote attempt accepted into this window projection. */
-  lifecycleAttemptId: number | null
+export interface GitRemoteProjection {
   remotes?: string[]
   remoteDetails?: GitRemoteInfo[]
   hasRemotes?: boolean
@@ -98,6 +91,31 @@ export interface WorkspaceRemoteState {
    *  red dot. */
   fetchError: string | null
 }
+
+/** Filesystem-transport admission state, independent from optional Git capability. */
+export type WorkspaceAdmissionState =
+  | { kind: 'local' }
+  | { kind: 'remote'; lifecycle: RemoteRepoConnectionLifecycle | null; lifecycleAttemptId: number | null }
+
+/** Git-only client state, owned exclusively by the Git capability. */
+export interface GitWorkspaceProjection {
+  dataLoads: RepoDataLoadBundle
+  operations: RepoOperationsState
+  ui: { branchViewMode: BranchViewMode }
+  projection: RepoProjectionMeta
+  remote: GitRemoteProjection
+  events: RepoEvent[]
+}
+
+export type WorkspaceCapabilityState =
+  | { kind: 'probing'; probe: Extract<WorkspaceProbeState, { status: 'probing' }> }
+  | { kind: 'unavailable'; probe: Extract<WorkspaceProbeState, { status: 'unavailable' }> }
+  | { kind: 'filesystem'; probe: WorkspaceFilesystemReadyProbeState }
+  | {
+      kind: 'git'
+      probe: WorkspaceGitReadyProbeState
+      git: GitWorkspaceProjection
+    }
 
 export type WorkspaceSessionProjectionState = 'projected' | 'stub'
 
@@ -119,7 +137,7 @@ export interface RepoSnapshotCacheEntry {
     branches: RepoBranchState[]
     currentBranch: string
   }
-  ui: Pick<WorkspaceUiState, 'branchViewMode'>
+  ui: { branchViewMode: BranchViewMode }
 }
 
 export interface WorkspaceState {
@@ -128,15 +146,11 @@ export interface WorkspaceState {
   name: string
   /** Current runtime authority for this workspace; mirrors the runtime endpoint `workspaceRuntimeId`. */
   workspaceRuntimeId: string
-  dataLoads: RepoDataLoadBundle
-  operations: RepoOperationsState
   ui: WorkspaceUiState
-  projection: RepoProjectionMeta
   session: WorkspaceSessionState
-  remote: WorkspaceRemoteState
   availability: WorkspaceAvailabilityState
-  workspaceProbe: WorkspaceProbeState
-  events: RepoEvent[]
+  admission: WorkspaceAdmissionState
+  capability: WorkspaceCapabilityState
 }
 
 export interface RuntimeCoherentWorkspaceState {

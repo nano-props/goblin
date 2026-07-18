@@ -2,16 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { Check, Loader2, RefreshCw } from 'lucide-react'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import type { RepoEvent, WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { GitWorkspaceProjection, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { Tip } from '#/web/components/Tip.tsx'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
 import { runManualRepoSync } from '#/web/stores/workspaces/refresh.ts'
-import type {
-  RepoActivity,
-  RepoActivityProjectionRepo,
-  RepoCompletion,
-} from '#/web/components/repo-activity/model.ts'
+import type { RepoActivity, RepoActivityProjectionRepo, RepoCompletion } from '#/web/components/repo-activity/model.ts'
 import {
   getRepoActivity,
   getRepoActivityControlView,
@@ -31,15 +27,15 @@ interface Props {
 }
 
 const COMPLETION_VISIBLE_MS = 1500
-const EMPTY_EVENTS: RepoEvent[] = []
 
-type RepoActivityControlRepo = Pick<
-  WorkspaceState,
-  'id' | 'workspaceRuntimeId' | 'dataLoads' | 'availability' | 'projection' | 'remote'
-> &
+type RepoActivityControlRepo = Pick<WorkspaceState, 'id' | 'workspaceRuntimeId' | 'availability'> &
+  Pick<GitWorkspaceProjection, 'dataLoads' | 'projection' | 'remote'> &
   RepoActivityProjectionRepo
 
-function useRepoActivityControlPresentation(repo: RepoActivityProjectionRepo, serverOperations?: RepoOperationsSnapshot) {
+function useRepoActivityControlPresentation(
+  repo: RepoActivityProjectionRepo,
+  serverOperations?: RepoOperationsSnapshot,
+) {
   const rawActivity = getRepoActivity(repo, serverOperations)
   const rawActivityKey = rawActivity
     ? `${rawActivity.kind}:${rawActivity.labelKey}:${JSON.stringify(rawActivity.labelParams ?? {})}`
@@ -71,15 +67,15 @@ export function RepoActivityControl({ repoId }: Props) {
     useWorkspacesStore,
     (s): RepoActivityControlRepo | undefined => {
       const repo = s.workspaces[repoId]
-      return repo
+      return repo?.capability.kind === 'git'
         ? {
             id: repo.id,
             workspaceRuntimeId: repo.workspaceRuntimeId,
-            dataLoads: repo.dataLoads,
-            branchAction: repo.operations.branchAction,
+            dataLoads: repo.capability.git.dataLoads,
+            branchAction: repo.capability.git.operations.branchAction,
             availability: repo.availability,
-            projection: repo.projection,
-            remote: repo.remote,
+            projection: repo.capability.git.projection,
+            remote: repo.capability.git.remote,
           }
         : undefined
     },
@@ -116,7 +112,10 @@ function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
 }
 
 function useRepoCompletion(repoId: string): RepoCompletion | null {
-  const events = useWorkspacesStore((s) => s.workspaces[repoId]?.events ?? EMPTY_EVENTS)
+  const events = useWorkspacesStore((s) => {
+    const workspace = s.workspaces[repoId]
+    return workspace?.capability.kind === 'git' ? workspace.capability.git.events : null
+  })
   const [completion, setCompletion] = useState<RepoCompletion | null>(null)
   const latestEventIdRef = useRef(0)
 
@@ -126,6 +125,7 @@ function useRepoCompletion(repoId: string): RepoCompletion | null {
   }, [repoId])
 
   useEffect(() => {
+    if (!events) return
     const latestSeen = latestEventIdRef.current
     let nextLatestSeen = latestSeen
     let nextCompletion: RepoCompletion | null = null
@@ -161,7 +161,9 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
     // Fire-and-forget so AsyncButton's internal pending state does not fight
     // the external manualSyncBusy prop. The visual loading state is owned by
     // the operation, not the click promise.
-    void runManualRepoSync({ get: useWorkspacesStore.getState, set: useWorkspacesStore.setState }, repo.id, { workspaceRuntimeId })
+    void runManualRepoSync({ get: useWorkspacesStore.getState, set: useWorkspacesStore.setState }, repo.id, {
+      workspaceRuntimeId,
+    })
   }
 
   const fetchTooltipKey = repo.remote.hasRemotes === false ? 'action.fetch-local-title' : 'action.fetch-title'

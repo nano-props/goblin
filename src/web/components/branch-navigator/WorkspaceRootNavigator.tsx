@@ -14,10 +14,7 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
-import {
-  runShowWorkspacePaneTabCommand,
-  runTerminalPrimaryActionCommand,
-} from '#/web/commands/workspace-commands.ts'
+import { runShowWorkspacePaneTabCommand, runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
 import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
 import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
@@ -28,11 +25,7 @@ interface WorkspaceRootNavigatorProps {
 }
 
 /** The non-Git workspace root is a first-class navigation target, not a synthetic branch. */
-export function WorkspaceRootNavigator({
-  workspaceId,
-  selected,
-  onSelect,
-}: WorkspaceRootNavigatorProps) {
+export function WorkspaceRootNavigator({ workspaceId, selected, onSelect }: WorkspaceRootNavigatorProps) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
   const compact = useIsCompactUi()
@@ -40,8 +33,8 @@ export function WorkspaceRootNavigator({
   const actionVisible = compact || menuOpen
   const workspace = useWorkspacesStore(
     useShallow((state) => {
-      const probe = state.workspaces[workspaceId]?.workspaceProbe
       const repo = state.workspaces[workspaceId]
+      const probe = repo?.capability.probe
       return {
         name: probe?.status === 'ready' ? probe.name : formatWorkspaceDisplayLocation(workspaceId),
         terminalAvailable: workspaceTerminalAvailable(probe),

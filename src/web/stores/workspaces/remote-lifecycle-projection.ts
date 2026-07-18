@@ -20,16 +20,20 @@ export function acceptRemoteLifecycleProjection(
   if (!lifecycle || !isRemoteRepoId(entry.workspaceId)) return false
   const current = get().workspaces[entry.workspaceId]
   if (!current || current.workspaceRuntimeId !== entry.workspaceRuntimeId) return false
-  if (!remoteLifecycleProjectionIsFresh(current.remote.lifecycleAttemptId, current.remote.lifecycle?.kind, lifecycle)) {
+  if (current.admission.kind !== 'remote') return false
+  if (!remoteLifecycleProjectionIsFresh(current.admission.lifecycleAttemptId, current.admission.lifecycle?.kind, lifecycle)) {
     return false
   }
 
   let accepted = false
   updateIfFresh(set, entry.workspaceId, entry.workspaceRuntimeId, (repo) => {
-    if (!remoteLifecycleProjectionIsFresh(repo.remote.lifecycleAttemptId, repo.remote.lifecycle?.kind, lifecycle))
+    if (repo.admission.kind !== 'remote') return
+    if (!remoteLifecycleProjectionIsFresh(repo.admission.lifecycleAttemptId, repo.admission.lifecycle?.kind, lifecycle))
       return
-    repo.remote.lifecycleAttemptId = lifecycle.attemptId
-    if (lifecycle.kind === 'idle') repo.remote.lifecycle = null
+    repo.admission.lifecycleAttemptId = lifecycle.attemptId
+    if (lifecycle.kind === 'idle') {
+      repo.admission.lifecycle = null
+    }
     else if (lifecycle.kind === 'connecting') markRemoteLifecycleConnecting(repo)
     else if (lifecycle.kind === 'ready') {
       markRemoteLifecycleReady(repo, lifecycle.target)

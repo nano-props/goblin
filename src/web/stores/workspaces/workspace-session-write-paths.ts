@@ -2,6 +2,7 @@ import { lastPathSegment } from '#/web/lib/paths.ts'
 import { recordWithoutKey } from '#/shared/record.ts'
 import PQueue from 'p-queue'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
   restoreRepoProjectionFromCacheEntry,
   seedRepoProjectionQueryFromCacheEntry,
@@ -33,8 +34,11 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import { acceptRemoteLifecycleSnapshot } from '#/web/stores/workspaces/remote-lifecycle-projection.ts'
-import { emptyWorkspaceOperations } from '#/web/stores/workspaces/operations.ts'
-import { markRemoteLifecycleFailed, markRemoteLifecycleReady } from '#/web/stores/workspaces/availability.ts'
+import {
+  markRepoUnavailable,
+  markRemoteLifecycleFailed,
+  markRemoteLifecycleReady,
+} from '#/web/stores/workspaces/availability.ts'
 import type {
   CloseWorkspaceResult,
   OpenWorkspacePostOpenError,
@@ -360,23 +364,19 @@ function sameRepoRootSet(left: readonly string[], right: readonly string[]): boo
 }
 
 function repoShellForNewRuntimeEpoch(repo: WorkspaceState, workspaceRuntimeId: string): WorkspaceState {
-  return {
+  const next: WorkspaceState = {
     ...repo,
     workspaceRuntimeId,
-    dataLoads: {
-      repoReadModel: { phase: 'idle', loadedAt: repo.dataLoads.repoReadModel.loadedAt, error: null, stale: true },
-      fetch: { phase: 'idle', loadedAt: null, error: null, stale: false },
-    },
-    operations: emptyWorkspaceOperations(),
-    remote: {
-      ...repo.remote,
+    capability: { kind: 'probing', probe: { status: 'probing' } },
+  }
+  if (repo.admission.kind === 'remote') {
+    next.admission = {
+      kind: 'remote',
       lifecycle: null,
       lifecycleAttemptId: null,
-      fetchFailed: false,
-      fetchError: null,
-    },
-    events: [],
+    }
   }
+  return next
 }
 
 async function runWorkspaceRuntimeMembershipCommand<T>(repoKey: string, command: () => Promise<T>): Promise<T> {
@@ -580,8 +580,7 @@ function buildNewWorkspace(
   const hint = nameHints.find((value): value is string => !!value)
   const name = hint ?? cached?.name ?? lastPathSegment(id)
   seedRepoProjectionQueryFromCacheEntry(id, workspaceRuntimeId, cached)
-  const repo = restoreRepoProjectionFromCacheEntry(emptyWorkspace(id, name, workspaceRuntimeId), cached)
-  return hint ? { ...repo, name: hint } : repo
+  return emptyWorkspace(id, name, workspaceRuntimeId)
 }
 
 function remoteTargetsEqual(a: RemoteRepoTarget | undefined | null, b: RemoteRepoTarget | undefined): boolean {
@@ -667,12 +666,15 @@ export function addResolvedWorkspace(
       // to 'ready'. The `addResolvedWorkspace` write path is only ever
       // reached for a remote entry with a target — the failure
       // branch in workspace runtime resolution calls addUnavailableWorkspace instead.
-      if (resolvedRepo.target) markRemoteLifecycleReady(repo, resolvedRepo.target)
-      if (resolvedRepo.workspaceProbe) repo.workspaceProbe = resolvedRepo.workspaceProbe
-      return repo
+      if (resolvedRepo.workspaceProbe) acceptWorkspaceProbeState(repo, resolvedRepo.workspaceProbe)
+      const restored = restoreRepoProjectionFromCacheEntry(repo, s.repoSnapshotCache[resolvedRepo.id])
+      if (resolvedRepo.target) markRemoteLifecycleReady(restored, resolvedRepo.target)
+      return restored
     },
     update: (existing) => {
+      const hadGitProjection = existing.capability.kind === 'git'
       const runtimeChanged = existing.workspaceRuntimeId !== workspaceRuntimeId
+      const preserveGitProjection = !runtimeChanged && hadGitProjection
       const nameChanged = resolvedRepo.name.length > 0 && existing.name !== resolvedRepo.name
       const sessionEntry = sessionEntryForResolvedRepo(resolvedRepo)
       const sessionProjectionState = sessionProjectionStateForResolvedRepo(resolvedRepo)
@@ -680,10 +682,10 @@ export function addResolvedWorkspace(
         existing.session.projectionState !== sessionProjectionState ||
         !sameWorkspaceSessionEntry(existing.session.entry, sessionEntry)
       const workspaceProbeChanged =
-        !!resolvedRepo.workspaceProbe && !sameWorkspaceProbeState(existing.workspaceProbe, resolvedRepo.workspaceProbe)
+        !!resolvedRepo.workspaceProbe && !sameWorkspaceProbeState(existing.capability.probe, resolvedRepo.workspaceProbe)
       if (!resolvedRepo.target) {
         if (!runtimeChanged && !nameChanged && !sessionChanged && !workspaceProbeChanged) return null
-        return {
+        const next: WorkspaceState = {
           ...existing,
           workspaceRuntimeId: runtimeChanged ? workspaceRuntimeId : existing.workspaceRuntimeId,
           name: nameChanged ? resolvedRepo.name : existing.name,
@@ -691,15 +693,26 @@ export function addResolvedWorkspace(
             entry: sessionEntry,
             projectionState: sessionProjectionState,
           },
-          workspaceProbe: resolvedRepo.workspaceProbe ?? existing.workspaceProbe,
+          capability: runtimeChanged ? { kind: 'probing', probe: { status: 'probing' } } : existing.capability,
         }
+        if (resolvedRepo.workspaceProbe) acceptWorkspaceProbeState(next, resolvedRepo.workspaceProbe)
+        return preserveGitProjection ? next : restoreRepoProjectionFromCacheEntry(next, s.repoSnapshotCache[resolvedRepo.id])
       }
-      const lifecycleReady = existing.remote.lifecycle?.kind === 'ready'
+      const lifecycleReady = existing.admission.kind === 'remote' && existing.admission.lifecycle?.kind === 'ready'
       const targetChanged = !remoteTargetsEqual(
-        remoteRepoConnectionTarget(existing.remote.lifecycle),
+        existing.admission.kind === 'remote' ? remoteRepoConnectionTarget(existing.admission.lifecycle) : null,
         resolvedRepo.target,
       )
-      if (!runtimeChanged && !nameChanged && !sessionChanged && lifecycleReady && !targetChanged) return null
+      if (
+        !runtimeChanged &&
+        !nameChanged &&
+        !sessionChanged &&
+        !workspaceProbeChanged &&
+        lifecycleReady &&
+        !targetChanged
+      ) {
+        return null
+      }
       // Promote the existing remote repo from 'connecting' or
       // 'failed' to 'ready' even when the retained target is the
       // same. The converged lifecycle result is authoritative; target
@@ -712,10 +725,20 @@ export function addResolvedWorkspace(
           entry: sessionEntry,
           projectionState: sessionProjectionState,
         },
-        remote: { ...existing.remote },
+        capability: runtimeChanged ? { kind: 'probing', probe: { status: 'probing' } } : existing.capability,
+        admission:
+          existing.admission.kind === 'remote'
+            ? {
+                kind: 'remote',
+                lifecycle: existing.admission.lifecycle,
+                lifecycleAttemptId: existing.admission.lifecycleAttemptId,
+              }
+            : existing.admission,
       }
-      markRemoteLifecycleReady(next, resolvedRepo.target)
-      return next
+      if (resolvedRepo.workspaceProbe) acceptWorkspaceProbeState(next, resolvedRepo.workspaceProbe)
+      const restored = preserveGitProjection ? next : restoreRepoProjectionFromCacheEntry(next, s.repoSnapshotCache[resolvedRepo.id])
+      markRemoteLifecycleReady(restored, resolvedRepo.target)
+      return restored
     },
   })
 }
@@ -749,7 +772,8 @@ export function addUnavailableWorkspace(
       }
       // New repo: write the failed lifecycle (with last-known target
       // if the probe got far enough to resolve one).
-      markRemoteLifecycleFailed(repo, reason, target)
+      if (repo.admission.kind === 'remote') markRemoteLifecycleFailed(repo, reason, target)
+      else markRepoUnavailable(repo, reason)
       return repo
     },
     update: (existing) => {
@@ -761,7 +785,10 @@ export function addUnavailableWorkspace(
       // be a fresh object — zustand's middleware freezes the
       // state tree, and markRemoteLifecycleFailed mutates the
       // passed repo's remote.
-      const retainedTarget = target ?? remoteRepoConnectionTarget(existing.remote.lifecycle) ?? undefined
+      const retainedTarget =
+        target ??
+        (existing.admission.kind === 'remote' ? remoteRepoConnectionTarget(existing.admission.lifecycle) : null) ??
+        undefined
       const next: WorkspaceState = {
         ...existing,
         workspaceRuntimeId: runtimeChanged ? workspaceRuntimeId : existing.workspaceRuntimeId,
@@ -769,9 +796,17 @@ export function addUnavailableWorkspace(
           entry: target ? remoteWorkspaceSessionEntry(target) : existing.session.entry,
           projectionState: 'projected',
         },
-        remote: { ...existing.remote },
+        admission:
+          existing.admission.kind === 'remote'
+            ? {
+                kind: 'remote',
+                lifecycle: existing.admission.lifecycle,
+                lifecycleAttemptId: existing.admission.lifecycleAttemptId,
+              }
+            : existing.admission,
       }
-      markRemoteLifecycleFailed(next, reason, retainedTarget)
+      if (next.admission.kind === 'remote') markRemoteLifecycleFailed(next, reason, retainedTarget)
+      else markRepoUnavailable(next, reason)
       return next
     },
   })
@@ -818,15 +853,6 @@ export function insertPlaceholderWorkspace(
       // only the runtime projection may publish `connecting`.
       // 'refreshing' so the cached branches render with a stale indicator
       // (dataLoadInitialLoading would hide them).
-      const cached = s.repoSnapshotCache[entry.id]
-      if (cached && cached.data.branches.length > 0) {
-        repo.dataLoads.repoReadModel = {
-          ...repo.dataLoads.repoReadModel,
-          phase: 'refreshing',
-          error: null,
-          stale: true,
-        }
-      }
       return repo
     },
   })
@@ -835,7 +861,7 @@ export function insertPlaceholderWorkspace(
 export function refreshInitialWorkspaceState(set: WorkspacesSet, get: WorkspacesGet, refresh: InitialRepoRefresh) {
   const repo = get().workspaces[refresh.id]
   if (!repo || repo.workspaceRuntimeId !== refresh.workspaceRuntimeId) return
-  if (repo.workspaceProbe.status === 'ready' && repo.workspaceProbe.capabilities.git.status === 'unavailable') return
+  if (repo.capability.kind !== 'git') return
   void requestRepoProjectionReadModelRefresh({ get, set }, refresh.id, { workspaceRuntimeId: refresh.workspaceRuntimeId })
 }
 

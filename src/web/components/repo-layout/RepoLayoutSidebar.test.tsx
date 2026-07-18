@@ -8,9 +8,12 @@ import { RepoLayoutSidebar } from '#/web/components/repo-layout/RepoLayoutSideba
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
 vi.mock('#/web/components/WorkspacePickerHost.tsx', () => ({
-  WorkspacePickerHost: () => <button type="button" data-testid="workspace-picker-host" className="h-10 w-full shrink-0" />,
+  WorkspacePickerHost: () => (
+    <button type="button" data-testid="workspace-picker-host" className="h-10 w-full shrink-0" />
+  ),
 }))
 
 const responsiveMocks = vi.hoisted(() => ({ compact: false }))
@@ -27,6 +30,12 @@ vi.mock('#/web/commands/workspace-commands.ts', () => ({
 }))
 
 const REPO_ID = 'goblin+file:///tmp/repo-shell-sidebar-test'
+
+function gitProjection() {
+  const capability = useWorkspacesStore.getState().workspaces[REPO_ID]?.capability
+  if (capability?.kind !== 'git') throw new Error('Expected Git workspace fixture')
+  return capability.git
+}
 
 beforeEach(() => {
   responsiveMocks.compact = false
@@ -49,7 +58,12 @@ afterEach(() => {
 describe('RepoLayoutSidebar', () => {
   test('renders sidebar actions before the branch content without growing action rows', () => {
     const { container } = renderSidebar(
-      <RepoLayoutSidebar workspaceId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />,
+      <RepoLayoutSidebar
+        workspaceId={REPO_ID}
+        git={gitProjection()}
+        compact={false}
+        branchContent={<div data-testid="branch-content" />}
+      />,
     )
 
     const sidebarTop = container.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
@@ -75,7 +89,7 @@ describe('RepoLayoutSidebar', () => {
   })
 
   test('renders placeholder state when no repo is open', () => {
-    const { container } = renderSidebar(<RepoLayoutSidebar compact={false} />)
+    const { container } = renderSidebar(<RepoLayoutSidebar git={null} compact={false} />)
 
     expect(container.querySelector('[data-testid="workspace-picker-host"]')).not.toBeNull()
 
@@ -98,7 +112,7 @@ describe('RepoLayoutSidebar', () => {
       <RepoLayoutSidebar
         workspaceId={REPO_ID}
         compact={false}
-        gitAvailable={false}
+        git={null}
         onOpenDashboard={onOpenDashboard}
         onSelectWorkspaceRoot={onSelectWorkspaceRoot}
       />,
@@ -150,9 +164,7 @@ describe('RepoLayoutSidebar', () => {
 
   test('keeps the workspace row action menu visible in compact UI', () => {
     responsiveMocks.compact = true
-    const { container } = renderSidebar(
-      <RepoLayoutSidebar workspaceId={REPO_ID} compact gitAvailable={false} />,
-    )
+    const { container } = renderSidebar(<RepoLayoutSidebar workspaceId={REPO_ID} compact git={null} />)
 
     const menuTrigger = container.querySelector('button[aria-label="action.menu"]')
     expect(menuTrigger?.parentElement?.className).toContain('opacity-100')
@@ -164,6 +176,7 @@ describe('RepoLayoutSidebar', () => {
     const { container } = renderSidebar(
       <RepoLayoutSidebar
         workspaceId={REPO_ID}
+        git={gitProjection()}
         compact={false}
         branchContent={<div />}
         onCreateWorktree={onCreateWorktree}
@@ -180,7 +193,12 @@ describe('RepoLayoutSidebar', () => {
 
   test('renders zen reveal top chrome as draggable without owning zen-toggle geometry', () => {
     const { container } = renderSidebar(
-      <RepoLayoutSidebar workspaceId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />,
+      <RepoLayoutSidebar
+        workspaceId={REPO_ID}
+        git={gitProjection()}
+        compact={false}
+        branchContent={<div data-testid="branch-content" />}
+      />,
     )
 
     const sidebarTop = container.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
@@ -195,6 +213,7 @@ describe('RepoLayoutSidebar', () => {
     const { container } = renderSidebar(
       <RepoLayoutSidebar
         workspaceId={REPO_ID}
+        git={gitProjection()}
         compact={false}
         chromeRegion="none"
         branchContent={<div data-testid="branch-content" />}

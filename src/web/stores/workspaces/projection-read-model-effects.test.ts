@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { acceptRepoProjectionReadModel } from '#/web/stores/workspaces/projection-read-model-effects.ts'
 import {
   createBranchSnapshot,
+  createGitWorkspaceProbeForTest,
   installGoblinTestBridge,
   resetWorkspacesStore,
   seedRepoReadModelQueryData,
@@ -11,6 +12,7 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
+import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
 
 beforeEach(() => {
   resetWorkspacesStore()
@@ -38,6 +40,7 @@ describe('repo projection read-model effects', () => {
       id: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
+      workspaceProbe: createGitWorkspaceProbeForTest(),
     })
     seedRepoReadModelQueryData(repo, {
       branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
@@ -74,6 +77,7 @@ describe('repo projection read-model effects', () => {
       id: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
+      workspaceProbe: createGitWorkspaceProbeForTest(),
     })
     seedRepoReadModelQueryData(repo, {
       branches: [createBranchSnapshot('feature/a')],
@@ -103,6 +107,7 @@ describe('repo projection read-model effects', () => {
       id: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
+      workspaceProbe: createGitWorkspaceProbeForTest(),
     })
     seedRepoReadModelQueryData(repo, {
       branches: [createBranchSnapshot('feature/a')],
@@ -130,6 +135,7 @@ describe('repo projection read-model effects', () => {
       id: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
+      workspaceProbe: createGitWorkspaceProbeForTest(),
     })
     const loadedAt = 123
     const firstProjection: WorkspaceRuntimeProjection = {
@@ -190,17 +196,25 @@ describe('repo projection read-model effects', () => {
       id: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
+      workspaceProbe: createGitWorkspaceProbeForTest(),
     })
     useWorkspacesStore.setState((state) => {
       const current = state.workspaces['goblin+file:///repo']!
+      const git = requireGitWorkspaceForTest(current).capability.git
       return {
         workspaces: {
           ...state.workspaces,
           'goblin+file:///repo': {
             ...current,
-            dataLoads: {
-              ...current.dataLoads,
-              repoReadModel: { phase: 'loading', loadedAt: null, error: null, stale: false },
+            capability: {
+              ...current.capability,
+              git: {
+                ...git,
+                dataLoads: {
+                  ...git.dataLoads,
+                  repoReadModel: { phase: 'loading', loadedAt: null, error: null, stale: false },
+                },
+              },
             },
           },
         },
@@ -218,7 +232,7 @@ describe('repo projection read-model effects', () => {
       { scope: 'query-cache' },
     )
 
-    expect(useWorkspacesStore.getState().workspaces['goblin+file:///repo']?.dataLoads.repoReadModel).toMatchObject({
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces['goblin+file:///repo']).capability.git.dataLoads.repoReadModel).toMatchObject({
       phase: 'loading',
       loadedAt: null,
     })

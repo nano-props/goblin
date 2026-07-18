@@ -18,7 +18,6 @@ import {
   primaryWindowPresentationIsCurrent,
   type PrimaryWindowPresentationToken,
 } from '#/web/primary-window-presentation.ts'
-import { workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -253,7 +252,7 @@ function rememberWorkspacePaneRouteSelection(
 ): void {
   const state = useWorkspacesStore.getState()
   const repo = state.workspaces[workspaceId]
-  const branchModel = repo ? readRepoBranchSnapshotQueryProjection(repo) : null
+  const branchModel = repo?.capability.kind === 'git' ? readRepoBranchSnapshotQueryProjection(repo) : null
   const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
   if (!repo || !branchModel || !branch) return
   state.setWorkspacePaneTab(
@@ -302,7 +301,7 @@ function restoreWorkspacePresentationOrOpenDashboard(
   const entryCanResume =
     entry &&
     entry.route.kind !== 'newWorktree' &&
-    (!workspaceGitUnavailable(repo?.workspaceProbe) ||
+    (repo?.capability.kind === 'git' ||
       entry.route.kind === 'workspace-root' ||
       entry.route.kind === 'dashboard')
   if (entryCanResume) {

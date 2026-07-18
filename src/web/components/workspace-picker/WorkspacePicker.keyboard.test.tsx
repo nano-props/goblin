@@ -74,7 +74,7 @@ describe('WorkspacePicker keyboard navigation', () => {
 })
 
 function workspace(name: string, id: string): WorkspacePickerItem {
-  return { id, name, gitCapability: 'available', remoteDetails: [], lastSyncedAt: null, lifecycle: null }
+  return { id, name, gitCapability: 'available', git: { remoteDetails: [], lastSyncedAt: null }, lifecycle: null }
 }
 
 const labels = {

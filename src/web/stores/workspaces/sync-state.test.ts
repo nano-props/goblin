@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from 'vitest'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
   disposeRepoOperationScheduler,
   markRepoOperationTargets,
@@ -18,6 +19,16 @@ interface RepoOverrides {
 
 function repo(overrides: RepoOverrides = {}): WorkspaceState {
   const base = emptyWorkspace('/tmp/goblin-sync-state-test', 'repo', 'repo-runtime-test')
+  acceptWorkspaceProbeState(base, {
+    status: 'ready',
+    name: 'repo',
+    capabilities: {
+      files: { read: true, write: true },
+      terminal: { available: true },
+      git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+    },
+    diagnostics: [],
+  })
   if (overrides.fetchBusy) {
     markRepoOperationTargets(base.id, nextRepoOperationId(base.id), [{ key: 'fetch', reason: 'fetch' }], 'running')
   }

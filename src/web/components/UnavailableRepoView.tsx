@@ -27,8 +27,8 @@ export function UnavailableRepoView({ repo }: Props) {
   const isUnavailable = isRepoUnavailable(repo)
   const isRemote = isRemoteRepoId(repo.id)
   const reason = isRemote
-    ? repo.remote.lifecycle?.kind === 'failed'
-      ? repo.remote.lifecycle.reason
+    ? repo.admission.kind === 'remote' && repo.admission.lifecycle?.kind === 'failed'
+      ? repo.admission.lifecycle.reason
       : 'error.failed-read-repo'
     : repo.availability.phase === 'unavailable'
       ? repo.availability.reason
@@ -60,7 +60,10 @@ export function UnavailableRepoView({ repo }: Props) {
                 {t('repo-unavailable.path')}
               </div>
               <div className="mt-1 break-all font-mono text-[11px] text-foreground">
-                {formatWorkspaceDisplayLocation(repo.id, remoteRepoTarget(repo.id, repo.remote.lifecycle))}
+                {formatWorkspaceDisplayLocation(
+                  repo.id,
+                  remoteRepoTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null),
+                )}
               </div>
               <div className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 {t('repo-unavailable.reason')}

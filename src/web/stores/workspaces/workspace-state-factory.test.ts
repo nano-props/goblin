@@ -2,6 +2,8 @@ import { describe, expect, test } from 'vitest'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { deriveConnectivity } from '#/web/stores/workspaces/workspace-guards.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
+import { requireRemoteAdmissionForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
 
 const REMOTE_ID = 'goblin+ssh://example/srv/repo'
 
@@ -18,6 +20,95 @@ function remoteTargetFixture() {
 }
 
 describe('deriveConnectivity', () => {
+  test('creates a capability-neutral local workspace shell', () => {
+    const workspace = emptyWorkspace('goblin+file:///workspace', 'workspace', 'workspace-runtime-test')
+
+    expect(workspace.admission).toEqual({ kind: 'local' })
+    expect(workspace.capability).toEqual({ kind: 'probing', probe: { status: 'probing' } })
+  })
+
+  test('creates and clears the Git projection only at probe acceptance', () => {
+    const workspace = emptyWorkspace('goblin+file:///workspace', 'workspace', 'workspace-runtime-test')
+    acceptWorkspaceProbeState(workspace, {
+      status: 'ready',
+      name: 'workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
+      diagnostics: [],
+    })
+
+    expect(workspace.capability.kind).toBe('git')
+    if (workspace.capability.kind !== 'git') throw new Error('Expected Git capability')
+    expect(workspace.capability.git.dataLoads.repoReadModel.phase).toBe('idle')
+    expect(workspace.capability.git.operations.repoReadModel.phase).toBe('idle')
+    expect(workspace.capability.git.ui).toEqual({ branchViewMode: 'all' })
+    expect(workspace.capability.git.projection).toEqual({ source: 'fresh', savedAt: null })
+    expect(workspace.capability.git.remote.fetchFailed).toBe(false)
+    expect(workspace.capability.git.events).toEqual([])
+
+    acceptWorkspaceProbeState(workspace, {
+      status: 'ready',
+      name: 'workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [],
+    })
+    expect(workspace.capability.kind).toBe('filesystem')
+  })
+
+  test('preserves the accepted Git projection across a same-capability probe refresh', () => {
+    const workspace = emptyWorkspace('goblin+file:///workspace', 'workspace', 'workspace-runtime-test')
+    const gitProbe = {
+      status: 'ready' as const,
+      name: 'workspace',
+      capabilities: {
+        files: { read: true as const, write: true },
+        terminal: { available: true },
+        git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+      },
+      diagnostics: [],
+    }
+    acceptWorkspaceProbeState(workspace, gitProbe)
+    if (workspace.capability.kind !== 'git') throw new Error('Expected Git capability')
+    const acceptedProjection = workspace.capability.git
+    acceptedProjection.remote.fetchFailed = true
+
+    acceptWorkspaceProbeState(workspace, { ...gitProbe, name: 'workspace-refreshed' })
+
+    if (workspace.capability.kind !== 'git') throw new Error('Expected Git capability')
+    expect(workspace.capability.git).toBe(acceptedProjection)
+    expect(workspace.capability.git.remote.fetchFailed).toBe(true)
+    expect(workspace.capability.probe.name).toBe('workspace-refreshed')
+  })
+
+  test.each([
+    [{ status: 'probing' as const }, 'probing'],
+    [{ status: 'unavailable' as const, reason: 'error.workspace-path-not-found' as const }, 'unavailable'],
+  ])('discards Git authority when the probe transitions to %s', (nextProbe, expectedKind) => {
+    const workspace = emptyWorkspace('goblin+file:///workspace', 'workspace', 'workspace-runtime-test')
+    acceptWorkspaceProbeState(workspace, {
+      status: 'ready',
+      name: 'workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
+      diagnostics: [],
+    })
+
+    acceptWorkspaceProbeState(workspace, nextProbe)
+
+    expect(workspace.capability.kind).toBe(expectedKind)
+    expect('git' in workspace.capability).toBe(false)
+  })
+
   test('local repos always read as connected', () => {
     const repo = emptyWorkspace('/tmp/local-repo', 'local', 'repo-runtime-test')
     expect(deriveConnectivity(repo)).toBe('connected')
@@ -25,27 +116,27 @@ describe('deriveConnectivity', () => {
 
   test('a remote repo with lifecycle=connecting reads as connecting', () => {
     const repo = emptyWorkspace(REMOTE_ID, 'remote', 'repo-runtime-test')
-    repo.remote.lifecycle = { kind: 'connecting' }
+    requireRemoteAdmissionForTest(repo).lifecycle = { kind: 'connecting' }
     expect(deriveConnectivity(repo)).toBe('connecting')
   })
 
   test('a remote repo with lifecycle=ready reads as connected', () => {
     const repo = emptyWorkspace(REMOTE_ID, 'remote', 'repo-runtime-test')
     const target = remoteTargetFixture()
-    repo.remote.lifecycle = { kind: 'ready', target }
+    requireRemoteAdmissionForTest(repo).lifecycle = { kind: 'ready', target }
     expect(deriveConnectivity(repo)).toBe('connected')
   })
 
   test('a remote repo with lifecycle=failed reads as unreachable', () => {
     const repo = emptyWorkspace(REMOTE_ID, 'remote', 'repo-runtime-test')
-    repo.remote.lifecycle = { kind: 'failed', reason: 'unreachable' }
+    requireRemoteAdmissionForTest(repo).lifecycle = { kind: 'failed', reason: 'unreachable' }
     expect(deriveConnectivity(repo)).toBe('unreachable')
   })
 
   test('a remote repo with lifecycle=failed but a retained target still reads as unreachable', () => {
     const repo = emptyWorkspace(REMOTE_ID, 'remote', 'repo-runtime-test')
     const target = remoteTargetFixture()
-    repo.remote.lifecycle = { kind: 'failed', reason: 'timeout', target }
+    requireRemoteAdmissionForTest(repo).lifecycle = { kind: 'failed', reason: 'timeout', target }
     expect(deriveConnectivity(repo)).toBe('unreachable')
   })
 
@@ -57,5 +148,12 @@ describe('deriveConnectivity', () => {
     // should hit this branch.
     const repo = emptyWorkspace(REMOTE_ID, 'remote', 'repo-runtime-test')
     expect(deriveConnectivity(repo)).toBe('connecting')
+  })
+
+  test('rejects a remote identity with local transport admission', () => {
+    const workspace = emptyWorkspace(REMOTE_ID, 'remote', 'workspace-runtime-test')
+    workspace.admission = { kind: 'local' }
+
+    expect(() => deriveConnectivity(workspace)).toThrow('Remote workspace identity requires remote transport admission')
   })
 })

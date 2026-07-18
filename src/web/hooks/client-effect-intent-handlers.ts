@@ -132,13 +132,16 @@ export async function handleWorkspaceClientIntent(
 ): Promise<boolean> {
   // Workspace intents are route-aware and may be gated by overlays, shortcut
   // suppression, or terminal focus before they execute.
-  const currentRepo = deps.currentWorkspaceId ? (useWorkspacesStore.getState().workspaces[deps.currentWorkspaceId] ?? null) : null
+  const currentRepo = deps.currentWorkspaceId
+    ? (useWorkspacesStore.getState().workspaces[deps.currentWorkspaceId] ?? null)
+    : null
   const plan = createWorkspaceIntentPlan(event, {
     overlayBlocked: deps.isOverlayOpen() || isShortcutBlockingLayerOpen(),
     workspaceShortcutSuppressed: deps.isWorkspaceShortcutSuppressed(),
     terminalFocused: isTerminalFocused(),
     currentWorkspaceId: deps.currentWorkspaceId,
-    currentRepo,
+    currentWorkspaceRuntimeId: currentRepo?.workspaceRuntimeId ?? null,
+    currentWorkspaceCapability: currentRepo?.capability ?? null,
     currentWorkspacePaneCommandTarget: deps.currentWorkspacePaneCommandTarget,
   })
   if (!plan) return false
@@ -163,9 +166,9 @@ export async function handleWorkspaceClientIntent(
       deps.openRemoteWorkspace()
       return true
     case 'create-worktree': {
-      if (!currentRepo) return true
+      if (!currentRepo || currentRepo.capability.kind !== 'git') return true
       const branchAction = projectBranchActionOperation(
-        currentRepo.operations.branchAction,
+        currentRepo.capability.git.operations.branchAction,
         getRepoOperationsQueryData(currentRepo.id, currentRepo.workspaceRuntimeId)?.operations,
       )
       if (branchAction.phase !== 'idle') {

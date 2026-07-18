@@ -26,8 +26,13 @@ import { RepoDashboardPane } from '#/web/components/repo-pages/RepoDashboardPane
 import { CreateWorktreePagePane } from '#/web/components/repo-pages/CreateWorktreePagePane.tsx'
 import type { RepoRouteView } from '#/web/App.tsx'
 import { useT } from '#/web/stores/i18n.ts'
-import { workspaceGitAvailable, workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
+import type { RepoProjectionPromotionViewState } from '#/web/hooks/useRestoreRepoTabsOnView.ts'
+
+interface RepoProjectionRestoreController {
+  state: RepoProjectionPromotionViewState
+  retry: () => void
+}
 
 function EmptyRepoWorkspacePane({ trafficLightOffset }: { trafficLightOffset: boolean }) {
   return (
@@ -80,11 +85,10 @@ export function RepoView({
   )
   const setWorkspacePaneSize = useWorkspacesStore((s) => s.setWorkspacePaneSize)
   const repo = useWorkspacesStore((s) => s.workspaces[workspaceId])
-  const gitAvailable = workspaceGitAvailable(repo?.workspaceProbe)
-  const gitUnavailable = workspaceGitUnavailable(repo?.workspaceProbe)
+  const git = repo?.capability.kind === 'git' ? repo.capability.git : null
+  const gitAvailable = git !== null
+  const gitUnavailable = repo?.capability.kind === 'filesystem'
   const gitCapabilitySettled = gitAvailable || gitUnavailable
-  useRepoToasts(workspaceId)
-  const projectionRestore = useRestoreRepoTabsOnView({ repoId: repo ? workspaceId : null })
 
   const routeBranchName = routeView?.kind === 'branch' ? routeView.branchName : null
 
@@ -154,6 +158,7 @@ export function RepoView({
     <RepoWorkspacePane>
       <RepoLayoutSidebar
         workspaceId={workspaceId}
+        git={git}
         compact={compact}
         branchContent={branchContent ?? (!gitCapabilitySettled ? <BranchNavigatorSkeleton /> : undefined)}
         chromeRegion={chromeRegion}
@@ -164,7 +169,6 @@ export function RepoView({
         dashboardSelected={dashboardSelected}
         newWorktreeSelected={newWorktreeSelected}
         currentBranchName={routeBranchName}
-        gitAvailable={gitAvailable}
         workspaceRootSelected={gitUnavailable && routeView?.kind === 'workspace-root'}
         onSelectWorkspaceRoot={gitUnavailable ? () => onOpenWorkspaceRoot?.(repo.id) : undefined}
       />
@@ -193,14 +197,73 @@ export function RepoView({
     )
   }
 
-  if (repo.session.projectionState === 'stub' && projectionRestore.state.phase === 'failed') {
-    const failure = (
-      <RepoProjectionFailureView
-        repo={repo}
-        message={projectionRestore.state.message}
-        onRetry={projectionRestore.retry}
-      />
-    )
+  function renderWorkspace(projectionRestore: RepoProjectionRestoreController | null): ReactNode {
+    if (repo.session.projectionState === 'stub' && !projectionRestore) {
+      throw new Error('A filesystem workspace cannot own a Git projection stub')
+    }
+    if (repo.session.projectionState === 'stub' && projectionRestore?.state.phase === 'failed') {
+      const failure = (
+        <RepoProjectionFailureView
+          repo={repo}
+          message={projectionRestore.state.message}
+          onRetry={projectionRestore.retry}
+        />
+      )
+      return (
+        <RepoLayoutWorkspaceShell
+          workspaceId={workspaceId}
+          compact={compact}
+          zenMode={view.zenMode}
+          repoWorkspaceActive={repoWorkspaceActive}
+          workspacePaneSize={view.workspacePaneSize}
+          onWorkspacePaneSizeChange={setWorkspacePaneSize}
+          sidebarPane={renderSidebarPane(compact ? failure : undefined)}
+          zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
+          repoWorkspacePane={
+            <RepoWorkspacePane>
+              <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
+              {failure}
+            </RepoWorkspacePane>
+          }
+          singlePaneActivePane={compact ? 'navigator' : singlePane}
+        />
+      )
+    }
+
+    if (repo.session.projectionState === 'stub' || view.initialLoading) {
+      return (
+        <RepoLayoutWorkspaceShell
+          workspaceId={workspaceId}
+          compact={compact}
+          zenMode={view.zenMode}
+          repoWorkspaceActive={repoWorkspaceActive}
+          workspacePaneSize={view.workspacePaneSize}
+          onWorkspacePaneSizeChange={setWorkspacePaneSize}
+          sidebarPane={renderSidebarPane(compact && currentBranchName ? undefined : <BranchNavigatorSkeleton />)}
+          zenRevealSidebarPane={renderSidebarPane(
+            compact && currentBranchName ? undefined : <BranchNavigatorSkeleton />,
+            'none',
+          )}
+          repoWorkspacePane={
+            <RepoWorkspacePane>
+              {currentBranchName ? (
+                <RepoWorkspaceSkeleton
+                  toolbarDraggable={!compact}
+                  toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+                />
+              ) : (
+                <>
+                  <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
+                  <RepoWorkspaceEmptySkeleton />
+                </>
+              )}
+            </RepoWorkspacePane>
+          }
+          singlePaneActivePane={currentBranchName ? 'workspace' : 'navigator'}
+        />
+      )
+    }
+
     return (
       <RepoLayoutWorkspaceShell
         workspaceId={workspaceId}
@@ -209,123 +272,87 @@ export function RepoView({
         repoWorkspaceActive={repoWorkspaceActive}
         workspacePaneSize={view.workspacePaneSize}
         onWorkspacePaneSizeChange={setWorkspacePaneSize}
-        sidebarPane={renderSidebarPane(compact ? failure : undefined)}
+        sidebarPane={renderSidebarPane()}
         zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
         repoWorkspacePane={
           <RepoWorkspacePane>
-            <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
-            {failure}
-          </RepoWorkspacePane>
-        }
-        singlePaneActivePane={compact ? 'navigator' : singlePane}
-      />
-    )
-  }
-
-  if (repo.session.projectionState === 'stub' || view.initialLoading) {
-    return (
-      <RepoLayoutWorkspaceShell
-        workspaceId={workspaceId}
-        compact={compact}
-        zenMode={view.zenMode}
-        repoWorkspaceActive={repoWorkspaceActive}
-        workspacePaneSize={view.workspacePaneSize}
-        onWorkspacePaneSizeChange={setWorkspacePaneSize}
-        sidebarPane={renderSidebarPane(compact && currentBranchName ? undefined : <BranchNavigatorSkeleton />)}
-        zenRevealSidebarPane={renderSidebarPane(
-          compact && currentBranchName ? undefined : <BranchNavigatorSkeleton />,
-          'none',
-        )}
-        repoWorkspacePane={
-          <RepoWorkspacePane>
-            {currentBranchName ? (
-              <RepoWorkspaceSkeleton
-                toolbarDraggable={!compact}
-                toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+            {routeView?.kind === 'dashboard' ? (
+              <RepoDashboardPane
+                repoId={workspaceId}
+                compact={compact}
+                trafficLightOffset={workspaceTrafficLightOffset}
+                onBack={() => onOpenRepoRoot?.(repo.id)}
+                onSelectBranch={(branchName) => onOpenRepoBranch?.(repo.id, branchName)}
               />
+            ) : routeView?.kind === 'workspace-root' ? (
+              <RepoWorkspace
+                workspaceId={workspaceId}
+                currentBranchName={null}
+                workspacePaneRouteContext={{ kind: 'workspace-root' }}
+                shortcutsEnabled={!compact || singlePane === 'workspace'}
+                toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+                onBackToBranchNavigator={() => onOpenRepoRoot?.(repo.id)}
+              />
+            ) : routeView?.kind === 'worktree' ? (
+              <RepoWorkspace
+                workspaceId={workspaceId}
+                currentBranchName={null}
+                workspacePaneRouteContext={{
+                  kind: 'git-worktree',
+                  worktreePath: routeView.worktreePath,
+                  route: routeView.workspacePaneRoute,
+                }}
+                shortcutsEnabled={!compact || singlePane === 'workspace'}
+                toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+                onBackToBranchNavigator={() => onOpenRepoRoot?.(repo.id)}
+              />
+            ) : routeView?.kind === 'newWorktree' ? (
+              <CreateWorktreePagePane
+                repoId={workspaceId}
+                compact={compact}
+                trafficLightOffset={workspaceTrafficLightOffset}
+                onCancel={() => {
+                  if (onCancelRepoNewWorktree) onCancelRepoNewWorktree(repo.id)
+                  else onOpenRepoRoot?.(repo.id)
+                }}
+                onCreated={(branchName) => onReplaceRepoBranch?.(repo.id, branchName)}
+              />
+            ) : routeView?.kind === 'empty' ? (
+              <EmptyRepoWorkspacePane trafficLightOffset={workspaceTrafficLightOffset} />
             ) : (
-              <>
-                <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
-                <RepoWorkspaceEmptySkeleton />
-              </>
+              <RepoWorkspace
+                workspaceId={workspaceId}
+                currentBranchName={workspaceCurrentBranchName}
+                workspacePaneRouteContext={workspacePaneRouteContext}
+                shortcutsEnabled={!compact || singlePane === 'workspace'}
+                toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+                onBackToBranchNavigator={routeView ? () => onOpenRepoRoot?.(repo.id) : undefined}
+              />
             )}
           </RepoWorkspacePane>
         }
-        singlePaneActivePane={currentBranchName ? 'workspace' : 'navigator'}
+        singlePaneActivePane={singlePane}
       />
     )
   }
 
-  return (
-    <RepoLayoutWorkspaceShell
-      workspaceId={workspaceId}
-      compact={compact}
-      zenMode={view.zenMode}
-      repoWorkspaceActive={repoWorkspaceActive}
-      workspacePaneSize={view.workspacePaneSize}
-      onWorkspacePaneSizeChange={setWorkspacePaneSize}
-      sidebarPane={renderSidebarPane()}
-      zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
-      repoWorkspacePane={
-        <RepoWorkspacePane>
-          {routeView?.kind === 'dashboard' ? (
-            <RepoDashboardPane
-              repoId={workspaceId}
-              compact={compact}
-              trafficLightOffset={workspaceTrafficLightOffset}
-              onBack={() => onOpenRepoRoot?.(repo.id)}
-              onSelectBranch={(branchName) => onOpenRepoBranch?.(repo.id, branchName)}
-            />
-          ) : routeView?.kind === 'workspace-root' ? (
-            <RepoWorkspace
-              workspaceId={workspaceId}
-              currentBranchName={null}
-              workspacePaneRouteContext={{ kind: 'workspace-root' }}
-              shortcutsEnabled={!compact || singlePane === 'workspace'}
-              toolbarTrafficLightOffset={workspaceTrafficLightOffset}
-              onBackToBranchNavigator={() => onOpenRepoRoot?.(repo.id)}
-            />
-          ) : routeView?.kind === 'worktree' ? (
-            <RepoWorkspace
-              workspaceId={workspaceId}
-              currentBranchName={null}
-              workspacePaneRouteContext={{
-                kind: 'git-worktree',
-                worktreePath: routeView.worktreePath,
-                route: routeView.workspacePaneRoute,
-              }}
-              shortcutsEnabled={!compact || singlePane === 'workspace'}
-              toolbarTrafficLightOffset={workspaceTrafficLightOffset}
-              onBackToBranchNavigator={() => onOpenRepoRoot?.(repo.id)}
-            />
-          ) : routeView?.kind === 'newWorktree' ? (
-            <CreateWorktreePagePane
-              repoId={workspaceId}
-              compact={compact}
-              trafficLightOffset={workspaceTrafficLightOffset}
-              onCancel={() => {
-                if (onCancelRepoNewWorktree) onCancelRepoNewWorktree(repo.id)
-                else onOpenRepoRoot?.(repo.id)
-              }}
-              onCreated={(branchName) => onReplaceRepoBranch?.(repo.id, branchName)}
-            />
-          ) : routeView?.kind === 'empty' ? (
-            <EmptyRepoWorkspacePane trafficLightOffset={workspaceTrafficLightOffset} />
-          ) : (
-            <RepoWorkspace
-              workspaceId={workspaceId}
-              currentBranchName={workspaceCurrentBranchName}
-              workspacePaneRouteContext={workspacePaneRouteContext}
-              shortcutsEnabled={!compact || singlePane === 'workspace'}
-              toolbarTrafficLightOffset={workspaceTrafficLightOffset}
-              onBackToBranchNavigator={routeView ? () => onOpenRepoRoot?.(repo.id) : undefined}
-            />
-          )}
-        </RepoWorkspacePane>
-      }
-      singlePaneActivePane={singlePane}
-    />
+  return git ? (
+    <GitWorkspaceEffects workspaceId={workspaceId}>{renderWorkspace}</GitWorkspaceEffects>
+  ) : (
+    renderWorkspace(null)
   )
+}
+
+function GitWorkspaceEffects({
+  workspaceId,
+  children,
+}: {
+  workspaceId: string
+  children: (projectionRestore: RepoProjectionRestoreController) => ReactNode
+}) {
+  useRepoToasts(workspaceId)
+  const projectionRestore = useRestoreRepoTabsOnView({ repoId: workspaceId })
+  return children(projectionRestore)
 }
 
 function RoutedRepoNotFound({ workspaceId }: { workspaceId: string }) {

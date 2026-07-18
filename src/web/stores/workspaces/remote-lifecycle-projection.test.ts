@@ -6,6 +6,7 @@ import {
   acceptRemoteLifecycleSnapshot,
 } from '#/web/stores/workspaces/remote-lifecycle-projection.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspaceRemoteAdmission } from '#/web/workspace-capability.ts'
 
 const repoRoot = 'goblin+ssh://example/repo'
 const workspaceRuntimeId = 'repo-runtime-test-1'
@@ -26,7 +27,8 @@ describe('remote lifecycle projection acceptance', () => {
   test('accepts connecting then terminal within one server attempt', () => {
     expect(accept({ kind: 'connecting', attemptId: 2 })).toBe(true)
     expect(accept({ kind: 'ready', attemptId: 2, target })).toBe(true)
-    expect(useWorkspacesStore.getState().workspaces[repoRoot]?.remote).toMatchObject({
+    expect(workspaceRemoteAdmission(useWorkspacesStore.getState().workspaces[repoRoot])).toEqual({
+      kind: 'remote',
       lifecycleAttemptId: 2,
       lifecycle: { kind: 'ready', target },
     })
@@ -37,9 +39,8 @@ describe('remote lifecycle projection acceptance', () => {
     expect(accept({ kind: 'failed', attemptId: 3, reason: 'timeout' })).toBe(true)
     expect(accept({ kind: 'ready', attemptId: 2, target })).toBe(false)
     expect(accept({ kind: 'connecting', attemptId: 3 })).toBe(false)
-    expect(useWorkspacesStore.getState().workspaces[repoRoot]?.remote.lifecycle).toEqual({
-      kind: 'failed',
-      reason: 'timeout',
+    expect(workspaceRemoteAdmission(useWorkspacesStore.getState().workspaces[repoRoot])).toMatchObject({
+      lifecycle: { kind: 'failed', reason: 'timeout' },
     })
   })
 
@@ -67,7 +68,9 @@ describe('remote lifecycle projection acceptance', () => {
         },
       ],
     })
-    expect(useWorkspacesStore.getState().workspaces[repoRoot]?.remote.lifecycle).toEqual({ kind: 'ready', target })
+    expect(workspaceRemoteAdmission(useWorkspacesStore.getState().workspaces[repoRoot])).toMatchObject({
+      lifecycle: { kind: 'ready', target },
+    })
     expect(useWorkspacesStore.getState().workspaces['goblin+ssh://other/repo']).toBeUndefined()
   })
 })

@@ -6,6 +6,7 @@ import { finishDataLoadSuccess } from '#/web/stores/workspaces/repo-data-load-st
 import { stripBranchWorktreeMetadata } from '#/web/stores/workspaces/worktree-state.ts'
 import { seedRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchSnapshotQueryProjection, type RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
+import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
 const MAX_REPOS = 50
 const FiniteNumber = v.pipe(v.number(), v.finite())
@@ -50,22 +51,24 @@ function cachedBranches(
 }
 
 function restoreProjectionFromSnapshot(repo: WorkspaceState, snapshot: RepoSnapshotCacheEntry): WorkspaceState {
+  if (!isGitWorkspace(repo)) return repo
+  const git = gitWorkspaceProjection(repo)
   const dataLoads = {
-    ...repo.dataLoads,
-    repoReadModel: { ...repo.dataLoads.repoReadModel },
+    ...git.dataLoads,
+    repoReadModel: { ...git.dataLoads.repoReadModel },
   }
   if (snapshot.data.branches.length > 0) finishDataLoadSuccess(dataLoads.repoReadModel, snapshot.savedAt)
   return {
     ...repo,
     name: snapshot.name || repo.name,
-    dataLoads,
-    ui: {
-      ...repo.ui,
-      branchViewMode: snapshot.ui.branchViewMode,
-    },
-    projection: {
-      source: 'cache',
-      savedAt: snapshot.savedAt,
+    capability: {
+      ...repo.capability,
+      git: {
+        ...git,
+        dataLoads,
+        ui: { branchViewMode: snapshot.ui.branchViewMode },
+        projection: { source: 'cache', savedAt: snapshot.savedAt },
+      },
     },
   }
 }
@@ -105,7 +108,7 @@ export function seedRepoProjectionQueryFromCacheEntry(
 }
 
 export function persistRepoSnapshotCacheEntry(set: WorkspacesSet, repo: WorkspaceState | undefined, workspaceRuntimeId: string): void {
-  if (!repo) return
+  if (!repo || !isGitWorkspace(repo)) return
   if (repo.workspaceRuntimeId !== workspaceRuntimeId) return
   const branchModel = readRepoBranchSnapshotQueryProjection(repo)
   const entry = branchModel ? repoSnapshotCacheEntryFromRepo(repo, branchModel) : null
@@ -128,7 +131,7 @@ export function normalizeRepoSnapshotCache(value: unknown): Record<string, RepoS
 }
 
 function repoSnapshotCacheEntryFromRepo(
-  repo: WorkspaceState,
+  repo: WorkspaceState & { capability: Extract<WorkspaceState['capability'], { kind: 'git' }> },
   branchModel: RepoBranchSnapshotData,
 ): RepoSnapshotCacheEntry | null {
   if (branchModel.branches.length === 0) return null
@@ -140,7 +143,7 @@ function repoSnapshotCacheEntryFromRepo(
       currentBranch: branchModel.currentBranch,
     },
     ui: {
-      branchViewMode: repo.ui.branchViewMode,
+      branchViewMode: gitWorkspaceProjection(repo).ui.branchViewMode,
     },
   }
 }

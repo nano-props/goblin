@@ -18,7 +18,7 @@ export function commitWorkspacePaneRouteSupplement(
 ): boolean {
   const state = useWorkspacesStore.getState()
   const repo = state.workspaces[target.repoId]
-  if (!repo || repo.workspaceRuntimeId !== target.workspaceRuntimeId) return false
+  if (!repo || repo.capability.kind !== 'git' || repo.workspaceRuntimeId !== target.workspaceRuntimeId) return false
   const branchModel = readRepoBranchSnapshotQueryProjection(repo)
   const branch = branchModel?.branches.find((candidate) => candidate.name === target.branchName)
   if (!branch || (branch.worktree?.path ?? null) !== target.worktreePath) return false

@@ -3,7 +3,13 @@ import { isRemoteRepoId, localWorkspaceSessionEntry } from '#/shared/remote-repo
 import { emptyWorkspaceOperations } from '#/web/stores/workspaces/operations.ts'
 import { emptyWorkspaceDataLoadBundle } from '#/web/stores/workspaces/repo-data-load-state.ts'
 import type { ExecResult } from '#/web/types.ts'
-import type { RepoEvent, RepoResultEventOptions, WorkspaceState, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
+import type {
+  GitWorkspaceProjection,
+  RepoEvent,
+  RepoResultEventOptions,
+  WorkspaceState,
+  WorkspacesStore,
+} from '#/web/stores/workspaces/types.ts'
 
 let nextEventId = 1
 
@@ -17,25 +23,26 @@ export function emptyWorkspace(id: string, name: string, workspaceRuntimeId: str
     id,
     name,
     workspaceRuntimeId,
-    dataLoads: emptyWorkspaceDataLoadBundle(),
-    operations: emptyWorkspaceOperations(),
-    ui: {
-      branchViewMode: 'all',
-      preferredWorkspacePaneTabByTarget: {},
-    },
-    projection: {
-      source: 'fresh',
-      savedAt: null,
-    },
+    ui: { preferredWorkspacePaneTabByTarget: {} },
     session: {
       entry: isRemoteRepoId(id) ? null : localWorkspaceSessionEntry(id),
       projectionState: 'projected',
     },
+    availability: { phase: 'available' },
+    admission: isRemoteRepoId(id)
+      ? { kind: 'remote', lifecycle: null, lifecycleAttemptId: null }
+      : { kind: 'local' },
+    capability: { kind: 'probing', probe: { status: 'probing' } },
+  }
+}
+
+export function emptyGitWorkspaceProjection(): GitWorkspaceProjection {
+  return {
+    dataLoads: emptyWorkspaceDataLoadBundle(),
+    operations: emptyWorkspaceOperations(),
+    ui: { branchViewMode: 'all' },
+    projection: { source: 'fresh', savedAt: null },
     remote: {
-      // Local repos never have a remote lifecycle. Remote shells remain null
-      // until a server runtime projection is accepted.
-      lifecycle: null,
-      lifecycleAttemptId: null,
       remotes: [],
       remoteDetails: [],
       hasRemotes: false,
@@ -46,8 +53,6 @@ export function emptyWorkspace(id: string, name: string, workspaceRuntimeId: str
       fetchFailed: false,
       fetchError: null,
     },
-    availability: { phase: 'available' },
-    workspaceProbe: { status: 'probing' },
     events: [],
   }
 }

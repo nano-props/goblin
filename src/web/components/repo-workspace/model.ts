@@ -12,6 +12,7 @@ export interface RepoWorkspacePresentation {
 
 export function getRepoWorkspacePresentation(repo: WorkspaceState | undefined): RepoWorkspacePresentation {
   if (!repo) return { exists: false, initialLoading: false }
+  if (repo.capability.kind !== 'git') return { exists: true, initialLoading: false }
   // The repo read model is loading when either it never resolved or the SSH probe
   // hasn't settled yet for a remote repo with no cached data. The
   // latter is the slow-network case: the placeholder repo is up but we
@@ -20,10 +21,11 @@ export function getRepoWorkspacePresentation(repo: WorkspaceState | undefined): 
   // available the projection already shows stale branches and we drop
   // the skeleton.
   const remoteConnecting = deriveConnectivity(repo) === 'connecting'
-  const hasLoadedReadModel = repo.dataLoads.repoReadModel.loadedAt !== null
+  const hasLoadedReadModel = repo.capability.git.dataLoads.repoReadModel.loadedAt !== null
   return {
     exists: true,
-    initialLoading: dataLoadInitialLoading(repo.dataLoads.repoReadModel) || (remoteConnecting && !hasLoadedReadModel),
+    initialLoading:
+      dataLoadInitialLoading(repo.capability.git.dataLoads.repoReadModel) || (remoteConnecting && !hasLoadedReadModel),
   }
 }
 
@@ -32,10 +34,9 @@ export type CurrentRepoWorkspacePresentation = ReturnType<typeof getCurrentRepoW
 
 export interface RepoWorkspaceRepo extends BranchActionRepo {
   branchModel: RepoBranchReadModelData
-  workspaceProbe: WorkspaceState['workspaceProbe']
+  probe: Extract<WorkspaceState['capability'], { kind: 'git' }>['probe']
   ui: Pick<WorkspaceState['ui'], 'preferredWorkspacePaneTabByTarget'> & { currentBranchName: string | null }
   unavailable: boolean
-  remote: BranchActionRepo['remote'] & Pick<WorkspaceState['remote'], 'lifecycle'>
 }
 
 export function getCurrentRepoWorkspace(repo: RepoWorkspaceRepo) {

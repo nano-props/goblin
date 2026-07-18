@@ -51,10 +51,11 @@ export function CreateWorktreePagePane({
   onCreated,
 }: CreateWorktreePagePaneProps) {
   const liveRepo = useWorkspacesStore((s) => s.workspaces[repoId])
+  const git = liveRepo?.capability.kind === 'git' ? liveRepo.capability.git : null
   const runBranchAction = useWorkspacesStore((s) => s.runBranchAction)
-  const branchReadModel = useRepoBranchReadModel(liveRepo?.id ?? '', liveRepo?.workspaceRuntimeId ?? '', !!liveRepo)
+  const branchReadModel = useRepoBranchReadModel(liveRepo?.id ?? '', liveRepo?.workspaceRuntimeId ?? '', git !== null)
   const operationsReadModel = useRepoOperationsReadModel(liveRepo?.id ?? '', liveRepo?.workspaceRuntimeId ?? '', {
-    enabled: !!liveRepo,
+    enabled: git !== null,
   })
   const workspaceRuntimeId = liveRepo?.workspaceRuntimeId ?? null
   const [configTrustChoice, setConfigTrustChoice] = useState<ConfigTrustChoice>(null)
@@ -108,7 +109,7 @@ export function CreateWorktreePagePane({
   })
   const bootstrapDecisionReady =
     !bootstrapLoading && (bootstrapPreviewError || (bootstrapPreview !== null && !worktreeBootstrapTrustLoading))
-  const pageReady = !!liveRepo && !!branchReadModel && bootstrapDecisionReady
+  const pageReady = !!liveRepo && git !== null && !!branchReadModel && bootstrapDecisionReady
   const showLoadingSkeleton = useLoadingVisibility(!pageReady)
   const holdLoadingPage = !pageReady || showLoadingSkeleton
 
@@ -164,9 +165,14 @@ export function CreateWorktreePagePane({
 
   async function handleCreateWorktree(request: CreateWorktreeRequest): Promise<boolean> {
     const currentRepo = useWorkspacesStore.getState().workspaces[repoId]
-    if (!currentRepo || currentRepo.workspaceRuntimeId !== liveRepo.workspaceRuntimeId) return false
+    if (
+      !currentRepo ||
+      currentRepo.capability.kind !== 'git' ||
+      currentRepo.workspaceRuntimeId !== liveRepo.workspaceRuntimeId
+    )
+      return false
     const branchAction = projectBranchActionOperation(
-      currentRepo.operations.branchAction,
+      currentRepo.capability.git.operations.branchAction,
       operationsReadModel.data?.operations,
     )
     if (branchAction.phase !== 'idle' || worktreeBootstrap.loading) return false
@@ -184,7 +190,16 @@ export function CreateWorktreePagePane({
       <ScrollPane>
         <CreateWorktreePageBody
           repo={{
-            ...projectBranchActionRepo(liveRepo, operationsReadModel.data?.operations),
+            ...projectBranchActionRepo(
+              {
+                id: liveRepo.id,
+                workspaceRuntimeId: liveRepo.workspaceRuntimeId,
+                operations: { branchAction: git.operations.branchAction },
+                remote: git.remote,
+                remoteLifecycle: liveRepo.admission.kind === 'remote' ? liveRepo.admission.lifecycle : null,
+              },
+              operationsReadModel.data?.operations,
+            ),
             branchModel: branchReadModel,
           }}
           worktreeBootstrap={worktreeBootstrap}

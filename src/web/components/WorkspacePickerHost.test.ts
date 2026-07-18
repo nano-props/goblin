@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { latestRepoSyncTime } from '#/web/stores/workspaces/sync-time.ts'
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
 import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
-import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { emptyGitWorkspaceProjection } from '#/web/stores/workspaces/workspace-state-factory.ts'
 
 describe('workspacePickerItemsEqual', () => {
   test('treats Git capability changes as unequal', () => {
@@ -10,8 +10,7 @@ describe('workspacePickerItemsEqual', () => {
       id: 'goblin+file:///tmp/workspace',
       name: 'workspace',
       gitCapability: 'unavailable',
-      remoteDetails: [],
-      lastSyncedAt: null,
+      git: null,
       lifecycle: null,
     }
 
@@ -24,8 +23,7 @@ describe('workspacePickerItemsEqual', () => {
         id: 'goblin+ssh://example/srv%2Frepo',
         name: 'repo',
         gitCapability: 'available',
-        remoteDetails: [],
-        lastSyncedAt: null,
+        git: { remoteDetails: [], lastSyncedAt: null },
         lifecycle: {
           kind: 'ready',
           target: {
@@ -45,8 +43,7 @@ describe('workspacePickerItemsEqual', () => {
         id: 'goblin+ssh://example/srv%2Frepo',
         name: 'repo',
         gitCapability: 'available',
-        remoteDetails: [],
-        lastSyncedAt: null,
+        git: { remoteDetails: [], lastSyncedAt: null },
         lifecycle: {
           kind: 'ready',
           target: {
@@ -80,8 +77,7 @@ describe('workspacePickerItemsEqual', () => {
         id: target.id,
         name: 'repo',
         gitCapability: 'available',
-        remoteDetails: [],
-        lastSyncedAt: null,
+        git: { remoteDetails: [], lastSyncedAt: null },
         lifecycle: {
           kind: 'failed',
           reason: 'timeout',
@@ -94,8 +90,7 @@ describe('workspacePickerItemsEqual', () => {
         id: target.id,
         name: 'repo',
         gitCapability: 'available',
-        remoteDetails: [],
-        lastSyncedAt: null,
+        git: { remoteDetails: [], lastSyncedAt: null },
         lifecycle: {
           kind: 'failed',
           reason: 'timeout',
@@ -118,8 +113,7 @@ describe('workspacePickerItemsEqual', () => {
         id: 'goblin+file:///tmp/repo',
         name: 'repo',
         gitCapability: 'available',
-        remoteDetails: [],
-        lastSyncedAt: 1_000,
+        git: { remoteDetails: [], lastSyncedAt: 1_000 },
         lifecycle: null,
       },
     ]
@@ -128,8 +122,7 @@ describe('workspacePickerItemsEqual', () => {
         id: 'goblin+file:///tmp/repo',
         name: 'repo',
         gitCapability: 'available',
-        remoteDetails: [],
-        lastSyncedAt: 2_000,
+        git: { remoteDetails: [], lastSyncedAt: 2_000 },
         lifecycle: null,
       },
     ]
@@ -143,8 +136,7 @@ describe('workspacePickerItemsEqual', () => {
         id: 'goblin+file:///tmp/repo',
         name: 'repo',
         gitCapability: 'available',
-        remoteDetails: [],
-        lastSyncedAt: null,
+        git: { remoteDetails: [], lastSyncedAt: null },
         terminalBellCount: 1,
         lifecycle: null,
       },
@@ -154,8 +146,7 @@ describe('workspacePickerItemsEqual', () => {
         id: 'goblin+file:///tmp/repo',
         name: 'repo',
         gitCapability: 'available',
-        remoteDetails: [],
-        lastSyncedAt: null,
+        git: { remoteDetails: [], lastSyncedAt: null },
         terminalBellCount: 2,
         lifecycle: null,
       },
@@ -165,19 +156,19 @@ describe('workspacePickerItemsEqual', () => {
   })
 
   test('does not treat warm cache read-model time as a sync time', () => {
-    const repo = emptyWorkspace('goblin+file:///tmp/repo', 'repo', 'repo-runtime-test')
-    repo.projection = { source: 'cache', savedAt: 2_000 }
-    repo.dataLoads.repoReadModel.loadedAt = 2_000
+    const git = emptyGitWorkspaceProjection()
+    git.projection = { source: 'cache', savedAt: 2_000 }
+    git.dataLoads.repoReadModel.loadedAt = 2_000
 
-    expect(latestRepoSyncTime(repo)).toBeNull()
+    expect(latestRepoSyncTime(git)).toBeNull()
   })
 
   test('uses fresh read-model and fetch data-load times as sync candidates', () => {
-    const repo = emptyWorkspace('goblin+file:///tmp/repo', 'repo', 'repo-runtime-test')
-    repo.projection = { source: 'fresh', savedAt: null }
-    repo.dataLoads.repoReadModel.loadedAt = 2_000
-    repo.dataLoads.fetch.loadedAt = 3_000
+    const git = emptyGitWorkspaceProjection()
+    git.projection = { source: 'fresh', savedAt: null }
+    git.dataLoads.repoReadModel.loadedAt = 2_000
+    git.dataLoads.fetch.loadedAt = 3_000
 
-    expect(latestRepoSyncTime(repo)).toBe(3_000)
+    expect(latestRepoSyncTime(git)).toBe(3_000)
   })
 })

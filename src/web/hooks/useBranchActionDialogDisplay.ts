@@ -125,9 +125,11 @@ export function useBranchActionDialogDisplay<P>(
   const slotRepo = slot ? workspaces[slot.repoId] : null
   const branchReadModel = useRepoBranchReadModel(slot?.repoId ?? '', slotRepo?.workspaceRuntimeId ?? '', !!slotRepo)
   const operationsReadModel = useRepoOperationsReadModel(slot?.repoId ?? '', slotRepo?.workspaceRuntimeId ?? '', {
-    enabled: !!slotRepo,
+    enabled: slotRepo?.capability.kind === 'git',
   })
-  const liveContext = slot ? resolveContext(workspaces, slot, branchReadModel, operationsReadModel.data?.operations) : null
+  const liveContext = slot
+    ? resolveContext(workspaces, slot, branchReadModel, operationsReadModel.data?.operations)
+    : null
   // Retain the last non-null `liveContext` for the close-animation
   // window. After the user clicks Confirm/Cancel, `slot` is null and
   // `liveContext` is null, but the host still needs a stable context
@@ -157,20 +159,21 @@ function resolveContext<P>(
   operations: readonly RepoServerOperationState[] | undefined,
 ): BranchActionDialogContext | null {
   const repoFromStore = workspaces[entry.repoId]
-  if (!repoFromStore || !branchReadModel) return null
+  if (!repoFromStore || repoFromStore.capability.kind !== 'git' || !branchReadModel) return null
+  const git = repoFromStore.capability.git
   const repo: BranchActionDialogRepo = {
     id: repoFromStore.id,
     workspaceRuntimeId: repoFromStore.workspaceRuntimeId,
     branchModel: branchReadModel,
-    branchAction: projectBranchActionOperation(repoFromStore.operations.branchAction, operations, entry.branchName),
+    branchAction: projectBranchActionOperation(git.operations.branchAction, operations, entry.branchName),
     remote: {
-      lifecycle: repoFromStore.remote.lifecycle,
-      hasRemotes: repoFromStore.remote.hasRemotes,
-      hasBrowserRemote: repoFromStore.remote.hasBrowserRemote,
-      hasGitHubRemote: repoFromStore.remote.hasGitHubRemote,
-      browserRemoteProvider: repoFromStore.remote.browserRemoteProvider,
-      remoteProviders: repoFromStore.remote.remoteProviders,
+      hasRemotes: git.remote.hasRemotes,
+      hasBrowserRemote: git.remote.hasBrowserRemote,
+      hasGitHubRemote: git.remote.hasGitHubRemote,
+      browserRemoteProvider: git.remote.browserRemoteProvider,
+      remoteProviders: git.remote.remoteProviders,
     },
+    remoteLifecycle: repoFromStore.admission.kind === 'remote' ? repoFromStore.admission.lifecycle : null,
   }
   const branch = repo.branchModel.branches.find((b) => b.name === entry.branchName)
   if (!branch) return null

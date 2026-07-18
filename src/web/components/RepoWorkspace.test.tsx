@@ -152,14 +152,14 @@ function directoryWorkspaceProbe(name: string, options: { filesWritable?: boolea
 }
 
 function gitWorktreeFilesystemTarget(repo: WorkspaceState, rootPath: string, branchName: string) {
-  if (repo.workspaceProbe.status !== 'ready') throw new Error('expected ready workspace fixture')
+  if (repo.capability.kind !== 'git') throw new Error('expected Git workspace fixture')
   return {
     kind: 'git-worktree' as const,
     workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     rootPath,
     head: { kind: 'branch' as const, branchName },
-    capabilities: repo.workspaceProbe.capabilities,
+    capabilities: repo.capability.probe.capabilities,
   }
 }
 

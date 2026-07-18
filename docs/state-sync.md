@@ -45,6 +45,7 @@ Notes:
 - `useWorkspacesStore` is not a shared cross-window store.
 - `RuntimeCoherentWorkspaceState` names the runtime-coherent workspace projection slice.
 - `useWorkspacesStore.workspaces` is a client-local projection of runtime-coherent workspace truth.
+- Each `WorkspaceState` is a capability-neutral shell. Its discriminated `capability` owns the accepted probe and, only in the `git` variant, the complete `GitWorkspaceProjection`; plain and probing workspaces do not carry empty Git state. Its separate `admission` owns remote filesystem-transport lifecycle, so SSH readiness is not inferred from Git remotes.
 - React Query is the client read model for server-owned workspace runtime projections. UI and command paths should read through query-backed helpers such as `useRepoBranchReadModel` or `readRepoBranchQueryProjection` instead of treating `useWorkspacesStore.workspaces[*]` fields as authoritative runtime truth.
 - React Query is also the client projection for server-owned settings snapshots and workspace pane tab lists. Mutation helpers should update or invalidate those caches from server-returned canonical data, not from client intent payloads.
 - Store repo data may still exist as a projection for UI orchestration, action state, warm restore, and in-place server response application. New runtime reads should prefer the query-backed projection unless they are explicitly write-side projection code.

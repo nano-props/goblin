@@ -6,25 +6,76 @@ import {
   type RemoteRepoTarget,
 } from '#/shared/remote-repo.ts'
 import { deriveConnectivityLog } from '#/web/logger.ts'
-import type { WorkspaceState, WorkspacesSet, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
+import type {
+  GitWorkspaceProjection,
+  WorkspaceCapabilityState,
+  WorkspaceState,
+  WorkspacesSet,
+  WorkspacesStore,
+} from '#/web/stores/workspaces/types.ts'
+import {
+  workspaceGitAvailable,
+  workspaceGitUnavailable,
+  type WorkspaceProbeState,
+} from '#/shared/workspace-runtime.ts'
+import { emptyGitWorkspaceProjection } from '#/web/stores/workspaces/workspace-state-factory.ts'
+
+/** The sole transition boundary for authoritative workspace capability state. */
+export function acceptWorkspaceProbeState(repo: WorkspaceState, workspaceProbe: WorkspaceProbeState): void {
+  repo.capability = workspaceCapabilityAfterProbe(repo, workspaceProbe)
+}
+
+function workspaceCapabilityAfterProbe(
+  repo: WorkspaceState,
+  workspaceProbe: WorkspaceProbeState,
+): WorkspaceCapabilityState {
+  if (workspaceProbe.status === 'probing') {
+    return { kind: 'probing', probe: workspaceProbe }
+  }
+  if (workspaceProbe.status === 'unavailable') {
+    return { kind: 'unavailable', probe: workspaceProbe }
+  }
+  if (workspaceGitUnavailable(workspaceProbe)) {
+    return { kind: 'filesystem', probe: workspaceProbe }
+  }
+  if (workspaceGitAvailable(workspaceProbe)) {
+    return {
+      kind: 'git',
+      probe: workspaceProbe,
+      git: gitProjectionAcrossProbeTransition(repo),
+    }
+  }
+  throw new Error('Workspace ready probe has an unsupported Git capability')
+}
+
+function gitProjectionAcrossProbeTransition(repo: WorkspaceState): GitWorkspaceProjection {
+  switch (repo.capability.kind) {
+    case 'git':
+      return repo.capability.git
+    case 'probing':
+    case 'unavailable':
+    case 'filesystem':
+      return emptyGitWorkspaceProjection()
+  }
+}
 
 /**
- * Live SSH liveness state for remote repos. Derived — never stored —
- * from `isRemoteRepoId(id)` + `remote.lifecycle.kind`. The lifecycle
+ * Live SSH liveness state for remote workspaces. Derived — never stored —
+ * from `isRemoteRepoId(id)` + `admission.lifecycle.kind`. The lifecycle
  * union is the single source of truth; availability and target presence
  * are not used to infer connectivity.
- *   - `connecting`:  remote repo whose lifecycle run has not
+ *   - `connecting`:  remote workspace whose lifecycle run has not
  *     converged (placeholder / in-flight probe)
  *   - `connected`:   remote repo with a converged `ready` lifecycle;
  *     also the default for local repos
- *   - `unreachable`: remote repo whose last probe converged to
+ *   - `unreachable`: remote workspace whose last probe converged to
  *     `failed`
  */
 type RepoConnectivity = 'connecting' | 'connected' | 'unreachable'
 
 export function deriveConnectivity(repo: WorkspaceState): RepoConnectivity {
   if (!isRemoteRepoId(repo.id)) return 'connected'
-  const lifecycle = repo.remote.lifecycle
+  const lifecycle = requiredRemoteWorkspaceAdmission(repo).lifecycle
   if (lifecycle) {
     if (lifecycle.kind === 'failed') return 'unreachable'
     if (lifecycle.kind === 'connecting') return 'connecting'
@@ -57,7 +108,7 @@ export function remoteRepoTarget(id: string, lifecycle: RemoteRepoConnectionLife
 /**
  * Whether a repo is in a terminal "cannot be operated on" state:
  *   - Local repo: `availability.phase === 'unavailable'`
- *   - Remote repo: `remote.lifecycle.kind === 'failed'`
+ *   - Remote repo: `admission.lifecycle.kind === 'failed'`
  *
  * Replaces the per-call-site `repo.availability.phase === 'unavailable'`
  * check. Callers that previously had to know whether they were
@@ -65,9 +116,18 @@ export function remoteRepoTarget(id: string, lifecycle: RemoteRepoConnectionLife
  */
 export function isRepoUnavailable(repo: WorkspaceState): boolean {
   if (isRemoteRepoId(repo.id)) {
-    return repo.remote.lifecycle?.kind === 'failed'
+    return requiredRemoteWorkspaceAdmission(repo).lifecycle?.kind === 'failed'
   }
   return repo.availability.phase === 'unavailable'
+}
+
+function requiredRemoteWorkspaceAdmission(
+  workspace: WorkspaceState,
+): Extract<WorkspaceState['admission'], { kind: 'remote' }> {
+  if (workspace.admission.kind !== 'remote') {
+    throw new Error('Remote workspace identity requires remote transport admission')
+  }
+  return workspace.admission
 }
 
 type RepoMutator = (repo: Draft<WorkspaceState>) => void

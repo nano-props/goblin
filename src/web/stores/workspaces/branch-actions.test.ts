@@ -22,6 +22,7 @@ import type { BranchViewMode } from '#/web/stores/workspaces/types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { repoProjection } from '#/web/stores/workspaces/refresh-test-utils.ts'
+import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
 const REPO_ID = 'goblin+file:///tmp/goblin-branch-actions-test-repo'
 const refreshStoreAccess = { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState }
 
@@ -29,7 +30,8 @@ function branchBrowserRemoteProvider(
   repo: NonNullable<ReturnType<typeof useWorkspacesStore.getState>['workspaces'][string]>,
   branch: ReturnType<typeof createRepoBranch>,
 ) {
-  const providers = repo.remote.remoteProviders
+  const remote = requireGitWorkspaceForTest(repo).capability.git.remote
+  const providers = remote.remoteProviders
   const tracking = branch.tracking
   if (tracking && providers) {
     const remoteName = Object.keys(providers)
@@ -37,7 +39,7 @@ function branchBrowserRemoteProvider(
       .sort((a, b) => b.length - a.length)[0]
     if (remoteName) return providers[remoteName]
   }
-  return repo.remote.browserRemoteProvider
+  return remote.browserRemoteProvider
 }
 
 async function flushAsyncWork() {
@@ -65,7 +67,7 @@ function updateRepoForTest(
 
 function setBranchViewModeForTest(branchViewMode: BranchViewMode) {
   updateRepoForTest((repo) => {
-    repo.ui.branchViewMode = branchViewMode
+    requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode = branchViewMode
   })
 }
 
@@ -77,6 +79,14 @@ function repoBranchNames(): string[] {
 function repoCurrentBranch(): string | null {
   const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
   return repo ? (readRepoBranchQueryProjection(repo)?.currentBranch ?? null) : null
+}
+
+function repoGitPresentationForTest(repo: NonNullable<ReturnType<typeof useWorkspacesStore.getState>['workspaces'][string]>) {
+  const git = requireGitWorkspaceForTest(repo).capability.git
+  return {
+    ...repoPresentationFromQueryForTest(repo),
+    branchAction: git.operations.branchAction,
+  }
 }
 
 function createWorktreeAction(): Extract<RepoBranchAction, { kind: 'createWorktree' }> {
@@ -141,7 +151,7 @@ describe('branch action capabilities', () => {
         hasGitHubRemote: true,
       },
     })
-    let repo = repoPresentationFromQueryForTest(useWorkspacesStore.getState().workspaces[REPO_ID]!)
+    let repo = repoGitPresentationForTest(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]))
 
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canPush: true,
@@ -150,14 +160,15 @@ describe('branch action capabilities', () => {
     })
 
     updateRepoForTest((repo) => {
-      repo.remote.remotes = []
-      repo.remote.hasRemotes = false
-      repo.remote.hasBrowserRemote = false
-      repo.remote.browserRemoteProvider = undefined
-      repo.remote.remoteProviders = {}
-      repo.remote.hasGitHubRemote = false
+      const remote = requireGitWorkspaceForTest(repo).capability.git.remote
+      remote.remotes = []
+      remote.hasRemotes = false
+      remote.hasBrowserRemote = false
+      remote.browserRemoteProvider = undefined
+      remote.remoteProviders = {}
+      remote.hasGitHubRemote = false
     })
-    repo = repoPresentationFromQueryForTest(useWorkspacesStore.getState().workspaces[REPO_ID]!)
+    repo = repoGitPresentationForTest(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]))
 
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canPush: false,
@@ -178,7 +189,7 @@ describe('branch action capabilities', () => {
     })
 
     expect(branch.worktree).toEqual({ path: REPO_ID })
-    expect(getBranchActionCapabilities(repoPresentationFromQueryForTest(repo), branch)).toMatchObject({
+    expect(getBranchActionCapabilities(repoGitPresentationForTest(repo), branch)).toMatchObject({
       canRemoveWorktree: false,
     })
   })
@@ -192,7 +203,7 @@ describe('branch action capabilities', () => {
       currentBranch: 'feature/current-linked',
     })
 
-    expect(getBranchActionCapabilities(repoPresentationFromQueryForTest(repo), branch)).toMatchObject({
+    expect(getBranchActionCapabilities(repoGitPresentationForTest(repo), branch)).toMatchObject({
       canRemoveWorktree: true,
       isRegularBranch: false,
     })
@@ -211,8 +222,8 @@ describe('branch action capabilities', () => {
     seedRepoWithReadModelForTest({
       id: target!.id,
       branches: [branch],
+      remoteLifecycle: { kind: 'ready', target: target! },
       remote: {
-        lifecycle: { kind: 'ready', target: target! },
         remotes: ['origin'],
         hasRemotes: true,
         hasBrowserRemote: true,
@@ -222,7 +233,7 @@ describe('branch action capabilities', () => {
       },
     })
 
-    const repo = repoPresentationFromQueryForTest(useWorkspacesStore.getState().workspaces[target!.id]!)
+    const repo = repoGitPresentationForTest(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[target!.id]))
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canOpenTerminal: true,
       canOpenEditor: true,
@@ -308,7 +319,7 @@ describe('runBranchAction', () => {
     let pullCalls = 0
     let resolveFetch!: (value: { ok: true; message: string }) => void
     updateRepoForTest((repo) => {
-      repo.remote.hasRemotes = true
+      requireGitWorkspaceForTest(repo).capability.git.remote.hasRemotes = true
     })
     installGoblinTestBridge({
       'repo.fetch': () =>
@@ -346,7 +357,7 @@ describe('runBranchAction', () => {
     const work = useWorkspacesStore.getState().runBranchAction(REPO_ID, { kind: 'push', branch: 'feature/a' })
     const running = useWorkspacesStore.getState().workspaces[REPO_ID]
 
-    expect(running?.operations.branchAction).toMatchObject({
+    expect(requireGitWorkspaceForTest(running).capability.git.operations.branchAction).toMatchObject({
       phase: 'running',
       reason: 'branch:push',
       target: 'feature/a',
@@ -358,7 +369,7 @@ describe('runBranchAction', () => {
     await work
 
     const settled = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(settled?.operations.branchAction).toMatchObject({
+    expect(requireGitWorkspaceForTest(settled).capability.git.operations.branchAction).toMatchObject({
       phase: 'idle',
       target: null,
     })
@@ -379,7 +390,7 @@ describe('runBranchAction', () => {
 
     const pullWork = useWorkspacesStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
     await flushAsyncWork()
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.dataLoads.fetch.phase).toBe('loading')
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads.fetch.phase).toBe('loading')
 
     let releaseFetchOwner!: () => void
     const fetchOwner = runLatestOperation({
@@ -401,7 +412,7 @@ describe('runBranchAction', () => {
     resolvePull({ ok: true, message: 'ok' })
     await pullWork
 
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.dataLoads.fetch.phase).toBe('loading')
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads.fetch.phase).toBe('loading')
     expect(repoOperation(REPO_ID, 'fetch').phase).toBe('running')
 
     releaseFetchOwner()
@@ -431,7 +442,7 @@ describe('runBranchAction', () => {
     })
     await flushAsyncWork()
 
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.branchAction).toMatchObject({
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction).toMatchObject({
       phase: 'queued',
       reason: 'branch:deleteBranch',
       target: 'feature/a',
@@ -450,7 +461,7 @@ describe('runBranchAction', () => {
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(deleteCalls).toBe(0)
     expect(repo?.workspaceRuntimeId).toBe('repo-runtime-test-2')
-    expect(repo?.operations.branchAction).toMatchObject({
+    expect(requireGitWorkspaceForTest(repo).capability.git.operations.branchAction).toMatchObject({
       phase: 'idle',
       target: null,
     })
@@ -480,7 +491,7 @@ describe('runBranchAction', () => {
 
     expect(result).toEqual({ ok: false, message: 'error.branch-action-wait-timeout' })
     expect(deleteCalls).toBe(0)
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.events.at(-1)).toMatchObject({
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.events.at(-1)).toMatchObject({
       kind: 'result',
       result: { ok: false, message: 'error.branch-action-wait-timeout' },
       action: {
@@ -488,7 +499,7 @@ describe('runBranchAction', () => {
         branch: 'feature/a',
       },
     })
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.branchAction).toMatchObject({
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction).toMatchObject({
       phase: 'idle',
       target: null,
     })
@@ -509,7 +520,7 @@ describe('runBranchAction', () => {
     const result = await useWorkspacesStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
 
     expect(result).toEqual({ ok: false, message: 'error.network-op-in-progress' })
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.events.at(-1)).toMatchObject({
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.events.at(-1)).toMatchObject({
       kind: 'result',
       result: { ok: false, message: 'error.network-op-in-progress' },
       action: {
@@ -533,7 +544,7 @@ describe('runBranchAction', () => {
       .runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' }, { refreshOnError: false })
 
     expect(result).toEqual({ ok: false, message: 'boom' })
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.branchAction).toMatchObject({
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction).toMatchObject({
       phase: 'idle',
       target: null,
     })
@@ -570,13 +581,13 @@ describe('runBranchAction', () => {
 
     expect(pullCalls).toBe(0)
     expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('queued')
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.branchAction.phase).toBe('queued')
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction.phase).toBe('queued')
 
     resolveStatus([])
     await flushAsyncWork()
 
     expect(pullCalls).toBe(1)
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.branchAction.phase).toBe('running')
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction.phase).toBe('running')
     resolvePull({ ok: true, message: 'ok' })
     await Promise.all([statusWork, pullWork])
   })
@@ -626,13 +637,13 @@ describe('runBranchAction', () => {
       await flushAsyncWork()
 
       expect(actionCalls).toBe(0)
-      expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.branchAction.phase).toBe('queued')
+      expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction.phase).toBe('queued')
 
       resolveStatus([])
       await flushAsyncWork()
 
       expect(actionCalls).toBe(1)
-      expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.branchAction.phase).toBe('running')
+      expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction.phase).toBe('running')
       resolveAction({ ok: true, message: 'ok' })
       await Promise.all([statusWork, actionWork])
     },
@@ -650,7 +661,7 @@ describe('runBranchAction', () => {
     const work = useWorkspacesStore.getState().runBranchAction(REPO_ID, createWorktreeAction())
     const running = useWorkspacesStore.getState().workspaces[REPO_ID]
 
-    expect(running?.operations.branchAction).toMatchObject({
+    expect(requireGitWorkspaceForTest(running).capability.git.operations.branchAction).toMatchObject({
       phase: 'running',
       reason: 'branch:createWorktree',
       target: 'feature/new',
@@ -662,7 +673,7 @@ describe('runBranchAction', () => {
     await work
 
     const settled = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(settled?.operations.branchAction).toMatchObject({
+    expect(requireGitWorkspaceForTest(settled).capability.git.operations.branchAction).toMatchObject({
       phase: 'idle',
       target: null,
     })
@@ -711,7 +722,7 @@ describe('runBranchAction', () => {
       const work = useWorkspacesStore.getState().runBranchAction(REPO_ID, action)
       await flushAsyncWork()
 
-      expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.branchAction).toMatchObject({
+      expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction).toMatchObject({
         phase: 'running',
         target,
       })
@@ -723,7 +734,7 @@ describe('runBranchAction', () => {
       resolveProjection()
       await work
 
-      expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.branchAction).toMatchObject({
+      expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction).toMatchObject({
         phase: 'idle',
         target: null,
       })
@@ -747,7 +758,7 @@ describe('runBranchAction', () => {
 
     useWorkspacesStore.getState().submitBranchAction(REPO_ID, createWorktreeAction())
 
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.operations.branchAction).toMatchObject({
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction).toMatchObject({
       phase: 'running',
       reason: 'branch:createWorktree',
       target: 'feature/new',
@@ -766,7 +777,7 @@ describe('runBranchAction', () => {
       .getState()
       .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId: 'repo-runtime-test', refreshOnError: false })
 
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.events.at(-1)).toMatchObject({
+    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.events.at(-1)).toMatchObject({
       kind: 'result',
       result: { ok: false, message: 'error.invalid-path' },
       action: {
@@ -786,7 +797,7 @@ describe('runBranchAction', () => {
       .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId: 'repo-runtime-test' })
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(repo?.ui.branchViewMode).toBe('all')
+    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('all')
   })
 
   test('keeps worktrees filtering after creating a worktree', async () => {
@@ -798,7 +809,7 @@ describe('runBranchAction', () => {
       .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId: 'repo-runtime-test' })
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(repo?.ui.branchViewMode).toBe('worktrees')
+    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
   })
 
   test.each([
@@ -815,7 +826,7 @@ describe('runBranchAction', () => {
       .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId: 'repo-runtime-test', refreshOnError: false })
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(repo?.ui.branchViewMode).toBe('worktrees')
+    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
   })
 
   test('does not let stale create worktree refresh results change selection', async () => {
@@ -838,7 +849,7 @@ describe('runBranchAction', () => {
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(repo?.workspaceRuntimeId).toBe('repo-runtime-test-2')
-    expect(repo?.ui.branchViewMode).toBe('worktrees')
+    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
   })
 
   test('does not let stale branch action refresh results overwrite a reopened repo', async () => {
@@ -893,6 +904,6 @@ describe('runBranchAction', () => {
       )
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(repo?.ui.branchViewMode).toBe('worktrees')
+    expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')
   })
 })

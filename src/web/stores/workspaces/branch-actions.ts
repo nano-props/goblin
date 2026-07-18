@@ -39,6 +39,7 @@ import {
   removeRepoWorktree,
 } from '#/web/repo-client.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
+import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
 const BRANCH_NETWORK_OPERATION_KEY = 'branch-network-action'
 const BRANCH_ACTION_WAIT_TIMEOUT_MS = 30_000
 const BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE = 'error.branch-action-wait-timeout'
@@ -154,12 +155,14 @@ function settleNetworkFetchDataLoadState(
 ): void {
   if (!ownsFetchDataLoad) return
   updateIfFresh(set, id, workspaceRuntimeId, (r) => {
+    if (!isGitWorkspace(r)) return
+    const fetch = gitWorkspaceProjection(r).dataLoads.fetch
     if (result.message === 'cancelled') {
-      cancelDataLoad(r.dataLoads.fetch)
+      cancelDataLoad(fetch)
       return
     }
-    if (result.ok) finishDataLoadSuccess(r.dataLoads.fetch)
-    else finishDataLoadError(r.dataLoads.fetch, result.message)
+    if (result.ok) finishDataLoadSuccess(fetch)
+    else finishDataLoadError(fetch, result.message)
   })
 }
 
@@ -260,7 +263,7 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
     submitBranchAction(id: string, action: RepoBranchAction, options?: RunBranchActionOptions): void {
       const repo = get().workspaces[id]
       const workspaceRuntimeId = options?.workspaceRuntimeId ?? repo?.workspaceRuntimeId
-      if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId) return
+      if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId || !isGitWorkspace(repo)) return
       void get().runBranchAction(id, action, options)
     },
 
@@ -270,7 +273,7 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       options?: RunBranchActionOptions,
     ): Promise<ExecResult | null> {
       const repoBefore = get().workspaces[id]
-      if (!repoBefore) return null
+      if (!repoBefore || !isGitWorkspace(repoBefore)) return null
       const workspaceRuntimeId = options?.workspaceRuntimeId ?? repoBefore.workspaceRuntimeId
       if (repoBefore.workspaceRuntimeId !== workspaceRuntimeId) return null
       const network = isNetworkBranchAction(action)
@@ -278,12 +281,12 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       if (isRepoUnavailable(repoBefore)) {
         // Per the lifecycle union: local repos carry their
         // failure reason in `availability.reason`; remote repos
-        // carry it in `remote.lifecycle.reason` (or 'unknown'
+        // carry it in `admission.lifecycle.reason` (or 'unknown'
         // before Phase 3 had a chance to settle it). Either way,
         // we won't run branch actions on a failed repo.
         const reason =
-          repoBefore.remote.lifecycle?.kind === 'failed'
-            ? repoBefore.remote.lifecycle.reason
+          repoBefore.admission.kind === 'remote' && repoBefore.admission.lifecycle?.kind === 'failed'
+            ? repoBefore.admission.lifecycle.reason
             : repoBefore.availability.phase === 'unavailable'
               ? repoBefore.availability.reason
               : 'error.failed-read-repo'
@@ -300,7 +303,9 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
         return result
       }
       updateIfFresh(set, id, workspaceRuntimeId, (r) => {
-        if (network) startDataLoad(r.dataLoads.fetch, { hasData: r.dataLoads.fetch.loadedAt !== null })
+        if (!isGitWorkspace(r)) return
+        const fetch = gitWorkspaceProjection(r).dataLoads.fetch
+        if (network) startDataLoad(fetch, { hasData: fetch.loadedAt !== null })
       })
       const ownsNetworkFetchDataLoad = (ctx: Pick<RepoOperationContext, 'ownsTarget'>) =>
         network && ctx.ownsTarget('fetch')

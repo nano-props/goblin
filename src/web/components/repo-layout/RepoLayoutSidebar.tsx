@@ -14,6 +14,7 @@ import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { TitleBarDragRegion } from '#/web/components/title-bar-chrome-region.tsx'
+import type { GitWorkspaceProjection } from '#/web/stores/workspaces/types.ts'
 
 const NOOP = () => {}
 const SIDEBAR_TOP_CLASS_NAME = 'flex shrink-0 items-center gap-1 bg-card text-sm'
@@ -21,6 +22,7 @@ type RepoShellSidebarChromeRegion = 'drag' | 'none'
 
 interface RepoShellSidebarProps {
   workspaceId?: string
+  git: GitWorkspaceProjection | null
   compact: boolean
   branchContent?: ReactNode
   chromeRegion?: RepoShellSidebarChromeRegion
@@ -31,13 +33,13 @@ interface RepoShellSidebarProps {
   dashboardSelected?: boolean
   newWorktreeSelected?: boolean
   currentBranchName?: string | null
-  gitAvailable?: boolean
   workspaceRootSelected?: boolean
   onSelectWorkspaceRoot?: () => void
 }
 
 export function RepoLayoutSidebar({
   workspaceId,
+  git,
   compact,
   branchContent,
   chromeRegion = 'drag',
@@ -48,12 +50,11 @@ export function RepoLayoutSidebar({
   dashboardSelected = false,
   newWorktreeSelected = false,
   currentBranchName,
-  gitAvailable = true,
   workspaceRootSelected = false,
   onSelectWorkspaceRoot,
 }: RepoShellSidebarProps) {
   const t = useT()
-  const navigatorTitleKey = gitAvailable ? 'tab.branches' : 'workspace.navigation-title'
+  const navigatorTitleKey = git ? 'tab.branches' : 'workspace.navigation-title'
   return (
     <aside className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
       {!compact &&
@@ -76,14 +77,14 @@ export function RepoLayoutSidebar({
         onOpenDashboard={onOpenDashboard}
         dashboardSelected={dashboardSelected}
         newWorktreeSelected={newWorktreeSelected}
-        gitAvailable={gitAvailable}
+        gitAvailable={git !== null}
       />
       {workspaceId ? (
         <>
-          <RepoShellBranchHeader workspaceId={workspaceId} title={t(navigatorTitleKey)} gitAvailable={gitAvailable} />
+          <RepoShellBranchHeader workspaceId={workspaceId} title={t(navigatorTitleKey)} gitAvailable={git !== null} />
           <div className="flex min-h-0 flex-1 bg-card">
             {branchContent ??
-              (gitAvailable ? (
+              (git ? (
                 <BranchNavigator
                   repoId={workspaceId}
                   onSelectBranch={onSelectBranch}

@@ -16,6 +16,7 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 
 const REPO_ID = 'goblin+file:///tmp/navigation-actions-repo'
 const BRANCH_NAME = 'feature/create-pending'
@@ -98,23 +99,8 @@ describe('createPrimaryWindowNavigationActions', () => {
 
   test('activates a non-Git workspace at its Dashboard without restoring Git navigation history', () => {
     seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    markRepoGitUnavailable(REPO_ID)
     useWorkspacesStore.setState((state) => ({
-      workspaces: {
-        ...state.workspaces,
-        [REPO_ID]: {
-          ...state.workspaces[REPO_ID]!,
-          workspaceProbe: {
-            status: 'ready',
-            name: 'workspace',
-            capabilities: {
-              files: { read: true, write: true },
-              terminal: { available: true },
-              git: { status: 'unavailable' },
-            },
-            diagnostics: [],
-          },
-        },
-      },
       navigationHistoryByWorkspace: {
         ...state.navigationHistoryByWorkspace,
         [REPO_ID]: {
@@ -574,6 +560,11 @@ describe('createPrimaryWindowNavigationActions', () => {
   })
 
   test('activates a repo at its current workspace history entry', () => {
+    seedRepoWithReadModelForTest({
+      id: 'goblin+file:///tmp/repo-b',
+      branches: [createRepoBranch('feature/remembered')],
+      currentBranchName: 'feature/remembered',
+    })
     const entry = branchHistoryEntry('goblin+file:///tmp/repo-b', 'feature/remembered', 'history')
     useWorkspacesStore.getState().recordWorkspaceNavigation(entry)
     const navigation = routeNavigation()
@@ -681,6 +672,11 @@ describe('createPrimaryWindowNavigationActions', () => {
   })
 
   test('cycles to the target repo current workspace history entry', () => {
+    seedRepoWithReadModelForTest({
+      id: 'goblin+file:///tmp/repo-b',
+      branches: [createRepoBranch('feature/remembered')],
+      currentBranchName: 'feature/remembered',
+    })
     const entry = branchHistoryEntry('goblin+file:///tmp/repo-b', 'feature/remembered', 'status')
     useWorkspacesStore.getState().recordWorkspaceNavigation(entry)
     const navigation = routeNavigation()
@@ -748,6 +744,11 @@ describe('createPrimaryWindowNavigationActions', () => {
   })
 
   test('closes the current repo and restores the next repo workspace history entry', async () => {
+    seedRepoWithReadModelForTest({
+      id: 'goblin+file:///tmp/repo-c',
+      branches: [createRepoBranch('feature/remembered')],
+      currentBranchName: 'feature/remembered',
+    })
     useWorkspacesStore
       .getState()
       .recordWorkspaceNavigation(branchHistoryEntry('goblin+file:///tmp/repo-c', 'feature/remembered', 'history'))
@@ -1129,16 +1130,16 @@ function markRepoGitUnavailable(workspaceId: string): void {
       workspaces: {
         ...state.workspaces,
         [workspaceId]: replaceWorkspace(repo, (draft) => {
-          draft.workspaceProbe = {
-          status: 'ready',
-          name: 'workspace',
-          capabilities: {
-            files: { read: true, write: true },
-            terminal: { available: true },
-            git: { status: 'unavailable' },
-          },
-          diagnostics: [],
-          }
+          acceptWorkspaceProbeState(draft, {
+            status: 'ready',
+            name: 'workspace',
+            capabilities: {
+              files: { read: true, write: true },
+              terminal: { available: true },
+              git: { status: 'unavailable' },
+            },
+            diagnostics: [],
+          })
         }),
       },
     }

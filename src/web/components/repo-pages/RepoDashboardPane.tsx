@@ -26,10 +26,9 @@ import {
   useWorkspaceDirectoryOverview,
 } from '#/web/repo-data-query.ts'
 import type { PullRequestEntry } from '#/shared/api-types.ts'
-import type { RepoBranchState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { GitWorkspaceProjection, RepoBranchState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
-import { workspaceGitAvailable, workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 import { DirectoryOverviewContent } from '#/web/components/repo-pages/DirectoryOverviewContent.tsx'
 import { DASHBOARD_CARD_CLASS_NAME, DashboardMetricCard } from '#/web/components/repo-pages/dashboard-ui.tsx'
 import { remoteRepoTarget } from '#/web/stores/workspaces/workspace-guards.ts'
@@ -78,15 +77,14 @@ export function RepoDashboardPane({
             id: state.id,
             name: state.name,
             workspaceRuntimeId: state.workspaceRuntimeId,
-            projection: state.projection,
-            remote: state.remote,
-            workspaceProbe: state.workspaceProbe,
+            admission: state.admission,
+            capability: state.capability,
           }
         : null
     }),
   )
-  const directoryWorkspace = workspaceGitUnavailable(repo?.workspaceProbe)
-  const gitQueriesEnabled = !!repo && workspaceGitAvailable(repo.workspaceProbe)
+  const directoryWorkspace = repo?.capability.kind === 'filesystem'
+  const gitQueriesEnabled = repo?.capability.kind === 'git'
   const projectionReadModel = useRepoProjectionReadModel(
     repoId,
     repo?.workspaceRuntimeId ?? '',
@@ -144,7 +142,7 @@ export function RepoDashboardPane({
               retrying={statusReadModel.isFetching}
               onRetry={retryStatus}
             />
-          ) : repo && branchModel && summary ? (
+          ) : repo && repo.capability.kind === 'git' && branchModel && summary ? (
             <>
               {statusStale && (
                 <RepoStatusStaleNotice
@@ -153,7 +151,12 @@ export function RepoDashboardPane({
                   onRetry={retryStatus}
                 />
               )}
-              <DashboardHeader repo={repo} currentBranch={branchModel.currentBranch} lang={lang} />
+              <DashboardHeader
+                repo={repo}
+                git={repo.capability.git}
+                currentBranch={branchModel.currentBranch}
+                lang={lang}
+              />
               <DashboardStats compact={compact} summary={summary} />
               <div
                 className={cn(
@@ -187,14 +190,14 @@ function DirectoryDashboard({
   overview,
   compact,
 }: {
-  repo: Pick<WorkspaceState, 'name' | 'id' | 'remote'>
+  repo: Pick<WorkspaceState, 'name' | 'id' | 'admission'>
   overview: { topLevelFileCount: number; topLevelDirectoryCount: number; totalSizeBytes: number }
   compact: boolean
 }) {
   const t = useT()
   const displayLocation = formatWorkspaceDisplayLocation(
     repo.id,
-    remoteRepoTarget(repo.id, repo.remote.lifecycle),
+    remoteRepoTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null),
   )
   return (
     <>
@@ -284,21 +287,23 @@ function branchWorktreeDirty(branchModel: RepoBranchReadModelData, branch: RepoB
 
 function DashboardHeader({
   repo,
+  git,
   currentBranch,
   lang,
 }: {
-  repo: Pick<WorkspaceState, 'name' | 'id' | 'projection' | 'remote'>
+  repo: Pick<WorkspaceState, 'name' | 'id' | 'admission'>
+  git: GitWorkspaceProjection
   currentBranch: string
   lang: Lang
 }) {
   const t = useT()
-  const updatedAt = repo.projection.savedAt
-    ? formatRelativeTimeOrNull(new Date(repo.projection.savedAt).toISOString(), lang)
+  const updatedAt = git.projection.savedAt
+    ? formatRelativeTimeOrNull(new Date(git.projection.savedAt).toISOString(), lang)
     : null
-  const remoteState = dashboardRemoteState(repo)
+  const remoteState = dashboardRemoteState(git)
   const displayLocation = formatWorkspaceDisplayLocation(
     repo.id,
-    remoteRepoTarget(repo.id, repo.remote.lifecycle),
+    remoteRepoTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null),
   )
 
   return (
@@ -327,12 +332,12 @@ function DashboardHeader({
   )
 }
 
-function dashboardRemoteState(repo: Pick<WorkspaceState, 'remote'>): {
+function dashboardRemoteState(git: GitWorkspaceProjection): {
   labelKey: string
   variant: 'outline' | 'success' | 'attention'
 } {
-  if (repo.remote.fetchFailed) return { labelKey: 'dashboard.remote.fetch-failed', variant: 'attention' }
-  if (repo.remote.hasRemotes) return { labelKey: 'dashboard.remote.connected', variant: 'success' }
+  if (git.remote.fetchFailed) return { labelKey: 'dashboard.remote.fetch-failed', variant: 'attention' }
+  if (git.remote.hasRemotes) return { labelKey: 'dashboard.remote.connected', variant: 'success' }
   return { labelKey: 'dashboard.remote.local-only', variant: 'outline' }
 }
 

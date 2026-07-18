@@ -165,7 +165,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
   // (e.g. network reconnect) re-renders this row.
   const worktreeTarget = useWorkspacesStore((s) => {
     const repo = s.workspaces[detail.repoId]
-    return repo ? remoteRepoTarget(repo.id, repo.remote.lifecycle) : null
+    return repo ? remoteRepoTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null) : null
   })
   const openFilesTab = useMemo(
     () =>

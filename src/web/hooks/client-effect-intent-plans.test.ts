@@ -121,7 +121,9 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentWorkspaceId: 'goblin+file:///tmp/repo',
-        currentRepo: CURRENT_GIT_REPO,
+
+        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
+        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -137,7 +139,9 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentWorkspaceId: 'goblin+file:///tmp/repo',
-        currentRepo: CURRENT_GIT_REPO,
+
+        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
+        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -153,7 +157,9 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentWorkspaceId: 'goblin+file:///tmp/repo',
-        currentRepo: CURRENT_GIT_REPO,
+
+        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
+        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -169,7 +175,9 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentWorkspaceId: null,
-        currentRepo: null,
+
+        currentWorkspaceRuntimeId: null,
+        currentWorkspaceCapability: null,
         currentWorkspacePaneCommandTarget: null,
       },
     )
@@ -185,7 +193,9 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentWorkspaceId: 'goblin+file:///tmp/repo',
-        currentRepo: CURRENT_GIT_REPO,
+
+        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
+        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -205,7 +215,9 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentWorkspaceId: CURRENT_DIRECTORY_REPO.id,
-        currentRepo: CURRENT_DIRECTORY_REPO,
+
+        currentWorkspaceRuntimeId: CURRENT_DIRECTORY_REPO.workspaceRuntimeId,
+        currentWorkspaceCapability: { kind: 'filesystem', probe: CURRENT_DIRECTORY_REPO.workspaceProbe },
         currentWorkspacePaneCommandTarget: {
           kind: 'workspace-root',
           workspacePaneRoute: null,
@@ -231,7 +243,9 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentWorkspaceId: 'goblin+file:///tmp/repo',
-        currentRepo: CURRENT_GIT_REPO,
+
+        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
+        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -251,7 +265,9 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentWorkspaceId: 'goblin+file:///tmp/repo',
-        currentRepo: CURRENT_GIT_REPO,
+
+        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
+        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -267,7 +283,9 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentWorkspaceId: 'goblin+file:///tmp/repo',
-        currentRepo: CURRENT_GIT_REPO,
+
+        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
+        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -283,7 +301,9 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: true,
         currentWorkspaceId: 'goblin+file:///tmp/repo',
-        currentRepo: CURRENT_GIT_REPO,
+
+        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
+        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -299,7 +319,9 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentWorkspaceId: 'goblin+file:///tmp/repo',
-        currentRepo: CURRENT_GIT_REPO,
+
+        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
+        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )
@@ -315,7 +337,9 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentWorkspaceId: CURRENT_DIRECTORY_REPO.id,
-        currentRepo: CURRENT_DIRECTORY_REPO,
+
+        currentWorkspaceRuntimeId: CURRENT_DIRECTORY_REPO.workspaceRuntimeId,
+        currentWorkspaceCapability: { kind: 'filesystem', probe: CURRENT_DIRECTORY_REPO.workspaceProbe },
         currentWorkspacePaneCommandTarget: {
           kind: 'workspace-root',
           workspacePaneRoute: null,
@@ -341,7 +365,9 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentWorkspaceId: null,
-        currentRepo: null,
+
+        currentWorkspaceRuntimeId: null,
+        currentWorkspaceCapability: null,
         currentWorkspacePaneCommandTarget: null,
       },
     )
@@ -357,7 +383,9 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentWorkspaceId: 'goblin+file:///tmp/repo',
-        currentRepo: CURRENT_GIT_REPO,
+
+        currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
+        currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
         currentWorkspacePaneCommandTarget: { kind: 'git-branch', branchName: 'main', workspacePaneRoute: null },
       },
     )

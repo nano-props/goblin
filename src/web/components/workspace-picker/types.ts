@@ -5,12 +5,11 @@ export interface WorkspacePickerItem {
   name: string
   /** Git capability reported by the authoritative workspace probe. */
   gitCapability: 'unknown' | 'available' | 'unavailable'
-  remoteDetails: GitRemoteInfo[]
-  /**
-   * Last time this client refreshed workspace data after a sync/invalidation.
-   * Null until read-model/fetch data loads have completed at least once.
-   */
-  lastSyncedAt: number | null
+  git: {
+    remoteDetails: GitRemoteInfo[] | undefined
+    /** Last time this client refreshed Git data after a sync/invalidation. */
+    lastSyncedAt: number | null
+  } | null
   /** Unread terminal bell count across this workspace's terminal sessions. */
   terminalBellCount?: number
   /**

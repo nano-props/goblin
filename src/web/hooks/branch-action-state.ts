@@ -4,7 +4,7 @@ import {
   isBranchActionReason,
   type RepoOperationState,
 } from '#/web/stores/workspaces/operations.ts'
-import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import type { GitWorkspaceProjection, WorkspaceAdmissionState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 export type BranchActionItemId =
@@ -28,13 +28,14 @@ export interface BranchActionRepo {
   branchModel: Pick<RepoBranchReadModelData, 'currentBranch' | 'status' | 'worktreesByPath'>
   branchAction: RepoOperationState
   remote: Pick<
-    WorkspaceState['remote'],
-    'lifecycle' | 'hasRemotes' | 'hasBrowserRemote' | 'hasGitHubRemote' | 'browserRemoteProvider' | 'remoteProviders'
+    GitWorkspaceProjection['remote'],
+    'hasRemotes' | 'hasBrowserRemote' | 'hasGitHubRemote' | 'browserRemoteProvider' | 'remoteProviders'
   >
+  remoteLifecycle: Extract<WorkspaceAdmissionState, { kind: 'remote' }>['lifecycle']
 }
 
 interface BranchActionLocalFallbackRepo {
-  operations: Pick<WorkspaceState['operations'], 'branchAction'>
+  operations: Pick<GitWorkspaceProjection['operations'], 'branchAction'>
 }
 
 export function isBranchActionBlocked(repo: Pick<BranchActionRepo, 'branchAction'>): boolean {

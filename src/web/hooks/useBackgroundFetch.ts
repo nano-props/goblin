@@ -7,7 +7,12 @@ import { useFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { hasClientServerConfig } from '#/web/lib/server-config.ts'
 
 function isBackgroundSyncEligible(repo: WorkspaceState | null | undefined): repo is WorkspaceState {
-  return !!repo && !isRepoUnavailable(repo) && repo.remote.hasRemotes === true
+  return (
+    !!repo &&
+    !isRepoUnavailable(repo) &&
+    repo.capability.kind === 'git' &&
+    repo.capability.git.remote.hasRemotes === true
+  )
 }
 
 export function backgroundSyncRepoIdsFromStore(
@@ -19,7 +24,9 @@ export function backgroundSyncRepoIdsFromStore(
 }
 
 export function useBackgroundFetch({ hydratedRouteRepoId }: { hydratedRouteRepoId: string | null }) {
-  const eligibleRepoIdsKey = useWorkspacesStore((s) => backgroundSyncRepoIdsFromStore(s, hydratedRouteRepoId).join('\0'))
+  const eligibleRepoIdsKey = useWorkspacesStore((s) =>
+    backgroundSyncRepoIdsFromStore(s, hydratedRouteRepoId).join('\0'),
+  )
   const { fetchIntervalSec } = useFetchSettings()
   const hasServer = hasClientServerConfig()
 

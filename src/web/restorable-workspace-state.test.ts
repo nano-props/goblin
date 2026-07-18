@@ -11,6 +11,7 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { repoWorktreeStatusQueryKey } from '#/web/repo-data-query.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 
 describe('restorable-workspace-state', () => {
   beforeEach(() => {
@@ -61,7 +62,7 @@ describe('restorable-workspace-state', () => {
       'repo-without-query-model',
       'repo-runtime-without-query',
     )
-    repo.workspaceProbe = {
+    acceptWorkspaceProbeState(repo, {
       status: 'ready',
       name: 'repo-without-query-model',
       capabilities: {
@@ -70,7 +71,7 @@ describe('restorable-workspace-state', () => {
         git: { status: 'unavailable' },
       },
       diagnostics: [],
-    }
+    })
     const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, repo.id)
     const workspaceRootTargetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'workspace-root',
