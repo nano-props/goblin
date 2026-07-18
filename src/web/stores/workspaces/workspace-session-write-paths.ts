@@ -9,10 +9,7 @@ import {
 } from '#/web/stores/workspaces/persistence.ts'
 import { disposeRepoOperationScheduler } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
-import {
-  abortRepoOperation,
-  probeRepo,
-} from '#/web/repo-client.ts'
+import { abortRepoOperation, probeRepo } from '#/web/repo-client.ts'
 import {
   closeWorkspaceRuntime,
   openWorkspaceRuntime,
@@ -561,7 +558,9 @@ async function recordRecentWorkspacePostOpen(repo: WorkspaceSessionEntry): Promi
     return []
   } catch (err) {
     workspacesLog.warn('failed to record recent repo after opening workspace', { repo, err })
-    return [{ kind: 'recent-workspace', message: err instanceof Error ? err.message : 'workspace-picker.recent-save-failed' }]
+    return [
+      { kind: 'recent-workspace', message: err instanceof Error ? err.message : 'workspace-picker.recent-save-failed' },
+    ]
   }
 }
 
@@ -606,6 +605,15 @@ function sessionEntryForResolvedRepo(resolvedRepo: ResolvedRepo): WorkspaceSessi
 
 function sessionProjectionStateForResolvedRepo(resolvedRepo: ResolvedRepo): WorkspaceSessionProjectionState {
   return resolvedRepo.session?.projectionState ?? 'projected'
+}
+
+function capabilityAcrossRuntimeTransition(
+  workspace: WorkspaceState,
+  workspaceRuntimeId: string,
+): WorkspaceState['capability'] {
+  return workspace.workspaceRuntimeId === workspaceRuntimeId
+    ? workspace.capability
+    : { kind: 'probing', probe: { status: 'probing' } }
 }
 
 /** Upsert a repo by id, centralising the "if it exists, mutate; if
@@ -682,7 +690,8 @@ export function addResolvedWorkspace(
         existing.session.projectionState !== sessionProjectionState ||
         !sameWorkspaceSessionEntry(existing.session.entry, sessionEntry)
       const workspaceProbeChanged =
-        !!resolvedRepo.workspaceProbe && !sameWorkspaceProbeState(existing.capability.probe, resolvedRepo.workspaceProbe)
+        !!resolvedRepo.workspaceProbe &&
+        !sameWorkspaceProbeState(existing.capability.probe, resolvedRepo.workspaceProbe)
       if (!resolvedRepo.target) {
         if (!runtimeChanged && !nameChanged && !sessionChanged && !workspaceProbeChanged) return null
         const next: WorkspaceState = {
@@ -693,10 +702,12 @@ export function addResolvedWorkspace(
             entry: sessionEntry,
             projectionState: sessionProjectionState,
           },
-          capability: runtimeChanged ? { kind: 'probing', probe: { status: 'probing' } } : existing.capability,
+          capability: capabilityAcrossRuntimeTransition(existing, workspaceRuntimeId),
         }
         if (resolvedRepo.workspaceProbe) acceptWorkspaceProbeState(next, resolvedRepo.workspaceProbe)
-        return preserveGitProjection ? next : restoreRepoProjectionFromCacheEntry(next, s.repoSnapshotCache[resolvedRepo.id])
+        return preserveGitProjection
+          ? next
+          : restoreRepoProjectionFromCacheEntry(next, s.repoSnapshotCache[resolvedRepo.id])
       }
       const lifecycleReady = existing.admission.kind === 'remote' && existing.admission.lifecycle?.kind === 'ready'
       const targetChanged = !remoteTargetsEqual(
@@ -725,7 +736,7 @@ export function addResolvedWorkspace(
           entry: sessionEntry,
           projectionState: sessionProjectionState,
         },
-        capability: runtimeChanged ? { kind: 'probing', probe: { status: 'probing' } } : existing.capability,
+        capability: capabilityAcrossRuntimeTransition(existing, workspaceRuntimeId),
         admission:
           existing.admission.kind === 'remote'
             ? {
@@ -736,7 +747,9 @@ export function addResolvedWorkspace(
             : existing.admission,
       }
       if (resolvedRepo.workspaceProbe) acceptWorkspaceProbeState(next, resolvedRepo.workspaceProbe)
-      const restored = preserveGitProjection ? next : restoreRepoProjectionFromCacheEntry(next, s.repoSnapshotCache[resolvedRepo.id])
+      const restored = preserveGitProjection
+        ? next
+        : restoreRepoProjectionFromCacheEntry(next, s.repoSnapshotCache[resolvedRepo.id])
       markRemoteLifecycleReady(restored, resolvedRepo.target)
       return restored
     },
@@ -749,8 +762,9 @@ export function addResolvedWorkspace(
  *     got a probe failure back). Uses the restorable cache for any cached
  *     name/branches, then flips availability.
  *   - If a placeholder (from insertPlaceholderWorkspace) is already there, promote
- *     it in place — preserves the cached projection, updates target if
- *     the probe produced one, and flips availability to 'unavailable'.
+ *     it in place. Capability authority is retained only while the runtime epoch
+ *     is unchanged; a replacement runtime starts from probing before availability
+ *     and transport admission settle.
  *     (The derived connectivity naturally reads as 'unreachable' once
  *     availability is unavailable.)
  */
@@ -792,6 +806,7 @@ export function addUnavailableWorkspace(
       const next: WorkspaceState = {
         ...existing,
         workspaceRuntimeId: runtimeChanged ? workspaceRuntimeId : existing.workspaceRuntimeId,
+        capability: capabilityAcrossRuntimeTransition(existing, workspaceRuntimeId),
         session: {
           entry: target ? remoteWorkspaceSessionEntry(target) : existing.session.entry,
           projectionState: 'projected',
@@ -862,7 +877,9 @@ export function refreshInitialWorkspaceState(set: WorkspacesSet, get: Workspaces
   const repo = get().workspaces[refresh.id]
   if (!repo || repo.workspaceRuntimeId !== refresh.workspaceRuntimeId) return
   if (repo.capability.kind !== 'git') return
-  void requestRepoProjectionReadModelRefresh({ get, set }, refresh.id, { workspaceRuntimeId: refresh.workspaceRuntimeId })
+  void requestRepoProjectionReadModelRefresh({ get, set }, refresh.id, {
+    workspaceRuntimeId: refresh.workspaceRuntimeId,
+  })
 }
 
 export function createWorkspaceLifecycleActions(
@@ -897,7 +914,11 @@ export function createWorkspaceLifecycleActions(
   }
 }
 
-async function openLocalWorkspace(set: WorkspacesSet, get: WorkspacesGet, repoInput: string): Promise<OpenWorkspaceResult> {
+async function openLocalWorkspace(
+  set: WorkspacesSet,
+  get: WorkspacesGet,
+  repoInput: string,
+): Promise<OpenWorkspaceResult> {
   const initialRefreshRef: { current: InitialRepoRefresh | null } = { current: null }
   const resolved = await runWorkspaceRuntimeMembershipCommand(repoInput, async () => {
     const opened = await openLocalWorkspaceRuntimeForCommandInput(repoInput)
@@ -909,13 +930,17 @@ async function openLocalWorkspace(set: WorkspacesSet, get: WorkspacesGet, repoIn
       : { kind: 'local' as const, id: repo.id }
     const membership = await addWorkspaceMembershipResult(workspaceEntry)
     if (!membership.ok) {
-      workspacesLog.warn('failed to add local repo to server workspace', { workspaceId: repo.id, err: membership.error })
+      workspacesLog.warn('failed to add local repo to server workspace', {
+        workspaceId: repo.id,
+        err: membership.error,
+      })
       await releaseUncommittedWorkspaceRuntime(repo.id, workspaceRuntimeId)
       return { ...opened, reason: 'error.failed-read-repo', repo: null, workspaceRuntimeId: null }
     }
     set((state) => {
       const { workspaces, workspaceOrder, changed } = addResolvedWorkspace(state, repo, workspaceRuntimeId)
-      if (changed) initialRefreshRef.current = { id: repo.id, workspaceRuntimeId: workspaces[repo.id]!.workspaceRuntimeId }
+      if (changed)
+        initialRefreshRef.current = { id: repo.id, workspaceRuntimeId: workspaces[repo.id]!.workspaceRuntimeId }
       return changed ? { workspaces, workspaceOrder } : state
     })
     return opened
@@ -944,7 +969,11 @@ async function openRemoteWorkspace(
         openedWorkspaceRuntimeId = workspaceRuntimeId
         set((state) => {
           const result = insertPlaceholderWorkspace(
-            { workspaces: state.workspaces, repoSnapshotCache: state.repoSnapshotCache, workspaceOrder: state.workspaceOrder },
+            {
+              workspaces: state.workspaces,
+              repoSnapshotCache: state.repoSnapshotCache,
+              workspaceOrder: state.workspaceOrder,
+            },
             entry,
             workspaceRuntimeId,
           )
@@ -957,7 +986,10 @@ async function openRemoteWorkspace(
     const membership = await addWorkspaceMembershipResult(entry)
     if (!membership.ok) {
       if (openedWorkspaceRuntimeId) await rollbackNewWorkspace(set, get, entry.id, openedWorkspaceRuntimeId)
-      workspacesLog.warn('failed to add remote repo to server workspace', { workspaceId: entry.id, err: membership.error })
+      workspacesLog.warn('failed to add remote repo to server workspace', {
+        workspaceId: entry.id,
+        err: membership.error,
+      })
       return null
     }
     return { workspaceRuntimeId }
@@ -976,7 +1008,11 @@ async function openRemoteWorkspace(
   return { ok: true, workspaceId, postOpenEffects: recordRecentWorkspacePostOpen(recentEntry) }
 }
 
-async function closeWorkspaceMembership(set: WorkspacesSet, get: WorkspacesGet, id: string): Promise<CloseWorkspaceResult> {
+async function closeWorkspaceMembership(
+  set: WorkspacesSet,
+  get: WorkspacesGet,
+  id: string,
+): Promise<CloseWorkspaceResult> {
   const workspaceRuntimeId = get().workspaces[id]?.workspaceRuntimeId ?? null
   const membership = await removeWorkspaceMembershipResult(id)
   if (!membership.ok) {

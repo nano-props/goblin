@@ -12,7 +12,7 @@ import { requireRemoteAdmissionForTest } from '#/web/stores/workspaces/git-works
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { markRemoteLifecycleReady } from '#/web/stores/workspaces/availability.ts'
-import { addResolvedWorkspace } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
+import { addResolvedWorkspace, addUnavailableWorkspace } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import {
   branchSnapshot,
   flushIpc,
@@ -25,6 +25,34 @@ import {
 beforeEach(resetLifecycleTest)
 
 describe('repo lifecycle', () => {
+  test('does not carry Git capability authority into a replacement runtime that is unavailable', () => {
+    const workspaceId = REPO_A
+    const workspace = emptyWorkspace(workspaceId, 'Example workspace', 'workspace-runtime-old')
+    acceptWorkspaceProbeState(workspace, {
+      status: 'ready',
+      name: 'Example workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
+      diagnostics: [],
+    })
+
+    const result = addUnavailableWorkspace(
+      { workspaces: { [workspaceId]: workspace }, repoSnapshotCache: {}, workspaceOrder: [workspaceId] },
+      workspaceId,
+      'Workspace is unavailable',
+      'workspace-runtime-new',
+    )
+
+    expect(result.workspaces[workspaceId]).toMatchObject({
+      workspaceRuntimeId: 'workspace-runtime-new',
+      availability: { phase: 'unavailable', reason: 'Workspace is unavailable' },
+      capability: { kind: 'probing', probe: { status: 'probing' } },
+    })
+  })
+
   test('accepts a capability change for an unchanged ready remote target', () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
@@ -380,7 +408,10 @@ describe('repo lifecycle', () => {
     if (result.ok) await result.postOpenEffects
 
     expect(result).toMatchObject({ ok: true, workspaceId: target!.id })
-    expect(requireRemoteAdmissionForTest(useWorkspacesStore.getState().workspaces[target!.id]).lifecycle).toEqual({ kind: 'ready', target })
+    expect(requireRemoteAdmissionForTest(useWorkspacesStore.getState().workspaces[target!.id]).lifecycle).toEqual({
+      kind: 'ready',
+      target,
+    })
     expect(calls.recent).toEqual([remoteWorkspaceSessionEntry(target!)])
   })
 
@@ -399,7 +430,9 @@ describe('repo lifecycle', () => {
       },
     })
 
-    await expect(useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))).resolves.toMatchObject({
+    await expect(
+      useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!)),
+    ).resolves.toMatchObject({
       ok: true,
       workspaceId: target!.id,
     })
