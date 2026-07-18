@@ -57,7 +57,7 @@ describe('openRepoFromDialog', () => {
 
     expect(activateRepo).toHaveBeenCalledWith('goblin+file:///tmp/repo')
     await Promise.resolve()
-    expect(mocks.toastError).toHaveBeenCalledWith('repo-picker.recent-save-failed', {
+    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.recent-save-failed', {
       description: 'recent write failed',
     })
   })

@@ -47,13 +47,14 @@ import {
   workspaceDirectoryOverviewQueryKey,
 } from '#/web/repo-data-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import { nextRepoWorkspaceTabAfterClose } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import { nextWorkspacePaneTabEntryAfterClose } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   createTerminalWithAdmissionForContextTest,
   terminalSessionContextForTest,
 } from '#/web/test-utils/terminal-session-context.ts'
+import { setTerminalSessionCommandBridgeForTest } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
@@ -418,6 +419,26 @@ describe('RepoWorkspace', () => {
       .getState()
       .setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: workspaceId }, 'files')
     const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(workspaceId, workspaceId)
+    const closeTerminalByDescriptor = vi.fn(async () => {
+      setWorkspacePaneTabsForTargetQueryData({
+        kind: 'workspace-root',
+        repoRoot: workspaceId,
+        repoRuntimeId: repo.repoRuntimeId,
+        tabs: [workspacePaneStaticTabEntry('files')],
+      })
+      return true
+    })
+    const workspaceTerminalCommands = terminalSessionContextForTest({
+      ...terminalCommandContext,
+      closeTerminalByDescriptor,
+    })
+    const workspaceTerminalReadContext = terminalReadContextWithSession(terminalWorktreeKey, terminalSessionId)
+    const resetTerminalCommandBridge = setTerminalSessionCommandBridgeForTest({
+      terminalWorktreeSnapshot: workspaceTerminalReadContext.terminalWorktreeSnapshot,
+      createTerminal: terminalCommandContext.createTerminal,
+      selectTerminal: terminalCommandContext.selectTerminal,
+      closeTerminalByDescriptor,
+    })
     const showRepoWorkspacePaneTab = vi.fn<NonNullable<PrimaryWindowNavigationActions['showRepoWorkspacePaneTab']>>(
       (_repoId, presentation, options) => {
         if (presentation.kind === 'terminal') {
@@ -439,8 +460,8 @@ describe('RepoWorkspace', () => {
     render(
       <QueryClientProvider client={primaryWindowQueryClient}>
         <PrimaryWindowNavigationProvider value={workspaceNavigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContextWithSession(terminalWorktreeKey, terminalSessionId)}>
+          <TerminalSessionContext value={workspaceTerminalCommands}>
+            <TerminalSessionReadContext value={workspaceTerminalReadContext}>
               <RepoWorkspace repoId={workspaceId} workspacePaneRouteContext={{ kind: 'workspace-root' }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -458,6 +479,22 @@ describe('RepoWorkspace', () => {
     expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).toBe(
       terminalSessionId,
     )
+
+    const terminalChrome = document.querySelector(
+      `[data-workspace-pane-tab-tooltip-id="terminal:${terminalSessionId}"]`,
+    )
+    const closeButton = terminalChrome
+      ? Array.from(terminalChrome.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
+          (button.getAttribute('aria-label') ?? '').startsWith('terminal.close-named'),
+        )
+      : null
+    expect(closeButton).not.toBeNull()
+    act(() => closeButton?.click())
+
+    await waitFor(() => expect(closeTerminalByDescriptor).toHaveBeenCalledWith(terminalSessionId, expect.any(Object)))
+    await waitFor(() => expect(screen.getByRole('tabpanel', { name: 'tab.files' })).toBeTruthy())
+    expect(screen.queryByRole('tab', { name: terminalSessionId })).toBeNull()
+    resetTerminalCommandBridge()
   })
 
   test('renders the shared empty pane when every workspace-root tab is closed', () => {
@@ -1447,13 +1484,13 @@ describe('RepoWorkspace', () => {
     expect(closeTarget?.tabs.map((tab) => tab.identity)).toEqual(['workspace-pane:status', 'workspace-pane:files'])
     expect(
       closeTarget
-        ? nextRepoWorkspaceTabAfterClose(
-            closeTarget.tabs,
+        ? nextWorkspacePaneTabEntryAfterClose(
+            closeTarget.tabEntries,
             'workspace-pane:files',
             workspacePaneTabOpener(paneTarget, repo.repoRuntimeId, 'workspace-pane:files'),
-          )?.identity
+          )?.type
         : null,
-    ).toBe('workspace-pane:status')
+    ).toBe('status')
 
     const filesTab = container.querySelector('[data-workspace-pane-tab-tooltip-id="workspace-pane:files"]')
     const filesCloseButton = filesTab
@@ -1563,7 +1600,7 @@ describe('RepoWorkspace', () => {
     expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, branchName, 'status', presentationOptions())
   })
 
-  test('reconciles a closed active tab after close-back navigation rejects', async () => {
+  test('reports a successful close and reconciles after close-back navigation rejects', async () => {
     const branchName = 'feature/close-route-rejected'
     const worktreePath = '/tmp/close-route-rejected-worktree'
     const repo = seedRepoWithReadModelForTest({
@@ -1608,7 +1645,7 @@ describe('RepoWorkspace', () => {
         },
         navigation: actions,
       }),
-    ).resolves.toBe(false)
+    ).resolves.toBe(true)
 
     await waitFor(() => {
       expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, presentationOptions({ replace: true }))

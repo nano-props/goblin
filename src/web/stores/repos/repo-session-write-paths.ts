@@ -550,7 +550,7 @@ async function recordRecentWorkspacePostOpen(repo: WorkspaceSessionEntry): Promi
     return []
   } catch (err) {
     reposLog.warn('failed to record recent repo after opening workspace', { repo, err })
-    return [{ kind: 'recent-repo', message: err instanceof Error ? err.message : 'repo-picker.recent-save-failed' }]
+    return [{ kind: 'recent-repo', message: err instanceof Error ? err.message : 'workspace-picker.recent-save-failed' }]
   }
 }
 

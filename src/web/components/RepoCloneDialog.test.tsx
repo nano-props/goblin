@@ -115,7 +115,7 @@ describe('RepoCloneDialog', () => {
     click('button[type="submit"]')
     await flush()
 
-    expect(mocks.toastError).toHaveBeenCalledWith('repo-picker.recent-save-failed', {
+    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.recent-save-failed', {
       description: '/tmp/cloned-repo\nrecent write failed',
     })
   })

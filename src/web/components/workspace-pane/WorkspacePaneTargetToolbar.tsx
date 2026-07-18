@@ -202,6 +202,8 @@ export function WorkspacePaneTargetToolbar({
           repoId: target.workspaceId,
           target: commandTarget,
           targetIdentity: item.identity,
+          runtimeView: item.kind === 'runtime' ? item.view : undefined,
+          selectedIdentity: model.selectedIdentity,
           navigation,
         })
       }}

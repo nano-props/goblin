@@ -9,8 +9,8 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 
-vi.mock('#/web/components/RepoPickerHost.tsx', () => ({
-  RepoPickerHost: () => <button type="button" data-testid="repo-picker-host" className="h-10 w-full shrink-0" />,
+vi.mock('#/web/components/WorkspacePickerHost.tsx', () => ({
+  WorkspacePickerHost: () => <button type="button" data-testid="workspace-picker-host" className="h-10 w-full shrink-0" />,
 }))
 
 const responsiveMocks = vi.hoisted(() => ({ compact: false }))
@@ -56,8 +56,8 @@ describe('RepoLayoutSidebar', () => {
     expect(sidebarTop?.dataset.titleBarChromeRegion).toBe('drag')
     expect(sidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
 
-    const repoPicker = container.querySelector('[data-testid="repo-picker-host"]')
-    expect(repoPicker).not.toBeNull()
+    const workspacePicker = container.querySelector('[data-testid="workspace-picker-host"]')
+    expect(workspacePicker).not.toBeNull()
 
     const createWorktree = container.querySelector('[data-testid="create-worktree-button"]')
     if (!(createWorktree instanceof HTMLButtonElement)) throw new Error('missing create worktree button')
@@ -77,7 +77,7 @@ describe('RepoLayoutSidebar', () => {
   test('renders placeholder state when no repo is open', () => {
     const { container } = renderSidebar(<RepoLayoutSidebar compact={false} />)
 
-    expect(container.querySelector('[data-testid="repo-picker-host"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-picker-host"]')).not.toBeNull()
 
     const createWorktree = container.querySelector('[data-testid="create-worktree-button"]')
     expect(createWorktree).toBeNull()
@@ -104,10 +104,11 @@ describe('RepoLayoutSidebar', () => {
       />,
     )
 
-    expect(container.querySelector('[data-testid="repo-picker-host"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-picker-host"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="create-worktree-button"]')).toBeNull()
     expect(container.querySelector('[data-testid="workspace-root-navigator"]')).not.toBeNull()
-    expect(container.textContent).toContain('tab.branches')
+    expect(container.textContent).toContain('workspace.navigation-title')
+    expect(container.textContent).not.toContain('tab.branches')
     expect(container.textContent).toContain('repo.dashboard')
     expect(container.querySelector('button[aria-label="app-chrome.settings"]')).not.toBeNull()
 

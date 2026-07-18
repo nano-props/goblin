@@ -5,6 +5,7 @@ import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 export interface TerminalCloseConfirmPayload {
   readonly repoId: string
   readonly targetIdentity: string
+  readonly selectedIdentity: string | null
   readonly workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   readonly terminalSessionId: string
   readonly terminalBase: TerminalSessionBase

@@ -25,6 +25,6 @@ export function reportOpenRepoPostOpenEffects(
 function postOpenErrorTitleKey(kind: 'recent-repo'): string {
   switch (kind) {
     case 'recent-repo':
-      return 'repo-picker.recent-save-failed'
+      return 'workspace-picker.recent-save-failed'
   }
 }

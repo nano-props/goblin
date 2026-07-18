@@ -17,7 +17,7 @@ describe('remote diagnostics helpers', () => {
   test('maps remote unavailable reasons to more specific body copy', () => {
     expect(unavailableBodyKey(false, 'error.failed-read-repo')).toBe('repo-unavailable.body')
     expect(unavailableBodyKey(true, 'error.ssh-config-changed')).toBe('repo-unavailable.remote-config-changed')
-    expect(unavailableBodyKey(true, 'repo-picker.open-remote-home-unavailable')).toBe(
+    expect(unavailableBodyKey(true, 'workspace-picker.open-remote-home-unavailable')).toBe(
       'repo-unavailable.remote-home-unavailable',
     )
     expect(unavailableBodyKey(true, 'path-missing')).toBe('repo-unavailable.remote-path-missing')
@@ -59,7 +59,7 @@ describe('remote diagnostics helpers', () => {
 
   test('translates remote diagnostic categories through the diagnostics dictionary keys', () => {
     const t = (key: string) =>
-      key === 'repo-picker.open-remote-diagnostics-category-auth-failed' ? 'Authentication failed' : key
+      key === 'workspace-picker.open-remote-diagnostics-category-auth-failed' ? 'Authentication failed' : key
     expect(formatTranslatableReason(t, 'auth-failed')).toBe('Authentication failed')
   })
 

@@ -125,7 +125,7 @@ test('closes a workspace-root static tab through the shared tab transaction', as
   })
 })
 
-test('awaits close-back navigation and clears the transition when navigation rejects', async () => {
+test('reports lifecycle success and clears the transition when close-back navigation rejects', async () => {
   seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
@@ -148,7 +148,7 @@ test('awaits close-back navigation and clears the transition when navigation rej
   await vi.waitFor(() => expect(commitWorkspacePaneRoute).toHaveBeenCalledOnce())
 
   routeCommit.reject(new Error('navigation failed'))
-  await expect(close).resolves.toBe(false)
+  await expect(close).resolves.toBe(true)
 })
 
 test('sends a detached worktree close to the server without requiring a branch', async () => {
@@ -215,8 +215,6 @@ test('sends a detached worktree close to the server without requiring a branch',
       repoId: REPO_ID,
       workspacePaneRoute: route,
       navigation: navigationWith(),
-      currentRepoId: REPO_ID,
-      currentBranchName: null,
       currentWorkspacePaneRoute: route,
       confirmedTerminal: {
         terminalSessionId,
@@ -242,7 +240,7 @@ test('confirmed workspace terminal close selects Files without inventing a branc
   const runtimeTarget = runtimeWorkspacePaneTargetForTest(targetInput)
   setWorkspacePaneTabsForTargetQueryData({
     ...targetInput,
-    tabs: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+    tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
   })
   useReposStore.getState().setWorkspacePaneTabForTarget(targetInput, 'terminal')
   useReposStore.getState().setSelectedTerminal(formatTerminalWorktreeKey(REPO_ID, REPO_ID), terminalSessionId)
@@ -285,16 +283,24 @@ test('confirmed workspace terminal close selects Files without inventing a branc
   expect(
     useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[formatTerminalWorktreeKey(REPO_ID, REPO_ID)],
   ).toBe(terminalSessionId)
+  const navigation = navigationWith({
+    showRepoWorkspacePaneTab: vi.fn((_repoId, presentation, options) => {
+      if (presentation.kind === 'static') {
+        useReposStore.getState().setWorkspacePaneTabForTarget(targetInput, presentation.tab)
+      }
+      options?.onCommit?.()
+      return true
+    }),
+  })
 
   await expect(
     dispatchConfirmCloseTerminalWorkspacePaneTabAction({
       paneTarget: { kind: 'workspace-root', repoRoot: REPO_ID },
       repoId: REPO_ID,
       workspacePaneRoute: undefined,
-      navigation: navigationWith(),
-      currentRepoId: REPO_ID,
-      currentBranchName: null,
+      navigation,
       currentWorkspacePaneRoute: null,
+      selectedIdentity: `terminal:${terminalSessionId}`,
       confirmedTerminal: {
         terminalSessionId,
         base: {

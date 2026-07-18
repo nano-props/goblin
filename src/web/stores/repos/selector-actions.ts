@@ -22,7 +22,7 @@ interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
 interface PrimaryWindowNavigationStoreActions
   extends Pick<ReposStore, 'closeRepo' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'> {}
 
-interface RepoPickerStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
+interface WorkspacePickerStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
 
 interface ClientEffectIntentStoreActions extends Pick<
   ReposStore,
@@ -86,9 +86,9 @@ export function primaryWindowNavigationStoreActionsFromStore(
   }
 }
 
-export function repoPickerStoreActionsFromStore(
+export function workspacePickerStoreActionsFromStore(
   state: Pick<ReposStore, 'ensureWorkspaceOpen'>,
-): RepoPickerStoreActions {
+): WorkspacePickerStoreActions {
   const runtimeCoherent = runtimeCoherentRepoOpenStoreActionsFromStore({
     ensureWorkspaceOpen: state.ensureWorkspaceOpen,
   })

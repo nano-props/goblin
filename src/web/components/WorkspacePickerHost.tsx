@@ -1,37 +1,37 @@
 // Data-binding host for the workspace picker. The picker itself owns
-// toolbar/sidebar presentation; this host only supplies repo summaries,
+// toolbar/sidebar presentation; this host only supplies workspace summaries,
 // labels, and open/switch actions.
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useShallow } from 'zustand/react/shallow'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { RepoPicker } from '#/web/components/repo-picker/RepoPicker.tsx'
-import { repoPickerReposEqual } from '#/web/components/repo-picker/summary-equality.ts'
+import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
+import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
-import type { RepoPickerRepo, RepoPickerSurface } from '#/web/components/repo-picker/types.ts'
+import type { WorkspacePickerItem, WorkspacePickerSurface } from '#/web/components/workspace-picker/types.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
 import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
-import { repoPickerStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
+import { workspacePickerStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
 import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
 import { useMemo } from 'react'
 import { useRepoTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
 import { toast } from 'sonner'
 
-interface RepoPickerHostProps {
-  currentRepoId: string | null
+interface WorkspacePickerHostProps {
+  currentWorkspaceId: string | null
   onOpenRepoPathDialog: () => void
   onOpenRemote: () => void
   onClone: () => void
-  surface?: RepoPickerSurface
+  surface?: WorkspacePickerSurface
 }
 
-export function RepoPickerHost({
-  currentRepoId,
+export function WorkspacePickerHost({
+  currentWorkspaceId,
   onOpenRepoPathDialog,
   onOpenRemote,
   onClone,
   surface = 'toolbar',
-}: RepoPickerHostProps) {
+}: WorkspacePickerHostProps) {
   const t = useT()
   const { shortcutsDisabled } = useShortcutSettings()
   // Build the summary array inside the selector but compare with our
@@ -45,28 +45,36 @@ export function RepoPickerHost({
     useReposStore,
     (s) =>
       s.order
-        .map<RepoPickerRepo | null>((id) => {
-          const r = s.repos[id]
-          if (!r) return null
+        .map<WorkspacePickerItem | null>((id) => {
+          const workspace = s.repos[id]
+          if (!workspace) return null
           return {
-            id: r.id,
-            name: r.name,
-            remoteDetails: r.remote.remoteDetails ?? [],
-            lastSyncedAt: latestRepoSyncTime(r),
-            lifecycle: r.remote.lifecycle,
+            id: workspace.id,
+            name: workspace.name,
+            gitCapability:
+              workspace.workspaceProbe.status === 'ready'
+                ? workspace.workspaceProbe.capabilities.git.status
+                : 'unknown',
+            remoteDetails: workspace.remote.remoteDetails ?? [],
+            lastSyncedAt: latestRepoSyncTime(workspace),
+            lifecycle: workspace.remote.lifecycle,
           }
         })
-        .filter((x): x is RepoPickerRepo => x !== null),
-    repoPickerReposEqual,
+        .filter((x): x is WorkspacePickerItem => x !== null),
+    workspacePickerItemsEqual,
   )
-  const repoIds = useMemo(() => summaries.map((repo) => repo.id), [summaries])
-  const terminalBellCounts = useRepoTerminalBellCounts(repoIds)
+  const workspaceIds = useMemo(() => summaries.map((workspace) => workspace.id), [summaries])
+  const terminalBellCounts = useRepoTerminalBellCounts(workspaceIds)
   const summariesWithTerminalBells = useMemo(
-    () => summaries.map((repo) => ({ ...repo, terminalBellCount: terminalBellCounts[repo.id] ?? 0 })),
+    () =>
+      summaries.map((workspace) => ({
+        ...workspace,
+        terminalBellCount: terminalBellCounts[workspace.id] ?? 0,
+      })),
     [summaries, terminalBellCounts],
   )
   const navigation = usePrimaryWindowNavigation()
-  const { ensureWorkspaceOpen } = useReposStore(useShallow(repoPickerStoreActionsFromStore))
+  const { ensureWorkspaceOpen } = useReposStore(useShallow(workspacePickerStoreActionsFromStore))
 
   async function handleOpenLocal() {
     await openRepoFromDialog({
@@ -77,30 +85,30 @@ export function RepoPickerHost({
     })
   }
 
-  async function handleClose(repoId: string) {
-    const result = await navigation.closeRepo(repoId)
+  async function handleClose(workspaceId: string) {
+    const result = await navigation.closeRepo(workspaceId)
     if (!result.ok) toast.error(t(result.message))
   }
 
   return (
-    <RepoPicker
-      repos={summariesWithTerminalBells}
-      currentRepoId={currentRepoId}
+    <WorkspacePicker
+      workspaces={summariesWithTerminalBells}
+      currentWorkspaceId={currentWorkspaceId}
       labels={{
-        repositories: t('repo-picker.repos'),
-        closeWithName: (name) => t('repo-picker.close-named', { name }),
+        workspaces: t('workspace-picker.workspaces'),
+        closeWithName: (name) => t('workspace-picker.close-named', { name }),
         open: t('app-chrome.open'),
-        placeholder: t('repo-picker.placeholder'),
-        openLocal: t('repo-picker.open-local'),
+        placeholder: t('workspace-picker.placeholder'),
+        openLocal: t('workspace-picker.open-local'),
         openLocalShortcut: shortcutsDisabled ? null : '⌘O',
-        openRemote: t('repo-picker.open-remote'),
+        openRemote: t('workspace-picker.open-remote'),
         openRemoteShortcut: shortcutsDisabled ? null : '⌘⇧R',
-        clone: t('repo-picker.clone'),
+        clone: t('workspace-picker.clone'),
         cloneShortcut: shortcutsDisabled ? null : '⌘⇧O',
         unavailable: t('repo-unavailable.title'),
       }}
       onActivate={navigation.activateRepo}
-      onClose={(repoId) => void handleClose(repoId)}
+      onClose={(workspaceId) => void handleClose(workspaceId)}
       onOpenLocal={handleOpenLocal}
       onOpenRemote={onOpenRemote}
       onClone={onClone}

@@ -9,7 +9,7 @@ import {
 import {
   primaryWindowNavigationStoreActionsFromStore,
   clientEffectIntentStoreActionsFromStore,
-  repoPickerStoreActionsFromStore,
+  workspacePickerStoreActionsFromStore,
   restorableWorkspaceLayoutPreferenceStoreActionsFromStore,
   restorableWorkspaceLayoutStoreActionsFromStore,
   runtimeCoherentRepoNavigationStoreActionsFromStore,
@@ -113,7 +113,7 @@ describe('repo selectors', () => {
       commitWorkspaceNavigation: fnA,
     })
     expect(
-      repoPickerStoreActionsFromStore({
+      workspacePickerStoreActionsFromStore({
         ensureWorkspaceOpen: fnA as never,
       }),
     ).toEqual({

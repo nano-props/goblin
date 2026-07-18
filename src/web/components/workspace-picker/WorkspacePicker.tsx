@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useRef, useState } from 'react'
-import { Check, ChevronDown, Download, FolderGit2, FolderOpen, Plus, Server, X } from 'lucide-react'
+import { Check, ChevronDown, Download, Folder, FolderGit2, FolderOpen, Plus, Server, X } from 'lucide-react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
@@ -7,46 +7,46 @@ import { ToolbarTabList, ToolbarTabStripBody } from '#/web/components/tab-strip/
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
 import { MenuRowButton } from '#/web/components/ui/menu-row-button.tsx'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
-import { CurrentRepoSidebarButton, CurrentRepoToolbarButton } from '#/web/components/repo-picker/CurrentRepoButton.tsx'
+import { CurrentWorkspaceSidebarButton, CurrentWorkspaceToolbarButton } from '#/web/components/workspace-picker/CurrentWorkspaceButton.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
-import type { RepoPickerLabels, RepoPickerRepo, RepoPickerSurface } from '#/web/components/repo-picker/types.ts'
+import type { WorkspacePickerLabels, WorkspacePickerItem, WorkspacePickerSurface } from '#/web/components/workspace-picker/types.ts'
 import { isRemoteRepoId, remoteRepoConnectionTarget } from '#/shared/remote-repo.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
 
-function navigatedRepoId(
-  repos: RepoPickerRepo[],
+function navigatedWorkspaceId(
+  workspaces: WorkspacePickerItem[],
   currentId: string,
   direction: 'prev' | 'next' | 'first' | 'last',
 ): string | null {
-  if (repos.length === 0) return null
-  const current = repos.findIndex((repo) => repo.id === currentId)
+  if (workspaces.length === 0) return null
+  const current = workspaces.findIndex((workspace) => workspace.id === currentId)
   const index =
     direction === 'first'
       ? 0
       : direction === 'last'
-        ? repos.length - 1
+        ? workspaces.length - 1
         : current === -1
           ? 0
           : direction === 'next'
-            ? (current + 1) % repos.length
-            : (current - 1 + repos.length) % repos.length
-  return repos[index]?.id ?? null
+            ? (current + 1) % workspaces.length
+            : (current - 1 + workspaces.length) % workspaces.length
+  return workspaces[index]?.id ?? null
 }
 
-interface RepoPickerProps {
-  repos: RepoPickerRepo[]
-  currentRepoId: string | null
-  labels: RepoPickerLabels
+interface WorkspacePickerProps {
+  workspaces: WorkspacePickerItem[]
+  currentWorkspaceId: string | null
+  labels: WorkspacePickerLabels
   onActivate: (id: string) => void
   onClose: (id: string) => void
   onOpenLocal: () => void
   onOpenRemote: () => void
   onClone: () => void
-  surface?: RepoPickerSurface
+  surface?: WorkspacePickerSurface
 }
 
-function RepoSwitcherAction({
+function WorkspaceSwitcherAction({
   icon,
   label,
   shortcut,
@@ -72,21 +72,21 @@ function RepoSwitcherAction({
   )
 }
 
-function RepoMenuContent({
-  repos,
-  currentRepoId,
+function WorkspaceMenuContent({
+  workspaces,
+  currentWorkspaceId,
   labels,
-  onSelectRepo,
+  onSelectWorkspace,
   onClose,
   onOpenLocal,
   onOpenRemote,
   onClone,
   onSelectAction,
 }: {
-  repos: RepoPickerRepo[]
-  currentRepoId: string | null
-  labels: RepoPickerLabels
-  onSelectRepo: (id: string) => void
+  workspaces: WorkspacePickerItem[]
+  currentWorkspaceId: string | null
+  labels: WorkspacePickerLabels
+  onSelectWorkspace: (id: string) => void
   onClose: (id: string) => void
   onOpenLocal: () => void
   onOpenRemote: () => void
@@ -94,14 +94,14 @@ function RepoMenuContent({
   onSelectAction: (action: () => void) => void
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
-  const showRepoList = repos.length > 0
+  const showWorkspaceList = workspaces.length > 0
   return (
     <PopoverContent
       side="bottom"
       align="start"
       className="flex w-max max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0"
       style={{ minWidth: 'max(16rem, var(--radix-popover-trigger-width))' }}
-      aria-label={labels.repositories}
+      aria-label={labels.workspaces}
       ref={contentRef}
       tabIndex={-1}
       onOpenAutoFocus={(event) => {
@@ -109,38 +109,39 @@ function RepoMenuContent({
         contentRef.current?.focus({ preventScroll: true })
       }}
     >
-      {showRepoList ? (
+      {showWorkspaceList ? (
         <>
           <ScrollArea className="max-h-80" scrollbarMode="compact">
             <div className="space-y-0.5 p-1" role="list">
-              {repos.map((repo) => {
-                const selected = repo.id === currentRepoId
-                const RepoIcon = isRemoteRepoId(repo.id) ? Server : FolderGit2
-                const remoteTarget = remoteRepoConnectionTarget(repo.lifecycle)
+              {workspaces.map((workspace) => {
+                const selected = workspace.id === currentWorkspaceId
+                const WorkspaceIcon =
+                  isRemoteRepoId(workspace.id) ? Server : workspace.gitCapability === 'available' ? FolderGit2 : Folder
+                const remoteTarget = remoteRepoConnectionTarget(workspace.lifecycle)
                 return (
-                  <div key={repo.id} className="group relative flex items-center" role="listitem">
+                  <div key={workspace.id} className="group relative flex items-center" role="listitem">
                     <MenuRowButton
                       size="roomy"
                       selected={selected}
-                      onClick={() => onSelectRepo(repo.id)}
+                      onClick={() => onSelectWorkspace(workspace.id)}
                       aria-current={selected ? 'true' : undefined}
                       leading={
                         selected ? (
                           <Check size={13} aria-hidden />
                         ) : (
-                          <RepoIcon size={13} className="text-muted-foreground" aria-hidden />
+                          <WorkspaceIcon size={13} className="text-muted-foreground" aria-hidden />
                         )
                       }
                       contentClassName="whitespace-normal"
                       trailing={
-                        (repo.terminalBellCount ?? 0) > 0 ? (
-                          <TerminalBellBadge count={repo.terminalBellCount ?? 0} />
+                        (workspace.terminalBellCount ?? 0) > 0 ? (
+                          <TerminalBellBadge count={workspace.terminalBellCount ?? 0} />
                         ) : null
                       }
                     >
-                      <div className="truncate font-medium leading-5">{repo.name}</div>
+                      <div className="truncate font-medium leading-5">{workspace.name}</div>
                       <div className="truncate font-mono text-xs leading-4 text-muted-foreground">
-                        {formatWorkspaceDisplayLocation(repo.id, remoteTarget)}
+                        {formatWorkspaceDisplayLocation(workspace.id, remoteTarget)}
                       </div>
                     </MenuRowButton>
                     <Button
@@ -151,10 +152,10 @@ function RepoMenuContent({
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation()
-                        onClose(repo.id)
+                        onClose(workspace.id)
                       }}
-                      title={labels.closeWithName(repo.name)}
-                      aria-label={labels.closeWithName(repo.name)}
+                      title={labels.closeWithName(workspace.name)}
+                      aria-label={labels.closeWithName(workspace.name)}
                     >
                       <X size={13} />
                     </Button>
@@ -164,19 +165,19 @@ function RepoMenuContent({
             </div>
           </ScrollArea>
           <div className="border-t border-separator p-1">
-            <RepoSwitcherAction
+            <WorkspaceSwitcherAction
               icon={<FolderOpen size={14} />}
               label={labels.openLocal}
               shortcut={labels.openLocalShortcut}
               onSelect={() => onSelectAction(onOpenLocal)}
             />
-            <RepoSwitcherAction
+            <WorkspaceSwitcherAction
               icon={<Server size={14} />}
               label={labels.openRemote}
               shortcut={labels.openRemoteShortcut}
               onSelect={() => onSelectAction(onOpenRemote)}
             />
-            <RepoSwitcherAction
+            <WorkspaceSwitcherAction
               icon={<Download size={14} />}
               label={labels.clone}
               shortcut={labels.cloneShortcut}
@@ -186,19 +187,19 @@ function RepoMenuContent({
         </>
       ) : (
         <div className="p-1">
-          <RepoSwitcherAction
+          <WorkspaceSwitcherAction
             icon={<FolderOpen size={14} />}
             label={labels.openLocal}
             shortcut={labels.openLocalShortcut}
             onSelect={() => onSelectAction(onOpenLocal)}
           />
-          <RepoSwitcherAction
+          <WorkspaceSwitcherAction
             icon={<Server size={14} />}
             label={labels.openRemote}
             shortcut={labels.openRemoteShortcut}
             onSelect={() => onSelectAction(onOpenRemote)}
           />
-          <RepoSwitcherAction
+          <WorkspaceSwitcherAction
             icon={<Download size={14} />}
             label={labels.clone}
             shortcut={labels.cloneShortcut}
@@ -210,9 +211,9 @@ function RepoMenuContent({
   )
 }
 
-export function RepoPicker({
-  repos,
-  currentRepoId,
+export function WorkspacePicker({
+  workspaces,
+  currentWorkspaceId,
   labels,
   onActivate,
   onClose,
@@ -220,41 +221,41 @@ export function RepoPicker({
   onOpenRemote,
   onClone,
   surface = 'toolbar',
-}: RepoPickerProps) {
+}: WorkspacePickerProps) {
   const focusRegistry = useFocusRegistry<string, HTMLButtonElement>()
   const [menuOpen, setMenuOpen] = useState(false)
 
   const handleClose = useCallback(
     (id: string) => {
-      const isCurrent = id === currentRepoId
-      const idx = repos.findIndex((r) => r.id === id)
-      const nextId = repos[idx + 1]?.id ?? repos[idx - 1]?.id ?? null
+      const isCurrent = id === currentWorkspaceId
+      const idx = workspaces.findIndex((r) => r.id === id)
+      const nextId = workspaces[idx + 1]?.id ?? workspaces[idx - 1]?.id ?? null
       onClose(id)
       if (isCurrent && nextId) {
         focusRegistry.focus(nextId)
       }
     },
-    [repos, currentRepoId, onClose, focusRegistry],
+    [workspaces, currentWorkspaceId, onClose, focusRegistry],
   )
 
   const handleKeyboardNavigate = (id: string, direction: 'prev' | 'next' | 'first' | 'last') => {
-    const nextId = navigatedRepoId(repos, id, direction)
+    const nextId = navigatedWorkspaceId(workspaces, id, direction)
     if (!nextId) return
     onActivate(nextId)
     focusRegistry.focus(nextId)
   }
 
-  const currentRepo = repos.find((r) => r.id === currentRepoId) ?? repos[0] ?? null
-  const totalTerminalBellCount = repos.reduce((count, repo) => count + (repo.terminalBellCount ?? 0), 0)
+  const currentWorkspace = workspaces.find((r) => r.id === currentWorkspaceId) ?? workspaces[0] ?? null
+  const totalTerminalBellCount = workspaces.reduce((count, workspace) => count + (workspace.terminalBellCount ?? 0), 0)
 
   return (
-    <nav className="flex h-full min-w-0 flex-1 items-center" aria-label={labels.repositories}>
+    <nav className="flex h-full min-w-0 flex-1 items-center" aria-label={labels.workspaces}>
       <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-        {currentRepo ? (
+        {currentWorkspace ? (
           surface === 'sidebar' ? (
             <PopoverTrigger asChild>
-              <CurrentRepoSidebarButton
-                repo={currentRepo}
+              <CurrentWorkspaceSidebarButton
+                workspace={currentWorkspace}
                 focusRegistry={focusRegistry}
                 onKeyboardNavigate={handleKeyboardNavigate}
                 unavailableLabel={labels.unavailable}
@@ -265,10 +266,10 @@ export function RepoPicker({
           ) : (
             <PopoverTrigger asChild>
               <ToolbarTabStripBody className="flex-1">
-                <ToolbarTabList role="tablist" aria-orientation="horizontal" data-current-repo-group className="flex-1">
-                  <CurrentRepoToolbarButton
-                    repo={currentRepo}
-                    isCurrent={currentRepo.id === currentRepoId}
+                <ToolbarTabList role="tablist" aria-orientation="horizontal" data-current-workspace-group className="flex-1">
+                  <CurrentWorkspaceToolbarButton
+                    workspace={currentWorkspace}
+                    isCurrent={currentWorkspace.id === currentWorkspaceId}
                     focusRegistry={focusRegistry}
                     onActivate={onActivate}
                     onKeyboardNavigate={handleKeyboardNavigate}
@@ -283,7 +284,7 @@ export function RepoPicker({
         ) : surface === 'sidebar' ? (
           <PopoverTrigger asChild>
             <SidebarRowButton
-              data-testid="repo-picker-placeholder"
+              data-testid="workspace-picker-placeholder"
               aria-label={labels.placeholder}
               size="dense"
               fill
@@ -302,11 +303,11 @@ export function RepoPicker({
             </PopoverTrigger>
           </Tip>
         )}
-        <RepoMenuContent
-          repos={repos}
-          currentRepoId={currentRepoId}
+        <WorkspaceMenuContent
+          workspaces={workspaces}
+          currentWorkspaceId={currentWorkspaceId}
           labels={labels}
-          onSelectRepo={(id) => {
+          onSelectWorkspace={(id) => {
             setMenuOpen(false)
             onActivate(id)
           }}

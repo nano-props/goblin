@@ -164,8 +164,8 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
       }}
       showCloseButton={!pending}
       className="sm:max-w-xl"
-      title={t('repo-picker.open-remote-title')}
-      description={t('repo-picker.open-remote-description')}
+      title={t('workspace-picker.open-remote-title')}
+      description={t('workspace-picker.open-remote-description')}
     >
       <form
         className="space-y-3"
@@ -175,7 +175,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
         }}
       >
         <Field className="gap-2">
-          <FieldLabel htmlFor="remote-ssh-host">{t('repo-picker.open-remote-host-alias-label')}</FieldLabel>
+          <FieldLabel htmlFor="remote-ssh-host">{t('workspace-picker.open-remote-host-alias-label')}</FieldLabel>
           {hasInclude ? (
             <>
               <Input
@@ -202,7 +202,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
                   ))}
                 </datalist>
               )}
-              <FieldDescription>{t('repo-picker.open-remote-include-manual-hint')}</FieldDescription>
+              <FieldDescription>{t('workspace-picker.open-remote-include-manual-hint')}</FieldDescription>
             </>
           ) : hosts.length > 0 ? (
             <Select
@@ -236,7 +236,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
         </Field>
 
         <Field className="gap-2" data-invalid={pathFieldError ? true : undefined}>
-          <FieldLabel htmlFor="remote-path">{t('repo-picker.open-remote-path-label')}</FieldLabel>
+          <FieldLabel htmlFor="remote-path">{t('workspace-picker.open-remote-path-label')}</FieldLabel>
           <RemotePathSuggestions
             id="remote-path"
             ref={pathInputRef}
@@ -249,8 +249,8 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
             suggestions={remotePathSuggestions.suggestions}
             isLoading={remotePathSuggestions.isLoading}
             hasFetched={remotePathSuggestions.hasFetched}
-            emptyLabel={t('repo-picker.open-remote-path-no-matches')}
-            placeholder={t('repo-picker.open-remote-path-placeholder')}
+            emptyLabel={t('workspace-picker.open-remote-path-no-matches')}
+            placeholder={t('workspace-picker.open-remote-path-placeholder')}
             aria-invalid={!!pathFieldError}
           />
           {pathFieldError ? (
@@ -266,8 +266,8 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
           loading={loading}
           idleText={
             !hasInclude && hosts.length === 0
-              ? t('repo-picker.open-remote-config-required')
-              : t('repo-picker.open-remote-diagnostics-idle-detail')
+              ? t('workspace-picker.open-remote-config-required')
+              : t('workspace-picker.open-remote-diagnostics-idle-detail')
           }
         />
 
@@ -288,14 +288,14 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
             disabled={!canSubmit || pending}
             onClick={() => void handleTest()}
           >
-            {t('repo-picker.open-remote-test-connection')}
+            {t('workspace-picker.open-remote-test-connection')}
           </Button>
           <Button
             type="submit"
             className={cn('min-w-28', compact && 'w-full min-w-0')}
             disabled={!canSubmit || pending}
           >
-            {t('repo-picker.open-remote-confirm')}
+            {t('workspace-picker.open-remote-confirm')}
           </Button>
         </DialogFooter>
       </form>
@@ -309,8 +309,8 @@ export function remoteDiagnosticsAllowWorkspaceOpen(result: Pick<RemoteDiagnosti
 
 export function remotePathError(value: string): { errorKey: string | null } {
   const trimmed = value.trim()
-  if (!trimmed) return { errorKey: 'repo-picker.open-remote-path-required' }
-  if (!isValidRemotePathInput(trimmed)) return { errorKey: 'repo-picker.open-remote-path-absolute' }
+  if (!trimmed) return { errorKey: 'workspace-picker.open-remote-path-required' }
+  if (!isValidRemotePathInput(trimmed)) return { errorKey: 'workspace-picker.open-remote-path-absolute' }
   return { errorKey: null }
 }
 
@@ -330,7 +330,7 @@ export function formatRemoteDialogError(
   err: unknown,
 ): string {
   const message = err instanceof Error ? err.message : String(err)
-  if (message.startsWith('error.') || message.startsWith('repo-picker.')) return t(message)
+  if (message.startsWith('error.') || message.startsWith('workspace-picker.')) return t(message)
   return message
 }
 

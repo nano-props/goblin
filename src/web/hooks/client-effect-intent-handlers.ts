@@ -270,7 +270,7 @@ export function createExternalOpenIntentDrainer(deps: ExternalOpenIntentDrainerD
               })
             },
             onPostOpenError: (path, message) => {
-              toast.error(deps.t('repo-picker.recent-save-failed'), {
+              toast.error(deps.t('workspace-picker.recent-save-failed'), {
                 description: `${path}\n${deps.t(message)}`,
               })
             },

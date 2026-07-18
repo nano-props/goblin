@@ -45,7 +45,6 @@ describe('TerminalActionDialogHost', () => {
     renderInJsdom(
       <TerminalActionDialogHost
         currentRepoId="/repo"
-        currentBranchName="main"
         currentWorkspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }}
         navigation={{} as PrimaryWindowNavigationActions}
       />,
@@ -55,6 +54,7 @@ describe('TerminalActionDialogHost', () => {
       useTerminalActionDialogsStore.getState().openCloseConfirm({
         repoId: '/repo',
         targetIdentity: 'terminal:term-111111111111111111111',
+        selectedIdentity: 'terminal:term-111111111111111111111',
         workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
         terminalSessionId: 'term-111111111111111111111',
         terminalBase: terminalSessionBaseForTest({

@@ -130,7 +130,7 @@ describe('RepoActivityControl component', () => {
     // The tooltip should be a single line (no separator), starting
     // with the "Last synced" label, and the relative time should be
     // present (date-fns renders "5 seconds ago" in en).
-    expect(tooltip.textContent).toContain('repo-picker.tooltip.last-sync-label')
+    expect(tooltip.textContent).toContain('workspace-picker.tooltip.last-sync-label')
     expect(tooltip.textContent).toMatch(/5\s+seconds?/)
   })
 
@@ -143,7 +143,7 @@ describe('RepoActivityControl component', () => {
     // No sync time has been recorded, so the tooltip shows the
     // generic fetch title — not the "Last synced" line.
     expect(tooltip.textContent).toContain('action.fetch-title')
-    expect(tooltip.textContent).not.toContain('repo-picker.tooltip.last-sync-label')
+    expect(tooltip.textContent).not.toContain('workspace-picker.tooltip.last-sync-label')
   })
 })
 

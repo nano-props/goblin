@@ -76,8 +76,8 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
         if (!nextOpen && !pending) onClose()
       }}
       showCloseButton={!pending}
-      title={t('repo-picker.open-title')}
-      description={t('repo-picker.open-description')}
+      title={t('workspace-picker.open-title')}
+      description={t('workspace-picker.open-description')}
     >
       <form
         className="space-y-0"
@@ -87,7 +87,7 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
         }}
       >
         <Field>
-          <FieldLabel htmlFor="open-repo-path">{t('repo-picker.open-path-label')}</FieldLabel>
+          <FieldLabel htmlFor="open-repo-path">{t('workspace-picker.open-path-label')}</FieldLabel>
           <div className={cn('gap-2', compact ? 'flex flex-col' : 'flex')}>
             <Input
               id="open-repo-path"
@@ -98,7 +98,7 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
                 setPath(event.target.value)
                 setError(null)
               }}
-              placeholder={t('repo-picker.open-path-placeholder')}
+              placeholder={t('workspace-picker.open-path-placeholder')}
               className="min-w-0 flex-1 font-mono text-xs"
             />
             {canChoosePath ? (
@@ -109,7 +109,7 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
                 className={cn('h-auto self-stretch px-3', compact && 'w-full')}
                 onClick={() => void choosePath()}
               >
-                {t('repo-picker.open-path-choose')}
+                {t('workspace-picker.open-path-choose')}
               </Button>
             ) : null}
           </div>
@@ -127,7 +127,7 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
             {t('dialog.cancel')}
           </Button>
           <Button type="submit" className={cn(compact && 'w-full')} disabled={!canSubmit}>
-            {pending ? t('repo-picker.open-opening') : t('repo-picker.open-local-confirm')}
+            {pending ? t('workspace-picker.open-opening') : t('workspace-picker.open-local-confirm')}
           </Button>
         </DialogFooter>
       </form>

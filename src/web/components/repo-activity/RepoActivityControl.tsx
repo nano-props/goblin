@@ -176,7 +176,7 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
   // sync has happened. Single-line label so the font matches the
   // rest of the repo chrome tooltips.
   const tooltipLabel = lastSyncedLabel
-    ? `${t('repo-picker.tooltip.last-sync-label')} ${lastSyncedLabel}`
+    ? `${t('workspace-picker.tooltip.last-sync-label')} ${lastSyncedLabel}`
     : t(fetchTooltipKey)
 
   return (

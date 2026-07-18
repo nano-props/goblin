@@ -35,35 +35,35 @@ describe('i18n dictionaries', () => {
     expect(ko['menu.file.open-remote-workspace']).toBe('원격 작업 공간 열기…')
     expect(ja['menu.file.open-remote-workspace']).toBe('リモートワークスペースを開く…')
 
-    expect(zh['repo-picker.open-remote']).toBe('打开远程工作区…')
-    expect(ko['repo-picker.open-remote']).toBe('원격 작업 공간 열기…')
-    expect(ja['repo-picker.open-remote']).toBe('リモートワークスペースを開く…')
+    expect(zh['workspace-picker.open-remote']).toBe('打开远程工作区…')
+    expect(ko['workspace-picker.open-remote']).toBe('원격 작업 공간 열기…')
+    expect(ja['workspace-picker.open-remote']).toBe('リモートワークスペースを開く…')
 
-    expect(ko['repo-picker.open-remote-host-label']).toBe('호스트')
-    expect(ja['repo-picker.open-remote-host-label']).toBe('ホスト')
-    expect(ko['repo-picker.open-remote-port-label']).toBe('포트')
-    expect(ja['repo-picker.open-remote-port-label']).toBe('ポート')
-    expect(ko['repo-picker.open-remote-username-label']).toBe('사용자 이름')
-    expect(ja['repo-picker.open-remote-username-label']).toBe('ユーザー名')
-    expect(ko['repo-picker.open-remote-private-key-label']).toBe('개인 키')
-    expect(ja['repo-picker.open-remote-private-key-label']).toBe('秘密鍵')
-    expect(ko['repo-picker.open-remote-private-key-choose']).toBe('개인 키 선택')
-    expect(ja['repo-picker.open-remote-private-key-choose']).toBe('秘密鍵を選択')
-    expect(ko['repo-picker.open-remote-path-label']).toBe('원격 경로')
-    expect(ja['repo-picker.open-remote-path-label']).toBe('リモートパス')
+    expect(ko['workspace-picker.open-remote-host-label']).toBe('호스트')
+    expect(ja['workspace-picker.open-remote-host-label']).toBe('ホスト')
+    expect(ko['workspace-picker.open-remote-port-label']).toBe('포트')
+    expect(ja['workspace-picker.open-remote-port-label']).toBe('ポート')
+    expect(ko['workspace-picker.open-remote-username-label']).toBe('사용자 이름')
+    expect(ja['workspace-picker.open-remote-username-label']).toBe('ユーザー名')
+    expect(ko['workspace-picker.open-remote-private-key-label']).toBe('개인 키')
+    expect(ja['workspace-picker.open-remote-private-key-label']).toBe('秘密鍵')
+    expect(ko['workspace-picker.open-remote-private-key-choose']).toBe('개인 키 선택')
+    expect(ja['workspace-picker.open-remote-private-key-choose']).toBe('秘密鍵を選択')
+    expect(ko['workspace-picker.open-remote-path-label']).toBe('원격 경로')
+    expect(ja['workspace-picker.open-remote-path-label']).toBe('リモートパス')
   })
 
   test('keeps top-level workspace copy independent of Git repository terminology', () => {
     const workspaceKeys = [
-      'repo-picker.repos',
-      'repo-picker.placeholder',
+      'workspace-picker.workspaces',
+      'workspace-picker.placeholder',
       'repo-unavailable.title',
       'repo-unavailable.body',
       'repo-unavailable.close',
       'empty.body',
       'repo-route.not-found-title',
       'drop.body',
-      'repo-picker.recent-save-failed',
+      'workspace-picker.recent-save-failed',
     ] as const satisfies readonly DictKey[]
     for (const key of workspaceKeys) {
       expect(en[key], key).not.toMatch(/\brepositor(?:y|ies)\b/i)

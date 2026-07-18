@@ -2,8 +2,8 @@
 
 import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { RepoPicker } from '#/web/components/repo-picker/RepoPicker.tsx'
-import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
+import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
+import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 beforeEach(() => {
@@ -14,14 +14,14 @@ beforeEach(() => {
   })
 })
 
-describe('RepoPicker keyboard navigation', () => {
-  test('moves between repos from the current repo button', () => {
+describe('WorkspacePicker keyboard navigation', () => {
+  test('moves between workspaces from the current workspace button', () => {
     const onActivate = vi.fn()
 
     renderInJsdom(
-      <RepoPicker
-        repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
-        currentRepoId="/tmp/repo-a"
+      <WorkspacePicker
+        workspaces={[workspace('workspace-a', '/tmp/workspace-a'), workspace('workspace-b', '/tmp/workspace-b')]}
+        currentWorkspaceId="/tmp/workspace-a"
         labels={labels}
         onActivate={onActivate}
         onClose={() => {}}
@@ -31,25 +31,25 @@ describe('RepoPicker keyboard navigation', () => {
       />,
     )
 
-    const currentRepoButton = document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')
-    if (!(currentRepoButton instanceof HTMLButtonElement)) throw new Error('missing current repo button')
+    const currentWorkspaceButton = document.body.querySelector('[data-current-workspace-id="/tmp/workspace-a"]')
+    if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
 
     act(() => {
-      currentRepoButton.dispatchEvent(
+      currentWorkspaceButton.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true }),
       )
     })
 
-    expect(onActivate).toHaveBeenCalledWith('/tmp/repo-b')
+    expect(onActivate).toHaveBeenCalledWith('/tmp/workspace-b')
   })
 
-  test('moves between repos from the sidebar current repo button', () => {
+  test('moves between workspaces from the sidebar current workspace button', () => {
     const onActivate = vi.fn()
 
     renderInJsdom(
-      <RepoPicker
-        repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
-        currentRepoId="/tmp/repo-a"
+      <WorkspacePicker
+        workspaces={[workspace('workspace-a', '/tmp/workspace-a'), workspace('workspace-b', '/tmp/workspace-b')]}
+        currentWorkspaceId="/tmp/workspace-a"
         labels={labels}
         onActivate={onActivate}
         onClose={() => {}}
@@ -60,25 +60,25 @@ describe('RepoPicker keyboard navigation', () => {
       />,
     )
 
-    const currentRepoButton = document.body.querySelector('[data-current-repo-id="/tmp/repo-a"]')
-    if (!(currentRepoButton instanceof HTMLButtonElement)) throw new Error('missing current repo button')
+    const currentWorkspaceButton = document.body.querySelector('[data-current-workspace-id="/tmp/workspace-a"]')
+    if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
 
     act(() => {
-      currentRepoButton.dispatchEvent(
+      currentWorkspaceButton.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', bubbles: true }),
       )
     })
 
-    expect(onActivate).toHaveBeenCalledWith('/tmp/repo-b')
+    expect(onActivate).toHaveBeenCalledWith('/tmp/workspace-b')
   })
 })
 
-function repo(name: string, id: string): RepoPickerRepo {
-  return { id, name, remoteDetails: [], lastSyncedAt: null, lifecycle: null }
+function workspace(name: string, id: string): WorkspacePickerItem {
+  return { id, name, gitCapability: 'available', remoteDetails: [], lastSyncedAt: null, lifecycle: null }
 }
 
 const labels = {
-  repositories: 'Repositories',
+  workspaces: 'Workspaces',
   closeWithName: (name: string) => `Close ${name}`,
   open: 'Open',
   placeholder: 'Select workspace',

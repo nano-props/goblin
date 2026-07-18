@@ -125,8 +125,8 @@ vi.mock('#/web/components/repo-pages/RepoDashboardPane.tsx', () => ({
   ),
 }))
 
-vi.mock('#/web/components/RepoPickerHost.tsx', () => ({
-  RepoPickerHost: () => <div data-testid="repo-picker" />,
+vi.mock('#/web/components/WorkspacePickerHost.tsx', () => ({
+  WorkspacePickerHost: () => <div data-testid="workspace-picker" />,
 }))
 
 vi.mock('#/web/components/repo-toolbar/RepoToolbarActions.tsx', () => ({
@@ -1101,7 +1101,7 @@ describe('RepoView workspace navigation', () => {
     const { container } = render(<RepoView repoId={REPO_ID} />)
 
     expect(workspace(container)?.dataset.mode).toBe('split')
-    expect(container.querySelector('[data-testid="repo-picker"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-picker"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="create-worktree-row-action"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="repo-workspace-empty-skeleton"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="repo-workspace-skeleton"]')).toBeNull()
@@ -1124,7 +1124,7 @@ describe('RepoView workspace navigation', () => {
     const { container } = render(branchRepoView())
 
     expect(workspace(container)?.dataset.mode).toBe('split')
-    expect(container.querySelector('[data-testid="repo-picker"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-picker"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="create-worktree-row-action"]')).not.toBeNull()
     expect(container.querySelector('button[aria-label="app-chrome.settings"]')).not.toBeNull()
     expect(document.body.textContent).toContain('repo-unavailable.title')

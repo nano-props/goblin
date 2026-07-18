@@ -1,11 +1,7 @@
 import { ArrowLeft, type LucideIcon } from 'lucide-react'
 import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
 import { ToolbarTabStrip, ToolbarTabStripBody, ToolbarTabList } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
-import {
-  toolbarTabButtonClassName,
-  toolbarTabChromeClassName,
-  toolbarTabIconClassName,
-} from '#/web/components/tab-strip/tab-variants.ts'
+import { toolbarTabChromeClassName, toolbarTabIconClassName } from '#/web/components/tab-strip/tab-variants.ts'
 import {
   WorkspaceToolbar,
   WorkspaceToolbarContent,
@@ -36,8 +32,7 @@ export function RepoPageToolbar({
   const tab = (
     <ToolbarClosableTab
       closeButton={false}
-      containerClassName={toolbarTabChromeClassName({ variant: 'workspace', active: true })}
-      buttonClassName={toolbarTabButtonClassName('workspace')}
+      containerClassName={toolbarTabChromeClassName({ variant: 'workspace-pane', active: true })}
       buttonProps={{ role: 'tab', 'aria-selected': true, title: label }}
     >
       <Icon size={14} className={toolbarTabIconClassName(true)} />

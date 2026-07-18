@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   adjacentRepoWorkspaceTab,
   createRepoWorkspaceTabModel,
-  nextRepoWorkspaceTabAfterClose,
+  nextWorkspacePaneTabEntryAfterClose,
   repoWorkspaceRuntimeTabSessionId,
   type RepoWorkspaceTabModel,
   type RepoWorkspaceTabModelInput,
@@ -10,7 +10,11 @@ import {
 } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
+import {
+  workspacePaneRuntimeTabEntry,
+  workspacePaneStaticTabEntry,
+  workspacePaneTabEntryIdentity,
+} from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
@@ -19,6 +23,11 @@ const REPO_ID = 'goblin+file:///tmp/goblin-repo-workspace-tab-model-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/tmp/goblin-repo-workspace-tab-model-worktree'
 const WORKTREE_KEY = formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH)
+
+function requiredEntryIdentity(entry: WorkspacePaneTabEntry | null): string {
+  if (!entry) throw new Error('expected workspace pane tab entry')
+  return workspacePaneTabEntryIdentity(entry)
+}
 
 describe('repo workspace pane tab model', () => {
   test('projects only tabs supported by a detached worktree surface and selects a valid fallback', () => {
@@ -82,6 +91,32 @@ describe('repo workspace pane tab model', () => {
       'terminal:term-222222222222222222222',
     ])
     expect(model.activeTab?.identity).toBe('terminal:term-222222222222222222222')
+  })
+
+  test('keeps the canonical selected terminal entry while its live view is not projected', () => {
+    const repoId = 'goblin+file:///tmp/plain-workspace'
+    const terminalSessionId = 'term-111111111111111111111'
+    const model = createRepoWorkspaceTabModel({
+      repoId,
+      repoRuntimeId: 'repo-runtime-plain',
+      paneTarget: { kind: 'workspace-root', repoRoot: repoId },
+      preferredTab: 'terminal',
+      allowPreferredTabFallback: false,
+      tabEntries: [workspacePaneStaticTabEntry('files'), terminalEntry(terminalSessionId)],
+      runtimeTabViews: [],
+      runtimeTabStateByType: {
+        terminal: { projectionPhase: 'pending', selectedSessionId: terminalSessionId },
+      },
+      requestedSessionIdByRuntimeType: { terminal: terminalSessionId },
+    })
+
+    expect(model.activeTab).toBeNull()
+    expect(model.selectedEntry).toEqual(terminalEntry(terminalSessionId))
+    expect(model.selectedIdentity).toBe(`terminal:${terminalSessionId}`)
+    if (!model.selectedIdentity) throw new Error('expected selected terminal identity')
+    expect(
+      nextWorkspacePaneTabEntryAfterClose(model.tabEntries, model.selectedIdentity),
+    ).toEqual(workspacePaneStaticTabEntry('files'))
   })
 
   test('projects a mixed tab list across static and terminal tabs', () => {
@@ -743,13 +778,13 @@ describe('repo workspace pane tab model', () => {
       selectedTerminalSessionId: 'term-111111111111111111111',
     })
 
-    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'workspace-pane:status')?.identity).toBe(
+    expect(requiredEntryIdentity(nextWorkspacePaneTabEntryAfterClose(model.tabEntries, 'workspace-pane:status'))).toBe(
       'terminal:term-111111111111111111111',
     )
-    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'workspace-pane:changes')?.identity).toBe(
+    expect(requiredEntryIdentity(nextWorkspacePaneTabEntryAfterClose(model.tabEntries, 'workspace-pane:changes'))).toBe(
       'terminal:term-111111111111111111111',
     )
-    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'missing:missing')).toBeNull()
+    expect(nextWorkspacePaneTabEntryAfterClose(model.tabEntries, 'missing:missing')).toBeNull()
   })
 
   test('prefers the opener tab over the adjacent tab when resolving the next tab after close', () => {
@@ -767,8 +802,13 @@ describe('repo workspace pane tab model', () => {
     })
 
     expect(
-      nextRepoWorkspaceTabAfterClose(model.tabs, 'terminal:term-111111111111111111111', 'workspace-pane:changes')
-        ?.identity,
+      requiredEntryIdentity(
+        nextWorkspacePaneTabEntryAfterClose(
+          model.tabEntries,
+          'terminal:term-111111111111111111111',
+          'workspace-pane:changes',
+        ),
+      ),
     ).toBe('workspace-pane:changes')
   })
 
@@ -787,8 +827,13 @@ describe('repo workspace pane tab model', () => {
     })
 
     expect(
-      nextRepoWorkspaceTabAfterClose(model.tabs, 'terminal:term-111111111111111111111', 'terminal:missing-opener')
-        ?.identity,
+      requiredEntryIdentity(
+        nextWorkspacePaneTabEntryAfterClose(
+          model.tabEntries,
+          'terminal:term-111111111111111111111',
+          'terminal:missing-opener',
+        ),
+      ),
     ).toBe('workspace-pane:changes')
   })
 
@@ -807,7 +852,7 @@ describe('repo workspace pane tab model', () => {
       selectedTerminalSessionId: null,
     })
 
-    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'workspace-pane:status')).toBeNull()
+    expect(nextWorkspacePaneTabEntryAfterClose(model.tabEntries, 'workspace-pane:status')).toBeNull()
   })
 
   test('moves through the shared tab list from the active tab identity', () => {

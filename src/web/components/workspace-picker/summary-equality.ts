@@ -1,4 +1,4 @@
-import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
+import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
 import {
   isRemoteRepoConnectionTerminal,
   type RemoteRepoConnectionLifecycle,
@@ -7,7 +7,7 @@ import {
 
 /**
  * Structural equality for the lifecycle union as it appears on a
- * `RepoPickerRepo`. The `connecting` variant has no fields, while
+ * `WorkspacePickerItem`. The `connecting` variant has no fields, while
  * terminal variants include the rendered remote locator.
  */
 function remoteTargetEqual(a: RemoteRepoTarget, b: RemoteRepoTarget): boolean {
@@ -42,7 +42,7 @@ function lifecycleEqual(a: RemoteRepoConnectionLifecycle | null, b: RemoteRepoCo
   return !isRemoteRepoConnectionTerminal(a) && !isRemoteRepoConnectionTerminal(b)
 }
 
-export function repoPickerReposEqual(a: RepoPickerRepo[], b: RepoPickerRepo[]): boolean {
+export function workspacePickerItemsEqual(a: WorkspacePickerItem[], b: WorkspacePickerItem[]): boolean {
   if (a === b) return true
   if (a.length !== b.length) return false
   for (let i = 0; i < a.length; i++) {
@@ -51,6 +51,7 @@ export function repoPickerReposEqual(a: RepoPickerRepo[], b: RepoPickerRepo[]): 
     if (
       x.id !== y.id ||
       x.name !== y.name ||
+      x.gitCapability !== y.gitCapability ||
       x.lastSyncedAt !== y.lastSyncedAt ||
       (x.terminalBellCount ?? 0) !== (y.terminalBellCount ?? 0)
     )

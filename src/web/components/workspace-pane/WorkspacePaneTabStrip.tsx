@@ -31,11 +31,7 @@ import { useT } from '#/web/stores/i18n.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { ToolbarTabList, ToolbarTabStrip, ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
-import {
-  toolbarTabButtonClassName,
-  toolbarTabChromeClassName,
-  toolbarTabIconClassName,
-} from '#/web/components/tab-strip/tab-variants.ts'
+import { toolbarTabChromeClassName, toolbarTabIconClassName } from '#/web/components/tab-strip/tab-variants.ts'
 import { useFocusRegistry, type FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useSortableTab } from '#/web/components/tab-strip/useSortableTab.ts'
 import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
@@ -1084,7 +1080,7 @@ function WorkspacePaneTabChrome({
         },
       }}
       containerClassName={toolbarTabChromeClassName({
-        variant: 'workspace',
+        variant: 'workspace-pane',
         active: isActive,
         dragging: isDragging,
         compact,
@@ -1109,7 +1105,6 @@ function WorkspacePaneTabChrome({
         onClick: () => onSelect(item.identity),
         onKeyDown: (e) => onKeyDown(e, item.identity),
       }}
-      buttonClassName={toolbarTabButtonClassName('workspace')}
       {...closeProps}
     >
       <WorkspacePaneTabIcon item={item} active={isActive} compact={compact} />

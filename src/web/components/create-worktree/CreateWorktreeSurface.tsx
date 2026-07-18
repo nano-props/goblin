@@ -320,7 +320,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
               suggestions={remotePathSuggestions.suggestions}
               isLoading={remotePathSuggestions.isLoading}
               hasFetched={remotePathSuggestions.hasFetched}
-              emptyLabel={t('repo-picker.open-remote-path-no-matches')}
+              emptyLabel={t('workspace-picker.open-remote-path-no-matches')}
               placeholder={derived.displayDefaultPath}
               aria-describedby="cwt-path-hint"
             />

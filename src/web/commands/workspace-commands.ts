@@ -1,5 +1,5 @@
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabEntryIdentity, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import {
   dispatchCloseWorkspacePaneTabAction,
   dispatchConfirmCloseTerminalWorkspacePaneTabAction,
@@ -32,6 +32,7 @@ import {
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { workspacePaneTabTargetForPaneTarget } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
@@ -64,6 +65,8 @@ interface WorkspacePaneTabCommandTargetOptions {
 }
 
 interface CloseWorkspacePaneTabCommandOptions extends WorkspacePaneTabCommandTargetOptions {
+  runtimeView?: WorkspacePaneRuntimeTabSummary
+  selectedIdentity?: string | null
   skipTerminalCloseConfirm?: boolean
   skipRuntimeCloseConfirm?: boolean
 }
@@ -73,8 +76,7 @@ interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions {
   workspacePaneRoute: WorkspacePaneCommandRoute
   navigation: PrimaryWindowNavigationActions
   targetIdentity?: string
-  currentRepoId: string | null
-  currentBranchName: string | null
+  selectedIdentity: string | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   confirmedTerminal: ConfirmedTerminalWorkspacePaneTabClose
 }
@@ -84,7 +86,10 @@ type CloseWorkspacePaneTabOrWindowCommandOptions = Omit<CloseWorkspacePaneTabCom
   closeWindow?: () => void
 }
 
-type CloseWorkspaceSurfaceIntent = { kind: 'close-tab' } | { kind: 'close-window' } | { kind: 'noop' }
+type CloseWorkspaceSurfaceIntent =
+  | { kind: 'close-tab'; targetIdentity: string; selectedIdentity: string | null }
+  | { kind: 'close-window' }
+  | { kind: 'noop' }
 
 interface SelectWorkspacePaneTabByIndexCommandOptions {
   repoId: string | null
@@ -200,7 +205,16 @@ export async function runCloseWorkspacePaneTabOrWindowCommand({
     closeWindow()
     return true
   }
-  if (options.target && (await runCloseWorkspacePaneTabCommand({ ...options, target: options.target }))) return true
+  if (
+    options.target &&
+    (await runCloseWorkspacePaneTabCommand({
+      ...options,
+      target: options.target,
+      targetIdentity: intent.targetIdentity,
+      selectedIdentity: intent.selectedIdentity,
+    }))
+  )
+    return true
   return true
 }
 
@@ -253,12 +267,16 @@ function resolveCloseWorkspaceSurfaceIntent(
         )
   if (!target) return { kind: 'close-window' }
   if (targetIdentity) {
-    return target.tabs.some((candidate) => candidate.identity === targetIdentity)
-      ? { kind: 'close-tab' }
+    return target.tabEntries.some((entry) => workspacePaneTabEntryIdentity(entry) === targetIdentity)
+      ? { kind: 'close-tab', targetIdentity, selectedIdentity: target.selectedIdentity }
       : { kind: 'noop' }
   }
-  if (target.activeTab) {
-    return { kind: 'close-tab' }
+  if (target.selectedEntry && target.selectedIdentity) {
+    return {
+      kind: 'close-tab',
+      targetIdentity: target.selectedIdentity,
+      selectedIdentity: target.selectedIdentity,
+    }
   }
   if (target.selection?.kind === 'runtime-host') return { kind: 'noop' }
   return { kind: 'close-window' }

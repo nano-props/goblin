@@ -1,7 +1,7 @@
 import { cn } from '#/web/lib/cn.ts'
 import { compositeFocusRing } from '#/web/components/ui/focus.ts'
 
-type ToolbarTabVariant = 'repo' | 'workspace'
+type ToolbarTabVariant = 'workspace-picker' | 'workspace-pane'
 
 export function toolbarTabChromeClassName(options: {
   variant: ToolbarTabVariant
@@ -13,19 +13,19 @@ export function toolbarTabChromeClassName(options: {
   hoverable?: boolean
 }): string {
   const { variant, active, dragging = false, compact = false, hoverable = true } = options
-  // The repo picker and compact workspace strips render only one visible item,
+  // The workspace picker and compact pane strips render only one visible item,
   // so the "active" chrome would be visually misleading. Mute it to match the
   // idle tab chrome from expanded strips.
   const muteActiveChrome = compact
   return cn(
     'group relative select-none items-center transition-colors duration-100',
     compositeFocusRing,
-    variant === 'repo'
+    variant === 'workspace-picker'
       ? 'flex h-8 max-w-64 shrink-0 touch-none gap-1.5 rounded-md border px-2 text-xs'
       : compact
         ? 'flex h-7 min-w-0 flex-1 gap-1 rounded-md border px-2.5 text-sm'
         : 'flex h-7 w-36 shrink-0 gap-1 rounded-md border px-2.5 text-sm',
-    variant === 'repo'
+    variant === 'workspace-picker'
       ? active && !muteActiveChrome
         ? 'border-input bg-card text-foreground'
         : cn('border-transparent text-foreground', hoverable && 'hover:bg-accent/70')
@@ -37,15 +37,8 @@ export function toolbarTabChromeClassName(options: {
   )
 }
 
-export function toolbarTabButtonClassName(_variant: ToolbarTabVariant): string | undefined {
-  // Reserved for future variant-specific button tweaks. `h-full` lives on
-  // the shared base button className in ToolbarClosableTab so the
-  // clickable area always fills the container's full height.
-  return undefined
-}
-
 export function toolbarTabIconClassName(active: boolean, compact = false): string {
-  // The repo picker and compact workspace strips show only one visible item;
+  // The workspace picker and compact pane strips show only one visible item;
   // the icon follows the muted chrome.
   const emphasized = active && !compact
   return cn('shrink-0', emphasized ? 'text-foreground' : 'text-muted-foreground')

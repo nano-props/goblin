@@ -160,7 +160,7 @@ describe('CloneRepositoryDialog', () => {
 
     renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
 
-    expect(queryButtonByText('repo-picker.clone-parent-choose')).toBeNull()
+    expect(queryButtonByText('workspace-picker.clone-parent-choose')).toBeNull()
   })
 })
 

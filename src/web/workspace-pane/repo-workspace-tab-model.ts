@@ -17,6 +17,7 @@ import {
   WORKSPACE_PANE_RUNTIME_TAB_TYPES,
   isWorkspacePaneRuntimeTabEntry,
   isWorkspacePaneRuntimeTabType,
+  workspacePaneTabEntryIdentity,
   workspacePaneRuntimeTabIdentity,
   workspacePaneRuntimeTabSessionId,
 } from '#/shared/workspace-pane.ts'
@@ -142,6 +143,9 @@ export interface RepoWorkspaceTabModel {
   renderedTab: WorkspacePaneTabType | null
   /** The selected materialized tab, when one exists in the tab strip. */
   activeTab: RepoWorkspaceMaterializedTab | null
+  /** Canonical selected entry, independent of whether its live runtime view has projected. */
+  selectedEntry: WorkspacePaneTabEntry | null
+  selectedIdentity: string | null
 }
 
 export interface RepoWorkspaceTabModelInput {
@@ -219,6 +223,12 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
       ? pendingRuntimeWorkspacePaneTab(selection.runtimeType)
       : null
   const tabs = pendingTab ? [...materializedTabs, pendingTab] : materializedTabs
+  const selectedEntry = selectedWorkspacePaneTabEntry({
+    selection,
+    tabEntries,
+    runtimeTabStateByType,
+    requestedSessionIdByRuntimeType: input.requestedSessionIdByRuntimeType,
+  })
 
   return {
     repoId: input.repoId,
@@ -238,6 +248,8 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
     selection,
     renderedTab: selection?.tab ?? null,
     activeTab: selection?.kind === 'materialized-tab' ? selection.materializedTab : null,
+    selectedEntry,
+    selectedIdentity: selectedEntry ? workspacePaneTabEntryIdentity(selectedEntry) : null,
   }
 }
 
@@ -252,20 +264,18 @@ function paneTargetPresentationBranch(target: RepoWorkspacePaneModelTarget, work
   return target.kind === 'git-worktree' && worktreeHead ? gitHeadBranch(worktreeHead) : null
 }
 
-export function nextRepoWorkspaceTabAfterClose(
-  tabs: readonly RepoWorkspaceTab[],
+export function nextWorkspacePaneTabEntryAfterClose(
+  entries: readonly WorkspacePaneTabEntry[],
   closingIdentity: string,
   openerIdentity?: string | null,
-): RepoWorkspaceMaterializedTab | null {
-  const index = tabs.findIndex((tab) => tab.identity === closingIdentity)
+): WorkspacePaneTabEntry | null {
+  const index = entries.findIndex((entry) => workspacePaneTabEntryIdentity(entry) === closingIdentity)
   if (index === -1) return null
-  // Chrome-style opener preference: if the tab that opened this one is still
-  // open, reactivate it before falling back to the nearest neighbor.
   if (openerIdentity) {
-    const opener = tabs.find((tab) => tab.identity === openerIdentity)
-    if (opener && isMaterializedRepoWorkspaceTab(opener)) return opener
+    const opener = entries.find((entry) => workspacePaneTabEntryIdentity(entry) === openerIdentity)
+    if (opener) return opener
   }
-  return nextSelectableRepoWorkspaceTab(tabs, index, 1) ?? nextSelectableRepoWorkspaceTab(tabs, index, -1)
+  return entries[index + 1] ?? entries[index - 1] ?? null
 }
 
 export function adjacentRepoWorkspaceTab(
@@ -409,6 +419,38 @@ function workspacePaneSelection({
   const firstTab = materializedTabs[0]
   if (firstTab) return { kind: 'materialized-tab', tab: firstTab.type, materializedTab: firstTab }
   return null
+}
+
+function selectedWorkspacePaneTabEntry(input: {
+  selection: RepoWorkspaceSelection | null
+  tabEntries: readonly WorkspacePaneTabEntry[]
+  runtimeTabStateByType: RepoWorkspaceRuntimeTabStateByType
+  requestedSessionIdByRuntimeType: RepoWorkspaceRequestedRuntimeSessionByType | undefined
+}): WorkspacePaneTabEntry | null {
+  const materializedTab = input.selection?.materializedTab
+  if (materializedTab) {
+    return (
+      input.tabEntries.find(
+        (entry) => workspacePaneTabEntryIdentity(entry) === materializedTab.identity,
+      ) ?? null
+    )
+  }
+  if (input.selection?.kind !== 'runtime-host') return null
+  const runtimeType = input.selection.runtimeType
+  const requestedSessionId = input.requestedSessionIdByRuntimeType?.[runtimeType]
+  const selectedSessionId =
+    requestedSessionId !== undefined
+      ? requestedSessionId
+      : input.runtimeTabStateByType[runtimeType].selectedSessionId
+  if (!selectedSessionId) return null
+  return (
+    input.tabEntries.find(
+      (entry) =>
+        isWorkspacePaneRuntimeTabEntry(entry) &&
+        entry.type === runtimeType &&
+        entry.runtimeSessionId === selectedSessionId,
+    ) ?? null
+  )
 }
 
 function activeRepoWorkspaceTab(

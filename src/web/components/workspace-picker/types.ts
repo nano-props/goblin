@@ -1,28 +1,30 @@
 import type { GitRemoteInfo } from '#/web/types.ts'
 import type { RemoteRepoConnectionLifecycle } from '#/shared/remote-repo.ts'
-export interface RepoPickerRepo {
+export interface WorkspacePickerItem {
   id: string
   name: string
+  /** Git capability reported by the authoritative workspace probe. */
+  gitCapability: 'unknown' | 'available' | 'unavailable'
   remoteDetails: GitRemoteInfo[]
   /**
-   * Last time this client refreshed repo data after a sync/invalidation.
+   * Last time this client refreshed workspace data after a sync/invalidation.
    * Null until read-model/fetch data loads have completed at least once.
    */
   lastSyncedAt: number | null
-  /** Unread terminal bell count across this repo's terminal sessions. */
+  /** Unread terminal bell count across this workspace's terminal sessions. */
   terminalBellCount?: number
   /**
-   * Single source-of-truth lifecycle for a remote repo. `null`
-   * for local repos. The picker reads `lifecycle.kind` directly
-   * to decide which badge to show on the current repo button.
+   * Single source-of-truth lifecycle for a remote workspace. `null`
+   * for local workspaces. The picker reads `lifecycle.kind` directly
+   * to decide which badge to show on the current workspace button.
    */
   lifecycle: RemoteRepoConnectionLifecycle | null
 }
 
-export type RepoPickerSurface = 'toolbar' | 'sidebar'
+export type WorkspacePickerSurface = 'toolbar' | 'sidebar'
 
-export interface RepoPickerLabels {
-  repositories: string
+export interface WorkspacePickerLabels {
+  workspaces: string
   closeWithName: (name: string) => string
   open: string
   placeholder: string

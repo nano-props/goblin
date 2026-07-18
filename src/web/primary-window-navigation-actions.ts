@@ -291,13 +291,17 @@ function restoreRepoPresentationOrOpenDashboard(
 ): void {
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
-  if (workspaceGitUnavailable(repo?.workspaceProbe)) {
-    routeNavigation.openRepoDashboard(repoId, { presentationToken })
-    return
-  }
   const entry = state.navigationHistoryByRepo[repoId]?.current ?? null
   // Creating a worktree is a transient workflow, not a repo workspace to resume.
-  if (entry && entry.route.kind !== 'newWorktree') {
+  // A non-Git workspace may resume only capability-invariant presentations;
+  // stale Git-scoped history must not prevent picker activation.
+  const entryCanResume =
+    entry &&
+    entry.route.kind !== 'newWorktree' &&
+    (!workspaceGitUnavailable(repo?.workspaceProbe) ||
+      entry.route.kind === 'workspace' ||
+      entry.route.kind === 'dashboard')
+  if (entryCanResume) {
     const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, { presentationToken })
     if (result.kind === 'accepted' || (result.kind === 'blocked' && options.onBlocked === 'stay')) return
   }

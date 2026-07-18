@@ -2,7 +2,7 @@ import { useContext, type ReactNode } from 'react'
 import { Settings } from 'lucide-react'
 import { BranchNavigator } from '#/web/components/BranchNavigator.tsx'
 import { WorkspaceRootNavigator } from '#/web/components/branch-navigator/WorkspaceRootNavigator.tsx'
-import { RepoPickerHost } from '#/web/components/RepoPickerHost.tsx'
+import { WorkspacePickerHost } from '#/web/components/WorkspacePickerHost.tsx'
 import {
   BranchFilterAction,
   CreateWorktreeRowAction,
@@ -53,6 +53,7 @@ export function RepoLayoutSidebar({
   onSelectWorkspaceRoot,
 }: RepoShellSidebarProps) {
   const t = useT()
+  const navigatorTitleKey = gitAvailable ? 'tab.branches' : 'workspace.navigation-title'
   return (
     <aside className="flex min-h-0 min-w-0 flex-1 flex-col bg-card">
       {!compact &&
@@ -79,7 +80,7 @@ export function RepoLayoutSidebar({
       />
       {repoId ? (
         <>
-          <RepoShellBranchHeader repoId={repoId} title={t('tab.branches')} gitAvailable={gitAvailable} />
+          <RepoShellBranchHeader repoId={repoId} title={t(navigatorTitleKey)} gitAvailable={gitAvailable} />
           <div className="flex min-h-0 flex-1 bg-card">
             {branchContent ??
               (gitAvailable ? (
@@ -123,7 +124,7 @@ function RepoShellPrimaryActions({
   return (
     <div className="shrink-0 px-3 pt-4">
       <div className="flex min-w-0 flex-col gap-1">
-        <RepoPickerRow repoId={repoId} />
+        <WorkspacePickerRow repoId={repoId} />
         {repoId ? (
           <>
             <DashboardRowAction repoId={repoId} selected={dashboardSelected} onOpenDashboard={onOpenDashboard} />
@@ -141,12 +142,12 @@ function RepoShellPrimaryActions({
   )
 }
 
-function RepoPickerRow({ repoId }: { repoId?: string }) {
+function WorkspacePickerRow({ repoId }: { repoId?: string }) {
   const overlayActions = useContext(LayoutOverlayActions)
   return (
     <div className="flex h-8 min-w-0 shrink-0 items-center">
-      <RepoPickerHost
-        currentRepoId={repoId ?? null}
+      <WorkspacePickerHost
+        currentWorkspaceId={repoId ?? null}
         onOpenRepoPathDialog={overlayActions?.openRepoPathDialog ?? NOOP}
         onOpenRemote={overlayActions?.openRemoteRepo ?? NOOP}
         onClone={overlayActions?.openCloneRepo ?? NOOP}

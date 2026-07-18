@@ -1,15 +1,29 @@
 import { describe, expect, test } from 'vitest'
 import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
-import { repoPickerReposEqual } from '#/web/components/repo-picker/summary-equality.ts'
-import type { RepoPickerRepo } from '#/web/components/repo-picker/types.ts'
+import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
+import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 
-describe('repoPickerReposEqual', () => {
+describe('workspacePickerItemsEqual', () => {
+  test('treats Git capability changes as unequal', () => {
+    const item: WorkspacePickerItem = {
+      id: 'goblin+file:///tmp/workspace',
+      name: 'workspace',
+      gitCapability: 'unavailable',
+      remoteDetails: [],
+      lastSyncedAt: null,
+      lifecycle: null,
+    }
+
+    expect(workspacePickerItemsEqual([item], [{ ...item, gitCapability: 'available' }])).toBe(false)
+  })
+
   test('treats remote lifecycle target changes as unequal even when repo id stays the same', () => {
-    const left: RepoPickerRepo[] = [
+    const left: WorkspacePickerItem[] = [
       {
         id: 'goblin+ssh://example/srv%2Frepo',
         name: 'repo',
+        gitCapability: 'available',
         remoteDetails: [],
         lastSyncedAt: null,
         lifecycle: {
@@ -26,10 +40,11 @@ describe('repoPickerReposEqual', () => {
         },
       },
     ]
-    const right: RepoPickerRepo[] = [
+    const right: WorkspacePickerItem[] = [
       {
         id: 'goblin+ssh://example/srv%2Frepo',
         name: 'repo',
+        gitCapability: 'available',
         remoteDetails: [],
         lastSyncedAt: null,
         lifecycle: {
@@ -47,7 +62,7 @@ describe('repoPickerReposEqual', () => {
       },
     ]
 
-    expect(repoPickerReposEqual(left, right)).toBe(false)
+    expect(workspacePickerItemsEqual(left, right)).toBe(false)
   })
 
   test('treats failed lifecycle target locator changes as unequal', () => {
@@ -60,10 +75,11 @@ describe('repoPickerReposEqual', () => {
       remotePath: '/srv/repo',
       displayName: 'example:repo',
     }
-    const left: RepoPickerRepo[] = [
+    const left: WorkspacePickerItem[] = [
       {
         id: target.id,
         name: 'repo',
+        gitCapability: 'available',
         remoteDetails: [],
         lastSyncedAt: null,
         lifecycle: {
@@ -73,10 +89,11 @@ describe('repoPickerReposEqual', () => {
         },
       },
     ]
-    const right: RepoPickerRepo[] = [
+    const right: WorkspacePickerItem[] = [
       {
         id: target.id,
         name: 'repo',
+        gitCapability: 'available',
         remoteDetails: [],
         lastSyncedAt: null,
         lifecycle: {
@@ -92,47 +109,51 @@ describe('repoPickerReposEqual', () => {
       },
     ]
 
-    expect(repoPickerReposEqual(left, right)).toBe(false)
+    expect(workspacePickerItemsEqual(left, right)).toBe(false)
   })
 
   test('treats last sync time changes as unequal', () => {
-    const left: RepoPickerRepo[] = [
+    const left: WorkspacePickerItem[] = [
       {
         id: 'goblin+file:///tmp/repo',
         name: 'repo',
+        gitCapability: 'available',
         remoteDetails: [],
         lastSyncedAt: 1_000,
         lifecycle: null,
       },
     ]
-    const right: RepoPickerRepo[] = [
+    const right: WorkspacePickerItem[] = [
       {
         id: 'goblin+file:///tmp/repo',
         name: 'repo',
+        gitCapability: 'available',
         remoteDetails: [],
         lastSyncedAt: 2_000,
         lifecycle: null,
       },
     ]
 
-    expect(repoPickerReposEqual(left, right)).toBe(false)
+    expect(workspacePickerItemsEqual(left, right)).toBe(false)
   })
 
   test('treats terminal bell count changes as unequal', () => {
-    const left: RepoPickerRepo[] = [
+    const left: WorkspacePickerItem[] = [
       {
         id: 'goblin+file:///tmp/repo',
         name: 'repo',
+        gitCapability: 'available',
         remoteDetails: [],
         lastSyncedAt: null,
         terminalBellCount: 1,
         lifecycle: null,
       },
     ]
-    const right: RepoPickerRepo[] = [
+    const right: WorkspacePickerItem[] = [
       {
         id: 'goblin+file:///tmp/repo',
         name: 'repo',
+        gitCapability: 'available',
         remoteDetails: [],
         lastSyncedAt: null,
         terminalBellCount: 2,
@@ -140,7 +161,7 @@ describe('repoPickerReposEqual', () => {
       },
     ]
 
-    expect(repoPickerReposEqual(left, right)).toBe(false)
+    expect(workspacePickerItemsEqual(left, right)).toBe(false)
   })
 
   test('does not treat warm cache read-model time as a sync time', () => {

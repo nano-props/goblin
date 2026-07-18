@@ -15,6 +15,7 @@ import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 
 const REPO_ID = 'goblin+file:///tmp/navigation-actions-repo'
 const BRANCH_NAME = 'feature/create-pending'
@@ -137,6 +138,63 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(navigation.openRepoRoot).not.toHaveBeenCalled()
     expect(navigation.openRepoBranch).not.toHaveBeenCalled()
   })
+
+  test.each(['workspace', 'dashboard'] as const)(
+    'activates a non-Git workspace at its last %s presentation',
+    (kind) => {
+      seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+      markRepoGitUnavailable(REPO_ID)
+      useReposStore.getState().recordWorkspaceNavigation({ repoId: REPO_ID, route: { kind } })
+      const navigation = routeNavigation()
+      const actions = createPrimaryWindowNavigationActions({
+        currentRepoId: 'goblin+file:///tmp/other-workspace',
+        order: ['goblin+file:///tmp/other-workspace', REPO_ID],
+        closeRepo: vi.fn(),
+        routeNavigation: navigation,
+      })
+
+      actions.activateRepo(REPO_ID)
+
+      if (kind === 'workspace') {
+        expect(navigation.openRepoWorkspace).toHaveBeenCalledWith(REPO_ID, presentationOptions())
+        expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
+      } else {
+        expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
+        expect(navigation.openRepoWorkspace).not.toHaveBeenCalled()
+      }
+    },
+  )
+
+  test.each([
+    { kind: 'branch', branchName: 'feature/stale', workspacePaneTab: null, terminalWorktreeKey: null, terminalSessionId: null },
+    { kind: 'worktree', worktreePath: '/tmp/stale-worktree', workspacePaneTab: 'files' as const, terminalSessionId: null },
+    { kind: 'newWorktree', returnTo: null },
+  ] satisfies WorkspaceNavigationHistoryEntry['route'][])(
+    'falls back to Dashboard instead of restoring stale non-Git $kind history',
+    (route) => {
+      seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+      markRepoGitUnavailable(REPO_ID)
+      useReposStore.getState().recordWorkspaceNavigation({ repoId: REPO_ID, route })
+      const navigation = routeNavigation()
+      const openRepoWorktreeTab = vi.fn(() => true)
+      navigation.openRepoWorktreeTab = openRepoWorktreeTab
+      const actions = createPrimaryWindowNavigationActions({
+        currentRepoId: 'goblin+file:///tmp/other-workspace',
+        order: ['goblin+file:///tmp/other-workspace', REPO_ID],
+        closeRepo: vi.fn(),
+        routeNavigation: navigation,
+      })
+
+      actions.activateRepo(REPO_ID)
+
+      expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
+      expect(navigation.openRepoBranch).not.toHaveBeenCalled()
+      expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
+      expect(navigation.openRepoWorktree).not.toHaveBeenCalled()
+      expect(openRepoWorktreeTab).not.toHaveBeenCalled()
+      expect(navigation.openRepoNewWorktree).not.toHaveBeenCalled()
+    },
+  )
 
   test('selects branches by resolving the branch workspace pane route', () => {
     seedRepoWithReadModelForTest({
@@ -1040,6 +1098,30 @@ function createPrimaryWindowNavigationActions(options: PrimaryWindowNavigationAc
     peekWorkspaceNavigation: store.peekWorkspaceNavigation,
     commitWorkspaceNavigation: store.commitWorkspaceNavigation,
     ...options,
+  })
+}
+
+function markRepoGitUnavailable(repoId: string): void {
+  useReposStore.setState((state) => {
+    const repo = state.repos[repoId]
+    if (!repo) return state
+    return {
+      repos: {
+        ...state.repos,
+        [repoId]: replaceRepo(repo, (draft) => {
+          draft.workspaceProbe = {
+          status: 'ready',
+          name: 'workspace',
+          capabilities: {
+            files: { read: true, write: true },
+            terminal: { available: true },
+            git: { status: 'unavailable' },
+          },
+          diagnostics: [],
+          }
+        }),
+      },
+    }
   })
 }
 

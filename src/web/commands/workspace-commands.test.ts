@@ -1456,11 +1456,10 @@ describe('workspace commands', () => {
       await runConfirmCloseTerminalWorkspacePaneTabCommand({
         workspacePaneRoute: payload.workspacePaneRoute,
         repoId: payload.repoId,
-        currentRepoId: payload.repoId,
-        currentBranchName: terminalPresentationBranch(payload.terminalBase.presentation),
         currentWorkspacePaneRoute: payload.workspacePaneRoute ?? null,
         navigation: navigationWith(),
         targetIdentity: payload.targetIdentity,
+        selectedIdentity: payload.selectedIdentity,
         confirmedTerminal: {
           terminalSessionId: payload.terminalSessionId,
           base: payload.terminalBase,
@@ -1513,11 +1512,10 @@ describe('workspace commands', () => {
       await runConfirmCloseTerminalWorkspacePaneTabCommand({
         workspacePaneRoute: payload.workspacePaneRoute,
         repoId: payload.repoId,
-        currentRepoId: payload.repoId,
-        currentBranchName: terminalPresentationBranch(payload.terminalBase.presentation),
         currentWorkspacePaneRoute: { kind: 'static', tab: 'status' },
         navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
         targetIdentity: payload.targetIdentity,
+        selectedIdentity: payload.selectedIdentity,
         confirmedTerminal: {
           terminalSessionId: payload.terminalSessionId,
           base: payload.terminalBase,
@@ -1586,11 +1584,10 @@ describe('workspace commands', () => {
       await runConfirmCloseTerminalWorkspacePaneTabCommand({
         workspacePaneRoute: payload.workspacePaneRoute,
         repoId: payload.repoId,
-        currentRepoId: OTHER_REPO_ID,
-        currentBranchName: 'feature/worktree',
         currentWorkspacePaneRoute: workspacePaneRoute,
         navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
         targetIdentity: payload.targetIdentity,
+        selectedIdentity: payload.selectedIdentity,
         confirmedTerminal: {
           terminalSessionId: payload.terminalSessionId,
           base: payload.terminalBase,
@@ -2661,6 +2658,41 @@ describe('workspace commands', () => {
     expect(closeWindow).not.toHaveBeenCalled()
     expect(preferredWorkspacePaneTab()).toBe('terminal')
     expect(openTabsFor('feature/worktree')).toEqual(['status'])
+  })
+
+  test('close workspace tab command closes the selected canonical terminal while its live view is pending', async () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [staticEntry('status'), terminalEntry(terminalSessionId)],
+      },
+    })
+    useReposStore.getState().setSelectedTerminal(WORKTREE_KEY, terminalSessionId)
+    const closeWindow = vi.fn()
+    const closeTerminalByDescriptor = vi.fn(async () => true)
+    setTerminalSessionCommandBridge({
+      terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
+      createTerminal: vi.fn(async () => terminalSessionId),
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor,
+    })
+
+    expect(
+      await runCloseWorkspacePaneTabOrWindowCommand({
+        workspacePaneRoute: undefined,
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        navigation: navigationWith(),
+        closeWindow,
+      }),
+    ).toBe(true)
+
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith(terminalSessionId, expect.any(Object))
+    expect(closeWindow).not.toHaveBeenCalled()
   })
 
   test('close workspace tab command does not close the window while terminal sync is unresolved', async () => {

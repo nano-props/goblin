@@ -9,14 +9,12 @@ import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 
 interface Props {
   currentRepoId: string | null
-  currentBranchName: string | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   navigation: PrimaryWindowNavigationActions
 }
 
 export function TerminalActionDialogHost({
   currentRepoId,
-  currentBranchName,
   currentWorkspacePaneRoute,
   navigation,
 }: Props) {
@@ -55,11 +53,10 @@ export function TerminalActionDialogHost({
         await runConfirmCloseTerminalWorkspacePaneTabCommand({
           repoId: payload.repoId,
           workspacePaneRoute: payload.workspacePaneRoute,
-          currentRepoId,
-          currentBranchName,
           currentWorkspacePaneRoute,
           navigation,
           targetIdentity: payload.targetIdentity,
+          selectedIdentity: payload.selectedIdentity,
           confirmedTerminal: {
             terminalSessionId: payload.terminalSessionId,
             base: payload.terminalBase,

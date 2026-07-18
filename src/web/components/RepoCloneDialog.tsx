@@ -30,7 +30,7 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
     }
     navigation.activateRepo(openResult.id)
     reportOpenRepoPostOpenEffects(openResult, t, { descriptionPrefix: result.path })
-    toast.success(t('repo-picker.clone-opened'), { description: result.path })
+    toast.success(t('workspace-picker.clone-opened'), { description: result.path })
     return result
   }
 

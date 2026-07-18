@@ -406,7 +406,6 @@ function PrimaryWindowOverlays({
       <FiletreeActionDialogHost currentRepoId={hydratedRouteRepoId} />
       <TerminalActionDialogHost
         currentRepoId={hydratedRouteRepoId}
-        currentBranchName={currentBranchName}
         currentWorkspacePaneRoute={currentWorkspacePaneRoute}
         navigation={navigation}
       />
