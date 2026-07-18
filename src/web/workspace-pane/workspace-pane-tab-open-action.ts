@@ -6,6 +6,7 @@ import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-provide
 import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
 import {
   commitWorkspacePaneCurrentTargetRoute,
+  selectWorkspacePaneControllerTab,
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import {
@@ -20,7 +21,12 @@ import {
 } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  requiredGitWorkspacePaneTabsTarget,
+  workspacePaneTabsTargetWorktreePath,
+  type WorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
+import type { GitHead } from '#/shared/git-head.ts'
 import {
   captureWorkspacePaneActiveTabIdentity,
   recordWorkspacePaneTabOpener,
@@ -29,6 +35,7 @@ import {
   resolveWorkspacePaneTabTargetForBranch,
   resolveWorkspacePaneDestinationTarget,
   workspacePaneTabInteractionBlockedForBranch,
+  workspacePaneTabTargetForPaneTarget,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   workspacePaneActionTargetFromCoordinates,
@@ -39,6 +46,85 @@ import {
   primaryWindowPresentationIsCurrent,
   type PrimaryWindowPresentationToken,
 } from '#/web/primary-window-presentation.ts'
+
+export interface OpenWorkspacePaneTargetStaticTabActionOptions {
+  repoId: string
+  paneTarget: WorkspacePaneTabsTarget
+  worktreeHead?: GitHead
+  type: WorkspacePaneStaticTabType
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
+  navigation: WorkspacePaneTabControllerCommitNavigation
+}
+
+/** Opens and presents a static tab as one target-scoped transaction. */
+export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
+  input: OpenWorkspacePaneTargetStaticTabActionOptions,
+): Promise<WorkspacePaneActionOutcome> {
+  const repo = useReposStore.getState().repos[input.repoId]
+  if (!repo || input.paneTarget.repoRoot !== input.repoId) return { kind: 'target-missing' }
+  const repoRuntimeId = repo.repoRuntimeId
+  const worktreePath = workspacePaneTabsTargetWorktreePath(input.paneTarget)
+  const branchName =
+    input.paneTarget.kind === 'git-branch'
+      ? input.paneTarget.branchName
+      : input.worktreeHead?.kind === 'branch'
+        ? input.worktreeHead.branchName
+        : null
+  const provider = workspacePaneStaticTabProvider(input.type)
+  const hasFilesystemRoot = input.paneTarget.kind !== 'git-branch'
+  if (!provider.canOpen({ hasWorktree: hasFilesystemRoot })) {
+    return { kind: 'unsupported', reason: 'worktree-required' }
+  }
+  const presentationToken = beginPrimaryWindowPresentation()
+  const actionTarget = workspacePaneActionTargetFromCoordinates({
+    repoId: input.repoId,
+    repoRuntimeId,
+    branchName,
+    worktreePath,
+  })
+  return await runWorkspacePaneAction(actionTarget, async () => {
+    if (!primaryWindowPresentationIsCurrent(presentationToken)) return { kind: 'superseded' }
+    const target = { ...input.paneTarget, repoRuntimeId }
+    const currentTabs = readWorkspacePaneTabsForTarget(target)
+    const alreadyOpen = currentTabs.some((entry) => entry.type === input.type)
+    const openerIdentity = alreadyOpen
+      ? null
+      : captureWorkspacePaneActiveTabIdentity(input.paneTarget, repoRuntimeId, {
+          workspacePaneRoute: input.workspacePaneRoute,
+        })
+    const committed = await updateWorkspacePaneTabs({
+      ...target,
+      operation: { type: 'open-static', tabType: input.type, insertAfterIdentity: null },
+    })
+    if (!committed.ok) return { kind: 'mutation-failed' }
+    if (!committed.projectionApplied) return { kind: 'superseded' }
+    const model = workspacePaneTabTargetForPaneTarget(input.paneTarget, input.workspacePaneRoute, input.worktreeHead)
+    const tab = model?.tabs.find((candidate) => candidate.type === input.type)
+    if (!model || !tab || !primaryWindowPresentationIsCurrent(presentationToken)) {
+      return { kind: 'completed', changed: !alreadyOpen, presentation: 'superseded' }
+    }
+    if (openerIdentity) {
+      recordWorkspacePaneTabOpener(
+        input.paneTarget,
+        repoRuntimeId,
+        workspacePaneStaticTabId(input.type),
+        openerIdentity,
+      )
+    }
+    if (provider.refreshOnOpen && branchName) {
+      void requestVisibleWorkspaceStatusRefresh(
+        { get: useReposStore.getState, set: useReposStore.setState },
+        input.repoId,
+        repoRuntimeId,
+        branchName,
+      )
+    }
+    const presented = await selectWorkspacePaneControllerTab(model, tab, input.navigation, presentationToken)
+    return presented
+      ? { kind: 'completed', changed: !alreadyOpen, presentation: 'observed' }
+      : { kind: 'navigation-rejected' }
+  })
+}
 
 export interface OpenWorkspacePaneStaticTabActionOptions {
   repoId: string

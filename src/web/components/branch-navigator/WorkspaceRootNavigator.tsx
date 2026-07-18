@@ -14,7 +14,10 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
-import { runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
+import {
+  runShowWorkspacePaneTabCommand,
+  runTerminalPrimaryActionCommand,
+} from '#/web/commands/workspace-commands.ts'
 import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
 import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
@@ -22,8 +25,6 @@ interface WorkspaceRootNavigatorProps {
   repoId: string
   selected: boolean
   onSelect?: () => void
-  onOpenStatus?: () => void
-  onOpenFiles?: () => void
 }
 
 /** The non-Git workspace root is a first-class navigation target, not a synthetic branch. */
@@ -31,8 +32,6 @@ export function WorkspaceRootNavigator({
   repoId,
   selected,
   onSelect,
-  onOpenStatus,
-  onOpenFiles,
 }: WorkspaceRootNavigatorProps) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
@@ -62,6 +61,14 @@ export function WorkspaceRootNavigator({
           capabilities: workspace.capabilities,
         }
       : null
+  const commandTarget = filesystemTarget
+    ? { kind: 'workspace-root' as const, workspacePaneRoute: null, filesystemTarget }
+    : null
+
+  const showStaticTab = (tab: 'status' | 'files') => {
+    if (!commandTarget) return
+    void runShowWorkspacePaneTabCommand({ repoId, target: commandTarget, tab, navigation })
+  }
 
   return (
     <ScrollArea className="h-full min-h-0 flex-1" data-testid="workspace-root-navigator">
@@ -70,7 +77,7 @@ export function WorkspaceRootNavigator({
           data-testid="workspace-root-row"
           selected={selected}
           onClick={onSelect}
-          onDoubleClick={onOpenStatus}
+          onDoubleClick={commandTarget ? () => showStaticTab('status') : undefined}
           contentClassName="gap-2"
           content={
             <>
@@ -97,15 +104,15 @@ export function WorkspaceRootNavigator({
                         label={t('tab.status')}
                         icon={<FileText />}
                         close={close}
-                        onSelect={onOpenStatus}
+                        onSelect={commandTarget ? () => showStaticTab('status') : undefined}
                       />
                       <WorkspaceAction
                         label={t('tab.files')}
                         icon={<FolderTree />}
                         close={close}
-                        onSelect={onOpenFiles}
+                        onSelect={commandTarget ? () => showStaticTab('files') : undefined}
                       />
-                      {workspace.terminalAvailable && filesystemTarget && (
+                      {workspace.terminalAvailable && commandTarget && (
                         <WorkspaceAction
                           label={t('tab.terminal')}
                           icon={<Terminal />}
@@ -113,7 +120,7 @@ export function WorkspaceRootNavigator({
                           onSelect={() => {
                             void runTerminalPrimaryActionCommand({
                               repoId,
-                              target: { kind: 'workspace-root', workspacePaneRoute: null, filesystemTarget },
+                              target: commandTarget,
                               navigation,
                               t,
                             })

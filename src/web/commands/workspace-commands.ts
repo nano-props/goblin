@@ -5,7 +5,7 @@ import {
   dispatchConfirmCloseTerminalWorkspacePaneTabAction,
   type ConfirmedTerminalWorkspacePaneTabClose,
 } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
-import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
+import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import {
   dispatchMoveWorkspacePaneTabAction,
   dispatchSelectWorkspacePaneTabByIdentityAction,
@@ -118,17 +118,18 @@ async function showWorkspacePaneTabCommand({
   if (!repoId) return false
   const { branchName, filesystemTarget, workspacePaneRoute } = workspacePaneCommandCoordinates(target)
   const provider = workspacePaneTabProvider(tab)
+  if (isWorkspacePaneStaticTabProvider(provider)) {
+    const outcome = await dispatchOpenWorkspacePaneTargetStaticTabAction({
+      repoId,
+      paneTarget: workspacePaneCommandPaneTarget(repoId, target),
+      worktreeHead: workspacePaneCommandWorktreeHead(target),
+      type: provider.type,
+      workspacePaneRoute,
+      navigation,
+    })
+    return workspacePaneActionOutcomeHandled(outcome)
+  }
   if (branchName === null) {
-    if (isWorkspacePaneStaticTabProvider(provider)) {
-      return await dispatchSelectWorkspacePaneTabByIdentityAction({
-        repoId,
-        paneTarget: workspacePaneCommandPaneTarget(repoId, target),
-        worktreeHead: workspacePaneCommandWorktreeHead(target),
-        workspacePaneRoute,
-        identity: provider.identity(),
-        navigation,
-      })
-    }
     return tab === 'terminal'
       ? await runTerminalPrimaryActionCommand({
           repoId,
@@ -136,16 +137,6 @@ async function showWorkspacePaneTabCommand({
           navigation,
         })
       : false
-  }
-  if (isWorkspacePaneStaticTabProvider(provider)) {
-    const outcome = await dispatchShowWorkspacePaneStaticTabAction({
-      repoId,
-      branchName,
-      type: provider.type,
-      workspacePaneRoute,
-      navigation,
-    })
-    return workspacePaneActionOutcomeHandled(outcome)
   }
   if (tab === 'terminal')
     return await runTerminalPrimaryActionCommand({

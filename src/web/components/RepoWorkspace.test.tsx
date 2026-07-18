@@ -399,6 +399,67 @@ describe('RepoWorkspace', () => {
     expect(screen.queryByText('tab.terminal')).toBeNull()
   })
 
+  test('selects an existing workspace-root terminal after Files without a route transition', async () => {
+    const workspaceId = 'goblin+file:///tmp/plain-terminal-workspace'
+    const terminalSessionId = 'term-333333333333333333333'
+    const repo = seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branches: [],
+      currentBranchName: null,
+      workspaceProbe: directoryWorkspaceProbe('plain-terminal-workspace'),
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'workspace-root',
+      repoRoot: workspaceId,
+      repoRuntimeId: repo.repoRuntimeId,
+      tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+    })
+    useReposStore
+      .getState()
+      .setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: workspaceId }, 'files')
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(workspaceId, workspaceId)
+    const showRepoWorkspacePaneTab = vi.fn<NonNullable<PrimaryWindowNavigationActions['showRepoWorkspacePaneTab']>>(
+      (_repoId, presentation, options) => {
+        if (presentation.kind === 'terminal') {
+          useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, presentation.terminalSessionId)
+        }
+        useReposStore.getState().setWorkspacePaneTabForTarget(
+          { kind: 'workspace-root', repoRoot: workspaceId },
+          presentation.kind === 'terminal' ? 'terminal' : presentation.tab,
+        )
+        options?.onCommit?.()
+        return true
+      },
+    )
+    const workspaceNavigation: PrimaryWindowNavigationActions = {
+      ...navigation,
+      showRepoWorkspacePaneTab,
+    }
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={workspaceNavigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContextWithSession(terminalWorktreeKey, terminalSessionId)}>
+              <RepoWorkspace repoId={workspaceId} workspacePaneRouteContext={{ kind: 'workspace-root' }} />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByRole('tabpanel', { name: 'tab.files' })).toBeTruthy()
+    const terminalTab = screen.getByRole('tab', { name: terminalSessionId })
+    act(() => terminalTab.click())
+
+    expect(showRepoWorkspacePaneTab).toHaveBeenCalled()
+
+    await waitFor(() => expect(screen.getByRole('tabpanel', { name: 'tab.terminal' })).toBeTruthy())
+    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).toBe(
+      terminalSessionId,
+    )
+  })
+
   test('renders the shared empty pane when every workspace-root tab is closed', () => {
     const workspaceId = 'goblin+file:///tmp/empty-plain-workspace'
     const repo = seedRepoWithReadModelForTest({

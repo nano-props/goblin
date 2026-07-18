@@ -399,6 +399,10 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     showRepoBranchEmptyWorkspacePane: vi.fn(() => true),
     showRepoBranchWorkspacePaneTab: vi.fn(() => true),
     showRepoBranchTerminalSession: vi.fn(() => true),
+    showRepoWorkspacePaneTab: vi.fn((_repoId, _presentation, options) => {
+      options?.onCommit?.()
+      return true
+    }),
     commitWorkspacePaneRoute: vi.fn(() => false),
     goBack: vi.fn(),
     goForward: vi.fn(),

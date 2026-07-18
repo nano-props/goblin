@@ -8,6 +8,7 @@ import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import {
   beginPrimaryWindowPresentation,
   primaryWindowNavigationState,
+  primaryWindowPresentationIsCurrent,
   registerPrimaryWindowNavigation,
   releasePrimaryWindowNavigation,
   type PrimaryWindowPresentationToken,
@@ -31,7 +32,7 @@ export interface PrimaryWindowRouteNavigation {
   openSettings: (page: SettingsPage, options?: PrimaryWindowRouteNavigationOptions) => void
   closeSettings: (options?: PrimaryWindowRouteNavigationOptions) => void
   openRepoRoot: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => void
-  openRepoWorkspace: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => void
+  openRepoWorkspace: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
   openRepoDashboard: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => void
   openRepoBranch: (repoId: string, branchName: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
   openRepoBranchTab: (
@@ -105,6 +106,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           token: options?.presentationToken,
           commitEffect: options?.onCommit,
           targetHref: target.href,
+          currentHref: () => router.state.location.href,
           navigate: async (navigationId) => {
             await router.navigate({
               to: '/',
@@ -187,12 +189,13 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
       },
       openRepoWorkspace(repoId, options) {
         const repoSlug = repoSlugForId(repoId)
-        if (!repoSlug || !router) return
+        if (!repoSlug || !router) return false
         const target = router.buildLocation({ to: '/repo/$repoSlug/workspace', params: { repoSlug } })
-        void runOwnedPrimaryWindowNavigation({
+        return runOwnedPrimaryWindowNavigation({
           token: options?.presentationToken,
           commitEffect: options?.onCommit,
           targetHref: target.href,
+          currentHref: () => router.state.location.href,
           navigate: async (navigationId) => {
             await router.navigate({
               to: '/repo/$repoSlug/workspace',
@@ -505,10 +508,16 @@ export function usePrimaryWindowRouteActions(): PrimaryWindowRouteNavigation {
 export function runOwnedPrimaryWindowNavigation(input: {
   token?: PrimaryWindowPresentationToken
   targetHref: string
+  currentHref?: () => string
   commitEffect?: () => void
   navigate(navigationId: string): Promise<unknown>
 }): boolean {
   const token = input.token ?? beginPrimaryWindowPresentation()
+  if (input.currentHref?.() === input.targetHref) {
+    if (!primaryWindowPresentationIsCurrent(token)) return false
+    input.commitEffect?.()
+    return true
+  }
   const navigationId = registerPrimaryWindowNavigation(token, input.targetHref, input.commitEffect)
   if (!navigationId) return false
   void input

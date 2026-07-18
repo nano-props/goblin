@@ -147,15 +147,6 @@ export function RepoView({
   const sidebarOpenDashboard = routeView ? () => onOpenRepoDashboard?.(repo.id) : undefined
   const dashboardSelected = routeView?.kind === 'dashboard'
   const newWorktreeSelected = routeView?.kind === 'newWorktree'
-  const openWorkspaceTab = (type: 'status' | 'files') => {
-    useReposStore
-      .getState()
-      .setWorkspacePaneTabForTarget(
-        { kind: 'workspace-root', repoRoot: repo.id },
-        type,
-      )
-    onOpenRepoWorkspace?.(repo.id)
-  }
   const renderSidebarPane = (
     branchContent?: ReactNode,
     chromeRegion: 'drag' | 'none' = zenModeCollapsed ? 'none' : 'drag',
@@ -176,8 +167,6 @@ export function RepoView({
         gitAvailable={gitAvailable}
         workspaceRootSelected={gitUnavailable && routeView?.kind === 'workspace'}
         onSelectWorkspaceRoot={gitUnavailable ? () => onOpenRepoWorkspace?.(repo.id) : undefined}
-        onOpenWorkspaceStatus={gitUnavailable ? () => openWorkspaceTab('status') : undefined}
-        onOpenWorkspaceFiles={gitUnavailable ? () => openWorkspaceTab('files') : undefined}
       />
     </RepoWorkspacePane>
   )

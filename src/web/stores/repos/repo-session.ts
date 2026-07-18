@@ -19,6 +19,7 @@ import { workspacePaneTabsByTargetFromQueryData } from '#/web/workspace-pane/wor
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { restoredPreferredWorkspacePaneTabByTarget } from '#/web/restorable-workspace-state.ts'
 import { recordWithoutKey } from '#/shared/record.ts'
+import { workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 
 interface InitialRepoRefresh {
   id: string
@@ -96,7 +97,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
           },
           { scope: 'repo-read-model' },
         )
-        if (isProjectedRestoredWorkspaceRepo(restoredRepo)) {
+        if (isProjectedRestoredWorkspaceRepo(restoredRepo) || workspaceGitUnavailable(restoredRepo.workspaceProbe)) {
           applyRestoredPreferredWorkspacePaneTabs(
             set,
             get,
@@ -172,9 +173,11 @@ function applyRestoredPreferredWorkspacePaneTabs(
 ): void {
   const state = get()
   const repo = state.repos[repoRoot]
-  const branches = repo ? readRepoBranchSnapshotQueryProjection(repo)?.branches : null
   const restoredPreferred = state.restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByRepo[repoRoot]
-  if (!repo || !branches || !restoredPreferred) return
+  if (!repo || !restoredPreferred) return
+  const branchProjection = readRepoBranchSnapshotQueryProjection(repo)?.branches
+  const branches = branchProjection ?? (workspaceGitUnavailable(repo.workspaceProbe) ? [] : null)
+  if (!branches) return
   const preferredWorkspacePaneTabByTarget = restoredPreferredWorkspacePaneTabByTarget(
     repoRoot,
     { branches },

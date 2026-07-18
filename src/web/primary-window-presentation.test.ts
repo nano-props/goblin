@@ -103,4 +103,54 @@ describe('primary window presentation history ownership', () => {
 
     expect(commitEffect).not.toHaveBeenCalled()
   })
+
+  test('commits a same-target presentation without waiting for a no-op router event', () => {
+    const commitEffect = vi.fn()
+    const navigate = vi.fn(async () => {})
+
+    expect(
+      runOwnedPrimaryWindowNavigation({
+        targetHref: '/workspace',
+        currentHref: () => '/workspace',
+        commitEffect,
+        navigate,
+      }),
+    ).toBe(true)
+
+    expect(commitEffect).toHaveBeenCalledOnce()
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  test('rejects a stale same-target presentation without committing', () => {
+    const staleToken = beginPrimaryWindowPresentation()
+    beginPrimaryWindowPresentation()
+    const commitEffect = vi.fn()
+
+    expect(
+      runOwnedPrimaryWindowNavigation({
+        token: staleToken,
+        targetHref: '/workspace',
+        currentHref: () => '/workspace',
+        commitEffect,
+        navigate: vi.fn(async () => {}),
+      }),
+    ).toBe(false)
+    expect(commitEffect).not.toHaveBeenCalled()
+  })
+
+  test('accepts a same-target commit whose effect starts the next presentation', () => {
+    const commitEffect = vi.fn(() => {
+      beginPrimaryWindowPresentation()
+    })
+
+    expect(
+      runOwnedPrimaryWindowNavigation({
+        targetHref: '/workspace',
+        currentHref: () => '/workspace',
+        commitEffect,
+        navigate: vi.fn(async () => {}),
+      }),
+    ).toBe(true)
+    expect(commitEffect).toHaveBeenCalledOnce()
+  })
 })

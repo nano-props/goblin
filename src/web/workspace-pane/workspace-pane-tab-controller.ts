@@ -1,4 +1,9 @@
 import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import {
+  isWorkspacePaneRuntimeTabEntry,
+  workspacePaneTabEntryIdentity,
+  type WorkspacePaneTabEntry,
+} from '#/shared/workspace-pane.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import {
   isRepoWorkspaceRuntimeTab,
@@ -25,7 +30,6 @@ import {
   type PrimaryWindowPresentationToken,
 } from '#/web/primary-window-presentation.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { workspacePaneTabsTargetWorktreePath } from '#/shared/workspace-pane-tabs-target.ts'
 import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
@@ -47,7 +51,7 @@ export type WorkspacePaneTabControllerCommitNavigation = Pick<
   'commitWorkspacePaneRoute'
 > &
   Pick<PrimaryWindowNavigationActions, 'showRepoWorktreeTerminalSession'> &
-  Pick<PrimaryWindowNavigationActions, 'showRepoWorktreeWorkspacePaneTab'>
+  Pick<PrimaryWindowNavigationActions, 'showRepoWorktreeWorkspacePaneTab' | 'showRepoWorkspacePaneTab'>
 type WorkspacePaneTabControllerOptionalShowNavigation = Partial<WorkspacePaneTabControllerShowNavigation>
 
 export function workspacePaneControllerRouteForTab(tab: RepoWorkspaceTab): WorkspacePaneTabControllerRoute | undefined {
@@ -113,32 +117,87 @@ export async function selectWorkspacePaneControllerTab(
   navigation: WorkspacePaneTabControllerCommitNavigation,
   presentationToken: PrimaryWindowPresentationToken = beginPrimaryWindowPresentation(),
 ): Promise<boolean> {
+  if (!primaryWindowPresentationIsCurrent(presentationToken)) return false
   if (target.paneTarget.kind === 'git-worktree' && target.branchName === null) {
     if (!workspacePaneTabControllerTargetIsCurrent(target) || tab.kind === 'pending') return false
     if (isRepoWorkspaceRuntimeTab(tab) && tab.runtimeType === 'terminal') {
       return (
-        navigation.showRepoWorktreeTerminalSession?.(target.repoId, target.paneTarget.worktreePath, tab.sessionId) ??
+        navigation.showRepoWorktreeTerminalSession?.(
+          target.repoId,
+          target.paneTarget.worktreePath,
+          tab.sessionId,
+          { presentationToken },
+        ) ??
         false
       )
     }
     if (tab.kind !== 'static') return false
     return (
-      navigation.showRepoWorktreeWorkspacePaneTab?.(target.repoId, target.paneTarget.worktreePath, tab.type) ?? false
+      navigation.showRepoWorktreeWorkspacePaneTab?.(
+        target.repoId,
+        target.paneTarget.worktreePath,
+        tab.type,
+        { presentationToken },
+      ) ?? false
     )
   }
   if (target.paneTarget.kind === 'workspace-root') {
     if (!workspacePaneTabControllerTargetIsCurrent(target) || tab.kind === 'pending') return false
-    const state = useReposStore.getState()
-    if (isRepoWorkspaceRuntimeTab(tab) && tab.runtimeType === 'terminal') {
-      state.setSelectedTerminal(formatTerminalWorktreeKey(target.repoId, target.repoId), tab.sessionId)
-    }
-    state.setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: target.repoId }, tab.type)
-    return workspacePaneTabControllerTargetIsCurrent(target)
+    const presentation =
+      isRepoWorkspaceRuntimeTab(tab) && tab.runtimeType === 'terminal'
+        ? { kind: 'terminal' as const, terminalSessionId: tab.sessionId }
+        : tab.kind === 'static'
+          ? { kind: 'static' as const, tab: tab.type }
+          : null
+    return presentation
+      ? (navigation.showRepoWorkspacePaneTab?.(target.repoId, presentation, { presentationToken }) ?? false)
+      : false
   }
   if (target.paneTarget.kind === 'inactive') return false
   const route = workspacePaneControllerRouteForTab(tab)
   if (route === undefined) return false
   return await commitWorkspacePaneCurrentTargetRoute(target, route, navigation, undefined, presentationToken)
+}
+
+/** Selects canonical tab authority without requiring a live presentation view. */
+export async function selectWorkspacePaneControllerTabEntry(
+  target: RepoWorkspaceTabModel,
+  entry: WorkspacePaneTabEntry,
+  navigation: WorkspacePaneTabControllerCommitNavigation,
+  presentationToken: PrimaryWindowPresentationToken = beginPrimaryWindowPresentation(),
+): Promise<boolean> {
+  if (!primaryWindowPresentationIsCurrent(presentationToken)) return false
+  const materialized = target.tabs.find((tab) => tab.identity === workspacePaneTabEntryIdentity(entry))
+  if (materialized) return await selectWorkspacePaneControllerTab(target, materialized, navigation, presentationToken)
+  if (!isWorkspacePaneRuntimeTabEntry(entry) || entry.type !== 'terminal') return false
+  if (!workspacePaneTabControllerTargetIsCurrent(target)) return false
+  if (target.paneTarget.kind === 'workspace-root') {
+    return (
+      navigation.showRepoWorkspacePaneTab?.(
+        target.repoId,
+        { kind: 'terminal', terminalSessionId: entry.runtimeSessionId },
+        { presentationToken },
+      ) ?? false
+    )
+  }
+  if (target.paneTarget.kind === 'git-worktree' && target.branchName === null) {
+    return (
+      navigation.showRepoWorktreeTerminalSession?.(
+        target.repoId,
+        target.paneTarget.worktreePath,
+        entry.runtimeSessionId,
+        { presentationToken },
+      ) ?? false
+    )
+  }
+  if (!target.branchName) return false
+  return await commitWorkspacePaneCurrentTargetRoute(
+    target,
+    { kind: 'terminal', terminalSessionId: entry.runtimeSessionId },
+    navigation,
+    undefined,
+    presentationToken,
+  )
 }
 
 export function commitWorkspacePaneControllerCloseBackTarget(

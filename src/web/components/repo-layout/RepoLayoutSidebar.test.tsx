@@ -14,14 +14,24 @@ vi.mock('#/web/components/RepoPickerHost.tsx', () => ({
 }))
 
 const responsiveMocks = vi.hoisted(() => ({ compact: false }))
+const workspaceCommandMocks = vi.hoisted(() => ({
+  showTab: vi.fn(async () => true),
+  terminal: vi.fn(async () => true),
+}))
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => responsiveMocks.compact,
+}))
+vi.mock('#/web/commands/workspace-commands.ts', () => ({
+  runShowWorkspacePaneTabCommand: workspaceCommandMocks.showTab,
+  runTerminalPrimaryActionCommand: workspaceCommandMocks.terminal,
 }))
 
 const REPO_ID = 'goblin+file:///tmp/repo-shell-sidebar-test'
 
 beforeEach(() => {
   responsiveMocks.compact = false
+  workspaceCommandMocks.showTab.mockClear()
+  workspaceCommandMocks.terminal.mockClear()
   primaryWindowQueryClient.clear()
   resetReposStore()
   seedRepoWithReadModelForTest({
@@ -84,8 +94,6 @@ describe('RepoLayoutSidebar', () => {
   test('keeps the shared dashboard and navigator layout without Git-only controls when Git is unavailable', () => {
     const onOpenDashboard = vi.fn()
     const onSelectWorkspaceRoot = vi.fn()
-    const onOpenWorkspaceStatus = vi.fn()
-    const onOpenWorkspaceFiles = vi.fn()
     const { container } = renderSidebar(
       <RepoLayoutSidebar
         repoId={REPO_ID}
@@ -93,8 +101,6 @@ describe('RepoLayoutSidebar', () => {
         gitAvailable={false}
         onOpenDashboard={onOpenDashboard}
         onSelectWorkspaceRoot={onSelectWorkspaceRoot}
-        onOpenWorkspaceStatus={onOpenWorkspaceStatus}
-        onOpenWorkspaceFiles={onOpenWorkspaceFiles}
       />,
     )
 
@@ -126,7 +132,9 @@ describe('RepoLayoutSidebar', () => {
       throw new Error('missing workspace root actions')
     }
     fireEvent.click(statusAction)
-    expect(onOpenWorkspaceStatus).toHaveBeenCalledOnce()
+    expect(workspaceCommandMocks.showTab).toHaveBeenCalledWith(
+      expect.objectContaining({ repoId: REPO_ID, tab: 'status' }),
+    )
 
     fireEvent.click(menuTrigger)
     const reopenedFilesAction = [...document.querySelectorAll('button')].find(
@@ -134,13 +142,15 @@ describe('RepoLayoutSidebar', () => {
     )
     if (!(reopenedFilesAction instanceof HTMLButtonElement)) throw new Error('missing reopened Files action')
     fireEvent.click(reopenedFilesAction)
-    expect(onOpenWorkspaceFiles).toHaveBeenCalledOnce()
+    expect(workspaceCommandMocks.showTab).toHaveBeenCalledWith(
+      expect.objectContaining({ repoId: REPO_ID, tab: 'files' }),
+    )
   })
 
   test('keeps the workspace row action menu visible in compact UI', () => {
     responsiveMocks.compact = true
     const { container } = renderSidebar(
-      <RepoLayoutSidebar repoId={REPO_ID} compact gitAvailable={false} onOpenWorkspaceStatus={vi.fn()} />,
+      <RepoLayoutSidebar repoId={REPO_ID} compact gitAvailable={false} />,
     )
 
     const menuTrigger = container.querySelector('button[aria-label="action.menu"]')

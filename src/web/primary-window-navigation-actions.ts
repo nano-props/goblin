@@ -30,6 +30,10 @@ export interface PrimaryWindowPresentationNavigationOptions {
     { kind: 'exact-route'; route: WorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
 }
 
+export type WorkspaceRootPanePresentation =
+  | { kind: 'static'; tab: WorkspacePaneStaticTabType }
+  | { kind: 'terminal'; terminalSessionId: string }
+
 export interface PrimaryWindowNavigationActions {
   activateRepo: (repoId: string) => void
   closeRepo: (repoId: string) => Promise<CloseRepoResult>
@@ -52,13 +56,18 @@ export interface PrimaryWindowNavigationActions {
     repoId: string,
     worktreePath: string,
     terminalSessionId: string,
-    options?: { replace?: boolean },
+    options?: PrimaryWindowPresentationNavigationOptions,
   ) => boolean
   showRepoWorktreeWorkspacePaneTab?: (
     repoId: string,
     worktreePath: string,
     tab: WorkspacePaneStaticTabType,
-    options?: { replace?: boolean },
+    options?: PrimaryWindowPresentationNavigationOptions,
+  ) => boolean
+  showRepoWorkspacePaneTab?: (
+    repoId: string,
+    presentation: WorkspaceRootPanePresentation,
+    options?: PrimaryWindowPresentationNavigationOptions,
   ) => boolean
   commitWorkspacePaneRoute: (
     repoId: string,
@@ -166,14 +175,36 @@ export function createPrimaryWindowNavigationActions({
     showRepoWorktreeTerminalSession(repoId, worktreePath, terminalSessionId, options) {
       const open = routeNavigation.openRepoWorktreeTerminal
       if (!open) return false
-      const token = beginPrimaryWindowPresentation()
+      const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
       return open(repoId, worktreePath, terminalSessionId, { ...options, presentationToken: token })
     },
     showRepoWorktreeWorkspacePaneTab(repoId, worktreePath, tab, options) {
       const open = routeNavigation.openRepoWorktreeTab
       if (!open) return false
-      const token = beginPrimaryWindowPresentation()
+      const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
       return open(repoId, worktreePath, tab, { ...options, presentationToken: token })
+    },
+    showRepoWorkspacePaneTab(repoId, presentation, options) {
+      const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
+      return routeNavigation.openRepoWorkspace(repoId, {
+        ...options,
+        presentationToken: token,
+        onCommit: () => {
+          const state = useReposStore.getState()
+          if (!state.repos[repoId]) return
+          if (presentation.kind === 'terminal') {
+            state.setSelectedTerminal(
+              formatTerminalWorktreeKeyForPath(repoId, repoId),
+              presentation.terminalSessionId,
+            )
+          }
+          state.setWorkspacePaneTabForTarget(
+            { kind: 'workspace-root', repoRoot: repoId },
+            presentation.kind === 'terminal' ? 'terminal' : presentation.tab,
+          )
+          options?.onCommit?.()
+        },
+      })
     },
     commitWorkspacePaneRoute(repoId, branch, route, options) {
       return commitWorkspacePaneRoute(routeNavigation, repoId, branch, route, options)

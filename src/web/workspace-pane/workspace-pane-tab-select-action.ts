@@ -5,8 +5,10 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import { adjacentRepoWorkspaceTab, type RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import {
   selectWorkspacePaneControllerTab,
+  selectWorkspacePaneControllerTabEntry,
   workspacePaneTabControllerTargetIsCurrent,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { workspacePaneTabEntryIdentity } from '#/shared/workspace-pane.ts'
 import { dispatchWorkspacePaneDestinationRoute } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import type { WorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
@@ -109,11 +111,16 @@ async function selectWorkspacePaneTabByIdentityAction(
   const sourceRoute = workspacePaneRoute
   const target = resolveSelectableWorkspacePaneTarget(options, sourceRoute)
   const tab = target?.tabs.find((candidate) => candidate.identity === identity) ?? null
-  if (!target || !tab || !queuedWorkspacePaneTargetMatches(coordinatorTarget, target)) return false
+  const tabEntry = target?.tabEntries.find((candidate) => workspacePaneTabEntryIdentity(candidate) === identity) ?? null
+  if (!target || (!tab && !tabEntry) || !queuedWorkspacePaneTargetMatches(coordinatorTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
-  if (tab.kind === 'pending') return false
-  const committed = await selectWorkspacePaneControllerTab(target, tab, navigation, presentationToken)
-  if (committed && reselect && tab.kind === 'runtime' && tab.runtimeType === 'terminal') {
+  if (tab?.kind === 'pending') return false
+  const committed = tab
+    ? await selectWorkspacePaneControllerTab(target, tab, navigation, presentationToken)
+    : tabEntry
+      ? await selectWorkspacePaneControllerTabEntry(target, tabEntry, navigation, presentationToken)
+      : false
+  if (committed && reselect && tab?.kind === 'runtime' && tab.runtimeType === 'terminal') {
     runtimeActionContext?.terminal?.scrollToBottom?.(tab.sessionId)
   }
   return committed

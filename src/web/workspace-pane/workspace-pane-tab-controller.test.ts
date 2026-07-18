@@ -5,9 +5,14 @@ import {
   commitWorkspacePaneControllerCloseBackTarget,
   commitWorkspacePaneExactTargetRoute,
   selectWorkspacePaneControllerTab,
+  selectWorkspacePaneControllerTabEntry,
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
-import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import {
+  workspacePaneRuntimeTabEntry,
+  workspacePaneStaticTabId,
+  type WorkspacePaneStaticTabType,
+} from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RepoWorkspaceStaticTab, RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -18,6 +23,7 @@ import {
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
+import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
 
 const SOURCE_ROUTE = { kind: 'static' as const, tab: 'files' as const }
 const TARGET_ROUTE = { kind: 'static' as const, tab: 'status' as const }
@@ -78,8 +84,18 @@ describe('workspace pane tab controller transactions', () => {
     )
   })
 
-  test('selects a workspace-scoped tab without committing a branch route', async () => {
-    const navigation = { commitWorkspacePaneRoute: vi.fn(() => false) }
+  test('presents a workspace-scoped tab through the workspace route', async () => {
+    const showRepoWorkspacePaneTab = vi.fn((_repoId, presentation, options) => {
+      useReposStore
+        .getState()
+        .setWorkspacePaneTabForTarget(
+          { kind: 'workspace-root', repoRoot: 'goblin+file:///repo' },
+          presentation.kind === 'terminal' ? 'terminal' : presentation.tab,
+        )
+      options?.onCommit?.()
+      return true
+    })
+    const navigation = { commitWorkspacePaneRoute: vi.fn(() => false), showRepoWorkspacePaneTab }
 
     await expect(
       selectWorkspacePaneControllerTab(
@@ -95,6 +111,11 @@ describe('workspace pane tab controller transactions', () => {
     ).resolves.toBe(true)
 
     expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(
+      'goblin+file:///repo',
+      { kind: 'static', tab: 'files' },
+      expect.objectContaining({ presentationToken: expect.any(Object) }),
+    )
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'workspace-root',
       repoRoot: 'goblin+file:///repo',
@@ -102,6 +123,33 @@ describe('workspace pane tab controller transactions', () => {
     expect(useReposStore.getState().repos['goblin+file:///repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
       'files',
     )
+  })
+
+  test('does not create a replacement worktree presentation after the queued token is superseded', async () => {
+    const tokenA = beginPrimaryWindowPresentation()
+    beginPrimaryWindowPresentation()
+    const showRepoWorktreeTerminalSession = vi.fn(() => true)
+    const target = {
+      ...workspacePaneTarget(),
+      branchName: null,
+      paneTarget: {
+        kind: 'git-worktree' as const,
+        repoRoot: 'goblin+file:///repo',
+        worktreePath: '/worktree-a',
+      },
+      tabEntries: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
+      tabs: [],
+    }
+
+    await expect(
+      selectWorkspacePaneControllerTabEntry(
+        target,
+        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+        { commitWorkspacePaneRoute: vi.fn(() => false), showRepoWorktreeTerminalSession },
+        tokenA,
+      ),
+    ).resolves.toBe(false)
+    expect(showRepoWorktreeTerminalSession).not.toHaveBeenCalled()
   })
 
   test('commits a server-created runtime route while the local branch label is stale', async () => {

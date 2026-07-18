@@ -34,8 +34,6 @@ interface RepoShellSidebarProps {
   gitAvailable?: boolean
   workspaceRootSelected?: boolean
   onSelectWorkspaceRoot?: () => void
-  onOpenWorkspaceStatus?: () => void
-  onOpenWorkspaceFiles?: () => void
 }
 
 export function RepoLayoutSidebar({
@@ -53,8 +51,6 @@ export function RepoLayoutSidebar({
   gitAvailable = true,
   workspaceRootSelected = false,
   onSelectWorkspaceRoot,
-  onOpenWorkspaceStatus,
-  onOpenWorkspaceFiles,
 }: RepoShellSidebarProps) {
   const t = useT()
   return (
@@ -97,8 +93,6 @@ export function RepoLayoutSidebar({
                   repoId={repoId}
                   selected={workspaceRootSelected}
                   onSelect={onSelectWorkspaceRoot}
-                  onOpenStatus={onOpenWorkspaceStatus}
-                  onOpenFiles={onOpenWorkspaceFiles}
                 />
               ))}
           </div>

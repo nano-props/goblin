@@ -1830,6 +1830,50 @@ describe('workspace commands', () => {
     expect(closeWindow).not.toHaveBeenCalled()
   })
 
+  test.each(['status', 'files'] as const)(
+    'reopens a closed workspace-root %s tab through the shared open transaction',
+    async (tabType) => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branchSnapshots: [], currentBranchName: null })
+    const target = {
+      kind: 'workspace-root' as const,
+      repoRoot: REPO_ID,
+      repoRuntimeId: repo.repoRuntimeId,
+    }
+    setWorkspacePaneTabsForTargetQueryData({ ...target, tabs: [staticEntry('status'), staticEntry('files')] })
+    useReposStore.getState().setWorkspacePaneTabForTarget(target, tabType)
+    const navigation = navigationWith()
+
+    await expect(
+      runCloseWorkspacePaneTabCommand({
+        workspacePaneRoute: undefined,
+        repoId: REPO_ID,
+        branchName: null,
+        navigation,
+        targetIdentity: `workspace-pane:${tabType}`,
+      }),
+    ).resolves.toBe(true)
+    const remainingType = tabType === 'status' ? 'files' : 'status'
+    expect(readWorkspacePaneTabsForTarget(target).map((tab) => tab.type)).toEqual([remainingType])
+
+    await expect(
+      runShowWorkspacePaneTabCommand({
+        workspacePaneRoute: null,
+        repoId: REPO_ID,
+        branchName: null,
+        tab: tabType,
+        navigation,
+      }),
+    ).resolves.toBe(true)
+    expect(readWorkspacePaneTabsForTarget(target).map((tab) => tab.type)).toEqual([remainingType, tabType])
+    expect(
+      preferredWorkspacePaneTabForTarget(useReposStore.getState().repos[REPO_ID]!.ui, {
+        kind: 'workspace-root',
+        repoRoot: REPO_ID,
+      }),
+    ).toBe(tabType)
+    },
+  )
+
   test('close workspace tab command queues tab switching while a static close is in flight', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -3255,6 +3299,14 @@ function navigationWith(
       return true
     },
     showRepoBranchTerminalSession: () => true,
+    showRepoWorkspacePaneTab: (repoId, presentation, options) => {
+      useReposStore.getState().setWorkspacePaneTabForTarget(
+        { kind: 'workspace-root', repoRoot: repoId },
+        presentation.kind === 'terminal' ? 'terminal' : presentation.tab,
+      )
+      options?.onCommit?.()
+      return true
+    },
     commitWorkspacePaneRoute: () => false,
     goBack: () => {},
     goForward: () => {},

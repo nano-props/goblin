@@ -18,7 +18,7 @@ import {
 } from '#/web/stores/repos/repo-session-test-utils.ts'
 import { acceptRemoteLifecycleProjection } from '#/web/stores/repos/remote-lifecycle-projection.ts'
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
-import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
 
@@ -32,10 +32,63 @@ const GIT_WORKSPACE_PROBE = {
   },
   diagnostics: [],
 }
+const DIRECTORY_WORKSPACE_PROBE = {
+  ...GIT_WORKSPACE_PROBE,
+  capabilities: { ...GIT_WORKSPACE_PROBE.capabilities, git: { status: 'unavailable' as const } },
+}
 
 beforeEach(resetLifecycleTest)
 
 describe('repo session hydration', () => {
+  test('restores a workspace-root terminal preference without a Git branch projection', async () => {
+    const targetKey = workspacePaneTabsTargetIdentityKey({ kind: 'workspace-root', repoRoot: REPO_A })
+    await useReposStore.getState().hydrateRestoredWorkspaceRuntime(
+      {
+        repos: [
+          {
+            entry: localWorkspaceSessionEntry(REPO_A),
+            repoRoot: REPO_A,
+            repoRuntimeId: 'repo-runtime-server-a',
+            name: 'directory-a',
+            workspaceProbe: DIRECTORY_WORKSPACE_PROBE,
+            projection: null,
+          },
+        ],
+        workspacePaneTabs: [
+          {
+            repoRoot: REPO_A,
+            repoRuntimeId: 'repo-runtime-server-a',
+            snapshot: {
+              revision: 1,
+              entries: [
+                {
+                  target: runtimeWorkspacePaneTargetForTest({
+                    kind: 'workspace-root',
+                    repoRoot: REPO_A,
+                    repoRuntimeId: 'repo-runtime-server-a',
+                  }),
+                  tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
+                },
+              ],
+            },
+          },
+        ],
+        restoredRepoId: REPO_A,
+      },
+      {
+        restoredClientWorkspace: {
+          ...defaultClientWorkspaceState(),
+          preferredWorkspacePaneTabByTargetByRepo: { [REPO_A]: { [targetKey]: 'terminal' } },
+        },
+      },
+    )
+
+    expect(useReposStore.getState().repos[REPO_A]?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe('terminal')
+    expect(
+      useReposStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByRepo[REPO_A],
+    ).toBeUndefined()
+  })
+
   test('restores a validated preferred tab for an eagerly projected repo', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch' as const,
