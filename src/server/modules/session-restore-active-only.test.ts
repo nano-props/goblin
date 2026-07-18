@@ -5,6 +5,15 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const ACTIVE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo-active')
+const STUB_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo-stub')
+const NESTED_STUB_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo-stub/src')
+const REPO_A_ID = workspaceIdForTest('goblin+file:///repo-a')
+const REPO_B_ID = workspaceIdForTest('goblin+file:///repo-b')
+const LOCAL_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
+const REMOTE_WORKSPACE_ID = workspaceIdForTest('goblin+ssh://prod/srv/repo')
 
 const mocks = vi.hoisted(() => ({
   acquireWorkspaceRuntimeLease: vi.fn(),
@@ -107,8 +116,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [
-        { kind: 'local', id: 'goblin+file:///repo-active' },
-        { kind: 'local', id: 'goblin+file:///repo-stub' },
+        { kind: 'local', id: ACTIVE_WORKSPACE_ID },
+        { kind: 'local', id: STUB_WORKSPACE_ID },
       ],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
@@ -162,8 +171,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
   })
 
   test('converges to a repo added while restore is opening the original membership', async () => {
-    const repoA = { kind: 'local' as const, id: 'goblin+file:///repo-a' }
-    const repoB = { kind: 'local' as const, id: 'goblin+file:///repo-b' }
+    const repoA = { kind: 'local' as const, id: REPO_A_ID }
+    const repoB = { kind: 'local' as const, id: REPO_B_ID }
     const initial = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA] }
     const latest = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA, repoB] }
     mocks.getServerWorkspaceState.mockResolvedValue(initial)
@@ -197,8 +206,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
   })
 
   test('releases only a repo removed while restore is in flight', async () => {
-    const repoA = { kind: 'local' as const, id: 'goblin+file:///repo-a' }
-    const repoB = { kind: 'local' as const, id: 'goblin+file:///repo-b' }
+    const repoA = { kind: 'local' as const, id: REPO_A_ID }
+    const repoB = { kind: 'local' as const, id: REPO_B_ID }
     const initial = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA, repoB] }
     const latest = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoB] }
     mocks.getServerWorkspaceState.mockResolvedValue(initial)
@@ -227,8 +236,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
   })
 
   test('converges when workspace membership changes during pane projection', async () => {
-    const repoA = { kind: 'local' as const, id: 'goblin+file:///repo-a' }
-    const repoB = { kind: 'local' as const, id: 'goblin+file:///repo-b' }
+    const repoA = { kind: 'local' as const, id: REPO_A_ID }
+    const repoB = { kind: 'local' as const, id: REPO_B_ID }
     const initial = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA] }
     const latest = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA, repoB] }
     mocks.getServerWorkspaceState.mockResolvedValue(initial)
@@ -252,7 +261,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
   })
 
   test('releases every attempt lease after persistent membership conflicts', async () => {
-    const repo = { kind: 'local' as const, id: 'goblin+file:///repo' }
+    const repo = { kind: 'local' as const, id: LOCAL_WORKSPACE_ID }
     const workspace = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repo] }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.compareAndReplaceServerWorkspaceRepos.mockResolvedValue({
@@ -279,8 +288,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [
-        { kind: 'local', id: 'goblin+file:///repo-a' },
-        { kind: 'local', id: 'goblin+file:///repo-b' },
+        { kind: 'local', id: REPO_A_ID },
+        { kind: 'local', id: REPO_B_ID },
       ],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
@@ -316,8 +325,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [
-        { kind: 'local', id: 'goblin+file:///repo-active' },
-        { kind: 'local', id: 'goblin+file:///repo-stub/src' },
+        { kind: 'local', id: ACTIVE_WORKSPACE_ID },
+        { kind: 'local', id: NESTED_STUB_WORKSPACE_ID },
       ],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
@@ -366,9 +375,9 @@ describe('restoreServerWorkspace — active-only restore', () => {
   test('non-active remote repos are probed and retain their display name', async () => {
     const remoteEntry = {
       kind: 'remote' as const,
-      id: 'goblin+ssh://prod/srv/repo',
+      id: REMOTE_WORKSPACE_ID,
       ref: {
-        id: 'goblin+ssh://prod/srv/repo',
+        id: REMOTE_WORKSPACE_ID,
         alias: 'prod',
         remotePath: '/srv/repo',
         displayName: 'prod:repo',
@@ -376,7 +385,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo-active' }, remoteEntry],
+      openWorkspaceEntries: [{ kind: 'local', id: ACTIVE_WORKSPACE_ID }, remoteEntry],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
@@ -417,8 +426,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [
-        { kind: 'local', id: 'goblin+file:///repo-active' },
-        { kind: 'local', id: 'goblin+file:///repo-stub' },
+        { kind: 'local', id: ACTIVE_WORKSPACE_ID },
+        { kind: 'local', id: STUB_WORKSPACE_ID },
       ],
       workspacePaneTabsByTargetByWorkspace: {
         // The Git target cannot be validated without the deferred projection;

@@ -16,14 +16,17 @@ import {
   runtimeCoherentWorkspaceOpenStoreActionsFromStore,
   runtimeCoherentWorkspaceProjectionStoreActionsFromStore,
 } from '#/web/stores/workspaces/selector-actions.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/repo')
 
 describe('repo selectors', () => {
   test('builds explicit runtime-coherent and local state slices from store fields', () => {
     expect(
       runtimeCoherentRepoProjectionStateFromStore({
         workspaces: {
-          'goblin+file:///tmp/repo': {
-            id: 'goblin+file:///tmp/repo',
+          [WORKSPACE_ID]: {
+            id: WORKSPACE_ID,
           } as never,
         },
       }),
@@ -39,8 +42,8 @@ describe('repo selectors', () => {
   test('builds restorable workspace state from store fields', () => {
     expect(
       restorableWorkspaceStateFromStore({
-        workspaceOrder: ['goblin+file:///tmp/repo'],
-        restoredWorkspaceId: 'goblin+file:///tmp/repo',
+        workspaceOrder: [WORKSPACE_ID],
+        restoredWorkspaceId: WORKSPACE_ID,
         zenMode: false,
         workspacePaneSize: 50,
         selectedTerminalSessionIdByTerminalWorktree: {

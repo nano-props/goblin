@@ -14,11 +14,15 @@ import type {
 } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
+import { localWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   workspacePaneRuntimeTabEntry,
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
+
+const LOCAL_WORKSPACE_ENTRY = localWorkspaceSessionEntry(workspaceIdForTest('goblin+file:///repo'))
 import {
   issueTestPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeExecutionCapability,
@@ -465,7 +469,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [branchTarget],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [],
     })
     if (validated.kind !== 'validated') throw new Error('unexpected membership conflict')
@@ -534,7 +538,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [branchProjection('main')],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [],
     })
 
@@ -573,7 +577,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [branchProjection('main')],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [],
     })
 
@@ -593,7 +597,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [branchProjection('main')],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [],
     })
 
@@ -610,7 +614,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [],
     })
 
@@ -664,7 +668,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [],
     })
 
@@ -695,7 +699,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: providers,
     })
 
@@ -728,7 +732,7 @@ describe('workspace pane layout aggregate', () => {
         ...scope,
         validTargets: [worktreeProjection(target.branchName)],
         physicalTargets: [],
-        expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+        expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
         providerSnapshots: [],
       }),
     ).resolves.toEqual({ kind: 'membership-conflict' })
@@ -750,7 +754,7 @@ describe('workspace pane layout aggregate', () => {
         ...scope,
         validTargets: [branchProjection('main')],
         physicalTargets: [],
-        expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+        expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
         providerSnapshots: [],
         assertCurrent: () => {
           if (!current) throw new Error('error.workspace-runtime-stale')
@@ -774,7 +778,7 @@ describe('workspace pane layout aggregate', () => {
         ...scope,
         validTargets: [],
         physicalTargets: [],
-        expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+        expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
         providerSnapshots: [],
       }),
     ).rejects.toBe(failure)
@@ -795,7 +799,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [worktreeProjection('old-branch')],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [
         {
           type: 'terminal',
@@ -833,7 +837,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [worktreeProjection('feature/current')],
       physicalTargets: [],
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [],
     })
 
@@ -925,7 +929,7 @@ async function validateTargets(
     ...scope,
     validTargets,
     physicalTargets: [],
-    expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+    expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
     providerSnapshots: [],
   })
   if (result.kind !== 'validated') throw new Error('test target validation failed')

@@ -9,7 +9,10 @@ import {
 import { canStartRemoteFetch } from '#/web/stores/workspaces/sync-state.ts'
 import type { RepoOperationTarget } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 type RemoteFetchBlockerKey = 'fetch' | 'branchAction' | 'repoReadModel'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/goblin-sync-state-test')
 
 interface RepoOverrides {
   fetchBusy?: boolean
@@ -18,7 +21,7 @@ interface RepoOverrides {
 }
 
 function repo(overrides: RepoOverrides = {}): WorkspaceState {
-  const base = emptyWorkspace('/tmp/goblin-sync-state-test', 'repo', 'repo-runtime-test')
+  const base = emptyWorkspace(WORKSPACE_ID, 'repo', 'repo-runtime-test')
   acceptWorkspaceProbeState(base, {
     status: 'ready',
     name: 'repo',
@@ -52,7 +55,7 @@ function repo(overrides: RepoOverrides = {}): WorkspaceState {
 }
 
 afterEach(() => {
-  disposeRepoOperationScheduler('/tmp/goblin-sync-state-test')
+  disposeRepoOperationScheduler(WORKSPACE_ID)
 })
 
 describe('canStartRemoteFetch', () => {

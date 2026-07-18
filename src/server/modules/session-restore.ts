@@ -29,6 +29,7 @@ import {
 import { probeWorkspace } from '#/server/modules/workspace-probe.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 import { parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
 import { compareAndReplaceServerWorkspaceRepos, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
@@ -76,7 +77,7 @@ export async function restoreServerWorkspace(input: RestoreServerWorkspaceInput)
         ...input,
         activeRepoRoot: input.activeRepoRoot ?? workspace.openWorkspaceEntries[0]?.id ?? null,
       }
-      const openedByRoot = new Map<string, OpenedWorkspaceRuntime>()
+      const openedByRoot = new Map<WorkspaceId, OpenedWorkspaceRuntime>()
       let repaired = false
       let committed = false
       try {
@@ -126,7 +127,7 @@ type RestoreServerWorkspaceSnapshotOutcome =
 async function restoreServerWorkspaceSnapshot(
   input: RestoreServerWorkspaceInput,
   source: ServerWorkspaceState,
-  openedByRoot: Map<string, OpenedWorkspaceRuntime>,
+  openedByRoot: Map<WorkspaceId, OpenedWorkspaceRuntime>,
 ): Promise<RestoreServerWorkspaceSnapshotOutcome> {
   input.signal?.throwIfAborted()
   let repoRestoreFailed = false
@@ -197,7 +198,7 @@ function readableWorkspace(probe: WorkspaceProbeState): boolean {
 function reconcileOpenedRepoMemberships(
   input: RestoreServerWorkspaceInput,
   entries: readonly WorkspaceSessionEntry[],
-  openedByRoot: Map<string, OpenedWorkspaceRuntime>,
+  openedByRoot: Map<WorkspaceId, OpenedWorkspaceRuntime>,
 ): void {
   const expectedByRoot = new Map(entries.map((entry) => [workspaceSessionEntryId(entry), entry]))
   for (const [repoRoot, opened] of openedByRoot) {
@@ -243,7 +244,7 @@ async function openWorkspaceRuntime(
         kind: 'opened',
         opened: stubWorkspaceRepo({
           entry,
-          workspaceId: entry.id,
+          workspaceId: lease.workspaceId,
           name,
           workspaceProbe: authoritativeProbe,
           lease,
@@ -260,7 +261,7 @@ async function openWorkspaceRuntime(
         kind: 'opened',
         opened: stubWorkspaceRepo({
           entry,
-          workspaceId: entry.id,
+          workspaceId: lease.workspaceId,
           name,
           workspaceProbe: authoritativeProbe,
           lease,
@@ -271,7 +272,7 @@ async function openWorkspaceRuntime(
       kind: 'opened',
       opened: projectedWorkspaceRepo({
         entry,
-        workspaceId: entry.id,
+        workspaceId: lease.workspaceId,
         name,
         workspaceProbe: authoritativeProbe,
         projection,
@@ -305,7 +306,7 @@ async function openRemoteWorkspace(
           kind: 'opened',
           opened: stubWorkspaceRepo({
             entry,
-            workspaceId: entry.id,
+            workspaceId: lease.workspaceId,
             name: lifecycle.name,
             workspaceProbe: requiredWorkspaceProbe(input.userId, entry.id, lease.workspaceRuntimeId),
             lease,
@@ -324,7 +325,7 @@ async function openRemoteWorkspace(
         kind: 'opened',
         opened: stubWorkspaceRepo({
           entry,
-          workspaceId: entry.id,
+          workspaceId: lease.workspaceId,
           name: lifecycle.name,
           target: lifecycle.lifecycle.target,
           workspaceProbe,
@@ -342,7 +343,7 @@ async function openRemoteWorkspace(
         kind: 'opened',
         opened: stubWorkspaceRepo({
           entry,
-          workspaceId: entry.id,
+          workspaceId: lease.workspaceId,
           name: lifecycle.name,
           target: lifecycle.lifecycle.target,
           workspaceProbe,
@@ -354,7 +355,7 @@ async function openRemoteWorkspace(
       kind: 'opened',
       opened: projectedWorkspaceRepo({
         entry,
-        workspaceId: entry.id,
+        workspaceId: lease.workspaceId,
         name: lifecycle.name,
         target: lifecycle.lifecycle.target,
         workspaceProbe,
@@ -417,7 +418,7 @@ async function withAcquiredWorkspaceRuntimeLease<T>(
 
 interface OpenedWorkspaceRuntimeInput {
   entry: WorkspaceSessionEntry
-  workspaceId: string
+  workspaceId: WorkspaceId
   name: string
   target?: RemoteRepoTarget
   workspaceProbe: WorkspaceProbeState
@@ -458,19 +459,24 @@ function isOpenedProjectedRepo(repo: OpenedWorkspaceRuntime): repo is OpenedProj
 function activeWorkspaceIdForOpened(
   activeRepoRoot: string | null | undefined,
   opened: OpenedWorkspaceRuntime[],
-): string | null {
-  if (activeRepoRoot && opened.some((repo) => repo.workspaceId === activeRepoRoot)) return activeRepoRoot
+): WorkspaceId | null {
+  const activeWorkspace = activeRepoRoot ? opened.find((repo) => repo.workspaceId === activeRepoRoot) : null
+  if (activeWorkspace) return activeWorkspace.workspaceId
   return opened[0]?.workspaceId ?? null
 }
 
-function openedWorkspaceByRoot<T extends RestoredWorkspaceRuntime>(opened: T[]): Map<string, T> {
+function openedWorkspaceByRoot<T extends RestoredWorkspaceRuntime>(opened: T[]): Map<WorkspaceId, T> {
   return new Map(opened.map((repo) => [repo.workspaceId, repo]))
 }
 
 function runtimeSnapshotFromOpened(
   opened: OpenedWorkspaceRuntime[],
-  restoredWorkspaceId: string | null,
-  workspacePaneTabs: Array<{ workspaceId: string; workspaceRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>,
+  restoredWorkspaceId: WorkspaceId | null,
+  workspacePaneTabs: Array<{
+    workspaceId: WorkspaceId
+    workspaceRuntimeId: string
+    snapshot: WorkspacePaneTabsSnapshot
+  }>,
 ): WorkspaceRuntimeRestoreSnapshot {
   return {
     workspaces: opened.map((repo) => omit(repo, ['lease'])),
@@ -479,10 +485,16 @@ function runtimeSnapshotFromOpened(
   }
 }
 
-function releaseOpenedWorkspaceRuntimes(input: RestoreServerWorkspaceInput, opened: Iterable<OpenedWorkspaceRuntime>): void {
+function releaseOpenedWorkspaceRuntimes(
+  input: RestoreServerWorkspaceInput,
+  opened: Iterable<OpenedWorkspaceRuntime>,
+): void {
   for (const repo of opened) releaseWorkspaceRuntimeLease(input, repo.lease)
 }
 
-function releaseWorkspaceRuntimeLease(input: RestoreServerWorkspaceInput, lease: WorkspaceRuntimeMembershipLeaseEntry): void {
+function releaseWorkspaceRuntimeLease(
+  input: RestoreServerWorkspaceInput,
+  lease: WorkspaceRuntimeMembershipLeaseEntry,
+): void {
   releaseWorkspaceRuntimeMembershipLease(input.userId, input.clientId, lease)
 }

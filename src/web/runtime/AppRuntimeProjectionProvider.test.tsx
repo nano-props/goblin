@@ -29,6 +29,7 @@ import {
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const projectionMocks = vi.hoisted(() => ({
   reconcileServerSessionsSnapshot: vi.fn(() => true),
@@ -46,7 +47,7 @@ vi.mock('#/web/stores/workspaces/workspace-session-write-paths.ts', async (impor
   reconcileOpenWorkspaceRuntimeMemberships: projectionMocks.reconcileOpenWorkspaceRuntimeMemberships,
 }))
 
-const REPO_ID = 'goblin+file:///tmp/goblin-runtime-provider-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-runtime-provider-repo')
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/goblin-runtime-provider-worktree'
 
@@ -851,7 +852,7 @@ function seedCurrentRepo() {
 function seedSecondRepo() {
   const current = useWorkspacesStore.getState()
   const secondRepo = seedRepoWithReadModelForTest({
-    id: 'goblin+file:///tmp/goblin-runtime-provider-repo-2',
+    id: workspaceIdForTest('goblin+file:///tmp/goblin-runtime-provider-repo-2'),
     branches: [createRepoBranch('feature/other', { worktree: { path: '/tmp/goblin-runtime-provider-worktree-2' } })],
     currentBranchName: 'feature/other',
     preferredWorkspacePaneTab: 'terminal',

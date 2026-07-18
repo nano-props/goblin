@@ -5,6 +5,7 @@ import {
   buildSettingsSnapshot,
   runtimeSettingsSnapshotFromSettingsSnapshot,
 } from '#/shared/settings-snapshot.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const prefs = {
   lang: 'ja' as const,
@@ -28,7 +29,9 @@ describe('settings snapshot partitions', () => {
 
   test('builds runtime recent repos separately from settings prefs', () => {
     expect(
-      buildRuntimeRecentWorkspacesState({ recentWorkspaces: [{ kind: 'local', id: 'goblin+file:///tmp/repo-a' }] }),
+      buildRuntimeRecentWorkspacesState({
+        recentWorkspaces: [{ kind: 'local', id: workspaceIdForTest('goblin+file:///tmp/repo-a') }],
+      }),
     ).toEqual({
       recentWorkspaces: [{ kind: 'local', id: 'goblin+file:///tmp/repo-a' }],
     })
@@ -38,7 +41,7 @@ describe('settings snapshot partitions', () => {
     const snapshot = buildSettingsSnapshot({
       prefs,
       globalShortcutRegistered: false,
-      recentWorkspaces: [{ kind: 'local', id: 'goblin+file:///tmp/repo-b' }],
+      recentWorkspaces: [{ kind: 'local', id: workspaceIdForTest('goblin+file:///tmp/repo-b') }],
       repoSettings: [],
     })
 

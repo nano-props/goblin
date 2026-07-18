@@ -3,6 +3,7 @@ import { workspaceSessionEntryId, type WorkspaceSessionEntry } from '#/shared/re
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { formatWorkspaceLocator, parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { ServerWorkspaceMatchOutcome } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
@@ -22,7 +23,7 @@ export async function projectWorkspacePaneTabsWithMembershipGuard(input: {
 }): Promise<
   | {
       matched: true
-      snapshots: Array<{ workspaceId: string; workspaceRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>
+      snapshots: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>
       repaired: boolean
     }
   | { matched: false; latestWorkspace: ServerWorkspaceState }
@@ -48,7 +49,11 @@ async function restoreWorkspacePaneTabsForWorkspaces(
   input: WorkspacePaneTabsRestoreInput,
   workspaces: RestoredWorkspaceRuntime[],
 ) {
-  const snapshots: Array<{ workspaceId: string; workspaceRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }> = []
+  const snapshots: Array<{
+    workspaceId: WorkspaceId
+    workspaceRuntimeId: string
+    snapshot: WorkspacePaneTabsSnapshot
+  }> = []
   let repaired = false
   for (const workspace of workspaces) {
     input.signal?.throwIfAborted()

@@ -22,6 +22,7 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   resetTerminalActionDialogsStore,
@@ -158,8 +159,8 @@ vi.mock('sonner', () => ({
   },
 }))
 
-const REPO_ID = 'goblin+file:///tmp/goblin-workspace-command-repo'
-const OTHER_REPO_ID = 'goblin+file:///tmp/goblin-workspace-command-other-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-workspace-command-repo')
+const OTHER_REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-workspace-command-other-repo')
 const WORKTREE_PATH = '/tmp/goblin-workspace-command-worktree'
 const WORKTREE_PANE_TARGET = {
   kind: 'git-worktree' as const,
@@ -3319,15 +3320,17 @@ function navigationWith(
   seedInitialObservedWorkspacePaneRouteForTest(undefined, { autoSeed: options.autoSeedInitialRoute !== false })
   const navigation: PrimaryWindowNavigationActions = {
     currentWorkspacePaneRoute: observedWorkspacePaneRouteForTarget,
-    activateWorkspace: (workspaceId) => useWorkspacesStore.setState({ restoredWorkspaceId: workspaceId }),
+    activateWorkspace: (workspaceId) =>
+      useWorkspacesStore.setState({ restoredWorkspaceId: workspaceIdForTest(workspaceId) }),
     closeWorkspace: async () => ({ ok: true }),
     cycleWorkspace: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: (workspaceId, branch, tab) => {
       const state = useWorkspacesStore.getState()
-      useWorkspacesStore.setState({ restoredWorkspaceId: workspaceId })
-      state.setWorkspacePaneTab(workspaceId, branch, tab)
+      const canonicalWorkspaceId = workspaceIdForTest(workspaceId)
+      useWorkspacesStore.setState({ restoredWorkspaceId: canonicalWorkspaceId })
+      state.setWorkspacePaneTab(canonicalWorkspaceId, branch, tab)
       return true
     },
     showRepoBranchTerminalSession: () => true,

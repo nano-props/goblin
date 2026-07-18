@@ -4,7 +4,12 @@ import {
   type RestoredWorkspaceRuntime,
   type WorkspaceRuntimeRestoreSnapshot,
 } from '#/shared/api-types.ts'
-import type { WorkspaceHydrationOptions, WorkspacesGet, WorkspacesSet, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
+import type {
+  WorkspaceHydrationOptions,
+  WorkspacesGet,
+  WorkspacesSet,
+  WorkspacesStore,
+} from '#/web/stores/workspaces/types.ts'
 import {
   addResolvedWorkspace,
   createWorkspaceLifecycleActions,
@@ -20,9 +25,10 @@ import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-mo
 import { restoredPreferredWorkspacePaneTabByTarget } from '#/web/restorable-workspace-state.ts'
 import { recordWithoutKey } from '#/shared/record.ts'
 import { workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface InitialRepoRefresh {
-  id: string
+  id: WorkspaceId
   workspaceRuntimeId: string
 }
 
@@ -31,7 +37,10 @@ type RestorableWorkspaceLifecycleActions = Pick<
   'hydrateRestoredWorkspaceRuntime' | 'promoteRestoredWorkspace'
 >
 
-function createRestorableWorkspaceLifecycleActions(set: WorkspacesSet, get: WorkspacesGet): RestorableWorkspaceLifecycleActions {
+function createRestorableWorkspaceLifecycleActions(
+  set: WorkspacesSet,
+  get: WorkspacesGet,
+): RestorableWorkspaceLifecycleActions {
   return {
     async hydrateRestoredWorkspaceRuntime(
       runtime: WorkspaceRuntimeRestoreSnapshot,
@@ -84,7 +93,12 @@ function createRestorableWorkspaceLifecycleActions(set: WorkspacesSet, get: Work
             runtime.restoredWorkspaceId,
             null,
           )
-          if (workspaces === s.workspaces && workspaceOrder === s.workspaceOrder && nextRestoredRepoId === s.restoredWorkspaceId) return s
+          if (
+            workspaces === s.workspaces &&
+            workspaceOrder === s.workspaceOrder &&
+            nextRestoredRepoId === s.restoredWorkspaceId
+          )
+            return s
           return { workspaces, workspaceOrder, restoredWorkspaceId: nextRestoredRepoId }
         })
         acceptRepoProjectionReadModel(
@@ -140,11 +154,19 @@ function createRestorableWorkspaceLifecycleActions(set: WorkspacesSet, get: Work
       if (!promoted) return false
 
       if (!isProjectedRestoredWorkspaceRuntime(restoredRepo)) {
-        writeWorkspacePaneTabsSnapshotQueryData(restoredRepo.workspaceId, restoredRepo.workspaceRuntimeId, result.snapshot)
+        writeWorkspacePaneTabsSnapshotQueryData(
+          restoredRepo.workspaceId,
+          restoredRepo.workspaceRuntimeId,
+          result.snapshot,
+        )
         return true
       }
       seedRepoProjectionQueryData(restoredRepo.workspaceId, restoredRepo.workspaceRuntimeId, restoredRepo.projection)
-      writeWorkspacePaneTabsSnapshotQueryData(restoredRepo.workspaceId, restoredRepo.workspaceRuntimeId, result.snapshot)
+      writeWorkspacePaneTabsSnapshotQueryData(
+        restoredRepo.workspaceId,
+        restoredRepo.workspaceRuntimeId,
+        result.snapshot,
+      )
       acceptRepoProjectionReadModel(
         set,
         get,
@@ -173,7 +195,8 @@ function applyRestoredPreferredWorkspacePaneTabs(
 ): void {
   const state = get()
   const repo = state.workspaces[repoRoot]
-  const restoredPreferred = state.restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[repoRoot]
+  const restoredPreferred =
+    state.restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[repoRoot]
   if (!repo || !restoredPreferred) return
   const branchProjection = readRepoBranchSnapshotQueryProjection(repo)?.branches
   const branches = branchProjection ?? (repo.capability.kind === 'filesystem' ? [] : null)

@@ -5,6 +5,11 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const LOCAL_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
+const NESTED_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo/src')
+const REMOTE_WORKSPACE_ID = workspaceIdForTest('goblin+ssh://prod/srv/repo')
 
 const mocks = vi.hoisted(() => ({
   acquireWorkspaceRuntimeLease: vi.fn(),
@@ -115,7 +120,7 @@ describe('restoreServerWorkspace', () => {
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
       workspacePaneTabsByTargetByWorkspace: {
         'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
@@ -166,7 +171,7 @@ describe('restoreServerWorkspace', () => {
   test('repairs instead of migrating non-canonical local workspace entries', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo/src' }],
+      openWorkspaceEntries: [{ kind: 'local', id: NESTED_WORKSPACE_ID }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.probeRepo.mockResolvedValue({ ok: true, root: '/repo', name: 'repo' })
@@ -210,7 +215,7 @@ describe('restoreServerWorkspace', () => {
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
       workspacePaneTabsByTargetByWorkspace: {
         'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
@@ -251,7 +256,7 @@ describe('restoreServerWorkspace', () => {
   test('keeps a canonical active local repo as a stub when projection is temporarily unavailable', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
@@ -287,7 +292,7 @@ describe('restoreServerWorkspace', () => {
   })
 
   test('keeps a local repo declaration as a stub when its path is temporarily unavailable', async () => {
-    const entry = { kind: 'local' as const, id: 'goblin+file:///repo' }
+    const entry = { kind: 'local' as const, id: LOCAL_WORKSPACE_ID }
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [entry],
@@ -319,8 +324,8 @@ describe('restoreServerWorkspace', () => {
   test('keeps an active remote repo as a stub when lifecycle is temporarily unavailable', async () => {
     const remoteEntry = {
       kind: 'remote' as const,
-      id: 'goblin+ssh://prod/srv/repo',
-      ref: { id: 'goblin+ssh://prod/srv/repo', alias: 'prod', remotePath: '/srv/repo', displayName: 'repo' },
+      id: REMOTE_WORKSPACE_ID,
+      ref: { id: REMOTE_WORKSPACE_ID, alias: 'prod', remotePath: '/srv/repo', displayName: 'repo' },
     }
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
@@ -375,7 +380,7 @@ describe('restoreServerWorkspace', () => {
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
       workspacePaneTabsByTargetByWorkspace: {
         'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
@@ -416,7 +421,7 @@ describe('restoreServerWorkspace', () => {
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
       workspacePaneTabsByTargetByWorkspace: {
         'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
@@ -468,8 +473,8 @@ describe('restoreServerWorkspace', () => {
   test('releases the acquired remote runtime when remote lifecycle restore is aborted', async () => {
     const remoteEntry = {
       kind: 'remote' as const,
-      id: 'goblin+ssh://prod/srv/repo',
-      ref: { id: 'goblin+ssh://prod/srv/repo', alias: 'prod', remotePath: '/srv/repo', displayName: 'repo' },
+      id: REMOTE_WORKSPACE_ID,
+      ref: { id: REMOTE_WORKSPACE_ID, alias: 'prod', remotePath: '/srv/repo', displayName: 'repo' },
     }
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
@@ -518,7 +523,7 @@ describe('restoreServerWorkspace', () => {
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
       workspacePaneTabsByTargetByWorkspace: {
         'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('files')] },
       },
@@ -564,7 +569,7 @@ describe('restoreServerWorkspace', () => {
     })
     const invalidWorkspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
       workspacePaneTabsByTargetByWorkspace: {
         'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('files')] },
         '/other': { [otherTargetKey]: [workspacePaneStaticTabEntry('history')] },
@@ -572,7 +577,7 @@ describe('restoreServerWorkspace', () => {
     }
     const currentWorkspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
     }
     mocks.getServerWorkspaceState.mockResolvedValueOnce(invalidWorkspace).mockResolvedValueOnce(currentWorkspace)
     mocks.compareAndReplaceServerWorkspaceRepos

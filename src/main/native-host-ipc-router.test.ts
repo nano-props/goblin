@@ -333,6 +333,23 @@ describe('main repo ipc cancellation', () => {
     expect(writeNativeClientWorkspaceStateMock).toHaveBeenCalledWith(workspace)
   })
 
+  test('rejects a non-canonical workspace identity at the native persistence boundary', async () => {
+    const result = await invokeIpc('clientWorkspace.write', {
+      restoredWorkspaceId: '/repo',
+      zenMode: false,
+      workspacePaneSize: 50,
+      selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByTargetByWorkspace: {},
+      filetreeViewStateByWorktreeByWorkspace: {},
+    })
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'BAD_REQUEST' },
+    })
+    expect(writeNativeClientWorkspaceStateMock).not.toHaveBeenCalled()
+  })
+
   test('rejects IPC calls without a sender frame', async () => {
     const result = await invokeIpc(
       'settings.setGlobalShortcut',

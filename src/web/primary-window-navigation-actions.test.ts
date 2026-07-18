@@ -15,10 +15,16 @@ import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
-import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { emptyWorkspace, replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-const REPO_ID = 'goblin+file:///tmp/navigation-actions-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/navigation-actions-repo')
+const REPO_A_ID = workspaceIdForTest('goblin+file:///tmp/repo-a')
+const REPO_B_ID = workspaceIdForTest('goblin+file:///tmp/repo-b')
+const REPO_C_ID = workspaceIdForTest('goblin+file:///tmp/repo-c')
+const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/other-workspace')
 const BRANCH_NAME = 'feature/create-pending'
 const presentationOptions = (options: { replace?: boolean; returnTo?: string | null } = {}) =>
   expect.objectContaining({ ...options, presentationToken: expect.any(Object) })
@@ -133,8 +139,8 @@ describe('createPrimaryWindowNavigationActions', () => {
       useWorkspacesStore.getState().recordWorkspaceNavigation({ workspaceId: REPO_ID, route: { kind } })
       const navigation = routeNavigation()
       const actions = createPrimaryWindowNavigationActions({
-        currentWorkspaceId: 'goblin+file:///tmp/other-workspace',
-        workspaceOrder: ['goblin+file:///tmp/other-workspace', REPO_ID],
+        currentWorkspaceId: OTHER_WORKSPACE_ID,
+        workspaceOrder: [OTHER_WORKSPACE_ID, REPO_ID],
         closeWorkspace: vi.fn(),
         routeNavigation: navigation,
       })
@@ -165,8 +171,8 @@ describe('createPrimaryWindowNavigationActions', () => {
       const openRepoWorktreeTab = vi.fn(() => true)
       navigation.openRepoWorktreeTab = openRepoWorktreeTab
       const actions = createPrimaryWindowNavigationActions({
-        currentWorkspaceId: 'goblin+file:///tmp/other-workspace',
-        workspaceOrder: ['goblin+file:///tmp/other-workspace', REPO_ID],
+        currentWorkspaceId: OTHER_WORKSPACE_ID,
+        workspaceOrder: [OTHER_WORKSPACE_ID, REPO_ID],
         closeWorkspace: vi.fn(),
         routeNavigation: navigation,
       })
@@ -317,16 +323,16 @@ describe('createPrimaryWindowNavigationActions', () => {
   test('opens explicit empty branch routes through route navigation', () => {
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID, REPO_B_ID],
       closeWorkspace: vi.fn(),
       routeNavigation: navigation,
     })
 
-    actions.showRepoBranchEmptyWorkspacePane('goblin+file:///tmp/repo-b', 'feature/test', { replace: true })
+    actions.showRepoBranchEmptyWorkspacePane(REPO_B_ID, 'feature/test', { replace: true })
 
     expect(navigation.openRepoBranch).toHaveBeenCalledWith(
-      'goblin+file:///tmp/repo-b',
+      REPO_B_ID,
       'feature/test',
       presentationOptions({ replace: true }),
     )
@@ -335,16 +341,16 @@ describe('createPrimaryWindowNavigationActions', () => {
   test('opens branch workspace static tabs through route navigation', () => {
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID, REPO_B_ID],
       closeWorkspace: vi.fn(),
       routeNavigation: navigation,
     })
 
-    actions.showRepoBranchWorkspacePaneTab('goblin+file:///tmp/repo-b', 'feature/test', 'history')
+    actions.showRepoBranchWorkspacePaneTab(REPO_B_ID, 'feature/test', 'history')
 
     expect(navigation.openRepoBranchTab).toHaveBeenCalledWith(
-      'goblin+file:///tmp/repo-b',
+      REPO_B_ID,
       'feature/test',
       'history',
       presentationOptions(),
@@ -525,7 +531,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
     })
-    const peekWorkspaceNavigation = vi.fn((workspaceId: string, direction: 'back' | 'forward') =>
+    const peekWorkspaceNavigation = vi.fn((workspaceId: WorkspaceId, direction: 'back' | 'forward') =>
       useWorkspacesStore.getState().peekWorkspaceNavigation(workspaceId, direction),
     )
     const navigation = routeNavigation()
@@ -548,37 +554,37 @@ describe('createPrimaryWindowNavigationActions', () => {
   test('cycles repos by navigating from the current repo', () => {
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b', 'goblin+file:///tmp/repo-c'],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID, REPO_B_ID, REPO_C_ID],
       closeWorkspace: vi.fn(),
       routeNavigation: navigation,
     })
 
     actions.cycleWorkspace(1)
 
-    expect(navigation.openRepoDashboard).toHaveBeenCalledWith('goblin+file:///tmp/repo-b', presentationOptions())
+    expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_B_ID, presentationOptions())
   })
 
   test('activates a repo at its current workspace history entry', () => {
     seedRepoWithReadModelForTest({
-      id: 'goblin+file:///tmp/repo-b',
+      id: REPO_B_ID,
       branches: [createRepoBranch('feature/remembered')],
       currentBranchName: 'feature/remembered',
     })
-    const entry = branchHistoryEntry('goblin+file:///tmp/repo-b', 'feature/remembered', 'history')
+    const entry = branchHistoryEntry(REPO_B_ID, 'feature/remembered', 'history')
     useWorkspacesStore.getState().recordWorkspaceNavigation(entry)
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID, REPO_B_ID],
       closeWorkspace: vi.fn(),
       routeNavigation: navigation,
     })
 
-    actions.activateWorkspace('goblin+file:///tmp/repo-b')
+    actions.activateWorkspace(REPO_B_ID)
 
     expect(navigation.openRepoBranchTab).toHaveBeenCalledWith(
-      'goblin+file:///tmp/repo-b',
+      REPO_B_ID,
       'feature/remembered',
       'history',
       presentationOptions(),
@@ -588,20 +594,20 @@ describe('createPrimaryWindowNavigationActions', () => {
 
   test('does not resume a repo at its new-worktree workflow', () => {
     useWorkspacesStore.getState().recordWorkspaceNavigation({
-      workspaceId: 'goblin+file:///tmp/repo-b',
+      workspaceId: REPO_B_ID,
       route: { kind: 'newWorktree', returnTo: '/repo/repo-b/branch/main' },
     })
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID, REPO_B_ID],
       closeWorkspace: vi.fn(),
       routeNavigation: navigation,
     })
 
-    actions.activateWorkspace('goblin+file:///tmp/repo-b')
+    actions.activateWorkspace(REPO_B_ID)
 
-    expect(navigation.openRepoDashboard).toHaveBeenCalledWith('goblin+file:///tmp/repo-b', presentationOptions())
+    expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_B_ID, presentationOptions())
     expect(navigation.openRepoNewWorktree).not.toHaveBeenCalled()
   })
 
@@ -621,8 +627,8 @@ describe('createPrimaryWindowNavigationActions', () => {
     })
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a', REPO_ID],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID, REPO_ID],
       closeWorkspace: vi.fn(),
       routeNavigation: navigation,
     })
@@ -635,24 +641,25 @@ describe('createPrimaryWindowNavigationActions', () => {
   })
 
   test('falls back to the dashboard when a repo history route is unavailable', () => {
-    const entry = branchHistoryEntry('goblin+file:///tmp/repo-b', 'feature/remembered', 'history')
+    const entry = branchHistoryEntry(REPO_B_ID, 'feature/remembered', 'history')
     useWorkspacesStore.getState().recordWorkspaceNavigation(entry)
     const navigation = routeNavigation()
     vi.mocked(navigation.openRepoBranchTab).mockReturnValue(false)
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID, REPO_B_ID],
       closeWorkspace: vi.fn(),
       routeNavigation: navigation,
     })
 
-    actions.activateWorkspace('goblin+file:///tmp/repo-b')
+    actions.activateWorkspace(REPO_B_ID)
 
-    expect(navigation.openRepoDashboard).toHaveBeenCalledWith('goblin+file:///tmp/repo-b', presentationOptions())
+    expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_B_ID, presentationOptions())
   })
 
   test('falls back to the dashboard when workspace-root history cannot be presented', () => {
-    const workspaceId = 'goblin+file:///tmp/workspace-b'
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/workspace-b')
+    const currentWorkspaceId = workspaceIdForTest('goblin+file:///tmp/workspace-a')
     useWorkspacesStore.getState().recordWorkspaceNavigation({
       workspaceId: workspaceId,
       route: { kind: 'workspace-root' },
@@ -660,8 +667,8 @@ describe('createPrimaryWindowNavigationActions', () => {
     const navigation = routeNavigation()
     vi.mocked(navigation.openWorkspaceRootPane).mockReturnValue(false)
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/workspace-a',
-      workspaceOrder: ['goblin+file:///tmp/workspace-a', workspaceId],
+      currentWorkspaceId,
+      workspaceOrder: [currentWorkspaceId, workspaceId],
       closeWorkspace: vi.fn(),
       routeNavigation: navigation,
     })
@@ -673,16 +680,16 @@ describe('createPrimaryWindowNavigationActions', () => {
 
   test('cycles to the target repo current workspace history entry', () => {
     seedRepoWithReadModelForTest({
-      id: 'goblin+file:///tmp/repo-b',
+      id: REPO_B_ID,
       branches: [createRepoBranch('feature/remembered')],
       currentBranchName: 'feature/remembered',
     })
-    const entry = branchHistoryEntry('goblin+file:///tmp/repo-b', 'feature/remembered', 'status')
+    const entry = branchHistoryEntry(REPO_B_ID, 'feature/remembered', 'status')
     useWorkspacesStore.getState().recordWorkspaceNavigation(entry)
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID, REPO_B_ID],
       closeWorkspace: vi.fn(),
       routeNavigation: navigation,
     })
@@ -690,7 +697,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     actions.cycleWorkspace(1)
 
     expect(navigation.openRepoBranchTab).toHaveBeenCalledWith(
-      'goblin+file:///tmp/repo-b',
+      REPO_B_ID,
       'feature/remembered',
       'status',
       presentationOptions(),
@@ -700,30 +707,30 @@ describe('createPrimaryWindowNavigationActions', () => {
   test('cycles repos backward and wraps around', () => {
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b', 'goblin+file:///tmp/repo-c'],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID, REPO_B_ID, REPO_C_ID],
       closeWorkspace: vi.fn(),
       routeNavigation: navigation,
     })
 
     actions.cycleWorkspace(-1)
 
-    expect(navigation.openRepoDashboard).toHaveBeenCalledWith('goblin+file:///tmp/repo-c', presentationOptions())
+    expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_C_ID, presentationOptions())
   })
 
   test('closes the repo through the store action without navigation when it is not current', async () => {
     const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b', 'goblin+file:///tmp/repo-c'],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID, REPO_B_ID, REPO_C_ID],
       closeWorkspace,
       routeNavigation: navigation,
     })
 
-    await actions.closeWorkspace('goblin+file:///tmp/repo-b')
+    await actions.closeWorkspace(REPO_B_ID)
 
-    expect(closeWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/repo-b')
+    expect(closeWorkspace).toHaveBeenCalledWith(REPO_B_ID)
     expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
   })
 
@@ -731,41 +738,41 @@ describe('createPrimaryWindowNavigationActions', () => {
     const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-b',
-      workspaceOrder: ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b', 'goblin+file:///tmp/repo-c'],
+      currentWorkspaceId: REPO_B_ID,
+      workspaceOrder: [REPO_A_ID, REPO_B_ID, REPO_C_ID],
       closeWorkspace,
       routeNavigation: navigation,
     })
 
-    await actions.closeWorkspace('goblin+file:///tmp/repo-b')
+    await actions.closeWorkspace(REPO_B_ID)
 
-    expect(closeWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/repo-b')
-    expect(navigation.openRepoDashboard).toHaveBeenCalledWith('goblin+file:///tmp/repo-c', presentationOptions())
+    expect(closeWorkspace).toHaveBeenCalledWith(REPO_B_ID)
+    expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_C_ID, presentationOptions())
   })
 
   test('closes the current repo and restores the next repo workspace history entry', async () => {
     seedRepoWithReadModelForTest({
-      id: 'goblin+file:///tmp/repo-c',
+      id: REPO_C_ID,
       branches: [createRepoBranch('feature/remembered')],
       currentBranchName: 'feature/remembered',
     })
     useWorkspacesStore
       .getState()
-      .recordWorkspaceNavigation(branchHistoryEntry('goblin+file:///tmp/repo-c', 'feature/remembered', 'history'))
+      .recordWorkspaceNavigation(branchHistoryEntry(REPO_C_ID, 'feature/remembered', 'history'))
     const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-b',
-      workspaceOrder: ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b', 'goblin+file:///tmp/repo-c'],
+      currentWorkspaceId: REPO_B_ID,
+      workspaceOrder: [REPO_A_ID, REPO_B_ID, REPO_C_ID],
       closeWorkspace,
       routeNavigation: navigation,
     })
 
-    await actions.closeWorkspace('goblin+file:///tmp/repo-b')
+    await actions.closeWorkspace(REPO_B_ID)
 
-    expect(closeWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/repo-b')
+    expect(closeWorkspace).toHaveBeenCalledWith(REPO_B_ID)
     expect(navigation.openRepoBranchTab).toHaveBeenCalledWith(
-      'goblin+file:///tmp/repo-c',
+      REPO_C_ID,
       'feature/remembered',
       'history',
       presentationOptions(),
@@ -789,15 +796,15 @@ describe('createPrimaryWindowNavigationActions', () => {
     const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a', REPO_ID],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID, REPO_ID],
       closeWorkspace,
       routeNavigation: navigation,
     })
 
-    await actions.closeWorkspace('goblin+file:///tmp/repo-a')
+    await actions.closeWorkspace(REPO_A_ID)
 
-    expect(closeWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
+    expect(closeWorkspace).toHaveBeenCalledWith(REPO_A_ID)
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
     expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
     expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(entry)
@@ -806,13 +813,13 @@ describe('createPrimaryWindowNavigationActions', () => {
   test('closes the final current repo and navigates home', async () => {
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a'],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID],
       closeWorkspace: vi.fn(async () => ({ ok: true as const })),
       routeNavigation: navigation,
     })
 
-    await actions.closeWorkspace('goblin+file:///tmp/repo-a')
+    await actions.closeWorkspace(REPO_A_ID)
 
     expect(navigation.openHome).toHaveBeenCalled()
   })
@@ -820,13 +827,13 @@ describe('createPrimaryWindowNavigationActions', () => {
   test('keeps the current route when the shared workspace close fails', async () => {
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID, REPO_B_ID],
       closeWorkspace: vi.fn(async () => ({ ok: false as const, message: 'error.failed-read-repo' })),
       routeNavigation: navigation,
     })
 
-    await expect(actions.closeWorkspace('goblin+file:///tmp/repo-a')).resolves.toEqual({
+    await expect(actions.closeWorkspace(REPO_A_ID)).resolves.toEqual({
       ok: false,
       message: 'error.failed-read-repo',
     })
@@ -837,41 +844,41 @@ describe('createPrimaryWindowNavigationActions', () => {
   test('opens create worktree for the current repo', async () => {
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a'],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID],
       closeWorkspace: vi.fn(),
       routeNavigation: navigation,
     })
 
     actions.openCreateWorktree()
 
-    expect(navigation.openRepoNewWorktree).toHaveBeenCalledWith('goblin+file:///tmp/repo-a', presentationOptions())
+    expect(navigation.openRepoNewWorktree).toHaveBeenCalledWith(REPO_A_ID, presentationOptions())
   })
 
   test('restores a saved new-worktree return target when navigating workspace history', () => {
     const navigation = routeNavigation()
     const target = {
-      workspaceId: 'goblin+file:///tmp/repo-a',
+      workspaceId: REPO_A_ID,
       route: { kind: 'newWorktree' as const, returnTo: '/repo/repo-a/branch/main' },
     }
     const traversal = historyTraversal(target)
     const peekWorkspaceNavigation = vi.fn(() => traversal)
     const commitWorkspaceNavigation = vi.fn(() => true)
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a'],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID],
       closeWorkspace: vi.fn(),
       peekWorkspaceNavigation,
       commitWorkspaceNavigation,
       routeNavigation: navigation,
     })
 
-    actions.goBack('goblin+file:///tmp/repo-a')
+    actions.goBack(REPO_A_ID)
 
-    expect(peekWorkspaceNavigation).toHaveBeenCalledWith('goblin+file:///tmp/repo-a', 'back')
+    expect(peekWorkspaceNavigation).toHaveBeenCalledWith(REPO_A_ID, 'back')
     expect(commitWorkspaceNavigation).toHaveBeenCalledWith(traversal)
     expect(navigation.openRepoNewWorktree).toHaveBeenCalledWith(
-      'goblin+file:///tmp/repo-a',
+      REPO_A_ID,
       presentationOptions({ returnTo: '/repo/repo-a/branch/main' }),
     )
   })
@@ -879,7 +886,7 @@ describe('createPrimaryWindowNavigationActions', () => {
   test('restores a saved bare branch workspace history entry', () => {
     const navigation = routeNavigation()
     const target = {
-      workspaceId: 'goblin+file:///tmp/repo-a',
+      workspaceId: REPO_A_ID,
       route: {
         kind: 'branch' as const,
         branchName: 'feature/test',
@@ -892,20 +899,20 @@ describe('createPrimaryWindowNavigationActions', () => {
     const peekWorkspaceNavigation = vi.fn(() => traversal)
     const commitWorkspaceNavigation = vi.fn(() => true)
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a'],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID],
       closeWorkspace: vi.fn(),
       peekWorkspaceNavigation,
       commitWorkspaceNavigation,
       routeNavigation: navigation,
     })
 
-    actions.goBack('goblin+file:///tmp/repo-a')
+    actions.goBack(REPO_A_ID)
 
-    expect(peekWorkspaceNavigation).toHaveBeenCalledWith('goblin+file:///tmp/repo-a', 'back')
+    expect(peekWorkspaceNavigation).toHaveBeenCalledWith(REPO_A_ID, 'back')
     expect(commitWorkspaceNavigation).toHaveBeenCalledWith(traversal)
     expect(navigation.openRepoBranch).toHaveBeenCalledWith(
-      'goblin+file:///tmp/repo-a',
+      REPO_A_ID,
       'feature/test',
       presentationOptions(),
     )
@@ -971,7 +978,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     useWorkspacesStore.getState().recordWorkspaceNavigation(branch)
     useWorkspacesStore.getState().recordWorkspaceNavigation(dashboard)
     const navigation = routeNavigation()
-    const peekWorkspaceNavigation = vi.fn((workspaceId: string, direction: 'back' | 'forward') =>
+    const peekWorkspaceNavigation = vi.fn((workspaceId: WorkspaceId, direction: 'back' | 'forward') =>
       useWorkspacesStore.getState().peekWorkspaceNavigation(workspaceId, direction),
     )
     const actions = createPrimaryWindowNavigationActions({
@@ -992,7 +999,7 @@ describe('createPrimaryWindowNavigationActions', () => {
   test('restores a malformed terminal history entry as the bare branch route', () => {
     const navigation = routeNavigation()
     const target = {
-      workspaceId: 'goblin+file:///tmp/repo-a',
+      workspaceId: REPO_A_ID,
       route: {
         kind: 'branch' as const,
         branchName: 'feature/test',
@@ -1005,20 +1012,20 @@ describe('createPrimaryWindowNavigationActions', () => {
     const peekWorkspaceNavigation = vi.fn(() => traversal)
     const commitWorkspaceNavigation = vi.fn(() => true)
     const actions = createPrimaryWindowNavigationActions({
-      currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-      workspaceOrder: ['goblin+file:///tmp/repo-a'],
+      currentWorkspaceId: REPO_A_ID,
+      workspaceOrder: [REPO_A_ID],
       closeWorkspace: vi.fn(),
       peekWorkspaceNavigation,
       commitWorkspaceNavigation,
       routeNavigation: navigation,
     })
 
-    actions.goBack('goblin+file:///tmp/repo-a')
+    actions.goBack(REPO_A_ID)
 
-    expect(peekWorkspaceNavigation).toHaveBeenCalledWith('goblin+file:///tmp/repo-a', 'back')
+    expect(peekWorkspaceNavigation).toHaveBeenCalledWith(REPO_A_ID, 'back')
     expect(commitWorkspaceNavigation).toHaveBeenCalledWith(traversal)
     expect(navigation.openRepoBranch).toHaveBeenCalledWith(
-      'goblin+file:///tmp/repo-a',
+      REPO_A_ID,
       'feature/test',
       presentationOptions(),
     )
@@ -1029,25 +1036,25 @@ describe('createPrimaryWindowNavigationActions', () => {
   test.each(['back', 'forward'] as const)(
     'does not commit %s history when route restore is unavailable',
     (direction) => {
-      const target = branchHistoryEntry('goblin+file:///tmp/repo-a', 'feature/test', 'history')
+      const target = branchHistoryEntry(REPO_A_ID, 'feature/test', 'history')
       const traversal = { ...historyTraversal(target), direction }
       const peekWorkspaceNavigation = vi.fn(() => traversal)
       const commitWorkspaceNavigation = vi.fn(() => true)
       const navigation = routeNavigation()
       vi.mocked(navigation.openRepoBranchTab).mockReturnValue(false)
       const actions = createPrimaryWindowNavigationActions({
-        currentWorkspaceId: 'goblin+file:///tmp/repo-a',
-        workspaceOrder: ['goblin+file:///tmp/repo-a'],
+        currentWorkspaceId: REPO_A_ID,
+        workspaceOrder: [REPO_A_ID],
         closeWorkspace: vi.fn(),
         peekWorkspaceNavigation,
         commitWorkspaceNavigation,
         routeNavigation: navigation,
       })
 
-      if (direction === 'back') actions.goBack('goblin+file:///tmp/repo-a')
-      else actions.goForward('goblin+file:///tmp/repo-a')
+      if (direction === 'back') actions.goBack(REPO_A_ID)
+      else actions.goForward(REPO_A_ID)
 
-      expect(peekWorkspaceNavigation).toHaveBeenCalledWith('goblin+file:///tmp/repo-a', direction)
+      expect(peekWorkspaceNavigation).toHaveBeenCalledWith(REPO_A_ID, direction)
       expect(commitWorkspaceNavigation).not.toHaveBeenCalled()
     },
   )
@@ -1081,7 +1088,7 @@ function preferredWorkspacePaneTab() {
 }
 
 function branchHistoryEntry(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   branchName: string,
   workspacePaneTab: 'status' | 'history',
 ): WorkspaceNavigationHistoryEntry {
@@ -1114,6 +1121,12 @@ type PrimaryWindowNavigationActionTestOptions = Omit<
   Partial<Pick<PrimaryWindowNavigationActionOptions, 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'>>
 
 function createPrimaryWindowNavigationActions(options: PrimaryWindowNavigationActionTestOptions) {
+  if (options.currentWorkspaceId && !useWorkspacesStore.getState().workspaces[options.currentWorkspaceId]) {
+    const workspace = emptyWorkspace(options.currentWorkspaceId, 'workspace', 'navigation-actions-runtime')
+    useWorkspacesStore.setState((state) => ({
+      workspaces: { ...state.workspaces, [workspace.id]: workspace },
+    }))
+  }
   const store = useWorkspacesStore.getState()
   return createPrimaryWindowNavigationActionsCore({
     peekWorkspaceNavigation: store.peekWorkspaceNavigation,

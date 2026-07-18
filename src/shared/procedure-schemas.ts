@@ -220,7 +220,7 @@ const FiletreeSessionViewStateSchema = v.object({
   topVisibleRowIndex: v.number(),
 })
 const ClientWorkspaceStateSchema = v.object({
-  restoredWorkspaceId: v.nullable(v.string()),
+  restoredWorkspaceId: v.nullable(WorkspaceIdSchema),
   zenMode: v.boolean(),
   workspacePaneSize: v.number(),
   selectedTerminalSessionIdByTerminalWorktree: v.record(v.string(), v.string()),

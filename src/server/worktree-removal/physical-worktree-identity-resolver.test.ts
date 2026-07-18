@@ -4,10 +4,11 @@ import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
 import type { WorkspaceRuntimeClosedEvent } from '#/server/modules/workspace-runtimes.ts'
 import { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { validatePhysicalWorktreeExecution } from '#/server/worktree-removal/physical-worktree-capability.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const LOCAL_INPUT = {
   userId: 'user-1',
-  repoRoot: 'goblin+file:///repos/main',
+  repoRoot: workspaceIdForTest('goblin+file:///repos/main'),
   workspaceRuntimeId: 'repo-runtime-1',
   worktreePath: '/worktrees/alias',
 }
@@ -28,9 +29,9 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       onWorkspaceRuntimeClosed: () => () => undefined,
     })
 
-    await expect(
-      resolver.capture({ ...LOCAL_INPUT, worktreePath: '/repos/main' }),
-    ).resolves.toMatchObject({ identity: { kind: 'local', endpoint: '/repos/main' } })
+    await expect(resolver.capture({ ...LOCAL_INPUT, worktreePath: '/repos/main' })).resolves.toMatchObject({
+      identity: { kind: 'local', endpoint: '/repos/main' },
+    })
     expect(getLocalWorktrees).not.toHaveBeenCalled()
     resolver.dispose()
   })
@@ -46,7 +47,9 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       async nativeRealpath() {
         return '/volumes/repo/worktrees/feature'
       },
-      async nativeStat() { return LOCAL_MARKER },
+      async nativeStat() {
+        return LOCAL_MARKER
+      },
       isCurrentWorkspaceRuntime: () => true,
       onWorkspaceRuntimeClosed: () => () => undefined,
     })
@@ -78,7 +81,9 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       async nativeRealpath() {
         return canonicalPath
       },
-      async nativeStat() { return LOCAL_MARKER },
+      async nativeStat() {
+        return LOCAL_MARKER
+      },
       isCurrentWorkspaceRuntime: () => true,
       onWorkspaceRuntimeClosed: () => () => undefined,
     })
@@ -204,7 +209,9 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       async nativeRealpath(input) {
         return input
       },
-      async nativeStat() { return LOCAL_MARKER },
+      async nativeStat() {
+        return LOCAL_MARKER
+      },
       isCurrentWorkspaceRuntime: () => current,
       onWorkspaceRuntimeClosed(listener) {
         closedListener = listener
@@ -234,7 +241,9 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       async nativeRealpath(input) {
         return input
       },
-      async nativeStat() { return LOCAL_MARKER },
+      async nativeStat() {
+        return LOCAL_MARKER
+      },
       isCurrentWorkspaceRuntime: () => true,
       onWorkspaceRuntimeClosed: () => () => undefined,
     })
@@ -285,7 +294,9 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       async nativeRealpath(input) {
         return input
       },
-      async nativeStat() { return LOCAL_MARKER },
+      async nativeStat() {
+        return LOCAL_MARKER
+      },
       isCurrentWorkspaceRuntime: () => true,
       onWorkspaceRuntimeClosed: () => () => undefined,
     })

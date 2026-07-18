@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import { remoteRuntimeFailureReasonFromCommandResult } from '#/server/modules/remote-runtime-failure.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const target: RemoteRepoTarget = {
-  id: 'goblin+ssh://example/srv/repo',
+  id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
   alias: 'example',
   host: 'example.test',
   user: 'deploy',

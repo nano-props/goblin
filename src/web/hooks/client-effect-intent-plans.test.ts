@@ -8,9 +8,10 @@ import {
 } from '#/web/hooks/client-effect-intent-plans.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const CURRENT_GIT_REPO = {
-  id: 'goblin+file:///tmp/repo',
+  id: workspaceIdForTest('goblin+file:///tmp/repo'),
   workspaceRuntimeId: 'repo-runtime-test-7',
   workspaceProbe: {
     status: 'ready' as const,
@@ -66,7 +67,7 @@ describe('client effect intent plans', () => {
   })
 
   test('marks worktree terminal bell intent unavailable when the branch read model is missing', () => {
-    const plan = createTerminalBellIntentPlan({ id: 'goblin+file:///tmp/repo' }, null, {
+    const plan = createTerminalBellIntentPlan({ id: workspaceIdForTest('goblin+file:///tmp/repo') }, null, {
       type: 'terminal-bell-click',
       repoRoot: 'goblin+file:///tmp/repo',
       terminalSessionId: 'term-222222222222222222222',
@@ -79,7 +80,7 @@ describe('client effect intent plans', () => {
   test('routes a detached worktree bell through its authoritative catalog entry', () => {
     const worktreePath = '/workspace/detached'
     const plan = createTerminalBellIntentPlan(
-      { id: 'goblin+file:///workspace/repo' },
+      { id: workspaceIdForTest('goblin+file:///workspace/repo') },
       {
         branches: [],
         currentBranch: 'main',
@@ -106,7 +107,10 @@ describe('client effect intent plans', () => {
 
   test('suppresses recent repo open when overlays block the action', () => {
     const plan = createAppLevelIntentPlan(
-      { type: 'open-recent-workspace-requested', entry: { kind: 'local', id: 'goblin+file:///tmp/repo' } },
+      {
+        type: 'open-recent-workspace-requested',
+        entry: { kind: 'local', id: workspaceIdForTest('goblin+file:///tmp/repo') },
+      },
       { overlayBlocked: true },
     )
 

@@ -3,6 +3,7 @@ import { latestRepoSyncTime } from '#/web/stores/workspaces/sync-time.ts'
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
 import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
 import { emptyGitWorkspaceProjection } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('workspacePickerItemsEqual', () => {
   test('treats Git capability changes as unequal', () => {
@@ -27,7 +28,7 @@ describe('workspacePickerItemsEqual', () => {
         lifecycle: {
           kind: 'ready',
           target: {
-            id: 'goblin+ssh://example/srv%2Frepo',
+            id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
             alias: 'example',
             host: 'old-host.internal',
             user: 'old-user',
@@ -47,7 +48,7 @@ describe('workspacePickerItemsEqual', () => {
         lifecycle: {
           kind: 'ready',
           target: {
-            id: 'goblin+ssh://example/srv%2Frepo',
+            id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
             alias: 'example',
             host: 'new-host.internal',
             user: 'new-user',
@@ -64,7 +65,7 @@ describe('workspacePickerItemsEqual', () => {
 
   test('treats failed lifecycle target locator changes as unequal', () => {
     const target = {
-      id: 'goblin+ssh://example/srv%2Frepo',
+      id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
       alias: 'example',
       host: 'same-host.internal',
       user: 'old-user',

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('remote client web helpers', () => {
   beforeEach(() => {
@@ -61,7 +62,7 @@ describe('remote client web helpers', () => {
 
     await expect(
       testRemoteRepoConnection({
-        id: 'goblin+ssh://prod/srv/repo',
+        id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
         alias: 'prod',
         host: 'example.com',
         user: 'alice',

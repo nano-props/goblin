@@ -7,6 +7,7 @@ import { useBranchActionItems, visibleBranchActionItems } from '#/web/hooks/useB
 import type { BranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
 import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import { idleOperation } from '#/web/stores/workspaces/operations.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const mocks = vi.hoisted(() => ({
   setDetailCollapsed: vi.fn(),
@@ -166,7 +167,7 @@ function allVisibleCapabilities(): BranchActionCapabilities {
 
 function repo(): BranchActionRepo {
   return {
-    id: 'goblin+file:///tmp/goblin-action-items',
+    id: workspaceIdForTest('goblin+file:///tmp/goblin-action-items'),
     workspaceRuntimeId: 'repo-runtime-test',
     branchModel: {
       currentBranch: 'main',

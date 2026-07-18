@@ -65,7 +65,7 @@ function remoteTargetFixture() {
   return target!
 }
 
-function seedRepo(id: string, lifecycle: RemoteRepoConnectionLifecycle | null) {
+function seedRepo(id: ReturnType<typeof workspaceIdForTest>, lifecycle: RemoteRepoConnectionLifecycle | null) {
   const repo = emptyWorkspace(id, id, 'repo-runtime-test')
   repo.admission = isRemoteRepoId(id) ? { kind: 'remote', lifecycle, lifecycleAttemptId: null } : { kind: 'local' }
   useWorkspacesStore.setState((s) => ({
@@ -110,7 +110,8 @@ describe('useNetworkReconnect', () => {
   })
 
   test('skips local repos entirely', async () => {
-    seedRepo('/tmp/local-repo', null)
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/local-workspace')
+    seedRepo(workspaceId, null)
     mountHook()
 
     fireOnline()
@@ -119,7 +120,7 @@ describe('useNetworkReconnect', () => {
     // Local repos don't have a lifecycle at all. The hook
     // must not call `runRemoteWorkspaceConnection` for them — which
     // means the repo remains untouched.
-    const repo = useWorkspacesStore.getState().workspaces['/tmp/local-repo']
+    const repo = useWorkspacesStore.getState().workspaces[workspaceId]
     expect(repo?.admission).toEqual({ kind: 'local' })
   })
 

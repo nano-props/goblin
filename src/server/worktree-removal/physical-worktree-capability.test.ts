@@ -11,8 +11,9 @@ import {
   testPhysicalWorktreeIdentity,
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REMOTE_REPO = 'goblin+ssh://prod/srv/repo'
+const REMOTE_REPO = workspaceIdForTest('goblin+ssh://prod/srv/repo')
 const REMOTE_PATH = '/srv/worktrees/feature'
 
 describe('physical worktree capability boundaries', () => {

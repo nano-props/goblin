@@ -7,6 +7,7 @@ import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { useFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { useLanSettings } from '#/web/runtime-settings-lan.ts'
@@ -117,8 +118,8 @@ describe('runtime settings hooks', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({
         recentWorkspaces: [
-          { kind: 'local', id: 'goblin+file:///tmp/repo-a' },
-          { kind: 'local', id: 'goblin+file:///tmp/repo-b' },
+          { kind: 'local', id: workspaceIdForTest('goblin+file:///tmp/repo-a') },
+          { kind: 'local', id: workspaceIdForTest('goblin+file:///tmp/repo-b') },
         ],
       }),
     )

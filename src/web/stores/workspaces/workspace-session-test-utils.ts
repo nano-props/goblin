@@ -3,8 +3,9 @@ import { resolveServerRemoteRepoConnection, type RemoteRepoConnectionDeps } from
 import { createBranchSnapshot, installGoblinTestBridge, resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { flushMicrotasks } from '#/test-utils/index.ts'
-export const REPO_A = 'goblin+file:///tmp/goblin-lifecycle-a'
-export const REPO_B = 'goblin+file:///tmp/goblin-lifecycle-b'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+export const REPO_A = workspaceIdForTest('goblin+file:///tmp/goblin-lifecycle-a')
+export const REPO_B = workspaceIdForTest('goblin+file:///tmp/goblin-lifecycle-b')
 export const branchSnapshot = createBranchSnapshot
 
 export async function flushIpc(): Promise<void> {

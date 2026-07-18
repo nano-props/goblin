@@ -12,8 +12,10 @@ import type {
   WorkspaceRefreshResult,
   WorkspaceSettledProbeState,
 } from '#/shared/workspace-runtime.ts'
+import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface WorkspaceRuntimeState {
+  workspaceId: WorkspaceId
   currentWorkspaceRuntimeId: string | null
   members: Map<string, number>
   nextMembershipGeneration: number
@@ -29,7 +31,7 @@ interface WorkspaceRuntimeState {
 
 export interface WorkspaceRuntimeClosedEvent {
   userId: string
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
 }
 
@@ -39,14 +41,14 @@ export interface WorkspaceRuntimeMembershipAcquiredEvent {
 }
 
 export interface WorkspaceRuntimeEntry {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   remoteLifecycle: RemoteRepoRuntimeLifecycle | null
   workspaceProbe: WorkspaceProbeState
 }
 
 export interface WorkspaceRuntimeMembershipLeaseEntry {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   generation: number
 }
@@ -82,11 +84,12 @@ function workspaceRuntimeStateByUser(userId: string): Map<string, WorkspaceRunti
   return states
 }
 
-function workspaceRuntimeState(userId: string, workspaceId: string): WorkspaceRuntimeState {
+function workspaceRuntimeState(userId: string, workspaceId: WorkspaceId): WorkspaceRuntimeState {
   const byWorkspace = workspaceRuntimeStateByUser(userId)
   const existing = byWorkspace.get(workspaceId)
   if (existing) return existing
   const created: WorkspaceRuntimeState = {
+    workspaceId,
     currentWorkspaceRuntimeId: null,
     members: new Map(),
     nextMembershipGeneration: 0,
@@ -101,6 +104,12 @@ function workspaceRuntimeState(userId: string, workspaceId: string): WorkspaceRu
   }
   byWorkspace.set(workspaceId, created)
   return created
+}
+
+function requiredCanonicalWorkspaceId(workspaceId: string): WorkspaceId {
+  const canonicalWorkspaceId = canonicalWorkspaceLocator(workspaceId)
+  if (!canonicalWorkspaceId) throw new Error('workspace runtime requires a canonical workspaceId')
+  return canonicalWorkspaceId
 }
 
 export function acquireWorkspaceRuntime(userId: string, workspaceId: string, clientId: string): string {
@@ -122,13 +131,13 @@ function acquireWorkspaceRuntimeMembership(
   workspaceId: string,
   clientId: string,
 ): WorkspaceRuntimeMembershipLeaseEntry {
-  if (!workspaceId) throw new Error('workspace runtime open requires workspaceId')
+  const canonicalWorkspaceId = requiredCanonicalWorkspaceId(workspaceId)
   if (!clientId) throw new Error('workspace runtime acquire requires clientId')
-  const state = workspaceRuntimeState(userId, workspaceId)
+  const state = workspaceRuntimeState(userId, canonicalWorkspaceId)
   const workspaceRuntimeId = state.currentWorkspaceRuntimeId ?? startWorkspaceRuntimeEpoch(state)
   state.nextMembershipGeneration += 1
   state.members.set(clientId, state.nextMembershipGeneration)
-  return { workspaceId, workspaceRuntimeId, generation: state.nextMembershipGeneration }
+  return { workspaceId: canonicalWorkspaceId, workspaceRuntimeId, generation: state.nextMembershipGeneration }
 }
 
 export function releaseWorkspaceRuntime(
@@ -143,7 +152,7 @@ export function releaseWorkspaceRuntime(
   const state = workspaceRuntimesByUser.get(userId)?.get(workspaceId)
   if (!state?.members.has(clientId)) return { released: false, runtimeClosed: false }
   return releaseWorkspaceRuntimeMembershipForCurrentState(userId, clientId, {
-    workspaceId,
+    workspaceId: state.workspaceId,
     workspaceRuntimeId,
     generation: state.members.get(clientId)!,
   })
@@ -185,12 +194,19 @@ function releaseWorkspaceRuntimeMembershipForCurrentState(
 }
 
 /** Snapshot the membership generations whose liveness was owned by one client. */
-export function captureWorkspaceRuntimeMembershipLease(userId: string, clientId: string): WorkspaceRuntimeMembershipLease {
+export function captureWorkspaceRuntimeMembershipLease(
+  userId: string,
+  clientId: string,
+): WorkspaceRuntimeMembershipLease {
   const entries: WorkspaceRuntimeMembershipLeaseEntry[] = []
   for (const [workspaceId, state] of workspaceRuntimesByUser.get(userId) ?? []) {
     const generation = state.members.get(clientId)
     if (generation === undefined || !state.currentWorkspaceRuntimeId) continue
-    entries.push({ workspaceId, workspaceRuntimeId: state.currentWorkspaceRuntimeId, generation })
+    entries.push({
+      workspaceId: state.workspaceId,
+      workspaceRuntimeId: state.currentWorkspaceRuntimeId,
+      generation,
+    })
   }
   return { userId, clientId, entries }
 }
@@ -200,7 +216,9 @@ export function captureWorkspaceRuntimeMembershipLease(userId: string, clientId:
  * A later HTTP acquire renews its generation and cannot be removed by an old
  * disconnect timer, even if the realtime channel is still recovering.
  */
-export function expireWorkspaceRuntimeMembershipLease(lease: WorkspaceRuntimeMembershipLease): WorkspaceRuntimeClosedEvent[] {
+export function expireWorkspaceRuntimeMembershipLease(
+  lease: WorkspaceRuntimeMembershipLease,
+): WorkspaceRuntimeClosedEvent[] {
   const states = workspaceRuntimesByUser.get(lease.userId)
   if (!states) return []
   const closed: WorkspaceRuntimeClosedEvent[] = []
@@ -231,7 +249,7 @@ export function listWorkspaceRuntimes(userId: string): WorkspaceRuntimeEntry[] {
   for (const [workspaceId, state] of states) {
     if (state.currentWorkspaceRuntimeId) {
       runtimes.push({
-        workspaceId,
+        workspaceId: state.workspaceId,
         workspaceRuntimeId: state.currentWorkspaceRuntimeId,
         remoteLifecycle: isRemoteRepoId(workspaceId) ? state.remoteLifecycle : null,
         workspaceProbe: exposedWorkspaceProbe(state),
@@ -250,18 +268,17 @@ export function replaceWorkspaceRuntimeMembershipsForClient(
   clientId: string,
   workspaceIds: readonly string[],
 ): WorkspaceRuntimeEntry[] {
-  assertValidWorkspaceRuntimeMembershipDeclaration(clientId, workspaceIds)
-  const desired = new Set(workspaceIds)
+  const desired = new Set(decodeWorkspaceRuntimeMembershipDeclaration(clientId, workspaceIds))
   const states = workspaceRuntimesByUser.get(userId)
   const closed: WorkspaceRuntimeClosedEvent[] = []
   if (states) {
     for (const [workspaceId, state] of states) {
-      if (desired.has(workspaceId)) continue
+      if (desired.has(state.workspaceId)) continue
       const workspaceRuntimeId = state.currentWorkspaceRuntimeId
       if (!workspaceRuntimeId || !state.members.delete(clientId) || state.members.size > 0) continue
       if (state.activeWorkspaceLifecycleOperations > 0) continue
       stopWorkspaceRuntimeEpoch(state)
-      closed.push({ userId, workspaceId, workspaceRuntimeId })
+      closed.push({ userId, workspaceId: state.workspaceId, workspaceRuntimeId })
     }
   }
   for (const workspaceId of desired) acquireWorkspaceRuntimeMembership(userId, workspaceId, clientId)
@@ -272,19 +289,24 @@ export function replaceWorkspaceRuntimeMembershipsForClient(
   return listWorkspaceRuntimes(userId)
 }
 
-function assertValidWorkspaceRuntimeMembershipDeclaration(clientId: string, workspaceIds: readonly string[]): void {
+function decodeWorkspaceRuntimeMembershipDeclaration(
+  clientId: string,
+  workspaceIds: readonly string[],
+): WorkspaceId[] {
   if (!isOpaqueId(clientId)) throw new Error('workspace runtime reconcile requires a valid clientId')
   if (workspaceIds.length > 100) throw new Error('workspace runtime reconcile accepts at most 100 workspace ids')
-  for (const workspaceId of workspaceIds) {
-    if (!workspaceId) throw new Error('workspace runtime reconcile requires non-empty workspace ids')
-  }
+  return workspaceIds.map(requiredCanonicalWorkspaceId)
 }
 
 export function isCurrentWorkspaceRuntime(userId: string, workspaceId: string, workspaceRuntimeId: string): boolean {
   return workspaceRuntimesByUser.get(userId)?.get(workspaceId)?.currentWorkspaceRuntimeId === workspaceRuntimeId
 }
 
-export function workspaceRuntimeHasGitCapability(userId: string, workspaceId: string, workspaceRuntimeId: string): boolean {
+export function workspaceRuntimeHasGitCapability(
+  userId: string,
+  workspaceId: string,
+  workspaceRuntimeId: string,
+): boolean {
   const state = workspaceRuntimesByUser.get(userId)?.get(workspaceId)
   return (
     state?.currentWorkspaceRuntimeId === workspaceRuntimeId &&
@@ -432,7 +454,11 @@ function releaseWorkspaceLifecycleOperation(
     return
   }
   stopWorkspaceRuntimeEpoch(state)
-  emitWorkspaceRuntimeClosed({ userId: input.userId, workspaceId: input.workspaceId, workspaceRuntimeId: input.workspaceRuntimeId })
+  emitWorkspaceRuntimeClosed({
+    userId: input.userId,
+    workspaceId: state.workspaceId,
+    workspaceRuntimeId: input.workspaceRuntimeId,
+  })
 }
 
 function workspaceRefreshMayCommit(probe: WorkspaceSettledProbeState): boolean {
@@ -605,7 +631,10 @@ function remoteLifecycleTarget(lifecycle: RemoteRepoRuntimeLifecycle): RemoteRep
   return lifecycle.kind === 'ready' || lifecycle.kind === 'failed' ? (lifecycle.target ?? null) : null
 }
 
-function supersededRemoteLifecycleResult(state: WorkspaceRuntimeState, workspaceRuntimeId: string): RepoRemoteLifecycleRunResult {
+function supersededRemoteLifecycleResult(
+  state: WorkspaceRuntimeState,
+  workspaceRuntimeId: string,
+): RepoRemoteLifecycleRunResult {
   return state.currentWorkspaceRuntimeId === workspaceRuntimeId ? { kind: 'superseded' } : { kind: 'stale-runtime' }
 }
 
@@ -633,7 +662,13 @@ export function clearWorkspaceRuntimesForUser(userId: string): void {
         throw new Error(`cannot reset workspace runtimes with active workspace lifecycle operations for ${workspaceId}`)
       }
       const workspaceRuntimeId = stopWorkspaceRuntimeEpoch(state)
-      if (workspaceRuntimeId) emitWorkspaceRuntimeClosed({ userId, workspaceId, workspaceRuntimeId })
+      if (workspaceRuntimeId) {
+        emitWorkspaceRuntimeClosed({
+          userId,
+          workspaceId: state.workspaceId,
+          workspaceRuntimeId,
+        })
+      }
     }
   }
   workspaceRuntimesByUser.delete(userId)

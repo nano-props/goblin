@@ -69,7 +69,7 @@ type RepoWorkspaceRepoShell = Omit<RepoWorkspaceRepo, 'branchModel' | 'branchAct
 }
 
 interface WorkspacePaneShell {
-  id: string
+  id: WorkspaceState['id']
   workspaceRuntimeId: string
   ui: Pick<WorkspaceState['ui'], 'preferredWorkspacePaneTabByTarget'> & { currentBranchName: string | null }
   unavailable: boolean

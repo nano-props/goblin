@@ -170,7 +170,8 @@ async function projectWorkspaceRepo(
 }
 
 function assertCurrentWorkspaceRuntimeMembership(input: RestoreRepoTabsInput): void {
-  if (isCurrentWorkspaceRuntimeMembership(input.userId, input.repoRoot, input.workspaceRuntimeId, input.clientId)) return
+  if (isCurrentWorkspaceRuntimeMembership(input.userId, input.repoRoot, input.workspaceRuntimeId, input.clientId))
+    return
   throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
 }
 

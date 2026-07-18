@@ -5,6 +5,10 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const LOCAL_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
+const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///other')
 
 const mocks = vi.hoisted(() => ({
   acquireWorkspaceRuntimeLease: vi.fn(),
@@ -109,7 +113,7 @@ describe('restoreRepoTabsForRepo', () => {
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
       workspacePaneTabsByTargetByWorkspace: {
         'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
@@ -163,7 +167,7 @@ describe('restoreRepoTabsForRepo', () => {
     })
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
       workspacePaneTabsByTargetByWorkspace: {
         'goblin+file:///repo': { [staleTargetKey]: [workspacePaneStaticTabEntry('history')] },
       },
@@ -304,7 +308,7 @@ describe('restoreRepoTabsForRepo', () => {
   test('throws repo-runtime-stale when clientId/workspaceRuntimeId does not match the active lease', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(false)
@@ -327,7 +331,7 @@ describe('restoreRepoTabsForRepo', () => {
   test('rejects lazy restore when the repo is absent from server workspace membership', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///other' }],
+      openWorkspaceEntries: [{ kind: 'local', id: OTHER_WORKSPACE_ID }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()

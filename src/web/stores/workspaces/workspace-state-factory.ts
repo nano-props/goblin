@@ -3,6 +3,8 @@ import { isRemoteRepoId, localWorkspaceSessionEntry } from '#/shared/remote-repo
 import { emptyWorkspaceOperations } from '#/web/stores/workspaces/operations.ts'
 import { emptyWorkspaceDataLoadBundle } from '#/web/stores/workspaces/repo-data-load-state.ts'
 import type { ExecResult } from '#/web/types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type {
   GitWorkspaceProjection,
   RepoEvent,
@@ -19,17 +21,19 @@ type RepoMutator = (repo: Draft<WorkspaceState>) => void
 type ReposPatch = Pick<WorkspacesStore, 'workspaces'>
 
 export function emptyWorkspace(id: string, name: string, workspaceRuntimeId: string): WorkspaceState {
+  const workspaceId: WorkspaceId | null = canonicalWorkspaceLocator(id)
+  if (!workspaceId) throw new Error('Workspace state requires a canonical workspace ID')
   return {
-    id,
+    id: workspaceId,
     name,
     workspaceRuntimeId,
     ui: { preferredWorkspacePaneTabByTarget: {} },
     session: {
-      entry: isRemoteRepoId(id) ? null : localWorkspaceSessionEntry(id),
+      entry: isRemoteRepoId(workspaceId) ? null : localWorkspaceSessionEntry(workspaceId),
       projectionState: 'projected',
     },
     availability: { phase: 'available' },
-    admission: isRemoteRepoId(id)
+    admission: isRemoteRepoId(workspaceId)
       ? { kind: 'remote', lifecycle: null, lifecycleAttemptId: null }
       : { kind: 'local' },
     capability: { kind: 'probing', probe: { status: 'probing' } },

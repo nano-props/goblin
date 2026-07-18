@@ -18,6 +18,7 @@ import {
   runRepoRemoteLifecycle,
   workspaceRuntimeHasGitCapability,
 } from '#/server/modules/workspace-runtimes.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const USER_ID = 'user_repo_runtime'
 const REPO_ROOT = 'goblin+file:///workspace-runtimes/repo'
@@ -25,6 +26,13 @@ const REPO_ROOT = 'goblin+file:///workspace-runtimes/repo'
 describe('workspace runtimes', () => {
   beforeEach(() => {
     clearWorkspaceRuntimesForUser(USER_ID)
+  })
+
+  test('rejects a non-canonical workspace identity at runtime admission', () => {
+    expect(() => acquireWorkspaceRuntime(USER_ID, '/workspace-runtimes/repo', 'client-a')).toThrow(
+      'workspace runtime requires a canonical workspaceId',
+    )
+    expect(listWorkspaceRuntimes(USER_ID)).toEqual([])
   })
 
   test('shares an epoch until the last client releases it', () => {
@@ -390,7 +398,7 @@ describe('workspace runtimes', () => {
   })
 
   test('ensure retries a failed remote lifecycle and joins the ready state', async () => {
-    const workspaceId = 'goblin+ssh://example/repo'
+    const workspaceId = workspaceIdForTest('goblin+ssh://example/repo')
     const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, workspaceId, 'client-a')
     const failed = vi.fn(async () => ({
       kind: 'failed' as const,
@@ -436,7 +444,7 @@ describe('workspace runtimes', () => {
   test('atomically replaces one client membership set without changing sibling clients', () => {
     const firstRuntimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-b')
-    const secondRoot = '/workspace-runtimes/second'
+    const secondRoot = 'goblin+file:///workspace-runtimes/second'
 
     const reconciled = replaceWorkspaceRuntimeMembershipsForClient(USER_ID, 'client-a', [secondRoot])
 
@@ -455,8 +463,8 @@ describe('workspace runtimes', () => {
   })
 
   test('publishes close events only after the replacement snapshot is complete', () => {
-    const oldRoot = '/workspace-runtimes/old'
-    const newRoot = '/workspace-runtimes/new'
+    const oldRoot = 'goblin+file:///workspace-runtimes/old'
+    const newRoot = 'goblin+file:///workspace-runtimes/new'
     acquireWorkspaceRuntime(USER_ID, oldRoot, 'client-a')
     const observedSnapshots: string[][] = []
     const unsubscribe = onWorkspaceRuntimeClosed(() => {
@@ -471,8 +479,8 @@ describe('workspace runtimes', () => {
   })
 
   test('rejects an invalid declaration before changing any memberships', () => {
-    const oldRoot = '/workspace-runtimes/atomic-old'
-    const newRoot = '/workspace-runtimes/atomic-new'
+    const oldRoot = 'goblin+file:///workspace-runtimes/atomic-old'
+    const newRoot = 'goblin+file:///workspace-runtimes/atomic-new'
     const oldRuntimeId = acquireWorkspaceRuntime(USER_ID, oldRoot, 'client-a')
     const closed = vi.fn()
     const unsubscribe = onWorkspaceRuntimeClosed(closed)
@@ -481,7 +489,7 @@ describe('workspace runtimes', () => {
         'workspace runtime reconcile requires a valid clientId',
       )
       expect(() => replaceWorkspaceRuntimeMembershipsForClient(USER_ID, 'client-a', [newRoot, ''])).toThrow(
-        'workspace runtime reconcile requires non-empty workspace ids',
+        'workspace runtime requires a canonical workspaceId',
       )
       expect(listWorkspaceRuntimes(USER_ID)).toEqual([
         expect.objectContaining({ workspaceId: oldRoot, workspaceRuntimeId: oldRuntimeId }),

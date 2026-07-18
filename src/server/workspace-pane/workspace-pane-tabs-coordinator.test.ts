@@ -16,6 +16,10 @@ import {
   testPhysicalWorktrees,
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { localWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const LOCAL_WORKSPACE_ENTRY = localWorkspaceSessionEntry(workspaceIdForTest('goblin+file:///repo'))
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import {
@@ -682,7 +686,7 @@ describe('workspace pane tabs coordinator queues', () => {
             }),
           ],
           physicalTargets: [],
-          expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+          expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
           providerSnapshots: [],
         }),
     )
@@ -757,7 +761,7 @@ describe('workspace pane tabs coordinator queues', () => {
           worktreePath: '/repo/worktree',
         }),
       ],
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
       assertCurrent: () => {},
     })
 
@@ -812,7 +816,7 @@ describe('workspace pane tabs coordinator queues', () => {
             worktreePath: '/repo/worktree',
           }),
         ],
-        expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+        expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
         assertCurrent: () => {},
       }),
     ).resolves.toEqual({ kind: 'membership-conflict' })
@@ -857,7 +861,7 @@ describe('workspace pane tabs coordinator queues', () => {
             worktreePath: '/repo/worktree',
           }),
         ],
-        expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+        expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
         assertCurrent: () => {},
       }),
     ).rejects.toThrow('error.worktree-removal-in-progress')
@@ -1200,7 +1204,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const restore = coordinator.restoreScope({
       ...listInput,
       targets: [],
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
     })
     await expect(restore).rejects.toThrow('error.worktree-removal-in-progress')
     expect(coordinator.physicalWorktreeTargets(capability.identity)).toHaveLength(1)
@@ -1212,7 +1216,7 @@ describe('workspace pane tabs coordinator queues', () => {
       coordinator.restoreScope({
         ...listInput,
         targets: [],
-        expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+        expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
       }),
     ).resolves.toMatchObject({ kind: 'validated' })
     expect(coordinator.physicalWorktreeTargets(capability.identity)).toEqual([])

@@ -1,9 +1,16 @@
+import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+
 export function repoSlugFromId(repoId: string): string {
   return slugFromText(repoId)
 }
 
 export function repoIdFromSlug(slug: string): string | null {
   return textFromSlug(slug)
+}
+
+export function workspaceIdFromSlug(slug: string): WorkspaceId | null {
+  const decoded = repoIdFromSlug(slug)
+  return decoded ? canonicalWorkspaceLocator(decoded) : null
 }
 
 export function branchSlugFromName(branchName: string): string {

@@ -13,6 +13,7 @@ import {
 } from '#/server/modules/repo-tree-source.ts'
 import { buildChildNodes, buildLimitedChildNodes } from '#/server/modules/repo-tree-source-pure.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 async function makeTempWorktree(files: Record<string, string>): Promise<string> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'repo-tree-source-'))
@@ -188,7 +189,7 @@ vi.mock('#/system/ssh/filesystem.ts', () => ({ getRemoteDirectoryWalk: remoteMoc
 
 function remoteTarget(): RemoteRepoTarget {
   return {
-    id: 'goblin+ssh://mybox/myrepo',
+    id: workspaceIdForTest('goblin+ssh://mybox/myrepo'),
     alias: 'mybox',
     remotePath: '/srv/repos/myrepo',
     displayName: 'mybox:myrepo',

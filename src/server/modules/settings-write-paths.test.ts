@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const mocks = vi.hoisted(() => ({
   publishSettingsInvalidation: vi.fn(),
@@ -67,7 +68,7 @@ describe('settings command handlers', () => {
   })
 
   test('adds recent repos and publishes settings snapshot invalidation', async () => {
-    const repo = { kind: 'local', id: 'goblin+file:///tmp/repo-a' } as const
+    const repo = { kind: 'local', id: workspaceIdForTest('goblin+file:///tmp/repo-a') } as const
     mocks.addServerRecentWorkspace.mockResolvedValue([repo])
     const { handleAddRecentWorkspace } = await import('#/server/modules/settings-write-paths.ts')
 

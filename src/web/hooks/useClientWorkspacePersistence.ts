@@ -14,6 +14,7 @@ import {
   subscribeWorkspacePaneTabsPersistenceChanges,
   workspacePaneTabsPersistenceSnapshot,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const CLIENT_WORKSPACE_SAVE_DEBOUNCE_MS = 200
 
@@ -23,8 +24,8 @@ interface ClientWorkspacePersistenceInput {
   sessionRestoreError: string | null
   restoredClientWorkspaceBaseline: ReturnType<typeof useWorkspacesStore.getState>['restoredClientWorkspaceBaseline']
   workspaces: ReturnType<typeof useWorkspacesStore.getState>['workspaces']
-  workspaceOrder: string[]
-  restoredWorkspaceId: string | null
+  workspaceOrder: WorkspaceId[]
+  restoredWorkspaceId: WorkspaceId | null
   zenMode: boolean
   workspacePaneSize: number
   selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
@@ -49,7 +50,7 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
   const workspacePaneTabsVersion = useWorkspacePaneTabsCacheVersion()
   const filetreeInteractionByScope = useFiletreeInteractionStore((s) => s.interactionByScope)
   const lastImmediateKeyRef = useRef<string | null>(null)
-  const lastRoutedRepoIdRef = useRef<string | null>(null)
+  const lastRoutedWorkspaceIdRef = useRef<WorkspaceId | null>(null)
   const debounceTimerRef = useRef<number | null>(null)
 
   const latestClientWorkspace = useEffectEvent(() =>
@@ -67,7 +68,7 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
         selectedTerminalSessionIdByTerminalWorktree,
         filetreeInteractionByScope,
       },
-      routedRepoId ?? lastRoutedRepoIdRef.current,
+      (routedRepoId ? workspaces[routedRepoId]?.id : null) ?? lastRoutedWorkspaceIdRef.current,
     ),
   )
 
@@ -86,8 +87,9 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
   })
 
   useLayoutEffect(() => {
-    if (routedRepoId) lastRoutedRepoIdRef.current = routedRepoId
-  }, [routedRepoId])
+    const routedWorkspaceId = routedRepoId ? workspaces[routedRepoId]?.id : null
+    if (routedWorkspaceId) lastRoutedWorkspaceIdRef.current = routedWorkspaceId
+  }, [routedRepoId, workspaces])
 
   useEffect(() => subscribeAppQuitting(flushLatestClientWorkspace), [])
 
@@ -152,7 +154,7 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
 
 function clientWorkspaceFromPersistenceInput(
   input: ClientWorkspacePersistenceInput,
-  lastRoutedRepoId: string | null,
+  lastRoutedRepoId: WorkspaceId | null,
 ): ClientWorkspaceState | null {
   if (!workspaceSessionPersistenceOpenFromStore(input)) return null
   return clientWorkspaceStateFromRestorableWorkspaceState({

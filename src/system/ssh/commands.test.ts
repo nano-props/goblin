@@ -19,6 +19,7 @@ import {
   buildRemoteTerminalInvocation,
 } from '#/system/ssh/commands.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const originalPath = process.env.PATH
 const originalPathExt = process.env.PATHEXT
@@ -671,7 +672,7 @@ async function initRepoWithWorktrees(
 
 function targetWithPath(repoPath: string): RemoteRepoTarget {
   return {
-    id: `goblin+ssh://prod${repoPath}`,
+    id: workspaceIdForTest(`goblin+ssh://prod${repoPath}`),
     alias: 'prod',
     host: 'example.test',
     user: 'deploy',
@@ -683,7 +684,7 @@ function targetWithPath(repoPath: string): RemoteRepoTarget {
 
 function target(): RemoteRepoTarget {
   return {
-    id: 'goblin+ssh://prod/srv/repo',
+    id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
     alias: 'prod',
     host: 'example.test',
     user: 'deploy',

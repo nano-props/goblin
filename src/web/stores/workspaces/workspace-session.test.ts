@@ -13,6 +13,7 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { markRemoteLifecycleReady } from '#/web/stores/workspaces/availability.ts'
 import { addResolvedWorkspace, addUnavailableWorkspace } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   branchSnapshot,
   flushIpc,
@@ -76,11 +77,12 @@ describe('repo lifecycle', () => {
       diagnostics: [],
     })
     markRemoteLifecycleReady(workspace, target)
+    const workspaceId = workspaceIdForTest(target.id)
 
     const result = addResolvedWorkspace(
-      { workspaces: { [target.id]: workspace }, repoSnapshotCache: {}, workspaceOrder: [target.id] },
+      { workspaces: { [workspaceId]: workspace }, repoSnapshotCache: {}, workspaceOrder: [workspaceId] },
       {
-        id: target.id,
+        id: workspaceId,
         name: target.displayName,
         target,
         workspaceProbe: {

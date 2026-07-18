@@ -1,9 +1,14 @@
 export type RepoKind = 'local' | 'remote'
 
-import { formatWorkspaceLocator, parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import {
+  canonicalWorkspaceLocator,
+  formatWorkspaceLocator,
+  parseWorkspaceLocator,
+  type WorkspaceId,
+} from '#/shared/workspace-locator.ts'
 
 export interface RemoteRepoRef {
-  id: string
+  id: WorkspaceId
   alias: string
   remotePath: string
   displayName: string
@@ -20,8 +25,8 @@ export interface RemoteRepoTarget extends RemoteRepoRef {
   }
 }
 
-export type LocalWorkspaceSessionEntry = { kind: 'local'; id: string }
-export type RemoteWorkspaceSessionEntry = { kind: 'remote'; id: string; ref: RemoteRepoRef }
+export type LocalWorkspaceSessionEntry = { kind: 'local'; id: WorkspaceId }
+export type RemoteWorkspaceSessionEntry = { kind: 'remote'; id: WorkspaceId; ref: RemoteRepoRef }
 export type WorkspaceSessionEntry = LocalWorkspaceSessionEntry | RemoteWorkspaceSessionEntry
 
 export function sameWorkspaceSessionEntry(
@@ -291,7 +296,7 @@ export interface RemoteRepoRefInput {
   displayName?: unknown
 }
 
-export function normalizeRemoteRepoId(input: RemoteRepoRefInput): string {
+export function normalizeRemoteRepoId(input: RemoteRepoRefInput): WorkspaceId {
   const normalized = remoteRefFields(input)
   if (!normalized) throw new TypeError('Invalid remote repository reference')
   const locator = formatWorkspaceLocator(
@@ -345,11 +350,11 @@ export function isRemoteRepoTarget(value: unknown): value is RemoteRepoTarget {
   return !!normalized && normalized.id === target.id && normalized.displayName === target.displayName
 }
 
-export function workspaceSessionEntryId(entry: WorkspaceSessionEntry): string {
+export function workspaceSessionEntryId(entry: WorkspaceSessionEntry): WorkspaceId {
   return entry.id
 }
 
-export function localWorkspaceSessionEntry(id: string): LocalWorkspaceSessionEntry {
+export function localWorkspaceSessionEntry(id: WorkspaceId): LocalWorkspaceSessionEntry {
   return { kind: 'local', id }
 }
 
@@ -364,8 +369,9 @@ export function normalizeWorkspaceSessionEntry(input: unknown): WorkspaceSession
   const entry = input as Partial<WorkspaceSessionEntry> & { ref?: unknown }
   if (entry.kind === 'local') {
     if (typeof entry.id !== 'string') return null
-    const parsed = parseWorkspaceLocator(entry.id, 'posix') ?? parseWorkspaceLocator(entry.id, 'win32')
-    return parsed?.transport === 'file' ? { kind: 'local', id: entry.id } : null
+    const id = canonicalWorkspaceLocator(entry.id)
+    const parsed = id ? parseWorkspaceLocator(id, 'posix') ?? parseWorkspaceLocator(id, 'win32') : null
+    return id && parsed?.transport === 'file' ? { kind: 'local', id } : null
   }
   if (entry.kind === 'remote') {
     if (typeof entry.id !== 'string') return null

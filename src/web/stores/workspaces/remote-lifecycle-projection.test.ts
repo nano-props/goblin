@@ -7,8 +7,9 @@ import {
 } from '#/web/stores/workspaces/remote-lifecycle-projection.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceRemoteAdmission } from '#/web/workspace-capability.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const repoRoot = 'goblin+ssh://example/repo'
+const repoRoot = workspaceIdForTest('goblin+ssh://example/repo')
 const workspaceRuntimeId = 'repo-runtime-test-1'
 const target = normalizeRemoteTarget({
   alias: 'example',
@@ -46,7 +47,10 @@ describe('remote lifecycle projection acceptance', () => {
 
   test('rejects a projection for a replaced runtime generation', () => {
     useWorkspacesStore.setState((state) => ({
-      workspaces: { ...state.workspaces, [repoRoot]: { ...state.workspaces[repoRoot]!, workspaceRuntimeId: 'repo-runtime-test-2' } },
+      workspaces: {
+        ...state.workspaces,
+        [repoRoot]: { ...state.workspaces[repoRoot]!, workspaceRuntimeId: 'repo-runtime-test-2' },
+      },
     }))
     expect(accept({ kind: 'ready', attemptId: 1, target })).toBe(false)
   })
@@ -61,7 +65,7 @@ describe('remote lifecycle projection acceptance', () => {
           remoteLifecycle: { kind: 'ready', attemptId: 1, target },
         },
         {
-          workspaceId: 'goblin+ssh://other/repo',
+          workspaceId: workspaceIdForTest('goblin+ssh://other/repo'),
           workspaceRuntimeId: 'repo-runtime-other',
           workspaceProbe: { status: 'probing' },
           remoteLifecycle: { kind: 'failed', attemptId: 4, reason: 'timeout' },

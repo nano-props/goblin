@@ -26,9 +26,13 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { ClientWorkspaceState, ServerWorkspaceState, WorkspaceRuntimeRestoreSnapshot } from '#/shared/api-types.ts'
 import { readClientWorkspaceState } from '#/web/client-workspace-state.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type * as SettingsClient from '#/web/settings-client.ts'
+import type * as SettingsActions from '#/web/settings-actions.ts'
 
 vi.mock('#/web/settings-client.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#/web/settings-client.ts')>()
+  const actual = await importOriginal<typeof SettingsClient>()
   return {
     ...actual,
     getExternalAppsSnapshot: vi.fn(),
@@ -37,7 +41,7 @@ vi.mock('#/web/settings-client.ts', async (importOriginal) => {
 })
 
 vi.mock('#/web/settings-actions.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#/web/settings-actions.ts')>()
+  const actual = await importOriginal<typeof SettingsActions>()
   return {
     ...actual,
     restoreWorkspaceAtBoot: vi.fn(),
@@ -91,7 +95,7 @@ describe('app bootstrap hooks', () => {
     const targetKey = branchTargetKey('goblin+file:///tmp/repo', 'main')
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: workspaceIdForTest('goblin+file:///tmp/repo') }],
         workspacePaneTabsByTargetByWorkspace: {
           'goblin+file:///tmp/repo': {
             [targetKey]: [],
@@ -99,7 +103,7 @@ describe('app bootstrap hooks', () => {
         },
       },
       {
-        restoredWorkspaceId: 'goblin+file:///tmp/repo',
+        restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
         zenMode: false,
         workspacePaneSize: 45,
         selectedTerminalSessionIdByTerminalWorktree: {
@@ -161,7 +165,7 @@ describe('app bootstrap hooks', () => {
   })
 
   test('passes the routed repo root to server workspace restore', async () => {
-    renderInJsdom(<Harness activeRepoRoot="goblin+file:///tmp/routed-repo" />)
+    renderInJsdom(<Harness activeRepoRoot={workspaceIdForTest('goblin+file:///tmp/routed-repo')} />)
 
     await vi.waitFor(() => {
       expect(mockedRestoreWorkspaceAtBoot).toHaveBeenCalledWith(
@@ -177,10 +181,10 @@ describe('app bootstrap hooks', () => {
   test('restores the boot session when non-critical authenticated hydrates fail', async () => {
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: workspaceIdForTest('goblin+file:///tmp/repo') }],
       },
       {
-        restoredWorkspaceId: 'goblin+file:///tmp/repo',
+        restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
         zenMode: true,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
@@ -217,10 +221,10 @@ describe('app bootstrap hooks', () => {
   test('blocks persistence when server workspace restore fails', async () => {
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: workspaceIdForTest('goblin+file:///tmp/repo') }],
       },
       {
-        restoredWorkspaceId: 'goblin+file:///tmp/repo',
+        restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
         zenMode: true,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
@@ -251,10 +255,10 @@ describe('app bootstrap hooks', () => {
   test('continues with a repaired session returned by server restore', async () => {
     const persistedSession = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: workspaceIdForTest('goblin+file:///tmp/repo') }],
       },
       {
-        restoredWorkspaceId: 'goblin+file:///tmp/repo',
+        restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
         zenMode: true,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
@@ -306,10 +310,12 @@ describe('app bootstrap hooks', () => {
   test('blocks persistence when repo session hydration fails', async () => {
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/missing-repo' }],
+        openWorkspaceEntries: [
+          { kind: 'local' as const, id: workspaceIdForTest('goblin+file:///tmp/missing-repo') },
+        ],
       },
       {
-        restoredWorkspaceId: 'goblin+file:///tmp/missing-repo',
+        restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/missing-repo'),
         zenMode: true,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
@@ -382,7 +388,9 @@ describe('app bootstrap hooks', () => {
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) })
     expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(false)
     expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(false)
-    expect(useWorkspacesStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
+    expect(useWorkspacesStore.getState().sessionRestoreError).toBe(
+      'authenticated workspace restore timed out after 30000ms',
+    )
   })
 
   test('reports timeout when server workspace restore does not return after abort', async () => {
@@ -401,17 +409,19 @@ describe('app bootstrap hooks', () => {
 
     expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(false)
     expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(false)
-    expect(useWorkspacesStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
+    expect(useWorkspacesStore.getState().sessionRestoreError).toBe(
+      'authenticated workspace restore timed out after 30000ms',
+    )
   })
 
   test('reports timeout when repo session hydration does not return after abort', async () => {
     vi.useFakeTimers()
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///tmp/repo' }],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: workspaceIdForTest('goblin+file:///tmp/repo') }],
       },
       {
-        restoredWorkspaceId: 'goblin+file:///tmp/repo',
+        restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
         zenMode: true,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
@@ -435,7 +445,9 @@ describe('app bootstrap hooks', () => {
 
     expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(false)
     expect(useWorkspacesStore.getState().sessionPersistenceReady).toBe(false)
-    expect(useWorkspacesStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
+    expect(useWorkspacesStore.getState().sessionRestoreError).toBe(
+      'authenticated workspace restore timed out after 30000ms',
+    )
   })
 
   test('aborts authenticated workspace restore on unmount without committing restore failure', async () => {
@@ -506,7 +518,7 @@ describe('app bootstrap hooks', () => {
   })
 })
 
-function Harness({ activeRepoRoot = null }: { activeRepoRoot?: string | null }) {
+function Harness({ activeRepoRoot = null }: { activeRepoRoot?: WorkspaceId | null }) {
   const bootstrap = useAuthenticatedAppBootstrap({ activeRepoRoot })
   return bootstrap.state.status === 'failed' ? (
     <button onClick={bootstrap.retry}>{bootstrap.state.message}</button>
@@ -560,10 +572,11 @@ function restoredRuntimeForWorkspace(
   serverWorkspace: ServerWorkspaceState,
   restoredWorkspaceId: string | null,
 ): WorkspaceRuntimeRestoreSnapshot {
+  const restoredWorkspace = restoredWorkspaceId ? workspaceIdForTest(restoredWorkspaceId) : null
   return {
     workspaces: serverWorkspace.openWorkspaceEntries.map((entry) => ({
       entry,
-      workspaceId: entry.id,
+      workspaceId: workspaceIdForTest(entry.id),
       workspaceRuntimeId: `repo-runtime-${entry.id}`,
       name: entry.id.split('/').pop() || entry.id,
       workspaceProbe: {
@@ -601,7 +614,7 @@ function restoredRuntimeForWorkspace(
       },
     })),
     workspacePaneTabs: [],
-    restoredWorkspaceId,
+    restoredWorkspaceId: restoredWorkspace,
   }
 }
 

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   failedDiagnosticsCategory,
   formatTranslatableReason,
@@ -41,7 +42,7 @@ describe('remote diagnostics helpers', () => {
         message: 'auth-failed',
         details: 'Permission denied',
         target: {
-          id: 'goblin+ssh://prod/srv/repo',
+          id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
           alias: 'prod',
           host: 'example.com',
           user: 'alice',

@@ -27,6 +27,7 @@ import { readRepoBranchQueryProjection, type RepoBranchReadModelData } from '#/w
 import { stripBranchWorktreeMetadata } from '#/web/stores/workspaces/worktree-state.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { disposeAllRepoOperationSchedulers } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
@@ -145,8 +146,9 @@ export function seedRepoShellForTest(options: {
   remoteLifecycle?: RemoteRepoConnectionLifecycle | null
   workspaceProbe?: WorkspaceProbeState
 }): WorkspaceState {
+  const workspaceId = workspaceIdForTest(options.id)
   const base = emptyWorkspace(
-    options.id,
+    workspaceId,
     options.name ?? 'repo',
     options.workspaceRuntimeId ?? createOpaqueId('repo-runtime'),
   )
@@ -166,10 +168,10 @@ export function seedRepoShellForTest(options: {
     repo.admission.lifecycle = options.remoteLifecycle
   }
   useWorkspacesStore.setState({
-    workspaces: { [options.id]: repo },
+    workspaces: { [workspaceId]: repo },
     repoSnapshotCache: {},
-    workspaceOrder: [options.id],
-    restoredWorkspaceId: options.id,
+    workspaceOrder: [workspaceId],
+    restoredWorkspaceId: workspaceId,
     workspaceMembershipReady: true,
     sessionPersistenceReady: true,
     sessionRestoreError: null,

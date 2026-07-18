@@ -8,9 +8,10 @@ import {
   runRepoRemoteLifecycle,
 } from '#/server/modules/workspace-runtimes.ts'
 import type { RemoteRepoConnectionResult, RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const userId = 'user_test'
-const workspaceId = 'goblin+ssh://example/repo'
+const workspaceId = workspaceIdForTest('goblin+ssh://example/repo')
 const target: RemoteRepoTarget = {
   id: workspaceId,
   alias: 'example',

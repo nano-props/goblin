@@ -1,6 +1,10 @@
 import { tildifyPath } from '#/shared/paths.ts'
 import type { RemoteRepoRef, RemoteRepoTarget, WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
-import { parseCanonicalWorkspaceLocator, parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import {
+  canonicalWorkspaceLocator,
+  parseCanonicalWorkspaceLocator,
+  type WorkspaceId,
+} from '#/shared/workspace-locator.ts'
 
 export type RemoteRepoRefLocatorInput = Pick<RemoteRepoRef, 'alias' | 'remotePath'>
 export type RemoteRepoTargetLocatorInput = Pick<RemoteRepoTarget, 'host' | 'user' | 'remotePath'>
@@ -8,7 +12,7 @@ export type RemoteWorktreeLocatorInput = Pick<RemoteRepoTarget, 'host' | 'user'>
 
 export const MAX_REPO_LOCATOR_LENGTH = 4096
 
-export function toSafeCanonicalRepoLocator(value: unknown): string | null {
+export function toSafeCanonicalRepoLocator(value: unknown): WorkspaceId | null {
   if (
     typeof value !== 'string' ||
     value.length === 0 ||
@@ -17,8 +21,7 @@ export function toSafeCanonicalRepoLocator(value: unknown): string | null {
   ) {
     return null
   }
-  const platform = typeof process !== 'undefined' && process.platform === 'win32' ? 'win32' : 'posix'
-  return parseWorkspaceLocator(value, platform) ? value : null
+  return canonicalWorkspaceLocator(value)
 }
 
 export function formatWorkspaceDisplayLocation(

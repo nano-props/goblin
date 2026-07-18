@@ -142,7 +142,7 @@ export interface RepoSnapshotCacheEntry {
 
 export interface WorkspaceState {
   /** Canonical workspace id. Local workspace ids encode their absolute filesystem root. */
-  id: string
+  id: WorkspaceId
   name: string
   /** Current runtime authority for this workspace; mirrors the runtime endpoint `workspaceRuntimeId`. */
   workspaceRuntimeId: string
@@ -168,12 +168,12 @@ export interface RestorableWorkspaceState {
    *  next-launch restore. This is restorable state, not runtime-coherent
    *  shared state. */
   /** Open workspace order restored from the server workspace. */
-  workspaceOrder: string[]
+  workspaceOrder: WorkspaceId[]
   /**
    * Session workspace restored from ClientWorkspaceState.restoredWorkspaceId.
    * The route owns the current workspace.
    */
-  restoredWorkspaceId: string | null
+  restoredWorkspaceId: WorkspaceId | null
   /** Large-screen Zen Mode restored from ClientWorkspaceState. Compact UI is stronger and always shows one pane at a time. */
   zenMode: boolean
   workspacePaneSize: number
@@ -201,7 +201,7 @@ export type WorkspaceNavigationHistoryRoute =
     }
 
 export interface WorkspaceNavigationHistoryEntry {
-  workspaceId: string
+  workspaceId: WorkspaceId
   route: WorkspaceNavigationHistoryRoute
 }
 
@@ -212,7 +212,7 @@ export interface WorkspaceNavigationHistoryState {
 }
 
 export interface WorkspaceNavigationHistoryTraversal {
-  workspaceId: string
+  workspaceId: WorkspaceId
   direction: 'back' | 'forward'
   current: WorkspaceNavigationHistoryEntry
   target: WorkspaceNavigationHistoryEntry
@@ -267,7 +267,10 @@ interface LocalWorkspaceActions {
     entry: WorkspaceNavigationHistoryEntry,
     options?: { replace?: boolean; browserHistoryTraversal?: 'back' | 'forward' },
   ) => void
-  peekWorkspaceNavigation: (workspaceId: string, direction: 'back' | 'forward') => WorkspaceNavigationHistoryTraversal | null
+  peekWorkspaceNavigation: (
+    workspaceId: WorkspaceId,
+    direction: 'back' | 'forward',
+  ) => WorkspaceNavigationHistoryTraversal | null
   commitWorkspaceNavigation: (traversal: WorkspaceNavigationHistoryTraversal) => boolean
 }
 

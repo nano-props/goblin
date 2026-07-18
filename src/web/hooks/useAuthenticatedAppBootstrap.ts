@@ -16,6 +16,7 @@ import { createTimeoutAbortController } from '#/web/lib/abort.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { readClientWorkspaceState } from '#/web/client-workspace-state.ts'
 import { workspaceSessionEntryId, type WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type AuthenticatedAppBootstrapState =
   { status: 'restoring-workspace' } | { status: 'ready' } | { status: 'failed'; message: string }
@@ -38,7 +39,7 @@ interface AuthenticatedWorkspaceRestoreRun {
 type WorkspaceRestoreOutcome = { status: 'completed' } | { status: 'cancelled' } | { status: 'failed'; message: string }
 
 export function useAuthenticatedAppBootstrap(options?: {
-  activeRepoRoot?: string | null
+  activeRepoRoot?: WorkspaceId | null
 }): AuthenticatedAppBootstrapResult {
   const activeRepoRootRef = useRef(options?.activeRepoRoot ?? null)
   const restoreRunRef = useRef<AuthenticatedWorkspaceRestoreRun | null>(null)
@@ -68,7 +69,7 @@ export function useAuthenticatedAppBootstrap(options?: {
 
 function startAuthenticatedWorkspaceRestoreRun(
   onSettled: (outcome: WorkspaceRestoreOutcome) => void,
-  activeRepoRoot: string | null,
+  activeRepoRoot: WorkspaceId | null,
 ): AuthenticatedWorkspaceRestoreRun {
   let cancelled = false
   const timeout = createTimeoutAbortController(
@@ -114,7 +115,7 @@ async function hydrateNonCriticalAuthenticatedState(
 async function restoreBootSession(
   settingsSnapshot: Promise<SettingsSnapshot>,
   signal: AbortSignal,
-  activeRepoRoot: string | null,
+  activeRepoRoot: WorkspaceId | null,
 ): Promise<WorkspaceRestoreOutcome> {
   try {
     useWorkspacesStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
@@ -199,14 +200,15 @@ function blockSessionPersistenceAfterRestoreFailure(message: string): void {
 function composeRestoredClientWorkspace(
   openWorkspaceEntries: WorkspaceSessionEntry[],
   presentation: ClientWorkspaceState,
-  serverRestoredRepoId: string | null,
+  serverRestoredRepoId: WorkspaceId | null,
 ): ClientWorkspaceState {
   const openRepoIds = new Set(openWorkspaceEntries.map(workspaceSessionEntryId))
+  const presentationWorkspaceId = presentation.restoredWorkspaceId
   return {
     ...presentation,
     restoredWorkspaceId:
-      presentation.restoredWorkspaceId && openRepoIds.has(presentation.restoredWorkspaceId)
-        ? presentation.restoredWorkspaceId
+      presentationWorkspaceId && openRepoIds.has(presentationWorkspaceId)
+        ? presentationWorkspaceId
         : serverRestoredRepoId,
   }
 }

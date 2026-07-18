@@ -40,7 +40,12 @@ import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
-import { branchNameFromSlug, repoIdFromSlug, worktreePathFromSlug } from '#/web/repo-route-slugs.ts'
+import {
+  branchNameFromSlug,
+  repoIdFromSlug,
+  workspaceIdFromSlug,
+  worktreePathFromSlug,
+} from '#/web/repo-route-slugs.ts'
 import { returnToFromHref, usePrimaryWindowRouteActions } from '#/web/primary-window-route-navigation.ts'
 import {
   usePrimaryWindowHistoryPresentationObserver,
@@ -101,7 +106,7 @@ export function Layout() {
 function AuthenticatedAppShell() {
   const routeMatches = useRouterState({ select: (s) => s.matches })
   const activeRepoSlug = repoRouteContextFromMatches(routeMatches)?.repoSlug ?? null
-  const activeRepoRoot = activeRepoSlug ? repoIdFromSlug(activeRepoSlug) : null
+  const activeRepoRoot = activeRepoSlug ? workspaceIdFromSlug(activeRepoSlug) : null
   const bootstrap = useAuthenticatedAppBootstrap({ activeRepoRoot })
   const bootstrapState = bootstrap.state
   const location = useRouterState({ select: (s) => s.location })

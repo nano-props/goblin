@@ -8,6 +8,7 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import {
   type WorkspacePaneStaticTabType,
@@ -41,7 +42,7 @@ vi.mock('#/web/stores/workspaces/repo-refresh-actions.ts', async (importOriginal
   return { ...actual, requestVisibleWorkspaceStatusRefresh: vi.fn(() => true) }
 })
 
-const REPO_ID = 'goblin+file:///tmp/workspace-pane-tab-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-repo')
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
@@ -648,7 +649,7 @@ describe('openWorkspacePaneTab', () => {
   })
 
   test('scopes recorded openers per workspace pane target so identical static tab identities do not bleed', async () => {
-    const OTHER_REPO_ID = 'goblin+file:///tmp/workspace-pane-tab-other-repo'
+    const OTHER_REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-other-repo')
     const OTHER_WORKTREE_PATH = '/tmp/workspace-pane-tab-other-worktree'
     // seedRepoWithReadModelForTest replaces the whole `repos` map, so seed both repos
     // before merging them back together into one multi-repo store state.
@@ -828,8 +829,9 @@ function navigationWithStoreActions(
     tab,
   ) => {
     const state = useWorkspacesStore.getState()
-    useWorkspacesStore.setState({ restoredWorkspaceId: repoId })
-    state.setWorkspacePaneTab(repoId, branch, tab)
+    const workspaceId = workspaceIdForTest(repoId)
+    useWorkspacesStore.setState({ restoredWorkspaceId: workspaceId })
+    state.setWorkspacePaneTab(workspaceId, branch, tab)
     return true
   },
 ): Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab' | 'commitWorkspacePaneRoute'> {

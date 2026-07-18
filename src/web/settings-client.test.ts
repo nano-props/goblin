@@ -4,6 +4,7 @@ import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bo
 import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
@@ -383,7 +384,9 @@ describe('settings-client', () => {
       }),
     }))
     const { addRecentWorkspace } = await import('#/web/settings-client.ts')
-    await expect(addRecentWorkspace({ kind: 'local', id: 'goblin+file:///tmp/repo' })).resolves.toMatchObject({
+    await expect(
+      addRecentWorkspace({ kind: 'local', id: workspaceIdForTest('goblin+file:///tmp/repo') }),
+    ).resolves.toMatchObject({
       recentWorkspaces: [{ kind: 'local', id: 'goblin+file:///tmp/repo' }],
       addedRepo: { kind: 'local', id: 'goblin+file:///tmp/repo' },
     })
@@ -494,7 +497,7 @@ describe('settings-client', () => {
     }))
     const { addRecentWorkspace } = await import('#/web/settings-client.ts')
     await expect(
-      addRecentWorkspace({ kind: 'local', id: '/bad\0repo' } as unknown as { kind: 'local'; id: string }),
+      addRecentWorkspace({ kind: 'local', id: workspaceIdForTest('goblin+file:///candidate') }),
     ).resolves.toMatchObject({
       recentWorkspaces: [{ kind: 'local', id: 'goblin+file:///existing' }],
       addedRepo: null,
@@ -596,7 +599,9 @@ describe('settings-client', () => {
       }),
     }))
     const { addRecentWorkspace } = await import('#/web/settings-client.ts')
-    await expect(addRecentWorkspace({ kind: 'local', id: 'goblin+file:///persisted' })).rejects.toThrow(
+    await expect(
+      addRecentWorkspace({ kind: 'local', id: workspaceIdForTest('goblin+file:///persisted') }),
+    ).rejects.toThrow(
       'projection IPC rejected',
     )
     expect(fetchMock).toHaveBeenCalledTimes(1)

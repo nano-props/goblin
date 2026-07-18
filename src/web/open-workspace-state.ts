@@ -6,12 +6,13 @@ import {
   type WorkspaceSessionEntry,
 } from '#/shared/remote-repo.ts'
 import type { WorkspaceAdmissionState } from '#/web/stores/workspaces/types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 /** Minimal shape this helper needs from a `WorkspaceState`. Defined
  *  locally so the persistence / session layer doesn't have to
  *  depend on the full store types. */
 interface OpenWorkspaceRepoLike {
-  id: string
+  id: WorkspaceId
   session?: {
     entry: WorkspaceSessionEntry | null
   }
@@ -19,7 +20,7 @@ interface OpenWorkspaceRepoLike {
 }
 
 export function persistedOpenWorkspaceEntries(
-  workspaceOrder: string[],
+  workspaceOrder: WorkspaceId[],
   workspaces: Record<string, OpenWorkspaceRepoLike | undefined>,
 ): WorkspaceSessionEntry[] {
   return workspaceOrder.flatMap<WorkspaceSessionEntry>((id) => {
@@ -42,10 +43,10 @@ export function persistedOpenWorkspaceEntries(
 }
 
 export function nextRestoredRepoIdAfterWorkspaceClose(
-  workspaceOrder: string[],
-  restoredWorkspaceId: string | null,
-  closedId: string,
-): string | null {
+  workspaceOrder: WorkspaceId[],
+  restoredWorkspaceId: WorkspaceId | null,
+  closedId: WorkspaceId,
+): WorkspaceId | null {
   if (restoredWorkspaceId !== closedId) return restoredWorkspaceId
   const idx = workspaceOrder.indexOf(closedId)
   if (idx === -1) return null
@@ -53,12 +54,12 @@ export function nextRestoredRepoIdAfterWorkspaceClose(
 }
 
 export function restoredWorkspaceIdAfterWorkspaceHydration(
-  currentRestoredRepoId: string | null,
+  currentRestoredRepoId: WorkspaceId | null,
   workspaces: Record<string, unknown>,
-  workspaceOrder: string[],
-  preferredActiveRepoId: string | null,
-  managedRestoredRepoId: string | null,
-): string | null {
+  workspaceOrder: WorkspaceId[],
+  preferredActiveRepoId: WorkspaceId | null,
+  managedRestoredRepoId: WorkspaceId | null,
+): WorkspaceId | null {
   if (currentRestoredRepoId && currentRestoredRepoId !== managedRestoredRepoId && workspaces[currentRestoredRepoId]) {
     return currentRestoredRepoId
   }

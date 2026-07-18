@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 let tmp: string | null = null
 
@@ -19,7 +20,7 @@ test('persists client workspace independently of the embedded server origin', as
   const persistence = await import('#/main/client-workspace-state.ts')
   const state = {
     ...defaultClientWorkspaceState(),
-    restoredWorkspaceId: 'goblin+file:///repo-d',
+    restoredWorkspaceId: workspaceIdForTest('goblin+file:///repo-d'),
   }
 
   await persistence.writeNativeClientWorkspaceState(state)

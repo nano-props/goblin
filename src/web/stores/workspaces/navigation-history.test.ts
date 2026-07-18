@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REPO_ID = 'goblin+file:///tmp/repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo')
 
 beforeEach(() => {
   resetWorkspacesStore()

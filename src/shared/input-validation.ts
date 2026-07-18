@@ -8,7 +8,12 @@ import {
   parseRemoteRepoId,
   type WorkspaceSessionEntry,
 } from '#/shared/remote-repo.ts'
-import { parseWorkspaceLocator, type WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
+import {
+  formatWorkspaceLocator,
+  parseWorkspaceLocator,
+  type WorkspaceId,
+  type WorkspaceLocatorPlatform,
+} from '#/shared/workspace-locator.ts'
 
 export const MAX_IPC_PATH_LENGTH = MAX_REPO_LOCATOR_LENGTH
 export const MAX_IPC_BRANCH_LENGTH = 1024
@@ -43,11 +48,13 @@ export function isValidRepoLocator(value: unknown): value is string {
   return toSafeRepoLocator(value) !== null
 }
 
-export function toSafeRepoLocator(value: unknown): string | null {
+export function toSafeRepoLocator(value: unknown): WorkspaceId | null {
   if (typeof value !== 'string' || value.length === 0 || value.length > MAX_IPC_PATH_LENGTH || value.includes('\0')) {
     return null
   }
-  return parseWorkspaceLocator(value, currentPlatform()) ? value : null
+  const platform = currentPlatform()
+  const parsed = parseWorkspaceLocator(value, platform)
+  return parsed ? formatWorkspaceLocator(parsed, platform) : null
 }
 
 export function toSafeSessionRepoEntry(value: unknown): WorkspaceSessionEntry | null {

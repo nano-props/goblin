@@ -22,8 +22,9 @@ import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { repoWorktreeStatusQueryKey } from '#/web/repo-data-query.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REPO_ID = 'goblin+file:///tmp/workspace-pane-target-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-target-repo')
 const WORKTREE_PATH = '/tmp/workspace-pane-target-worktree'
 
 beforeEach(() => {

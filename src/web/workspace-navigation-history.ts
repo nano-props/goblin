@@ -15,6 +15,7 @@ import {
   observePrimaryWindowHistoryNavigation,
   type PrimaryWindowPresentationToken,
 } from '#/web/primary-window-presentation.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type WorkspaceNavigationRouteContext =
   | { kind: 'empty'; workspaceId: string }
@@ -133,17 +134,17 @@ function useWorkspaceNavigationHistoryEntry(
 }
 
 type WorkspaceNavigationHistoryRouteSnapshot =
-  | { workspaceId: string; kind: 'empty' | 'workspace-root' | 'dashboard' }
-  | { workspaceId: string; kind: 'newWorktree'; returnTo: string | null }
+  | { workspaceId: WorkspaceId; kind: 'empty' | 'workspace-root' | 'dashboard' }
+  | { workspaceId: WorkspaceId; kind: 'newWorktree'; returnTo: string | null }
   | {
-      workspaceId: string
+      workspaceId: WorkspaceId
       kind: 'worktree'
       worktreePath: string
       workspacePaneTab: WorkspacePaneTabType | null
       terminalSessionId: string | null
     }
   | {
-      workspaceId: string
+      workspaceId: WorkspaceId
       kind: 'branch'
       branchName: string
       workspacePaneTab: WorkspacePaneTabType | null
@@ -156,7 +157,7 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
   workspaceId,
 }: {
   routeContext: WorkspaceNavigationRouteContext
-  workspaceId: string
+  workspaceId: WorkspaceId
 }): WorkspaceNavigationHistoryRouteSnapshot | null {
   switch (routeContext.kind) {
     case 'empty':

@@ -48,6 +48,13 @@ import {
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+
+const REPO_A_ID = workspaceIdForTest('goblin+file:///repo-a')
+const REPO_B_ID = workspaceIdForTest('goblin+file:///repo-b')
+const MISSING_REPO_ID = workspaceIdForTest('goblin+file:///missing')
+const WORKSPACE_REPO_ID = workspaceIdForTest('goblin+file:///workspace/repo')
 
 beforeEach(() => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
@@ -61,43 +68,43 @@ afterEach(() => {
 
 describe('primary window initial route', () => {
   test('prefers the restored repo over the first repo in order', () => {
-    const repoA = emptyWorkspace('goblin+file:///repo-a', 'repo-a', 'repo-runtime-a')
-    const repoB = emptyWorkspace('goblin+file:///repo-b', 'repo-b', 'repo-runtime-b')
+    const repoA = emptyWorkspace(REPO_A_ID, 'repo-a', 'repo-runtime-a')
+    const repoB = emptyWorkspace(REPO_B_ID, 'repo-b', 'repo-runtime-b')
 
     expect(
       initialRepoRouteSlugFromStore({
-        restoredWorkspaceId: 'goblin+file:///repo-b',
-        workspaceOrder: ['goblin+file:///repo-a', 'goblin+file:///repo-b'],
-        workspaces: { 'goblin+file:///repo-a': repoA, 'goblin+file:///repo-b': repoB },
+        restoredWorkspaceId: REPO_B_ID,
+        workspaceOrder: [REPO_A_ID, REPO_B_ID],
+        workspaces: { [REPO_A_ID]: repoA, [REPO_B_ID]: repoB },
         workspaceMembershipReady: true,
       }),
-    ).toBe(repoSlugFromId('goblin+file:///repo-b'))
+    ).toBe(repoSlugFromId(REPO_B_ID))
   })
 
   test('waits for workspace membership restore instead of routing to the first partial repo', () => {
-    const repoA = emptyWorkspace('goblin+file:///repo-a', 'repo-a', 'repo-runtime-a')
+    const repoA = emptyWorkspace(REPO_A_ID, 'repo-a', 'repo-runtime-a')
 
     expect(
       initialRepoRouteSlugFromStore({
         restoredWorkspaceId: null,
-        workspaceOrder: ['goblin+file:///repo-a'],
-        workspaces: { 'goblin+file:///repo-a': repoA },
+        workspaceOrder: [REPO_A_ID],
+        workspaces: { [REPO_A_ID]: repoA },
         workspaceMembershipReady: false,
       }),
     ).toBeNull()
   })
 
   test('falls back to the first ordered repo when restore has settled without a restored repo', () => {
-    const repoA = emptyWorkspace('goblin+file:///repo-a', 'repo-a', 'repo-runtime-a')
+    const repoA = emptyWorkspace(REPO_A_ID, 'repo-a', 'repo-runtime-a')
 
     expect(
       initialRepoRouteSlugFromStore({
-        restoredWorkspaceId: 'goblin+file:///missing',
-        workspaceOrder: ['goblin+file:///repo-a'],
-        workspaces: { 'goblin+file:///repo-a': repoA },
+        restoredWorkspaceId: MISSING_REPO_ID,
+        workspaceOrder: [REPO_A_ID],
+        workspaces: { [REPO_A_ID]: repoA },
         workspaceMembershipReady: true,
       }),
-    ).toBe(repoSlugFromId('goblin+file:///repo-a'))
+    ).toBe(repoSlugFromId(REPO_A_ID))
   })
 })
 
@@ -195,7 +202,7 @@ describe('repo route view derivation', () => {
 
   test('maps a detached worktree terminal URL to a filesystem surface', () => {
     expect(
-      repoRouteViewFromChildRoute('goblin+file:///workspace/repo', {
+      repoRouteViewFromChildRoute(WORKSPACE_REPO_ID, {
         dashboard: false,
         branchSlug: null,
         worktreeSlug: worktreeSlugFromPath('/workspace/detached'),
@@ -204,7 +211,7 @@ describe('repo route view derivation', () => {
       }),
     ).toEqual({
       kind: 'worktree',
-      repoId: 'goblin+file:///workspace/repo',
+      repoId: WORKSPACE_REPO_ID,
       worktreePath: '/workspace/detached',
       workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-333333333333333333333' },
     })
@@ -216,7 +223,7 @@ describe('repo route capability admission', () => {
     ['branch surface', (repoSlug: string) => `/repo/${repoSlug}/branch/bWFpbg`],
     ['new-worktree surface', (repoSlug: string) => `/repo/${repoSlug}/worktree/new`],
   ])('redirects a non-Git %s to Dashboard without mounting the rejected surface', async (_label, pathForSlug) => {
-    const repoId = 'goblin+file:///tmp/plain-router-workspace'
+    const repoId = workspaceIdForTest('goblin+file:///tmp/plain-router-workspace')
     seedRepoCapability(repoId, 'unavailable')
     render(createElement(PrimaryWindowRouterProvider))
     appMocks.render.mockClear()
@@ -230,7 +237,7 @@ describe('repo route capability admission', () => {
   })
 
   test('keeps an explicitly selected workspace surface when Git capability becomes available', async () => {
-    const repoId = 'goblin+file:///tmp/git-router-workspace'
+    const repoId = workspaceIdForTest('goblin+file:///tmp/git-router-workspace')
     seedRepoCapability(repoId, 'available')
     render(createElement(PrimaryWindowRouterProvider))
     appMocks.render.mockClear()
@@ -243,7 +250,7 @@ describe('repo route capability admission', () => {
   })
 })
 
-function seedRepoCapability(repoId: string, gitStatus: 'available' | 'unavailable') {
+function seedRepoCapability(repoId: WorkspaceId, gitStatus: 'available' | 'unavailable') {
   resetWorkspacesStore()
   const repo = emptyWorkspace(repoId, 'workspace', 'runtime-router-test')
   acceptWorkspaceProbeState(repo, {

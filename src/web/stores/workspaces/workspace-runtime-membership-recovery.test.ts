@@ -8,9 +8,10 @@ import {
 } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { installGoblinTestBridge, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REPO_ROOT = 'goblin+file:///tmp/runtime-membership-recovery'
-const REMOTE_REPO_ROOT = 'goblin+ssh://example/srv/runtime-membership-recovery'
+const REPO_ROOT = workspaceIdForTest('goblin+file:///tmp/runtime-membership-recovery')
+const REMOTE_REPO_ROOT = workspaceIdForTest('goblin+ssh://example/srv/runtime-membership-recovery')
 
 describe('workspace runtime membership recovery', () => {
   beforeEach(() => {
@@ -25,7 +26,10 @@ describe('workspace runtime membership recovery', () => {
   test('atomically advances a current repo shell to the reconciled server epoch', async () => {
     const previousWorkspaceRuntimeId = seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] }).workspaceRuntimeId
 
-    const result = await reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState)
+    const result = await reconcileOpenWorkspaceRuntimeMemberships(
+      useWorkspacesStore.setState,
+      useWorkspacesStore.getState,
+    )
 
     expect(result).toEqual({
       kind: 'settled',
@@ -190,7 +194,9 @@ describe('workspace runtime membership recovery', () => {
       expect(useWorkspacesStore.getState().workspaces[REMOTE_REPO_ROOT]?.workspaceRuntimeId).toBe(nextRemoteRuntimeId)
     })
 
-    await expect(openWorkspaceRuntimeWithCache('/tmp/unrelated-runtime')).resolves.toBe('repo-runtime-abcdefghijklmnopqrstu')
+    await expect(
+      openWorkspaceRuntimeWithCache(workspaceIdForTest('goblin+file:///tmp/unrelated-runtime')),
+    ).resolves.toBe('repo-runtime-abcdefghijklmnopqrstu')
     await expect(recovery).resolves.toMatchObject({ kind: 'settled' })
 
     remoteEnsure.resolve({ kind: 'superseded', repoId: REMOTE_REPO_ROOT })

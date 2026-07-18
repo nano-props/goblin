@@ -9,12 +9,13 @@ import { restorableWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-t
 import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 let tmp: string | null = null
 let previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
-const REPO_A = 'goblin+file:///repo-a'
-const REPO_B = 'goblin+file:///repo-b'
-const REPO_C = 'goblin+file:///repo-c'
+const REPO_A = workspaceIdForTest('goblin+file:///repo-a')
+const REPO_B = workspaceIdForTest('goblin+file:///repo-b')
+const REPO_C = workspaceIdForTest('goblin+file:///repo-c')
 
 async function writeWorkspacePaneLayout(
   source: { serverWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository },
@@ -189,7 +190,7 @@ test('stores the shared open repo order without applying the recent-workspace li
   const mod = await import('#/server/modules/settings-source.ts')
   const entries = Array.from({ length: 12 }, (_, index) => ({
     kind: 'local' as const,
-    id: `goblin+file:///repo-${index}`,
+    id: workspaceIdForTest(`goblin+file:///repo-${index}`),
   }))
 
   for (const entry of entries) await mod.addServerWorkspaceRepo(entry)

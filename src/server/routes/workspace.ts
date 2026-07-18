@@ -20,6 +20,7 @@ import { WORKSPACE_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import {
   formatWorkspaceLocator,
   parseWorkspaceLocator,
+  type WorkspaceId,
   type WorkspaceLocatorPlatform,
 } from '#/shared/workspace-locator.ts'
 import path from 'node:path'
@@ -82,7 +83,11 @@ export function createWorkspaceRoutes(options: {
         },
       })
       if (!authoritativeProbe || authoritativeProbe.status !== 'ready') {
-        return c.json({ ok: false as const, input: input.workspaceInput, reason: 'error.workspace-transport-unavailable' })
+        return c.json({
+          ok: false as const,
+          input: input.workspaceInput,
+          reason: 'error.workspace-transport-unavailable',
+        })
       }
       return c.json({
         ok: true as const,
@@ -146,14 +151,15 @@ function serverLocatorPlatform(): WorkspaceLocatorPlatform {
   return process.platform === 'win32' ? 'win32' : 'posix'
 }
 
-function assertCanonicalWorkspaceId(value: string): void {
+function assertCanonicalWorkspaceId(value: string): asserts value is WorkspaceId {
   if (!parseWorkspaceLocator(value, serverLocatorPlatform())) {
     throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-locator-malformed' })
   }
 }
 
-function workspaceLocatorFromCommandInput(input: string, platform: WorkspaceLocatorPlatform): string | null {
-  if (parseWorkspaceLocator(input, platform)?.transport === 'file') return input
+function workspaceLocatorFromCommandInput(input: string, platform: WorkspaceLocatorPlatform): WorkspaceId | null {
+  const parsed = parseWorkspaceLocator(input, platform)
+  if (parsed?.transport === 'file') return formatWorkspaceLocator(parsed, platform)
   const implementation = platform === 'win32' ? path.win32 : path.posix
   if (!implementation.isAbsolute(input)) return null
   return formatWorkspaceLocator({ transport: 'file', platform, path: input }, platform)

@@ -91,7 +91,7 @@ export interface ServerWorkspaceState {
 
 export interface ClientWorkspaceState {
   /** Repo id restored when opening `/` — null when no repos were open. */
-  restoredWorkspaceId: string | null
+  restoredWorkspaceId: WorkspaceId | null
   zenMode: boolean
   workspacePaneSize: number
   selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
@@ -120,7 +120,7 @@ export interface RuntimeRecentWorkspacesState {
 }
 
 export interface WorkspaceRuntimeEntry {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   remoteLifecycle?: RemoteRepoRuntimeLifecycle | null
   workspaceProbe: WorkspaceProbeState
@@ -136,7 +136,7 @@ export interface WorkspaceRuntimeMembershipReconcileResult {
 
 interface RestoredWorkspaceRuntimeBase {
   entry: WorkspaceSessionEntry
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   name: string
   workspaceProbe: WorkspaceProbeState
@@ -163,8 +163,12 @@ export function isProjectedRestoredWorkspaceRuntime(
 
 export interface WorkspaceRuntimeRestoreSnapshot {
   workspaces: RestoredWorkspaceRuntime[]
-  workspacePaneTabs: Array<{ workspaceId: string; workspaceRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>
-  restoredWorkspaceId: string | null
+  workspacePaneTabs: Array<{
+    workspaceId: WorkspaceId
+    workspaceRuntimeId: string
+    snapshot: WorkspacePaneTabsSnapshot
+  }>
+  restoredWorkspaceId: WorkspaceId | null
 }
 
 export interface WorkspaceRestoreResult {
@@ -453,9 +457,17 @@ export interface AppIpcHandlers {
       deleteUpstream?: boolean
     }) => Promise<ExecResult>
     createWorktree: (input: CreateWorktreeIpcInput) => Promise<ExecResult>
-    worktreeBootstrapPreview: (input: { cwd: string; workspaceRuntimeId: string }) => Promise<WorktreeBootstrapPreviewResult>
+    worktreeBootstrapPreview: (input: {
+      cwd: string
+      workspaceRuntimeId: string
+    }) => Promise<WorktreeBootstrapPreviewResult>
     remoteBranches: (input: { cwd: string; workspaceRuntimeId: string }) => Promise<string[]>
-    pull: (input: { cwd: string; workspaceRuntimeId: string; branch: string; worktreePath?: string }) => Promise<ExecResult>
+    pull: (input: {
+      cwd: string
+      workspaceRuntimeId: string
+      branch: string
+      worktreePath?: string
+    }) => Promise<ExecResult>
     push: (input: { cwd: string; workspaceRuntimeId: string; branch: string }) => Promise<ExecResult>
     fetch: (input: { cwd: string; workspaceRuntimeId: string }) => Promise<ExecResult>
     abort: (input: { cwd: string }) => Promise<boolean>
@@ -535,7 +547,7 @@ export const CwdInput = v.object({ cwd: WorkspaceIdSchema })
 export const BranchInput = v.object({ cwd: v.string(), branch: v.string() })
 
 export const RemoteTargetSchema = v.object({
-  id: v.string(),
+  id: WorkspaceIdSchema,
   alias: v.string(),
   host: v.string(),
   user: v.string(),

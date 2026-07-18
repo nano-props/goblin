@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   formatLocalRepoLocator,
   formatRemoteRepoRefLocator,
@@ -70,15 +71,18 @@ describe('repo locators', () => {
 
   test('formats recent repo session entry locators', () => {
     expect(
-      formatWorkspaceSessionEntryLocator({ kind: 'local', id: 'goblin+file:///Users/example/repo' }, '/Users/example'),
+      formatWorkspaceSessionEntryLocator(
+        { kind: 'local', id: workspaceIdForTest('goblin+file:///Users/example/repo') },
+        '/Users/example',
+      ),
     ).toBe('~/repo')
     expect(
       formatWorkspaceSessionEntryLocator(
         {
           kind: 'remote',
-          id: 'goblin+ssh://prod/srv/repo',
+          id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
           ref: {
-            id: 'goblin+ssh://prod/srv/repo',
+            id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
             alias: 'prod',
             remotePath: '/srv/repo',
             displayName: 'prod:repo',

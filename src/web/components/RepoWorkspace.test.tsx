@@ -66,13 +66,14 @@ import {
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const responsiveMocks = vi.hoisted(() => ({ compact: false }))
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => responsiveMocks.compact,
 }))
 
-const REPO_ID = 'goblin+file:///tmp/repo-workspace-container-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-workspace-container-repo')
 const presentationOptions = (options: { replace?: boolean } = {}) =>
   expect.objectContaining({ ...options, presentationToken: expect.any(Object) })
 

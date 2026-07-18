@@ -8,7 +8,7 @@ import {
   workspacePaneTabRequiresWorktree,
 } from '#/shared/workspace-pane.ts'
 import { parseWorkspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import { parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import type { RestorableWorkspaceState, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
 import { persistedFiletreeViewStateByWorktreeByWorkspaceForSession } from '#/web/filetree-session-state.ts'
@@ -294,7 +294,7 @@ interface RestoredWorkspaceStateFromClientWorkspace extends Pick<
 
 export function restoreRestorableWorkspaceStateFromClientWorkspace(
   clientWorkspace: ClientWorkspaceState,
-  restoredWorkspaceId: string | null = clientWorkspace.restoredWorkspaceId,
+  restoredWorkspaceId: WorkspaceId | null = clientWorkspace.restoredWorkspaceId,
 ): RestoredWorkspaceStateFromClientWorkspace {
   return {
     restoredWorkspaceId,

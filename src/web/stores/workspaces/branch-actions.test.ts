@@ -23,7 +23,9 @@ import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { repoProjection } from '#/web/stores/workspaces/refresh-test-utils.ts'
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
-const REPO_ID = 'goblin+file:///tmp/goblin-branch-actions-test-repo'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-branch-actions-test-repo')
+const REPO_WORKTREE_PATH = '/tmp/goblin-branch-actions-test-repo'
 const refreshStoreAccess = { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState }
 
 function branchBrowserRemoteProvider(
@@ -178,17 +180,17 @@ describe('branch action capabilities', () => {
   })
 
   test('uses canonical worktree state to gate primary worktree removal', () => {
-    const branch = createRepoBranch('feature/main-worktree', { worktree: { path: REPO_ID } })
+    const branch = createRepoBranch('feature/main-worktree', { worktree: { path: REPO_WORKTREE_PATH } })
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
       branchSnapshots: [
-        createBranchSnapshot('feature/main-worktree', { worktree: { path: REPO_ID, isPrimary: true } }),
+        createBranchSnapshot('feature/main-worktree', { worktree: { path: REPO_WORKTREE_PATH, isPrimary: true } }),
       ],
       currentBranch: 'main',
     })
 
-    expect(branch.worktree).toEqual({ path: REPO_ID })
+    expect(branch.worktree).toEqual({ path: REPO_WORKTREE_PATH })
     expect(getBranchActionCapabilities(repoGitPresentationForTest(repo), branch)).toMatchObject({
       canRemoveWorktree: false,
     })
@@ -196,9 +198,10 @@ describe('branch action capabilities', () => {
 
   test('allows removing the current branch when it belongs to a linked worktree', () => {
     const worktreePath = '/tmp/goblin-current-linked-worktree'
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/goblin-current-linked-worktree')
     const branch = createRepoBranch('feature/current-linked', { worktree: { path: worktreePath } })
     const repo = seedRepoWithReadModelForTest({
-      id: worktreePath,
+      id: workspaceId,
       branches: [branch],
       currentBranch: 'feature/current-linked',
     })

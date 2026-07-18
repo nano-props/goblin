@@ -28,6 +28,7 @@ import {
 import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacesLog } from '#/web/logger.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import { acceptRemoteLifecycleSnapshot } from '#/web/stores/workspaces/remote-lifecycle-projection.ts'
@@ -61,7 +62,7 @@ import {
 import { sameWorkspaceProbeState, type WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 
 interface ResolvedRepo {
-  id: string
+  id: WorkspaceId
   name: string
   target?: RemoteRepoTarget
   workspaceProbe?: WorkspaceProbeState
@@ -92,7 +93,7 @@ const activeWorkspaceRuntimeMembershipCommands = new Set<Promise<unknown>>()
 let workspaceRuntimeMembershipExclusiveTail: Promise<void> = Promise.resolve()
 
 export interface InitialRepoRefresh {
-  id: string
+  id: WorkspaceId
   workspaceRuntimeId: string
 }
 
@@ -101,7 +102,6 @@ type WorkspaceAdmissionInput =
 
 function workspaceAdmissionFromInput(input: string | WorkspaceSessionEntry): WorkspaceAdmissionInput {
   if (typeof input !== 'string') return { kind: 'workspace-entry', entry: input }
-  if (!isRemoteRepoId(input)) return { kind: 'command-input', input }
   const parsed = parseRemoteRepoId(input)
   const ref = parsed ? normalizeRemoteRepoRef(parsed) : null
   return ref
@@ -129,11 +129,13 @@ export async function resolveRepoPath(
         target,
       }
     }
+    const workspaceId = canonicalWorkspaceLocator(probe.root)
+    if (!workspaceId) throw new Error('Workspace probe returned a non-canonical workspace ID')
     return {
       input: repoInput,
       reason: null,
       repo: {
-        id: probe.root,
+        id: workspaceId,
         name:
           probe.name ??
           (typeof value !== 'string' && value.kind === 'remote' ? value.ref.displayName : lastPathSegment(probe.root)),
@@ -195,7 +197,7 @@ async function openLocalWorkspaceRuntimeForCommandInput(repoInput: string): Prom
 }
 
 export async function openWorkspaceRuntimeWithCache(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   onOpened?: (workspaceRuntimeId: string) => void | Promise<void>,
 ): Promise<string> {
   return await runWorkspaceRuntimeMembershipCommand(workspaceId, async () => {
@@ -206,13 +208,16 @@ export async function openWorkspaceRuntimeWithCache(
   })
 }
 
-export async function closeWorkspaceRuntimeWithCache(workspaceId: string, workspaceRuntimeId: string): Promise<void> {
+export async function closeWorkspaceRuntimeWithCache(
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+): Promise<void> {
   await runWorkspaceRuntimeMembershipCommand(workspaceId, async () => {
     await closeWorkspaceRuntimeWithCacheNow(workspaceId, workspaceRuntimeId)
   })
 }
 
-async function closeWorkspaceRuntimeWithCacheNow(workspaceId: string, workspaceRuntimeId: string): Promise<void> {
+async function closeWorkspaceRuntimeWithCacheNow(workspaceId: WorkspaceId, workspaceRuntimeId: string): Promise<void> {
   try {
     const released = await closeWorkspaceRuntime(workspaceId, workspaceRuntimeId)
     if (released) await removeWorkspaceRuntimeFromCache({ workspaceId, workspaceRuntimeId })
@@ -228,14 +233,18 @@ async function closeWorkspaceRuntimeWithCacheNow(workspaceId: string, workspaceR
 export type WorkspaceRuntimeMembershipRecoveryResult =
   | {
       kind: 'settled'
-      targets: Array<{ workspaceId: string; workspaceRuntimeId: string }>
-      changedTargets: Array<{ workspaceId: string; previousWorkspaceRuntimeId: string; workspaceRuntimeId: string }>
+      targets: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }>
+      changedTargets: Array<{
+        workspaceId: WorkspaceId
+        previousWorkspaceRuntimeId: string
+        workspaceRuntimeId: string
+      }>
     }
   | { kind: 'superseded' }
 
 type SettledWorkspaceRuntimeMembershipRecovery = Extract<WorkspaceRuntimeMembershipRecoveryResult, { kind: 'settled' }>
 type ReconciledWorkspaceRuntimeMembershipRecovery = WorkspaceRuntimeMembershipRecoveryResult & {
-  remoteEnsureTargets?: Array<{ workspaceId: string; workspaceRuntimeId: string }>
+  remoteEnsureTargets?: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }>
 }
 
 /**
@@ -253,9 +262,7 @@ export async function reconcileOpenWorkspaceRuntimeMemberships(
   if (recovery.kind === 'superseded') return recovery
   void Promise.all(
     (recovery.remoteEnsureTargets ?? []).map(async (target) => {
-      const workspaceId = canonicalWorkspaceLocator(target.workspaceId)
-      if (!workspaceId) return
-      await runRemoteWorkspaceConnection(set, get, workspaceId, {
+      await runRemoteWorkspaceConnection(set, get, target.workspaceId, {
         workspaceRuntimeId: target.workspaceRuntimeId,
         mode: 'ensure',
       })
@@ -272,7 +279,7 @@ async function reconcileOpenWorkspaceRuntimeMembershipsNow(
 ): Promise<ReconciledWorkspaceRuntimeMembershipRecovery> {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const capturedRecovery = await reconcileCapturedWorkspaceRuntimeMemberships(set, get)
-    const currentRoots = Object.keys(get().workspaces)
+    const currentRoots = Object.values(get().workspaces).map((workspace) => workspace.id)
     if (sameRepoRootSet(currentRoots, capturedRecovery.declaredRepoRoots)) {
       return {
         kind: 'settled',
@@ -290,8 +297,8 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
   get: WorkspacesGet,
 ): Promise<
   SettledWorkspaceRuntimeMembershipRecovery & {
-    declaredRepoRoots: string[]
-    remoteEnsureTargets: Array<{ workspaceId: string; workspaceRuntimeId: string }>
+    declaredRepoRoots: WorkspaceId[]
+    remoteEnsureTargets: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }>
   }
 > {
   const captured = Object.values(get().workspaces).map((repo) => ({
@@ -432,7 +439,11 @@ async function runExclusiveWorkspaceRuntimeMembershipCommand<T>(command: () => P
   return await work
 }
 
-function orderedInsert(workspaceOrder: string[], id: string, rankById?: ReadonlyMap<string, number>): string[] {
+function orderedInsert(
+  workspaceOrder: WorkspaceId[],
+  id: WorkspaceId,
+  rankById?: ReadonlyMap<string, number>,
+): WorkspaceId[] {
   if (!rankById) return [...workspaceOrder, id]
   const rank = rankById.get(id)
   if (rank === undefined) return [...workspaceOrder, id]
@@ -446,7 +457,8 @@ function orderedInsert(workspaceOrder: string[], id: string, rankById?: Readonly
 }
 
 function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string): Partial<WorkspacesStore> {
-  if (!s.workspaces[id]) return s
+  const workspace = s.workspaces[id]
+  if (!workspace) return s
   const workspaces = { ...s.workspaces }
   const selectedTerminalSessionIdByTerminalWorktree = { ...s.selectedTerminalSessionIdByTerminalWorktree }
   const tabOpenerIdentityByScope = { ...s.tabOpenerIdentityByScope }
@@ -461,7 +473,11 @@ function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string): Partia
     if (scopeKey.startsWith(`${id}\0`)) delete tabOpenerIdentityByScope[scopeKey]
   }
   const workspaceOrder = s.workspaceOrder.filter((x) => x !== id)
-  const restoredWorkspaceId = nextRestoredRepoIdAfterWorkspaceClose(s.workspaceOrder, s.restoredWorkspaceId, id)
+  const restoredWorkspaceId = nextRestoredRepoIdAfterWorkspaceClose(
+    s.workspaceOrder,
+    s.restoredWorkspaceId,
+    workspace.id,
+  )
   const restoredClientWorkspaceBaseline = s.restoredClientWorkspaceBaseline
     ? {
         ...s.restoredClientWorkspaceBaseline,
@@ -494,7 +510,7 @@ function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string): Partia
 async function rollbackNewWorkspace(
   set: WorkspacesSet,
   get: WorkspacesGet,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
 ): Promise<void> {
   if (get().workspaces[workspaceId]?.workspaceRuntimeId !== workspaceRuntimeId) return
@@ -544,7 +560,7 @@ async function removeWorkspaceMembershipResult(workspaceId: string): Promise<Wor
   }
 }
 
-async function releaseUncommittedWorkspaceRuntime(workspaceId: string, workspaceRuntimeId: string): Promise<void> {
+async function releaseUncommittedWorkspaceRuntime(workspaceId: WorkspaceId, workspaceRuntimeId: string): Promise<void> {
   try {
     await closeWorkspaceRuntimeWithCacheNow(workspaceId, workspaceRuntimeId)
   } catch (err) {
@@ -571,7 +587,7 @@ async function recordRecentWorkspacePostOpen(repo: WorkspaceSessionEntry): Promi
  *  returning it from `upsertRepo.create`. */
 function buildNewWorkspace(
   s: Pick<WorkspacesStore, 'repoSnapshotCache'>,
-  id: string,
+  id: WorkspaceId,
   nameHints: ReadonlyArray<string | undefined | null>,
   workspaceRuntimeId: string,
 ): WorkspaceState {
@@ -628,13 +644,13 @@ function capabilityAcrossRuntimeTransition(
  *    the existing repo was preserved (no-op or update returned null). */
 function upsertRepo(
   s: Pick<WorkspacesStore, 'workspaces' | 'repoSnapshotCache' | 'workspaceOrder'>,
-  id: string,
+  id: WorkspaceId,
   options: {
     rankById?: ReadonlyMap<string, number>
     create: () => WorkspaceState
     update?: (existing: WorkspaceState) => WorkspaceState | null
   },
-): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: string } {
+): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: WorkspaceId } {
   const existing = s.workspaces[id]
   if (existing) {
     if (!options.update) return { workspaces: s.workspaces, workspaceOrder: s.workspaceOrder, changed: false, id }
@@ -660,7 +676,7 @@ export function addResolvedWorkspace(
   resolvedRepo: ResolvedRepo,
   workspaceRuntimeId: string,
   rankById?: ReadonlyMap<string, number>,
-): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: string } {
+): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: WorkspaceId } {
   return upsertRepo(s, resolvedRepo.id, {
     rankById,
     create: () => {
@@ -770,12 +786,12 @@ export function addResolvedWorkspace(
  */
 export function addUnavailableWorkspace(
   s: Pick<WorkspacesStore, 'workspaces' | 'repoSnapshotCache' | 'workspaceOrder'>,
-  id: string,
+  id: WorkspaceId,
   reason: string,
   workspaceRuntimeId: string,
   target?: RemoteRepoTarget,
   rankById?: ReadonlyMap<string, number>,
-): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: string } {
+): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: WorkspaceId } {
   return upsertRepo(s, id, {
     rankById,
     create: () => {
@@ -848,7 +864,7 @@ export function insertPlaceholderWorkspace(
   entry: WorkspaceSessionEntry,
   workspaceRuntimeId: string,
   rankById?: ReadonlyMap<string, number>,
-): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: string } {
+): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: WorkspaceId } {
   return upsertRepo(s, entry.id, {
     rankById,
     create: () => {
@@ -901,10 +917,9 @@ export function createWorkspaceLifecycleActions(
     },
 
     async retryRemoteWorkspaceConnection(id: string) {
-      if (!isRemoteRepoId(id)) return null
-      const workspaceId = canonicalWorkspaceLocator(id)
-      if (!workspaceId) return null
-      const outcome = await runRemoteWorkspaceConnection(set, get, workspaceId)
+      const workspace = get().workspaces[id]
+      if (workspace?.admission.kind !== 'remote') return null
+      const outcome = await runRemoteWorkspaceConnection(set, get, workspace.id)
       if (!outcome) return null
       if (outcome.kind === 'superseded' || outcome.kind === 'stale-runtime' || outcome.kind === 'cancelled') return null
       if (outcome.kind === 'transport-failed') return { ok: false, reason: outcome.reason }
@@ -948,13 +963,11 @@ async function openLocalWorkspace(
   if (!resolved.repo || !resolved.workspaceRuntimeId) {
     return { ok: false, message: resolved.reason ?? 'error.repo-git-unavailable' }
   }
-  const workspaceId = canonicalWorkspaceLocator(resolved.repo.id)
-  if (!workspaceId) return { ok: false, message: 'error.failed-read-repo' }
   if (initialRefreshRef.current) refreshInitialWorkspaceState(set, get, initialRefreshRef.current)
   const recentEntry = resolved.repo.target
     ? remoteWorkspaceSessionEntry(resolved.repo.target)
     : { kind: 'local' as const, id: resolved.repo.id }
-  return { ok: true, workspaceId, postOpenEffects: recordRecentWorkspacePostOpen(recentEntry) }
+  return { ok: true, workspaceId: resolved.repo.id, postOpenEffects: recordRecentWorkspacePostOpen(recentEntry) }
 }
 
 async function openRemoteWorkspace(
@@ -996,16 +1009,14 @@ async function openRemoteWorkspace(
   })
   if (!prepared) return { ok: false, message: 'error.failed-read-repo' }
 
-  const workspaceId = canonicalWorkspaceLocator(entry.id)
-  if (!workspaceId) return { ok: false, message: 'error.failed-read-repo' }
-  const outcome = await runRemoteWorkspaceConnection(set, get, workspaceId, {
+  const outcome = await runRemoteWorkspaceConnection(set, get, entry.id, {
     workspaceRuntimeId: prepared.workspaceRuntimeId,
   })
   if (get().workspaces[entry.id]?.workspaceRuntimeId !== prepared.workspaceRuntimeId) {
     return { ok: false, message: 'error.failed-read-repo' }
   }
   const recentEntry = outcome?.kind === 'ready' ? remoteWorkspaceSessionEntry(outcome.target) : entry
-  return { ok: true, workspaceId, postOpenEffects: recordRecentWorkspacePostOpen(recentEntry) }
+  return { ok: true, workspaceId: entry.id, postOpenEffects: recordRecentWorkspacePostOpen(recentEntry) }
 }
 
 async function closeWorkspaceMembership(
@@ -1013,7 +1024,8 @@ async function closeWorkspaceMembership(
   get: WorkspacesGet,
   id: string,
 ): Promise<CloseWorkspaceResult> {
-  const workspaceRuntimeId = get().workspaces[id]?.workspaceRuntimeId ?? null
+  const workspace = get().workspaces[id]
+  const workspaceRuntimeId = workspace?.workspaceRuntimeId ?? null
   const membership = await removeWorkspaceMembershipResult(id)
   if (!membership.ok) {
     workspacesLog.warn('failed to remove repo from server workspace', { id, err: membership.error })
@@ -1022,9 +1034,9 @@ async function closeWorkspaceMembership(
   disposeRepoOperationScheduler(id)
   void abortRepoOperation(id).catch(() => {})
   set((state) => removeWorkspaceFromSessionState(state, id))
-  if (workspaceRuntimeId) {
+  if (workspace && workspaceRuntimeId) {
     try {
-      await closeWorkspaceRuntimeWithCache(id, workspaceRuntimeId)
+      await closeWorkspaceRuntimeWithCache(workspace.id, workspaceRuntimeId)
     } catch (err) {
       workspacesLog.warn('failed to close workspace runtime', { id, workspaceRuntimeId, err })
       void invalidateWorkspaceRuntimes().catch((refreshErr) => {

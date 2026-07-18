@@ -8,7 +8,8 @@ import {
   seedRepoWithReadModelForTest,
   type IpcTestHandler,
 } from '#/web/test-utils/bridge.ts'
-export const REPO_ID = 'goblin+file:///tmp/goblin-test-repo'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-test-repo')
 export const ipcHandlers: Record<string, IpcTestHandler> = {}
 export const pullRequest = createPullRequest
 

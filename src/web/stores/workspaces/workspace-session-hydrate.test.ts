@@ -21,6 +21,7 @@ import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const GIT_WORKSPACE_PROBE = {
   status: 'ready' as const,
@@ -87,7 +88,9 @@ describe('repo session hydration', () => {
     expect(restoredWorkspace?.capability.kind).toBe('filesystem')
     expect(restoredWorkspace?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe('terminal')
     expect(
-      useWorkspacesStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[REPO_A],
+      useWorkspacesStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[
+        REPO_A
+      ],
     ).toBeUndefined()
   })
 
@@ -151,7 +154,9 @@ describe('repo session hydration', () => {
       [targetKey]: 'history',
     })
     expect(
-      useWorkspacesStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[REPO_A],
+      useWorkspacesStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[
+        REPO_A
+      ],
     ).toBeUndefined()
   })
 
@@ -373,7 +378,9 @@ describe('repo session hydration', () => {
       [targetKey]: 'history',
     })
     expect(
-      useWorkspacesStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[REPO_A],
+      useWorkspacesStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[
+        REPO_A
+      ],
     ).toBeUndefined()
   })
 
@@ -434,12 +441,13 @@ describe('repo session hydration', () => {
       remotePath: '/repo',
     })!
     const entry = remoteWorkspaceSessionEntry(target)
+    const workspaceId = workspaceIdForTest(entry.id)
     const workspaceRuntimeId = 'repo-runtime-remote'
     await useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime({
       workspaces: [
         {
           entry,
-          workspaceId: entry.id,
+          workspaceId,
           workspaceRuntimeId,
           name: 'repo',
           workspaceProbe: GIT_WORKSPACE_PROBE,
@@ -451,7 +459,7 @@ describe('repo session hydration', () => {
     })
     expect(
       acceptRemoteLifecycleProjection(useWorkspacesStore.setState, useWorkspacesStore.getState, {
-        workspaceId: entry.id,
+        workspaceId,
         workspaceRuntimeId,
         remoteLifecycle: { kind: 'failed', attemptId: 5, reason: 'unreachable', target },
       }),
@@ -461,7 +469,7 @@ describe('repo session hydration', () => {
       useWorkspacesStore.getState().promoteRestoredWorkspace({
         workspace: {
           entry,
-          workspaceId: entry.id,
+          workspaceId,
           workspaceRuntimeId,
           name: 'repo',
           target,

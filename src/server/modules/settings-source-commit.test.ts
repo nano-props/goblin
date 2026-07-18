@@ -1,8 +1,9 @@
 import { afterEach, expect, test, vi } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REPO_A = 'goblin+file:///repo-a'
-const REPO_B = 'goblin+file:///repo-b'
-const REPO_C = 'goblin+file:///repo-c'
+const REPO_A = workspaceIdForTest('goblin+file:///repo-a')
+const REPO_B = workspaceIdForTest('goblin+file:///repo-b')
+const REPO_C = workspaceIdForTest('goblin+file:///repo-c')
 
 const persistence = vi.hoisted(() => ({
   stored: null as unknown,

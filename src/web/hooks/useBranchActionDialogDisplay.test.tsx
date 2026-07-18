@@ -33,9 +33,10 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REPO_ID = 'goblin+file:///tmp/goblin-dialog-display-test'
-const OTHER_REPO_ID = '/tmp/goblin-dialog-display-test-other'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-dialog-display-test')
+const OTHER_REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-dialog-display-test-other')
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()

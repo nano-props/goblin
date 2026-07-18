@@ -12,6 +12,7 @@
 import { act, cleanup } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { BranchActionDialogHost } from '#/web/components/BranchActionDialogHost.tsx'
 import {
   branchCheckboxKey,
@@ -109,7 +110,7 @@ vi.mock('#/web/components/ConfirmDialog.tsx', () => ({
   },
 }))
 
-const REPO_ID = 'goblin+file:///tmp/goblin-dialog-host-test'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-dialog-host-test')
 
 function setupRepo() {
   const worktreePath = '/tmp/dialog-host-worktree'
@@ -196,7 +197,7 @@ describe('BranchActionDialogHost', () => {
   test('regression: closeStaleDialogs clears any open dialog whose repo does not match the new active workspace', () => {
     // Repo A active, open removeConfirm for A/feature/x.
     const { repo: repoA, branch: branchA } = setupRepo()
-    const repoBId = '/tmp/goblin-other-repo'
+    const repoBId = workspaceIdForTest('goblin+file:///tmp/goblin-other-repo')
     // Add repoB to the store alongside repoA via seedRepoWithReadModelForTest +
     // setState merge (seedRepoWithReadModelForTest alone would overwrite `repos`).
     seedRepoWithReadModelForTest({ id: repoBId, branches: [createRepoBranch('main')] })
@@ -337,7 +338,7 @@ describe('BranchActionDialogHost', () => {
     // `(currentRepoId, currentBranchName)`.
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const repoA = setupRepo().repo
-    const repoBId = '/tmp/goblin-other-repo'
+    const repoBId = workspaceIdForTest('goblin+file:///tmp/goblin-other-repo')
     seedRepoWithReadModelForTest({ id: repoBId, branches: [createRepoBranch('main')] })
     act(() => {
       useWorkspacesStore.setState((state) => ({

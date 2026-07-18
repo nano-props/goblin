@@ -1,10 +1,15 @@
 import { describe, expect, test } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import {
   restoredWorkspaceIdAfterWorkspaceHydration,
   nextRestoredRepoIdAfterWorkspaceClose,
   persistedOpenWorkspaceEntries,
 } from '#/web/open-workspace-state.ts'
+
+const REPO_A = workspaceIdForTest('goblin+file:///tmp/repo-a')
+const REPO_B = workspaceIdForTest('goblin+file:///tmp/repo-b')
+const REPO_C = workspaceIdForTest('goblin+file:///tmp/repo-c')
 
 describe('persistedOpenWorkspaceEntries', () => {
   test('preserves order, skips missing repos, and serializes remote targets as session entries', () => {
@@ -16,16 +21,19 @@ describe('persistedOpenWorkspaceEntries', () => {
       remotePath: '/srv/repo',
       displayName: 'example:repo',
     })
-    expect(target).not.toBeNull()
+    if (!target) throw new Error('expected a valid remote target fixture')
 
     expect(
-      persistedOpenWorkspaceEntries(['goblin+file:///tmp/repo-a', target!.id, '/tmp/missing'], {
-        'goblin+file:///tmp/repo-a': { id: 'goblin+file:///tmp/repo-a', admission: { kind: 'local' } },
-        [target!.id]: {
-          id: target!.id,
+      persistedOpenWorkspaceEntries([REPO_A, target.id, workspaceIdForTest('goblin+file:///tmp/missing')], {
+        [REPO_A]: {
+          id: REPO_A,
+          admission: { kind: 'local' },
+        },
+        [target.id]: {
+          id: target.id,
           admission: {
             kind: 'remote',
-            lifecycle: { kind: 'ready', target: target! },
+            lifecycle: { kind: 'ready', target },
             lifecycleAttemptId: 1,
           },
         },
@@ -34,9 +42,9 @@ describe('persistedOpenWorkspaceEntries', () => {
       { kind: 'local', id: 'goblin+file:///tmp/repo-a' },
       {
         kind: 'remote',
-        id: target!.id,
+        id: target.id,
         ref: {
-          id: target!.id,
+          id: target.id,
           alias: 'example',
           remotePath: '/srv/repo',
           displayName: 'example:repo',
@@ -54,13 +62,13 @@ describe('persistedOpenWorkspaceEntries', () => {
       remotePath: '/srv/repo',
       displayName: 'example:repo',
     })
-    expect(target).not.toBeNull()
-    const entry = remoteWorkspaceSessionEntry(target!)
+    if (!target) throw new Error('expected a valid remote target fixture')
+    const entry = remoteWorkspaceSessionEntry(target)
 
     expect(
-      persistedOpenWorkspaceEntries([target!.id], {
-        [target!.id]: {
-          id: target!.id,
+      persistedOpenWorkspaceEntries([target.id], {
+        [target.id]: {
+          id: target.id,
           session: { entry },
           admission: { kind: 'remote', lifecycle: null, lifecycleAttemptId: null },
         },
@@ -73,9 +81,9 @@ describe('nextRestoredRepoIdAfterWorkspaceClose', () => {
   test('keeps the active selection when closing an inactive workspace', () => {
     expect(
       nextRestoredRepoIdAfterWorkspaceClose(
-        ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
-        'goblin+file:///tmp/repo-a',
-        'goblin+file:///tmp/repo-b',
+        [REPO_A, REPO_B],
+        REPO_A,
+        REPO_B,
       ),
     ).toBe('goblin+file:///tmp/repo-a')
   })
@@ -83,23 +91,23 @@ describe('nextRestoredRepoIdAfterWorkspaceClose', () => {
   test('slides to the right neighbor, then the left, then null', () => {
     expect(
       nextRestoredRepoIdAfterWorkspaceClose(
-        ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b', 'goblin+file:///tmp/repo-c'],
-        'goblin+file:///tmp/repo-b',
-        'goblin+file:///tmp/repo-b',
+        [REPO_A, REPO_B, REPO_C],
+        REPO_B,
+        REPO_B,
       ),
     ).toBe('goblin+file:///tmp/repo-c')
     expect(
       nextRestoredRepoIdAfterWorkspaceClose(
-        ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
-        'goblin+file:///tmp/repo-b',
-        'goblin+file:///tmp/repo-b',
+        [REPO_A, REPO_B],
+        REPO_B,
+        REPO_B,
       ),
     ).toBe('goblin+file:///tmp/repo-a')
     expect(
       nextRestoredRepoIdAfterWorkspaceClose(
-        ['goblin+file:///tmp/repo-a'],
-        'goblin+file:///tmp/repo-a',
-        'goblin+file:///tmp/repo-a',
+        [REPO_A],
+        REPO_A,
+        REPO_A,
       ),
     ).toBeNull()
   })
@@ -109,10 +117,10 @@ describe('restoredWorkspaceIdAfterWorkspaceHydration', () => {
   test('preserves a user-selected restored repo over the persisted restored repo', () => {
     expect(
       restoredWorkspaceIdAfterWorkspaceHydration(
-        'goblin+file:///tmp/repo-a',
+        REPO_A,
         { 'goblin+file:///tmp/repo-a': {}, 'goblin+file:///tmp/repo-b': {} },
-        ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
-        'goblin+file:///tmp/repo-b',
+        [REPO_A, REPO_B],
+        REPO_B,
         null,
       ),
     ).toBe('goblin+file:///tmp/repo-a')
@@ -123,8 +131,8 @@ describe('restoredWorkspaceIdAfterWorkspaceHydration', () => {
       restoredWorkspaceIdAfterWorkspaceHydration(
         null,
         { 'goblin+file:///tmp/repo-a': {}, 'goblin+file:///tmp/repo-b': {} },
-        ['goblin+file:///tmp/repo-a', 'goblin+file:///tmp/repo-b'],
-        'goblin+file:///tmp/repo-b',
+        [REPO_A, REPO_B],
+        REPO_B,
         null,
       ),
     ).toBe('goblin+file:///tmp/repo-b')
@@ -132,7 +140,7 @@ describe('restoredWorkspaceIdAfterWorkspaceHydration', () => {
       restoredWorkspaceIdAfterWorkspaceHydration(
         null,
         { 'goblin+file:///tmp/repo-a': {} },
-        ['goblin+file:///tmp/repo-a'],
+        [REPO_A],
         null,
         null,
       ),
@@ -144,8 +152,8 @@ describe('restoredWorkspaceIdAfterWorkspaceHydration', () => {
       restoredWorkspaceIdAfterWorkspaceHydration(
         null,
         { 'goblin+file:///tmp/repo-a': {} },
-        ['goblin+file:///tmp/repo-a'],
-        '/tmp/missing',
+        [REPO_A],
+        workspaceIdForTest('goblin+file:///tmp/missing'),
         null,
       ),
     ).toBeNull()

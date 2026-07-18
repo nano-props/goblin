@@ -13,6 +13,7 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const responsiveMocks = vi.hoisted(() => ({
   mode: 'default' as 'default' | 'compact',
@@ -322,7 +323,7 @@ describe('RepoView workspace navigation', () => {
   })
 
   test('renders the shared directory Dashboard for a remote non-Git workspace', () => {
-    const workspaceId = 'goblin+ssh://example/srv%2Fworkspace'
+    const workspaceId = workspaceIdForTest('goblin+ssh://example/srv/workspace')
     seedRepoWithReadModelForTest({
       id: workspaceId,
       branches: [],

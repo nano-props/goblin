@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { repoIdFromSlug, repoSlugFromId } from '#/web/repo-route-slugs.ts'
+import { repoIdFromSlug, repoSlugFromId, workspaceIdFromSlug } from '#/web/repo-route-slugs.ts'
 
 describe('repo route slugs', () => {
   test('encodes local repo paths as base64url slugs', () => {
@@ -13,5 +13,11 @@ describe('repo route slugs', () => {
     const repoId = 'ssh://git.example.test/acme/repo.git'
 
     expect(repoIdFromSlug(repoSlugFromId(repoId))).toBe(repoId)
+  })
+
+  test('admits only canonical workspace identities at the route boundary', () => {
+    expect(workspaceIdFromSlug(repoSlugFromId('goblin+file:///workspace'))).toBe('goblin+file:///workspace')
+    expect(workspaceIdFromSlug(repoSlugFromId('/workspace'))).toBeNull()
+    expect(workspaceIdFromSlug(repoSlugFromId('goblin+file:///workspace/'))).toBeNull()
   })
 })

@@ -8,6 +8,7 @@
 // protocol types in `shared/terminal-types.ts`.
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   acquireWorkspaceRuntime,
   clearWorkspaceRuntimesForUser,
@@ -144,7 +145,7 @@ vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', asyn
               configFingerprint: 'terminal-runtime-test-config-fingerprint',
               endpointMarker: { deviceId: '10', inode: '20' },
               target: {
-                id: input.repoRoot,
+                id: workspaceIdForTest(input.repoRoot),
                 alias: 'prod',
                 host: 'example.test',
                 user: 'deploy',

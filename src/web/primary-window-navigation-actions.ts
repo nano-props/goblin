@@ -1,4 +1,5 @@
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
@@ -86,9 +87,12 @@ export interface PrimaryWindowNavigationActions {
 
 interface CreatePrimaryWindowNavigationActionsOptions {
   currentWorkspaceId: string | null
-  workspaceOrder: string[]
+  workspaceOrder: WorkspaceId[]
   closeWorkspace: (workspaceId: string) => Promise<CloseWorkspaceResult>
-  peekWorkspaceNavigation: (workspaceId: string, direction: 'back' | 'forward') => WorkspaceNavigationHistoryTraversal | null
+  peekWorkspaceNavigation: (
+    workspaceId: WorkspaceId,
+    direction: 'back' | 'forward',
+  ) => WorkspaceNavigationHistoryTraversal | null
   commitWorkspaceNavigation: (traversal: WorkspaceNavigationHistoryTraversal) => boolean
   routeNavigation: PrimaryWindowRouteNavigation
 }
@@ -214,16 +218,20 @@ export function createPrimaryWindowNavigationActions({
     },
     goBack(workspaceId) {
       if (workspaceNavigationHistoryRestoreBlocked(workspaceId, 'back')) return
+      const canonicalWorkspaceId = useWorkspacesStore.getState().workspaces[workspaceId]?.id
+      if (!canonicalWorkspaceId) return
       const presentationToken = beginPrimaryWindowPresentation()
-      const traversal = peekWorkspaceNavigation(workspaceId, 'back')
+      const traversal = peekWorkspaceNavigation(canonicalWorkspaceId, 'back')
       if (!traversal) return
       const result = restoreWorkspaceNavigationEntry(traversal.target, routeNavigation, { presentationToken })
       if (result.kind === 'accepted') commitWorkspaceNavigation(traversal)
     },
     goForward(workspaceId) {
       if (workspaceNavigationHistoryRestoreBlocked(workspaceId, 'forward')) return
+      const canonicalWorkspaceId = useWorkspacesStore.getState().workspaces[workspaceId]?.id
+      if (!canonicalWorkspaceId) return
       const presentationToken = beginPrimaryWindowPresentation()
-      const traversal = peekWorkspaceNavigation(workspaceId, 'forward')
+      const traversal = peekWorkspaceNavigation(canonicalWorkspaceId, 'forward')
       if (!traversal) return
       const result = restoreWorkspaceNavigationEntry(traversal.target, routeNavigation, { presentationToken })
       if (result.kind === 'accepted') commitWorkspaceNavigation(traversal)
@@ -311,20 +319,20 @@ function restoreWorkspacePresentationOrOpenDashboard(
   routeNavigation.openRepoDashboard(workspaceId, { presentationToken })
 }
 
-function nextWorkspaceIdAfterClose(workspaceOrder: string[], closingWorkspaceId: string): string | null {
-  const currentIndex = workspaceOrder.indexOf(closingWorkspaceId)
+function nextWorkspaceIdAfterClose(workspaceOrder: WorkspaceId[], closingWorkspaceId: string): WorkspaceId | null {
+  const currentIndex = workspaceOrder.findIndex((workspaceId) => workspaceId === closingWorkspaceId)
   if (currentIndex === -1) return workspaceOrder[0] ?? null
   return workspaceOrder[currentIndex + 1] ?? workspaceOrder[currentIndex - 1] ?? null
 }
 
 function nextNavigationWorkspaceId(
-  workspaceOrder: string[],
+  workspaceOrder: WorkspaceId[],
   currentWorkspaceId: string | null,
   direction: 1 | -1,
-): string | null {
+): WorkspaceId | null {
   if (workspaceOrder.length === 0) return null
   if (!currentWorkspaceId) return workspaceOrder[0] ?? null
-  const currentIndex = workspaceOrder.indexOf(currentWorkspaceId)
+  const currentIndex = workspaceOrder.findIndex((workspaceId) => workspaceId === currentWorkspaceId)
   if (currentIndex === -1) return workspaceOrder[0] ?? null
   return workspaceOrder[(currentIndex + direction + workspaceOrder.length) % workspaceOrder.length] ?? null
 }

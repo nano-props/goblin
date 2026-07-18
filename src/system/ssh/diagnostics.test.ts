@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { classifySshFailure, testRemoteRepo } from '#/system/ssh/diagnostics.ts'
 import type { RemoteCommandKind, RemoteCommandResult } from '#/system/ssh/commands.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const okShell: RemoteCommandResult = { ok: true, stdout: 'ok', stderr: '', message: 'ok', timedOut: false }
 
@@ -34,7 +35,7 @@ describe('classifySshFailure', () => {
 
 describe('testRemoteRepo parallel stages', () => {
   const target: RemoteRepoTarget = {
-    id: 'goblin+ssh://example/srv%2Frepo',
+    id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
     alias: 'example',
     host: 'example.local',
     user: 'me',

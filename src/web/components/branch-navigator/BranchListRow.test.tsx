@@ -6,6 +6,7 @@ import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.t
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { createGitRepoPresentationForTest, createRepoBranch } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 
 // Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
@@ -89,12 +90,15 @@ function baseProps(
 }
 
 function branchListRowRepo(): BranchActionRepo {
-  const repo = createGitRepoPresentationForTest(emptyWorkspace('/tmp/repo', 'repo', 'repo-runtime-test'), {
-    branches: [],
-    currentBranch: '',
-    status: [],
-    worktreesByPath: {},
-  })
+  const repo = createGitRepoPresentationForTest(
+    emptyWorkspace(workspaceIdForTest('goblin+file:///tmp/repo'), 'repo', 'repo-runtime-test'),
+    {
+      branches: [],
+      currentBranch: '',
+      status: [],
+      worktreesByPath: {},
+    },
+  )
   return {
     id: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,

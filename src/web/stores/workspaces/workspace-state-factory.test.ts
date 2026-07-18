@@ -20,6 +20,12 @@ function remoteTargetFixture() {
 }
 
 describe('deriveConnectivity', () => {
+  test('rejects a non-canonical workspace identity at aggregate creation', () => {
+    expect(() => emptyWorkspace('/workspace', 'workspace', 'workspace-runtime-test')).toThrow(
+      'Workspace state requires a canonical workspace ID',
+    )
+  })
+
   test('creates a capability-neutral local workspace shell', () => {
     const workspace = emptyWorkspace('goblin+file:///workspace', 'workspace', 'workspace-runtime-test')
 
@@ -110,7 +116,7 @@ describe('deriveConnectivity', () => {
   })
 
   test('local repos always read as connected', () => {
-    const repo = emptyWorkspace('/tmp/local-repo', 'local', 'repo-runtime-test')
+    const repo = emptyWorkspace('goblin+file:///tmp/local-repo', 'local', 'repo-runtime-test')
     expect(deriveConnectivity(repo)).toBe('connected')
   })
 

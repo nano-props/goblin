@@ -13,6 +13,7 @@ import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { resolveKnownWorktree } from '#/shared/worktree-guards.ts'
 import type { TerminalSessionPrepareManagerResult } from '#/server/terminal/terminal-session-ensurer.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 vi.mock('#/system/git/worktrees.ts', () => ({
   getWorktrees: vi.fn(async () => [
@@ -27,7 +28,7 @@ vi.mock('#/shared/worktree-guards.ts', () => ({
 vi.mock('#/system/ssh/config.ts', () => ({
   resolveRemoteTarget: vi.fn(async () => ({
     target: {
-      id: 'goblin+ssh://prod/srv/repo',
+      id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
       alias: 'prod',
       host: 'example.test',
       user: 'deploy',
@@ -50,7 +51,7 @@ const LOCAL_TARGET = {
   root: canonicalWorkspaceLocator('goblin+file:///repo/worktree')!,
 }
 const BRANCH_NAME = 'feature/worktree'
-const REMOTE_REPO_ROOT = 'goblin+ssh://prod/srv/repo'
+const REMOTE_REPO_ROOT = workspaceIdForTest('goblin+ssh://prod/srv/repo')
 const REMOTE_WORKTREE_PATH = '/srv/repo'
 const REMOTE_TARGET = {
   kind: 'workspace-root' as const,

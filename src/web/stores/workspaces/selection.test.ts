@@ -26,7 +26,8 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
-const REPO_ID = 'goblin+file:///tmp/goblin-selection-test-repo'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-selection-test-repo')
 const ipcHandlers: Record<string, (input: any) => unknown> = {}
 
 function seedRepo(options: {

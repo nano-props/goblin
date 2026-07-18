@@ -12,6 +12,7 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { repoWorktreeStatusQueryKey } from '#/web/repo-data-query.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('restorable-workspace-state', () => {
   beforeEach(() => {
@@ -269,7 +270,7 @@ describe('restorable-workspace-state', () => {
   test('restores restorable workspace state from ClientWorkspaceState', () => {
     expect(
       restoreRestorableWorkspaceStateFromClientWorkspace({
-        restoredWorkspaceId: 'goblin+file:///tmp/repo',
+        restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
         zenMode: false,
         workspacePaneSize: 40,
         selectedTerminalSessionIdByTerminalWorktree: {

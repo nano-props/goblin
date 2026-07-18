@@ -8,11 +8,12 @@ import {
   remoteWorkspaceSessionEntry,
   sameWorkspaceSessionEntry,
 } from '#/shared/remote-repo.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('remote repository normalization', () => {
   test('compares complete persisted repo entry identity', () => {
     const entry = remoteWorkspaceSessionEntry({
-      id: 'goblin+ssh://host/repo',
+      id: workspaceIdForTest('goblin+ssh://host/repo'),
       alias: 'host',
       remotePath: '/repo',
       displayName: 'host:repo',
@@ -23,8 +24,8 @@ describe('remote repository normalization', () => {
     )
     expect(
       sameWorkspaceSessionEntry(
-        { kind: 'local', id: 'goblin+file:///repo' },
-        { kind: 'local', id: 'goblin+file:///repo' },
+        { kind: 'local', id: workspaceIdForTest('goblin+file:///repo') },
+        { kind: 'local', id: workspaceIdForTest('goblin+file:///repo') },
       ),
     ).toBe(true)
     expect(sameWorkspaceSessionEntry(null, entry)).toBe(false)
@@ -83,7 +84,7 @@ describe('remote repository normalization', () => {
   test('normalizes persisted remote session entries before reuse', () => {
     expect(
       remoteWorkspaceSessionEntry({
-        id: 'goblin+ssh://prod/',
+        id: workspaceIdForTest('goblin+ssh://prod/'),
         alias: 'prod',
         remotePath: '/srv/repo',
         displayName: 'prod:/',
@@ -102,7 +103,7 @@ describe('remote repository normalization', () => {
 
   test('treats display names as canonical target data', () => {
     const target = {
-      id: 'goblin+ssh://prod/srv/repo',
+      id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
       alias: 'prod',
       host: 'example.test',
       user: 'alice',

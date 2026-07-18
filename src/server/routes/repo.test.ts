@@ -10,8 +10,9 @@ import {
 } from '#/server/modules/workspace-runtimes.ts'
 import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const WORKSPACE_ID = 'goblin+file:///tmp/repo'
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/repo')
 function treeTarget(workspaceRuntimeId: string) {
   return {
     kind: 'git-worktree' as const,
@@ -254,7 +255,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
   test('rejects Git reads after the server commits Git unavailable', async () => {
     const app = createTestRepoRoutes()
-    const workspaceId = 'goblin+file:///tmp/plain-workspace'
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-workspace')
     const workspaceRuntimeId = await openTestWorkspaceRuntime(workspaceId)
     await runSerializedWorkspaceRefresh({
       userId: 'user-test',
@@ -476,7 +477,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
   test('marks remote lifecycle failed when a runtime-scoped repo read hits transport failure', async () => {
     const app = createTestRepoRoutes()
-    const repoId = 'goblin+ssh://prod/home/alice/service'
+    const repoId = workspaceIdForTest('goblin+ssh://prod/home/alice/service')
     const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
     mocks.getRepoLog.mockRejectedValueOnce(
       new RemoteRepoRuntimeFailureError({
@@ -566,7 +567,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     },
   ])('marks remote lifecycle failed when /$name hits transport failure', async ({ path, body, mock }) => {
     const app = createTestRepoRoutes()
-    const repoId = 'goblin+ssh://prod/home/alice/service'
+    const repoId = workspaceIdForTest('goblin+ssh://prod/home/alice/service')
     const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
     mock.mockRejectedValueOnce(
       new RemoteRepoRuntimeFailureError({
@@ -596,7 +597,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
   test('marks remote lifecycle failed when a runtime-scoped repo write hits transport failure', async () => {
     const app = createTestRepoRoutes()
-    const repoId = 'goblin+ssh://prod/home/alice/service'
+    const repoId = workspaceIdForTest('goblin+ssh://prod/home/alice/service')
     const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
     mocks.pullRepoBranch.mockRejectedValueOnce(
       new RemoteRepoRuntimeFailureError({
