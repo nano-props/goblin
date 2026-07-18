@@ -129,7 +129,7 @@ function createTestRepoRoutes(
     deleteBranch: async (_userId, input) => await input.deleteBranch(),
   },
   workspaceCapabilityTransitionHost: Parameters<typeof createRepoRoutes>[0]['workspaceCapabilityTransitionHost'] = {
-    removeGitScopedResources: vi.fn(),
+    commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
   },
 ) {
   return createRepoRoutes({
@@ -268,8 +268,8 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       },
       diagnostics: [],
     })
-    const removeGitScopedResources = vi.fn(async () => undefined)
-    const app = createTestRepoRoutes(undefined, undefined, { removeGitScopedResources })
+    const commitGitCapabilityRemoval = vi.fn(async () => ({ kind: 'committed' as const }))
+    const app = createTestRepoRoutes(undefined, undefined, { commitGitCapabilityRemoval })
 
     const response = await app.request(
       new Request('http://localhost/runtime-open', {
@@ -296,8 +296,8 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       process.platform === 'win32' ? 'win32' : 'posix',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
-    expect(removeGitScopedResources).toHaveBeenCalledOnce()
-    expect(removeGitScopedResources).toHaveBeenCalledWith({
+    expect(commitGitCapabilityRemoval).toHaveBeenCalledOnce()
+    expect(commitGitCapabilityRemoval).toHaveBeenCalledWith({
       userId: 'user-test',
       workspaceId: 'goblin+file:///tmp/repo/subdir',
       workspaceRuntimeId: json.repoRuntimeId,
@@ -316,8 +316,8 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       },
       diagnostics: [{ scope: 'git', message: 'Git probe timed out' }],
     })
-    const removeGitScopedResources = vi.fn(async () => undefined)
-    const app = createTestRepoRoutes(undefined, undefined, { removeGitScopedResources })
+    const commitGitCapabilityRemoval = vi.fn(async () => ({ kind: 'committed' as const }))
+    const app = createTestRepoRoutes(undefined, undefined, { commitGitCapabilityRemoval })
     const opened = await app.request(
       new Request('http://localhost/runtime-open', {
         method: 'POST',
@@ -326,7 +326,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       }),
     )
     const openedJson = (await opened.json()) as { ok: true; repo: { id: string }; repoRuntimeId: string }
-    expect(removeGitScopedResources).not.toHaveBeenCalled()
+    expect(commitGitCapabilityRemoval).not.toHaveBeenCalled()
 
     mocks.probeWorkspace.mockResolvedValue({
       status: 'ready',
@@ -353,7 +353,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       }),
     )
 
-    expect(removeGitScopedResources).toHaveBeenCalledOnce()
+    expect(commitGitCapabilityRemoval).toHaveBeenCalledOnce()
   })
 
   test('runtime-open with repoInput fails without minting a runtime id when probe fails', async () => {
@@ -432,8 +432,8 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   })
 
   test('workspace-refresh commits a conclusive capability result for the current runtime', async () => {
-    const removeGitScopedResources = vi.fn(async () => undefined)
-    const app = createTestRepoRoutes(undefined, undefined, { removeGitScopedResources })
+    const commitGitCapabilityRemoval = vi.fn(async () => ({ kind: 'committed' as const }))
+    const app = createTestRepoRoutes(undefined, undefined, { commitGitCapabilityRemoval })
     const workspaceId = 'goblin+file:///tmp/workspace-refresh'
     const workspaceRuntimeId = await openTestRepoRuntime(app, workspaceId)
     mocks.probeLocalWorkspace.mockResolvedValue({
@@ -459,7 +459,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       kind: 'committed',
       probe: { status: 'ready', capabilities: { git: { status: 'unavailable' } } },
     })
-    expect(removeGitScopedResources).toHaveBeenCalledWith({
+    expect(commitGitCapabilityRemoval).toHaveBeenCalledWith({
       userId: 'user-test',
       workspaceId,
       workspaceRuntimeId,

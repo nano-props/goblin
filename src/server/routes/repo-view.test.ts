@@ -35,7 +35,9 @@ const worktreeRemovalApplication = {
   removeWorktree: vi.fn(async () => ({ ok: false as const, message: 'unused' })),
 }
 
-const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = { removeGitScopedResources: vi.fn() }
+const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
+  commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
+}
 
 describe('POST /api/repo/view', () => {
   beforeEach(() => {

@@ -114,7 +114,9 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
   getUserSettings: mocks.getUserSettings,
 }))
 
-const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = { removeGitScopedResources: vi.fn() }
+const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
+  commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
+}
 
 describe('server app body limit', () => {
   test('rejects POST bodies over 1 MiB with a 413 JSON response', async () => {

@@ -9,7 +9,10 @@ import { REMOTE_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
 import { isCurrentRepoRuntime } from '#/server/modules/repo-runtimes.ts'
-import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
+import {
+  commitGitCapabilityRemovalOrThrow,
+  type WorkspaceCapabilityTransitionHost,
+} from '#/server/workspace-capability-transition-host.ts'
 import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
 
 export function createRemoteRoutes(options: { workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost }) {
@@ -29,7 +32,7 @@ export function createRemoteRoutes(options: { workspaceCapabilityTransitionHost:
         {
           beforeCapabilityCommit: async ({ before, after }) => {
             if (!workspaceGitCleanupRequired(before, after)) return
-            await options.workspaceCapabilityTransitionHost.removeGitScopedResources({
+            await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
               userId,
               workspaceId: repoId,
               workspaceRuntimeId: repoRuntimeId,

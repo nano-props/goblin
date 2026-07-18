@@ -58,7 +58,10 @@ import {
   type WorkspaceLocatorPlatform,
 } from '#/shared/workspace-locator.ts'
 import path from 'node:path'
-import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
+import {
+  commitGitCapabilityRemovalOrThrow,
+  type WorkspaceCapabilityTransitionHost,
+} from '#/server/workspace-capability-transition-host.ts'
 import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
 import { readWorkspaceDirectoryOverview } from '#/server/modules/workspace-directory-overview.ts'
 
@@ -127,7 +130,7 @@ export function createRepoRoutes(options: {
         probe: async () => await probeWorkspace(workspaceId, platform, { signal: c.req.raw.signal }),
         beforeCommit: async ({ before, after }) => {
           if (!workspaceGitCleanupRequired(before, after)) return
-          await options.workspaceCapabilityTransitionHost.removeGitScopedResources({
+          await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
             userId,
             workspaceId,
             workspaceRuntimeId,
@@ -484,7 +487,7 @@ export function createRepoRoutes(options: {
         probe: async () => probe,
         beforeCommit: async ({ before, after }) => {
           if (!workspaceGitCleanupRequired(before, after)) return
-          await options.workspaceCapabilityTransitionHost.removeGitScopedResources({
+          await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
             userId,
             workspaceId,
             workspaceRuntimeId: repoRuntimeId,

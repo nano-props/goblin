@@ -76,6 +76,8 @@ const TERMINAL_DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 // terminals, but remains a separate policy input so the two lifecycles are not
 // structurally coupled if product retention changes later.
 const REPO_RUNTIME_MEMBERSHIP_TTL_MS = 24 * 60 * 60 * 1000
+const INVALIDATED_SCOPE_RETIREMENT_RETRY_BASE_MS = 100
+const INVALIDATED_SCOPE_RETIREMENT_RETRY_MAX_MS = 5_000
 const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })
 
 const serverWorkspacePaneTargetProjection: WorkspacePaneTargetProjectionProvider = {
@@ -229,24 +231,114 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
     gCommand: options.gCommand,
   })
+  const invalidatedScopeRetirements = new Map<
+    string,
+    {
+      userId: string
+      repoRoot: string
+      repoRuntimeId: string
+      scope: string
+      attempts: number
+      running: boolean
+      timer: ReturnType<typeof setTimeout> | null
+    }
+  >()
   const unsubscribeRepoRuntimeClosed = onRepoRuntimeClosed((event) => {
     const scope = terminalSessionRuntimeScope(event.repoRoot, event.repoRuntimeId)
-    void manager
-      .closeSessionsForRepo(event.userId, scope)
-      .then(async (retirement) => {
-        if (retirement.failures.length > 0) throw new Error('terminal session close failed')
-        manager.releaseProjectionRevisionForScope(event.userId, scope)
-        await workspaceTabsCoordinator.closeInvalidatedScope({ userId: event.userId, scope })
-        broadcastRepoSessionsChanged(event.userId, event.repoRoot)
-        broadcastRepoWorkspaceTabsChanged(event.userId, event.repoRoot)
-      })
-      .catch((err) => {
-        terminalRuntimeLogger.warn(
-          { userId: event.userId, repoRoot: event.repoRoot, repoRuntimeId: event.repoRuntimeId, err },
-          'failed to close workspace tabs after repo runtime close',
-        )
-      })
+    const invalidation = manager.commitRepoRuntimeSessionInvalidation(event.userId, scope)
+    manager.releaseProjectionRevisionForScope(event.userId, scope)
+    scheduleInvalidatedScopeRetirement({ ...event, scope })
+    invalidation.publishEffects()
+    try {
+      broadcastRepoSessionsChanged(event.userId, event.repoRoot)
+    } catch (error) {
+      terminalRuntimeLogger.warn(
+        { userId: event.userId, repoRoot: event.repoRoot, repoRuntimeId: event.repoRuntimeId, err: error },
+        'failed to publish invalidated repo runtime sessions',
+      )
+    }
   })
+
+  function scheduleInvalidatedScopeRetirement(input: {
+    userId: string
+    repoRoot: string
+    repoRuntimeId: string
+    scope: string
+  }): void {
+    if (shuttingDown) return
+    const key = JSON.stringify([input.userId, input.scope])
+    if (invalidatedScopeRetirements.has(key)) return
+    const retirement = { ...input, attempts: 0, running: false, timer: null }
+    invalidatedScopeRetirements.set(key, retirement)
+    queueMicrotask(() => void runInvalidatedScopeRetirement(key, retirement))
+  }
+
+  async function runInvalidatedScopeRetirement(
+    key: string,
+    retirement: {
+      userId: string
+      repoRoot: string
+      repoRuntimeId: string
+      scope: string
+      attempts: number
+      running: boolean
+      timer: ReturnType<typeof setTimeout> | null
+    },
+  ): Promise<void> {
+    if (shuttingDown) {
+      invalidatedScopeRetirements.delete(key)
+      return
+    }
+    if (invalidatedScopeRetirements.get(key) !== retirement || retirement.running) return
+    retirement.running = true
+    retirement.timer = null
+    try {
+      await workspaceTabsCoordinator.closeInvalidatedScope({ userId: retirement.userId, scope: retirement.scope })
+      if (invalidatedScopeRetirements.get(key) !== retirement) return
+      invalidatedScopeRetirements.delete(key)
+      try {
+        broadcastRepoWorkspaceTabsChanged(retirement.userId, retirement.repoRoot)
+      } catch (error) {
+        terminalRuntimeLogger.warn(
+          {
+            userId: retirement.userId,
+            repoRoot: retirement.repoRoot,
+            repoRuntimeId: retirement.repoRuntimeId,
+            err: error,
+          },
+          'failed to publish retired repo runtime workspace tabs',
+        )
+      }
+    } catch (error) {
+      retirement.attempts += 1
+      terminalRuntimeLogger.warn(
+        {
+          userId: retirement.userId,
+          repoRoot: retirement.repoRoot,
+          repoRuntimeId: retirement.repoRuntimeId,
+          attempt: retirement.attempts,
+          err: error,
+        },
+        'failed to retire invalidated repo runtime workspace tabs; retrying',
+      )
+      if (invalidatedScopeRetirements.get(key) !== retirement) return
+      if (shuttingDown) {
+        invalidatedScopeRetirements.delete(key)
+        return
+      }
+      const delay = Math.min(
+        INVALIDATED_SCOPE_RETIREMENT_RETRY_BASE_MS * 2 ** Math.min(retirement.attempts - 1, 6),
+        INVALIDATED_SCOPE_RETIREMENT_RETRY_MAX_MS,
+      )
+      retirement.timer = setTimeout(() => {
+        retirement.timer = null
+        void runInvalidatedScopeRetirement(key, retirement)
+      }, delay)
+      retirement.timer.unref?.()
+    } finally {
+      retirement.running = false
+    }
+  }
 
   let shuttingDown = false
   const actions = createTerminalRuntimeActions({
@@ -364,6 +456,10 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       if (shuttingDown) return
       shuttingDown = true
       unsubscribeRepoRuntimeClosed()
+      for (const retirement of invalidatedScopeRetirements.values()) {
+        if (retirement.timer) clearTimeout(retirement.timer)
+      }
+      invalidatedScopeRetirements.clear()
       physicalWorktrees.dispose()
       coordinator.shutdown()
       manager.forceShutdown()
@@ -382,17 +478,38 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   terminalRuntimeLogger.info({ ptyMode: ptySupervisor.getDiagnostics().mode }, 'server terminal runtime created')
 
   const workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost = {
-    async removeGitScopedResources({ userId, workspaceId, workspaceRuntimeId, assertCurrent }) {
+    async commitGitCapabilityRemoval({ userId, workspaceId, workspaceRuntimeId, assertCurrent }) {
       const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
-      // The probe transition is staged before this hook runs, so this cleanup
-      // is already ordered before a concurrent close/reopen. Admission is a
-      // single fast-fail check; the durable write must never be compensated.
-      assertCurrent()
-      await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, workspaceId)
-      await workspaceTabsCoordinator.closeInvalidatedScope({ userId, scope })
-      manager.forceCloseGitScopedSessionsForRepo(userId, scope)
-      broadcastRepoSessionsChanged(userId, workspaceId)
-      broadcastRepoWorkspaceTabsChanged(userId, workspaceId)
+      let durableLayoutChanged: boolean
+      try {
+        assertCurrent()
+        durableLayoutChanged = await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, workspaceId)
+      } catch (error) {
+        return { kind: 'failed-before-commit', error }
+      }
+
+      // The accepted durable CAS is the capability-removal commit point.
+      // Register overlay retirement before detaching terminal authority; the
+      // queued effect cannot run until this synchronous commit returns.
+      scheduleInvalidatedScopeRetirement({
+        userId,
+        repoRoot: workspaceId,
+        repoRuntimeId: workspaceRuntimeId,
+        scope,
+      })
+      const terminalInvalidation = manager.commitGitSessionInvalidation(userId, scope)
+      terminalInvalidation.publishEffects()
+      if (durableLayoutChanged || terminalInvalidation.removedCount > 0) {
+        try {
+          broadcastRepoSessionsChanged(userId, workspaceId)
+        } catch (error) {
+          terminalRuntimeLogger.warn(
+            { userId, workspaceId, workspaceRuntimeId, err: error },
+            'failed to publish committed terminal invalidation',
+          )
+        }
+      }
+      return { kind: 'committed' }
     },
   }
 
@@ -450,19 +567,19 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 async function clearWorkspacePaneDurableLayout(
   repository: WorkspacePaneLayoutRepository,
   workspaceId: string,
-): Promise<void> {
+): Promise<boolean> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const current = await repository.load(workspaceId)
     const replacement = {
       entries: current.layout.entries.filter((entry) => entry.target.kind === 'workspace-root'),
     }
-    if (workspacePaneDurableLayoutsEqual(workspaceId, current.layout, replacement)) return
+    if (workspacePaneDurableLayoutsEqual(workspaceId, current.layout, replacement)) return false
     const outcome = await repository.compareAndSwap({
       repoRoot: workspaceId,
       expected: current.layout,
       replacement,
     })
-    if (outcome.kind === 'accepted') return
+    if (outcome.kind === 'accepted') return outcome.changed
     if (outcome.kind === 'write-failure') throw outcome.error
   }
   throw new Error('workspace pane layout cleanup was superseded')

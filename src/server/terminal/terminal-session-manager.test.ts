@@ -706,13 +706,92 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const manager = createManager(supervisor, { onSessionClosed })
     const created = await createSession(manager, supervisor)
 
-    await manager.closeSessionsForRepo(USER_ID, SCOPE)
+    manager.commitRepoRuntimeSessionInvalidation(USER_ID, SCOPE).publishEffects()
 
     expect(onSessionClosed).toHaveBeenCalledWith(
       USER_ID,
       expect.objectContaining({ terminalRuntimeSessionId: created.terminalRuntimeSessionId }),
       'scope',
     )
+  })
+
+  test('invalidates a repo runtime session before failed PTY cleanup settles', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onSessionClosed = vi.fn()
+    const manager = createManager(supervisor, { onSessionClosed })
+    const created = await createSession(manager, supervisor)
+    supervisor.killAndWait = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('worker unavailable'))
+      .mockRejectedValueOnce(new Error('worker unavailable'))
+      .mockResolvedValue(undefined)
+
+    const invalidation = manager.commitRepoRuntimeSessionInvalidation(USER_ID, SCOPE)
+
+    expect(invalidation.removedSessions).toEqual([
+      expect.objectContaining({ terminalRuntimeSessionId: created.terminalRuntimeSessionId }),
+    ])
+    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
+    expect(onSessionClosed).not.toHaveBeenCalled()
+
+    invalidation.publishEffects()
+    invalidation.publishEffects()
+
+    expect(onSessionClosed).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({ terminalRuntimeSessionId: created.terminalRuntimeSessionId }),
+      'scope',
+    )
+    await vi.waitFor(() => expect(supervisor.killAndWait).toHaveBeenCalledTimes(3))
+  })
+
+  test('keeps a committed invalidation when publication effects fail', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const manager = createManager(supervisor, {
+      onSessionClosed: vi.fn(() => {
+        throw new Error('publication failed')
+      }),
+    })
+    await createSession(manager, supervisor)
+
+    const invalidation = manager.commitRepoRuntimeSessionInvalidation(USER_ID, SCOPE)
+
+    expect(() => invalidation.publishEffects()).not.toThrow()
+    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
+  })
+
+  test('detaches every session even when summary process metadata throws', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const manager = createManager(supervisor)
+    await createSession(manager, supervisor)
+    await createSession(manager, supervisor)
+    supervisor.processName = vi.fn(() => {
+      throw new Error('process disappeared')
+    })
+
+    const invalidation = manager.commitRepoRuntimeSessionInvalidation(USER_ID, SCOPE)
+
+    expect(invalidation.removedSessions).toEqual([])
+    invalidation.publishEffects()
+    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
+  })
+
+  test('does not reschedule an invalidated PTY retirement after shutdown', async () => {
+    vi.useFakeTimers()
+    const supervisor = createDeferredPtySupervisor()
+    const manager = createManager(supervisor)
+    await createSession(manager, supervisor)
+    supervisor.killAndWait = vi.fn(async () => {
+      throw new Error('worker unavailable')
+    })
+
+    const invalidation = manager.commitRepoRuntimeSessionInvalidation(USER_ID, SCOPE)
+    invalidation.publishEffects()
+    manager.forceShutdown()
+    await vi.runOnlyPendingTimersAsync()
+
+    expect(supervisor.killAndWait).toHaveBeenCalledOnce()
+    vi.useRealTimers()
   })
 
   test('reports detached-user close reason for detached TTL cleanup', async () => {

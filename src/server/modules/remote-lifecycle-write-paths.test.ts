@@ -292,4 +292,32 @@ describe('remote lifecycle write path', () => {
     expect(mocks.resolveConnection).not.toHaveBeenCalled()
     expect(mocks.publishInvalidation).not.toHaveBeenCalled()
   })
+
+  test('does not publish a settled lifecycle after its runtime epoch closes', async () => {
+    const repoRuntimeId = acquireRepoRuntime(userId, repoId, 'client-test')
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.test',
+      user: 'developer',
+      port: 22,
+      remotePath: '/repo',
+    })!
+    mocks.resolveConnection.mockResolvedValue({
+      kind: 'ready',
+      repoId,
+      name: 'repo',
+      lifecycle: { kind: 'ready', target },
+      gitAvailable: true,
+    })
+    mocks.publishInvalidation
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {
+        releaseRepoRuntime(userId, repoId, repoRuntimeId, 'client-test')
+      })
+
+    await expect(runRemoteLifecycleWrite({ userId, repoId, repoRuntimeId, mode: 'restart' })).resolves.toEqual({
+      kind: 'stale-runtime',
+      repoId,
+    })
+  })
 })

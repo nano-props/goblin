@@ -19,7 +19,9 @@ const mocks = vi.hoisted(() => ({
   workspaceProbes: new Map<string, unknown>(),
 }))
 
-const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = { removeGitScopedResources: vi.fn() }
+const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
+  commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
+}
 
 vi.mock('#/server/modules/repo-runtimes.ts', () => ({
   acquireRepoRuntimeLease: mocks.acquireRepoRuntimeLease,
@@ -351,13 +353,13 @@ describe('restoreServerWorkspace — active-only restore', () => {
       projection: null,
       workspaceProbe: { capabilities: { git: { status: 'unavailable' } } },
     })
-    expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.removeGitScopedResources).toHaveBeenCalledWith({
+    expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).toHaveBeenCalledWith({
       userId: 'user-test',
       workspaceId: 'goblin+file:///repo-stub/src',
       workspaceRuntimeId: 'runtime-goblin_file____repo_stub_src',
       assertCurrent: expect.any(Function),
     })
-    expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.removeGitScopedResources).toHaveBeenCalledOnce()
+    expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).toHaveBeenCalledOnce()
     expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
   })
 
@@ -476,7 +478,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
 
     expect(result.runtime.repos[0]).toMatchObject({ projection: null, workspaceProbe: { status: 'ready' } })
     expect(mocks.readRepoProjection).not.toHaveBeenCalled()
-    expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.removeGitScopedResources).not.toHaveBeenCalled()
+    expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
       workspaceId: repoRoot,
       workspaceRuntimeId: 'runtime-goblin_file____repo',

@@ -34,7 +34,10 @@ import { compareAndReplaceServerWorkspaceRepos, getServerWorkspaceState } from '
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
 import { projectWorkspacePaneTabsWithMembershipGuard } from '#/server/modules/workspace-pane-tabs-restore.ts'
-import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
+import {
+  commitGitCapabilityRemovalOrThrow,
+  type WorkspaceCapabilityTransitionHost,
+} from '#/server/workspace-capability-transition-host.ts'
 import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
 
 export interface RestoreServerWorkspaceInput {
@@ -223,7 +226,7 @@ async function openWorkspaceRepo(
         probe: async () => await probeWorkspace(entry.id, serverLocatorPlatform(), { signal: input.signal }),
         beforeCommit: async ({ before, after }) => {
           if (!workspaceGitCleanupRequired(before, after)) return
-          await removeGitScopedResources(input, entry.id, lease.repoRuntimeId)
+          await commitGitCapabilityRemoval(input, entry.id, lease.repoRuntimeId)
         },
       })
     }
@@ -376,17 +379,17 @@ function remoteCapabilityTransitionOptions(
       after: WorkspaceSettledProbeState
     }) => {
       if (!workspaceGitCleanupRequired(before, after)) return
-      await removeGitScopedResources(input, workspaceId, workspaceRuntimeId)
+      await commitGitCapabilityRemoval(input, workspaceId, workspaceRuntimeId)
     },
   }
 }
 
-async function removeGitScopedResources(
+async function commitGitCapabilityRemoval(
   input: RestoreServerWorkspaceInput,
   workspaceId: string,
   workspaceRuntimeId: string,
 ): Promise<void> {
-  await input.workspaceCapabilityTransitionHost.removeGitScopedResources({
+  await commitGitCapabilityRemovalOrThrow(input.workspaceCapabilityTransitionHost, {
     userId: input.userId,
     workspaceId,
     workspaceRuntimeId,

@@ -19,7 +19,9 @@ const mocks = vi.hoisted(() => ({
   workspaceProbes: new Map<string, unknown>(),
 }))
 
-const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = { removeGitScopedResources: vi.fn() }
+const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
+  commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
+}
 
 vi.mock('#/server/modules/repo-runtimes.ts', () => ({
   acquireRepoRuntimeLease: mocks.acquireRepoRuntimeLease,

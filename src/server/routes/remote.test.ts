@@ -21,7 +21,9 @@ describe('remote lifecycle route', () => {
     })
 
     const response = await createRemoteRoutes({
-      workspaceCapabilityTransitionHost: { removeGitScopedResources: vi.fn() },
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
+      },
     }).request(
       new Request('http://localhost/lifecycle', {
         method: 'POST',
@@ -47,7 +49,7 @@ describe('remote lifecycle route', () => {
   })
 
   test('injects Git downgrade cleanup into the serialized capability transition', async () => {
-    const removeGitScopedResources = vi.fn(async () => undefined)
+    const commitGitCapabilityRemoval = vi.fn(async () => ({ kind: 'committed' as const }))
     mocks.runLifecycleWrite.mockImplementation(async (_input, options) => {
       await options.beforeCapabilityCommit({
         before: {
@@ -75,7 +77,7 @@ describe('remote lifecycle route', () => {
     })
 
     const response = await createRemoteRoutes({
-      workspaceCapabilityTransitionHost: { removeGitScopedResources },
+      workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval },
     }).request(
       new Request('http://localhost/lifecycle', {
         method: 'POST',
@@ -85,7 +87,7 @@ describe('remote lifecycle route', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(removeGitScopedResources).toHaveBeenCalledWith(
+    expect(commitGitCapabilityRemoval).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'user-test',
         workspaceId: 'goblin+ssh://example/repo',
@@ -96,7 +98,9 @@ describe('remote lifecycle route', () => {
 
   test('returns validation errors before invoking the write path', async () => {
     const response = await createRemoteRoutes({
-      workspaceCapabilityTransitionHost: { removeGitScopedResources: vi.fn() },
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
+      },
     }).request(
       new Request('http://localhost/lifecycle', {
         method: 'POST',

@@ -16,7 +16,10 @@ import {
 import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { probeWorkspace } from '#/server/modules/workspace-probe.ts'
-import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
+import {
+  commitGitCapabilityRemovalOrThrow,
+  type WorkspaceCapabilityTransitionHost,
+} from '#/server/workspace-capability-transition-host.ts'
 import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 
@@ -67,7 +70,7 @@ async function projectWorkspaceRepo(
         {
           beforeCapabilityCommit: async ({ before, after }) => {
             if (!workspaceGitCleanupRequired(before, after)) return
-            await input.workspaceCapabilityTransitionHost.removeGitScopedResources({
+            await commitGitCapabilityRemovalOrThrow(input.workspaceCapabilityTransitionHost, {
               userId: input.userId,
               workspaceId: entry.id,
               workspaceRuntimeId: input.repoRuntimeId,
@@ -127,7 +130,7 @@ async function projectWorkspaceRepo(
         }),
       beforeCommit: async ({ before, after }) => {
         if (!workspaceGitCleanupRequired(before, after)) return
-        await input.workspaceCapabilityTransitionHost.removeGitScopedResources({
+        await commitGitCapabilityRemovalOrThrow(input.workspaceCapabilityTransitionHost, {
           userId: input.userId,
           workspaceId: entry.id,
           workspaceRuntimeId: input.repoRuntimeId,

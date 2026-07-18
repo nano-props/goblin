@@ -47,8 +47,12 @@ import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-remo
 import { TerminalDirectory } from '#/server/terminal/terminal-directory.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { TerminalSessionAdmission } from '#/server/terminal/terminal-session-ensurer.ts'
+import { serverLogger } from '#/server/logger.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
+const INVALIDATED_SESSION_RETIREMENT_RETRY_BASE_MS = 100
+const INVALIDATED_SESSION_RETIREMENT_RETRY_MAX_MS = 5_000
+const terminalSessionManagerLogger = serverLogger.child({ module: 'terminal-session-manager' })
 
 export type TerminalSessionCloseReason = 'session' | 'scope' | 'detached-user' | 'shutdown'
 
@@ -133,9 +137,25 @@ export interface TerminalBatchRetirementResult {
   failures: Array<{ terminalRuntimeSessionId: string; message: string }>
 }
 
+export interface TerminalSessionInvalidationCommit {
+  removedSessions: readonly TerminalSessionSummary[]
+  removedCount: number
+  publishEffects(): void
+}
+
 export class TerminalSessionManager<TUser extends string | number> {
   private readonly directory = new TerminalDirectory<TUser, TerminalSessionView<TUser>>()
   private readonly closeOperationsByTerminalRuntimeSessionId = new Map<string, Promise<boolean>>()
+  private readonly invalidatedSessionRetirements = new Map<
+    string,
+    {
+      session: TerminalSessionView<TUser>
+      attempts: number
+      running: boolean
+      timer: ReturnType<typeof setTimeout> | null
+    }
+  >()
+  private shuttingDown = false
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
   private readonly isClientOnline: (userId: TUser, clientId: string) => boolean
@@ -491,9 +511,28 @@ export class TerminalSessionManager<TUser extends string | number> {
   private detachSession(session: TerminalSessionView<TUser>): TerminalSessionSummary {
     session.ptyBinding.invalidateOwnership()
     if (markTerminalSessionClosed(session)) this.emitLifecycle(session)
-    const closedSession = this.sessionSummary(session)
+    const summary = this.sessionSummary(session)
     this.directory.remove(session)
-    return closedSession
+    return summary
+  }
+
+  private detachSessionAuthority(session: TerminalSessionView<TUser>): {
+    summary: TerminalSessionSummary | null
+    lifecycleChanged: boolean
+  } {
+    session.ptyBinding.invalidateOwnership()
+    const lifecycleChanged = markTerminalSessionClosed(session)
+    this.directory.remove(session)
+    let summary: TerminalSessionSummary | null = null
+    try {
+      summary = this.sessionSummary(session)
+    } catch (error) {
+      terminalSessionManagerLogger.warn(
+        { terminalRuntimeSessionId: session.id, err: error },
+        'failed to stage invalidated terminal session summary',
+      )
+    }
+    return { summary, lifecycleChanged }
   }
 
   async closeSessionsForUser(userId: TUser): Promise<TerminalBatchRetirementResult> {
@@ -501,28 +540,126 @@ export class TerminalSessionManager<TUser extends string | number> {
     return await this.retireSessions(sessions, 'detached-user')
   }
 
-  async closeSessionsForRepo(userId: TUser, scope: string): Promise<TerminalBatchRetirementResult> {
-    const sessions = Array.from(this.directory.entries()).filter(
-      (session) => session.userId === userId && session.scope === scope,
-    )
-    return await this.retireSessions(sessions, 'scope')
+  commitRepoRuntimeSessionInvalidation(userId: TUser, scope: string): TerminalSessionInvalidationCommit {
+    return this.commitSessionInvalidation(userId, scope, () => true)
   }
 
-  forceCloseGitScopedSessionsForRepo(userId: TUser, scope: string): TerminalSessionSummary[] {
-    const removed: TerminalSessionSummary[] = []
+  commitGitSessionInvalidation(userId: TUser, scope: string): TerminalSessionInvalidationCommit {
+    return this.commitSessionInvalidation(userId, scope, (session) => session.target.kind !== 'workspace-root')
+  }
+
+  private commitSessionInvalidation(
+    userId: TUser,
+    scope: string,
+    matches: (session: TerminalSessionView<TUser>) => boolean,
+  ): TerminalSessionInvalidationCommit {
+    const removed: Array<{
+      session: TerminalSessionView<TUser>
+      summary: TerminalSessionSummary | null
+      lifecycleChanged: boolean
+    }> = []
     for (const session of Array.from(this.directory.entries())) {
-      if (session.userId !== userId || session.scope !== scope || session.target.kind === 'workspace-root') continue
-      const summary = this.detachSession(session)
-      removed.push(summary)
+      if (session.userId !== userId || session.scope !== scope || !matches(session)) continue
+      const detached = this.detachSessionAuthority(session)
+      removed.push({ session, ...detached })
+    }
+    let effectsPublished = false
+    return {
+      removedSessions: removed.flatMap((entry) => (entry.summary ? [entry.summary] : [])),
+      removedCount: removed.length,
+      publishEffects: () => {
+        if (effectsPublished) return
+        effectsPublished = true
+        for (const { session, summary, lifecycleChanged } of removed) {
+          if (lifecycleChanged) {
+            try {
+              this.emitLifecycle(session)
+            } catch (error) {
+              terminalSessionManagerLogger.warn(
+                { terminalRuntimeSessionId: session.id, err: error },
+                'failed to publish invalidated terminal lifecycle',
+              )
+            }
+          }
+          if (summary) {
+            try {
+              this.sink.onSessionClosed?.(session.userId, summary, 'scope')
+            } catch (error) {
+              terminalSessionManagerLogger.warn(
+                { terminalRuntimeSessionId: session.id, err: error },
+                'failed to publish invalidated terminal close',
+              )
+            }
+          } else {
+            terminalSessionManagerLogger.warn(
+              { terminalRuntimeSessionId: session.id },
+              'skipped invalidated terminal close without staged summary',
+            )
+          }
+          this.scheduleInvalidatedSessionResourceRetirement(session)
+        }
+      },
+    }
+  }
+
+  private scheduleInvalidatedSessionResourceRetirement(session: TerminalSessionView<TUser>): void {
+    if (this.shuttingDown) {
       try {
         session.ptyBinding.dispose(session)
-      } catch {
-        // The session is already retired from authoritative state. Disposal is
-        // best-effort process cleanup and cannot roll the capability transition back.
+      } catch (error) {
+        terminalSessionManagerLogger.warn(
+          { terminalRuntimeSessionId: session.id, err: error },
+          'failed to dispose invalidated terminal after shutdown',
+        )
       }
-      this.sink.onSessionClosed?.(session.userId, summary, 'scope')
+      return
     }
-    return removed
+    if (this.invalidatedSessionRetirements.has(session.id)) return
+    const retirement = { session, attempts: 0, running: false, timer: null }
+    this.invalidatedSessionRetirements.set(session.id, retirement)
+    void this.runInvalidatedSessionResourceRetirement(session.id, retirement)
+  }
+
+  private async runInvalidatedSessionResourceRetirement(
+    terminalRuntimeSessionId: string,
+    retirement: {
+      session: TerminalSessionView<TUser>
+      attempts: number
+      running: boolean
+      timer: ReturnType<typeof setTimeout> | null
+    },
+  ): Promise<void> {
+    if (this.invalidatedSessionRetirements.get(terminalRuntimeSessionId) !== retirement || retirement.running) return
+    retirement.running = true
+    retirement.timer = null
+    try {
+      await retirement.session.ptyBinding.disposeAndWait(retirement.session)
+      if (this.invalidatedSessionRetirements.get(terminalRuntimeSessionId) === retirement) {
+        this.invalidatedSessionRetirements.delete(terminalRuntimeSessionId)
+      }
+    } catch (error) {
+      retirement.attempts += 1
+      terminalSessionManagerLogger.warn(
+        { terminalRuntimeSessionId, attempt: retirement.attempts, err: error },
+        'failed to retire invalidated terminal session resources; retrying',
+      )
+      if (this.invalidatedSessionRetirements.get(terminalRuntimeSessionId) !== retirement) return
+      if (this.shuttingDown) {
+        this.invalidatedSessionRetirements.delete(terminalRuntimeSessionId)
+        return
+      }
+      const delay = Math.min(
+        INVALIDATED_SESSION_RETIREMENT_RETRY_BASE_MS * 2 ** Math.min(retirement.attempts - 1, 6),
+        INVALIDATED_SESSION_RETIREMENT_RETRY_MAX_MS,
+      )
+      retirement.timer = setTimeout(() => {
+        retirement.timer = null
+        void this.runInvalidatedSessionResourceRetirement(terminalRuntimeSessionId, retirement)
+      }, delay)
+      retirement.timer.unref?.()
+    } finally {
+      retirement.running = false
+    }
   }
 
   private async retireSessions(
@@ -592,10 +729,64 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 
   forceShutdown(): void {
+    this.shuttingDown = true
+    for (const retirement of this.invalidatedSessionRetirements.values()) {
+      if (retirement.timer) clearTimeout(retirement.timer)
+    }
+    const invalidatedRetirements = Array.from(this.invalidatedSessionRetirements.values())
+    this.invalidatedSessionRetirements.clear()
+    for (const retirement of invalidatedRetirements) {
+      try {
+        retirement.session.ptyBinding.dispose(retirement.session)
+      } catch (error) {
+        terminalSessionManagerLogger.warn(
+          { terminalRuntimeSessionId: retirement.session.id, err: error },
+          'failed to dispose invalidated terminal during shutdown',
+        )
+      }
+    }
     for (const session of Array.from(this.directory.entries())) {
-      const closedSession = this.detachSession(session)
-      session.ptyBinding.dispose(session)
-      this.sink.onSessionClosed?.(session.userId, closedSession, 'shutdown')
+      try {
+        const detached = this.detachSessionAuthority(session)
+        if (detached.lifecycleChanged) {
+          try {
+            this.emitLifecycle(session)
+          } catch (error) {
+            terminalSessionManagerLogger.warn(
+              { terminalRuntimeSessionId: session.id, err: error },
+              'failed to publish terminal shutdown lifecycle',
+            )
+          }
+        }
+        try {
+          session.ptyBinding.dispose(session)
+        } catch (error) {
+          terminalSessionManagerLogger.warn(
+            { terminalRuntimeSessionId: session.id, err: error },
+            'failed to dispose terminal during shutdown',
+          )
+        }
+        if (detached.summary) {
+          try {
+            this.sink.onSessionClosed?.(session.userId, detached.summary, 'shutdown')
+          } catch (error) {
+            terminalSessionManagerLogger.warn(
+              { terminalRuntimeSessionId: session.id, err: error },
+              'failed to publish terminal shutdown',
+            )
+          }
+        } else {
+          terminalSessionManagerLogger.warn(
+            { terminalRuntimeSessionId: session.id },
+            'skipped terminal shutdown without staged summary',
+          )
+        }
+      } catch (error) {
+        terminalSessionManagerLogger.warn(
+          { terminalRuntimeSessionId: session.id, err: error },
+          'failed to retire terminal',
+        )
+      }
     }
   }
 

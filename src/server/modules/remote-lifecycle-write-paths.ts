@@ -49,7 +49,7 @@ export async function runRemoteLifecycleWrite(
   if (result.lifecycle.kind === 'failed') {
     const current = workspaceProbeStateForRuntime(userId, repoId, repoRuntimeId)
     if (current?.status === 'probing') {
-      commitOrReadInitialWorkspaceProbeState({
+      const committed = commitOrReadInitialWorkspaceProbeState({
         userId,
         repoRoot: repoId,
         repoRuntimeId,
@@ -61,6 +61,7 @@ export async function runRemoteLifecycleWrite(
               : 'error.workspace-transport-unavailable',
         },
       })
+      if (!committed) return { kind: 'stale-runtime', repoId }
     }
   }
   const gitCapability = observed.gitCapability
@@ -79,15 +80,16 @@ export async function runRemoteLifecycleWrite(
     }
     const current = workspaceProbeStateForRuntime(userId, repoId, repoRuntimeId)
     if (current?.status === 'probing') {
-      await runSerializedInitialWorkspaceProbe({
+      const committed = await runSerializedInitialWorkspaceProbe({
         userId,
         repoRoot: repoId,
         repoRuntimeId,
         probe: async () => probe,
         beforeCommit: options.beforeCapabilityCommit,
       })
+      if (!committed) return { kind: 'stale-runtime', repoId }
     } else {
-      await runSerializedWorkspaceRefresh({
+      const committed = await runSerializedWorkspaceRefresh({
         userId,
         repoRoot: repoId,
         repoRuntimeId,
@@ -99,7 +101,9 @@ export async function runRemoteLifecycleWrite(
           await options.beforeCapabilityCommit?.(transition)
         },
       })
+      if (committed.kind === 'stale-runtime') return { kind: 'stale-runtime', repoId }
     }
   }
+  if (!workspaceProbeStateForRuntime(userId, repoId, repoRuntimeId)) return { kind: 'stale-runtime', repoId }
   return { kind: 'settled', repoId, name: result.name, lifecycle: result.lifecycle }
 }

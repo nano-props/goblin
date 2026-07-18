@@ -50,7 +50,9 @@ function makeWorkspacePaneTabsHost(): ServerWorkspacePaneTabsHost {
   }
 }
 
-const workspaceCapabilityTransitionHost = { removeGitScopedResources: vi.fn() }
+const workspaceCapabilityTransitionHost = {
+  commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
+}
 
 describe('server runtime', () => {
   beforeEach(() => {

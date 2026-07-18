@@ -65,7 +65,9 @@ const workspacePaneTabsHostStub = {
   updateTabs: vi.fn(),
 } satisfies ServerWorkspacePaneTabsHost
 
-const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = { removeGitScopedResources: vi.fn() }
+const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
+  commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
+}
 
 function settingsRouteOptions() {
   return {

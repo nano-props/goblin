@@ -1308,12 +1308,14 @@ describe('server terminal runtime', () => {
       ],
     }
 
-    await workspaceCapabilityTransitionHost.removeGitScopedResources({
-      userId: USER_1,
-      workspaceId: REPO_ROOT,
-      workspaceRuntimeId: REPO_RUNTIME_ID,
-      assertCurrent: () => {},
-    })
+    await expect(
+      workspaceCapabilityTransitionHost.commitGitCapabilityRemoval({
+        userId: USER_1,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: REPO_RUNTIME_ID,
+        assertCurrent: () => {},
+      }),
+    ).resolves.toEqual({ kind: 'committed' })
 
     await expect(
       host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
@@ -1344,14 +1346,14 @@ describe('server terminal runtime', () => {
     }
     testWorkspacePaneLayoutWriteError = new Error('layout write failed')
 
-    await expect(
-      workspaceCapabilityTransitionHost.removeGitScopedResources({
-        userId: USER_1,
-        workspaceId: REPO_ROOT,
-        workspaceRuntimeId: REPO_RUNTIME_ID,
-        assertCurrent: () => {},
-      }),
-    ).rejects.toThrow('layout write failed')
+    const result = await workspaceCapabilityTransitionHost.commitGitCapabilityRemoval({
+      userId: USER_1,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: REPO_RUNTIME_ID,
+      assertCurrent: () => {},
+    })
+
+    expect(result).toEqual({ kind: 'failed-before-commit', error: testWorkspacePaneLayoutWriteError })
 
     await expect(
       host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
@@ -1371,7 +1373,7 @@ describe('server terminal runtime', () => {
       ],
     }
     let checks = 0
-    await workspaceCapabilityTransitionHost.removeGitScopedResources({
+    await workspaceCapabilityTransitionHost.commitGitCapabilityRemoval({
       userId: USER_1,
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: REPO_RUNTIME_ID,
@@ -1384,6 +1386,61 @@ describe('server terminal runtime', () => {
     expect(checks).toBe(1)
     expect(testWorkspacePaneLayout).toEqual({ entries: [] })
     shutdown()
+  })
+
+  test('Git capability removal commit is idempotent', async () => {
+    const { host, workspaceCapabilityTransitionHost, shutdown } = buildRuntime()
+    const created = await createAdmittedTerminal(host, 'client_a', USER_1, {
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'primary',
+      cols: 80,
+      rows: 24,
+    })
+    expect(created.ok).toBe(true)
+    testWorkspacePaneLayout = {
+      entries: [
+        {
+          target: { kind: 'git-worktree', root: LINKED_REPO_ROOT },
+          tabs: [workspacePaneStaticTabEntry('files')],
+        },
+      ],
+    }
+    const input = {
+      userId: USER_1,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: REPO_RUNTIME_ID,
+      assertCurrent: () => {},
+    }
+
+    await expect(workspaceCapabilityTransitionHost.commitGitCapabilityRemoval(input)).resolves.toEqual({
+      kind: 'committed',
+    })
+    await expect(workspaceCapabilityTransitionHost.commitGitCapabilityRemoval(input)).resolves.toEqual({
+      kind: 'committed',
+    })
+
+    await expect(
+      host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
+    ).resolves.toEqual([])
+    expect(testWorkspacePaneLayout).toEqual({ entries: [] })
+    shutdown()
+  })
+
+  test('does not schedule deferred capability effects after runtime shutdown', async () => {
+    const { workspaceCapabilityTransitionHost, shutdown } = buildRuntime()
+    const pending = workspaceCapabilityTransitionHost.commitGitCapabilityRemoval({
+      userId: USER_1,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: REPO_RUNTIME_ID,
+      assertCurrent: () => {},
+    })
+
+    shutdown()
+    await expect(pending).resolves.toEqual({ kind: 'committed' })
+    await Promise.resolve()
   })
 
   test('serializes concurrent primary creates for the same worktree', async () => {
