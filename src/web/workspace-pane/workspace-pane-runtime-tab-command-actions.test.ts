@@ -5,7 +5,6 @@ import {
   terminalSessionCoordinates,
   type TerminalSessionBase,
 } from '#/shared/terminal-types.ts'
-import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
   runWorkspacePaneRuntimeNewAction,
@@ -15,12 +14,11 @@ import { createTerminalWithAdmissionForTest } from '#/web/test-utils/terminal-se
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
-  selectedWorkspacePaneTerminalBase,
   workspacePaneRuntimeTabCommandContext,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
+import { resolveWorkspacePaneTerminalExecutionTarget } from '#/web/workspace-pane/workspace-pane-terminal-execution-target.ts'
 import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   captureWorkspacePaneActiveTabIdentity,
   recordWorkspacePaneTabOpener,
@@ -46,20 +44,12 @@ describe('workspace pane runtime tab command actions', () => {
     resetReposStore()
   })
 
-  test('resolves the ordinary workspace root as the same terminal command target', () => {
+  test('resolves the ordinary workspace root while pane tabs are still pending', () => {
     const repo = seedRepoWithReadModelForTest({
       id: terminalCoordinates.repoRoot,
       repoRuntimeId: terminalCoordinates.repoRuntimeId,
       branches: [],
       currentBranchName: null,
-    })
-    setWorkspacePaneTabsForTargetQueryData({
-      kind: 'workspace-root',
-      repoRoot: repo.id,
-      repoRuntimeId: repo.repoRuntimeId,
-      branchName: null,
-      worktreePath: null,
-      tabs: [workspacePaneStaticTabEntry('files')],
     })
     useReposStore
       .getState()
@@ -68,7 +58,7 @@ describe('workspace pane runtime tab command actions', () => {
         'files',
       )
 
-    expect(selectedWorkspacePaneTerminalBase(repo.id, null, undefined)).toEqual({
+    expect(resolveWorkspacePaneTerminalExecutionTarget(repo.id, null)).toEqual({
       target: {
         kind: 'workspace-root',
         workspaceId: canonicalWorkspaceLocator(repo.id),
@@ -78,7 +68,7 @@ describe('workspace pane runtime tab command actions', () => {
     })
     expect(
       captureWorkspacePaneActiveTabIdentity(repo.id, repo.repoRuntimeId, null, { workspacePaneRoute: undefined }),
-    ).toBe('workspace-pane:files')
+    ).toBeNull()
     expect(
       recordWorkspacePaneTabOpener(
         repo.id,
@@ -93,6 +83,27 @@ describe('workspace pane runtime tab command actions', () => {
     )
   })
 
+  test('resolves a Git worktree execution target while pane tabs are still pending', () => {
+    const branchName = terminalPresentationBranch(terminalBase.presentation)
+    if (!branchName) throw new Error('expected Git worktree terminal fixture')
+    seedRepoWithReadModelForTest({
+      id: terminalCoordinates.repoRoot,
+      repoRuntimeId: terminalCoordinates.repoRuntimeId,
+      branches: [createRepoBranch(branchName, { worktree: { path: terminalExecutionPath(terminalBase.target) } })],
+      currentBranchName: branchName,
+    })
+
+    expect(resolveWorkspacePaneTerminalExecutionTarget(terminalCoordinates.repoRoot, branchName)).toEqual(terminalBase)
+    expect(
+      captureWorkspacePaneActiveTabIdentity(
+        terminalCoordinates.repoRoot,
+        terminalCoordinates.repoRuntimeId,
+        branchName,
+        { workspacePaneRoute: undefined },
+      ),
+    ).toBeNull()
+  })
+
   test('routes a committed create with its canonical admission branch', async () => {
     const branchName = terminalPresentationBranch(terminalBase.presentation)
     if (!branchName) throw new Error('expected Git worktree terminal fixture')
@@ -101,7 +112,6 @@ describe('workspace pane runtime tab command actions', () => {
       repoRuntimeId: terminalCoordinates.repoRuntimeId,
       branches: [createRepoBranch(branchName, { worktree: { path: terminalExecutionPath(terminalBase.target) } })],
       currentBranchName: branchName,
-      workspacePaneTabsByBranch: { [branchName]: [workspacePaneStaticTabEntry('status')] },
     })
     const showCreatedRuntimeTab = vi.fn(() => true)
     const context = workspacePaneRuntimeTabCommandContext({

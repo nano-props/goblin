@@ -1132,42 +1132,46 @@ describe('RepoWorkspaceToolbar', () => {
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes')
   })
 
-  test('T6.1: marks the new-terminal button busy while the initial session sync is in flight', async () => {
-    const { container: c } = renderToolbar({
+  test('opens a terminal while the initial session projection is still in flight', async () => {
+    const { container: c, mocks } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
       loading: true,
     })
 
     expect(c.querySelector('#workspace-status-tab')).not.toBeNull()
-    const busyNewButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
-    expect(busyNewButton).not.toBeNull()
-    expect(busyNewButton?.getAttribute('aria-label')).toBe('terminal.new')
-    expect(busyNewButton?.getAttribute('aria-busy')).toBe('true')
-    expect(busyNewButton?.disabled).toBe(true)
-    expect(busyNewButton?.querySelector('.animate-spin')).toBeNull()
+    const newButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
+    expect(newButton).not.toBeNull()
+    expect(newButton?.getAttribute('aria-label')).toBe('terminal.new')
+    expect(newButton?.getAttribute('aria-busy')).toBeNull()
+    expect(newButton?.disabled).toBe(false)
 
-    // Once the provider calls markProjectionReady() (which the real Provider
-    // does at the end of a successful terminal session reconcile), the
-    // busy state clears and the real button appears.
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repoRuntimeIdForTest())
+    act(() => {
+      newButton?.click()
+    })
     await flush()
-    expect(c.querySelector('button[aria-label="terminal.new"]')).not.toBeNull()
+    expect(mocks.createTerminal).toHaveBeenCalledOnce()
   })
 
-  test('keeps the new-terminal button busy when only a stale repo runtime is hydrated', () => {
+  test('opens a terminal for the current runtime when only a stale runtime projection is hydrated', async () => {
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, 'repo-runtime-old')
-    const { container: c } = renderToolbar({
+    const { container: c, mocks } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
       loading: true,
       repoRuntimeId: 'repo-runtime-new',
     })
 
-    const busyNewButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
-    expect(busyNewButton).not.toBeNull()
-    expect(busyNewButton?.getAttribute('aria-busy')).toBe('true')
-    expect(busyNewButton?.disabled).toBe(true)
+    const newButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
+    expect(newButton).not.toBeNull()
+    expect(newButton?.getAttribute('aria-busy')).toBeNull()
+    expect(newButton?.disabled).toBe(false)
+
+    act(() => {
+      newButton?.click()
+    })
+    await flush()
+    expect(mocks.createTerminal).toHaveBeenCalledOnce()
   })
 
   test('does not create another terminal while terminal creation is already pending', async () => {

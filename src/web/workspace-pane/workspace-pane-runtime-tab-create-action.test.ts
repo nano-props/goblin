@@ -53,9 +53,7 @@ afterEach(() => {
 describe('workspace pane runtime tab create action', () => {
   test('returns no terminal create action without a runtime target', () => {
     const action = workspacePaneRuntimeTabCreateAction('terminal', {
-      repoRoot: REPO_ROOT,
       runtimeTabStateByType: runtimeTabState(),
-      initialRuntimeProjectionHydrating: false,
       showCreatedRuntimeTab: vi.fn(),
       t: translate,
       terminal: {
@@ -73,9 +71,7 @@ describe('workspace pane runtime tab create action', () => {
     const showCreatedRuntimeTab = vi.fn(() => true)
     const captureOpenerIdentity = vi.fn(() => 'workspace-pane:status')
     const action = workspacePaneRuntimeTabCreateAction('terminal', {
-      repoRoot: REPO_ROOT,
       runtimeTabStateByType: runtimeTabState(),
-      initialRuntimeProjectionHydrating: false,
       showCreatedRuntimeTab,
       t: translate,
       terminal: { base: BASE, createTerminal, captureOpenerIdentity },
@@ -163,11 +159,9 @@ describe('workspace pane runtime tab create action', () => {
     expect(useReposStore.getState().repos[REPO_ROOT]?.repoRuntimeId).toBe('repo-runtime-replacement')
   })
 
-  test('marks the terminal create action busy while projection or create is pending', () => {
+  test('marks the terminal create action busy only while terminal creation is pending', () => {
     const pendingAction = workspacePaneRuntimeTabCreateAction('terminal', {
-      repoRoot: REPO_ROOT,
       runtimeTabStateByType: runtimeTabState({ createPending: true }),
-      initialRuntimeProjectionHydrating: false,
       showCreatedRuntimeTab: vi.fn(),
       t: translate,
       terminal: {
@@ -181,20 +175,6 @@ describe('workspace pane runtime tab create action', () => {
     pendingAction?.onCreate()
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
 
-    const hydratingAction = workspacePaneRuntimeTabCreateAction('terminal', {
-      repoRoot: REPO_ROOT,
-      runtimeTabStateByType: runtimeTabState(),
-      initialRuntimeProjectionHydrating: true,
-      showCreatedRuntimeTab: vi.fn(),
-      t: translate,
-      terminal: {
-        base: BASE,
-        createTerminal: vi.fn(async () => createAdmission()),
-        captureOpenerIdentity: vi.fn(() => null),
-      },
-    })
-    expect(hydratingAction?.busy).toBe(true)
-    expect(hydratingAction?.blocksTabInteraction).toBe(false)
   })
 })
 

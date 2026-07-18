@@ -37,9 +37,7 @@ export interface WorkspacePaneRuntimeTabCreateAction {
 }
 
 export interface WorkspacePaneRuntimeTabCreateActionContext {
-  repoRoot: string
   runtimeTabStateByType: WorkspacePaneRuntimeTabCreateStateByType
-  initialRuntimeProjectionHydrating: boolean
   showCreatedRuntimeTab: (
     type: WorkspacePaneRuntimeTabType,
     sessionId: string,
@@ -233,7 +231,7 @@ function terminalRuntimeTabCreateAction(
   if (!terminal || !base) return null
   return {
     label: context.t('terminal.new'),
-    busy: context.initialRuntimeProjectionHydrating || context.runtimeTabStateByType.terminal.createPending,
+    busy: context.runtimeTabStateByType.terminal.createPending,
     blocksTabInteraction: context.runtimeTabStateByType.terminal.createPending,
     onCreate: () => {
       if (context.runtimeTabStateByType.terminal.createPending) return

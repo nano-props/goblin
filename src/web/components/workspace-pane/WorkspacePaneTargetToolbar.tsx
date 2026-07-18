@@ -11,7 +11,6 @@ import {
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { WorkspacePaneToolbar } from '#/web/components/workspace-pane/WorkspacePaneToolbar.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
-import { useIsInitialTerminalProjectionHydrating } from '#/web/stores/terminal-projection-hydration.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-action-context.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
@@ -57,7 +56,6 @@ export function WorkspacePaneTargetToolbar({
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
   const branchName = target.kind === 'workspace-root' ? null : target.branchName
-  const worktreePath = target.kind === 'git-branch' ? null : target.rootPath
   const persistenceTarget =
     target.kind === 'workspace-root'
       ? { kind: 'workspace-root' as const, repoRoot: target.workspaceId, branchName: null, worktreePath: null }
@@ -67,7 +65,6 @@ export function WorkspacePaneTargetToolbar({
           worktreePath: target.kind === 'git-worktree' ? target.rootPath : null,
         }
   const targetKey = workspacePaneTabsTargetIdentityKey(persistenceTarget)
-  const hydrating = useIsInitialTerminalProjectionHydrating(target.workspaceId, target.workspaceRuntimeId)
   const showCreatedRuntimeTab = useCallback(
     (
       type: WorkspacePaneRuntimeTabType,
@@ -112,9 +109,7 @@ export function WorkspacePaneTargetToolbar({
     repoRoot: target.workspaceId,
     repoRuntimeId: target.workspaceRuntimeId,
     branchName,
-    worktreePath,
     runtimeTabStateByType: model.runtimeTabStateByType,
-    initialRuntimeProjectionHydrating: hydrating,
     workspacePaneRoute,
     showCreatedRuntimeTab,
     t,
