@@ -15,7 +15,7 @@ if (!workspaceId || !worktreeRoot) throw new Error('invalid workspace locator fi
 const input = {
   runtimeType: 'terminal' as const,
   request: {
-    repoRoot: '/repo',
+    workspaceId: '/repo',
     workspaceRuntimeId: 'repo-runtime-test',
     target: { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: 'repo-runtime-test', root: worktreeRoot },
     branch: 'main',
@@ -87,7 +87,7 @@ describe('workspace pane runtime realtime', () => {
           buffered.send(
             JSON.stringify({
               type: 'sessions-changed',
-              repoRoot: workspaceId,
+              workspaceId: workspaceId,
               workspaceRuntimeId: 'repo-runtime-test',
               revision: 1,
             }),
@@ -114,7 +114,7 @@ describe('workspace pane runtime realtime', () => {
     })
     expect(JSON.parse(socket.send.mock.calls[1]?.[0] ?? '')).toEqual({
       type: 'sessions-changed',
-      repoRoot: workspaceId,
+      workspaceId: workspaceId,
       workspaceRuntimeId: 'repo-runtime-test',
       revision: 1,
     })

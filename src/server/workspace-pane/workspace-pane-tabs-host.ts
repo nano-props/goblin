@@ -26,7 +26,7 @@ export interface ServerWorkspacePaneTabsHost {
     userId: string,
     input: WorkspacePaneTabsListInput & {
       targets: RestorableWorkspacePaneTarget[]
-      expectedRepoEntry: WorkspaceSessionEntry
+      expectedWorkspaceEntry: WorkspaceSessionEntry
     },
   ): MaybePromise<WorkspacePaneTabsRestoreResult>
   listWorkspaceTabs(

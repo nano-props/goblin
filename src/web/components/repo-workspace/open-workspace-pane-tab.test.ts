@@ -175,7 +175,7 @@ describe('openWorkspacePaneTab', () => {
       recordWorkspacePaneTabOpener(
         {
           kind: 'git-worktree',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           worktreePath: WORKTREE_PATH,
         },
         repo.workspaceRuntimeId,
@@ -198,7 +198,7 @@ describe('openWorkspacePaneTab', () => {
     expect(
       readWorkspacePaneTabsForTarget({
         kind: 'git-worktree' as const,
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,
         worktreePath: WORKTREE_PATH,
       }).map(workspacePaneTabEntryIdentity),
@@ -781,7 +781,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
   const target = repo
     ? workspacePaneTabsTargetForRepoBranch(
-        { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+        { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
         branchName,
       )
     : null
@@ -796,25 +796,25 @@ function preferredWorkspacePaneTab(branchName = 'feature/worktree') {
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
         workspacePaneTabsTargetForRepoBranch(
-          { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+          { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
           branchName,
         ),
       )
     : null
 }
 
-function openerScopeKey(repoRoot: string, branchName: string, worktreePath: string | null): string {
+function openerScopeKey(workspaceId: string, branchName: string, worktreePath: string | null): string {
   const target =
     worktreePath === null
-      ? { kind: 'git-branch' as const, repoRoot, branchName }
+      ? { kind: 'git-branch' as const, workspaceId, branchName }
       : {
           kind: 'git-worktree' as const,
-          repoRoot,
+          workspaceId,
           worktreePath,
           head: { kind: 'branch' as const, branchName },
         }
   const baseKey = tabOpenerScopeKey(target)
-  const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[repoRoot]?.workspaceRuntimeId
+  const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[workspaceId]?.workspaceRuntimeId
   if (workspaceRuntimeId) return `${baseKey}\0${workspaceRuntimeId}`
   return (
     Object.keys(useWorkspacesStore.getState().tabOpenerIdentityByScope).find((key) => key.startsWith(`${baseKey}\0`)) ??

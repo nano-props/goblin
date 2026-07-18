@@ -10,19 +10,19 @@ import {
 
 export interface GitBranchWorkspacePaneTabsTarget {
   kind: 'git-branch'
-  repoRoot: string
+  workspaceId: string
   branchName: string
 }
 
 export interface GitWorktreeWorkspacePaneTabsTarget {
   kind: 'git-worktree'
-  repoRoot: string
+  workspaceId: string
   worktreePath: string
 }
 
 export interface RootWorkspacePaneTabsTarget {
   kind: 'workspace-root'
-  repoRoot: string
+  workspaceId: string
 }
 
 export type WorkspacePaneTabsTarget =
@@ -38,31 +38,33 @@ export function workspacePaneTabsTargetWorktreePath(target: WorkspacePaneTabsTar
 }
 
 export function gitWorktreeWorkspacePaneTabsTarget(
-  repoRoot: string,
+  workspaceId: string,
   worktreePath: string,
 ): GitWorktreeWorkspacePaneTabsTarget | null {
-  const workspaceId = canonicalWorkspaceLocator(repoRoot)
-  const worktreeId = workspaceId ? workspaceLocatorForPath(workspaceId, worktreePath) : null
-  return workspaceId && worktreeId ? { kind: 'git-worktree', repoRoot: workspaceId, worktreePath } : null
+  const canonicalWorkspaceId = canonicalWorkspaceLocator(workspaceId)
+  const worktreeId = canonicalWorkspaceId ? workspaceLocatorForPath(canonicalWorkspaceId, worktreePath) : null
+  return canonicalWorkspaceId && worktreeId
+    ? { kind: 'git-worktree', workspaceId: canonicalWorkspaceId, worktreePath }
+    : null
 }
 
 export function gitWorkspacePaneTabsTarget(
-  repoRoot: string,
+  workspaceId: string,
   branchName: string,
   worktreePath: string | null,
 ): GitBranchWorkspacePaneTabsTarget | GitWorktreeWorkspacePaneTabsTarget | null {
   if (!isValidBranch(branchName)) return null
   return worktreePath === null
-    ? { kind: 'git-branch', repoRoot, branchName }
-    : gitWorktreeWorkspacePaneTabsTarget(repoRoot, worktreePath)
+    ? { kind: 'git-branch', workspaceId, branchName }
+    : gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
 }
 
 export function requiredGitWorkspacePaneTabsTarget(
-  repoRoot: string,
+  workspaceId: string,
   branchName: string,
   worktreePath: string | null,
 ): GitBranchWorkspacePaneTabsTarget | GitWorktreeWorkspacePaneTabsTarget {
-  const target = gitWorkspacePaneTabsTarget(repoRoot, branchName, worktreePath)
+  const target = gitWorkspacePaneTabsTarget(workspaceId, branchName, worktreePath)
   if (!target) throw new Error('workspace pane target requires canonical workspace coordinates')
   return target
 }
@@ -70,73 +72,75 @@ export function requiredGitWorkspacePaneTabsTarget(
 export type WorkspacePaneTabsTargetIdentity =
   | {
       kind: 'workspace-root'
-      repoRoot: string
+      workspaceId: string
     }
   | {
       kind: 'branch'
-      repoRoot: string
+      workspaceId: string
       branchName: string
     }
   | {
       kind: 'worktree'
-      repoRoot: string
+      workspaceId: string
       worktreeId: WorkspaceId
     }
 
 export function workspacePaneTabsTargetIdentityKey(target: WorkspacePaneTabsTarget): string {
   return workspacePaneTabsTargetIdentityKeyFromIdentity(
     target.kind === 'git-branch'
-      ? { kind: 'branch', repoRoot: target.repoRoot, branchName: target.branchName }
+      ? { kind: 'branch', workspaceId: target.workspaceId, branchName: target.branchName }
       : target.kind === 'git-worktree'
-        ? worktreeTargetIdentity(target.repoRoot, target.worktreePath)
+        ? worktreeTargetIdentity(target.workspaceId, target.worktreePath)
         : target,
   )
 }
 
 function worktreeTargetIdentity(
-  repoRoot: string,
+  workspaceId: string,
   worktreePath: string,
 ): Extract<WorkspacePaneTabsTargetIdentity, { kind: 'worktree' }> {
-  const workspaceId = canonicalWorkspaceLocator(repoRoot)
-  const worktreeId = workspaceId ? workspaceLocatorForPath(workspaceId, worktreePath) : null
-  if (!workspaceId || !worktreeId) throw new Error('workspace pane target requires canonical workspace coordinates')
-  return { kind: 'worktree', repoRoot: workspaceId, worktreeId }
+  const canonicalWorkspaceId = canonicalWorkspaceLocator(workspaceId)
+  const worktreeId = canonicalWorkspaceId ? workspaceLocatorForPath(canonicalWorkspaceId, worktreePath) : null
+  if (!canonicalWorkspaceId || !worktreeId) {
+    throw new Error('workspace pane target requires canonical workspace coordinates')
+  }
+  return { kind: 'worktree', workspaceId: canonicalWorkspaceId, worktreeId }
 }
 
 export function workspacePaneTabsTargetIdentityKeyFromIdentity(target: WorkspacePaneTabsTargetIdentity): string {
-  const repoRoot = canonicalWorkspaceLocator(target.repoRoot)
-  if (repoRoot !== target.repoRoot) throw new Error('workspace pane target requires a canonical workspace locator')
-  if (target.kind === 'workspace-root') return `${repoRoot}\0workspace-root`
+  const workspaceId = canonicalWorkspaceLocator(target.workspaceId)
+  if (workspaceId !== target.workspaceId) throw new Error('workspace pane target requires a canonical workspace locator')
+  if (target.kind === 'workspace-root') return `${workspaceId}\0workspace-root`
   if (target.kind === 'worktree') {
     if (
       canonicalWorkspaceLocator(target.worktreeId) !== target.worktreeId ||
-      !workspaceLocatorsShareTransport(repoRoot, target.worktreeId)
+      !workspaceLocatorsShareTransport(workspaceId, target.worktreeId)
     ) {
       throw new Error('workspace pane worktree target requires a compatible canonical locator')
     }
-    return `${repoRoot}\0worktree\0${target.worktreeId}`
+    return `${workspaceId}\0worktree\0${target.worktreeId}`
   }
   if (!isValidBranch(target.branchName)) throw new Error('workspace pane branch target requires a valid branch')
-  return `${target.repoRoot}\0branch\0${target.branchName}`
+  return `${target.workspaceId}\0branch\0${target.branchName}`
 }
 
 export function parseWorkspacePaneTabsTargetIdentityKey(key: string): WorkspacePaneTabsTargetIdentity | null {
   const parts = key.split('\0')
   if (parts.length === 2 && parts[1] === 'workspace-root') {
-    const repoRoot = canonicalWorkspaceLocator(parts[0])
-    return repoRoot === parts[0] ? { kind: 'workspace-root', repoRoot } : null
+    const workspaceId = canonicalWorkspaceLocator(parts[0])
+    return workspaceId === parts[0] ? { kind: 'workspace-root', workspaceId } : null
   }
   if (parts.length !== 3) return null
-  const [repoRoot, kind, value] = parts
-  const canonicalRepoRoot = canonicalWorkspaceLocator(repoRoot)
-  if (canonicalRepoRoot !== repoRoot || !value) return null
+  const [workspaceId, kind, value] = parts
+  const canonicalRepoRoot = canonicalWorkspaceLocator(workspaceId)
+  if (canonicalRepoRoot !== workspaceId || !value) return null
   if (kind === 'branch') {
-    return isValidBranch(value) ? { kind, repoRoot: canonicalRepoRoot, branchName: value } : null
+    return isValidBranch(value) ? { kind, workspaceId: canonicalRepoRoot, branchName: value } : null
   }
   if (kind === 'worktree') {
     const worktreeId = canonicalWorkspaceLocator(value)
     return worktreeId === value && workspaceLocatorsShareTransport(canonicalRepoRoot, worktreeId)
-      ? { kind, repoRoot: canonicalRepoRoot, worktreeId }
+      ? { kind, workspaceId: canonicalRepoRoot, worktreeId }
       : null
   }
   return null
@@ -184,7 +188,7 @@ export function parseRestorableWorkspacePaneTargetKey(key: string): RestorableWo
 export function restorableWorkspacePaneTarget(target: WorkspacePaneTabsTarget): RestorableWorkspacePaneTarget | null {
   if (target.kind === 'workspace-root') return { kind: 'workspace-root' }
   if (target.kind === 'git-branch') return { kind: 'git-branch', branch: target.branchName }
-  const identity = worktreeTargetIdentity(target.repoRoot, target.worktreePath)
+  const identity = worktreeTargetIdentity(target.workspaceId, target.worktreePath)
   return { kind: 'git-worktree', root: identity.worktreeId }
 }
 
@@ -193,38 +197,38 @@ export function workspacePaneTabsTargetFromRestorable(
   target: RestorableWorkspacePaneTarget,
 ): WorkspacePaneTabsTarget | null {
   if (target.kind === 'workspace-root') {
-    return { kind: 'workspace-root', repoRoot: workspaceId }
+    return { kind: 'workspace-root', workspaceId: workspaceId }
   }
   if (target.kind === 'git-branch') {
-    return { kind: 'git-branch', repoRoot: workspaceId, branchName: target.branch }
+    return { kind: 'git-branch', workspaceId: workspaceId, branchName: target.branch }
   }
   const root = parseCanonicalWorkspaceLocator(target.root)
   const workspace = parseCanonicalWorkspaceLocator(workspaceId)
   if (!root || !workspace || root.transport !== workspace.transport) return null
   if (root.transport === 'ssh' && (workspace.transport !== 'ssh' || root.profile !== workspace.profile)) return null
-  return { kind: 'git-worktree', repoRoot: workspaceId, worktreePath: root.path }
+  return { kind: 'git-worktree', workspaceId: workspaceId, worktreePath: root.path }
 }
 
 export function workspacePaneTabsTargetFromRuntime(target: RuntimeWorkspacePaneTarget): WorkspacePaneTabsTarget | null {
   if (!target.workspaceId || !target.workspaceRuntimeId) return null
   if (target.kind === 'workspace-root') {
-    return { kind: 'workspace-root', repoRoot: target.workspaceId }
+    return { kind: 'workspace-root', workspaceId: target.workspaceId }
   }
   if (target.kind === 'git-branch') {
-    return target.branch ? { kind: 'git-branch', repoRoot: target.workspaceId, branchName: target.branch } : null
+    return target.branch ? { kind: 'git-branch', workspaceId: target.workspaceId, branchName: target.branch } : null
   }
   const workspace = parseCanonicalWorkspaceLocator(target.workspaceId)
   const root = parseCanonicalWorkspaceLocator(target.root)
   if (!workspace || !root || workspace.transport !== root.transport) return null
   if (workspace.transport === 'ssh' && (root.transport !== 'ssh' || workspace.profile !== root.profile)) return null
-  return { kind: 'git-worktree', repoRoot: target.workspaceId, worktreePath: root.path }
+  return { kind: 'git-worktree', workspaceId: target.workspaceId, worktreePath: root.path }
 }
 
 export function runtimeWorkspacePaneTarget(
   target: WorkspacePaneTabsTarget,
   workspaceRuntimeId: string,
 ): RuntimeWorkspacePaneTarget | null {
-  const workspaceId = canonicalWorkspaceLocator(target.repoRoot)
+  const workspaceId = canonicalWorkspaceLocator(target.workspaceId)
   if (!workspaceId || !workspaceRuntimeId) return null
   if (target.kind === 'workspace-root') return { kind: 'workspace-root', workspaceId, workspaceRuntimeId }
   if (target.kind === 'git-branch') {

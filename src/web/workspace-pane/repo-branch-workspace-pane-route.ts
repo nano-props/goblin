@@ -30,7 +30,7 @@ export function resolveWorkspacePaneRoute(repoId: string, branchName: string): W
   if (!repo || repo.capability.kind !== 'git') return { kind: 'missing' }
   const branchModel = readRepoBranchSnapshotQueryProjection(repo)
   if (!branchModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
-  const target = workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
+  const target = workspacePaneTabsTargetForRepoBranch({ workspaceId: repo.id, branches: branchModel.branches }, branchName)
   if (!target) return { kind: 'missing' }
   const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget({
     ...target,
@@ -43,7 +43,7 @@ export function resolveWorkspacePaneRoute(repoId: string, branchName: string): W
     }
   }
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
-    repoRoot: repo.id,
+    workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath: workspacePaneTabsTargetWorktreePath(target),
   })

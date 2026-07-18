@@ -105,14 +105,14 @@ function normalizeSelectedTerminals(value: unknown): Record<string, string> {
 function normalizePreferredTabs(value: unknown): ClientWorkspaceState['preferredWorkspacePaneTabByTargetByWorkspace'] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const result: ClientWorkspaceState['preferredWorkspacePaneTabByTargetByWorkspace'] = {}
-  for (const [repoRoot, rawByTarget] of Object.entries(value)) {
-    const safeRepoRoot = toSafeCanonicalRepoLocator(repoRoot)
+  for (const [workspaceId, rawByTarget] of Object.entries(value)) {
+    const safeRepoRoot = toSafeCanonicalRepoLocator(workspaceId)
     if (!safeRepoRoot || !rawByTarget || typeof rawByTarget !== 'object' || Array.isArray(rawByTarget)) continue
     const byTarget: Record<string, WorkspacePaneSessionTabType | null> = {}
     for (const [targetKey, preferredTab] of Object.entries(rawByTarget)) {
       const normalized = preferredTabFromUnknown(preferredTab)
       const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
-      if (normalized !== undefined && target?.repoRoot === safeRepoRoot) byTarget[targetKey] = normalized
+      if (normalized !== undefined && target?.workspaceId === safeRepoRoot) byTarget[targetKey] = normalized
     }
     if (Object.keys(byTarget).length > 0) result[safeRepoRoot] = byTarget
   }
@@ -126,8 +126,8 @@ function preferredTabFromUnknown(value: unknown): WorkspacePaneSessionTabType | 
 function normalizeFiletreeState(value: unknown): ClientWorkspaceState['filetreeViewStateByWorktreeByWorkspace'] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const result: ClientWorkspaceState['filetreeViewStateByWorktreeByWorkspace'] = {}
-  for (const [repoRoot, rawByWorktree] of Object.entries(value)) {
-    const safeRepoRoot = toSafeCanonicalRepoLocator(repoRoot)
+  for (const [workspaceId, rawByWorktree] of Object.entries(value)) {
+    const safeRepoRoot = toSafeCanonicalRepoLocator(workspaceId)
     if (!safeRepoRoot || !rawByWorktree || typeof rawByWorktree !== 'object' || Array.isArray(rawByWorktree)) continue
     const byWorktree: Record<string, FiletreeSessionViewState> = {}
     for (const [worktreeId, rawSnapshot] of Object.entries(rawByWorktree)) {

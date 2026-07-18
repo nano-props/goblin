@@ -156,7 +156,7 @@ class TerminalSessionService {
       nativeWorktreePath === null ? null : terminalSessionWorktreePath(input.workspaceId, nativeWorktreePath)
     const result = await this.workspaceTabsCoordinator.replaceTabs({
       userId,
-      repoRoot: input.workspaceId,
+      workspaceId: input.workspaceId,
       scope,
       target: input.target,
       nativeWorktreePath: worktreePath,
@@ -173,7 +173,7 @@ class TerminalSessionService {
       workspaceId: string
       workspaceRuntimeId: string
       targets: RestorableWorkspacePaneTarget[]
-      expectedRepoEntry: WorkspaceSessionEntry
+      expectedWorkspaceEntry: WorkspaceSessionEntry
     },
   ): Promise<WorkspacePaneTabsRestoreResult> {
     if (!isValidWorkspaceLocatorInput(input.workspaceId)) {
@@ -184,7 +184,7 @@ class TerminalSessionService {
     const scope = terminalSessionRuntimeScope(input.workspaceId, input.workspaceRuntimeId)
     const result = await this.workspaceTabsCoordinator.restoreScope({
       userId,
-      repoRoot: input.workspaceId,
+      workspaceId: input.workspaceId,
       scope,
       targets: input.targets.flatMap((restorable) => {
         const nativePath = nativeWorktreePathForRestorableTarget(workspaceId, restorable)
@@ -200,7 +200,7 @@ class TerminalSessionService {
           },
         ]
       }),
-      expectedRepoEntry: input.expectedRepoEntry,
+      expectedWorkspaceEntry: input.expectedWorkspaceEntry,
       assertCurrent: () => this.assertCurrentWorkspaceRuntime(userId, input.workspaceId, input.workspaceRuntimeId),
     })
     if (result.kind === 'membership-conflict') return result
@@ -223,7 +223,7 @@ class TerminalSessionService {
       nativeWorktreePath === null ? null : terminalSessionWorktreePath(input.workspaceId, nativeWorktreePath)
     const result = await this.workspaceTabsCoordinator.updateTabs({
       userId,
-      repoRoot: input.workspaceId,
+      workspaceId: input.workspaceId,
       scope,
       target: input.target,
       nativeWorktreePath: worktreePath,
@@ -239,7 +239,7 @@ class TerminalSessionService {
     const scope = terminalSessionRuntimeScope(coordinates.repoRoot, coordinates.workspaceRuntimeId)
     await this.workspaceTabsCoordinator.reconcileWorktree({
       userId,
-      repoRoot: coordinates.repoRoot,
+      workspaceId: coordinates.repoRoot,
       scope,
       worktreePath: terminalExecutionPath(session.target),
     })
@@ -254,7 +254,7 @@ class TerminalSessionService {
     const scope = terminalSessionRuntimeScope(repoRoot, workspaceRuntimeId)
     return await this.workspaceTabsCoordinator.listWorkspaceTabs({
       userId,
-      repoRoot,
+      workspaceId: repoRoot,
       scope,
       assertCurrent: () => this.assertCurrentWorkspaceRuntime(userId, repoRoot, workspaceRuntimeId),
     })

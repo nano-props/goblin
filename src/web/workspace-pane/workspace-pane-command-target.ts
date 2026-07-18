@@ -43,11 +43,11 @@ export function workspacePaneCommandPaneTarget(
   workspaceId: string,
   target: WorkspacePaneCommandTarget,
 ): WorkspacePaneTabsTarget {
-  if (target.kind === 'workspace-root') return { kind: 'workspace-root', repoRoot: workspaceId }
+  if (target.kind === 'workspace-root') return { kind: 'workspace-root', workspaceId: workspaceId }
   if (target.kind === 'git-worktree') {
-    return { kind: 'git-worktree', repoRoot: workspaceId, worktreePath: target.filesystemTarget.rootPath }
+    return { kind: 'git-worktree', workspaceId: workspaceId, worktreePath: target.filesystemTarget.rootPath }
   }
-  return { kind: 'git-branch', repoRoot: workspaceId, branchName: target.branchName }
+  return { kind: 'git-branch', workspaceId: workspaceId, branchName: target.branchName }
 }
 
 export function workspacePaneCommandWorktreeHead(target: WorkspacePaneCommandTarget): GitHead | undefined {

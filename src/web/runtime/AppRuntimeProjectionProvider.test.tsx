@@ -59,7 +59,7 @@ let recoveredHandler: ((clientId: string) => void) | null = null
 const kickReconnectMock = vi.fn(() => {})
 const recoverSessionsMock =
   vi.fn<(...args: Array<{ repoRoot: string; workspaceRuntimeId: string }>) => Promise<TerminalSessionsSnapshot>>()
-const listWorkspaceTabsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<WorkspacePaneTabsEntry[]>>()
+const listWorkspaceTabsMock = vi.fn<(...args: Array<{ workspaceId: string }>) => Promise<WorkspacePaneTabsEntry[]>>()
 
 describe('AppRuntimeProjectionProvider', () => {
   beforeEach(() => {
@@ -176,7 +176,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await vi.waitFor(() => {
         expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenCalledWith(
-          { repoRoot: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId },
+          { workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId },
           {
             revision: 1,
             sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
@@ -205,7 +205,7 @@ describe('AppRuntimeProjectionProvider', () => {
     try {
       await vi.waitFor(() => {
         expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenCalledWith(
-          { repoRoot: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId },
+          { workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId },
           expect.objectContaining({ revision: 1 }),
           'client_sharedterminal',
         )
@@ -222,7 +222,7 @@ describe('AppRuntimeProjectionProvider', () => {
     const repo = seedCurrentRepo()
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'git-worktree' as const,
-      repoRoot: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
@@ -231,7 +231,7 @@ describe('AppRuntimeProjectionProvider', () => {
       {
         target: runtimeWorkspacePaneTargetForTest({
           kind: 'git-worktree' as const,
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           workspaceRuntimeId: repo.workspaceRuntimeId,
           worktreePath: WORKTREE_PATH,
         }),
@@ -248,7 +248,7 @@ describe('AppRuntimeProjectionProvider', () => {
         workspaceTabsChangedHandler?.({
           type: 'workspace-pane-tabs.changed',
           change: 'invalidation',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
         })
         await waitForScheduledServerSync()
       })
@@ -272,7 +272,7 @@ describe('AppRuntimeProjectionProvider', () => {
         workspaceTabsChangedHandler?.({
           type: 'workspace-pane-tabs.changed',
           change: 'revision',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           workspaceRuntimeId: repo.workspaceRuntimeId,
           revision: 5,
         })
@@ -284,7 +284,7 @@ describe('AppRuntimeProjectionProvider', () => {
         workspaceTabsChangedHandler?.({
           type: 'workspace-pane-tabs.changed',
           change: 'revision',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           workspaceRuntimeId: repo.workspaceRuntimeId,
           revision: 6,
         })
@@ -309,7 +309,7 @@ describe('AppRuntimeProjectionProvider', () => {
         workspaceTabsChangedHandler?.({
           type: 'workspace-pane-tabs.changed',
           change: 'invalidation',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
         })
         await waitForScheduledServerSync()
       })
@@ -362,7 +362,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
       expect(recoverSessionsMock).toHaveBeenCalledWith({
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,
       })
     } finally {
@@ -393,7 +393,7 @@ describe('AppRuntimeProjectionProvider', () => {
       )
       expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenCalledOnce()
       expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenCalledWith(
-        { repoRoot: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId },
+        { workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId },
         { revision: 2, sessions: [] },
         'client_sharedterminal',
       )
@@ -451,7 +451,7 @@ describe('AppRuntimeProjectionProvider', () => {
     const repo = seedCurrentRepo()
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'git-worktree' as const,
-      repoRoot: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
@@ -469,7 +469,7 @@ describe('AppRuntimeProjectionProvider', () => {
         {
           target: runtimeWorkspacePaneTargetForTest({
             kind: 'git-worktree' as const,
-            repoRoot: REPO_ID,
+            workspaceId: REPO_ID,
             workspaceRuntimeId: repo.workspaceRuntimeId,
             worktreePath: WORKTREE_PATH,
           }),
@@ -484,7 +484,7 @@ describe('AppRuntimeProjectionProvider', () => {
       await vi.waitFor(() => {
         expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledOnce()
         expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenLastCalledWith(
-          { repoRoot: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId },
+          { workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId },
           {
             revision: 2,
             sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
@@ -502,7 +502,7 @@ describe('AppRuntimeProjectionProvider', () => {
       await vi.waitFor(() => {
         expect(recoverSessionsMock).toHaveBeenCalledOnce()
         expect(recoverSessionsMock).toHaveBeenCalledWith({
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           workspaceRuntimeId: repo.workspaceRuntimeId,
         })
       })
@@ -539,7 +539,7 @@ describe('AppRuntimeProjectionProvider', () => {
       expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenCalledOnce()
       expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenCalledWith(
         {
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           workspaceRuntimeId: useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
         },
         { revision: 2, sessions: [] },
@@ -631,12 +631,12 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await vi.waitFor(() => {
         expect(recoverSessionsMock).toHaveBeenCalledWith({
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           workspaceRuntimeId: nextWorkspaceRuntimeId,
         })
       })
       expect(recoverSessionsMock).not.toHaveBeenCalledWith({
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,
       })
     } finally {
@@ -651,7 +651,7 @@ describe('AppRuntimeProjectionProvider', () => {
     try {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
       expect(recoverSessionsMock).toHaveBeenCalledWith({
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
         workspaceRuntimeId: firstRepo.workspaceRuntimeId,
       })
     } finally {
@@ -674,7 +674,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
       expect(recoverSessionsMock).toHaveBeenCalledWith({
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
         workspaceRuntimeId: firstRepo.workspaceRuntimeId,
       })
     } finally {
@@ -1017,7 +1017,7 @@ function completeServerSession(session: TestTerminalSessionSummary): TerminalSes
 function tabsFor(workspaceRuntimeId: string) {
   return readWorkspacePaneTabsForTarget({
     kind: 'git-worktree',
-    repoRoot: REPO_ID,
+    workspaceId: REPO_ID,
     workspaceRuntimeId,
     worktreePath: WORKTREE_PATH,
   })

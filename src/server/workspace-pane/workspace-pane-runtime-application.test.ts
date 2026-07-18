@@ -48,7 +48,7 @@ const otherWorktreeRoot = canonicalWorkspaceLocator('goblin+file:///repo/other-w
 if (!workspaceId || !worktreeRoot || !otherWorktreeRoot) throw new Error('invalid workspace locator fixture')
 
 const request = {
-  repoRoot: workspaceId,
+  workspaceId: workspaceId,
   workspaceRuntimeId: 'repo-runtime-test',
   branch: 'main',
   worktreePath: '/repo/worktree',
@@ -215,7 +215,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     })
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(
       'user-test',
-      request.repoRoot,
+      request.workspaceId,
       request.workspaceRuntimeId,
       paneTabsSnapshot.revision,
     )
@@ -316,7 +316,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
 
   test('reports remote runtime failure when physical worktree capture proves transport failure', async () => {
     const failure = new RemoteWorkspaceRuntimeFailureError({
-      workspaceId: request.repoRoot,
+      workspaceId: request.workspaceId,
       workspaceRuntimeId: request.workspaceRuntimeId,
       reason: 'unreachable',
     })
@@ -349,7 +349,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
 
   test('reports remote runtime failure when queued physical validation proves transport failure', async () => {
     const failure = new RemoteWorkspaceRuntimeFailureError({
-      workspaceId: request.repoRoot,
+      workspaceId: request.workspaceId,
       workspaceRuntimeId: request.workspaceRuntimeId,
       reason: 'unreachable',
       message: 'connection refused',

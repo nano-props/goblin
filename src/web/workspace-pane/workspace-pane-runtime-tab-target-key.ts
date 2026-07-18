@@ -1,7 +1,7 @@
 import { workspacePaneRuntimeTabTargetKeyForType } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
 export interface WorkspacePaneRuntimeTabTargetKeyInput {
-  repoRoot: string
+  workspaceId: string
   worktreePath: string | null
 }
 

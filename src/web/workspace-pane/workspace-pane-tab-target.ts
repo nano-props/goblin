@@ -134,7 +134,7 @@ function resolveWorkspacePaneTabTarget(
   if (!repo) return { kind: 'missing' }
   if (branchName !== null && repo.capability.kind !== 'git') return { kind: 'missing' }
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
-    repoRoot: workspaceId,
+    workspaceId: workspaceId,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath,
   })
@@ -142,7 +142,7 @@ function resolveWorkspacePaneTabTarget(
     branchName === null
       ? {
           kind: 'workspace-root',
-          repoRoot: workspaceId,
+          workspaceId: workspaceId,
           workspaceRuntimeId: repo.workspaceRuntimeId,
         }
       : {
@@ -158,7 +158,7 @@ function resolveWorkspacePaneTabTarget(
   }
   const preferenceTarget =
     branchName === null
-      ? { kind: 'workspace-root' as const, repoRoot: workspaceId }
+      ? { kind: 'workspace-root' as const, workspaceId: workspaceId }
       : requiredGitWorkspacePaneTabsTarget(workspaceId, branchName, worktreePath)
   return {
     kind: 'ready',
@@ -186,12 +186,12 @@ export function workspacePaneTabTargetForPaneTarget(
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
   worktreeHead?: GitHead,
 ): RepoWorkspaceTabModel | null {
-  const repo = useWorkspacesStore.getState().workspaces[paneTarget.repoRoot]
+  const repo = useWorkspacesStore.getState().workspaces[paneTarget.workspaceId]
   if (!repo) return null
   if (paneTarget.kind !== 'workspace-root' && repo.capability.kind !== 'git') return null
   const worktreePath = workspacePaneTabsTargetWorktreePath(paneTarget)
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
-    repoRoot: repo.id,
+    workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath,
   })
@@ -241,7 +241,7 @@ export function workspacePaneRouteNavigationBlockedForBranch(repoId: string, bra
   )
     return true
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
-    repoRoot: repo.id,
+    workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath: branch.worktree?.path ?? null,
   })
@@ -280,7 +280,7 @@ function preferredWorkspacePaneTabForRoute(
 export function workspacePaneTabTargetBlocksInteraction(model: RepoWorkspaceTabModel): boolean {
   const target =
     model.branchName === null
-      ? { kind: 'workspace-root' as const, repoRoot: model.workspaceId }
+      ? { kind: 'workspace-root' as const, workspaceId: model.workspaceId }
       : requiredGitWorkspacePaneTabsTarget(model.workspaceId, model.branchName, model.worktreePath)
   return repoWorkspaceTabModelBlocksTabInteraction(model) || workspacePaneTabsInteractionBlockedForTarget(target)
 }

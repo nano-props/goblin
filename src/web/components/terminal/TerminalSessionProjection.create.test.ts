@@ -202,7 +202,7 @@ function makeRuntimeMembershipIndex() {
 function terminalBase() {
   const target = runtimeWorkspacePaneTargetForTest({
     kind: 'git-worktree' as const,
-    repoRoot: REPO_ROOT,
+    workspaceId: REPO_ROOT,
     workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     worktreePath: WORKTREE_PATH,
   })
@@ -241,7 +241,7 @@ function emitBellForKey(projection: TerminalSessionProjection, terminalSessionId
       terminalSessionId,
       terminalWorktreeKey: WORKTREE_KEY,
       index: 1,
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       worktreePath: WORKTREE_PATH,
     },
@@ -871,7 +871,7 @@ describe('TerminalSessionProjection create flow', () => {
         terminalSessionId,
         terminalWorktreeKey: WORKTREE_KEY,
         index: 1,
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
       },

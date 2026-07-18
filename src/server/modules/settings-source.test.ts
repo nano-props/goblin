@@ -19,12 +19,12 @@ const REPO_C = workspaceIdForTest('goblin+file:///repo-c')
 
 async function writeWorkspacePaneLayout(
   source: { serverWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository },
-  repoRoot: string,
+  workspaceId: string,
   replacement: WorkspacePaneDurableLayout,
 ): Promise<void> {
-  const current = await source.serverWorkspacePaneLayoutRepository.load(repoRoot)
+  const current = await source.serverWorkspacePaneLayoutRepository.load(workspaceId)
   const outcome = await source.serverWorkspacePaneLayoutRepository.compareAndSwap({
-    repoRoot,
+    workspaceId,
     expected: current.layout,
     replacement,
   })
@@ -287,26 +287,26 @@ test('workspace pane layout repository loads and applies normalized CAS outcomes
 
   await expect(mod.serverWorkspacePaneLayoutRepository.load(REPO_A)).resolves.toEqual({ layout: empty })
   await mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
-    repoRoot: REPO_A,
+    workspaceId: REPO_A,
     expected: empty,
     replacement: history,
   })
   await expect(
     mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
-      repoRoot: REPO_A,
-      expectedRepoEntry: repoEntry,
+      workspaceId: REPO_A,
+      expectedWorkspaceEntry: repoEntry,
     }),
   ).resolves.toMatchObject({ kind: 'accepted', snapshot: { layout: history } })
   await expect(
     mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
-      repoRoot: REPO_A,
+      workspaceId: REPO_A,
       expected: history,
       replacement: history,
     }),
   ).resolves.toMatchObject({ kind: 'accepted', changed: false })
   await expect(
     mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
-      repoRoot: REPO_A,
+      workspaceId: REPO_A,
       expected: empty,
       replacement: empty,
     }),
@@ -315,8 +315,8 @@ test('workspace pane layout repository loads and applies normalized CAS outcomes
   await mod.removeServerWorkspaceEntry(REPO_A)
   await expect(
     mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
-      repoRoot: REPO_A,
-      expectedRepoEntry: repoEntry,
+      workspaceId: REPO_A,
+      expectedWorkspaceEntry: repoEntry,
     }),
   ).resolves.toMatchObject({ kind: 'membership-conflict', snapshot: { layout: history } })
 })
@@ -335,7 +335,7 @@ test('workspace pane layout repository does not disguise programming errors as p
 
   await expect(
     mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
-      repoRoot: REPO_A,
+      workspaceId: REPO_A,
       expected: { entries: [] },
       replacement,
     }),
@@ -354,7 +354,7 @@ test('workspace pane layout repository classifies settings write failures at the
 
   await expect(
     mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
-      repoRoot: REPO_A,
+      workspaceId: REPO_A,
       expected: { entries: [] },
       replacement: {
         entries: [
@@ -387,8 +387,8 @@ test('workspace pane restore does not write or classify persistence failures', a
   const settingsFile = path.join(tmp, 'user-settings.json')
   await expect(
     mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
-      repoRoot: REPO_A,
-      expectedRepoEntry: repoEntry,
+      workspaceId: REPO_A,
+      expectedWorkspaceEntry: repoEntry,
     }),
   ).resolves.toMatchObject({ kind: 'accepted', snapshot: { layout: staleLayout } })
 })
@@ -662,11 +662,11 @@ test('rejects invalid workspace external app recent path and item without touchi
   expect(await mod.getServerWorkspaceSettings()).toEqual([])
 })
 
-function branchTargetKey(_repoRoot: string, branchName: string): string {
+function branchTargetKey(_workspaceId: string, branchName: string): string {
   return restorableWorkspacePaneTargetKey({ kind: 'git-branch', branch: branchName })
 }
 
-function worktreeTargetKey(_repoRoot: string, _branchName: string, worktreePath: string): string {
+function worktreeTargetKey(_workspaceId: string, _branchName: string, worktreePath: string): string {
   const root = requiredFileWorkspaceLocator(worktreePath)
   return restorableWorkspacePaneTargetKey({ kind: 'git-worktree', root })
 }

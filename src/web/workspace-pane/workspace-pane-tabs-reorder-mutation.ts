@@ -82,11 +82,11 @@ async function runWorkspacePaneTabsReorderInQueue(
       ...target,
       operation: { type: 'reorder', tabIdentities: draggedTabs.map(workspacePaneTabEntryIdentity) },
     })
-    writeCanonicalWorkspacePaneTabsSnapshot(target.repoRoot, target.workspaceRuntimeId, snapshot, queryClient)
+    writeCanonicalWorkspacePaneTabsSnapshot(target.workspaceId, target.workspaceRuntimeId, snapshot, queryClient)
   } catch (err) {
     reportWorkspacePaneTabsFailure({
       operation: 'reorder',
-      repoRoot: target.repoRoot,
+      workspaceId: target.workspaceId,
       branchName: workspacePaneTabsBranchIdentity(target),
       worktreePath: workspacePaneTabsTargetWorktreePath(target),
       error: err,
@@ -99,7 +99,7 @@ type WorkspacePaneTabsReorderTarget = WorkspacePaneTabsTarget & { workspaceRunti
 
 function workspacePaneReorderActionTarget(target: WorkspacePaneTabsReorderTarget): WorkspacePaneActionTarget {
   return workspacePaneActionTargetFromCoordinates({
-    workspaceId: target.repoRoot,
+    workspaceId: target.workspaceId,
     workspaceRuntimeId: target.workspaceRuntimeId,
     branchName: workspacePaneTabsBranchIdentity(target),
     worktreePath: workspacePaneTabsTargetWorktreePath(target),

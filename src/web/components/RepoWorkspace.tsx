@@ -460,7 +460,7 @@ function WorkspaceRootPane({
 }) {
   const t = useT()
   const model = useWorkspaceRootTabModel(repo)
-  const target = { kind: 'workspace-root' as const, repoRoot: repo.id }
+  const target = { kind: 'workspace-root' as const, workspaceId: repo.id }
   const runtimeTarget = runtimeWorkspacePaneTarget(target, repo.workspaceRuntimeId)
   const terminalAvailable = repo.probe.capabilities.terminal.available
   const activePanel = model.selection?.tab === 'terminal' && !terminalAvailable ? null : (model.selection?.tab ?? null)

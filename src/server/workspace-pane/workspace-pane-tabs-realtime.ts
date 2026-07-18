@@ -11,17 +11,17 @@ export interface WorkspacePaneTabsRealtimeBroadcaster {
 export function broadcastWorkspacePaneTabsChanged(
   broadcaster: WorkspacePaneTabsRealtimeBroadcaster,
   userId: string,
-  repoRoot: string,
+  workspaceId: string,
 ): void {
-  broadcaster.broadcastToUser(userId, workspacePaneTabsInvalidatedRealtimeMessage(repoRoot))
+  broadcaster.broadcastToUser(userId, workspacePaneTabsInvalidatedRealtimeMessage(workspaceId))
 }
 
 export function broadcastWorkspacePaneTabsRevision(
   broadcaster: WorkspacePaneTabsRealtimeBroadcaster,
   userId: string,
-  repoRoot: string,
+  workspaceId: string,
   workspaceRuntimeId: string,
   revision: number,
 ): void {
-  broadcaster.broadcastToUser(userId, workspacePaneTabsRevisionRealtimeMessage(repoRoot, workspaceRuntimeId, revision))
+  broadcaster.broadcastToUser(userId, workspacePaneTabsRevisionRealtimeMessage(workspaceId, workspaceRuntimeId, revision))
 }

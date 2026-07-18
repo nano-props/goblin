@@ -34,7 +34,7 @@ describe('repo workspace pane tab model', () => {
     const model = createRepoWorkspaceTabModel({
       workspaceId: REPO_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      paneTarget: { kind: 'git-worktree', repoRoot: REPO_ID, worktreePath: WORKTREE_PATH },
+      paneTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
       worktreeHead: { kind: 'detached' },
       preferredTab: 'history',
       tabEntries: [staticEntry('status'), staticEntry('changes'), staticEntry('history'), staticEntry('files')],
@@ -52,7 +52,7 @@ describe('repo workspace pane tab model', () => {
     const model = createRepoWorkspaceTabModel({
       workspaceId,
       workspaceRuntimeId: 'repo-runtime-plain',
-      paneTarget: { kind: 'workspace-root', repoRoot: workspaceId },
+      paneTarget: { kind: 'workspace-root', workspaceId: workspaceId },
       preferredTab: 'files',
       tabEntries: [workspacePaneStaticTabEntry('files')],
       runtimeTabViews: [],
@@ -69,7 +69,7 @@ describe('repo workspace pane tab model', () => {
     const model = createRepoWorkspaceTabModel({
       workspaceId,
       workspaceRuntimeId: 'repo-runtime-plain',
-      paneTarget: { kind: 'workspace-root', repoRoot: workspaceId },
+      paneTarget: { kind: 'workspace-root', workspaceId: workspaceId },
       preferredTab: 'terminal',
       tabEntries: [
         workspacePaneStaticTabEntry('files'),
@@ -99,7 +99,7 @@ describe('repo workspace pane tab model', () => {
     const model = createRepoWorkspaceTabModel({
       workspaceId,
       workspaceRuntimeId: 'repo-runtime-plain',
-      paneTarget: { kind: 'workspace-root', repoRoot: workspaceId },
+      paneTarget: { kind: 'workspace-root', workspaceId: workspaceId },
       preferredTab: 'terminal',
       allowPreferredTabFallback: false,
       tabEntries: [workspacePaneStaticTabEntry('files'), terminalEntry(terminalSessionId)],
@@ -947,8 +947,8 @@ function createModel(input: RepoWorkspaceTabModelTestInput): RepoWorkspaceTabMod
     paneTarget: branchName
       ? requiredGitWorkspacePaneTabsTarget(modelInput.workspaceId, branchName, worktreePath)
       : worktreePath === modelInput.workspaceId
-        ? { kind: 'workspace-root', repoRoot: modelInput.workspaceId }
-        : { kind: 'inactive', repoRoot: modelInput.workspaceId },
+        ? { kind: 'workspace-root', workspaceId: modelInput.workspaceId }
+        : { kind: 'inactive', workspaceId: modelInput.workspaceId },
     worktreeHead: branchName && worktreePath ? { kind: 'branch', branchName } : undefined,
     runtimeTabStateByType: {
       ...runtimeTabStateByType,

@@ -55,7 +55,7 @@ vi.mock('#/server/modules/workspace-runtimes.ts', () => ({
     return probe
   }),
   workspaceProbeStateForRuntime: vi.fn(
-    (_userId, repoRoot) => mocks.workspaceProbes.get(repoRoot) ?? { status: 'probing' },
+    (_userId, workspaceId) => mocks.workspaceProbes.get(workspaceId) ?? { status: 'probing' },
   ),
 }))
 
@@ -70,8 +70,8 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
 }))
 
 vi.mock('#/server/modules/workspace-probe.ts', () => ({
-  probeWorkspace: vi.fn(async (repoRoot: string) =>
-    workspaceProbeFromLegacy(repoRoot, await mocks.probeRepo(repoRoot)),
+  probeWorkspace: vi.fn(async (workspaceId: string) =>
+    workspaceProbeFromLegacy(workspaceId, await mocks.probeRepo(workspaceId)),
   ),
 }))
 
@@ -89,15 +89,15 @@ describe('restoreServerWorkspace — active-only restore', () => {
       generation: 1,
     }))
     mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(true)
-    mocks.probeRepo.mockImplementation(async (repoRoot: string) => ({ ok: true, root: repoRoot, name: 'repo' }))
+    mocks.probeRepo.mockImplementation(async (workspaceId: string) => ({ ok: true, root: workspaceId, name: 'repo' }))
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       repoId: 'goblin+ssh://prod/srv/repo',
       name: 'prod:repo',
       lifecycle: { kind: 'ready', target: { id: 'goblin+ssh://prod/srv/repo' } },
     })
-    mocks.readRepoProjection.mockImplementation(async (repoRoot: string) => ({
-      snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: repoRoot } }] },
+    mocks.readRepoProjection.mockImplementation(async (workspaceId: string) => ({
+      snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: workspaceId } }] },
       status: [],
       pullRequests: null,
       operations: { operations: [], loadedAt: 0 },
@@ -330,9 +330,9 @@ describe('restoreServerWorkspace — active-only restore', () => {
       ],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.probeRepo.mockImplementation(async (repoRoot: string) => ({
+    mocks.probeRepo.mockImplementation(async (workspaceId: string) => ({
       ok: true,
-      root: repoRoot === 'goblin+file:///repo-stub/src' ? '/repo-stub' : repoRoot,
+      root: workspaceId === 'goblin+file:///repo-stub/src' ? '/repo-stub' : workspaceId,
       name: 'repo',
     }))
     const workspacePaneTabsHost = {
@@ -420,7 +420,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
   test('restores the workspace scope for non-active Git stubs without eagerly validating Git targets', async () => {
     const staleTargetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      repoRoot: 'goblin+file:///repo-stub',
+      workspaceId: 'goblin+file:///repo-stub',
       branchName: 'feature',
     })
     const workspace: ServerWorkspaceState = {
@@ -459,13 +459,13 @@ describe('restoreServerWorkspace — active-only restore', () => {
   })
 
   test('restores workspace-level layout when Git enrichment has a diagnostic', async () => {
-    const repoRoot = 'goblin+file:///repo'
+    const workspaceId = 'goblin+file:///repo'
     const workspace = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local' as const, id: repoRoot }],
+      openWorkspaceEntries: [{ kind: 'local' as const, id: workspaceId }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.workspaceProbes.set(repoRoot, {
+    mocks.workspaceProbes.set(workspaceId, {
       status: 'ready',
       name: 'repo',
       capabilities: {
@@ -489,9 +489,9 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(mocks.readRepoProjection).not.toHaveBeenCalled()
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
-      workspaceId: repoRoot,
+      workspaceId: workspaceId,
       workspaceRuntimeId: 'runtime-goblin_file____repo',
-      expectedRepoEntry: { kind: 'local', id: repoRoot },
+      expectedWorkspaceEntry: { kind: 'local', id: workspaceId },
       targets: [{ kind: 'workspace-root' }],
     })
   })
@@ -510,14 +510,14 @@ function gitProbe() {
   }
 }
 
-function workspaceProbeFromLegacy(repoRoot: string, result: { ok: boolean; root?: string; name?: string }) {
+function workspaceProbeFromLegacy(workspaceId: string, result: { ok: boolean; root?: string; name?: string }) {
   const reportedRoot = result.root?.startsWith('goblin+')
     ? result.root
     : result.root
       ? `goblin+file://${result.root}`
       : null
   return result.ok
-    ? reportedRoot && reportedRoot !== repoRoot
+    ? reportedRoot && reportedRoot !== workspaceId
       ? {
           ...gitProbe(),
           name: result.name ?? 'repo',

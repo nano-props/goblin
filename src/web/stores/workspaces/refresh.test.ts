@@ -1365,7 +1365,7 @@ describe('projection refresh request ordering', () => {
     updateRepoForTest((repo) => {
       repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
         repo.ui,
-        { kind: 'git-branch', repoRoot: REPO_ID, branchName: 'feature/a' },
+        { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/a' },
         'terminal',
       )
     })
@@ -1380,7 +1380,7 @@ describe('projection refresh request ordering', () => {
       repo && projection
         ? preferredWorkspacePaneTabForTarget(
             repo.ui,
-            workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: projection.branches }, 'feature/a'),
+            workspacePaneTabsTargetForRepoBranch({ workspaceId: repo.id, branches: projection.branches }, 'feature/a'),
           )
         : null,
     ).toBe('terminal')
@@ -1394,7 +1394,7 @@ describe('projection refresh request ordering', () => {
     updateRepoForTest((repo) => {
       repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
         repo.ui,
-        { kind: 'git-worktree', repoRoot: REPO_ID, worktreePath: '/tmp/worktree-a' },
+        { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: '/tmp/worktree-a' },
         'terminal',
       )
     })
@@ -1412,7 +1412,7 @@ describe('projection refresh request ordering', () => {
       repo && projection
         ? preferredWorkspacePaneTabForTarget(
             repo.ui,
-            workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: projection.branches }, 'feature/new'),
+            workspacePaneTabsTargetForRepoBranch({ workspaceId: repo.id, branches: projection.branches }, 'feature/new'),
           )
         : null,
     ).toBe('terminal')
@@ -1420,8 +1420,8 @@ describe('projection refresh request ordering', () => {
 
   test('repo read-model projection refresh prunes terminal sessions to current worktree paths', async () => {
     const workspaceRuntimeId = seedRepo([branch('stale', undefined, { worktree: { path: '/tmp/stale-worktree' } })])
-    const calls: Array<{ repoRoot: string }> = []
-    ipcHandlers['terminal.prune'] = async (input: { repoRoot: string }) => {
+    const calls: Array<{ workspaceId: string }> = []
+    ipcHandlers['terminal.prune'] = async (input: { workspaceId: string }) => {
       calls.push(input)
       return { pruned: 1, remaining: 1 }
     }
@@ -1439,7 +1439,7 @@ describe('projection refresh request ordering', () => {
 
     expect(calls).toEqual([
       expect.objectContaining({
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
       }),
     ])
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!

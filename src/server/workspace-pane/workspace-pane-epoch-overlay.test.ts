@@ -20,7 +20,7 @@ import {
 } from '#/shared/workspace-pane.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-const scope = { userId: 'user-a', repoRoot: '/repo', workspaceRuntimeId: 'runtime-a' }
+const scope = { userId: 'user-a', workspaceId: '/repo', workspaceRuntimeId: 'runtime-a' }
 const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')
 const worktreeRoot = canonicalWorkspaceLocator('goblin+file:///repo/worktree')
 const linkedWorkspaceId = canonicalWorkspaceLocator('goblin+file:///linked')
@@ -106,7 +106,7 @@ describe('workspace pane epoch overlay', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree')
     const lease = physicalWorktreeAdmissionLease(capability)
     const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-stalephysicalidentity1')
-    const linkedScope = { userId: 'user-a', repoRoot: '/linked', workspaceRuntimeId: 'runtime-linked' }
+    const linkedScope = { userId: 'user-a', workspaceId: '/linked', workspaceRuntimeId: 'runtime-linked' }
     const linkedTarget = {
       kind: 'git-worktree' as const,
       workspaceId: linkedWorkspaceId,

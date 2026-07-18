@@ -48,7 +48,7 @@ describe('useWorkspacePaneTabDragPreview', () => {
     setWorkspacePaneTabsForTargetQueryData(
       {
         kind: 'git-worktree' as const,
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         worktreePath: WORKTREE_PATH,
         tabs: sourceTabs,
@@ -185,7 +185,7 @@ describe('useWorkspacePaneTabDragPreview', () => {
 
 interface PreviewInputOverrides {
   kind?: 'workspace-root' | 'inactive'
-  repoRoot?: string
+  workspaceId?: string
   workspaceRuntimeId?: string
   branchName?: string | null
   worktreePath?: string | null
@@ -197,13 +197,13 @@ function renderPreviewHook(input: PreviewInputOverrides = {}) {
 }
 
 function previewInput(input: PreviewInputOverrides = {}): WorkspacePaneTabDragPreviewInput {
-  const repoRoot = input.repoRoot ?? REPO_ROOT
+  const workspaceId = input.workspaceId ?? REPO_ROOT
   const workspaceRuntimeId = input.workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID
   const canonicalTabs = input.canonicalTabs ?? []
   if (input.kind === 'workspace-root') {
     return {
       kind: 'workspace-root',
-      repoRoot,
+      workspaceId,
       workspaceRuntimeId,
 
       canonicalTabs,
@@ -212,7 +212,7 @@ function previewInput(input: PreviewInputOverrides = {}): WorkspacePaneTabDragPr
   if (input.kind === 'inactive' || input.branchName === null) {
     return {
       kind: 'inactive',
-      repoRoot,
+      workspaceId,
       workspaceRuntimeId,
       branchName: null,
       worktreePath: null,
@@ -221,7 +221,7 @@ function previewInput(input: PreviewInputOverrides = {}): WorkspacePaneTabDragPr
   }
   return {
     kind: 'git-worktree',
-    repoRoot,
+    workspaceId,
     workspaceRuntimeId,
     worktreePath: input.worktreePath ?? WORKTREE_PATH,
     canonicalTabs,
@@ -242,7 +242,7 @@ function readWorkspacePaneTabsFromQueryCache(queryClient: QueryClient): Workspac
   return readWorkspacePaneTabsForTarget(
     {
       kind: 'git-worktree' as const,
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       worktreePath: WORKTREE_PATH,
     },

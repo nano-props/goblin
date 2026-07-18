@@ -62,7 +62,7 @@ async function restoreWorkspacePaneTabsForWorkspaces(
     const result = await input.workspacePaneTabsHost.restoreTabs(input.userId, {
       workspaceId: workspace.workspaceId,
       workspaceRuntimeId: workspace.workspaceRuntimeId,
-      expectedRepoEntry: workspace.entry,
+      expectedWorkspaceEntry: workspace.entry,
       targets,
     })
     if (result.kind === 'membership-conflict') return result
@@ -102,6 +102,6 @@ function restorableWorktreeTarget(workspaceId: string, nativePath: string): Rest
   return root ? { kind: 'git-worktree', root } : null
 }
 
-export function workspaceEntry(workspace: ServerWorkspaceState, repoRoot: string) {
-  return workspace.openWorkspaceEntries.find((entry) => workspaceSessionEntryId(entry) === repoRoot) ?? null
+export function workspaceEntry(workspace: ServerWorkspaceState, workspaceId: string) {
+  return workspace.openWorkspaceEntries.find((entry) => workspaceSessionEntryId(entry) === workspaceId) ?? null
 }

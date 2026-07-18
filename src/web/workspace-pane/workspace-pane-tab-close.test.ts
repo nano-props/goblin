@@ -38,7 +38,7 @@ const BRANCH_NAME = 'feature/worktree-close'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-close-worktree'
 const WORKTREE_PANE_TARGET = {
   kind: 'git-worktree' as const,
-  repoRoot: REPO_ID,
+  workspaceId: REPO_ID,
   worktreePath: WORKTREE_PATH,
 }
 
@@ -92,7 +92,7 @@ test('closes a workspace-root static tab through the shared tab transaction', as
   const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
   const target = {
     kind: 'workspace-root' as const,
-    repoRoot: REPO_ID,
+    workspaceId: REPO_ID,
     workspaceRuntimeId: repo.workspaceRuntimeId,
   }
   setWorkspacePaneTabsForTargetQueryData({
@@ -105,7 +105,7 @@ test('closes a workspace-root static tab through the shared tab transaction', as
 
   await expect(
     dispatchCloseWorkspacePaneTabAction({
-      paneTarget: { kind: 'workspace-root', repoRoot: REPO_ID },
+      paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
       workspaceId: REPO_ID,
       workspacePaneRoute: undefined,
       navigation: navigationWith(),
@@ -166,7 +166,7 @@ test('sends a detached worktree close to the server without requiring a branch',
   const terminalWorktreeKey = `${REPO_ID}\0${WORKTREE_PATH}`
   const runtimeTarget = runtimeWorkspacePaneTargetForTest({
     kind: 'git-worktree' as const,
-    repoRoot: REPO_ID,
+    workspaceId: REPO_ID,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath: WORKTREE_PATH,
   })
@@ -232,7 +232,7 @@ test('confirmed workspace terminal close selects Files without inventing a branc
   const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
   const targetInput = {
     kind: 'workspace-root' as const,
-    repoRoot: REPO_ID,
+    workspaceId: REPO_ID,
     workspaceRuntimeId: repo.workspaceRuntimeId,
   }
   const runtimeTarget = runtimeWorkspacePaneTargetForTest(targetInput)
@@ -297,7 +297,7 @@ test('confirmed workspace terminal close selects Files without inventing a branc
 
   await expect(
     dispatchConfirmCloseTerminalWorkspacePaneTabAction({
-      paneTarget: { kind: 'workspace-root', repoRoot: REPO_ID },
+      paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
       workspaceId: REPO_ID,
       workspacePaneRoute: undefined,
       navigation,
@@ -370,7 +370,7 @@ test('does not let a late close from an old runtime navigate or clear the replac
   })
   setWorkspacePaneTabsForTargetQueryData({
     kind: 'git-worktree' as const,
-    repoRoot: REPO_ID,
+    workspaceId: REPO_ID,
     workspaceRuntimeId: replacementRuntimeId,
     worktreePath: WORKTREE_PATH,
     tabs: [workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('status')],

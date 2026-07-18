@@ -11,7 +11,7 @@ import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 export const INITIAL_WORKSPACE_PANE_TAB: WorkspacePaneTabType = 'status'
 
 interface WorkspacePaneTargetBranches {
-  repoRoot: string
+  workspaceId: string
   branches: ReadonlyArray<{ name: string; worktree?: { path?: string } | undefined }>
 }
 
@@ -23,9 +23,9 @@ export function workspacePaneTabsTargetForRepoBranch(
   const branch = repo.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return null
   if (!branch.worktree?.path) {
-    return { kind: 'git-branch', repoRoot: repo.repoRoot, branchName: branch.name }
+    return { kind: 'git-branch', workspaceId: repo.workspaceId, branchName: branch.name }
   }
-  return gitWorktreeWorkspacePaneTabsTarget(repo.repoRoot, branch.worktree.path)
+  return gitWorktreeWorkspacePaneTabsTarget(repo.workspaceId, branch.worktree.path)
 }
 
 export function workspacePaneTabsTargetForRepoTargetKey(
@@ -33,19 +33,19 @@ export function workspacePaneTabsTargetForRepoTargetKey(
   targetKey: string,
 ): WorkspacePaneTabsTarget | null {
   const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
-  if (!target || target.repoRoot !== repo.repoRoot) return null
+  if (!target || target.workspaceId !== repo.workspaceId) return null
   if (target.kind === 'workspace-root') {
-    return { kind: 'workspace-root', repoRoot: repo.repoRoot }
+    return { kind: 'workspace-root', workspaceId: repo.workspaceId }
   }
   if (target.kind === 'branch') {
     return repo.branches.some((branch) => branch.name === target.branchName)
-      ? { kind: 'git-branch', repoRoot: repo.repoRoot, branchName: target.branchName }
+      ? { kind: 'git-branch', workspaceId: repo.workspaceId, branchName: target.branchName }
       : null
   }
   const worktreePath = parseCanonicalWorkspaceLocator(target.worktreeId)?.path
   if (!worktreePath) return null
   const branch = repo.branches.find((candidate) => candidate.worktree?.path === worktreePath)
-  return branch ? gitWorktreeWorkspacePaneTabsTarget(repo.repoRoot, worktreePath) : null
+  return branch ? gitWorktreeWorkspacePaneTabsTarget(repo.workspaceId, worktreePath) : null
 }
 
 export function preferredWorkspacePaneTabForTarget(

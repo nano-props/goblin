@@ -60,7 +60,7 @@ vi.mock('#/web/settings-actions.ts', async () => {
   }
 })
 
-const ipcEventListeners = new Set<(event: { type: string; repoRoot?: string; key?: string }) => void>()
+const ipcEventListeners = new Set<(event: { type: string; workspaceId?: string; key?: string }) => void>()
 const intentListeners = new Set<(event: any) => void>()
 const closeAllOverlays = vi.fn()
 let overlayOpen = false
@@ -129,7 +129,7 @@ beforeEach(() => {
     value: {
       invokeIpc: vi.fn(async () => null),
       abortIpc: vi.fn(async () => true),
-      onEvent: vi.fn((cb: (event: { type: string; repoRoot?: string; key?: string }) => void) => {
+      onEvent: vi.fn((cb: (event: { type: string; workspaceId?: string; key?: string }) => void) => {
         ipcEventListeners.add(cb)
         return () => {
           ipcEventListeners.delete(cb)
@@ -187,7 +187,7 @@ describe('useClientEffectIntentRouter', () => {
 
     expect(intentListeners.size).toBeGreaterThan(0)
     await act(async () => {
-      for (const listener of intentListeners) listener({ type: 'terminal-bell-click', repoRoot: repo.id })
+      for (const listener of intentListeners) listener({ type: 'terminal-bell-click', workspaceId: repo.id })
       await Promise.resolve()
     })
 
@@ -221,7 +221,7 @@ describe('useClientEffectIntentRouter', () => {
 
     await act(async () => {
       for (const listener of intentListeners)
-        listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalSessionId, terminalWorktreeKey })
+        listener({ type: 'terminal-bell-click', workspaceId: repo.id, terminalSessionId, terminalWorktreeKey })
     })
 
     await waitFor(() => {
@@ -267,7 +267,7 @@ describe('useClientEffectIntentRouter', () => {
 
     await act(async () => {
       for (const listener of intentListeners)
-        listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalSessionId, terminalWorktreeKey })
+        listener({ type: 'terminal-bell-click', workspaceId: repo.id, terminalSessionId, terminalWorktreeKey })
     })
 
     await waitFor(() => {
@@ -474,7 +474,7 @@ describe('useClientEffectIntentRouter', () => {
       if (!branchName) throw new Error('expected Git worktree terminal fixture')
       visibleSessionIds = [...visibleSessionIds, terminalSessionId]
       workspacePaneTabsTestBridge.addRuntimeTab({
-        repoRoot: coordinates.repoRoot,
+        workspaceId: coordinates.repoRoot,
         workspaceRuntimeId: coordinates.workspaceRuntimeId,
         branchName,
         worktreePath: terminalExecutionPath(base.target),
@@ -630,7 +630,7 @@ function preferredWorkspacePaneTab(repoId: string) {
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
         workspacePaneTabsTargetForRepoBranch(
-          { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+          { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
           'main',
         ),
       )

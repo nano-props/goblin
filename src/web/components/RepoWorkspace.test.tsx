@@ -348,7 +348,7 @@ describe('RepoWorkspace', () => {
     const repo = useWorkspacesStore.getState().workspaces[workspaceId]!
     useWorkspacesStore
       .getState()
-      .setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: workspaceId }, 'status')
+      .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: workspaceId }, 'status')
     primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
       topLevelFileCount: 7,
       topLevelDirectoryCount: 3,
@@ -414,18 +414,18 @@ describe('RepoWorkspace', () => {
     })
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'workspace-root',
-      repoRoot: workspaceId,
+      workspaceId: workspaceId,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
     })
     useWorkspacesStore
       .getState()
-      .setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: workspaceId }, 'files')
+      .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: workspaceId }, 'files')
     const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(workspaceId, workspaceId)
     const closeTerminalByDescriptor = vi.fn(async () => {
       setWorkspacePaneTabsForTargetQueryData({
         kind: 'workspace-root',
-        repoRoot: workspaceId,
+        workspaceId: workspaceId,
         workspaceRuntimeId: repo.workspaceRuntimeId,
         tabs: [workspacePaneStaticTabEntry('files')],
       })
@@ -450,7 +450,7 @@ describe('RepoWorkspace', () => {
         useWorkspacesStore
           .getState()
           .setWorkspacePaneTabForTarget(
-            { kind: 'workspace-root', repoRoot: workspaceId },
+            { kind: 'workspace-root', workspaceId: workspaceId },
             presentation.kind === 'terminal' ? 'terminal' : presentation.tab,
           )
         options?.onCommit?.()
@@ -512,7 +512,7 @@ describe('RepoWorkspace', () => {
     })
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'workspace-root',
-      repoRoot: workspaceId,
+      workspaceId: workspaceId,
       workspaceRuntimeId: repo.workspaceRuntimeId,
 
       tabs: [],
@@ -846,7 +846,7 @@ describe('RepoWorkspace', () => {
       const branchName = terminalPresentationBranch(base.presentation)
       if (!branchName) throw new Error('expected Git worktree terminal fixture')
       workspacePaneTabsTestBridge.addRuntimeTab({
-        repoRoot: coordinates.repoRoot,
+        workspaceId: coordinates.repoRoot,
         workspaceRuntimeId: coordinates.workspaceRuntimeId,
         branchName,
         worktreePath: terminalExecutionPath(base.target),
@@ -1299,7 +1299,7 @@ describe('RepoWorkspace', () => {
         repo &&
           preferredWorkspacePaneTabForTarget(repo.ui, {
             kind: 'git-branch' as const,
-            repoRoot: REPO_ID,
+            workspaceId: REPO_ID,
             branchName,
           }),
       ).toBe('history')
@@ -1340,7 +1340,7 @@ describe('RepoWorkspace', () => {
         repo &&
           preferredWorkspacePaneTabForTarget(repo.ui, {
             kind: 'git-branch' as const,
-            repoRoot: REPO_ID,
+            workspaceId: REPO_ID,
             branchName,
           }),
       ).toBeNull()
@@ -1399,7 +1399,7 @@ describe('RepoWorkspace', () => {
       recordWorkspacePaneTabOpener(
         {
           kind: 'git-worktree',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           worktreePath,
         },
         repo.workspaceRuntimeId,
@@ -1478,7 +1478,7 @@ describe('RepoWorkspace', () => {
     })
     const paneTarget = {
       kind: 'git-worktree' as const,
-      repoRoot: REPO_ID,
+      workspaceId: REPO_ID,
       worktreePath,
     }
     expect(workspacePaneTabOpener(paneTarget, repo.workspaceRuntimeId, 'workspace-pane:files')).toBe(
@@ -1587,7 +1587,7 @@ describe('RepoWorkspace', () => {
 
     act(() => {
       setWorkspacePaneTabsForTargetQueryData({
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,
         branchName,
         worktreePath,
@@ -1759,7 +1759,7 @@ describe('RepoWorkspace', () => {
         repo &&
           preferredWorkspacePaneTabForTarget(repo.ui, {
             kind: 'git-branch' as const,
-            repoRoot: REPO_ID,
+            workspaceId: REPO_ID,
             branchName,
           }),
       ).toBe('status')

@@ -206,7 +206,7 @@ export function createPrimaryWindowNavigationActions({
             )
           }
           state.setWorkspacePaneTabForTarget(
-            { kind: 'workspace-root', repoRoot: workspaceId },
+            { kind: 'workspace-root', workspaceId: workspaceId },
             presentation.kind === 'terminal' ? 'terminal' : presentation.tab,
           )
           options?.onCommit?.()

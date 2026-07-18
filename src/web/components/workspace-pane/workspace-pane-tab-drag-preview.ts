@@ -14,7 +14,7 @@ interface WorkspacePaneTabDragPreviewSnapshot {
 }
 
 type WorkspacePaneTabDragPreviewTarget =
-  WorkspacePaneTabsTarget | { kind: 'inactive'; repoRoot: string; branchName: null; worktreePath: null }
+  WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: string; branchName: null; worktreePath: null }
 
 export type WorkspacePaneTabDragPreviewInput = WorkspacePaneTabDragPreviewTarget & {
   workspaceRuntimeId: string

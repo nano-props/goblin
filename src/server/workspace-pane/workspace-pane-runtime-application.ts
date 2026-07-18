@@ -43,8 +43,8 @@ interface WorkspacePaneRuntimeApplicationDependencies {
   terminalWorktree: {
     listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
   }
-  isCurrentWorkspaceRuntime(userId: string, repoRoot: string, workspaceRuntimeId: string): boolean
-  broadcastWorkspaceTabsChanged(userId: string, repoRoot: string, workspaceRuntimeId: string, revision: number): void
+  isCurrentWorkspaceRuntime(userId: string, workspaceId: string, workspaceRuntimeId: string): boolean
+  broadcastWorkspaceTabsChanged(userId: string, workspaceId: string, workspaceRuntimeId: string, revision: number): void
 }
 
 /**
@@ -68,24 +68,24 @@ export class WorkspacePaneRuntimeApplication {
     const runtimeTarget = input.request.target
     const restorableTarget = restorableWorkspacePaneTargetFromRuntime(runtimeTarget)
     const worktreePath = terminalSessionTargetWorktreePath(runtimeTarget)
-    const repoRoot = runtimeTarget.workspaceId
+    const workspaceId = runtimeTarget.workspaceId
     const workspaceRuntimeId = runtimeTarget.workspaceRuntimeId
     if (!restorableTarget || !worktreePath) {
       return runtimeFailure(input.runtimeType, 'error.invalid-arguments')
     }
-    const scope = terminalSessionRuntimeScope(repoRoot, workspaceRuntimeId)
-    if (!this.deps.isCurrentWorkspaceRuntime(userId, repoRoot, workspaceRuntimeId)) {
+    const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
+    if (!this.deps.isCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId)) {
       return runtimeFailure(input.runtimeType, 'error.workspace-runtime-stale')
     }
     // Runtime admission is a server-owned capability boundary. The client may
     // still render a terminal action from an older projection while a probe
     // transition is in flight, so never admit PTY creation from UI state.
-    if (!this.terminalCapabilityAvailable(userId, repoRoot, workspaceRuntimeId)) {
+    if (!this.terminalCapabilityAvailable(userId, workspaceId, workspaceRuntimeId)) {
       return runtimeFailure(input.runtimeType, 'error.unavailable')
     }
     let physicalCapability: PhysicalWorktreeExecutionCapability
     try {
-      physicalCapability = await this.capturePhysicalWorktree(userId, { repoRoot, workspaceRuntimeId }, worktreePath)
+      physicalCapability = await this.capturePhysicalWorktree(userId, { workspaceId, workspaceRuntimeId }, worktreePath)
     } catch (error) {
       await failRemoteWorkspaceRuntimeIfNeeded(userId, error)
       return runtimeFailure(input.runtimeType, error instanceof Error ? error.message : String(error))
@@ -93,7 +93,7 @@ export class WorkspacePaneRuntimeApplication {
     let result: { admitted: true; value: WorkspacePaneRuntimeOpenResult } | { admitted: false }
     try {
       result = await this.deps.worktreeOperations.runOperation(physicalCapability, async (permit) => {
-        if (!this.terminalCapabilityAvailable(userId, repoRoot, workspaceRuntimeId)) {
+        if (!this.terminalCapabilityAvailable(userId, workspaceId, workspaceRuntimeId)) {
           return runtimeFailure(input.runtimeType, 'error.unavailable')
         }
         switch (input.runtimeType) {
@@ -131,7 +131,7 @@ export class WorkspacePaneRuntimeApplication {
     try {
       physicalCapability = await this.capturePhysicalWorktree(
         userId,
-        { repoRoot: target.target.workspaceId, workspaceRuntimeId: target.target.workspaceRuntimeId },
+        { workspaceId: target.target.workspaceId, workspaceRuntimeId: target.target.workspaceRuntimeId },
         worktreePath,
       )
     } catch (error) {
@@ -213,7 +213,7 @@ export class WorkspacePaneRuntimeApplication {
     } catch (error) {
       if (committedRuntime === null) runtime.admission.abort()
       workspacePaneRuntimeApplicationLogger.error(
-        { error, userId, repoRoot: target.workspaceId, worktreePath },
+        { error, userId, workspaceId: target.workspaceId, worktreePath },
         'terminal open application command failed',
       )
       return runtimeFailure(
@@ -296,12 +296,12 @@ export class WorkspacePaneRuntimeApplication {
 
   private async capturePhysicalWorktree(
     userId: string,
-    target: { repoRoot: string; workspaceRuntimeId: string },
+    target: { workspaceId: string; workspaceRuntimeId: string },
     worktreePath: string,
   ): Promise<PhysicalWorktreeExecutionCapability> {
     const input = {
       userId,
-      repoRoot: target.repoRoot,
+      repoRoot: target.workspaceId,
       workspaceRuntimeId: target.workspaceRuntimeId,
       worktreePath,
     }

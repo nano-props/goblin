@@ -164,7 +164,7 @@ const OTHER_REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-workspace-co
 const WORKTREE_PATH = '/tmp/goblin-workspace-command-worktree'
 const WORKTREE_PANE_TARGET = {
   kind: 'git-worktree' as const,
-  repoRoot: REPO_ID,
+  workspaceId: REPO_ID,
   worktreePath: WORKTREE_PATH,
   head: { kind: 'branch' as const, branchName: 'feature/worktree' },
 }
@@ -880,7 +880,7 @@ describe('workspace commands', () => {
     })
     workspacePaneTabsTestBridge.addRuntimeTab({
       kind: 'git-worktree' as const,
-      repoRoot: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: workspaceRuntimeIdForTest(),
       worktreePath: WORKTREE_PATH,
       terminalSessionId: 'term-111111111111111111111',
@@ -1798,7 +1798,7 @@ describe('workspace commands', () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branchSnapshots: [], currentBranchName: null })
     const target = {
       kind: 'workspace-root' as const,
-      repoRoot: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: repo.workspaceRuntimeId,
     }
     setWorkspacePaneTabsForTargetQueryData({
@@ -1821,7 +1821,7 @@ describe('workspace commands', () => {
     expect(
       readWorkspacePaneTabsForTarget({
         kind: 'workspace-root',
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,
       }).map((tab) => tab.type),
     ).toEqual(['files'])
@@ -1834,7 +1834,7 @@ describe('workspace commands', () => {
       const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branchSnapshots: [], currentBranchName: null })
       const target = {
         kind: 'workspace-root' as const,
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,
       }
       setWorkspacePaneTabsForTargetQueryData({ ...target, tabs: [staticEntry('status'), staticEntry('files')] })
@@ -1866,7 +1866,7 @@ describe('workspace commands', () => {
       expect(
         preferredWorkspacePaneTabForTarget(useWorkspacesStore.getState().workspaces[REPO_ID]!.ui, {
           kind: 'workspace-root',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
         }),
       ).toBe(tabType)
     },
@@ -2907,7 +2907,7 @@ function preferredWorkspacePaneTab(branch = 'feature/worktree') {
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
         workspacePaneTabsTargetForRepoBranch(
-          { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+          { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
           branch,
         ),
       )
@@ -2922,7 +2922,7 @@ function tabsFor(branch: string): WorkspacePaneTabEntry[] {
   const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
   const target = repo
     ? workspacePaneTabsTargetForRepoBranch(
-        { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+        { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
         branch,
       )
     : null
@@ -3017,7 +3017,7 @@ function recordCreatedTerminalSelection(base: TerminalSessionBase, terminalSessi
   const branchName = terminalPresentationBranch(base.presentation)
   if (!branchName) return
   workspacePaneTabsTestBridge.addRuntimeTab({
-    repoRoot: coordinates.repoRoot,
+    workspaceId: coordinates.repoRoot,
     workspaceRuntimeId: coordinates.workspaceRuntimeId,
     branchName,
     worktreePath: terminalExecutionPath(base.target),
@@ -3034,7 +3034,7 @@ function removeTerminalFromWorkspacePaneTabsServer(base: TerminalSessionBase, te
   const branchName = terminalPresentationBranch(base.presentation)
   if (!branchName) throw new Error('expected Git worktree terminal fixture')
   workspacePaneTabsTestBridge.removeRuntimeTab({
-    repoRoot: coordinates.repoRoot,
+    workspaceId: coordinates.repoRoot,
     workspaceRuntimeId: coordinates.workspaceRuntimeId,
     branchName,
     worktreePath: terminalExecutionPath(base.target),
@@ -3338,7 +3338,7 @@ function navigationWith(
       useWorkspacesStore
         .getState()
         .setWorkspacePaneTabForTarget(
-          { kind: 'workspace-root', repoRoot: workspaceId },
+          { kind: 'workspace-root', workspaceId: workspaceId },
           presentation.kind === 'terminal' ? 'terminal' : presentation.tab,
         )
       options?.onCommit?.()

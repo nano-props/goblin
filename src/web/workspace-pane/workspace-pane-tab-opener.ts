@@ -22,7 +22,7 @@ export function captureWorkspacePaneActiveTabIdentity(
   workspaceRuntimeId: string,
   options: WorkspacePaneTabTargetOptions,
 ): string | null {
-  const repo = useWorkspacesStore.getState().workspaces[target.repoRoot]
+  const repo = useWorkspacesStore.getState().workspaces[target.workspaceId]
   if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId) return null
   const projection = readWorkspacePaneTabsProjectionForTarget({ ...target, workspaceRuntimeId: workspaceRuntimeId })
   if (projection.phase !== 'ready') return null
@@ -52,7 +52,7 @@ export function recordWorkspacePaneTabOpener(
   openerIdentity: string,
 ): WorkspacePaneTabOpenerRecordResult {
   const state = useWorkspacesStore.getState()
-  const repo = state.workspaces[target.repoRoot]
+  const repo = state.workspaces[target.workspaceId]
   if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId) return 'missing'
   state.setTabOpener(runtimeScopedTabOpenerKey(target, workspaceRuntimeId), childIdentity, openerIdentity)
   return 'recorded'

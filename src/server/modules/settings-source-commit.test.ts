@@ -38,7 +38,7 @@ test('commits a layout CAS with one durable write', async () => {
 
   await expect(
     repository.compareAndSwap({
-      repoRoot: REPO_A,
+      workspaceId: REPO_A,
       expected: current.layout,
       replacement: {
         entries: [{ target: { kind: 'git-branch', branch: 'main' }, tabs: [] }],

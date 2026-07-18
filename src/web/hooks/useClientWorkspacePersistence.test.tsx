@@ -56,7 +56,7 @@ describe('useClientWorkspacePersistence', () => {
     const worktreePath = '/tmp/repo-worktree'
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-worktree',
-      repoRoot: 'goblin+file:///tmp/repo',
+      workspaceId: 'goblin+file:///tmp/repo',
       worktreePath,
     })
     const terminalWorktreeKey = formatTerminalWorktreeKeyForPath('goblin+file:///tmp/repo', worktreePath)

@@ -72,12 +72,12 @@ export function WorkspacePaneTargetToolbar({
   const persistenceTarget = useMemo(
     () =>
       target.kind === 'workspace-root'
-        ? { kind: 'workspace-root' as const, repoRoot: target.workspaceId }
+        ? { kind: 'workspace-root' as const, workspaceId: target.workspaceId }
         : target.kind === 'git-branch'
-          ? { kind: 'git-branch' as const, repoRoot: target.workspaceId, branchName: target.branchName }
+          ? { kind: 'git-branch' as const, workspaceId: target.workspaceId, branchName: target.branchName }
           : {
               kind: 'git-worktree' as const,
-              repoRoot: target.workspaceId,
+              workspaceId: target.workspaceId,
               worktreePath: target.rootPath,
             },
     [branchName, rootPath, target.kind, target.workspaceId],

@@ -12,7 +12,7 @@ import {
 import { gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
 import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-export type RepoWorkspacePaneModelTarget = WorkspacePaneTabsTarget | { kind: 'inactive'; repoRoot: string }
+export type RepoWorkspacePaneModelTarget = WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: string }
 import {
   WORKSPACE_PANE_RUNTIME_TAB_TYPES,
   isWorkspacePaneRuntimeTabEntry,
@@ -182,10 +182,10 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
         )
       : normalizedTabEntries
   const runtimeTabTargetKeyByType = workspacePaneRuntimeTabTargetKeyByType({
-    repoRoot: input.workspaceId,
+    workspaceId: input.workspaceId,
     worktreePath,
   })
-  const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ repoRoot: input.workspaceId, worktreePath })
+  const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ workspaceId: input.workspaceId, worktreePath })
   const hasWorktree = !!worktreePath
   const runtimeTabStateByType = runtimeTabStateByTypeFromInput(input)
   const runtimeViews = input.runtimeTabViews.filter((view) => !!runtimeTabTargetKeyByType[view.type])
@@ -258,7 +258,7 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
 function paneTargetFilesystemPath(target: RepoWorkspacePaneModelTarget): string | null {
   if (target.kind === 'inactive' || target.kind === 'git-branch') return null
   if (target.kind === 'git-worktree') return workspacePaneTabsTargetWorktreePath(target)
-  return parseCanonicalWorkspaceLocator(target.repoRoot)?.path ?? null
+  return parseCanonicalWorkspaceLocator(target.workspaceId)?.path ?? null
 }
 
 function paneTargetPresentationBranch(

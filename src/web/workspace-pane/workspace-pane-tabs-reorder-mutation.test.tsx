@@ -141,7 +141,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
         <HookHost
           input={{
             kind: 'git-worktree' as const,
-            repoRoot: REPO_ROOT,
+            workspaceId: REPO_ROOT,
             workspaceRuntimeId: NEXT_WORKSPACE_RUNTIME_ID,
             worktreePath: WORKTREE_PATH,
             canonicalTabs: sourceTabs,
@@ -176,7 +176,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     setWorkspacePaneTabsForTargetQueryData(
       {
         kind: 'workspace-root',
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
 
         tabs: sourceTabs,
@@ -214,10 +214,10 @@ function renderMutationHook(
 ) {
   const target =
     input.kind === 'workspace-root'
-      ? { kind: 'workspace-root' as const, repoRoot: REPO_ROOT }
+      ? { kind: 'workspace-root' as const, workspaceId: REPO_ROOT }
       : {
           kind: 'git-worktree' as const,
-          repoRoot: REPO_ROOT,
+          workspaceId: REPO_ROOT,
           worktreePath: WORKTREE_PATH,
         }
   return renderInJsdom(
@@ -248,7 +248,7 @@ function readWorkspacePaneTabs(workspaceRuntimeId: string = WORKSPACE_RUNTIME_ID
   return readWorkspacePaneTabsForTarget(
     {
       kind: 'git-worktree',
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId,
       worktreePath: WORKTREE_PATH,
     },
@@ -258,7 +258,7 @@ function readWorkspacePaneTabs(workspaceRuntimeId: string = WORKSPACE_RUNTIME_ID
 
 function seedWorkspacePaneTabs(tabs: WorkspacePaneTabEntry[], workspaceRuntimeId: string = WORKSPACE_RUNTIME_ID): void {
   setWorkspacePaneTabsForTargetQueryData(
-    { repoRoot: REPO_ROOT, workspaceRuntimeId, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH, tabs },
+    { workspaceId: REPO_ROOT, workspaceRuntimeId, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH, tabs },
     queryClient,
   )
 }

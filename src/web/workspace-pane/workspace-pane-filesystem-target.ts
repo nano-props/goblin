@@ -21,7 +21,7 @@ export function workspacePaneFilesystemRuntimeTarget(
 ): RuntimeWorkspacePaneTarget | null {
   const tabsTarget =
     target.kind === 'workspace-root'
-      ? { kind: 'workspace-root' as const, repoRoot: target.workspaceId }
+      ? { kind: 'workspace-root' as const, workspaceId: target.workspaceId }
       : gitWorktreeWorkspacePaneTabsTarget(target.workspaceId, target.rootPath)
   return tabsTarget ? runtimeWorkspacePaneTarget(tabsTarget, target.workspaceRuntimeId) : null
 }
@@ -45,7 +45,7 @@ export function workspacePaneTerminalBaseFromCoordinates(input: {
 }): TerminalSessionBase | null {
   const tabsTarget =
     input.branchName === null
-      ? { kind: 'workspace-root' as const, repoRoot: input.workspaceId }
+      ? { kind: 'workspace-root' as const, workspaceId: input.workspaceId }
       : gitWorktreeWorkspacePaneTabsTarget(input.workspaceId, input.rootPath)
   const runtimeTarget = tabsTarget ? runtimeWorkspacePaneTarget(tabsTarget, input.workspaceRuntimeId) : null
   if (!runtimeTarget) return null

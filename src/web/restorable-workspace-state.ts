@@ -230,7 +230,7 @@ function preferredWorkspacePaneTabsForClientWorkspace(
 }
 
 export function restoredPreferredWorkspacePaneTabByTarget(
-  repoRoot: string,
+  workspaceId: string,
   repo: ClientWorkspaceRepoTargetProjection,
   preferredByTarget: Record<string, WorkspacePaneSessionTabType | null> | undefined,
   workspacePaneTabsByTarget: Record<string, WorkspacePaneTabEntry[]>,
@@ -238,20 +238,20 @@ export function restoredPreferredWorkspacePaneTabByTarget(
   if (!preferredByTarget) return {}
   return (
     preferredWorkspacePaneTabsForClientWorkspace(
-      { [repoRoot]: { ...repo, ui: { preferredWorkspacePaneTabByTarget: preferredByTarget } } },
-      [repoRoot],
-      { [repoRoot]: workspacePaneTabsByTarget },
-    )[repoRoot] ?? {}
+      { [workspaceId]: { ...repo, ui: { preferredWorkspacePaneTabByTarget: preferredByTarget } } },
+      [workspaceId],
+      { [workspaceId]: workspacePaneTabsByTarget },
+    )[workspaceId] ?? {}
   )
 }
 
 function workspacePaneTabsTargetKeyBelongsToRepo(
   targetKey: string,
-  repoRoot: string,
+  workspaceId: string,
   repo: ClientWorkspaceRepoTargetProjection,
 ) {
   const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
-  if (!target || target.repoRoot !== repoRoot) return null
+  if (!target || target.workspaceId !== workspaceId) return null
   if (target.kind === 'workspace-root') return target
   if (target.kind === 'branch') {
     return repo.branches.some((branch) => branch.name === target.branchName) ? target : null

@@ -147,7 +147,7 @@ function createRuntimeWorkspacePreferenceActions(
     let changed = false
     let workspaceRuntimeId: string | undefined
     set((s) => {
-      const repo = s.workspaces[target.repoRoot]
+      const repo = s.workspaces[target.workspaceId]
       if (!repo || preferredWorkspacePaneTabForTarget(repo.ui, target) === tab) return s
       changed = true
       workspaceRuntimeId = repo.workspaceRuntimeId
@@ -155,7 +155,7 @@ function createRuntimeWorkspacePreferenceActions(
         r.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(r.ui, target, tab)
       })
     })
-    if (changed && workspaceRuntimeId !== undefined) afterWorkspacePreferenceChange(target.repoRoot, workspaceRuntimeId)
+    if (changed && workspaceRuntimeId !== undefined) afterWorkspacePreferenceChange(target.workspaceId, workspaceRuntimeId)
   }
 
   return {
@@ -182,7 +182,7 @@ function createRuntimeWorkspacePreferenceActions(
       const repo = get().workspaces[id]
       if (!repo) return
       const branchModel = requireRepoBranchSnapshotQueryProjection(repo)
-      const target = workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branch)
+      const target = workspacePaneTabsTargetForRepoBranch({ workspaceId: repo.id, branches: branchModel.branches }, branch)
       if (target) setWorkspacePaneTabForTarget(target, tab)
     },
 

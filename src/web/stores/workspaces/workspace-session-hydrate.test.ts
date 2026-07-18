@@ -46,7 +46,7 @@ beforeEach(resetLifecycleTest)
 
 describe('repo session hydration', () => {
   test('restores a workspace-root terminal preference without a Git branch projection', async () => {
-    const targetKey = workspacePaneTabsTargetIdentityKey({ kind: 'workspace-root', repoRoot: REPO_A })
+    const targetKey = workspacePaneTabsTargetIdentityKey({ kind: 'workspace-root', workspaceId: REPO_A })
     await useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime(
       {
         workspaces: [
@@ -69,7 +69,7 @@ describe('repo session hydration', () => {
                 {
                   target: runtimeWorkspacePaneTargetForTest({
                     kind: 'workspace-root',
-                    repoRoot: REPO_A,
+                    workspaceId: REPO_A,
                     workspaceRuntimeId: 'repo-runtime-server-a',
                   }),
                   tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
@@ -101,7 +101,7 @@ describe('repo session hydration', () => {
   test('restores a validated preferred tab for an eagerly projected repo', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch' as const,
-      repoRoot: REPO_A,
+      workspaceId: REPO_A,
       branchName: 'main',
     })
     await useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime(
@@ -132,7 +132,7 @@ describe('repo session hydration', () => {
                 {
                   target: runtimeWorkspacePaneTargetForTest({
                     kind: 'git-branch' as const,
-                    repoRoot: REPO_A,
+                    workspaceId: REPO_A,
                     workspaceRuntimeId: 'repo-runtime-server-a',
                     branchName: 'main',
                   }),
@@ -321,7 +321,7 @@ describe('repo session hydration', () => {
   test('restores preferred tabs when a lazy repo is promoted', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch' as const,
-      repoRoot: REPO_A,
+      workspaceId: REPO_A,
       branchName: 'main',
     })
     await useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime(
@@ -368,7 +368,7 @@ describe('repo session hydration', () => {
           {
             target: runtimeWorkspacePaneTargetForTest({
               kind: 'git-branch' as const,
-              repoRoot: REPO_A,
+              workspaceId: REPO_A,
               workspaceRuntimeId: 'repo-runtime-server-a',
               branchName: 'main',
             }),

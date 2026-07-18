@@ -52,7 +52,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
       },
       (error) => {
         appRuntimeProjectionLog.debug('failed to refresh workspace pane tabs', {
-          repoRoot: scope.target.repoRoot,
+          workspaceId: scope.target.repoRoot,
           workspaceRuntimeId: scope.target.workspaceRuntimeId,
           error,
         })
@@ -212,12 +212,12 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
     )
     const offWorkspaceTabsChanged = scopeRegistry.track(
       workspacePaneTabsClient.onChanged((message) => {
-        const scope = currentScopeForRepo(scopeRegistry, message.repoRoot)
+        const scope = currentScopeForRepo(scopeRegistry, message.workspaceId)
         if (!scope) return
         if (
           message.change === 'revision' &&
           message.workspaceRuntimeId === scope.target.workspaceRuntimeId &&
-          (workspacePaneTabsProjectionRevision(message.repoRoot, message.workspaceRuntimeId) ?? -1) >= message.revision
+          (workspacePaneTabsProjectionRevision(message.workspaceId, message.workspaceRuntimeId) ?? -1) >= message.revision
         ) {
           return
         }
@@ -237,14 +237,14 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
 
 function currentScopeForRepo(
   registry: RuntimeProjectionScopeRegistry,
-  repoRoot: string,
+  workspaceId: string,
 ): RuntimeProjectionScope | null {
-  const workspaceRuntimeId = workspaceRuntimeIdForRoot(repoRoot)
-  return workspaceRuntimeId ? registry.scopeFor({ repoRoot, workspaceRuntimeId }) : null
+  const workspaceRuntimeId = workspaceRuntimeIdForRoot(workspaceId)
+  return workspaceRuntimeId ? registry.scopeFor({ repoRoot: workspaceId, workspaceRuntimeId }) : null
 }
 
-function workspaceRuntimeIdForRoot(repoRoot: string): string | null {
-  return useWorkspacesStore.getState().workspaces[repoRoot]?.workspaceRuntimeId ?? null
+function workspaceRuntimeIdForRoot(workspaceId: string): string | null {
+  return useWorkspacesStore.getState().workspaces[workspaceId]?.workspaceRuntimeId ?? null
 }
 
 function projectionHydrationFailureMessage(error: unknown): string {

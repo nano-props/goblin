@@ -287,7 +287,7 @@ export function createPullRequest(number: number, options: Partial<PullRequestIn
 type TestWorkspacePaneRuntimeTabInput =
   | (WorkspacePaneTabsTarget & { workspaceRuntimeId: string; terminalSessionId: string })
   | {
-      repoRoot: string
+      workspaceId: string
       workspaceRuntimeId: string
       branchName: string
       worktreePath: string
@@ -300,7 +300,7 @@ function testWorkspacePaneRuntimeTabTarget(
   return 'kind' in input
     ? input
     : {
-        ...requiredGitWorkspacePaneTabsTarget(input.repoRoot, input.branchName, input.worktreePath),
+        ...requiredGitWorkspacePaneTabsTarget(input.workspaceId, input.branchName, input.worktreePath),
         workspaceRuntimeId: input.workspaceRuntimeId,
       }
 }
@@ -554,7 +554,7 @@ export function installWorkspacePaneTabsTestBridge(
         }),
       )
       const snapshot = commitServerSnapshot()
-      writeWorkspacePaneTabsSnapshotQueryData(input.repoRoot, input.workspaceRuntimeId, snapshot)
+      writeWorkspacePaneTabsSnapshotQueryData(input.workspaceId, input.workspaceRuntimeId, snapshot)
     },
     removeRuntimeTab: (input) => {
       const target = testWorkspacePaneRuntimeTabTarget(input)
@@ -967,7 +967,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       write: async (input) => callTerminalHandler('terminal.write', input),
       resize: async (input) => callTerminalHandler('terminal.resize', input),
       takeover: async (input) => callTerminalHandler('terminal.takeover', input),
-      pruneTerminals: async (repoRoot) => callTerminalHandler('terminal.prune', { repoRoot }),
+      pruneTerminals: async (workspaceId) => callTerminalHandler('terminal.prune', { workspaceId }),
       recoverSessions: async (input) => callTerminalHandler('terminal.recoverSessions', input),
       notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
       sendTestNotification: async () => true,

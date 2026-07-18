@@ -98,7 +98,7 @@ describe('workspace pane runtime tab target projection', () => {
     })
 
     const projection = readWorkspacePaneRuntimeTabTargetProjection({
-      repoRoot: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-1',
       worktreePath: WORKTREE_PATH,
     })
@@ -134,7 +134,7 @@ describe('workspace pane runtime tab target projection', () => {
     })
 
     const projection = readWorkspacePaneRuntimeTabTargetProjection({
-      repoRoot: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-1',
       worktreePath: WORKTREE_PATH,
     })
@@ -143,8 +143,8 @@ describe('workspace pane runtime tab target projection', () => {
   })
 
   test('formats the current runtime target key', () => {
-    expect(workspacePaneRuntimeTabTargetKey({ repoRoot: REPO_ID, worktreePath: WORKTREE_PATH })).toBe(WORKTREE_KEY)
-    expect(workspacePaneRuntimeTabTargetKey({ repoRoot: REPO_ID, worktreePath: null })).toBeNull()
+    expect(workspacePaneRuntimeTabTargetKey({ workspaceId: REPO_ID, worktreePath: WORKTREE_PATH })).toBe(WORKTREE_KEY)
+    expect(workspacePaneRuntimeTabTargetKey({ workspaceId: REPO_ID, worktreePath: null })).toBeNull()
   })
 })
 

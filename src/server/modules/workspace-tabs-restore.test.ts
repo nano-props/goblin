@@ -109,7 +109,7 @@ describe('restoreWorkspaceTabs', () => {
   test('probes + projects + restores tabs for a single repo', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      repoRoot: LOCAL_WORKSPACE_ID,
+      workspaceId: LOCAL_WORKSPACE_ID,
       branchName: 'main',
     })
     const workspace: ServerWorkspaceState = {
@@ -155,7 +155,7 @@ describe('restoreWorkspaceTabs', () => {
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedWorkspaceEntry: { kind: 'local', id: 'goblin+file:///repo' },
       targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
   })
@@ -163,7 +163,7 @@ describe('restoreWorkspaceTabs', () => {
   test('repairs invalid deferred tab state before initializing the runtime scope', async () => {
     const staleTargetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      repoRoot: LOCAL_WORKSPACE_ID,
+      workspaceId: LOCAL_WORKSPACE_ID,
       branchName: 'deleted-branch',
     })
     const workspace: ServerWorkspaceState = {
@@ -201,7 +201,7 @@ describe('restoreWorkspaceTabs', () => {
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedWorkspaceEntry: { kind: 'local', id: 'goblin+file:///repo' },
       targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
   })
@@ -238,7 +238,7 @@ describe('restoreWorkspaceTabs', () => {
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedWorkspaceEntry: { kind: 'local', id: 'goblin+file:///repo' },
       targets: [{ kind: 'workspace-root' }],
     })
   })
@@ -301,7 +301,7 @@ describe('restoreWorkspaceTabs', () => {
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
       workspaceId: entry.id,
       workspaceRuntimeId: 'repo-runtime-test',
-      expectedRepoEntry: entry,
+      expectedWorkspaceEntry: entry,
       targets: [{ kind: 'workspace-root' }],
     })
   })
@@ -405,7 +405,7 @@ describe('restoreWorkspaceTabs', () => {
   test('does not repair pane tabs after repo membership is removed', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      repoRoot: LOCAL_WORKSPACE_ID,
+      workspaceId: LOCAL_WORKSPACE_ID,
       branchName: 'deleted',
     })
     const workspace = {

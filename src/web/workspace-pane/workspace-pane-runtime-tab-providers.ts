@@ -18,7 +18,7 @@ export type WorkspacePaneRuntimeTabTargetSelectionByType = Partial<Record<Worksp
 export type WorkspacePaneRuntimeTabTargetKeyByType = Partial<Record<WorkspacePaneRuntimeTabType, string | null>>
 
 export interface WorkspacePaneRuntimeTabTargetInput {
-  repoRoot: string
+  workspaceId: string
   workspaceRuntimeId: string
   worktreePath: string | null
 }
@@ -38,7 +38,7 @@ interface WorkspacePaneRuntimeTabSelectionSyncInput {
 
 export interface WorkspacePaneRuntimeTabProjectionProvider {
   type: WorkspacePaneRuntimeTabType
-  targetKey: (input: Pick<WorkspacePaneRuntimeTabTargetInput, 'repoRoot' | 'worktreePath'>) => string | null
+  targetKey: (input: Pick<WorkspacePaneRuntimeTabTargetInput, 'workspaceId' | 'worktreePath'>) => string | null
   readProjection: (input: WorkspacePaneRuntimeTabTargetInput) => WorkspacePaneRuntimeTabProviderProjection
   useProjection: (input: WorkspacePaneRuntimeTabTargetInput) => WorkspacePaneRuntimeTabProviderProjection
   useSyncSelection: (
@@ -78,13 +78,13 @@ export function workspacePaneRuntimeTabProjectionProvider(
 
 export function workspacePaneRuntimeTabTargetKeyForType(
   type: WorkspacePaneRuntimeTabType,
-  input: Pick<WorkspacePaneRuntimeTabTargetInput, 'repoRoot' | 'worktreePath'>,
+  input: Pick<WorkspacePaneRuntimeTabTargetInput, 'workspaceId' | 'worktreePath'>,
 ): string | null {
   return workspacePaneRuntimeTabProjectionProvider(type).targetKey(input)
 }
 
 export function workspacePaneRuntimeTabTargetKeyByType(
-  input: Pick<WorkspacePaneRuntimeTabTargetInput, 'repoRoot' | 'worktreePath'>,
+  input: Pick<WorkspacePaneRuntimeTabTargetInput, 'workspaceId' | 'worktreePath'>,
 ): WorkspacePaneRuntimeTabTargetKeyByType {
   return Object.fromEntries(
     workspacePaneRuntimeTabProjectionProviders().map((provider) => [provider.type, provider.targetKey(input)]),
@@ -92,7 +92,7 @@ export function workspacePaneRuntimeTabTargetKeyByType(
 }
 
 export function readWorkspacePaneRuntimeTabProviderProjections(input: {
-  repoRoot: string
+  workspaceId: string
   workspaceRuntimeId: string
   worktreePath: string | null
 }): WorkspacePaneRuntimeTabProviderProjection[] {
@@ -119,9 +119,9 @@ export function useSyncWorkspacePaneRuntimeTabProviderSelection(
 }
 
 function terminalRuntimeTabTargetKey(
-  input: Pick<WorkspacePaneRuntimeTabTargetInput, 'repoRoot' | 'worktreePath'>,
+  input: Pick<WorkspacePaneRuntimeTabTargetInput, 'workspaceId' | 'worktreePath'>,
 ): string | null {
-  const workspaceId = canonicalWorkspaceLocator(input.repoRoot)
+  const workspaceId = canonicalWorkspaceLocator(input.workspaceId)
   const worktreeId =
     input.worktreePath && workspaceId
       ? (canonicalWorkspaceLocator(input.worktreePath) ?? workspaceLocatorForPath(workspaceId, input.worktreePath))
@@ -130,14 +130,14 @@ function terminalRuntimeTabTargetKey(
 }
 
 function readTerminalRuntimeTabProviderProjection(input: {
-  repoRoot: string
+  workspaceId: string
   workspaceRuntimeId: string
   worktreePath: string | null
 }): WorkspacePaneRuntimeTabProviderProjection {
   const targetKey = terminalRuntimeTabTargetKey(input)
   const snapshot = targetKey ? (readTerminalSessionCommandBridge()?.terminalWorktreeSnapshot(targetKey) ?? null) : null
   const selectedSessionId = targetKey ? readTerminalSelectedSessionId(targetKey) : null
-  const projectionState = readTerminalRuntimeProjectionState(input.repoRoot, input.workspaceRuntimeId)
+  const projectionState = readTerminalRuntimeProjectionState(input.workspaceId, input.workspaceRuntimeId)
   return {
     type: 'terminal',
     targetKey,
@@ -157,14 +157,14 @@ function readTerminalSelectedSessionId(terminalWorktreeKey: string): string | nu
 }
 
 function useTerminalRuntimeTabProviderProjection({
-  repoRoot,
+  workspaceId,
   workspaceRuntimeId,
   worktreePath,
 }: WorkspacePaneRuntimeTabTargetInput): WorkspacePaneRuntimeTabProviderProjection {
-  const targetKey = terminalRuntimeTabTargetKey({ repoRoot, worktreePath })
+  const targetKey = terminalRuntimeTabTargetKey({ workspaceId, worktreePath })
   const terminalSessionSummaries = useTerminalSessionSummaries(targetKey)
   const terminalCreatePending = useTerminalWorktreeCreatePending(targetKey)
-  const terminalProjectionHydration = useTerminalRepoProjectionHydrationEntry(repoRoot)
+  const terminalProjectionHydration = useTerminalRepoProjectionHydrationEntry(workspaceId)
   const selectedTerminalSessionId = useWorkspacesStore((s) =>
     targetKey ? s.selectedTerminalSessionIdByTerminalWorktree[targetKey] : undefined,
   )
@@ -215,10 +215,10 @@ function useSyncTerminalRuntimeTabSelection(
 }
 
 function readTerminalRuntimeProjectionState(
-  repoRoot: string,
+  workspaceId: string,
   workspaceRuntimeId: string,
 ): WorkspacePaneRuntimeProjectionState {
-  const terminalProjectionHydration = useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(repoRoot)
+  const terminalProjectionHydration = useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(workspaceId)
   const currentTerminalProjectionHydration =
     terminalProjectionHydration?.workspaceRuntimeId === workspaceRuntimeId ? terminalProjectionHydration : null
   return {

@@ -365,7 +365,7 @@ export async function commitWorkspacePaneExactTargetRoute(
 }
 
 export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneControllerTarget): boolean {
-  if (target.paneTarget.kind === 'inactive' || target.paneTarget.repoRoot !== target.workspaceId) return false
+  if (target.paneTarget.kind === 'inactive' || target.paneTarget.workspaceId !== target.workspaceId) return false
   if (useWorkspacesStore.getState().workspaces[target.workspaceId]?.workspaceRuntimeId !== target.workspaceRuntimeId)
     return false
   if (target.paneTarget.kind === 'git-branch') {
@@ -394,7 +394,7 @@ export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneC
   }
   return (
     target.branchName === null &&
-    target.worktreePath === (parseCanonicalWorkspaceLocator(target.paneTarget.repoRoot)?.path ?? null)
+    target.worktreePath === (parseCanonicalWorkspaceLocator(target.paneTarget.workspaceId)?.path ?? null)
   )
 }
 

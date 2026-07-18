@@ -101,7 +101,7 @@ function selectedWorkspacePaneTab(repoId: string, branchName = 'feature/worktree
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
         workspacePaneTabsTargetForRepoBranch(
-          { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+          { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
           branchName,
         ),
       )
@@ -111,7 +111,7 @@ function selectedWorkspacePaneTab(repoId: string, branchName = 'feature/worktree
 function repoTerminalBase() {
   const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId
   const target = runtimeWorkspacePaneTargetForTest({
-    repoRoot: REPO_ID,
+    workspaceId: REPO_ID,
     workspaceRuntimeId,
     branchName: 'feature/worktree',
     worktreePath: WORKTREE_PATH,
@@ -384,7 +384,7 @@ function completeServerSession(session: TestTerminalSessionSummary): TerminalSes
 function terminalRuntimeTarget(workspaceRuntimeId: string) {
   return runtimeWorkspacePaneTargetForTest({
     kind: 'git-worktree' as const,
-    repoRoot: REPO_ID,
+    workspaceId: REPO_ID,
     workspaceRuntimeId: workspaceRuntimeId,
     worktreePath: WORKTREE_PATH,
   })
@@ -405,11 +405,11 @@ function completeServerSessions(sessions: TestTerminalSessionSummary[]): Termina
   return sessions.map(completeServerSession)
 }
 
-function tabsFor(repoRoot: string, branchName: string): WorkspacePaneTabEntry[] {
-  const repo = useWorkspacesStore.getState().workspaces[repoRoot]
+function tabsFor(workspaceId: string, branchName: string): WorkspacePaneTabEntry[] {
+  const repo = useWorkspacesStore.getState().workspaces[workspaceId]
   const target = repo
     ? workspacePaneTabsTargetForRepoBranch(
-        { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+        { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
         branchName,
       )
     : null
@@ -420,11 +420,11 @@ function normalizeTestSessionId(terminalSessionId: string): string {
   return terminalSessionId.split('\0').at(-1) ?? terminalSessionId
 }
 
-async function emitSessionsChanged(repoRoot = REPO_ID): Promise<void> {
+async function emitSessionsChanged(workspaceId = REPO_ID): Promise<void> {
   await act(async () => {
-    const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[repoRoot]?.workspaceRuntimeId
+    const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[workspaceId]?.workspaceRuntimeId
     if (workspaceRuntimeId)
-      sessionsChangedHandler?.({ repoRoot, workspaceRuntimeId, revision: ++sessionsChangedRevision })
+      sessionsChangedHandler?.({ repoRoot: workspaceId, workspaceRuntimeId, revision: ++sessionsChangedRevision })
     await waitForScheduledServerSync()
   })
 }
@@ -475,7 +475,7 @@ beforeEach(() => {
   closeMock.mockResolvedValue(true)
   createTerminalMock.mockReset()
   createTerminalMock.mockImplementation(async (input) => {
-    const repoRoot = input.target.workspaceId
+    const workspaceId = input.target.workspaceId
     const workspaceRuntimeId = input.target.workspaceRuntimeId
     const worktreePath = terminalExecutionRootForTest(input.target)
     const presentation =
@@ -483,7 +483,7 @@ beforeEach(() => {
         ? ({ kind: 'workspace-root' } as const)
         : ({ kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH_NAME } } as const)
     const currentSessions = await listSessionsMock({
-      repoRoot,
+      repoRoot: workspaceId,
       workspaceRuntimeId,
     })
     const allocatedSessionId =
@@ -534,7 +534,7 @@ beforeEach(() => {
         terminalRuntimeGeneration: 1,
         terminalSessionId,
         target: runtimeWorkspacePaneTargetForTest({
-          repoRoot,
+          workspaceId,
           workspaceRuntimeId,
           branchName: BRANCH_NAME,
           worktreePath,
@@ -953,7 +953,7 @@ describe('TerminalSessionProvider', () => {
         body: 'feature/worktree\n~/Developer/goblin — npm run dev',
         terminalSessionId: 'term-111111111111111111111',
         terminalWorktreeKey,
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
       })
 
       await act(async () => {
@@ -1023,7 +1023,7 @@ describe('TerminalSessionProvider', () => {
         body: 'feature/worktree\nzsh',
         terminalSessionId: 'term-111111111111111111111',
         terminalWorktreeKey,
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
       })
     } finally {
       hasFocus.mockRestore()
@@ -1069,7 +1069,7 @@ describe('TerminalSessionProvider', () => {
         body: 'feature/worktree\nbuild running',
         terminalSessionId: 'term-111111111111111111111',
         terminalWorktreeKey,
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
       })
     } finally {
       hasFocus.mockRestore()
@@ -1246,7 +1246,7 @@ describe('TerminalSessionProvider', () => {
         body: 'feature/worktree\n~/Developer/goblin — npm run dev',
         terminalSessionId: 'term-111111111111111111111',
         terminalWorktreeKey,
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
       })
     } finally {
       hasFocus.mockRestore()
@@ -1328,7 +1328,7 @@ describe('TerminalSessionProvider', () => {
     })
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'git-worktree' as const,
-      repoRoot: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
       worktreePath: WORKTREE_PATH,
       tabs: [
@@ -1345,7 +1345,7 @@ describe('TerminalSessionProvider', () => {
         {
           target: runtimeWorkspacePaneTargetForTest({
             kind: 'git-worktree' as const,
-            repoRoot: REPO_ID,
+            workspaceId: REPO_ID,
             workspaceRuntimeId: useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
             worktreePath: WORKTREE_PATH,
           }),

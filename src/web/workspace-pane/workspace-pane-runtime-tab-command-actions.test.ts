@@ -51,7 +51,7 @@ describe('workspace pane runtime tab command actions', () => {
       branches: [],
       currentBranchName: null,
     })
-    useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: repo.id }, 'files')
+    useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: repo.id }, 'files')
 
     const workspaceId = canonicalWorkspaceLocator(repo.id)
     if (!workspaceId) throw new Error('expected canonical workspace fixture')
@@ -61,13 +61,13 @@ describe('workspace pane runtime tab command actions', () => {
       presentation: { kind: 'workspace-root' },
     })
     expect(
-      captureWorkspacePaneActiveTabIdentity({ kind: 'workspace-root', repoRoot: repo.id }, repo.workspaceRuntimeId, {
+      captureWorkspacePaneActiveTabIdentity({ kind: 'workspace-root', workspaceId: repo.id }, repo.workspaceRuntimeId, {
         workspacePaneRoute: undefined,
       }),
     ).toBeNull()
     expect(
       recordWorkspacePaneTabOpener(
-        { kind: 'workspace-root', repoRoot: repo.id },
+        { kind: 'workspace-root', workspaceId: repo.id },
         repo.workspaceRuntimeId,
         'terminal:term-111111111111111111111',
         'workspace-pane:files',
@@ -75,7 +75,7 @@ describe('workspace pane runtime tab command actions', () => {
     ).toBe('recorded')
     expect(
       workspacePaneTabOpener(
-        { kind: 'workspace-root', repoRoot: repo.id },
+        { kind: 'workspace-root', workspaceId: repo.id },
         repo.workspaceRuntimeId,
         'terminal:term-111111111111111111111',
       ),

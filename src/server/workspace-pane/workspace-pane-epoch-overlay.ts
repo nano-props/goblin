@@ -17,7 +17,7 @@ import {
 
 export interface WorkspacePaneEpochScope {
   userId: string
-  repoRoot: string
+  workspaceId: string
   workspaceRuntimeId: string
 }
 
@@ -66,8 +66,8 @@ export class WorkspacePaneEpochOverlay {
         new Map([...refs].map(([refKey, ref]) => [refKey, cloneTargetRef(ref)])),
       )
     }
-    for (const [repoRoot, epochs] of source.epochsByRepoRoot) {
-      this.epochsByRepoRoot.set(repoRoot, new Map([...epochs].map(([key, scope]) => [key, { ...scope }])))
+    for (const [workspaceId, epochs] of source.epochsByRepoRoot) {
+      this.epochsByRepoRoot.set(workspaceId, new Map([...epochs].map(([key, scope]) => [key, { ...scope }])))
     }
   }
 
@@ -84,9 +84,9 @@ export class WorkspacePaneEpochOverlay {
       physicalLeasesByTarget: new Map(sourceState.physicalLeasesByTarget),
     }
     this.epochs.set(key, state)
-    const active = this.epochsByRepoRoot.get(scope.repoRoot) ?? new Map<string, WorkspacePaneEpochScope>()
+    const active = this.epochsByRepoRoot.get(scope.workspaceId) ?? new Map<string, WorkspacePaneEpochScope>()
     active.set(key, { ...scope })
-    this.epochsByRepoRoot.set(scope.repoRoot, active)
+    this.epochsByRepoRoot.set(scope.workspaceId, active)
     const refPrefix = `${key}\0`
     for (const [physicalKey, refs] of source.targetsByPhysicalKey) {
       for (const [refKey, ref] of refs) {
@@ -153,12 +153,12 @@ export class WorkspacePaneEpochOverlay {
       .flatMap(([, refs]) => Array.from(refs.values()).map(cloneTargetRef))
   }
 
-  clearPhysicalIdentity(repoRoot: string, removedLease: PhysicalWorktreeAdmissionLease): WorkspacePaneEpochScope[] {
+  clearPhysicalIdentity(workspaceId: string, removedLease: PhysicalWorktreeAdmissionLease): WorkspacePaneEpochScope[] {
     const physicalKey = physicalWorktreeAdmissionLeaseKey(removedLease)
     const refs = [...(this.targetsByPhysicalKey.get(physicalKey)?.values() ?? [])]
     const affected: WorkspacePaneEpochScope[] = []
     for (const ref of refs) {
-      if (ref.repoRoot !== repoRoot) continue
+      if (ref.workspaceId !== workspaceId) continue
       const scope = scopeFromEpochKey(epochKey(ref))
       const state = this.epochs.get(epochKey(scope))
       const targetKey = canonicalTargetKey(ref.target)
@@ -178,8 +178,8 @@ export class WorkspacePaneEpochOverlay {
     return [...state.physicalLeasesByTarget.values()]
   }
 
-  activeEpochs(repoRoot: string): WorkspacePaneEpochScope[] {
-    return Array.from(this.epochsByRepoRoot.get(repoRoot)?.values() ?? []).map((scope) => ({ ...scope }))
+  activeEpochs(workspaceId: string): WorkspacePaneEpochScope[] {
+    return Array.from(this.epochsByRepoRoot.get(workspaceId)?.values() ?? []).map((scope) => ({ ...scope }))
   }
 
   isActive(scope: WorkspacePaneEpochScope): boolean {
@@ -206,9 +206,9 @@ export class WorkspacePaneEpochOverlay {
       this.removePhysicalTarget(physicalWorktreeAdmissionLeaseKey(lease), scope, targetKey)
     }
     this.epochs.delete(key)
-    const active = this.epochsByRepoRoot.get(scope.repoRoot)
+    const active = this.epochsByRepoRoot.get(scope.workspaceId)
     active?.delete(key)
-    if (active?.size === 0) this.epochsByRepoRoot.delete(scope.repoRoot)
+    if (active?.size === 0) this.epochsByRepoRoot.delete(scope.workspaceId)
   }
 
   private state(scope: WorkspacePaneEpochScope): EpochState {
@@ -221,9 +221,9 @@ export class WorkspacePaneEpochOverlay {
         physicalLeasesByTarget: new Map(),
       }
       this.epochs.set(key, state)
-      const active = this.epochsByRepoRoot.get(scope.repoRoot) ?? new Map<string, WorkspacePaneEpochScope>()
+      const active = this.epochsByRepoRoot.get(scope.workspaceId) ?? new Map<string, WorkspacePaneEpochScope>()
       active.set(key, { ...scope })
-      this.epochsByRepoRoot.set(scope.repoRoot, active)
+      this.epochsByRepoRoot.set(scope.workspaceId, active)
     }
     return state
   }
@@ -303,13 +303,13 @@ export function providerRevisionMap(
 }
 
 function epochKey(scope: WorkspacePaneEpochScope): string {
-  return `${scope.userId}\0${scope.repoRoot}\0${scope.workspaceRuntimeId}`
+  return `${scope.userId}\0${scope.workspaceId}\0${scope.workspaceRuntimeId}`
 }
 
 function scopeFromEpochKey(key: string): WorkspacePaneEpochScope {
-  const [userId, repoRoot, workspaceRuntimeId] = key.split('\0')
-  if (!userId || !repoRoot || !workspaceRuntimeId) throw new Error('invalid workspace pane epoch key')
-  return { userId, repoRoot, workspaceRuntimeId }
+  const [userId, workspaceId, workspaceRuntimeId] = key.split('\0')
+  if (!userId || !workspaceId || !workspaceRuntimeId) throw new Error('invalid workspace pane epoch key')
+  return { userId, workspaceId, workspaceRuntimeId }
 }
 
 function epochTargetKey(scope: WorkspacePaneEpochScope, targetKey: string): string {
@@ -329,7 +329,7 @@ function cloneHint(hint: WorkspacePaneRuntimePlacementHint): WorkspacePaneRuntim
 function cloneTargetRef(ref: WorkspacePaneEpochTargetRef): WorkspacePaneEpochTargetRef {
   return {
     userId: ref.userId,
-    repoRoot: ref.repoRoot,
+    workspaceId: ref.workspaceId,
     workspaceRuntimeId: ref.workspaceRuntimeId,
     target: { ...ref.target },
   }

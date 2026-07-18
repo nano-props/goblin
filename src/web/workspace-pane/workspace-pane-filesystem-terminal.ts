@@ -16,7 +16,7 @@ export function showCreatedWorkspacePaneFilesystemTerminal(
     if (presentation.kind !== 'workspace-root') return false
     const state = useWorkspacesStore.getState()
     state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootPath), terminalSessionId)
-    state.setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: target.workspaceId }, 'terminal')
+    state.setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: target.workspaceId }, 'terminal')
     return true
   }
   if (presentation.kind !== 'git-worktree') return false

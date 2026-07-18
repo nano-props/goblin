@@ -76,7 +76,7 @@ describe('restorable-workspace-state', () => {
     const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, repo.id)
     const workspaceRootTargetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'workspace-root',
-      repoRoot: repo.id,
+      workspaceId: repo.id,
     })
     repo.ui.preferredWorkspacePaneTabByTarget[workspaceRootTargetKey] = 'files'
 
@@ -385,14 +385,14 @@ describe('restorable-workspace-state', () => {
   })
 })
 
-function branchTargetKey(repoRoot: string, branchName: string): string {
-  return workspacePaneTabsTargetIdentityKey({ kind: 'git-branch', repoRoot, branchName })
+function branchTargetKey(workspaceId: string, branchName: string): string {
+  return workspacePaneTabsTargetIdentityKey({ kind: 'git-branch', workspaceId, branchName })
 }
 
-function worktreeTargetKey(repoRoot: string, branchName: string, worktreePath: string): string {
+function worktreeTargetKey(workspaceId: string, branchName: string, worktreePath: string): string {
   return workspacePaneTabsTargetIdentityKey({
     kind: 'git-worktree',
-    repoRoot,
+    workspaceId,
     worktreePath,
   })
 }

@@ -1405,7 +1405,7 @@ function renderToolbar(options: {
     const branchName = terminalPresentationBranch(base.presentation)
     if (!branchName) throw new Error('expected Git worktree terminal fixture')
     workspacePaneTabsTestBridge.addRuntimeTab({
-      repoRoot: coordinates.repoRoot,
+      workspaceId: coordinates.repoRoot,
       workspaceRuntimeId: coordinates.workspaceRuntimeId,
       branchName,
       worktreePath: terminalExecutionPath(base.target),
@@ -1453,7 +1453,7 @@ function renderToolbar(options: {
   if (workspacePaneTabs) {
     const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId
     const workspacePaneTabsQueryInput = {
-      repoRoot: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId,
       branchName,
       worktreePath: options.worktree === false ? null : WORKTREE_PATH,
@@ -1499,7 +1499,7 @@ function renderToolbar(options: {
       preferredWorkspacePaneTab,
     })
     const nextTabsInput = {
-      repoRoot: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName,
       worktreePath,
@@ -1614,7 +1614,7 @@ function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
   const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
   const target = repo
     ? workspacePaneTabsTargetForRepoBranch(
-        { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+        { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
         branchName,
       )
     : null

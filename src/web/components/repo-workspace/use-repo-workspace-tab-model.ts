@@ -45,7 +45,7 @@ export function useRepoWorkspaceTabModelInput(
   const branchName = branch?.name ?? null
   const worktreePath = branch?.worktree?.path ?? null
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
-    repoRoot: repo.id,
+    workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath,
   })
@@ -61,7 +61,7 @@ export function useRepoWorkspaceTabModelInput(
         workspacePaneTabsQuery.data ?? { revision: 0, entries: [] },
         branchName
           ? requiredGitWorkspacePaneTabsTarget(repo.id, branchName, worktreePath)
-          : { kind: 'inactive', repoRoot: repo.id, branchName: null, worktreePath: null },
+          : { kind: 'inactive', workspaceId: repo.id, branchName: null, worktreePath: null },
       ),
     [workspacePaneTabsQuery.data, repo.id, repo.workspaceRuntimeId, branchName, worktreePath],
   )
@@ -83,7 +83,7 @@ export function useRepoWorkspaceTabModelInput(
       workspaceRuntimeId: repo.workspaceRuntimeId,
       paneTarget: branchName
         ? requiredGitWorkspacePaneTabsTarget(repo.id, branchName, worktreePath)
-        : { kind: 'inactive', repoRoot: repo.id },
+        : { kind: 'inactive', workspaceId: repo.id },
       worktreeHead: branchName && worktreePath ? { kind: 'branch', branchName } : undefined,
       preferredTab,
       allowPreferredTabFallback: workspacePaneRoute === undefined,
@@ -115,12 +115,12 @@ export function useWorkspaceRootTabModel(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'workspaceRuntimeId' | 'ui'>,
 ): RepoWorkspaceTabModel {
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
-    repoRoot: repo.id,
+    workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath: repo.id,
   })
   const tabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.workspaceRuntimeId)
-  const target = useMemo(() => ({ kind: 'workspace-root' as const, repoRoot: repo.id }), [repo.id])
+  const target = useMemo(() => ({ kind: 'workspace-root' as const, workspaceId: repo.id }), [repo.id])
   const tabEntries = useMemo(
     () => workspacePaneTabsForTargetFromQueryData(tabsQuery.data ?? { revision: 0, entries: [] }, target),
     [tabsQuery.data, target],
@@ -162,7 +162,7 @@ export function useFilesystemWorkspaceTabModel(
   requestedSessionId: string | null,
 ): RepoWorkspaceTabModel {
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
-    repoRoot: repo.id,
+    workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath,
   })

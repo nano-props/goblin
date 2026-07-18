@@ -28,24 +28,24 @@ export type WorkspacePaneLayoutRepositoryCasOutcome =
   WorkspacePaneLayoutRepositoryCasStateOutcome | { kind: 'write-failure'; error: unknown }
 
 export interface WorkspacePaneLayoutRepositoryCasInput {
-  repoRoot: string
+  workspaceId: string
   expected: WorkspacePaneDurableLayout
   replacement: WorkspacePaneDurableLayout
 }
 
 export interface WorkspacePaneLayoutRepository {
-  load(repoRoot: string): Promise<WorkspacePaneLayoutRepositorySnapshot>
+  load(workspaceId: string): Promise<WorkspacePaneLayoutRepositorySnapshot>
   compareAndSwap(input: WorkspacePaneLayoutRepositoryCasInput): Promise<WorkspacePaneLayoutRepositoryCasOutcome>
 }
 
 export function normalizeWorkspacePaneDurableLayout(
-  repoRoot: string,
+  workspaceId: string,
   layout: WorkspacePaneDurableLayout,
 ): WorkspacePaneDurableLayout {
   const byTarget = new Map<string, WorkspacePaneDurableLayoutEntry>()
   for (const entry of layout.entries) {
     if (!entry?.target || !Array.isArray(entry.tabs)) continue
-    if (!workspacePaneTabsTargetFromRestorable(repoRoot, entry.target)) continue
+    if (!workspacePaneTabsTargetFromRestorable(workspaceId, entry.target)) continue
     const tabs: WorkspacePaneStaticTabEntry[] = []
     const seen = new Set<string>()
     for (const tab of entry.tabs) {
@@ -69,12 +69,12 @@ export function normalizeWorkspacePaneDurableLayout(
 }
 
 export function workspacePaneDurableLayoutsEqual(
-  repoRoot: string,
+  workspaceId: string,
   a: WorkspacePaneDurableLayout,
   b: WorkspacePaneDurableLayout,
 ): boolean {
   return (
-    JSON.stringify(normalizeWorkspacePaneDurableLayout(repoRoot, a)) ===
-    JSON.stringify(normalizeWorkspacePaneDurableLayout(repoRoot, b))
+    JSON.stringify(normalizeWorkspacePaneDurableLayout(workspaceId, a)) ===
+    JSON.stringify(normalizeWorkspacePaneDurableLayout(workspaceId, b))
   )
 }

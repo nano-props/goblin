@@ -61,7 +61,7 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
   input: OpenWorkspacePaneTargetStaticTabActionOptions,
 ): Promise<WorkspacePaneActionOutcome> {
   const repo = useWorkspacesStore.getState().workspaces[input.workspaceId]
-  if (!repo || input.paneTarget.repoRoot !== input.workspaceId) return { kind: 'target-missing' }
+  if (!repo || input.paneTarget.workspaceId !== input.workspaceId) return { kind: 'target-missing' }
   const workspaceRuntimeId = repo.workspaceRuntimeId
   const worktreePath = workspacePaneTabsTargetWorktreePath(input.paneTarget)
   const branchName =

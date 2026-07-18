@@ -31,9 +31,9 @@ import {
 import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-const scope = { userId: 'user-a', repoRoot: 'goblin+file:///repo', workspaceRuntimeId: 'runtime-a' }
+const scope = { userId: 'user-a', workspaceId: 'goblin+file:///repo', workspaceRuntimeId: 'runtime-a' }
 const target = { branchName: 'feature/worktree', worktreePath: '/repo/worktree' }
-const workspaceId = canonicalWorkspaceLocator(scope.repoRoot)
+const workspaceId = canonicalWorkspaceLocator(scope.workspaceId)
 const worktreeRoot = canonicalWorkspaceLocator('goblin+file:///repo/worktree')
 if (!workspaceId || !worktreeRoot) throw new Error('invalid workspace locator fixture')
 const canonicalWorkspaceId = workspaceId
@@ -229,7 +229,7 @@ describe('workspace pane layout aggregate', () => {
     const lease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
     const baseline = await readSnapshot(aggregate, scope, validTargets, providers)
 
-    await aggregate.runExclusive(scope.repoRoot, async (operation) => {
+    await aggregate.runExclusive(scope.workspaceId, async (operation) => {
       await expect(
         operation.commitRuntimeTabPlacement(
           {
@@ -256,7 +256,7 @@ describe('workspace pane layout aggregate', () => {
     const lease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
     await readSnapshot(aggregate, scope, validTargets, providers)
 
-    await aggregate.runExclusive(scope.repoRoot, async (operation) => {
+    await aggregate.runExclusive(scope.workspaceId, async (operation) => {
       let callbackObservedUncommittedState = false
       const snapshot = await operation.commitRuntimeTabPlacement(
         {
@@ -291,7 +291,7 @@ describe('workspace pane layout aggregate', () => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       snapshots.push(
         await aggregate.runExclusive(
-          scope.repoRoot,
+          scope.workspaceId,
           async (operation) =>
             await operation.commitRuntimeTabPlacement(
               {
@@ -344,7 +344,7 @@ describe('workspace pane layout aggregate', () => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       snapshots.push(
         await aggregate.runExclusive(
-          scope.repoRoot,
+          scope.workspaceId,
           async (operation) =>
             await operation.commitRuntimeTabPlacement(
               {
@@ -376,7 +376,7 @@ describe('workspace pane layout aggregate', () => {
     const validTargets = [worktreeProjection(target.branchName)]
     const firstLease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
     const replacementLease = physicalWorktreeAdmissionLease(replacementCapability())
-    await aggregate.runExclusive(scope.repoRoot, async (operation) => {
+    await aggregate.runExclusive(scope.workspaceId, async (operation) => {
       await operation.commitRuntimeTabPlacement(
         {
           ...scope,
@@ -393,7 +393,7 @@ describe('workspace pane layout aggregate', () => {
 
     await expect(
       aggregate.runExclusive(
-        scope.repoRoot,
+        scope.workspaceId,
         async (operation) =>
           await operation.commitRuntimeTabPlacement(
             {
@@ -427,7 +427,7 @@ describe('workspace pane layout aggregate', () => {
       [scope, firstLease],
       [siblingScope, firstLease],
     ] as const) {
-      await aggregate.runExclusive(scope.repoRoot, async (operation) => {
+      await aggregate.runExclusive(scope.workspaceId, async (operation) => {
         await operation.commitRuntimeTabPlacement(
           {
             ...epochScope,
@@ -443,7 +443,7 @@ describe('workspace pane layout aggregate', () => {
     }
     const siblingBaseline = await readSnapshot(aggregate, siblingScope, validTargets, providers)
 
-    await aggregate.runExclusive(scope.repoRoot, async (operation) => {
+    await aggregate.runExclusive(scope.workspaceId, async (operation) => {
       await operation.commitRuntimeTabPlacement(
         {
           ...scope,
@@ -470,7 +470,7 @@ describe('workspace pane layout aggregate', () => {
 
     await expect(
       aggregate.runExclusive(
-        scope.repoRoot,
+        scope.workspaceId,
         async (operation) =>
           await operation.commitRuntimeTabPlacement(
             {
@@ -486,7 +486,7 @@ describe('workspace pane layout aggregate', () => {
       ),
     ).rejects.toThrow('error.workspace-tabs-target-invalid')
     expect(repository.load).not.toHaveBeenCalled()
-    expect(aggregate.activeEpochs(scope.repoRoot)).toEqual([])
+    expect(aggregate.activeEpochs(scope.workspaceId)).toEqual([])
   })
 
   test('uses one monotonic clock across durable, target, overlay, and provider dependencies', async () => {
@@ -497,7 +497,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [branchTarget],
       physicalTargets: [],
-      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
+      expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [],
     })
     if (validated.kind !== 'validated') throw new Error('unexpected membership conflict')
@@ -566,7 +566,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [branchProjection('main')],
       physicalTargets: [],
-      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
+      expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [],
     })
 
@@ -595,7 +595,7 @@ describe('workspace pane layout aggregate', () => {
     const restoreTransaction: WorkspacePaneLayoutRestoreTransaction = {
       async validateMembershipAndLoad(input) {
         repairs.push([])
-        const current = await repository.load(input.repoRoot)
+        const current = await repository.load(input.workspaceId)
         return { kind: 'accepted' as const, snapshot: current }
       },
     }
@@ -605,7 +605,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [branchProjection('main')],
       physicalTargets: [],
-      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
+      expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [],
     })
 
@@ -625,7 +625,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [branchProjection('main')],
       physicalTargets: [],
-      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
+      expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [],
     })
 
@@ -642,7 +642,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [],
       physicalTargets: [],
-      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
+      expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [],
     })
 
@@ -696,7 +696,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [],
       physicalTargets: [],
-      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
+      expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [],
     })
 
@@ -727,7 +727,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [],
       physicalTargets: [],
-      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
+      expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: providers,
     })
 
@@ -760,7 +760,7 @@ describe('workspace pane layout aggregate', () => {
         ...scope,
         validTargets: [worktreeProjection(target.branchName)],
         physicalTargets: [],
-        expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
+        expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
         providerSnapshots: [],
       }),
     ).resolves.toEqual({ kind: 'membership-conflict' })
@@ -782,7 +782,7 @@ describe('workspace pane layout aggregate', () => {
         ...scope,
         validTargets: [branchProjection('main')],
         physicalTargets: [],
-        expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
+        expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
         providerSnapshots: [],
         assertCurrent: () => {
           if (!current) throw new Error('error.workspace-runtime-stale')
@@ -806,7 +806,7 @@ describe('workspace pane layout aggregate', () => {
         ...scope,
         validTargets: [],
         physicalTargets: [],
-        expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
+        expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
         providerSnapshots: [],
       }),
     ).rejects.toBe(failure)
@@ -827,7 +827,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [worktreeProjection('old-branch')],
       physicalTargets: [],
-      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
+      expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [
         {
           type: 'terminal',
@@ -865,7 +865,7 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       validTargets: [worktreeProjection('feature/current')],
       physicalTargets: [],
-      expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
+      expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [],
     })
 
@@ -941,7 +941,7 @@ function aggregateFor(
   repository: WorkspacePaneLayoutRepository,
   restoreTransaction: WorkspacePaneLayoutRestoreTransaction = {
     async validateMembershipAndLoad(input) {
-      const current = await repository.load(input.repoRoot)
+      const current = await repository.load(input.workspaceId)
       return { kind: 'accepted' as const, changed: false, snapshot: current }
     },
   },
@@ -957,18 +957,18 @@ async function validateTargets(
     ...scope,
     validTargets,
     physicalTargets: [],
-    expectedRepoEntry: LOCAL_WORKSPACE_ENTRY,
+    expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
     providerSnapshots: [],
   })
   if (result.kind !== 'validated') throw new Error('test target validation failed')
 }
 
 async function replace(aggregate: WorkspacePaneLayoutAggregate, input: WorkspacePaneLayoutReplaceInput) {
-  return await aggregate.runExclusive(input.repoRoot, async (operation) => await operation.replace(input))
+  return await aggregate.runExclusive(input.workspaceId, async (operation) => await operation.replace(input))
 }
 
 async function update(aggregate: WorkspacePaneLayoutAggregate, input: WorkspacePaneLayoutUpdateInput) {
-  return await aggregate.runExclusive(input.repoRoot, async (operation) => await operation.update(input))
+  return await aggregate.runExclusive(input.workspaceId, async (operation) => await operation.update(input))
 }
 
 async function readSnapshot(
@@ -978,7 +978,7 @@ async function readSnapshot(
   providerSnapshots: WorkspacePaneLayoutValidationInput['providerSnapshots'],
 ) {
   return await aggregate.runExclusive(
-    snapshotScope.repoRoot,
+    snapshotScope.workspaceId,
     async (operation) =>
       await operation.snapshot({
         scope: snapshotScope,
@@ -990,7 +990,7 @@ async function readSnapshot(
 
 async function validate(aggregate: WorkspacePaneLayoutAggregate, input: WorkspacePaneLayoutValidationInput) {
   return await aggregate.runExclusive(
-    input.repoRoot,
+    input.workspaceId,
     async (operation) => await operation.validateMembershipAndSnapshot(input),
   )
 }

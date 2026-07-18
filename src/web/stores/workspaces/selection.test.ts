@@ -80,7 +80,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const branchModel = repo ? readRepoBranchQueryProjection(repo) : null
   const target =
     repo && branchModel
-      ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
+      ? workspacePaneTabsTargetForRepoBranch({ workspaceId: repo.id, branches: branchModel.branches }, branchName)
       : null
   return workspacePaneStaticTabsFromEntries(
     target ? readWorkspacePaneTabsForTarget({ ...target, workspaceRuntimeId: repo.workspaceRuntimeId }) : [],
@@ -95,7 +95,7 @@ function preferredTabFor(branchName?: string | null): WorkspacePaneTabType | nul
         repo.ui,
         branchModel
           ? workspacePaneTabsTargetForRepoBranch(
-              { repoRoot: repo.id, branches: branchModel.branches },
+              { workspaceId: repo.id, branches: branchModel.branches },
               branchName ?? 'main',
             )
           : null,
@@ -309,7 +309,7 @@ describe('setWorkspacePaneTab', () => {
 })
 
 function worktreeTargetKey(worktreePath: string): string {
-  return workspacePaneTabsTargetIdentityKey({ kind: 'git-worktree', repoRoot: REPO_ID, worktreePath })
+  return workspacePaneTabsTargetIdentityKey({ kind: 'git-worktree', workspaceId: REPO_ID, worktreePath })
 }
 
 describe('workspace pane layout state', () => {

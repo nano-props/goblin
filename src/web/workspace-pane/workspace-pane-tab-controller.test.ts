@@ -89,7 +89,7 @@ describe('workspace pane tab controller transactions', () => {
       useWorkspacesStore
         .getState()
         .setWorkspacePaneTabForTarget(
-          { kind: 'workspace-root', repoRoot: 'goblin+file:///repo' },
+          { kind: 'workspace-root', workspaceId: 'goblin+file:///repo' },
           presentation.kind === 'terminal' ? 'terminal' : presentation.tab,
         )
       options?.onCommit?.()
@@ -103,7 +103,7 @@ describe('workspace pane tab controller transactions', () => {
           ...workspacePaneTarget(),
           branchName: null,
           worktreePath: '/repo',
-          paneTarget: { kind: 'workspace-root', repoRoot: 'goblin+file:///repo' },
+          paneTarget: { kind: 'workspace-root', workspaceId: 'goblin+file:///repo' },
         },
         staticTab('files'),
         navigation,
@@ -118,7 +118,7 @@ describe('workspace pane tab controller transactions', () => {
     )
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'workspace-root',
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: 'goblin+file:///repo',
     })
     expect(
       useWorkspacesStore.getState().workspaces['goblin+file:///repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey],
@@ -134,7 +134,7 @@ describe('workspace pane tab controller transactions', () => {
       branchName: null,
       paneTarget: {
         kind: 'git-worktree' as const,
-        repoRoot: 'goblin+file:///repo',
+        workspaceId: 'goblin+file:///repo',
         worktreePath: '/worktree-a',
       },
       tabEntries: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
@@ -164,7 +164,7 @@ describe('workspace pane tab controller transactions', () => {
           worktreePath: '/worktree-a',
           paneTarget: {
             kind: 'git-worktree',
-            repoRoot: 'goblin+file:///repo',
+            workspaceId: 'goblin+file:///repo',
             worktreePath: '/worktree-a',
           },
         },
@@ -181,7 +181,7 @@ describe('workspace pane tab controller transactions', () => {
     )
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-worktree' as const,
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: 'goblin+file:///repo',
       worktreePath: '/worktree-a',
     })
     expect(
@@ -266,7 +266,7 @@ function workspacePaneTarget(): RepoWorkspaceTabModel {
     workspaceRuntimeId: 'repo-runtime-1',
     branchName: 'feature/a',
     worktreePath: '/worktree-a',
-    paneTarget: { kind: 'git-worktree', repoRoot: 'goblin+file:///repo', worktreePath: '/worktree-a' },
+    paneTarget: { kind: 'git-worktree', workspaceId: 'goblin+file:///repo', worktreePath: '/worktree-a' },
   } as RepoWorkspaceTabModel
 }
 

@@ -58,7 +58,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(
       preferredWorkspacePaneTabForTarget(useWorkspacesStore.getState().workspaces[REPO_ID]!.ui, {
         kind: 'workspace-root',
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
       }),
     ).toBe('files')
   })
@@ -73,7 +73,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
       const terminalKey = formatTerminalWorktreeKeyForPath(REPO_ID, REPO_ID)
       useWorkspacesStore.getState().setSelectedTerminal(terminalKey, 'term-111111111111111111111')
-      useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: REPO_ID }, 'files')
+      useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
       const navigation = routeNavigation()
       vi.mocked(navigation.openWorkspaceRootPane).mockImplementation((_repoId, options) => {
         if (accepted && commit) options?.onCommit?.()
@@ -98,7 +98,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       expect(
         preferredWorkspacePaneTabForTarget(useWorkspacesStore.getState().workspaces[repo.id]!.ui, {
           kind: 'workspace-root',
-          repoRoot: repo.id,
+          workspaceId: repo.id,
         }),
       ).toBe(commit ? 'terminal' : 'files')
     },
@@ -1087,7 +1087,7 @@ function preferredWorkspacePaneTab() {
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
         workspacePaneTabsTargetForRepoBranch(
-          { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+          { workspaceId: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
           BRANCH_NAME,
         ),
       )

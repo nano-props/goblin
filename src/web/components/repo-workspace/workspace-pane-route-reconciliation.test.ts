@@ -28,8 +28,8 @@ function createRepoWorkspaceTabModel(input: RouteModelInput) {
     paneTarget: branchName
       ? requiredGitWorkspacePaneTabsTarget(input.workspaceId, branchName, worktreePath)
       : worktreePath === input.workspaceId
-        ? { kind: 'workspace-root', repoRoot: input.workspaceId }
-        : { kind: 'inactive', repoRoot: input.workspaceId },
+        ? { kind: 'workspace-root', workspaceId: input.workspaceId }
+        : { kind: 'inactive', workspaceId: input.workspaceId },
     worktreeHead: branchName && worktreePath ? { kind: 'branch', branchName } : undefined,
   })
 }

@@ -37,12 +37,12 @@ describe('workspace pane tab target read model', () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'workspace-root',
-      repoRoot: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: repo.workspaceRuntimeId,
 
       tabs: [workspacePaneStaticTabEntry('files')],
     })
-    useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: REPO_ID }, 'files')
+    useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
 
     const target = workspacePaneTabTargetForWorkspace(REPO_ID)
 
@@ -110,7 +110,7 @@ describe('workspace pane tab target read model', () => {
     primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'git-worktree' as const,
-      repoRoot: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
@@ -136,7 +136,7 @@ describe('workspace pane tab target read model', () => {
     })
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'git-worktree' as const,
-      repoRoot: REPO_ID,
+      workspaceId: REPO_ID,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
@@ -183,7 +183,7 @@ describe('workspace pane tab target read model', () => {
     })
 
     recordWorkspacePaneTabOpener(
-      { kind: 'git-branch', repoRoot: REPO_ID, branchName: 'feature/query' },
+      { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/query' },
       repo.workspaceRuntimeId,
       'workspace-pane:changes',
       'workspace-pane:status',
@@ -191,7 +191,7 @@ describe('workspace pane tab target read model', () => {
 
     expect(
       useWorkspacesStore.getState().tabOpenerIdentityByScope[
-        `${tabOpenerScopeKey({ kind: 'git-branch', repoRoot: REPO_ID, branchName: 'feature/query' })}\0${repo.workspaceRuntimeId}`
+        `${tabOpenerScopeKey({ kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/query' })}\0${repo.workspaceRuntimeId}`
       ]?.['workspace-pane:changes'],
     ).toBe('workspace-pane:status')
   })
@@ -207,7 +207,7 @@ describe('workspace pane tab target read model', () => {
       recordWorkspacePaneTabOpener(
         {
           kind: 'git-worktree',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           worktreePath: WORKTREE_PATH,
         },
         repo.workspaceRuntimeId,
@@ -224,7 +224,7 @@ describe('workspace pane tab target read model', () => {
       workspacePaneTabOpener(
         {
           kind: 'git-worktree',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           worktreePath: WORKTREE_PATH,
         },
         repo.workspaceRuntimeId,
@@ -242,11 +242,11 @@ describe('workspace pane tab target read model', () => {
     }))
     const detachedTarget = {
       kind: 'git-worktree' as const,
-      repoRoot: REPO_ID,
+      workspaceId: REPO_ID,
       worktreePath: WORKTREE_PATH,
     }
-    const workspaceTarget = { kind: 'workspace-root' as const, repoRoot: REPO_ID }
-    const branchTarget = { kind: 'git-branch' as const, repoRoot: REPO_ID, branchName: 'feature/query' }
+    const workspaceTarget = { kind: 'workspace-root' as const, workspaceId: REPO_ID }
+    const branchTarget = { kind: 'git-branch' as const, workspaceId: REPO_ID, branchName: 'feature/query' }
 
     expect(
       recordWorkspacePaneTabOpener(
@@ -277,7 +277,7 @@ describe('workspace pane tab target read model', () => {
 
     expect(
       recordWorkspacePaneTabOpener(
-        { kind: 'git-branch', repoRoot: REPO_ID, branchName: 'feature/query' },
+        { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/query' },
         repo.workspaceRuntimeId,
         'workspace-pane:changes',
         'workspace-pane:status',

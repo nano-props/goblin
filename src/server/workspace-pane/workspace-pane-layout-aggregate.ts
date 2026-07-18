@@ -102,7 +102,7 @@ export interface WorkspacePaneLayoutSnapshotInput {
 export type WorkspacePaneLayoutValidationInput = WorkspacePaneEpochScope & {
   validTargets: readonly WorkspacePaneTargetProjection[]
   physicalTargets: readonly { target: RuntimeWorkspacePaneTarget; lease: PhysicalWorktreeAdmissionLease }[]
-  expectedRepoEntry: WorkspaceSessionEntry
+  expectedWorkspaceEntry: WorkspaceSessionEntry
   providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
   assertCurrent?: () => void
 }
@@ -135,7 +135,7 @@ export interface WorkspacePaneLayoutOperation {
     },
   ): void
   indexedAdmissionLeases(scope: WorkspacePaneEpochScope): PhysicalWorktreeAdmissionLease[]
-  clearPhysicalIdentity(repoRoot: string, lease: PhysicalWorktreeAdmissionLease): WorkspacePaneEpochScope[]
+  clearPhysicalIdentity(workspaceId: string, lease: PhysicalWorktreeAdmissionLease): WorkspacePaneEpochScope[]
 }
 
 export class WorkspacePaneLayoutAggregate {
@@ -156,13 +156,13 @@ export class WorkspacePaneLayoutAggregate {
   }
 
   async runExclusive<T>(
-    repoRoot: string,
+    workspaceId: string,
     task: (operation: WorkspacePaneLayoutOperation) => Promise<T> | T,
   ): Promise<T> {
-    let queue = this.operationQueuesByRepoRoot.get(repoRoot)
+    let queue = this.operationQueuesByRepoRoot.get(workspaceId)
     if (!queue) {
       queue = new PQueue({ concurrency: 1 })
-      this.operationQueuesByRepoRoot.set(repoRoot, queue)
+      this.operationQueuesByRepoRoot.set(workspaceId, queue)
     }
     try {
       return await queue.add(() =>
@@ -183,8 +183,8 @@ export class WorkspacePaneLayoutAggregate {
       )
     } finally {
       void queue.onIdle().then(() => {
-        if (this.operationQueuesByRepoRoot.get(repoRoot) !== queue) return
-        if (queue.size === 0 && queue.pending === 0) this.operationQueuesByRepoRoot.delete(repoRoot)
+        if (this.operationQueuesByRepoRoot.get(workspaceId) !== queue) return
+        if (queue.size === 0 && queue.pending === 0) this.operationQueuesByRepoRoot.delete(workspaceId)
       })
     }
   }
@@ -201,7 +201,7 @@ export class WorkspacePaneLayoutAggregate {
 
   private async snapshot(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot> {
     const { scope, validTargets, providerSnapshots, knownLayout } = input
-    const layout = knownLayout ?? (await this.repository.load(scope.repoRoot)).layout
+    const layout = knownLayout ?? (await this.repository.load(scope.workspaceId)).layout
     const entries = this.projectEntries(scope, layout, validTargets, providerSnapshots)
     return { revision: this.revision(scope, layout, validTargets, providerSnapshots, entries), entries }
   }
@@ -210,7 +210,7 @@ export class WorkspacePaneLayoutAggregate {
     input: WorkspacePaneLayoutSnapshotInput,
   ): Promise<WorkspacePaneTabsSnapshot['entries']> {
     const { scope, validTargets, providerSnapshots } = input
-    const layout = (await this.repository.load(scope.repoRoot)).layout
+    const layout = (await this.repository.load(scope.workspaceId)).layout
     return this.projectEntries(scope, layout, validTargets, providerSnapshots)
   }
 
@@ -219,8 +219,8 @@ export class WorkspacePaneLayoutAggregate {
   ): Promise<WorkspacePaneLayoutValidationResult> {
     input.assertCurrent?.()
     const outcome = await this.restoreTransaction.validateMembershipAndLoad({
-      repoRoot: input.repoRoot,
-      expectedRepoEntry: input.expectedRepoEntry,
+      workspaceId: input.workspaceId,
+      expectedWorkspaceEntry: input.expectedWorkspaceEntry,
     })
     if (outcome.kind === 'membership-conflict') return { kind: 'membership-conflict' }
     input.assertCurrent?.()
@@ -264,7 +264,7 @@ export class WorkspacePaneLayoutAggregate {
     const validTargets = targetMap(input.validTargets)
     const target = validTargets.get(runtimeTargetKey(input.target))
     if (!target) throw new Error('error.workspace-tabs-target-invalid')
-    const layout = (await this.repository.load(input.repoRoot)).layout
+    const layout = (await this.repository.load(input.workspaceId)).layout
     const stagedOverlay = this.overlay.fork()
     stagedOverlay.registerPhysicalTarget(input)
     const currentTabs = canonicalTabsForTarget(
@@ -304,8 +304,8 @@ export class WorkspacePaneLayoutAggregate {
     return this.overlay.physicalTargets(target)
   }
 
-  activeEpochs(repoRoot: string): WorkspacePaneEpochScope[] {
-    return this.overlay.activeEpochs(repoRoot)
+  activeEpochs(workspaceId: string): WorkspacePaneEpochScope[] {
+    return this.overlay.activeEpochs(workspaceId)
   }
 
   epochsForUser(userId: string): WorkspacePaneEpochScope[] {
@@ -319,7 +319,7 @@ export class WorkspacePaneLayoutAggregate {
   ): Promise<WorkspacePaneLayoutCommitResult> {
     for (let conflicts = 0; ; conflicts += 1) {
       input.assertCurrent?.()
-      const current = await this.repository.load(input.repoRoot)
+      const current = await this.repository.load(input.workspaceId)
       const target = resolveMutationTarget(input, input.validTargets)
       if (!target) throw new Error('error.workspace-tabs-target-invalid')
       const currentTabs = canonicalTabsForTarget(
@@ -336,7 +336,7 @@ export class WorkspacePaneLayoutAggregate {
       const durableTarget = restorableWorkspacePaneTargetFromRuntime(target.target)
       if (!durableTarget) throw new Error('error.workspace-tabs-target-invalid')
       const entry = { target: durableTarget, tabs: staticTabs }
-      const replacement = normalizeWorkspacePaneDurableLayout(input.repoRoot, {
+      const replacement = normalizeWorkspacePaneDurableLayout(input.workspaceId, {
         entries: [
           ...current.layout.entries.filter(
             (candidate) =>
@@ -347,7 +347,7 @@ export class WorkspacePaneLayoutAggregate {
       })
       input.assertCurrent?.()
       const outcome = await this.repository.compareAndSwap({
-        repoRoot: input.repoRoot,
+        workspaceId: input.workspaceId,
         expected: current.layout,
         replacement,
       })
@@ -417,7 +417,7 @@ export class WorkspacePaneLayoutAggregate {
     const affected = new Set(localAffectedUserIds)
     if (durableLayoutChanged) {
       affected.add(scope.userId)
-      for (const active of this.overlay.activeEpochs(scope.repoRoot)) affected.add(active.userId)
+      for (const active of this.overlay.activeEpochs(scope.workspaceId)) affected.add(active.userId)
     }
     return [...affected]
   }
@@ -433,7 +433,7 @@ function revisionForState(
   entries: WorkspacePaneTabsSnapshot['entries'],
 ): number {
   const key = epochKey(scope)
-  const layoutToken = JSON.stringify(normalizeWorkspacePaneDurableLayout(scope.repoRoot, layout))
+  const layoutToken = JSON.stringify(normalizeWorkspacePaneDurableLayout(scope.workspaceId, layout))
   const providerRevisions = new Map(providerRevisionMap(providers))
   const overlayRevision = overlay.revision(scope)
   const targetProjectionToken = JSON.stringify([...targetMap(validTargets)])
@@ -510,7 +510,7 @@ function providerTargets(
   for (const provider of providers) {
     for (const session of provider.liveSessions) {
       if (
-        session.target.workspaceId !== scope.repoRoot ||
+        session.target.workspaceId !== scope.workspaceId ||
         session.target.workspaceRuntimeId !== scope.workspaceRuntimeId
       ) {
         throw new Error('error.workspace-tabs-target-invalid')
@@ -573,12 +573,12 @@ function canonicalTabsForTarget(
 }
 
 function durableTargetKey(
-  scope: Pick<WorkspacePaneEpochScope, 'repoRoot' | 'workspaceRuntimeId'>,
+  scope: Pick<WorkspacePaneEpochScope, 'workspaceId' | 'workspaceRuntimeId'>,
   target: RestorableWorkspacePaneTarget,
 ): string {
-  const runtime = workspacePaneTabsTargetFromRestorable(scope.repoRoot, target)
+  const runtime = workspacePaneTabsTargetFromRestorable(scope.workspaceId, target)
   if (!runtime) throw new Error('error.workspace-tabs-target-invalid')
-  const workspaceId = canonicalWorkspaceLocator(scope.repoRoot)
+  const workspaceId = canonicalWorkspaceLocator(scope.workspaceId)
   if (!workspaceId) throw new Error('error.workspace-tabs-target-invalid')
   const bound =
     target.kind === 'workspace-root'
@@ -600,7 +600,7 @@ function targetProjectionKey(projection: WorkspacePaneTargetProjection): string 
 }
 
 function epochKey(scope: WorkspacePaneEpochScope): string {
-  return `${scope.userId}\0${scope.repoRoot}\0${scope.workspaceRuntimeId}`
+  return `${scope.userId}\0${scope.workspaceId}\0${scope.workspaceRuntimeId}`
 }
 
 function mapsEqual(a: Map<string, number>, b: Map<string, number>): boolean {

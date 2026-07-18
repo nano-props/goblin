@@ -37,7 +37,7 @@ export interface WorkspacePaneTabsMutationSuccess {
 export interface WorkspacePaneTabsMutationFailure {
   ok: false
   operation: WorkspacePaneTabsMutationOperation
-  repoRoot: string
+  workspaceId: string
   branchName: string | null
   worktreePath: string | null
   message: string
@@ -95,7 +95,7 @@ const workspacePaneTabsInteractionBlocker = createWorkspacePaneTabsInteractionBl
  */
 export function reportWorkspacePaneTabsFailure(input: {
   operation: WorkspacePaneTabsMutationOperation
-  repoRoot: string
+  workspaceId: string
   branchName: string | null
   worktreePath: string | null
   error: unknown
@@ -107,7 +107,7 @@ export function reportWorkspacePaneTabsFailure(input: {
         ? input.error
         : 'workspace pane tabs operation failed'
   goblinLog.warn(`workspace pane tabs ${input.operation} failed`, {
-    repoRoot: input.repoRoot,
+    workspaceId: input.workspaceId,
     branchName: input.branchName,
     worktreePath: input.worktreePath,
     operation: input.operation,
@@ -117,7 +117,7 @@ export function reportWorkspacePaneTabsFailure(input: {
   return {
     ok: false,
     operation: input.operation,
-    repoRoot: input.repoRoot,
+    workspaceId: input.workspaceId,
     branchName: input.branchName,
     worktreePath: input.worktreePath,
     message,
@@ -154,12 +154,12 @@ async function commitWorkspacePaneTabsNow(
 ): Promise<WorkspacePaneTabsMutationResult> {
   try {
     const snapshot = await replaceWorkspacePaneTabsOnServer(input)
-    const accepted = writeCanonicalWorkspacePaneTabsSnapshot(input.repoRoot, input.workspaceRuntimeId, snapshot)
+    const accepted = writeCanonicalWorkspacePaneTabsSnapshot(input.workspaceId, input.workspaceRuntimeId, snapshot)
     return { ok: true, projectionApplied: accepted }
   } catch (err) {
     return reportWorkspacePaneTabsFailure({
       operation: 'commit',
-      repoRoot: input.repoRoot,
+      workspaceId: input.workspaceId,
       branchName: workspacePaneTabsBranchIdentity(input),
       worktreePath: workspacePaneTabsTargetWorktreePath(input),
       error: err,
@@ -172,12 +172,12 @@ async function updateWorkspacePaneTabsNow(
 ): Promise<WorkspacePaneTabsMutationResult> {
   try {
     const snapshot = await updateWorkspacePaneTabsOnServer(input)
-    const accepted = writeCanonicalWorkspacePaneTabsSnapshot(input.repoRoot, input.workspaceRuntimeId, snapshot)
+    const accepted = writeCanonicalWorkspacePaneTabsSnapshot(input.workspaceId, input.workspaceRuntimeId, snapshot)
     return { ok: true, projectionApplied: accepted }
   } catch (err) {
     return reportWorkspacePaneTabsFailure({
       operation: 'update',
-      repoRoot: input.repoRoot,
+      workspaceId: input.workspaceId,
       branchName: workspacePaneTabsBranchIdentity(input),
       worktreePath: workspacePaneTabsTargetWorktreePath(input),
       error: err,
@@ -186,13 +186,13 @@ async function updateWorkspacePaneTabsNow(
 }
 
 export function writeCanonicalWorkspacePaneTabsSnapshot(
-  repoRoot: string,
+  workspaceId: string,
   workspaceRuntimeId: string,
   snapshot: WorkspacePaneTabsSnapshot,
   queryClient?: QueryClient,
 ): boolean {
-  if (!workspacePaneTabsProjectionScopeAccepted({ repoRoot, workspaceRuntimeId })) return false
-  return writeWorkspacePaneTabsSnapshotQueryData(repoRoot, workspaceRuntimeId, snapshot, queryClient)
+  if (!workspacePaneTabsProjectionScopeAccepted({ workspaceId, workspaceRuntimeId })) return false
+  return writeWorkspacePaneTabsSnapshotQueryData(workspaceId, workspaceRuntimeId, snapshot, queryClient)
 }
 
 export async function replaceWorkspacePaneTabsOnServer(
@@ -201,7 +201,7 @@ export async function replaceWorkspacePaneTabsOnServer(
   const target = runtimeWorkspacePaneTarget(input, input.workspaceRuntimeId)
   if (!target) throw new Error('error.workspace-tabs-target-invalid')
   return await workspacePaneTabsClient.replace({
-    workspaceId: input.repoRoot,
+    workspaceId: input.workspaceId,
     workspaceRuntimeId: input.workspaceRuntimeId,
     target,
     tabs: input.tabs,
@@ -214,7 +214,7 @@ export async function updateWorkspacePaneTabsOnServer(
   const target = runtimeWorkspacePaneTarget(input, input.workspaceRuntimeId)
   if (!target) throw new Error('error.workspace-tabs-target-invalid')
   return await workspacePaneTabsClient.update({
-    workspaceId: input.repoRoot,
+    workspaceId: input.workspaceId,
     workspaceRuntimeId: input.workspaceRuntimeId,
     target,
     operation: input.operation,
@@ -222,7 +222,7 @@ export async function updateWorkspacePaneTabsOnServer(
 }
 
 function workspacePaneTabsProjectionScopeAccepted(
-  input: Pick<CommitWorkspacePaneTabsInput, 'repoRoot' | 'workspaceRuntimeId'>,
+  input: Pick<CommitWorkspacePaneTabsInput, 'workspaceId' | 'workspaceRuntimeId'>,
 ): boolean {
-  return currentWorkspaceRuntimeId(useWorkspacesStore.getState(), input.repoRoot) === input.workspaceRuntimeId
+  return currentWorkspaceRuntimeId(useWorkspacesStore.getState(), input.workspaceId) === input.workspaceRuntimeId
 }

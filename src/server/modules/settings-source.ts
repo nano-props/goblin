@@ -551,21 +551,21 @@ function sameWorkspaceEntries(a: WorkspaceSessionEntry[], b: WorkspaceSessionEnt
 
 function workspacePaneLayoutFromWorkspace(
   workspace: ServerWorkspaceState,
-  repoRoot: string,
+  workspaceId: string,
 ): WorkspacePaneDurableLayout {
   const entries: WorkspacePaneDurableLayout['entries'] = []
-  for (const [targetKey, tabs] of Object.entries(workspace.workspacePaneTabsByTargetByWorkspace[repoRoot] ?? {})) {
+  for (const [targetKey, tabs] of Object.entries(workspace.workspacePaneTabsByTargetByWorkspace[workspaceId] ?? {})) {
     const target = parseRestorableWorkspacePaneTargetKey(targetKey)
-    if (!target || !workspacePaneTabsTargetFromRestorable(repoRoot, target)) continue
+    if (!target || !workspacePaneTabsTargetFromRestorable(workspaceId, target)) continue
     entries.push({ target, tabs })
   }
-  return normalizeWorkspacePaneDurableLayout(repoRoot, { entries })
+  return normalizeWorkspacePaneDurableLayout(workspaceId, { entries })
 }
 
 export const serverWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository = {
-  async load(repoRoot) {
+  async load(workspaceId) {
     const workspace = (await loadUserSettings()).workspace
-    return { layout: workspacePaneLayoutFromWorkspace(workspace, repoRoot) }
+    return { layout: workspacePaneLayoutFromWorkspace(workspace, workspaceId) }
   },
 
   async compareAndSwap(input) {
@@ -576,12 +576,12 @@ export const serverWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository 
 export const serverWorkspacePaneLayoutRestoreTransaction: WorkspacePaneLayoutRestoreTransaction = {
   async validateMembershipAndLoad(input) {
     return await mutateUserSettings<WorkspacePaneLayoutRestoreTransactionOutcome>(async (data) => {
-      const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
+      const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.workspaceId)
       const snapshot = { layout: currentLayout }
-      const currentRepoEntry = data.workspace.openWorkspaceEntries.find(
-        (entry) => workspaceSessionEntryId(entry) === input.repoRoot,
+      const currentWorkspaceEntry = data.workspace.openWorkspaceEntries.find(
+        (entry) => workspaceSessionEntryId(entry) === input.workspaceId,
       )
-      if (!sameWorkspaceSessionEntry(currentRepoEntry, input.expectedRepoEntry)) {
+      if (!sameWorkspaceSessionEntry(currentWorkspaceEntry, input.expectedWorkspaceEntry)) {
         return unchangedUserSettings(data, { kind: 'membership-conflict', snapshot })
       }
       return unchangedUserSettings(data, { kind: 'accepted' as const, snapshot })
@@ -594,12 +594,12 @@ async function compareAndSwapWorkspacePaneLayout(
 ): Promise<WorkspacePaneLayoutRepositoryCasOutcome> {
   return await mutateWorkspacePaneSettings<WorkspacePaneLayoutRepositoryCasOutcome>(
     async (data) => {
-      const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
+      const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.workspaceId)
       const snapshot = { layout: currentLayout }
-      if (!workspacePaneDurableLayoutsEqual(input.repoRoot, currentLayout, input.expected)) {
+      if (!workspacePaneDurableLayoutsEqual(input.workspaceId, currentLayout, input.expected)) {
         return unchangedUserSettings(data, { kind: 'conflict', snapshot })
       }
-      return workspacePaneLayoutMutation(data, input.repoRoot, currentLayout, input.replacement)
+      return workspacePaneLayoutMutation(data, input.workspaceId, currentLayout, input.replacement)
     },
     (error) => ({ kind: 'write-failure', error }),
   )
@@ -624,13 +624,13 @@ async function mutateWorkspacePaneSettings<T>(
 
 function workspacePaneLayoutMutation(
   data: UserSettingsData,
-  repoRoot: string,
+  workspaceId: string,
   currentLayout: WorkspacePaneDurableLayout,
   requestedLayout: WorkspacePaneDurableLayout,
 ): UserSettingsMutation<WorkspacePaneLayoutRepositoryCasOutcome> {
   const snapshot = { layout: currentLayout }
-  const replacement = normalizeWorkspacePaneDurableLayout(repoRoot, requestedLayout)
-  if (workspacePaneDurableLayoutsEqual(repoRoot, currentLayout, replacement)) {
+  const replacement = normalizeWorkspacePaneDurableLayout(workspaceId, requestedLayout)
+  if (workspacePaneDurableLayoutsEqual(workspaceId, currentLayout, replacement)) {
     return unchangedUserSettings(data, { kind: 'accepted', snapshot, changed: false })
   }
   const byTarget = Object.fromEntries(
@@ -638,14 +638,14 @@ function workspacePaneLayoutMutation(
   )
   const workspacePaneTabsByTargetByWorkspace =
     Object.keys(byTarget).length === 0
-      ? recordWithoutKey(data.workspace.workspacePaneTabsByTargetByWorkspace, repoRoot)
-      : { ...data.workspace.workspacePaneTabsByTargetByWorkspace, [repoRoot]: byTarget }
+      ? recordWithoutKey(data.workspace.workspacePaneTabsByTargetByWorkspace, workspaceId)
+      : { ...data.workspace.workspacePaneTabsByTargetByWorkspace, [workspaceId]: byTarget }
   const workspace = normalizeWorkspace({ ...data.workspace, workspacePaneTabsByTargetByWorkspace })
   return {
     next: { ...data, workspace },
     result: {
       kind: 'accepted',
-      snapshot: { layout: workspacePaneLayoutFromWorkspace(workspace, repoRoot) },
+      snapshot: { layout: workspacePaneLayoutFromWorkspace(workspace, workspaceId) },
       changed: true,
     },
   }

@@ -366,7 +366,7 @@ describe('repo lifecycle', () => {
     await useWorkspacesStore.getState().closeWorkspace(REPO_A)
     await vi.waitFor(() => {
       const cached = primaryWindowQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())
-      expect(cached?.runtimes).not.toContainEqual({ repoRoot: REPO_A, workspaceRuntimeId })
+      expect(cached?.runtimes).not.toContainEqual({ workspaceId: REPO_A, workspaceRuntimeId })
     })
   })
 
@@ -609,14 +609,14 @@ describe('repo lifecycle', () => {
     useWorkspacesStore
       .getState()
       .setTabOpener(
-        tabOpenerScopeKey({ kind: 'git-branch', repoRoot: REPO_A, branchName: 'feature/a' }),
+        tabOpenerScopeKey({ kind: 'git-branch', workspaceId: REPO_A, branchName: 'feature/a' }),
         'workspace-pane:changes',
         'workspace-pane:status',
       )
     useWorkspacesStore
       .getState()
       .setTabOpener(
-        tabOpenerScopeKey({ kind: 'git-branch', repoRoot: REPO_B, branchName: 'feature/b' }),
+        tabOpenerScopeKey({ kind: 'git-branch', workspaceId: REPO_B, branchName: 'feature/b' }),
         'workspace-pane:changes',
         'workspace-pane:status',
       )
@@ -625,10 +625,10 @@ describe('repo lifecycle', () => {
 
     const openers = useWorkspacesStore.getState().tabOpenerIdentityByScope
     expect(
-      openers[tabOpenerScopeKey({ kind: 'git-branch', repoRoot: REPO_A, branchName: 'feature/a' })],
+      openers[tabOpenerScopeKey({ kind: 'git-branch', workspaceId: REPO_A, branchName: 'feature/a' })],
     ).toBeUndefined()
     expect(
-      openers[tabOpenerScopeKey({ kind: 'git-branch', repoRoot: REPO_B, branchName: 'feature/b' })]?.[
+      openers[tabOpenerScopeKey({ kind: 'git-branch', workspaceId: REPO_B, branchName: 'feature/b' })]?.[
         'workspace-pane:changes'
       ],
     ).toBe('workspace-pane:status')

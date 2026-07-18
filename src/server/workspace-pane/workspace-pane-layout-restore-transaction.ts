@@ -7,7 +7,7 @@ export type WorkspacePaneLayoutRestoreTransactionOutcome =
 
 export interface WorkspacePaneLayoutRestoreTransaction {
   validateMembershipAndLoad(input: {
-    repoRoot: string
-    expectedRepoEntry: WorkspaceSessionEntry
+    workspaceId: string
+    expectedWorkspaceEntry: WorkspaceSessionEntry
   }): Promise<WorkspacePaneLayoutRestoreTransactionOutcome>
 }

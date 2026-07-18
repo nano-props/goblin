@@ -115,10 +115,10 @@ function useHarnessWorkspacePaneRoute(props: RepoWorkspaceContentHarnessProps): 
       ? branch.worktree?.path
         ? {
             kind: 'git-worktree' as const,
-            repoRoot: props.repo.id,
+            workspaceId: props.repo.id,
             worktreePath: branch.worktree.path,
           }
-        : { kind: 'git-branch' as const, repoRoot: props.repo.id, branchName: branch.name }
+        : { kind: 'git-branch' as const, workspaceId: props.repo.id, branchName: branch.name }
       : null,
   )
   const readContext = useTerminalSessionReadContext()
@@ -497,7 +497,7 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabOpener(
         {
           kind: 'git-worktree',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           worktreePath,
         },
         repo.workspaceRuntimeId,
@@ -1158,7 +1158,7 @@ describe('RepoWorkspaceContent', () => {
       async (_base, options) => {
         resolvedStartupShellCommand = (await options?.resolveStartupShellCommand?.()) ?? null
         workspacePaneTabsTestBridge.addRuntimeTab({
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           workspaceRuntimeId: repo.workspaceRuntimeId,
           branchName,
           worktreePath,
@@ -1258,7 +1258,7 @@ describe('RepoWorkspaceContent', () => {
     expect(
       readWorkspacePaneTabsForTarget({
         kind: 'git-worktree' as const,
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,
         worktreePath,
       }),
@@ -1275,7 +1275,7 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabOpener(
         {
           kind: 'git-worktree',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           worktreePath: '/tmp/filetree-open-worktree',
         },
         repo.workspaceRuntimeId,
@@ -1311,7 +1311,7 @@ describe('RepoWorkspaceContent', () => {
         startupShellCommand = (await options?.resolveStartupShellCommand?.()) ?? null
         workspacePaneTabsTestBridge.addRuntimeTab({
           kind: 'workspace-root',
-          repoRoot: workspaceId,
+          workspaceId: workspaceId,
           workspaceRuntimeId: repo.workspaceRuntimeId,
 
           terminalSessionId: 'term-111111111111111111111',

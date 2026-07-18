@@ -28,13 +28,13 @@ export const WORKSPACE_PANE_TABS_REALTIME_EVENTS = {
 export interface WorkspacePaneTabsInvalidatedRealtimeMessage {
   type: typeof WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed
   change: 'invalidation'
-  repoRoot: string
+  workspaceId: string
 }
 
 export interface WorkspacePaneTabsRevisionRealtimeMessage {
   type: typeof WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed
   change: 'revision'
-  repoRoot: string
+  workspaceId: string
   workspaceRuntimeId: string
   revision: number
 }
@@ -45,20 +45,20 @@ export type WorkspacePaneTabsChangedRealtimeMessage =
 export type WorkspacePaneTabsRealtimeMessage = WorkspacePaneTabsChangedRealtimeMessage
 
 export function workspacePaneTabsInvalidatedRealtimeMessage(
-  repoRoot: string,
+  workspaceId: string,
 ): WorkspacePaneTabsInvalidatedRealtimeMessage {
-  return { type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed, change: 'invalidation', repoRoot }
+  return { type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed, change: 'invalidation', workspaceId }
 }
 
 export function workspacePaneTabsRevisionRealtimeMessage(
-  repoRoot: string,
+  workspaceId: string,
   workspaceRuntimeId: string,
   revision: number,
 ): WorkspacePaneTabsRevisionRealtimeMessage {
   return {
     type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
     change: 'revision',
-    repoRoot,
+    workspaceId,
     workspaceRuntimeId,
     revision,
   }

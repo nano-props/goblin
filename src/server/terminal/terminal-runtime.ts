@@ -536,7 +536,7 @@ async function clearWorkspacePaneDurableLayout(
     }
     if (workspacePaneDurableLayoutsEqual(workspaceId, current.layout, replacement)) return false
     const outcome = await repository.compareAndSwap({
-      repoRoot: workspaceId,
+      workspaceId,
       expected: current.layout,
       replacement,
     })

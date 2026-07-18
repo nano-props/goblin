@@ -217,11 +217,16 @@ export class WorktreeRemovalApplication {
   ): Promise<void> {
     try {
       await this.deps.workspaceTabs.reconcilePhysicalWorktreeAfterRemovalFailure({
-        repoRoot,
+        workspaceId: repoRoot,
         worktreePath,
         physicalWorktreeCapability,
         permit,
-        scopes,
+        scopes: scopes.map(({ userId, repoRoot: workspaceId, scope, worktreePath }) => ({
+          userId,
+          workspaceId,
+          scope,
+          worktreePath,
+        })),
       })
     } catch (error) {
       worktreeRemovalLogger.error({ error, repoRoot, worktreePath }, 'tabs reconcile failed')

@@ -51,7 +51,7 @@ vi.mock('#/server/modules/workspace-runtimes.ts', () => ({
     return probe
   }),
   workspaceProbeStateForRuntime: vi.fn(
-    (_userId, repoRoot) => mocks.workspaceProbes.get(repoRoot) ?? { status: 'probing' },
+    (_userId, workspaceId) => mocks.workspaceProbes.get(workspaceId) ?? { status: 'probing' },
   ),
 }))
 
@@ -66,8 +66,8 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
 }))
 
 vi.mock('#/server/modules/workspace-probe.ts', () => ({
-  probeWorkspace: vi.fn(async (repoRoot: string) =>
-    workspaceProbeFromLegacy(repoRoot, await mocks.probeRepo(repoRoot)),
+  probeWorkspace: vi.fn(async (workspaceId: string) =>
+    workspaceProbeFromLegacy(workspaceId, await mocks.probeRepo(workspaceId)),
   ),
 }))
 
@@ -115,7 +115,7 @@ describe('restoreServerWorkspace', () => {
   test('restores server-owned workspace tabs only after strict validation succeeds', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: 'goblin+file:///repo',
       branchName: 'main',
     })
     const workspace: ServerWorkspaceState = {
@@ -149,7 +149,7 @@ describe('restoreServerWorkspace', () => {
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedWorkspaceEntry: { kind: 'local', id: 'goblin+file:///repo' },
       targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
     expect(result.runtime).toMatchObject({
@@ -214,7 +214,7 @@ describe('restoreServerWorkspace', () => {
   test('validates and projects workspace tabs into a canonical snapshot', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: 'goblin+file:///repo',
       branchName: 'main',
     })
     const workspace: ServerWorkspaceState = {
@@ -249,7 +249,7 @@ describe('restoreServerWorkspace', () => {
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
-      expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
+      expectedWorkspaceEntry: { kind: 'local', id: 'goblin+file:///repo' },
       targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
     expect(result.runtime.workspacePaneTabs).toEqual([
@@ -383,7 +383,7 @@ describe('restoreServerWorkspace', () => {
   test('releases opened runtimes when workspace tab commit fails unexpectedly', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: 'goblin+file:///repo',
       branchName: 'main',
     })
     const workspace: ServerWorkspaceState = {
@@ -424,7 +424,7 @@ describe('restoreServerWorkspace', () => {
   test('releases opened runtimes and skips tab commits when aborted after projection restore', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: 'goblin+file:///repo',
       branchName: 'main',
     })
     const workspace: ServerWorkspaceState = {
@@ -526,7 +526,7 @@ describe('restoreServerWorkspace', () => {
   test('releases opened runtimes when workspace repair persistence fails', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: 'goblin+file:///repo',
       branchName: 'missing',
     })
     const workspace: ServerWorkspaceState = {
@@ -567,12 +567,12 @@ describe('restoreServerWorkspace', () => {
   test('uses concurrently repaired repo tabs without overwriting them', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: 'goblin+file:///repo',
       branchName: 'missing',
     })
     const otherTargetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      repoRoot: 'goblin+file:///other',
+      workspaceId: 'goblin+file:///other',
       branchName: 'main',
     })
     const invalidWorkspace: ServerWorkspaceState = {
@@ -629,7 +629,7 @@ function gitProbe() {
 }
 
 function workspaceProbeFromLegacy(
-  repoRoot: string,
+  workspaceId: string,
   result: { ok: boolean; root?: string; name?: string; message?: string },
 ) {
   const reportedRoot = result.root?.startsWith('goblin+')
@@ -638,7 +638,7 @@ function workspaceProbeFromLegacy(
       ? `goblin+file://${result.root}`
       : null
   return result.ok
-    ? reportedRoot && reportedRoot !== repoRoot
+    ? reportedRoot && reportedRoot !== workspaceId
       ? {
           ...gitProbe(),
           name: result.name ?? 'repo',

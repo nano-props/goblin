@@ -12,7 +12,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
 export interface UseWorkspacePaneRuntimeTabTargetProjectionInput {
-  repoRoot: string
+  workspaceId: string
   workspaceRuntimeId: string
   worktreePath: string | null
 }
@@ -24,17 +24,17 @@ export interface WorkspacePaneRuntimeTabTargetProjectionHookResult extends Works
 }
 
 export function useWorkspacePaneRuntimeTabTargetProjection({
-  repoRoot,
+  workspaceId,
   workspaceRuntimeId,
   worktreePath,
 }: UseWorkspacePaneRuntimeTabTargetProjectionInput): WorkspacePaneRuntimeTabTargetProjectionHookResult {
-  const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ repoRoot, worktreePath })
+  const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ workspaceId, worktreePath })
   const runtimeTabTargetKeyByType = useMemo(
-    () => workspacePaneRuntimeTabTargetKeyByType({ repoRoot, worktreePath }),
-    [repoRoot, worktreePath],
+    () => workspacePaneRuntimeTabTargetKeyByType({ workspaceId, worktreePath }),
+    [workspaceId, worktreePath],
   )
   const providerProjections = useWorkspacePaneRuntimeTabProviderProjections({
-    repoRoot,
+    workspaceId,
     workspaceRuntimeId,
     worktreePath,
   })

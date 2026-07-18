@@ -11,7 +11,7 @@ const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/repo'
 const RUNTIME_TARGET = runtimeWorkspacePaneTargetForTest({
   kind: 'git-worktree' as const,
-  repoRoot: REPO_ROOT,
+  workspaceId: REPO_ROOT,
   workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
   worktreePath: WORKTREE_PATH,
 })
