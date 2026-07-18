@@ -152,7 +152,7 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
       // closed. Close commands are scoped to an existing surface and must
       // never recreate one just to deliver the intent.
       createClientCommandMenuItem(state, 'file-close-workspace-tab-or-window', { missingWindow: 'ignore' }),
-      createClientCommandMenuItem(state, 'file-close-tab', { missingWindow: 'ignore' }),
+      createClientCommandMenuItem(state, 'file-close-workspace', { missingWindow: 'ignore' }),
       { label: t('menu.file.close-window'), click: () => focusedRegisteredSurface()?.window.close() },
       separator(),
       { label: t('menu.file.open-in-browser'), click: () => void openWebVersionFromMenu() },
@@ -195,7 +195,7 @@ function createRecentWorkspacesMenu(recentWorkspaces: WorkspaceSessionEntry[]): 
 function createRecentWorkspaceMenuItem(entry: WorkspaceSessionEntry, home: string): MenuItemConstructorOptions {
   return {
     label: formatWorkspaceSessionEntryLocator(entry, home),
-    click: () => send({ type: 'open-recent-repo-requested', entry }),
+    click: () => send({ type: 'open-recent-workspace-requested', entry }),
   }
 }
 
@@ -266,8 +266,8 @@ function createWindowMenu(state: AppMenuState): MenuItemConstructorOptions {
       { role: 'minimize', label: t('menu.window.minimize') },
       { role: 'zoom', label: t('menu.window.zoom') },
       separator(),
-      createClientCommandMenuItem(state, 'window-next-repo'),
-      createClientCommandMenuItem(state, 'window-prev-repo'),
+      createClientCommandMenuItem(state, 'window-next-workspace'),
+      createClientCommandMenuItem(state, 'window-prev-workspace'),
       separator(),
       createClientCommandMenuItem(state, 'window-reset-layout', {
         // Reset Window also restores the main window itself to its default

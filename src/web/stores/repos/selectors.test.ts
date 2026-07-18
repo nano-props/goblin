@@ -12,9 +12,9 @@ import {
   workspacePickerStoreActionsFromStore,
   restorableWorkspaceLayoutPreferenceStoreActionsFromStore,
   restorableWorkspaceLayoutStoreActionsFromStore,
-  runtimeCoherentRepoNavigationStoreActionsFromStore,
-  runtimeCoherentRepoOpenStoreActionsFromStore,
-  runtimeCoherentRepoProjectionStoreActionsFromStore,
+  runtimeCoherentWorkspaceNavigationStoreActionsFromStore,
+  runtimeCoherentWorkspaceOpenStoreActionsFromStore,
+  runtimeCoherentWorkspaceProjectionStoreActionsFromStore,
 } from '#/web/stores/repos/selector-actions.ts'
 
 describe('repo selectors', () => {
@@ -79,36 +79,36 @@ describe('repo selectors', () => {
       resetLayout: fnA,
     })
     expect(
-      runtimeCoherentRepoOpenStoreActionsFromStore({
+      runtimeCoherentWorkspaceOpenStoreActionsFromStore({
         ensureWorkspaceOpen: fnA as never,
       }),
     ).toEqual({
       ensureWorkspaceOpen: fnA,
     })
     expect(
-      runtimeCoherentRepoNavigationStoreActionsFromStore({
-        closeRepo: fnA as never,
+      runtimeCoherentWorkspaceNavigationStoreActionsFromStore({
+        closeWorkspace: fnA as never,
       }),
     ).toEqual({
-      closeRepo: fnA,
+      closeWorkspace: fnA,
     })
     expect(
-      runtimeCoherentRepoProjectionStoreActionsFromStore({
+      runtimeCoherentWorkspaceProjectionStoreActionsFromStore({
         ensureWorkspaceOpen: fnA as never,
-        closeRepo: fnA as never,
+        closeWorkspace: fnA as never,
       }),
     ).toEqual({
       ensureWorkspaceOpen: fnA,
-      closeRepo: fnA,
+      closeWorkspace: fnA,
     })
     expect(
       primaryWindowNavigationStoreActionsFromStore({
-        closeRepo: fnA as never,
+        closeWorkspace: fnA as never,
         peekWorkspaceNavigation: fnA as never,
         commitWorkspaceNavigation: fnA as never,
       }),
     ).toEqual({
-      closeRepo: fnA,
+      closeWorkspace: fnA,
       peekWorkspaceNavigation: fnA,
       commitWorkspaceNavigation: fnA,
     })

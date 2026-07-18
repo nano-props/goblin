@@ -108,9 +108,9 @@ const terminalCommandContext: TerminalSessionContextValue = terminalSessionConte
 
 const navigation: PrimaryWindowNavigationActions = {
   currentWorkspacePaneRoute: () => undefined,
-  activateRepo: vi.fn(),
-  closeRepo: vi.fn(),
-  cycleRepo: vi.fn(),
+  activateWorkspace: vi.fn(),
+  closeWorkspace: vi.fn(),
+  cycleWorkspace: vi.fn(),
   selectRepoBranch: vi.fn(),
   showRepoBranchEmptyWorkspacePane: () => true,
   showRepoBranchWorkspacePaneTab: vi.fn(),
@@ -1885,9 +1885,9 @@ function navigationWithStore(
   seedInitialObservedWorkspacePaneRouteForTest()
   const store = useReposStore.getState()
   const navigation = createPrimaryWindowNavigationActions({
-    currentRepoId: REPO_ID,
+    currentWorkspaceId: REPO_ID,
     order: [REPO_ID],
-    closeRepo: store.closeRepo,
+    closeWorkspace: store.closeWorkspace,
     peekWorkspaceNavigation: store.peekWorkspaceNavigation,
     commitWorkspaceNavigation: store.commitWorkspaceNavigation,
     routeNavigation: routeNavigationOverrides,

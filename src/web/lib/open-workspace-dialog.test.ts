@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
-import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
+import type { OpenWorkspaceResult } from '#/web/stores/repos/types.ts'
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
 }))
@@ -12,50 +13,50 @@ vi.mock('sonner', () => ({
   },
 }))
 
-describe('openRepoFromDialog', () => {
+describe('openWorkspaceFromDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   test('opens the selected path', async () => {
     installGoblinTestBridge({
-      'repo.openDialog': () => '/tmp/repo',
+      'workspace.openDialog': () => '/tmp/repo',
     })
-    const ensureWorkspaceOpen = vi.fn(async (): Promise<OpenRepoResult> => ({
+    const ensureWorkspaceOpen = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
       ok: true,
-      id: 'goblin+file:///tmp/repo',
+      workspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
     }))
-    const activateRepo = vi.fn()
+    const activateWorkspace = vi.fn()
 
-    await openRepoFromDialog({
+    await openWorkspaceFromDialog({
       ensureWorkspaceOpen,
-      activateRepo,
+      activateWorkspace,
       t: (key) => key,
     })
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/repo')
-    expect(activateRepo).toHaveBeenCalledWith('goblin+file:///tmp/repo')
+    expect(activateWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/repo')
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
 
   test('shows a post-open error toast without blocking activation', async () => {
     installGoblinTestBridge({
-      'repo.openDialog': () => '/tmp/repo',
+      'workspace.openDialog': () => '/tmp/repo',
     })
-    const ensureWorkspaceOpen = vi.fn(async (): Promise<OpenRepoResult> => ({
+    const ensureWorkspaceOpen = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
       ok: true,
-      id: 'goblin+file:///tmp/repo',
-      postOpenEffects: Promise.resolve([{ kind: 'recent-repo', message: 'recent write failed' }]),
+      workspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
+      postOpenEffects: Promise.resolve([{ kind: 'recent-workspace', message: 'recent write failed' }]),
     }))
-    const activateRepo = vi.fn()
+    const activateWorkspace = vi.fn()
 
-    await openRepoFromDialog({
+    await openWorkspaceFromDialog({
       ensureWorkspaceOpen,
-      activateRepo,
+      activateWorkspace,
       t: (key) => key,
     })
 
-    expect(activateRepo).toHaveBeenCalledWith('goblin+file:///tmp/repo')
+    expect(activateWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/repo')
     await Promise.resolve()
     expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.recent-save-failed', {
       description: 'recent write failed',
@@ -64,22 +65,22 @@ describe('openRepoFromDialog', () => {
 
   test('shows an error toast when opening fails', async () => {
     installGoblinTestBridge({
-      'repo.openDialog': () => '/tmp/repo',
+      'workspace.openDialog': () => '/tmp/repo',
     })
-    const ensureWorkspaceOpen = vi.fn(async (): Promise<OpenRepoResult> => ({
+    const ensureWorkspaceOpen = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
       ok: false,
       message: 'error.workspace-git-unavailable',
     }))
-    const activateRepo = vi.fn()
+    const activateWorkspace = vi.fn()
 
-    await openRepoFromDialog({
+    await openWorkspaceFromDialog({
       ensureWorkspaceOpen,
-      activateRepo,
+      activateWorkspace,
       t: (key) => key,
     })
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/repo')
-    expect(activateRepo).not.toHaveBeenCalled()
+    expect(activateWorkspace).not.toHaveBeenCalled()
     expect(mocks.toastError).toHaveBeenCalledWith('drop.open-failed', {
       description: 'error.workspace-git-unavailable',
     })
@@ -87,19 +88,19 @@ describe('openRepoFromDialog', () => {
 
   test('does nothing when the dialog is cancelled', async () => {
     installGoblinTestBridge({
-      'repo.openDialog': () => null,
+      'workspace.openDialog': () => null,
     })
     const ensureWorkspaceOpen = vi.fn()
-    const activateRepo = vi.fn()
+    const activateWorkspace = vi.fn()
 
-    await openRepoFromDialog({
+    await openWorkspaceFromDialog({
       ensureWorkspaceOpen,
-      activateRepo,
+      activateWorkspace,
       t: (key) => key,
     })
 
     expect(ensureWorkspaceOpen).not.toHaveBeenCalled()
-    expect(activateRepo).not.toHaveBeenCalled()
+    expect(activateWorkspace).not.toHaveBeenCalled()
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
 
@@ -109,19 +110,19 @@ describe('openRepoFromDialog', () => {
       value: {},
     })
     const ensureWorkspaceOpen = vi.fn()
-    const activateRepo = vi.fn()
-    const openRepoPathDialog = vi.fn()
+    const activateWorkspace = vi.fn()
+    const openWorkspacePathDialog = vi.fn()
 
-    await openRepoFromDialog({
+    await openWorkspaceFromDialog({
       ensureWorkspaceOpen,
-      activateRepo,
-      openRepoPathDialog,
+      activateWorkspace,
+      openWorkspacePathDialog,
       t: (key) => key,
     })
 
-    expect(openRepoPathDialog).toHaveBeenCalledTimes(1)
+    expect(openWorkspacePathDialog).toHaveBeenCalledTimes(1)
     expect(ensureWorkspaceOpen).not.toHaveBeenCalled()
-    expect(activateRepo).not.toHaveBeenCalled()
+    expect(activateWorkspace).not.toHaveBeenCalled()
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
 })

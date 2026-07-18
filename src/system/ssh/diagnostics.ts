@@ -20,7 +20,7 @@ export async function testRemoteRepo(
   const run: DiagnosticsRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const stages = createStages()
   // No default timeout: the boot-probe caller passes SSH_BOOT_PROBE_TIMEOUT_MS,
-  // the manual diagnostic in OpenRemoteRepositoryDialog leaves it unset so
+  // the manual diagnostic in OpenRemoteWorkspaceDialog leaves it unset so
   // runRemoteCommand falls back to the full SSH_COMMAND_TIMEOUT_MS.
   const runOptions = { signal: options.signal, timeoutMs: options.timeoutMs }
 

@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 import { act } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { OpenRemoteRepositoryDialog } from '#/web/components/OpenRemoteRepositoryDialog.tsx'
+import { OpenRemoteWorkspaceDialog } from '#/web/components/OpenRemoteWorkspaceDialog.tsx'
 import {
   PrimaryWindowNavigationProvider,
   type PrimaryWindowNavigationActions,
@@ -101,11 +102,11 @@ afterEach(() => {
   setClientBridgeForTests(null)
 })
 
-describe('OpenRemoteRepositoryDialog', () => {
+describe('OpenRemoteWorkspaceDialog', () => {
   test('keeps the remote status row mounted before running a connection test', async () => {
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
-        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+        <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
       </PrimaryWindowNavigationProvider>,
     )
     await flush()
@@ -116,7 +117,7 @@ describe('OpenRemoteRepositoryDialog', () => {
   test('renders a minimal remote status row in the initial state', async () => {
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
-        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+        <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
       </PrimaryWindowNavigationProvider>,
     )
     await flush()
@@ -130,7 +131,7 @@ describe('OpenRemoteRepositoryDialog', () => {
   test('updates typed values in the host and path inputs', async () => {
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
-        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+        <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
       </PrimaryWindowNavigationProvider>,
     )
     await flush()
@@ -180,7 +181,7 @@ describe('OpenRemoteRepositoryDialog', () => {
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
-        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+        <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
       </PrimaryWindowNavigationProvider>,
     )
     await flush()
@@ -228,7 +229,7 @@ describe('OpenRemoteRepositoryDialog', () => {
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
-        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+        <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
       </PrimaryWindowNavigationProvider>,
     )
     await flush()
@@ -282,7 +283,7 @@ describe('OpenRemoteRepositoryDialog', () => {
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
-        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+        <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
       </PrimaryWindowNavigationProvider>,
     )
     await flush()
@@ -336,7 +337,7 @@ describe('OpenRemoteRepositoryDialog', () => {
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
-        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+        <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
       </PrimaryWindowNavigationProvider>,
     )
     await flush()
@@ -348,7 +349,7 @@ describe('OpenRemoteRepositoryDialog', () => {
   test('keeps the empty remote path in a neutral state until the user types an invalid path', async () => {
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
-        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+        <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
       </PrimaryWindowNavigationProvider>,
     )
     await flush()
@@ -365,7 +366,7 @@ describe('OpenRemoteRepositoryDialog', () => {
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
-        <OpenRemoteRepositoryDialog open onOpenChange={onOpenChange} />
+        <OpenRemoteWorkspaceDialog open onOpenChange={onOpenChange} />
       </PrimaryWindowNavigationProvider>,
     )
     await flush()
@@ -411,7 +412,7 @@ describe('OpenRemoteRepositoryDialog', () => {
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
-        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+        <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
       </PrimaryWindowNavigationProvider>,
     )
     await flush()
@@ -420,14 +421,17 @@ describe('OpenRemoteRepositoryDialog', () => {
   })
 
   test('ensures the remote workspace is open before delegating activation to navigation', async () => {
-    const ensureWorkspaceOpen = vi.fn(async () => ({ ok: true as const, id: target.id }))
+    const ensureWorkspaceOpen = vi.fn(async () => ({
+      ok: true as const,
+      workspaceId: workspaceIdForTest(target.id),
+    }))
     useReposStore.setState({ ensureWorkspaceOpen })
-    const activateRepo = vi.fn()
+    const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
 
     render(
-      <PrimaryWindowNavigationProvider value={navigationWith({ activateRepo })}>
-        <OpenRemoteRepositoryDialog open onOpenChange={onOpenChange} />
+      <PrimaryWindowNavigationProvider value={navigationWith({ activateWorkspace })}>
+        <OpenRemoteWorkspaceDialog open onOpenChange={onOpenChange} />
       </PrimaryWindowNavigationProvider>,
     )
     await flush()
@@ -447,21 +451,21 @@ describe('OpenRemoteRepositoryDialog', () => {
         displayName: 'prod:repo',
       },
     })
-    expect(activateRepo).toHaveBeenCalledWith(target.id)
+    expect(activateWorkspace).toHaveBeenCalledWith(target.id)
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
   test('reports post-open effect failures after opening a remote workspace', async () => {
     const ensureWorkspaceOpen = vi.fn(async () => ({
       ok: true as const,
-      id: target.id,
-      postOpenEffects: Promise.resolve([{ kind: 'recent-repo' as const, message: 'recent write failed' }]),
+      workspaceId: workspaceIdForTest(target.id),
+      postOpenEffects: Promise.resolve([{ kind: 'recent-workspace' as const, message: 'recent write failed' }]),
     }))
     useReposStore.setState({ ensureWorkspaceOpen })
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
-        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+        <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
       </PrimaryWindowNavigationProvider>,
     )
     await flush()
@@ -504,7 +508,7 @@ describe('OpenRemoteRepositoryDialog', () => {
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
-        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+        <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
       </PrimaryWindowNavigationProvider>,
     )
     await flush()
@@ -538,7 +542,7 @@ describe('OpenRemoteRepositoryDialog', () => {
 
     render(
       <PrimaryWindowNavigationProvider value={navigationWith({})}>
-        <OpenRemoteRepositoryDialog open onOpenChange={vi.fn()} />
+        <OpenRemoteWorkspaceDialog open onOpenChange={vi.fn()} />
       </PrimaryWindowNavigationProvider>,
     )
     await flush()
@@ -553,9 +557,9 @@ describe('OpenRemoteRepositoryDialog', () => {
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
   return {
-    activateRepo: () => {},
-    closeRepo: async () => ({ ok: true }),
-    cycleRepo: () => {},
+    activateWorkspace: () => {},
+    closeWorkspace: async () => ({ ok: true }),
+    cycleWorkspace: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,

@@ -215,7 +215,7 @@ async function openWorkspaceRepo(
 ): Promise<OpenWorkspaceRepoResult> {
   input.signal?.throwIfAborted()
   if (!parseWorkspaceLocator(entry.id, serverLocatorPlatform())) return { kind: 'invalid' }
-  if (entry.kind === 'remote') return await openRemoteWorkspaceRepo(input, entry, options)
+  if (entry.kind === 'remote') return await openRemoteWorkspace(input, entry, options)
   return await withAcquiredWorkspaceRepoLease(input, entry.id, async (lease) => {
     let authoritativeProbe = workspaceProbeStateForRuntime(input.userId, entry.id, lease.repoRuntimeId)
     if (authoritativeProbe?.status === 'probing') {
@@ -281,7 +281,7 @@ async function openWorkspaceRepo(
   })
 }
 
-async function openRemoteWorkspaceRepo(
+async function openRemoteWorkspace(
   input: RestoreServerWorkspaceInput,
   entry: RemoteWorkspaceSessionEntry,
   options: { active: boolean },

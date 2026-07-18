@@ -43,7 +43,7 @@ export function UnavailableRepoView({ repo }: Props) {
   const canOpenSshSettings = isRemote && shouldOfferSshSettings(reason)
 
   async function handleClose() {
-    const result = await navigation.closeRepo(repo.id)
+    const result = await navigation.closeWorkspace(repo.id)
     if (!result.ok) toast.error(t(result.message))
   }
 

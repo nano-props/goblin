@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { act } from '@testing-library/react'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
@@ -75,13 +76,13 @@ afterEach(() => {
 
 describe('RepoCloneDialog', () => {
   test('ensures the cloned workspace is open before delegating activation to navigation', async () => {
-    const ensureWorkspaceOpen = vi.fn(async () => ({ ok: true as const, id: 'goblin+file:///tmp/cloned-repo' }))
+    const ensureWorkspaceOpen = vi.fn(async () => ({ ok: true as const, workspaceId: workspaceIdForTest('goblin+file:///tmp/cloned-repo') }))
     useReposStore.setState({ ensureWorkspaceOpen })
-    const activateRepo = vi.fn()
+    const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
 
     renderInJsdom(
-      <PrimaryWindowNavigationProvider value={navigationWith({ activateRepo })}>
+      <PrimaryWindowNavigationProvider value={navigationWith({ activateWorkspace })}>
         <RepoCloneDialog open onOpenChange={onOpenChange} />
       </PrimaryWindowNavigationProvider>,
     )
@@ -92,15 +93,15 @@ describe('RepoCloneDialog', () => {
     await flush()
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo')
-    expect(activateRepo).toHaveBeenCalledWith('goblin+file:///tmp/cloned-repo')
+    expect(activateWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/cloned-repo')
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
   test('reports post-open effect failures after opening the cloned workspace', async () => {
     const ensureWorkspaceOpen = vi.fn(async () => ({
       ok: true as const,
-      id: 'goblin+file:///tmp/cloned-repo',
-      postOpenEffects: Promise.resolve([{ kind: 'recent-repo' as const, message: 'recent write failed' }]),
+      workspaceId: workspaceIdForTest('goblin+file:///tmp/cloned-repo'),
+      postOpenEffects: Promise.resolve([{ kind: 'recent-workspace' as const, message: 'recent write failed' }]),
     }))
     useReposStore.setState({ ensureWorkspaceOpen })
 
@@ -123,9 +124,9 @@ describe('RepoCloneDialog', () => {
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
   return {
-    activateRepo: () => {},
-    closeRepo: async () => ({ ok: true }),
-    cycleRepo: () => {},
+    activateWorkspace: () => {},
+    closeWorkspace: async () => ({ ok: true }),
+    cycleWorkspace: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,

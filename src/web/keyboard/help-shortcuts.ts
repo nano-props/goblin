@@ -9,7 +9,7 @@ import {
   SETTINGS_SHORTCUT_NON_MAC,
   VIEW_SHORTCUTS,
   WINDOW_REPO_SHORTCUTS,
-  CLOSE_REPO_SHORTCUT,
+  CLOSE_WORKSPACE_SHORTCUT,
   CLOSE_WORKSPACE_TAB_OR_WINDOW_SHORTCUT,
 } from '#/shared/shortcut-definitions.ts'
 export interface HelpShortcutRow {
@@ -52,7 +52,7 @@ export function helpShortcutSections(globalShortcut: string, isMac = inferIsMacP
           combos: [acceleratorToKeyLabelsForHelp(CLOSE_WORKSPACE_TAB_OR_WINDOW_SHORTCUT, isMac)],
           labelKey: 'help.row.close-workspace-tab-or-window',
         },
-        { combos: [acceleratorToKeyLabelsForHelp(CLOSE_REPO_SHORTCUT, isMac)], labelKey: 'help.row.close-repo' },
+        { combos: [acceleratorToKeyLabelsForHelp(CLOSE_WORKSPACE_SHORTCUT, isMac)], labelKey: 'help.row.close-workspace' },
         {
           combos: [acceleratorToKeyLabelsForHelp(isMac ? SETTINGS_SHORTCUT_MAC : SETTINGS_SHORTCUT_NON_MAC, isMac)],
           labelKey: 'help.row.settings',

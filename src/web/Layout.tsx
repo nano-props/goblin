@@ -11,12 +11,12 @@ import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessi
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
 import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
-import { RepoOpenDialog } from '#/web/components/RepoOpenDialog.tsx'
-import { OpenRemoteRepositoryDialog } from '#/web/components/OpenRemoteRepositoryDialog.tsx'
+import { WorkspaceOpenDialog } from '#/web/components/WorkspaceOpenDialog.tsx'
+import { OpenRemoteWorkspaceDialog } from '#/web/components/OpenRemoteWorkspaceDialog.tsx'
 import { BranchActionDialogHost } from '#/web/components/BranchActionDialogHost.tsx'
 import { FiletreeActionDialogHost } from '#/web/components/FiletreeActionDialogHost.tsx'
 import { TerminalActionDialogHost } from '#/web/components/TerminalActionDialogHost.tsx'
-import { RepoDropOverlay } from '#/web/components/RepoDropOverlay.tsx'
+import { WorkspaceDropOverlay } from '#/web/components/WorkspaceDropOverlay.tsx'
 import { Toaster } from '#/web/components/ui/sonner.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import { usePublicAppBootstrap } from '#/web/hooks/usePublicAppBootstrap.ts'
@@ -25,7 +25,7 @@ import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
 import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
-import { useRepoDrop } from '#/web/hooks/useRepoDrop.ts'
+import { useWorkspaceDrop } from '#/web/hooks/useWorkspaceDrop.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { useRepoProjectionQueryEffects } from '#/web/repo-projection-query-effects.ts'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
@@ -210,7 +210,7 @@ function AuthenticatedWorkspaceShell() {
             }
           : null
   const order = useReposStore((s) => s.order)
-  const { closeRepo, peekWorkspaceNavigation, commitWorkspaceNavigation } = useReposStore(
+  const { closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation } = useReposStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
   )
   const routeNavigation = usePrimaryWindowRouteActions()
@@ -218,17 +218,17 @@ function AuthenticatedWorkspaceShell() {
   const navigation = useMemo(
     () =>
       createPrimaryWindowNavigationActions({
-        currentRepoId: hydratedRouteRepoId,
+        currentWorkspaceId: hydratedRouteRepoId,
         order,
-        closeRepo,
+        closeWorkspace,
         peekWorkspaceNavigation,
         commitWorkspaceNavigation,
         routeNavigation,
       }),
-    [closeRepo, peekWorkspaceNavigation, commitWorkspaceNavigation, order, routeNavigation, hydratedRouteRepoId],
+    [closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation, order, routeNavigation, hydratedRouteRepoId],
   )
 
-  const repoDrop = useRepoDrop({ blocked: modalOpen })
+  const workspaceDrop = useWorkspaceDrop({ blocked: modalOpen })
 
   return (
     <>
@@ -240,9 +240,9 @@ function AuthenticatedWorkspaceShell() {
         routeContext={workspaceNavigationRouteContext(routeContext, routeHref)}
         navigation={navigation}
         closeAllOverlays={overlays.closeAllOverlays}
-        openRepoPathDialog={overlays.openRepoPathDialog}
+        openWorkspacePathDialog={overlays.openWorkspacePathDialog}
         openCloneRepo={overlays.openCloneRepo}
-        openRemoteRepo={overlays.openRemoteRepo}
+        openRemoteWorkspace={overlays.openRemoteWorkspace}
         modalOpen={modalOpen}
         isSettingsOpen={false}
         navigateToSettingsShortcuts={layoutRouteCallbacks.navigateToSettingsShortcuts}
@@ -251,24 +251,24 @@ function AuthenticatedWorkspaceShell() {
       <PrimaryWindowNavigationProvider value={navigation}>
         <LayoutOverlayActions
           value={{
-            openRepoPathDialog: overlays.openRepoPathDialog,
+            openWorkspacePathDialog: overlays.openWorkspacePathDialog,
             openCloneRepo: overlays.openCloneRepo,
-            openRemoteRepo: overlays.openRemoteRepo,
+            openRemoteWorkspace: overlays.openRemoteWorkspace,
             openCreateWorktree: navigation.openCreateWorktree,
           }}
         >
           <AppRuntimeProjectionProvider currentRepoId={hydratedRouteRepoId}>
             <div
               className="relative flex h-full flex-col"
-              onDragEnter={repoDrop.onDragEnter}
-              onDragOver={repoDrop.onDragOver}
-              onDragLeave={repoDrop.onDragLeave}
-              onDrop={repoDrop.onDrop}
+              onDragEnter={workspaceDrop.onDragEnter}
+              onDragOver={workspaceDrop.onDragOver}
+              onDragLeave={workspaceDrop.onDragLeave}
+              onDrop={workspaceDrop.onDrop}
             >
               <Outlet />
               <PrimaryWindowOverlays
                 overlays={overlays}
-                repoDrop={repoDrop}
+                workspaceDrop={workspaceDrop}
                 navigation={navigation}
                 hydratedRouteRepoId={hydratedRouteRepoId}
                 currentBranchName={currentBranchName}
@@ -379,7 +379,7 @@ function workspacePaneRouteFromMatches(
 
 interface PrimaryWindowOverlaysProps {
   overlays: ReturnType<typeof useAppOverlays>
-  repoDrop: ReturnType<typeof useRepoDrop>
+  workspaceDrop: ReturnType<typeof useWorkspaceDrop>
   navigation: PrimaryWindowNavigationActions
   hydratedRouteRepoId: string | null
   currentBranchName: string | null
@@ -388,7 +388,7 @@ interface PrimaryWindowOverlaysProps {
 
 function PrimaryWindowOverlays({
   overlays,
-  repoDrop,
+  workspaceDrop,
   navigation,
   hydratedRouteRepoId,
   currentBranchName,
@@ -396,11 +396,11 @@ function PrimaryWindowOverlays({
 }: PrimaryWindowOverlaysProps) {
   return (
     <>
-      <RepoOpenDialog open={overlays.state.openRepo.open} onOpenChange={overlays.setOpenRepoOpen} />
+      <WorkspaceOpenDialog open={overlays.state.openWorkspace.open} onOpenChange={overlays.setOpenWorkspaceOpen} />
       <RepoCloneDialog open={overlays.state.clone.open} onOpenChange={overlays.setCloneOpen} />
-      <OpenRemoteRepositoryDialog
-        open={overlays.state.openRemoteRepo.open}
-        onOpenChange={overlays.setOpenRemoteRepoOpen}
+      <OpenRemoteWorkspaceDialog
+        open={overlays.state.openRemoteWorkspace.open}
+        onOpenChange={overlays.setOpenRemoteWorkspaceOpen}
       />
       <BranchActionDialogHost currentRepoId={hydratedRouteRepoId} currentBranchName={currentBranchName} />
       <FiletreeActionDialogHost currentRepoId={hydratedRouteRepoId} />
@@ -409,7 +409,7 @@ function PrimaryWindowOverlays({
         currentWorkspacePaneRoute={currentWorkspacePaneRoute}
         navigation={navigation}
       />
-      <RepoDropOverlay active={repoDrop.active} />
+      <WorkspaceDropOverlay active={workspaceDrop.active} />
       <Toaster position="bottom-right" closeButton />
     </>
   )
@@ -441,9 +441,9 @@ function AuthenticatedWorkspaceSideEffects({
   routeContext,
   navigation,
   closeAllOverlays,
-  openRepoPathDialog,
+  openWorkspacePathDialog,
   openCloneRepo,
-  openRemoteRepo,
+  openRemoteWorkspace,
   modalOpen,
   isSettingsOpen,
   navigateToSettingsShortcuts,
@@ -456,9 +456,9 @@ function AuthenticatedWorkspaceSideEffects({
   routeContext: WorkspaceNavigationRouteContext | null
   navigation: PrimaryWindowNavigationActions
   closeAllOverlays: () => void
-  openRepoPathDialog: () => void
+  openWorkspacePathDialog: () => void
   openCloneRepo: () => void
-  openRemoteRepo: () => void
+  openRemoteWorkspace: () => void
   modalOpen: boolean
   isSettingsOpen: boolean
   navigateToSettingsShortcuts: () => void
@@ -467,12 +467,12 @@ function AuthenticatedWorkspaceSideEffects({
   const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen
   useClientEffectIntentRouter({
     navigation,
-    currentRepoId: hydratedRouteRepoId,
+    currentWorkspaceId: hydratedRouteRepoId,
     currentWorkspacePaneCommandTarget,
     closeAllOverlays,
-    openRepoPathDialog,
+    openWorkspacePathDialog,
     openCloneRepo,
-    openRemoteRepo,
+    openRemoteWorkspace,
     openCreateWorktree: navigation.openCreateWorktree,
     isOverlayOpen: () => modalOpen,
     isWorkspaceShortcutSuppressed: () => workspaceShortcutsSuppressed,
@@ -480,7 +480,7 @@ function AuthenticatedWorkspaceSideEffects({
 
   useKeyboard({
     navigation,
-    currentRepoId: hydratedRouteRepoId,
+    currentWorkspaceId: hydratedRouteRepoId,
     currentBranchName,
     currentWorkspacePaneCommandTarget,
     onShowHelp: navigateToSettingsShortcuts,

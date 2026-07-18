@@ -4,16 +4,16 @@ import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import { isWorkspacePaneTabType, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 
 export type ClientEffectIntent =
-  | { type: 'open-repo-requested' }
-  | { type: 'open-repo-path-requested' }
+  | { type: 'open-workspace-requested' }
+  | { type: 'open-workspace-path-requested' }
   | { type: 'open-remote-workspace-requested' }
   | { type: 'clone-repo-requested' }
   | { type: 'create-worktree-requested' }
   | { type: 'app-quitting' }
   | { type: 'terminal-new-tab-requested' }
   | { type: 'workspace-pane-close-tab-or-window-requested' }
-  | { type: 'close-repo-requested' }
-  | { type: 'cycle-repo-requested'; direction: 1 | -1 }
+  | { type: 'close-workspace-requested' }
+  | { type: 'cycle-workspace-requested'; direction: 1 | -1 }
   | { type: 'repo-refresh-requested' }
   | { type: 'show-workspace-pane-tab-requested'; tab: WorkspacePaneTabType }
   | { type: 'terminal-primary-action-requested' }
@@ -23,7 +23,7 @@ export type ClientEffectIntent =
   | { type: 'theme-pref-set-requested'; pref: ThemePref }
   | { type: 'lang-pref-set-requested'; pref: LangPref }
   | { type: 'clear-recent-workspaces-requested' }
-  | { type: 'open-recent-repo-requested'; entry: WorkspaceSessionEntry }
+  | { type: 'open-recent-workspace-requested'; entry: WorkspaceSessionEntry }
   | { type: 'terminal-bell-click'; repoRoot: string; terminalSessionId?: string; terminalWorktreeKey?: string }
   | { type: 'external-open-enqueued' }
 
@@ -32,15 +32,15 @@ export type ClientEffectIntentType = ClientEffectIntent['type']
 export function isClientEffectIntent(event: unknown): event is ClientEffectIntent {
   if (!isRecord(event)) return false
   switch (event.type) {
-    case 'open-repo-requested':
-    case 'open-repo-path-requested':
+    case 'open-workspace-requested':
+    case 'open-workspace-path-requested':
     case 'open-remote-workspace-requested':
     case 'clone-repo-requested':
     case 'create-worktree-requested':
     case 'app-quitting':
     case 'terminal-new-tab-requested':
     case 'workspace-pane-close-tab-or-window-requested':
-    case 'close-repo-requested':
+    case 'close-workspace-requested':
     case 'repo-refresh-requested':
     case 'terminal-primary-action-requested':
     case 'workspace-zen-mode-toggle-requested':
@@ -48,7 +48,7 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
     case 'clear-recent-workspaces-requested':
     case 'external-open-enqueued':
       return true
-    case 'cycle-repo-requested':
+    case 'cycle-workspace-requested':
       return event.direction === 1 || event.direction === -1
     case 'show-workspace-pane-tab-requested':
       return isWorkspacePaneTabType(typeof event.tab === 'string' ? event.tab : null)
@@ -58,7 +58,7 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
       return isThemePref(event.pref)
     case 'lang-pref-set-requested':
       return isLangPref(event.pref)
-    case 'open-recent-repo-requested':
+    case 'open-recent-workspace-requested':
       return isWorkspaceSessionEntry(event.entry)
     case 'terminal-bell-click':
       return (

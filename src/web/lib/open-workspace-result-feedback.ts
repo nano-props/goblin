@@ -1,9 +1,9 @@
 import { toast } from 'sonner'
-import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
+import type { OpenWorkspaceResult } from '#/web/stores/repos/types.ts'
 import { sessionLog } from '#/web/logger.ts'
 
-export function reportOpenRepoPostOpenEffects(
-  result: OpenRepoResult,
+export function reportOpenWorkspacePostOpenEffects(
+  result: OpenWorkspaceResult,
   t: (key: string) => string,
   options: { descriptionPrefix?: string } = {},
 ): void {
@@ -18,13 +18,13 @@ export function reportOpenRepoPostOpenEffects(
       }
     })
     .catch((err) => {
-      sessionLog.warn('post-open repo effects failed', { err })
+      sessionLog.warn('post-open workspace effects failed', { err })
     })
 }
 
-function postOpenErrorTitleKey(kind: 'recent-repo'): string {
+function postOpenErrorTitleKey(kind: 'recent-workspace'): string {
   switch (kind) {
-    case 'recent-repo':
+    case 'recent-workspace':
       return 'workspace-picker.recent-save-failed'
   }
 }

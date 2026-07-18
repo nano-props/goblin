@@ -26,22 +26,22 @@ export function usePrimaryWindowNavigation(): PrimaryWindowNavigationActions {
   if (context) return context
 
   const order = useReposStore((s) => s.order)
-  const { closeRepo, peekWorkspaceNavigation, commitWorkspaceNavigation } = useReposStore(
+  const { closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation } = useReposStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
   )
   const routeNavigation = usePrimaryWindowRouteNavigation()
   const fallbackNavigation = useMemo(
     () =>
       createPrimaryWindowNavigationActions({
-        currentRepoId: null,
+        currentWorkspaceId: null,
         order,
-        closeRepo,
+        closeWorkspace,
         peekWorkspaceNavigation,
         commitWorkspaceNavigation,
         routeNavigation,
       }),
     [
-      closeRepo,
+      closeWorkspace,
       peekWorkspaceNavigation,
       commitWorkspaceNavigation,
       order,

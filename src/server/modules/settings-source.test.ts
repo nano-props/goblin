@@ -182,7 +182,7 @@ test('serializes concurrent settings mutations without dropping updates', async 
   expect(existsSync(path.join(tmp, 'user-settings.json'))).toBe(true)
 })
 
-test('stores the shared open repo order without applying the recent-repo limit', async () => {
+test('stores the shared open repo order without applying the recent-workspace limit', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp

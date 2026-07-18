@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { RepoOpenDialog } from '#/web/components/RepoOpenDialog.tsx'
+import { WorkspaceOpenDialog } from '#/web/components/WorkspaceOpenDialog.tsx'
 import {
   PrimaryWindowNavigationProvider,
   type PrimaryWindowNavigationActions,
@@ -56,37 +57,37 @@ afterEach(() => {
   setClientBridgeForTests(null)
 })
 
-describe('RepoOpenDialog', () => {
+describe('WorkspaceOpenDialog', () => {
   test('ensures the workspace is open before delegating activation to navigation', async () => {
     const ensureWorkspaceOpen = vi.fn(async () => ({
       ok: true as const,
-      id: 'goblin+file:///Users/tester/Developer/repo',
+      workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
     }))
     useReposStore.setState({ ensureWorkspaceOpen })
-    const activateRepo = vi.fn()
+    const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
 
     renderInJsdom(
-      <PrimaryWindowNavigationProvider value={navigationWith({ activateRepo })}>
-        <RepoOpenDialog open onOpenChange={onOpenChange} />
+      <PrimaryWindowNavigationProvider value={navigationWith({ activateWorkspace })}>
+        <WorkspaceOpenDialog open onOpenChange={onOpenChange} />
       </PrimaryWindowNavigationProvider>,
     )
 
-    setInputValue('#open-repo-path', '~/Developer/repo')
+    setInputValue('#open-workspace-path', '~/Developer/repo')
     click('button[type="submit"]')
     await flush()
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/Users/tester/Developer/repo')
-    expect(activateRepo).toHaveBeenCalledWith('goblin+file:///Users/tester/Developer/repo')
+    expect(activateWorkspace).toHaveBeenCalledWith('goblin+file:///Users/tester/Developer/repo')
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 })
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
   return {
-    activateRepo: () => {},
-    closeRepo: async () => ({ ok: true }),
-    cycleRepo: () => {},
+    activateWorkspace: () => {},
+    closeWorkspace: async () => ({ ok: true }),
+    cycleWorkspace: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,

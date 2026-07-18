@@ -12,6 +12,7 @@ import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repo
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoDataLoadBundle } from '#/web/stores/repos/repo-data-load-state.ts'
 import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 export type BranchViewMode = 'all' | 'worktrees'
 type RepoDataSource = 'cache' | 'fresh'
 export type RepoBranchState = Omit<BranchSnapshotInfo, 'worktree'> & {
@@ -33,18 +34,19 @@ export type RepoEvent =
   | { id: number; kind: 'result'; result: ExecResult; action?: RepoEventAction }
   | { id: number; kind: 'error'; message: string }
 
-/** Discriminated union: a successful open guarantees `id`; a failed
+/** Discriminated union: a successful open guarantees `workspaceId`; a failed
  *  open carries a translation key or raw message. The shape forces
  *  callers to narrow before reading either field. */
-export interface OpenRepoPostOpenError {
-  kind: 'recent-repo'
+export interface OpenWorkspacePostOpenError {
+  kind: 'recent-workspace'
   message: string
 }
 
-export type OpenRepoResult =
-  { ok: true; id: string; postOpenEffects?: Promise<OpenRepoPostOpenError[]> } | { ok: false; message: string }
+export type OpenWorkspaceResult =
+  | { ok: true; workspaceId: WorkspaceId; postOpenEffects?: Promise<OpenWorkspacePostOpenError[]> }
+  | { ok: false; message: string }
 
-export type CloseRepoResult = { ok: true } | { ok: false; message: string }
+export type CloseWorkspaceResult = { ok: true } | { ok: false; message: string }
 
 export interface RepoWorktreeState {
   path: string
@@ -268,8 +270,8 @@ interface RestorableWorkspaceActions {
 interface RuntimeCoherentRepoProjectionActions {
   /** Ensure a repo belongs to the open workspace set without implying
    *  anything about the current active selection. */
-  ensureWorkspaceOpen: (path: string | WorkspaceSessionEntry) => Promise<OpenRepoResult>
-  closeRepo: (id: string) => Promise<CloseRepoResult>
+  ensureWorkspaceOpen: (path: string | WorkspaceSessionEntry) => Promise<OpenWorkspaceResult>
+  closeWorkspace: (id: string) => Promise<CloseWorkspaceResult>
   /**
    * Re-probe a remote repo's lifecycle. The single user-facing
    * entry point for "retry" (and the only path the
@@ -278,7 +280,7 @@ interface RuntimeCoherentRepoProjectionActions {
    * phase — the server starts a newer monotonic attempt.
    * Returns the new outcome, or `null` for non-remote ids.
    */
-  retryRemoteRepoConnection: (id: string) => Promise<{ ok: boolean; reason?: string } | null>
+  retryRemoteWorkspaceConnection: (id: string) => Promise<{ ok: boolean; reason?: string } | null>
   /** Updates the selected target's workspace pane tab type. The store does not project
    *  against terminal session count, worktree presence, or opened workspace pane tabs;
    *  the UI resolves the active pane at read time so session restore preserves

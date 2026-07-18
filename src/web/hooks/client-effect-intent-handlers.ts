@@ -6,10 +6,10 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { clearRecentWorkspaceHistory } from '#/web/settings-actions.ts'
-import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
-import { reportOpenRepoPostOpenEffects } from '#/web/lib/open-repo-result-feedback.ts'
+import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
+import { reportOpenWorkspacePostOpenEffects } from '#/web/lib/open-workspace-result-feedback.ts'
 import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
-import { openRepoPaths } from '#/web/lib/open-repo-paths.ts'
+import { openWorkspacePaths } from '#/web/lib/open-workspace-paths.ts'
 import { externalOpenLog } from '#/web/logger.ts'
 import {
   runCloseWorkspacePaneTabOrWindowCommand,
@@ -25,7 +25,7 @@ import {
 } from '#/web/hooks/client-effect-intent-plans.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
+import type { OpenWorkspaceResult } from '#/web/stores/repos/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
@@ -43,24 +43,24 @@ interface TerminalBellIntentDeps {
 
 interface SharedClientIntentDeps {
   navigation: PrimaryWindowNavigationActions
-  currentRepoId: string | null
+  currentWorkspaceId: string | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   closeAllOverlays: () => void
-  openRepoPathDialog: () => void
+  openWorkspacePathDialog: () => void
   openCloneRepo: () => void
-  openRemoteRepo: () => void
+  openRemoteWorkspace: () => void
   openCreateWorktree: () => void
   isOverlayOpen: () => boolean
   isWorkspaceShortcutSuppressed: () => boolean
-  ensureWorkspaceOpen: (input: string | WorkspaceSessionEntry) => Promise<OpenRepoResult>
+  ensureWorkspaceOpen: (input: string | WorkspaceSessionEntry) => Promise<OpenWorkspaceResult>
   resetLayout: () => void
   toggleZenMode: () => void
   t: (key: string) => string
 }
 
 interface ExternalOpenIntentDrainerDeps {
-  ensureWorkspaceOpen: (path: string) => Promise<OpenRepoResult>
-  activateRepo: (repoId: string) => void
+  ensureWorkspaceOpen: (path: string) => Promise<OpenWorkspaceResult>
+  activateWorkspace: (workspaceId: string) => void
   t: (key: string) => string
 }
 
@@ -112,11 +112,11 @@ export async function handleAppLevelClientIntent(
     case 'clear-recent-workspaces':
       await clearRecentWorkspaceHistory()
       return true
-    case 'ensure-recent-repo-open': {
+    case 'ensure-recent-workspace-open': {
       const result = await deps.ensureWorkspaceOpen(plan.entry)
       if (result.ok) {
-        reportOpenRepoPostOpenEffects(result, deps.t)
-        deps.navigation.activateRepo(result.id)
+        reportOpenWorkspacePostOpenEffects(result, deps.t)
+        deps.navigation.activateWorkspace(result.workspaceId)
       }
       return true
     }
@@ -132,12 +132,12 @@ export async function handleWorkspaceClientIntent(
 ): Promise<boolean> {
   // Workspace intents are route-aware and may be gated by overlays, shortcut
   // suppression, or terminal focus before they execute.
-  const currentRepo = deps.currentRepoId ? (useReposStore.getState().repos[deps.currentRepoId] ?? null) : null
+  const currentRepo = deps.currentWorkspaceId ? (useReposStore.getState().repos[deps.currentWorkspaceId] ?? null) : null
   const plan = createWorkspaceIntentPlan(event, {
     overlayBlocked: deps.isOverlayOpen() || isShortcutBlockingLayerOpen(),
     workspaceShortcutSuppressed: deps.isWorkspaceShortcutSuppressed(),
     terminalFocused: isTerminalFocused(),
-    currentRepoId: deps.currentRepoId,
+    currentWorkspaceId: deps.currentWorkspaceId,
     currentRepo,
     currentWorkspacePaneCommandTarget: deps.currentWorkspacePaneCommandTarget,
   })
@@ -145,22 +145,22 @@ export async function handleWorkspaceClientIntent(
   switch (plan.kind) {
     case 'noop':
       return true
-    case 'open-repo':
-      await openRepoFromDialog({
+    case 'open-workspace':
+      await openWorkspaceFromDialog({
         ensureWorkspaceOpen: async (path) => await deps.ensureWorkspaceOpen(path),
-        activateRepo: deps.navigation.activateRepo,
-        openRepoPathDialog: deps.openRepoPathDialog,
+        activateWorkspace: deps.navigation.activateWorkspace,
+        openWorkspacePathDialog: deps.openWorkspacePathDialog,
         t: deps.t,
       })
       return true
-    case 'open-repo-path':
-      deps.openRepoPathDialog()
+    case 'open-workspace-path':
+      deps.openWorkspacePathDialog()
       return true
     case 'open-clone-repo':
       deps.openCloneRepo()
       return true
     case 'open-remote-workspace':
-      deps.openRemoteRepo()
+      deps.openRemoteWorkspace()
       return true
     case 'create-worktree': {
       if (!currentRepo) return true
@@ -191,15 +191,15 @@ export async function handleWorkspaceClientIntent(
         target: plan.target,
         navigation: deps.navigation,
       })
-    case 'close-repo':
-      const closeResult = await deps.navigation.closeRepo(plan.repoId)
+    case 'close-workspace':
+      const closeResult = await deps.navigation.closeWorkspace(plan.workspaceId)
       if (!closeResult.ok) toast.error(deps.t(closeResult.message))
       return closeResult.ok
     case 'close-window':
       window.close()
       return true
-    case 'cycle-repo':
-      deps.navigation.cycleRepo(plan.direction)
+    case 'cycle-workspace':
+      deps.navigation.cycleWorkspace(plan.direction)
       return true
     case 'refresh-repo':
       await runManualRepoSync({ get: useReposStore.getState, set: useReposStore.setState }, plan.repoId, {
@@ -260,9 +260,9 @@ export function createExternalOpenIntentDrainer(deps: ExternalOpenIntentDrainerD
           rerun = false
           const paths = await consumeExternalOpenPaths()
           if (paths.length === 0) break
-          await openRepoPaths(paths, {
+          await openWorkspacePaths(paths, {
             ensureWorkspaceOpen: deps.ensureWorkspaceOpen,
-            activateRepo: deps.activateRepo,
+            activateWorkspace: deps.activateWorkspace,
             onOpenFailed: (path, message) => {
               const openErrorMessage = deps.t(message)
               toast.error(deps.t('drop.open-failed'), {

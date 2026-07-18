@@ -2,7 +2,7 @@ import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
-import type { CloseRepoResult, WorkspaceNavigationHistoryTraversal } from '#/web/stores/repos/types.ts'
+import type { CloseWorkspaceResult, WorkspaceNavigationHistoryTraversal } from '#/web/stores/repos/types.ts'
 import {
   restoreWorkspaceNavigationEntry,
   workspaceNavigationHistoryRestoreBlocked,
@@ -35,9 +35,9 @@ export type WorkspaceRootPanePresentation =
   | { kind: 'terminal'; terminalSessionId: string }
 
 export interface PrimaryWindowNavigationActions {
-  activateRepo: (repoId: string) => void
-  closeRepo: (repoId: string) => Promise<CloseRepoResult>
-  cycleRepo: (direction: 1 | -1) => void
+  activateWorkspace: (workspaceId: string) => void
+  closeWorkspace: (workspaceId: string) => Promise<CloseWorkspaceResult>
+  cycleWorkspace: (direction: 1 | -1) => void
   selectRepoBranch: (repoId: string, branch: string, options?: { replace?: boolean }) => boolean
   showRepoBranchEmptyWorkspacePane: (repoId: string, branch: string, options?: { replace?: boolean }) => boolean
   showRepoBranchWorkspacePaneTab: (
@@ -86,18 +86,18 @@ export interface PrimaryWindowNavigationActions {
 }
 
 interface CreatePrimaryWindowNavigationActionsOptions {
-  currentRepoId: string | null
+  currentWorkspaceId: string | null
   order: string[]
-  closeRepo: (repoId: string) => Promise<CloseRepoResult>
+  closeWorkspace: (workspaceId: string) => Promise<CloseWorkspaceResult>
   peekWorkspaceNavigation: (repoId: string, direction: 'back' | 'forward') => WorkspaceNavigationHistoryTraversal | null
   commitWorkspaceNavigation: (traversal: WorkspaceNavigationHistoryTraversal) => boolean
   routeNavigation: PrimaryWindowRouteNavigation
 }
 
 export function createPrimaryWindowNavigationActions({
-  currentRepoId,
+  currentWorkspaceId,
   order,
-  closeRepo,
+  closeWorkspace,
   peekWorkspaceNavigation,
   commitWorkspaceNavigation,
   routeNavigation,
@@ -106,27 +106,31 @@ export function createPrimaryWindowNavigationActions({
     currentWorkspacePaneRoute(repoId, branchName) {
       return routeNavigation.currentWorkspacePaneRoute(repoId, branchName)
     },
-    activateRepo(repoId) {
+    activateWorkspace(workspaceId) {
       const presentationToken = beginPrimaryWindowPresentation()
-      restoreRepoPresentationOrOpenDashboard(repoId, routeNavigation, presentationToken, { onBlocked: 'stay' })
+      restoreWorkspacePresentationOrOpenDashboard(workspaceId, routeNavigation, presentationToken, {
+        onBlocked: 'stay',
+      })
     },
-    async closeRepo(repoId) {
-      const nextRepoId = repoId === currentRepoId ? nextNavigationRepoIdAfterClose(order, repoId) : null
-      const presentationToken = repoId === currentRepoId ? beginPrimaryWindowPresentation() : null
-      const result = await closeRepo(repoId)
-      if (!result.ok || repoId !== currentRepoId) return result
-      if (nextRepoId)
-        restoreRepoPresentationOrOpenDashboard(nextRepoId, routeNavigation, presentationToken!, {
+    async closeWorkspace(workspaceId) {
+      const nextWorkspaceId = workspaceId === currentWorkspaceId ? nextWorkspaceIdAfterClose(order, workspaceId) : null
+      const presentationToken = workspaceId === currentWorkspaceId ? beginPrimaryWindowPresentation() : null
+      const result = await closeWorkspace(workspaceId)
+      if (!result.ok || workspaceId !== currentWorkspaceId) return result
+      if (nextWorkspaceId)
+        restoreWorkspacePresentationOrOpenDashboard(nextWorkspaceId, routeNavigation, presentationToken!, {
           onBlocked: 'dashboard',
         })
       else routeNavigation.openHome({ presentationToken: presentationToken! })
       return result
     },
-    cycleRepo(direction) {
-      const repoId = nextNavigationRepoId(order, currentRepoId, direction)
-      if (repoId) {
+    cycleWorkspace(direction) {
+      const workspaceId = nextNavigationWorkspaceId(order, currentWorkspaceId, direction)
+      if (workspaceId) {
         const presentationToken = beginPrimaryWindowPresentation()
-        restoreRepoPresentationOrOpenDashboard(repoId, routeNavigation, presentationToken, { onBlocked: 'stay' })
+        restoreWorkspacePresentationOrOpenDashboard(workspaceId, routeNavigation, presentationToken, {
+          onBlocked: 'stay',
+        })
       }
     },
     selectRepoBranch(repoId, branch, options) {
@@ -230,9 +234,9 @@ export function createPrimaryWindowNavigationActions({
       routeNavigation.openSettings(page, { presentationToken })
     },
     openCreateWorktree() {
-      if (!currentRepoId) return
+      if (!currentWorkspaceId) return
       const presentationToken = beginPrimaryWindowPresentation()
-      routeNavigation.openRepoNewWorktree(currentRepoId, { presentationToken })
+      routeNavigation.openRepoNewWorktree(currentWorkspaceId, { presentationToken })
     },
   }
 }
@@ -283,7 +287,7 @@ function commitWorkspacePaneRoute(
     : openResolvedWorkspacePaneRoute(routeNavigation, repoId, branchName, route, routeOptions)
 }
 
-function restoreRepoPresentationOrOpenDashboard(
+function restoreWorkspacePresentationOrOpenDashboard(
   repoId: string,
   routeNavigation: PrimaryWindowRouteNavigation,
   presentationToken: PrimaryWindowPresentationToken,
@@ -308,16 +312,20 @@ function restoreRepoPresentationOrOpenDashboard(
   routeNavigation.openRepoDashboard(repoId, { presentationToken })
 }
 
-function nextNavigationRepoIdAfterClose(order: string[], closingRepoId: string): string | null {
-  const currentIndex = order.indexOf(closingRepoId)
+function nextWorkspaceIdAfterClose(order: string[], closingWorkspaceId: string): string | null {
+  const currentIndex = order.indexOf(closingWorkspaceId)
   if (currentIndex === -1) return order[0] ?? null
   return order[currentIndex + 1] ?? order[currentIndex - 1] ?? null
 }
 
-function nextNavigationRepoId(order: string[], currentRepoId: string | null, direction: 1 | -1): string | null {
+function nextNavigationWorkspaceId(
+  order: string[],
+  currentWorkspaceId: string | null,
+  direction: 1 | -1,
+): string | null {
   if (order.length === 0) return null
-  if (!currentRepoId) return order[0] ?? null
-  const currentIndex = order.indexOf(currentRepoId)
+  if (!currentWorkspaceId) return order[0] ?? null
+  const currentIndex = order.indexOf(currentWorkspaceId)
   if (currentIndex === -1) return order[0] ?? null
   return order[(currentIndex + direction + order.length) % order.length] ?? null
 }

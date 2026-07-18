@@ -6,7 +6,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useOverlayRegistry } from '#/web/hooks/useOverlayRegistry.ts'
 
 function Harness() {
-  const overlays = useOverlayRegistry(['settings', 'clone', 'openRepo'] as const)
+  const overlays = useOverlayRegistry(['settings', 'clone', 'openWorkspace'] as const)
 
   return (
     <>
@@ -24,7 +24,7 @@ function Harness() {
       </button>
       <output id="settings-open">{overlays.state.settings ? 'open' : 'closed'}</output>
       <output id="clone-open">{overlays.state.clone ? 'open' : 'closed'}</output>
-      <output id="open-repo-open">{overlays.state.openRepo ? 'open' : 'closed'}</output>
+      <output id="open-workspace-open">{overlays.state.openWorkspace ? 'open' : 'closed'}</output>
       <output id="any-open">{overlays.anyOpen ? 'open' : 'closed'}</output>
     </>
   )
@@ -38,7 +38,7 @@ describe('useOverlayRegistry', () => {
     click(container, '#set-clone-open')
     expect(text(container, '#settings-open')).toBe('open')
     expect(text(container, '#clone-open')).toBe('open')
-    expect(text(container, '#open-repo-open')).toBe('closed')
+    expect(text(container, '#open-workspace-open')).toBe('closed')
     expect(text(container, '#any-open')).toBe('open')
 
     click(container, '#close-settings')
@@ -48,7 +48,7 @@ describe('useOverlayRegistry', () => {
     click(container, '#close-all')
     expect(text(container, '#settings-open')).toBe('closed')
     expect(text(container, '#clone-open')).toBe('closed')
-    expect(text(container, '#open-repo-open')).toBe('closed')
+    expect(text(container, '#open-workspace-open')).toBe('closed')
     expect(text(container, '#any-open')).toBe('closed')
   })
 })

@@ -4,7 +4,7 @@ import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { cloneRepository as runCloneRepository } from '#/web/repo-client.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { reportOpenRepoPostOpenEffects } from '#/web/lib/open-repo-result-feedback.ts'
+import { reportOpenWorkspacePostOpenEffects } from '#/web/lib/open-workspace-result-feedback.ts'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
 interface RepoCloneDialogProps {
   open: boolean
@@ -28,8 +28,8 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
       })
       return { ok: false, message: openResult.message, path: result.path }
     }
-    navigation.activateRepo(openResult.id)
-    reportOpenRepoPostOpenEffects(openResult, t, { descriptionPrefix: result.path })
+    navigation.activateWorkspace(openResult.workspaceId)
+    reportOpenWorkspacePostOpenEffects(openResult, t, { descriptionPrefix: result.path })
     toast.success(t('workspace-picker.clone-opened'), { description: result.path })
     return result
   }

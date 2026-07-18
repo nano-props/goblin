@@ -20,12 +20,12 @@ import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-
 
 interface ClientEffectIntentRouterOptions {
   navigation: PrimaryWindowNavigationActions
-  currentRepoId: string | null
+  currentWorkspaceId: string | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   closeAllOverlays: () => void
-  openRepoPathDialog: () => void
+  openWorkspacePathDialog: () => void
   openCloneRepo: () => void
-  openRemoteRepo: () => void
+  openRemoteWorkspace: () => void
   openCreateWorktree: () => void
   isOverlayOpen: () => boolean
   isWorkspaceShortcutSuppressed: () => boolean
@@ -33,12 +33,12 @@ interface ClientEffectIntentRouterOptions {
 
 export function useClientEffectIntentRouter({
   navigation,
-  currentRepoId,
+  currentWorkspaceId,
   currentWorkspacePaneCommandTarget,
   closeAllOverlays,
-  openRepoPathDialog,
+  openWorkspacePathDialog,
   openCloneRepo,
-  openRemoteRepo,
+  openRemoteWorkspace,
   openCreateWorktree,
   isOverlayOpen,
   isWorkspaceShortcutSuppressed,
@@ -51,14 +51,14 @@ export function useClientEffectIntentRouter({
   )
   const t = useT()
   const navigationRef = useRef(navigation)
-  const currentRepoIdRef = useRef(currentRepoId)
+  const currentWorkspaceIdRef = useRef(currentWorkspaceId)
   const currentWorkspacePaneCommandTargetRef = useRef(currentWorkspacePaneCommandTarget)
   const isOverlayOpenRef = useRef(isOverlayOpen)
   const isWorkspaceShortcutSuppressedRef = useRef(isWorkspaceShortcutSuppressed)
   const tRef = useRef(t)
   const ensureWorkspaceOpenRef = useRef(ensureWorkspaceOpen)
   navigationRef.current = navigation
-  currentRepoIdRef.current = currentRepoId
+  currentWorkspaceIdRef.current = currentWorkspaceId
   currentWorkspacePaneCommandTargetRef.current = currentWorkspacePaneCommandTarget
   isOverlayOpenRef.current = isOverlayOpen
   isWorkspaceShortcutSuppressedRef.current = isWorkspaceShortcutSuppressed
@@ -68,7 +68,7 @@ export function useClientEffectIntentRouter({
   useEffect(() => {
     const externalOpenDrainer = createExternalOpenIntentDrainer({
       ensureWorkspaceOpen: async (path) => await ensureWorkspaceOpenRef.current(path),
-      activateRepo: (repoId) => navigationRef.current.activateRepo(repoId),
+      activateWorkspace: (workspaceId) => navigationRef.current.activateWorkspace(workspaceId),
       t: (key) => tRef.current(key),
     })
     let disposed = false
@@ -76,12 +76,12 @@ export function useClientEffectIntentRouter({
 
     const sharedDeps = () => ({
       navigation: navigationRef.current,
-      currentRepoId: currentRepoIdRef.current,
+      currentWorkspaceId: currentWorkspaceIdRef.current,
       currentWorkspacePaneCommandTarget: currentWorkspacePaneCommandTargetRef.current,
       closeAllOverlays,
-      openRepoPathDialog,
+      openWorkspacePathDialog,
       openCloneRepo,
-      openRemoteRepo,
+      openRemoteWorkspace,
       openCreateWorktree,
       isOverlayOpen: () => isOverlayOpenRef.current(),
       isWorkspaceShortcutSuppressed: () => isWorkspaceShortcutSuppressedRef.current(),
@@ -135,14 +135,14 @@ export function useClientEffectIntentRouter({
   }, [
     closeAllOverlays,
     navigation,
-    currentRepoId,
+    currentWorkspaceId,
     isOverlayOpen,
     isWorkspaceShortcutSuppressed,
     ensureWorkspaceOpen,
     openCloneRepo,
-    openRemoteRepo,
+    openRemoteWorkspace,
     openCreateWorktree,
-    openRepoPathDialog,
+    openWorkspacePathDialog,
     resetLayout,
     toggleZenMode,
     t,

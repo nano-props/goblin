@@ -1,9 +1,9 @@
 import { createContext } from 'react'
 
 interface LayoutOverlayActionsValue {
-  openRepoPathDialog: () => void
+  openWorkspacePathDialog: () => void
   openCloneRepo: () => void
-  openRemoteRepo: () => void
+  openRemoteWorkspace: () => void
   /** Navigate the current repo route to the New Worktree page. */
   openCreateWorktree: () => void
 }

@@ -11,15 +11,15 @@ import { useLatestAsyncTask } from '#/web/hooks/useLatestAsyncTask.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
-import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
-import { reportOpenRepoPostOpenEffects } from '#/web/lib/open-repo-result-feedback.ts'
+import type { OpenWorkspaceResult } from '#/web/stores/repos/types.ts'
+import { reportOpenWorkspacePostOpenEffects } from '#/web/lib/open-workspace-result-feedback.ts'
 interface Props {
   open: boolean
   onClose: () => void
-  onOpen: (path: string) => Promise<OpenRepoResult>
+  onOpen: (path: string) => Promise<OpenWorkspaceResult>
 }
 
-export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
+export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
   const t = useT()
   const compact = useIsCompactUi()
   const [path, setPath] = useState('')
@@ -59,7 +59,7 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
       const result = await runLatest(() => onOpen(resolvedPath))
       if (result.status === 'stale') return
       if (result.value.ok) {
-        reportOpenRepoPostOpenEffects(result.value, t)
+        reportOpenWorkspacePostOpenEffects(result.value, t)
         onClose()
         return
       }
@@ -87,10 +87,10 @@ export function OpenRepositoryDialog({ open, onClose, onOpen }: Props) {
         }}
       >
         <Field>
-          <FieldLabel htmlFor="open-repo-path">{t('workspace-picker.open-path-label')}</FieldLabel>
+          <FieldLabel htmlFor="open-workspace-path">{t('workspace-picker.open-path-label')}</FieldLabel>
           <div className={cn('gap-2', compact ? 'flex flex-col' : 'flex')}>
             <Input
-              id="open-repo-path"
+              id="open-workspace-path"
               autoFocus
               disabled={pending}
               value={path}

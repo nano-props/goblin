@@ -48,7 +48,7 @@ const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
 
 interface Options {
   navigation: PrimaryWindowNavigationActions
-  currentRepoId: string | null
+  currentWorkspaceId: string | null
   currentBranchName?: string | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   onShowHelp: () => void
@@ -124,7 +124,7 @@ function moveBranchSelection(
 
 export function useKeyboard({
   navigation,
-  currentRepoId,
+  currentWorkspaceId,
   currentBranchName = null,
   currentWorkspacePaneCommandTarget,
   onShowHelp,
@@ -140,7 +140,7 @@ export function useKeyboard({
   const isWorkspaceShortcutSuppressedRef = useRef(isWorkspaceShortcutSuppressed)
   const isSettingsOpenRef = useRef(isSettingsOpen)
   const onExitSettingsRef = useRef(onExitSettings)
-  const currentRepoIdRef = useRef(currentRepoId)
+  const currentWorkspaceIdRef = useRef(currentWorkspaceId)
   const currentBranchNameRef = useRef(currentBranchName)
   const currentWorkspacePaneCommandTargetRef = useRef(currentWorkspacePaneCommandTarget)
   const openCreateWorktreeRef = useRef(openCreateWorktree)
@@ -148,7 +148,7 @@ export function useKeyboard({
   isWorkspaceShortcutSuppressedRef.current = isWorkspaceShortcutSuppressed
   isSettingsOpenRef.current = isSettingsOpen
   onExitSettingsRef.current = onExitSettings
-  currentRepoIdRef.current = currentRepoId
+  currentWorkspaceIdRef.current = currentWorkspaceId
   currentBranchNameRef.current = currentBranchName
   currentWorkspacePaneCommandTargetRef.current = currentWorkspacePaneCommandTarget
   openCreateWorktreeRef.current = openCreateWorktree
@@ -170,7 +170,7 @@ export function useKeyboard({
       }
 
       if (!workspaceShortcutsSuppressed && !isTypingTarget(e.target)) {
-        const repoId = currentRepoIdRef.current
+        const repoId = currentWorkspaceIdRef.current
         const navigationDirection =
           e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.code === 'ArrowLeft'
             ? -1
@@ -190,7 +190,7 @@ export function useKeyboard({
       }
 
       if (primaryModifierPressed(e) && !e.altKey && !workspaceShortcutsSuppressed) {
-        const repoId = currentRepoIdRef.current
+        const repoId = currentWorkspaceIdRef.current
         const paneTarget = currentWorkspacePaneCommandTargetRef.current
         const menuBackedShortcut = hasNativeMenuAccelerators()
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
@@ -251,7 +251,7 @@ export function useKeyboard({
       if (isTypingTarget(e.target)) return
 
       const state = useReposStore.getState()
-      const keyboardState = keyboardRuntimeStateFromStore(state, currentRepoIdRef.current)
+      const keyboardState = keyboardRuntimeStateFromStore(state, currentWorkspaceIdRef.current)
       const repo = keyboardState.repo
       const overlayOpen = workspaceShortcutsSuppressed
       const interactiveTarget = isInteractiveTarget(e.target)

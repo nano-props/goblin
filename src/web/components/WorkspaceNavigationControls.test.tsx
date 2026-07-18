@@ -116,9 +116,9 @@ function renderControls({
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
   return {
-    activateRepo: () => {},
-    closeRepo: async () => ({ ok: true }),
-    cycleRepo: () => {},
+    activateWorkspace: () => {},
+    closeWorkspace: async () => ({ ok: true }),
+    cycleWorkspace: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,

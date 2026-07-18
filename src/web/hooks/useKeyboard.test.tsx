@@ -49,7 +49,7 @@ const FILESYSTEM_CAPABILITIES = {
 } as const
 
 interface HookHostOptions {
-  currentRepoId: string | null
+  currentWorkspaceId: string | null
   currentBranchName: string | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   isWorkspaceShortcutSuppressed: () => boolean
@@ -108,7 +108,7 @@ describe('useKeyboard', () => {
       selectTerminal,
     })
     await renderHookHost({
-      currentRepoId: REPO_ID,
+      currentWorkspaceId: REPO_ID,
       currentBranchName: 'feature/worktree',
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
     })
@@ -149,7 +149,7 @@ describe('useKeyboard', () => {
       return true
     })
     await renderHookHost({
-      currentRepoId: REPO_ID,
+      currentWorkspaceId: REPO_ID,
       currentBranchName: 'feature/no-worktree',
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
     })
@@ -181,7 +181,7 @@ describe('useKeyboard', () => {
     })
     const selectRepoBranch = vi.fn()
     await renderHookHost({
-      currentRepoId: REPO_ID,
+      currentWorkspaceId: REPO_ID,
       currentBranchName: 'main',
       navigation: navigationWith({ selectRepoBranch }),
     })
@@ -198,7 +198,7 @@ describe('useKeyboard', () => {
     const goBack = vi.fn()
     const goForward = vi.fn()
     await renderHookHost({
-      currentRepoId: REPO_ID,
+      currentWorkspaceId: REPO_ID,
       navigation: navigationWith({ goBack, goForward }),
     })
 
@@ -240,7 +240,7 @@ describe('useKeyboard', () => {
       selectTerminal,
     })
     await renderHookHost({
-      currentRepoId: REPO_ID,
+      currentWorkspaceId: REPO_ID,
       currentBranchName: 'feature/worktree',
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
     })
@@ -293,7 +293,7 @@ describe('useKeyboard', () => {
       selectTerminal: vi.fn(),
     })
     await renderHookHost({
-      currentRepoId: REPO_ID,
+      currentWorkspaceId: REPO_ID,
       currentBranchName: 'feature/worktree',
       currentWorkspacePaneCommandTarget: {
         kind: 'git-worktree',
@@ -349,7 +349,7 @@ describe('useKeyboard', () => {
       selectTerminal: vi.fn(),
     })
     await renderHookHost({
-      currentRepoId: REPO_ID,
+      currentWorkspaceId: REPO_ID,
       currentBranchName: null,
       currentWorkspacePaneCommandTarget: {
         kind: 'workspace-root',
@@ -392,7 +392,7 @@ describe('useKeyboard', () => {
       currentBranchName: 'feature/worktree',
     })
     const openCreateWorktree = vi.fn()
-    await renderHookHost({ currentRepoId: REPO_ID, openCreateWorktree })
+    await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree })
 
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
@@ -406,7 +406,7 @@ describe('useKeyboard', () => {
   test('primary modifier plus n no-ops when there is no current repo', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     const openCreateWorktree = vi.fn()
-    await renderHookHost({ currentRepoId: null, openCreateWorktree })
+    await renderHookHost({ currentWorkspaceId: null, openCreateWorktree })
 
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
@@ -425,7 +425,7 @@ describe('useKeyboard', () => {
       currentBranchName: 'feature/worktree',
     })
     const openCreateWorktree = vi.fn()
-    await renderHookHost({ currentRepoId: REPO_ID, openCreateWorktree, isWorkspaceShortcutSuppressed: () => true })
+    await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree, isWorkspaceShortcutSuppressed: () => true })
 
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
@@ -464,7 +464,7 @@ describe('useKeyboard', () => {
       }
     })
     const openCreateWorktree = vi.fn()
-    await renderHookHost({ currentRepoId: REPO_ID, openCreateWorktree })
+    await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree })
 
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
@@ -487,7 +487,7 @@ describe('useKeyboard', () => {
       loadedAt: 123,
     })
     const openCreateWorktree = vi.fn()
-    await renderHookHost({ currentRepoId: REPO_ID, openCreateWorktree })
+    await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree })
 
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
@@ -522,7 +522,7 @@ describe('useKeyboard', () => {
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
     })
-    await renderHookHost({ currentRepoId: REPO_ID, openCreateWorktree })
+    await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree })
 
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', ctrlKey: true, bubbles: true }))
@@ -549,7 +549,7 @@ describe('useKeyboard', () => {
       closeTerminalByDescriptor,
     })
 
-    await renderHookHost({ currentRepoId: REPO_ID, currentWorkspacePaneCommandTarget: null })
+    await renderHookHost({ currentWorkspaceId: REPO_ID, currentWorkspacePaneCommandTarget: null })
 
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', ctrlKey: true, bubbles: true }))
@@ -584,7 +584,7 @@ describe('useKeyboard', () => {
       closeTerminalByDescriptor,
     })
     await renderHookHost({
-      currentRepoId: REPO_ID,
+      currentWorkspaceId: REPO_ID,
       currentBranchName: 'feature/worktree',
       currentWorkspacePaneCommandTarget: {
         kind: 'git-worktree',
@@ -654,7 +654,7 @@ function serverOperation(
 }
 
 function HookHost(overrides: Partial<HookHostOptions>) {
-  const repo = overrides.currentRepoId ? useReposStore.getState().repos[overrides.currentRepoId] : null
+  const repo = overrides.currentWorkspaceId ? useReposStore.getState().repos[overrides.currentWorkspaceId] : null
   const branch =
     repo && overrides.currentBranchName
       ? readRepoBranchSnapshotQueryProjection(repo)?.branches.find(
@@ -681,7 +681,7 @@ function HookHost(overrides: Partial<HookHostOptions>) {
         : null
   useKeyboard({
     navigation: overrides.navigation ?? navigationWith(),
-    currentRepoId: overrides.currentRepoId ?? null,
+    currentWorkspaceId: overrides.currentWorkspaceId ?? null,
     currentBranchName: overrides.currentBranchName ?? null,
     currentWorkspacePaneCommandTarget:
       overrides.currentWorkspacePaneCommandTarget ??
@@ -697,9 +697,9 @@ function HookHost(overrides: Partial<HookHostOptions>) {
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
   const navigation: PrimaryWindowNavigationActions = {
-    activateRepo: () => {},
-    closeRepo: async () => ({ ok: true }),
-    cycleRepo: () => {},
+    activateWorkspace: () => {},
+    closeWorkspace: async () => ({ ok: true }),
+    cycleWorkspace: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,

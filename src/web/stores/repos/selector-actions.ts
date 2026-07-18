@@ -10,17 +10,17 @@ interface RestorableWorkspaceLayoutPreferenceStoreActions extends Pick<
   'resetLayout' | 'toggleZenMode'
 > {}
 
-interface RuntimeCoherentRepoOpenStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
+interface RuntimeCoherentWorkspaceOpenStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
 
-interface RuntimeCoherentRepoNavigationStoreActions extends Pick<ReposStore, 'closeRepo'> {}
+interface RuntimeCoherentWorkspaceNavigationStoreActions extends Pick<ReposStore, 'closeWorkspace'> {}
 
-interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
+interface RuntimeCoherentWorkspaceProjectionStoreActions extends Pick<
   ReposStore,
-  'ensureWorkspaceOpen' | 'closeRepo'
+  'ensureWorkspaceOpen' | 'closeWorkspace'
 > {}
 
 interface PrimaryWindowNavigationStoreActions
-  extends Pick<ReposStore, 'closeRepo' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'> {}
+  extends Pick<ReposStore, 'closeWorkspace' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'> {}
 
 interface WorkspacePickerStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
 
@@ -29,19 +29,19 @@ interface ClientEffectIntentStoreActions extends Pick<
   'ensureWorkspaceOpen' | 'resetLayout' | 'toggleZenMode'
 > {}
 
-export function runtimeCoherentRepoOpenStoreActionsFromStore(
+export function runtimeCoherentWorkspaceOpenStoreActionsFromStore(
   state: Pick<ReposStore, 'ensureWorkspaceOpen'>,
-): RuntimeCoherentRepoOpenStoreActions {
+): RuntimeCoherentWorkspaceOpenStoreActions {
   return {
     ensureWorkspaceOpen: state.ensureWorkspaceOpen,
   }
 }
 
-export function runtimeCoherentRepoNavigationStoreActionsFromStore(
-  state: Pick<ReposStore, 'closeRepo'>,
-): RuntimeCoherentRepoNavigationStoreActions {
+export function runtimeCoherentWorkspaceNavigationStoreActionsFromStore(
+  state: Pick<ReposStore, 'closeWorkspace'>,
+): RuntimeCoherentWorkspaceNavigationStoreActions {
   return {
-    closeRepo: state.closeRepo,
+    closeWorkspace: state.closeWorkspace,
   }
 }
 
@@ -63,24 +63,24 @@ export function restorableWorkspaceLayoutPreferenceStoreActionsFromStore(
   }
 }
 
-export function runtimeCoherentRepoProjectionStoreActionsFromStore(
-  state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo'>,
-): RuntimeCoherentRepoProjectionStoreActions {
-  const open = runtimeCoherentRepoOpenStoreActionsFromStore({ ensureWorkspaceOpen: state.ensureWorkspaceOpen })
-  const navigation = runtimeCoherentRepoNavigationStoreActionsFromStore({
-    closeRepo: state.closeRepo,
+export function runtimeCoherentWorkspaceProjectionStoreActionsFromStore(
+  state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeWorkspace'>,
+): RuntimeCoherentWorkspaceProjectionStoreActions {
+  const open = runtimeCoherentWorkspaceOpenStoreActionsFromStore({ ensureWorkspaceOpen: state.ensureWorkspaceOpen })
+  const navigation = runtimeCoherentWorkspaceNavigationStoreActionsFromStore({
+    closeWorkspace: state.closeWorkspace,
   })
   return {
     ensureWorkspaceOpen: open.ensureWorkspaceOpen,
-    closeRepo: navigation.closeRepo,
+    closeWorkspace: navigation.closeWorkspace,
   }
 }
 
 export function primaryWindowNavigationStoreActionsFromStore(
-  state: Pick<ReposStore, 'closeRepo' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'>,
+  state: Pick<ReposStore, 'closeWorkspace' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'>,
 ): PrimaryWindowNavigationStoreActions {
   return {
-    closeRepo: state.closeRepo,
+    closeWorkspace: state.closeWorkspace,
     peekWorkspaceNavigation: state.peekWorkspaceNavigation,
     commitWorkspaceNavigation: state.commitWorkspaceNavigation,
   }
@@ -89,7 +89,7 @@ export function primaryWindowNavigationStoreActionsFromStore(
 export function workspacePickerStoreActionsFromStore(
   state: Pick<ReposStore, 'ensureWorkspaceOpen'>,
 ): WorkspacePickerStoreActions {
-  const runtimeCoherent = runtimeCoherentRepoOpenStoreActionsFromStore({
+  const runtimeCoherent = runtimeCoherentWorkspaceOpenStoreActionsFromStore({
     ensureWorkspaceOpen: state.ensureWorkspaceOpen,
   })
   return {
@@ -100,7 +100,7 @@ export function workspacePickerStoreActionsFromStore(
 export function clientEffectIntentStoreActionsFromStore(
   state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'resetLayout' | 'toggleZenMode'>,
 ): ClientEffectIntentStoreActions {
-  const runtimeCoherent = runtimeCoherentRepoOpenStoreActionsFromStore({
+  const runtimeCoherent = runtimeCoherentWorkspaceOpenStoreActionsFromStore({
     ensureWorkspaceOpen: state.ensureWorkspaceOpen,
   })
   return {

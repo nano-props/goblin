@@ -44,7 +44,7 @@ export const en = {
   'menu.file.open-data-folder.win': 'Open Data Folder in Explorer',
   'menu.file.close-window': 'Close Window',
   'menu.file.close-workspace-tab-or-window': 'Close Workspace Tab or Window',
-  'menu.file.close-tab': 'Close Repository',
+  'menu.file.close-workspace': 'Close Workspace',
   'menu.file.settings': 'Settings…',
   'menu.file.quit': 'Quit',
 
@@ -69,8 +69,8 @@ export const en = {
   'menu.view.toggle-dev-tools': 'Toggle Developer Tools',
 
   // ---- Menu — Window (goblin-specific) ---------------------------------------
-  'menu.window.next-repo': 'Next Repository',
-  'menu.window.prev-repo': 'Previous Repository',
+  'menu.window.next-workspace': 'Next Workspace',
+  'menu.window.prev-workspace': 'Previous Workspace',
   'menu.window.reset-window': 'Reset Window',
 
   // ---- Menu — Help --------------------------------------------------------
@@ -732,8 +732,8 @@ export const en = {
   'help.section.app': 'App',
   'help.row.next-branch': 'Next branch / commit',
   'help.row.prev-branch': 'Previous branch / commit',
-  'help.row.next-repo': 'Next repository',
-  'help.row.prev-repo': 'Previous repository',
+  'help.row.next-workspace': 'Next workspace',
+  'help.row.prev-workspace': 'Previous workspace',
   'help.row.view-status': 'Branch status',
   'help.row.view-changes': 'Changes',
   'help.row.view-log': 'Log',
@@ -745,7 +745,7 @@ export const en = {
   'help.row.open-local-workspace': 'Open workspace',
   'help.row.clone-repo': 'Clone repository',
   'help.row.activate-window': 'Show Goblin window',
-  'help.row.close-repo': 'Close current repository',
+  'help.row.close-workspace': 'Close current workspace',
   'help.row.close-workspace-tab-or-window': 'Close workspace tab or window',
   'help.row.close-window': 'Close window',
   'help.row.refresh': 'Sync Repository',

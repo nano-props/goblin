@@ -116,7 +116,7 @@ Notes:
 - Restorable helpers should focus on boot restore and persistence boundaries, not on live runtime convergence.
 - `repoSnapshotCache` is a startup affordance, not a runtime authority. Persist it from query-projected repo data when available; use it to paint placeholders during boot, then converge through normal server/query refresh.
 - `hydrateRestoredWorkspaceRuntime` belongs to the restorable boot path, while
-  `ensureWorkspaceOpen` and `closeRepo` belong to runtime repo lifecycle.
+  `ensureWorkspaceOpen` and `closeWorkspace` belong to runtime repo lifecycle.
 - Restorable state is not runtime-coherent shared state.
 - Do not add a whole-session client -> server write. Each side persists only the state it owns.
 - Explicit workspace pane layout commands persist their durable static layout

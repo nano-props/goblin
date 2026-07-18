@@ -602,7 +602,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
   >()
   const sessionStorageValues = new Map<string, string>()
   const hostOpenExternalUrl = handlers['app.openExternalUrl']
-  const hostOpenDirectoryDialog = handlers['repo.openDialog']
+  const hostOpenDirectoryDialog = handlers['workspace.openDialog']
   const hostConsumeExternalOpenPaths = handlers['repo.consumeExternalOpenPaths']
   const hostOpenSettingsWindow = handlers['app.openSettingsWindow']
   Object.defineProperty(globalThis, 'window', {

@@ -15,7 +15,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { RemoteDiagnosticsPanel } from '#/web/components/RemoteDiagnosticsPanel.tsx'
 import { isResolvableRemotePathInput, remoteWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { cn } from '#/web/lib/cn.ts'
-import { reportOpenRepoPostOpenEffects } from '#/web/lib/open-repo-result-feedback.ts'
+import { reportOpenWorkspacePostOpenEffects } from '#/web/lib/open-workspace-result-feedback.ts'
 import type { RemoteDiagnosticsResult, RemoteRepoTarget, SshConfigHost } from '#/shared/remote-repo.ts'
 import { isValidSshProfile } from '#/shared/workspace-locator.ts'
 interface Props {
@@ -23,7 +23,7 @@ interface Props {
   onOpenChange: (open: boolean) => void
 }
 
-export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
+export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
   const t = useT()
   const compact = useIsCompactUi()
   const navigation = usePrimaryWindowNavigation()
@@ -142,8 +142,8 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
         setLoading(false)
         return
       }
-      navigation.activateRepo(openResult.id)
-      reportOpenRepoPostOpenEffects(openResult, t, { descriptionPrefix: nextTarget.displayName })
+      navigation.activateWorkspace(openResult.workspaceId)
+      reportOpenWorkspacePostOpenEffects(openResult, t, { descriptionPrefix: nextTarget.displayName })
       onOpenChange(false)
     } catch (err) {
       setActionError(formatRemoteDialogError(t, err))

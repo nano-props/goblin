@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toast } from 'sonner'
@@ -147,23 +148,23 @@ describe('client effect intent handlers', () => {
   })
 })
 
-function deps(currentRepoId: string | null, currentBranchName = 'feature/worktree') {
+function deps(currentWorkspaceId: string | null, currentBranchName = 'feature/worktree') {
   return {
     navigation: navigationWithStoreActions(),
-    currentRepoId,
-    currentWorkspacePaneCommandTarget: currentRepoId
+    currentWorkspaceId,
+    currentWorkspacePaneCommandTarget: currentWorkspaceId
       ? { kind: 'git-branch' as const, branchName: currentBranchName, workspacePaneRoute: null }
       : null,
     closeAllOverlays: vi.fn(),
-    openRepoPathDialog: vi.fn(),
+    openWorkspacePathDialog: vi.fn(),
     openCloneRepo: vi.fn(),
-    openRemoteRepo: vi.fn(),
+    openRemoteWorkspace: vi.fn(),
     openCreateWorktree: vi.fn(),
     isOverlayOpen: () => false,
     isWorkspaceShortcutSuppressed: () => false,
     ensureWorkspaceOpen: vi.fn(async (input: string | { id: string }) => ({
       ok: true as const,
-      id: typeof input === 'string' ? input : input.id,
+      workspaceId: workspaceIdForTest(typeof input === 'string' ? input : input.id),
     })),
     resetLayout: vi.fn(),
     toggleZenMode: vi.fn(),
@@ -174,9 +175,9 @@ function deps(currentRepoId: string | null, currentBranchName = 'feature/worktre
 function navigationWithStoreActions(): PrimaryWindowNavigationActions {
   const navigation: PrimaryWindowNavigationActions = {
     currentWorkspacePaneRoute: () => undefined,
-    activateRepo: vi.fn(),
-    closeRepo: (repoId) => useReposStore.getState().closeRepo(repoId),
-    cycleRepo: vi.fn(),
+    activateWorkspace: vi.fn(),
+    closeWorkspace: (workspaceId) => useReposStore.getState().closeWorkspace(workspaceId),
+    cycleWorkspace: vi.fn(),
     selectRepoBranch: vi.fn(),
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {

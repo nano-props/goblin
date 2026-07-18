@@ -512,7 +512,7 @@ describe('openWorkspacePaneTab', () => {
     })
     await commitStarted
 
-    await useReposStore.getState().closeRepo(REPO_ID)
+    await useReposStore.getState().closeWorkspace(REPO_ID)
     rejectCommit(new Error('error.repo-runtime-stale'))
     await expect(openPromise).resolves.toBe(false)
 
@@ -562,7 +562,7 @@ describe('openWorkspacePaneTab', () => {
     })
     await commitStarted
 
-    await useReposStore.getState().closeRepo(REPO_ID)
+    await useReposStore.getState().closeWorkspace(REPO_ID)
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/reopened', { worktree: { path: WORKTREE_PATH } })],
@@ -621,7 +621,7 @@ describe('openWorkspacePaneTab', () => {
     })
     await commitStarted
 
-    await useReposStore.getState().closeRepo(REPO_ID)
+    await useReposStore.getState().closeWorkspace(REPO_ID)
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       repoRuntimeId: 'repo-runtime-reopened',

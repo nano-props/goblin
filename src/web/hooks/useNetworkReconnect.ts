@@ -1,12 +1,15 @@
 import { useEffect, useRef } from 'react'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-command.ts'
+import { runRemoteWorkspaceConnection } from '#/web/stores/repos/remote-workspace-connection-command.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import { goblinLog } from '#/web/logger.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 function reconnectRemoteRepo(set: ReposSet, get: ReposGet, repoId: string): void {
-  void runRemoteRepoConnection(set, get, repoId).then((outcome) => {
+  const workspaceId = canonicalWorkspaceLocator(repoId)
+  if (!workspaceId) return
+  void runRemoteWorkspaceConnection(set, get, workspaceId).then((outcome) => {
     if (outcome?.kind === 'transport-failed') {
       goblinLog.warn('remote reconnect command failed', { repoId, reason: outcome.reason })
     }
@@ -34,7 +37,7 @@ function reconnectRemoteRepo(set: ReposSet, get: ReposGet, repoId: string): void
  * route change; in practice the user reopens wifi/VPN seconds
  * before the OS catches up, so the first probe often still
  * fails. We don't retry inside the hook — the failed
- * `runRemoteRepoConnection` call settles to `failed` and the
+ * `runRemoteWorkspaceConnection` call settles to `failed` and the
  * next `online` event gives the next attempt.
  */
 export function useNetworkReconnect(): void {

@@ -35,9 +35,9 @@ const WORKTREE_PATH = '/tmp/goblin-branch-view-test-worktree'
 
 const navigation: PrimaryWindowNavigationActions = {
   currentWorkspacePaneRoute: () => undefined,
-  activateRepo: vi.fn(),
-  closeRepo: vi.fn(),
-  cycleRepo: vi.fn(),
+  activateWorkspace: vi.fn(),
+  closeWorkspace: vi.fn(),
+  cycleWorkspace: vi.fn(),
   selectRepoBranch: vi.fn(),
   showRepoBranchEmptyWorkspacePane: () => true,
   showRepoBranchWorkspacePaneTab: vi.fn(),

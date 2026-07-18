@@ -148,8 +148,8 @@ function WorkspacePickerRow({ repoId }: { repoId?: string }) {
     <div className="flex h-8 min-w-0 shrink-0 items-center">
       <WorkspacePickerHost
         currentWorkspaceId={repoId ?? null}
-        onOpenRepoPathDialog={overlayActions?.openRepoPathDialog ?? NOOP}
-        onOpenRemote={overlayActions?.openRemoteRepo ?? NOOP}
+        onOpenWorkspacePathDialog={overlayActions?.openWorkspacePathDialog ?? NOOP}
+        onOpenRemote={overlayActions?.openRemoteWorkspace ?? NOOP}
         onClone={overlayActions?.openCloneRepo ?? NOOP}
         surface="sidebar"
       />

@@ -1,15 +1,15 @@
-import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
+import type { OpenWorkspaceResult } from '#/web/stores/repos/types.ts'
 import { sessionLog } from '#/web/logger.ts'
 interface Options {
-  ensureWorkspaceOpen: (path: string) => Promise<OpenRepoResult>
-  activateRepo?: (id: string) => void
+  ensureWorkspaceOpen: (path: string) => Promise<OpenWorkspaceResult>
+  activateWorkspace?: (id: string) => void
   onOpenFailed?: (path: string, message: string) => void
   onPostOpenError?: (path: string, message: string) => void
 }
 
-export async function openRepoPaths(
+export async function openWorkspacePaths(
   paths: string[],
-  { ensureWorkspaceOpen, activateRepo, onOpenFailed, onPostOpenError }: Options,
+  { ensureWorkspaceOpen, activateWorkspace, onOpenFailed, onPostOpenError }: Options,
 ): Promise<string | null> {
   let firstId: string | null = null
   for (const path of paths) {
@@ -18,17 +18,17 @@ export async function openRepoPaths(
       onOpenFailed?.(path, result.message)
       continue
     }
-    firstId ??= result.id
+    firstId ??= result.workspaceId
     if (result.postOpenEffects) {
       void result.postOpenEffects
         .then((errors) => {
           for (const error of errors) onPostOpenError?.(path, error.message)
         })
         .catch((err) => {
-          sessionLog.warn('post-open repo effects failed', { path, err })
+          sessionLog.warn('post-open workspace effects failed', { path, err })
         })
     }
   }
-  if (firstId !== null) activateRepo?.(firstId)
+  if (firstId !== null) activateWorkspace?.(firstId)
   return firstId
 }

@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 import { act } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { OpenRepositoryDialog } from '#/web/components/OpenRepositoryDialog.tsx'
+import { OpenWorkspaceDialog } from '#/web/components/OpenWorkspaceDialog.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
-import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
+import type { OpenWorkspaceResult } from '#/web/stores/repos/types.ts'
 
 let ipcCalls: Array<{ path: string; input?: unknown }> = []
 const testWindow = window as unknown as {
@@ -51,41 +52,41 @@ afterEach(() => {
   delete testWindow.__GOBLIN_BOOTSTRAP__
 })
 
-describe('OpenRepositoryDialog', () => {
+describe('OpenWorkspaceDialog', () => {
   test('keeps the inline status row mounted', () => {
     render(
-      <OpenRepositoryDialog
+      <OpenWorkspaceDialog
         open
         onClose={vi.fn()}
-        onOpen={vi.fn(async () => ({ ok: true as const, id: 'goblin+file:///Users/tester/Developer/repo' }))}
+        onOpen={vi.fn(async () => ({ ok: true as const, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo') }))}
       />,
     )
 
     expect(document.body.querySelector('[data-slot="dialog-status-row"]')).not.toBeNull()
   })
 
-  test('focuses the repository path input when opened', () => {
+  test('focuses the workspace path input when opened', () => {
     render(
-      <OpenRepositoryDialog
+      <OpenWorkspaceDialog
         open
         onClose={vi.fn()}
-        onOpen={vi.fn(async () => ({ ok: true as const, id: 'goblin+file:///Users/tester/Developer/repo' }))}
+        onOpen={vi.fn(async () => ({ ok: true as const, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo') }))}
       />,
     )
 
-    expect(document.activeElement).toBe(input('#open-repo-path'))
+    expect(document.activeElement).toBe(input('#open-workspace-path'))
   })
 
   test('does not echo the typed path into the inline status row during normal input', () => {
     render(
-      <OpenRepositoryDialog
+      <OpenWorkspaceDialog
         open
         onClose={vi.fn()}
-        onOpen={vi.fn(async () => ({ ok: true as const, id: 'goblin+file:///Users/tester/Developer/repo' }))}
+        onOpen={vi.fn(async () => ({ ok: true as const, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo') }))}
       />,
     )
 
-    setInputValue('#open-repo-path', '~/asdasdasd')
+    setInputValue('#open-workspace-path', '~/asdasdasd')
 
     const status = document.body.querySelector('[data-slot="dialog-status-text"]')
     expect(status?.textContent).toBe('')
@@ -93,13 +94,13 @@ describe('OpenRepositoryDialog', () => {
   })
 
   test('waits for open success before closing', async () => {
-    const deferred = createDeferred<OpenRepoResult>()
+    const deferred = createDeferred<OpenWorkspaceResult>()
     const onClose = vi.fn()
     const onOpen = vi.fn(() => deferred.promise)
 
-    render(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
+    render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
-    setInputValue('#open-repo-path', '~/Developer/repo')
+    setInputValue('#open-workspace-path', '~/Developer/repo')
     click('button[type="submit"]')
 
     expect(onOpen).toHaveBeenCalledWith('/Users/tester/Developer/repo')
@@ -107,7 +108,7 @@ describe('OpenRepositoryDialog', () => {
     expect(buttonByText('dialog.cancel').disabled).toBe(true)
     expect(queryButtonByText('Close')).toBeNull()
 
-    deferred.resolve({ ok: true, id: 'goblin+file:///Users/tester/Developer/repo' })
+    deferred.resolve({ ok: true, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo') })
     await flush()
 
     expect(onClose).toHaveBeenCalledTimes(1)
@@ -115,12 +116,12 @@ describe('OpenRepositoryDialog', () => {
 
   test('can fill the path from the native picker and keeps the dialog open on failure', async () => {
     const onClose = vi.fn()
-    const onOpen = vi.fn(async (): Promise<OpenRepoResult> => ({
+    const onOpen = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
       ok: false,
       message: 'error.workspace-git-unavailable',
     }))
 
-    render(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
+    render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
     clickButtonByText('workspace-picker.open-path-choose')
     await flush()
@@ -129,7 +130,7 @@ describe('OpenRepositoryDialog', () => {
         host: expect.objectContaining({ openDirectoryDialog: expect.any(Function) }),
       }),
     )
-    expect(input('#open-repo-path').value).toBe('~/Developer/repo')
+    expect(input('#open-workspace-path').value).toBe('~/Developer/repo')
 
     click('button[type="submit"]')
     await flush()
@@ -141,13 +142,13 @@ describe('OpenRepositoryDialog', () => {
   test('allows retry after an unexpected open error', async () => {
     const onClose = vi.fn()
     const onOpen = vi
-      .fn<() => Promise<OpenRepoResult>>()
+      .fn<() => Promise<OpenWorkspaceResult>>()
       .mockRejectedValueOnce(new Error('boom'))
-      .mockResolvedValueOnce({ ok: true, id: 'goblin+file:///Users/tester/Developer/repo' })
+      .mockResolvedValueOnce({ ok: true, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo') })
 
-    render(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
+    render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
-    setInputValue('#open-repo-path', '~/Developer/repo')
+    setInputValue('#open-workspace-path', '~/Developer/repo')
     click('button[type="submit"]')
     await flush()
 
@@ -163,28 +164,28 @@ describe('OpenRepositoryDialog', () => {
   })
 
   test('ignores an older submit result after the dialog is reopened', async () => {
-    const first = createDeferred<OpenRepoResult>()
-    const second = createDeferred<OpenRepoResult>()
+    const first = createDeferred<OpenWorkspaceResult>()
+    const second = createDeferred<OpenWorkspaceResult>()
     const onClose = vi.fn()
     const onOpen = vi.fn(() => (onOpen.mock.calls.length === 0 ? first.promise : second.promise))
 
-    const { rerender } = render(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
+    const { rerender } = render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
-    setInputValue('#open-repo-path', '~/Developer/repo')
+    setInputValue('#open-workspace-path', '~/Developer/repo')
     click('button[type="submit"]')
 
-    rerender(<OpenRepositoryDialog open={false} onClose={onClose} onOpen={onOpen} />)
-    rerender(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
+    rerender(<OpenWorkspaceDialog open={false} onClose={onClose} onOpen={onOpen} />)
+    rerender(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
-    first.resolve({ ok: true, id: 'goblin+file:///Users/tester/Developer/repo' })
+    first.resolve({ ok: true, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo') })
     await flush()
 
     expect(onClose).not.toHaveBeenCalled()
     expect(button('button[type="submit"]').disabled).toBe(true)
 
-    setInputValue('#open-repo-path', '~/Developer/repo-next')
+    setInputValue('#open-workspace-path', '~/Developer/repo-next')
     click('button[type="submit"]')
-    second.resolve({ ok: true, id: 'goblin+file:///Users/tester/Developer/repo-next' })
+    second.resolve({ ok: true, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo-next') })
     await flush()
 
     expect(onClose).toHaveBeenCalledTimes(1)
@@ -192,17 +193,17 @@ describe('OpenRepositoryDialog', () => {
 
   test('clears a previous inline error after editing the path', async () => {
     const onClose = vi.fn()
-    const onOpen = vi.fn<() => Promise<OpenRepoResult>>().mockRejectedValueOnce(new Error('boom'))
+    const onOpen = vi.fn<() => Promise<OpenWorkspaceResult>>().mockRejectedValueOnce(new Error('boom'))
 
-    render(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
+    render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
-    setInputValue('#open-repo-path', '~/Developer/repo')
+    setInputValue('#open-workspace-path', '~/Developer/repo')
     click('button[type="submit"]')
     await flush()
 
     expect(document.body.textContent).toContain('boom')
 
-    setInputValue('#open-repo-path', '~/Developer/repo-next')
+    setInputValue('#open-workspace-path', '~/Developer/repo-next')
 
     expect(document.body.textContent).not.toContain('boom')
   })
@@ -211,12 +212,12 @@ describe('OpenRepositoryDialog', () => {
     delete testWindow.goblinNative
     setClientBridgeForTests(null)
     const onClose = vi.fn()
-    const onOpen = vi.fn(async (): Promise<OpenRepoResult> => ({
+    const onOpen = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
       ok: true,
-      id: 'goblin+file:///Users/tester/Developer/repo',
+      workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
     }))
 
-    render(<OpenRepositoryDialog open onClose={onClose} onOpen={onOpen} />)
+    render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
     expect(queryButtonByText('workspace-picker.open-path-choose')).toBeNull()
   })

@@ -24,10 +24,10 @@ describe('repo lifecycle', () => {
     const calls = installGoblin()
 
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (result.ok) useReposStore.setState({ restoredRepoId: result.id })
+    if (result.ok) useReposStore.setState({ restoredRepoId: result.workspaceId })
     if (result.ok) await result.postOpenEffects
 
-    expect(result).toMatchObject({ ok: true, id: REPO_A })
+    expect(result).toMatchObject({ ok: true, workspaceId: REPO_A })
     expect(useReposStore.getState().order).toEqual([REPO_A])
     expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     expect(calls.recent).toEqual([{ kind: 'local', id: REPO_A }])
@@ -41,7 +41,7 @@ describe('repo lifecycle', () => {
 
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
 
-    expect(result).toMatchObject({ ok: true, id: REPO_A })
+    expect(result).toMatchObject({ ok: true, workspaceId: REPO_A })
     const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())
     expect(cached?.runtimes).toEqual([
       {
@@ -67,7 +67,7 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().order).not.toContain(REPO_A)
   })
 
-  test('closeRepo keeps local state when shared membership persistence fails', async () => {
+  test('closeWorkspace keeps local state when shared membership persistence fails', async () => {
     installGoblin({
       'settings.removeWorkspaceRepo': () => {
         throw new Error('workspace write failed')
@@ -76,7 +76,7 @@ describe('repo lifecycle', () => {
     await expect(useReposStore.getState().ensureWorkspaceOpen(REPO_A)).resolves.toMatchObject({ ok: true })
     const repoRuntimeId = useReposStore.getState().repos[REPO_A]!.repoRuntimeId
 
-    await expect(useReposStore.getState().closeRepo(REPO_A)).resolves.toEqual({
+    await expect(useReposStore.getState().closeWorkspace(REPO_A)).resolves.toEqual({
       ok: false,
       message: 'error.failed-read-repo',
     })
@@ -104,11 +104,11 @@ describe('repo lifecycle', () => {
 
     const opening = useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     await vi.waitFor(() => expect(useReposStore.getState().repos[REPO_A]).toBeUndefined())
-    const closing = useReposStore.getState().closeRepo(REPO_A)
+    const closing = useReposStore.getState().closeWorkspace(REPO_A)
     expect(removeWorkspaceRepo).not.toHaveBeenCalled()
     releaseAdd.resolve()
 
-    await expect(opening).resolves.toMatchObject({ ok: true, id: REPO_A })
+    await expect(opening).resolves.toMatchObject({ ok: true, workspaceId: REPO_A })
     await expect(closing).resolves.toEqual({ ok: true })
     expect(workspaceRepos).toEqual([])
     expect(useReposStore.getState().repos[REPO_A]).toBeUndefined()
@@ -133,12 +133,12 @@ describe('repo lifecycle', () => {
     await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     blockRemove = true
 
-    const closing = useReposStore.getState().closeRepo(REPO_A)
+    const closing = useReposStore.getState().closeWorkspace(REPO_A)
     const reopening = useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     releaseRemove.resolve()
 
     await expect(closing).resolves.toEqual({ ok: true })
-    await expect(reopening).resolves.toMatchObject({ ok: true, id: REPO_A })
+    await expect(reopening).resolves.toMatchObject({ ok: true, workspaceId: REPO_A })
     expect(workspaceRepos).toEqual([REPO_A])
     expect(useReposStore.getState().repos[REPO_A]).toBeDefined()
   })
@@ -152,9 +152,9 @@ describe('repo lifecycle', () => {
 
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
 
-    expect(result).toMatchObject({ ok: true, id: REPO_A })
+    expect(result).toMatchObject({ ok: true, workspaceId: REPO_A })
     expect(result.ok ? await result.postOpenEffects : null).toEqual([
-      { kind: 'recent-repo', message: 'recent write failed' },
+      { kind: 'recent-workspace', message: 'recent write failed' },
     ])
     expect(useReposStore.getState().repos[REPO_A]).toBeDefined()
     const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())
@@ -171,10 +171,10 @@ describe('repo lifecycle', () => {
     const calls = installGoblin()
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (first.ok) useReposStore.setState({ restoredRepoId: first.id })
+    if (first.ok) useReposStore.setState({ restoredRepoId: first.workspaceId })
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
 
-    expect(result).toMatchObject({ ok: true, id: REPO_B })
+    expect(result).toMatchObject({ ok: true, workspaceId: REPO_B })
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     await vi.waitFor(() => {
@@ -186,7 +186,7 @@ describe('repo lifecycle', () => {
     const calls = installGoblin()
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (first.ok) useReposStore.setState({ restoredRepoId: first.id })
+    if (first.ok) useReposStore.setState({ restoredRepoId: first.workspaceId })
     await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
@@ -200,7 +200,7 @@ describe('repo lifecycle', () => {
     installGoblin()
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (first.ok) useReposStore.setState({ restoredRepoId: first.id })
+    if (first.ok) useReposStore.setState({ restoredRepoId: first.workspaceId })
     await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
 
     expect(Object.keys(useReposStore.getState().repos)).toEqual([REPO_A, REPO_B])
@@ -212,14 +212,14 @@ describe('repo lifecycle', () => {
     const calls = installGoblin()
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (first.ok) useReposStore.setState({ restoredRepoId: first.id })
+    if (first.ok) useReposStore.setState({ restoredRepoId: first.workspaceId })
     const second = await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
-    if (second.ok) useReposStore.setState({ restoredRepoId: second.id })
+    if (second.ok) useReposStore.setState({ restoredRepoId: second.workspaceId })
     // Opening REPO_A again is a focus action: the repo is already
     // resolved and its data is coherent, so we skip the runtime projection
     // pipeline.
     const third = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (third.ok) useReposStore.setState({ restoredRepoId: third.id })
+    if (third.ok) useReposStore.setState({ restoredRepoId: third.workspaceId })
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
@@ -240,14 +240,14 @@ describe('repo lifecycle', () => {
     })
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (first.ok) useReposStore.setState({ restoredRepoId: first.id })
+    if (first.ok) useReposStore.setState({ restoredRepoId: first.workspaceId })
     await vi.waitFor(() => {
       expect(snapshotResolvers).toHaveLength(1)
     })
     const firstToken = useReposStore.getState().repos[REPO_A]?.repoRuntimeId
-    await useReposStore.getState().closeRepo(REPO_A)
+    await useReposStore.getState().closeWorkspace(REPO_A)
     const second = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (second.ok) useReposStore.setState({ restoredRepoId: second.id })
+    if (second.ok) useReposStore.setState({ restoredRepoId: second.workspaceId })
     const secondToken = useReposStore.getState().repos[REPO_A]?.repoRuntimeId
     await vi.waitFor(() => {
       expect(snapshotResolvers).toHaveLength(2)
@@ -271,14 +271,14 @@ describe('repo lifecycle', () => {
     }
   })
 
-  test('closeRepo removes the closed server runtime membership from the query cache', async () => {
+  test('closeWorkspace removes the closed server runtime membership from the query cache', async () => {
     installGoblin()
 
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    expect(result).toMatchObject({ ok: true, id: REPO_A })
+    expect(result).toMatchObject({ ok: true, workspaceId: REPO_A })
     const repoRuntimeId = useReposStore.getState().repos[REPO_A]!.repoRuntimeId
 
-    await useReposStore.getState().closeRepo(REPO_A)
+    await useReposStore.getState().closeWorkspace(REPO_A)
     await vi.waitFor(() => {
       const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())
       expect(cached?.runtimes).not.toContainEqual({ repoRoot: REPO_A, repoRuntimeId })
@@ -289,7 +289,7 @@ describe('repo lifecycle', () => {
     installGoblin()
 
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    expect(result).toMatchObject({ ok: true, id: REPO_A })
+    expect(result).toMatchObject({ ok: true, workspaceId: REPO_A })
     const repoRuntimeId = useReposStore.getState().repos[REPO_A]!.repoRuntimeId
     primaryWindowQueryClient.setQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey(), {
       runtimes: [
@@ -324,7 +324,7 @@ describe('repo lifecycle', () => {
     const result = await useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))
     if (result.ok) await result.postOpenEffects
 
-    expect(result).toMatchObject({ ok: true, id: target!.id })
+    expect(result).toMatchObject({ ok: true, workspaceId: target!.id })
     expect(useReposStore.getState().repos[target!.id]?.remote.lifecycle).toEqual({ kind: 'ready', target })
     expect(calls.recent).toEqual([remoteWorkspaceSessionEntry(target!)])
   })
@@ -346,7 +346,7 @@ describe('repo lifecycle', () => {
 
     await expect(useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))).resolves.toMatchObject({
       ok: true,
-      id: target!.id,
+      workspaceId: target!.id,
     })
     expect(calls.workspaceRepos).toEqual([remoteWorkspaceSessionEntry(target!)])
     expect(useReposStore.getState().repos[target!.id]).toBeDefined()
@@ -371,7 +371,7 @@ describe('repo lifecycle', () => {
 
     const opening = useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))
     await vi.waitFor(() => expect(calls.workspaceRepos).toEqual([remoteWorkspaceSessionEntry(target!)]))
-    await expect(useReposStore.getState().closeRepo(target!.id)).resolves.toEqual({ ok: true })
+    await expect(useReposStore.getState().closeWorkspace(target!.id)).resolves.toEqual({ ok: true })
     lifecycle.resolve({
       kind: 'settled',
       repoId: target!.id,
@@ -384,7 +384,7 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().repos[target!.id]).toBeUndefined()
   })
 
-  test('retryRemoteRepoConnection returns a failure when the command transport fails', async () => {
+  test('retryRemoteWorkspaceConnection returns a failure when the command transport fails', async () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
       host: 'example.com',
@@ -400,7 +400,7 @@ describe('repo lifecycle', () => {
     })
     await useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))
 
-    await expect(useReposStore.getState().retryRemoteRepoConnection(target!.id)).resolves.toEqual({
+    await expect(useReposStore.getState().retryRemoteWorkspaceConnection(target!.id)).resolves.toEqual({
       ok: false,
       reason: 'unknown',
     })
@@ -435,7 +435,7 @@ describe('repo lifecycle', () => {
 
     const result = await useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))
 
-    expect(result).toMatchObject({ ok: true, id: target!.id })
+    expect(result).toMatchObject({ ok: true, workspaceId: target!.id })
     expect(useReposStore.getState().repos[target!.id]?.name).toBe('example:repo')
     await vi.waitFor(() => {
       const repo = useReposStore.getState().repos[target!.id]
@@ -474,7 +474,7 @@ describe('repo lifecycle', () => {
     })
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(oldTarget!))
-    expect(first).toMatchObject({ ok: true, id: oldTarget!.id })
+    expect(first).toMatchObject({ ok: true, workspaceId: oldTarget!.id })
     expect(useReposStore.getState().repos[oldTarget!.id]?.remote.lifecycle).toEqual({
       kind: 'ready',
       target: oldTarget,
@@ -488,7 +488,7 @@ describe('repo lifecycle', () => {
       'remote.resolveTarget': () => ({ target: newTarget }),
     })
     const second = await useReposStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(newTarget!))
-    expect(second).toMatchObject({ ok: true, id: newTarget!.id })
+    expect(second).toMatchObject({ ok: true, workspaceId: newTarget!.id })
     expect(useReposStore.getState().repos[newTarget!.id]?.remote.lifecycle).toEqual({
       kind: 'ready',
       target: newTarget,
@@ -498,7 +498,7 @@ describe('repo lifecycle', () => {
     })
   })
 
-  test('closeRepo clears recorded tab openers scoped to that repo, but leaves other repos untouched', async () => {
+  test('closeWorkspace clears recorded tab openers scoped to that repo, but leaves other repos untouched', async () => {
     // seedRepoWithReadModelForTest replaces the whole `repos` map, so seed both repos
     // before merging them back together into one multi-repo store state.
     const repoA = seedRepoWithReadModelForTest({
@@ -531,7 +531,7 @@ describe('repo lifecycle', () => {
         'workspace-pane:status',
       )
 
-    await useReposStore.getState().closeRepo(REPO_A)
+    await useReposStore.getState().closeWorkspace(REPO_A)
 
     const openers = useReposStore.getState().tabOpenerIdentityByScope
     expect(
@@ -544,7 +544,7 @@ describe('repo lifecycle', () => {
     ).toBe('workspace-pane:status')
   })
 
-  test('closeRepo clears workspace navigation history scoped to that repo', async () => {
+  test('closeWorkspace clears workspace navigation history scoped to that repo', async () => {
     const repoA = seedRepoWithReadModelForTest({
       id: REPO_A,
       branches: [createRepoBranch('feature/a')],
@@ -566,7 +566,7 @@ describe('repo lifecycle', () => {
       route: { kind: 'newWorktree', returnTo: '/repo/repo-b/dashboard' },
     })
 
-    await useReposStore.getState().closeRepo(REPO_A)
+    await useReposStore.getState().closeWorkspace(REPO_A)
 
     const history = useReposStore.getState().navigationHistoryByRepo
     expect(history[REPO_A]).toBeUndefined()

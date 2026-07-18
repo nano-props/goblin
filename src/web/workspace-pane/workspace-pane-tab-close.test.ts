@@ -398,9 +398,9 @@ test('does not let a late close from an old runtime navigate or clear the replac
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
   seedInitialObservedWorkspacePaneRouteForTest()
   const navigation: PrimaryWindowNavigationActions = {
-    activateRepo: vi.fn(),
-    closeRepo: vi.fn(),
-    cycleRepo: vi.fn(),
+    activateWorkspace: vi.fn(),
+    closeWorkspace: vi.fn(),
+    cycleWorkspace: vi.fn(),
     selectRepoBranch: vi.fn(() => true),
     showRepoBranchEmptyWorkspacePane: vi.fn(() => true),
     showRepoBranchWorkspacePaneTab: vi.fn(() => true),

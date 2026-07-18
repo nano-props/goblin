@@ -169,7 +169,7 @@ describe('workspace pane destination navigation', () => {
     })
     await Promise.resolve()
 
-    primaryNavigationActions().actions.activateRepo('/tmp/another-repo')
+    primaryNavigationActions().actions.activateWorkspace('/tmp/another-repo')
     routeCommit.resolve(true)
 
     await expect(committed).resolves.toEqual({ kind: 'superseded' })
@@ -233,9 +233,9 @@ function primaryNavigationActions() {
   return {
     routeNavigation,
     actions: createPrimaryWindowNavigationActions({
-      currentRepoId: REPO_ID,
+      currentWorkspaceId: REPO_ID,
       order: [REPO_ID],
-      closeRepo: vi.fn(),
+      closeWorkspace: vi.fn(),
       peekWorkspaceNavigation: store.peekWorkspaceNavigation,
       commitWorkspaceNavigation: store.commitWorkspaceNavigation,
       routeNavigation: routeNavigation as unknown as PrimaryWindowRouteNavigation,

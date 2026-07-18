@@ -12,15 +12,15 @@ import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/share
 
 type ClientWorkspaceIntent = Extract<
   ClientEffectIntent,
-  | { type: 'open-repo-requested' }
-  | { type: 'open-repo-path-requested' }
+  | { type: 'open-workspace-requested' }
+  | { type: 'open-workspace-path-requested' }
   | { type: 'open-remote-workspace-requested' }
   | { type: 'clone-repo-requested' }
   | { type: 'create-worktree-requested' }
   | { type: 'terminal-new-tab-requested' }
   | { type: 'workspace-pane-close-tab-or-window-requested' }
-  | { type: 'close-repo-requested' }
-  | { type: 'cycle-repo-requested' }
+  | { type: 'close-workspace-requested' }
+  | { type: 'cycle-workspace-requested' }
   | { type: 'repo-refresh-requested' }
   | { type: 'show-workspace-pane-tab-requested' }
   | { type: 'terminal-primary-action-requested' }
@@ -51,20 +51,20 @@ export type AppLevelIntentPlan =
   | { kind: 'set-theme-pref'; pref: ThemePref }
   | { kind: 'set-lang-pref'; pref: LangPref }
   | { kind: 'clear-recent-workspaces' }
-  | { kind: 'ensure-recent-repo-open'; entry: WorkspaceSessionEntry }
+  | { kind: 'ensure-recent-workspace-open'; entry: WorkspaceSessionEntry }
 
 export type WorkspaceIntentPlan =
   | { kind: 'noop' }
-  | { kind: 'open-repo' }
-  | { kind: 'open-repo-path' }
+  | { kind: 'open-workspace' }
+  | { kind: 'open-workspace-path' }
   | { kind: 'open-clone-repo' }
   | { kind: 'open-remote-workspace' }
   | { kind: 'create-worktree' }
   | { kind: 'new-terminal-tab'; repoId: string; target: WorkspacePaneCommandTarget }
   | { kind: 'close-workspace-pane-tab-or-window'; repoId: string; target: WorkspacePaneCommandTarget }
-  | { kind: 'close-repo'; repoId: string }
+  | { kind: 'close-workspace'; workspaceId: string }
   | { kind: 'close-window' }
-  | { kind: 'cycle-repo'; direction: 1 | -1 }
+  | { kind: 'cycle-workspace'; direction: 1 | -1 }
   | { kind: 'refresh-repo'; repoId: string; repoRuntimeId: string }
   | { kind: 'show-workspace-pane-tab'; repoId: string; target: WorkspacePaneCommandTarget; tab: WorkspacePaneTabType }
   | { kind: 'terminal-primary-action'; repoId: string; target: WorkspacePaneCommandTarget }
@@ -80,7 +80,7 @@ interface WorkspaceIntentPlanContext {
   overlayBlocked: boolean
   workspaceShortcutSuppressed: boolean
   terminalFocused: boolean
-  currentRepoId: string | null
+  currentWorkspaceId: string | null
   currentRepo: Pick<RepoState, 'id' | 'repoRuntimeId' | 'workspaceProbe'> | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
 }
@@ -134,8 +134,8 @@ export function createAppLevelIntentPlan(
       return { kind: 'set-lang-pref', pref: event.pref }
     case 'clear-recent-workspaces-requested':
       return context.overlayBlocked ? { kind: 'noop' } : { kind: 'clear-recent-workspaces' }
-    case 'open-recent-repo-requested':
-      return context.overlayBlocked ? { kind: 'noop' } : { kind: 'ensure-recent-repo-open', entry: event.entry }
+    case 'open-recent-workspace-requested':
+      return context.overlayBlocked ? { kind: 'noop' } : { kind: 'ensure-recent-workspace-open', entry: event.entry }
   }
   return null
 }
@@ -146,26 +146,26 @@ export function createWorkspaceIntentPlan(
 ): WorkspaceIntentPlan | null {
   if (!isClientWorkspaceIntent(event)) return null
   if (event.type === 'workspace-pane-close-tab-or-window-requested') {
-    if (!context.currentRepoId || !context.currentWorkspacePaneCommandTarget) return { kind: 'close-window' }
+    if (!context.currentWorkspaceId || !context.currentWorkspacePaneCommandTarget) return { kind: 'close-window' }
     if (context.overlayBlocked || context.workspaceShortcutSuppressed) return { kind: 'noop' }
     return {
       kind: 'close-workspace-pane-tab-or-window',
-      repoId: context.currentRepoId,
+      repoId: context.currentWorkspaceId,
       target: context.currentWorkspacePaneCommandTarget,
     }
   }
   if (context.overlayBlocked) return { kind: 'noop' }
   switch (event.type) {
-    case 'open-repo-requested':
-      return { kind: 'open-repo' }
-    case 'open-repo-path-requested':
-      return { kind: 'open-repo-path' }
+    case 'open-workspace-requested':
+      return { kind: 'open-workspace' }
+    case 'open-workspace-path-requested':
+      return { kind: 'open-workspace-path' }
     case 'clone-repo-requested':
       return { kind: 'open-clone-repo' }
     case 'create-worktree-requested':
       if (
         context.workspaceShortcutSuppressed ||
-        !context.currentRepoId ||
+        !context.currentWorkspaceId ||
         !workspaceWorktreesAvailable(context.currentRepo?.workspaceProbe)
       )
         return { kind: 'noop' }
@@ -174,49 +174,51 @@ export function createWorkspaceIntentPlan(
       return { kind: 'open-remote-workspace' }
     case 'terminal-new-tab-requested':
       if (
-        !context.currentRepoId ||
+        !context.currentWorkspaceId ||
         !context.currentWorkspacePaneCommandTarget ||
         !workspaceTerminalAvailable(context.currentRepo?.workspaceProbe)
       )
         return { kind: 'noop' }
       return {
         kind: 'new-terminal-tab',
-        repoId: context.currentRepoId,
+        repoId: context.currentWorkspaceId,
         target: context.currentWorkspacePaneCommandTarget,
       }
-    case 'close-repo-requested':
+    case 'close-workspace-requested':
       if (context.workspaceShortcutSuppressed) return { kind: 'noop' }
-      return context.currentRepoId ? { kind: 'close-repo', repoId: context.currentRepoId } : { kind: 'close-window' }
-    case 'cycle-repo-requested':
-      return context.workspaceShortcutSuppressed ? { kind: 'noop' } : { kind: 'cycle-repo', direction: event.direction }
+      return context.currentWorkspaceId
+        ? { kind: 'close-workspace', workspaceId: context.currentWorkspaceId }
+        : { kind: 'close-window' }
+    case 'cycle-workspace-requested':
+      return context.workspaceShortcutSuppressed ? { kind: 'noop' } : { kind: 'cycle-workspace', direction: event.direction }
     case 'repo-refresh-requested':
       if (context.workspaceShortcutSuppressed || context.terminalFocused || !context.currentRepo)
         return { kind: 'noop' }
       return { kind: 'refresh-repo', repoId: context.currentRepo.id, repoRuntimeId: context.currentRepo.repoRuntimeId }
     case 'show-workspace-pane-tab-requested':
-      if (context.workspaceShortcutSuppressed || !context.currentRepoId || !context.currentWorkspacePaneCommandTarget)
+      if (context.workspaceShortcutSuppressed || !context.currentWorkspaceId || !context.currentWorkspacePaneCommandTarget)
         return { kind: 'noop' }
       return {
         kind: 'show-workspace-pane-tab',
-        repoId: context.currentRepoId,
+        repoId: context.currentWorkspaceId,
         target: context.currentWorkspacePaneCommandTarget,
         tab: event.tab,
       }
     case 'terminal-primary-action-requested':
       if (
         context.workspaceShortcutSuppressed ||
-        !context.currentRepoId ||
+        !context.currentWorkspaceId ||
         !context.currentWorkspacePaneCommandTarget ||
         !workspaceTerminalAvailable(context.currentRepo?.workspaceProbe)
       )
         return { kind: 'noop' }
       return {
         kind: 'terminal-primary-action',
-        repoId: context.currentRepoId,
+        repoId: context.currentWorkspaceId,
         target: context.currentWorkspacePaneCommandTarget,
       }
     case 'workspace-zen-mode-toggle-requested':
-      if (context.workspaceShortcutSuppressed || context.terminalFocused || !context.currentRepoId)
+      if (context.workspaceShortcutSuppressed || context.terminalFocused || !context.currentWorkspaceId)
         return { kind: 'noop' }
       return { kind: 'toggle-zen-mode' }
   }
@@ -233,15 +235,15 @@ export function createExternalOpenDrainKickPlan(context: {
 
 function isClientWorkspaceIntent(event: ClientEffectIntent): event is ClientWorkspaceIntent {
   return (
-    event.type === 'open-repo-requested' ||
-    event.type === 'open-repo-path-requested' ||
+    event.type === 'open-workspace-requested' ||
+    event.type === 'open-workspace-path-requested' ||
     event.type === 'open-remote-workspace-requested' ||
     event.type === 'clone-repo-requested' ||
     event.type === 'create-worktree-requested' ||
     event.type === 'terminal-new-tab-requested' ||
     event.type === 'workspace-pane-close-tab-or-window-requested' ||
-    event.type === 'close-repo-requested' ||
-    event.type === 'cycle-repo-requested' ||
+    event.type === 'close-workspace-requested' ||
+    event.type === 'cycle-workspace-requested' ||
     event.type === 'repo-refresh-requested' ||
     event.type === 'show-workspace-pane-tab-requested' ||
     event.type === 'terminal-primary-action-requested' ||

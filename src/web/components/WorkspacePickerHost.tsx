@@ -9,7 +9,7 @@ import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePick
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePickerItem, WorkspacePickerSurface } from '#/web/components/workspace-picker/types.ts'
-import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
+import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
 import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { workspacePickerStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
 import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
@@ -19,7 +19,7 @@ import { toast } from 'sonner'
 
 interface WorkspacePickerHostProps {
   currentWorkspaceId: string | null
-  onOpenRepoPathDialog: () => void
+  onOpenWorkspacePathDialog: () => void
   onOpenRemote: () => void
   onClone: () => void
   surface?: WorkspacePickerSurface
@@ -27,7 +27,7 @@ interface WorkspacePickerHostProps {
 
 export function WorkspacePickerHost({
   currentWorkspaceId,
-  onOpenRepoPathDialog,
+  onOpenWorkspacePathDialog,
   onOpenRemote,
   onClone,
   surface = 'toolbar',
@@ -77,16 +77,16 @@ export function WorkspacePickerHost({
   const { ensureWorkspaceOpen } = useReposStore(useShallow(workspacePickerStoreActionsFromStore))
 
   async function handleOpenLocal() {
-    await openRepoFromDialog({
+    await openWorkspaceFromDialog({
       ensureWorkspaceOpen,
-      activateRepo: navigation.activateRepo,
-      openRepoPathDialog: onOpenRepoPathDialog,
+      activateWorkspace: navigation.activateWorkspace,
+      openWorkspacePathDialog: onOpenWorkspacePathDialog,
       t,
     })
   }
 
   async function handleClose(workspaceId: string) {
-    const result = await navigation.closeRepo(workspaceId)
+    const result = await navigation.closeWorkspace(workspaceId)
     if (!result.ok) toast.error(t(result.message))
   }
 
@@ -107,7 +107,7 @@ export function WorkspacePickerHost({
         cloneShortcut: shortcutsDisabled ? null : '⌘⇧O',
         unavailable: t('repo-unavailable.title'),
       }}
-      onActivate={navigation.activateRepo}
+      onActivate={navigation.activateWorkspace}
       onClose={(workspaceId) => void handleClose(workspaceId)}
       onOpenLocal={handleOpenLocal}
       onOpenRemote={onOpenRemote}

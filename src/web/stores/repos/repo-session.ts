@@ -7,7 +7,7 @@ import {
 import type { RepoWorkspaceHydrationOptions, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 import {
   addResolvedRepo,
-  createRuntimeRepoSessionActions,
+  createWorkspaceSessionActions,
   refreshInitialRepoState,
 } from '#/web/stores/repos/repo-session-write-paths.ts'
 import { restoredRepoIdAfterWorkspaceHydration } from '#/web/open-workspace-state.ts'
@@ -217,7 +217,7 @@ function applyRestoredPreferredWorkspacePaneTabs(
 
 export function createRepoSessionActions(set: ReposSet, get: ReposGet) {
   return {
-    ...createRuntimeRepoSessionActions(set, get),
+    ...createWorkspaceSessionActions(set, get),
     ...createRestorableWorkspaceLifecycleActions(set, get),
   }
 }

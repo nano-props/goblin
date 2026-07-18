@@ -4,7 +4,7 @@ import { pathForDroppedFile } from '#/web/app-shell-client.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
-import { openRepoPaths } from '#/web/lib/open-repo-paths.ts'
+import { openWorkspacePaths } from '#/web/lib/open-workspace-paths.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 interface Options {
   /** True when an overlay (Settings/Help) is up. While blocked, the
@@ -23,7 +23,7 @@ function isDropBlocked(blocked: boolean): boolean {
   return blocked || isShortcutBlockingLayerOpen()
 }
 
-export function useRepoDrop({ blocked }: Options) {
+export function useWorkspaceDrop({ blocked }: Options) {
   const ensureWorkspaceOpen = useReposStore((s) => s.ensureWorkspaceOpen)
   const navigation = usePrimaryWindowNavigation()
   const t = useT()
@@ -79,9 +79,9 @@ export function useRepoDrop({ blocked }: Options) {
       .filter((path) => path.length > 0)
     if (paths.length === 0) return
     void (async () => {
-      await openRepoPaths(paths, {
+      await openWorkspacePaths(paths, {
         ensureWorkspaceOpen,
-        activateRepo: navigation.activateRepo,
+        activateWorkspace: navigation.activateWorkspace,
         onOpenFailed: (_path, message) => {
           toast.error(tRef.current('drop.open-failed'), {
             description: tRef.current(message),

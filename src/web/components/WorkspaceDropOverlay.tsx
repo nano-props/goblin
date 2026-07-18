@@ -1,10 +1,10 @@
 import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
-interface RepoDropOverlayProps {
+interface WorkspaceDropOverlayProps {
   active: boolean
 }
 
-export function RepoDropOverlay({ active }: RepoDropOverlayProps) {
+export function WorkspaceDropOverlay({ active }: WorkspaceDropOverlayProps) {
   const t = useT()
   return (
     <div

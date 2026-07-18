@@ -163,7 +163,7 @@ describe('repo runtime membership recovery', () => {
     const opening = useReposStore.getState().ensureWorkspaceOpen(REPO_ROOT)
     const recovery = reconcileOpenRepoRuntimeMemberships(useReposStore.setState, useReposStore.getState)
 
-    await expect(opening).resolves.toMatchObject({ ok: true, id: REPO_ROOT })
+    await expect(opening).resolves.toMatchObject({ ok: true, workspaceId: REPO_ROOT })
     await expect(recovery).resolves.toMatchObject({ kind: 'settled' })
     expect(reconcile).toHaveBeenCalledWith(expect.objectContaining({ repoRoots: [REPO_ROOT] }))
   })

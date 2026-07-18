@@ -123,7 +123,7 @@ describe('app menu actions', () => {
     await Promise.resolve()
 
     expect(mocks.activatePrimaryWindow).toHaveBeenCalledTimes(1)
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-requested' })
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-workspace-requested' })
   })
 
   test('reuses an existing primary window for menu actions', async () => {
@@ -135,7 +135,7 @@ describe('app menu actions', () => {
     await Promise.resolve()
 
     expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-requested' })
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-workspace-requested' })
   })
 
   test('ignores close commands when no window exists', async () => {
@@ -143,7 +143,7 @@ describe('app menu actions', () => {
     buildAppMenu()
 
     clickMenuItem('menu.file', 'menu.file.close-workspace-tab-or-window')
-    clickMenuItem('menu.file', 'menu.file.close-tab')
+    clickMenuItem('menu.file', 'menu.file.close-workspace')
     await Promise.resolve()
 
     expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
@@ -172,7 +172,7 @@ describe('app menu actions', () => {
     clickMenuItem('menu.file', 'menu.file.open-local-workspace-path')
     await Promise.resolve()
 
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-path-requested' })
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-workspace-path-requested' })
   })
 
   test('tildifies Windows home paths in the recent repos menu', async () => {
@@ -303,7 +303,7 @@ describe('app menu actions', () => {
     const closeWorkspaceTabItem = fileMenu?.submenu?.find(
       (entry: any) => entry.label === 'menu.file.close-workspace-tab-or-window',
     )
-    const closeViewItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-tab')
+    const closeViewItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-workspace')
     const closeWindowItem = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.close-window')
     expect(newTerminalItem?.accelerator).toBe('CmdOrCtrl+T')
     expect(createWorktreeItem?.accelerator).toBe('CmdOrCtrl+N')

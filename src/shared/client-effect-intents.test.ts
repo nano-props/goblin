@@ -13,8 +13,8 @@ describe('isClientEffectIntent', () => {
   })
 
   test('validates payload-bearing intent variants', () => {
-    expect(isClientEffectIntent({ type: 'cycle-repo-requested', direction: 1 })).toBe(true)
-    expect(isClientEffectIntent({ type: 'cycle-repo-requested', direction: 0 })).toBe(false)
+    expect(isClientEffectIntent({ type: 'cycle-workspace-requested', direction: 1 })).toBe(true)
+    expect(isClientEffectIntent({ type: 'cycle-workspace-requested', direction: 0 })).toBe(false)
     expect(isClientEffectIntent({ type: 'open-settings-requested', page: 'about' })).toBe(true)
     expect(isClientEffectIntent({ type: 'open-settings-requested', page: 'missing' })).toBe(false)
     expect(isClientEffectIntent({ type: 'theme-pref-set-requested', pref: 'dark' })).toBe(true)
@@ -43,13 +43,13 @@ describe('isClientEffectIntent', () => {
   test('accepts only valid recent repo entries', () => {
     expect(
       isClientEffectIntent({
-        type: 'open-recent-repo-requested',
+        type: 'open-recent-workspace-requested',
         entry: { kind: 'local', id: 'goblin+file:///tmp/repo' },
       }),
     ).toBe(true)
-    expect(isClientEffectIntent({ type: 'open-recent-repo-requested', entry: { kind: 'local', id: '' } })).toBe(false)
+    expect(isClientEffectIntent({ type: 'open-recent-workspace-requested', entry: { kind: 'local', id: '' } })).toBe(false)
     expect(
-      isClientEffectIntent({ type: 'open-recent-repo-requested', entry: { kind: 'remote', id: 'remote:repo' } }),
+      isClientEffectIntent({ type: 'open-recent-workspace-requested', entry: { kind: 'remote', id: 'remote:repo' } }),
     ).toBe(false)
   })
 })

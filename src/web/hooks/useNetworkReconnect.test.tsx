@@ -6,17 +6,21 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { normalizeRemoteTarget, type RemoteRepoConnectionLifecycle } from '#/shared/remote-repo.ts'
 import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
-import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-command.ts'
+import { runRemoteWorkspaceConnection } from '#/web/stores/repos/remote-workspace-connection-command.ts'
 import { goblinLog } from '#/web/logger.ts'
 import { resetLifecycleTest } from '#/web/stores/repos/repo-session-test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 // Mock the server command adapter so the hook test doesn't depend on
 // the IPC bridge / network. Lifecycle projection behavior is covered by the
 // command and runtime-projection tests; this suite owns event submission.
-vi.mock('#/web/stores/repos/remote-repo-connection-command.ts', () => ({
-  runRemoteRepoConnection: vi.fn(async () => ({ kind: 'superseded' as const, repoId: 'remote', name: 'remote' })),
+vi.mock('#/web/stores/repos/remote-workspace-connection-command.ts', () => ({
+  runRemoteWorkspaceConnection: vi.fn(async () => ({
+    kind: 'superseded' as const,
+    workspaceId: workspaceIdForTest('goblin+file:///tmp/remote-workspace'),
+  })),
 }))
 
 beforeEach(() => {
@@ -24,13 +28,16 @@ beforeEach(() => {
   // `installGoblin({})` — the test-utils' fake `window` is
   // a plain object without `addEventListener`/`removeEventListener`,
   // which the hook needs. The hook itself doesn't go through
-  // the IPC bridge (it calls `runRemoteRepoConnection` which
+  // the IPC bridge (it calls `runRemoteWorkspaceConnection` which
   // uses the orchestrator's task), so we don't need the
   // bridge installed for this test. We only need a clean
   // store; `resetLifecycleTest` covers that.
   resetLifecycleTest()
-  vi.mocked(runRemoteRepoConnection).mockClear()
-  vi.mocked(runRemoteRepoConnection).mockResolvedValue({ kind: 'superseded', repoId: 'remote' })
+  vi.mocked(runRemoteWorkspaceConnection).mockClear()
+  vi.mocked(runRemoteWorkspaceConnection).mockResolvedValue({
+    kind: 'superseded',
+    workspaceId: workspaceIdForTest('goblin+file:///tmp/remote-workspace'),
+  })
 })
 
 function fireOnline(): void {
@@ -78,7 +85,7 @@ describe('useNetworkReconnect', () => {
 
     fireOnline()
     await flushMicrotasks(10)
-    expect(runRemoteRepoConnection).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), target.id)
+    expect(runRemoteWorkspaceConnection).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), target.id)
   })
 
   test('skips a `ready` remote repo (no re-probe on online)', async () => {
@@ -88,7 +95,7 @@ describe('useNetworkReconnect', () => {
 
     fireOnline()
     await flushMicrotasks(10)
-    expect(runRemoteRepoConnection).not.toHaveBeenCalled()
+    expect(runRemoteWorkspaceConnection).not.toHaveBeenCalled()
   })
 
   test('re-probes a `connecting` remote repo on `online` (orchestrator aborts stale run)', async () => {
@@ -99,7 +106,7 @@ describe('useNetworkReconnect', () => {
     fireOnline()
     await flushMicrotasks(10)
 
-    expect(runRemoteRepoConnection).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), target.id)
+    expect(runRemoteWorkspaceConnection).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), target.id)
   })
 
   test('skips local repos entirely', async () => {
@@ -110,7 +117,7 @@ describe('useNetworkReconnect', () => {
     await flushMicrotasks(10)
 
     // Local repos don't have a lifecycle at all. The hook
-    // must not call `runRemoteRepoConnection` for them — which
+    // must not call `runRemoteWorkspaceConnection` for them — which
     // means the repo remains untouched.
     const repo = useReposStore.getState().repos['/tmp/local-repo']
     expect(repo?.remote.lifecycle).toBeNull()
@@ -130,7 +137,7 @@ describe('useNetworkReconnect', () => {
     fireOnline()
     await flushMicrotasks(10)
 
-    expect(runRemoteRepoConnection).not.toHaveBeenCalled()
+    expect(runRemoteWorkspaceConnection).not.toHaveBeenCalled()
   })
 
   test('reads the latest repo set on each event (not a captured snapshot)', async () => {
@@ -145,15 +152,15 @@ describe('useNetworkReconnect', () => {
     fireOnline()
     await flushMicrotasks(10)
 
-    expect(runRemoteRepoConnection).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), target.id)
+    expect(runRemoteWorkspaceConnection).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), target.id)
   })
 
   test('owns transport failures from the fire-and-forget online event', async () => {
     const target = remoteTargetFixture()
     const warn = vi.spyOn(goblinLog, 'warn').mockImplementation(() => undefined)
-    vi.mocked(runRemoteRepoConnection).mockResolvedValueOnce({
+    vi.mocked(runRemoteWorkspaceConnection).mockResolvedValueOnce({
       kind: 'transport-failed',
-      repoId: target.id,
+      workspaceId: workspaceIdForTest(target.id),
       reason: 'unknown',
     })
     seedRepo(target.id, { kind: 'failed', reason: 'unreachable' })

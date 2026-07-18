@@ -272,7 +272,7 @@ describe('settings routes', () => {
     expect(mocks.restoreServerWorkspace).not.toHaveBeenCalled()
   })
 
-  test('delegates recent-repo writes to the settings command handler layer', async () => {
+  test('delegates recent-workspace writes to the settings command handler layer', async () => {
     const repo = { kind: 'local', id: 'goblin+file:///tmp/repo-a' } as const
     mocks.handleAddRecentWorkspace.mockResolvedValue({ ok: true, recentWorkspaces: [repo], addedRepo: repo })
     mocks.handleClearRecentWorkspaces.mockResolvedValue({ ok: true })

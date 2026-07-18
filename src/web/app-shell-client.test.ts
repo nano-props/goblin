@@ -122,7 +122,7 @@ describe('app shell client', () => {
     expect(window.open).not.toHaveBeenCalled()
   })
 
-  test('chooses repository paths through the client bridge host', async () => {
+  test('chooses workspace paths through the client bridge host', async () => {
     const bridgeModule = await import('#/web/client-bridge.ts')
     const openDirectoryDialog = vi.fn(async (input?: { title?: string }) =>
       input?.title === 'Open Workspace' ? '/tmp/repo' : '/tmp',

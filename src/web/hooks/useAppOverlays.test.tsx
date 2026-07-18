@@ -15,14 +15,14 @@ function Harness() {
       <button id="open-clone" type="button" onClick={overlays.openCloneRepo}>
         open clone
       </button>
-      <button id="open-repo" type="button" onClick={overlays.openRepoPathDialog}>
+      <button id="open-workspace" type="button" onClick={overlays.openWorkspacePathDialog}>
         open repo
       </button>
       <button id="close-all" type="button" onClick={overlays.closeAllOverlays}>
         close all
       </button>
       <output id="clone-open">{overlays.state.clone.open ? 'open' : 'closed'}</output>
-      <output id="open-repo-open">{overlays.state.openRepo.open ? 'open' : 'closed'}</output>
+      <output id="open-workspace-open">{overlays.state.openWorkspace.open ? 'open' : 'closed'}</output>
       <output id="any-open">{overlays.anyOpen ? 'open' : 'closed'}</output>
     </>
   )
@@ -40,14 +40,14 @@ function RoutedHarness() {
       <button id="open-clone" type="button" onClick={overlays.openCloneRepo}>
         open clone
       </button>
-      <button id="open-repo" type="button" onClick={overlays.openRepoPathDialog}>
+      <button id="open-workspace" type="button" onClick={overlays.openWorkspacePathDialog}>
         open repo
       </button>
       <button id="close-all" type="button" onClick={overlays.closeAllOverlays}>
         close all
       </button>
       <output id="clone-open">{overlays.state.clone.open ? 'open' : 'closed'}</output>
-      <output id="open-repo-open">{overlays.state.openRepo.open ? 'open' : 'closed'}</output>
+      <output id="open-workspace-open">{overlays.state.openWorkspace.open ? 'open' : 'closed'}</output>
       <output id="any-open">{overlays.anyOpen ? 'open' : 'closed'}</output>
     </>
   )
@@ -62,14 +62,14 @@ describe('useAppOverlays', () => {
     const { container } = renderInJsdom(<Harness />)
 
     click(container, '#open-clone')
-    click(container, '#open-repo')
+    click(container, '#open-workspace')
     expect(text(container, '#clone-open')).toBe('open')
-    expect(text(container, '#open-repo-open')).toBe('open')
+    expect(text(container, '#open-workspace-open')).toBe('open')
     expect(text(container, '#any-open')).toBe('open')
 
     click(container, '#close-all')
     expect(text(container, '#clone-open')).toBe('closed')
-    expect(text(container, '#open-repo-open')).toBe('closed')
+    expect(text(container, '#open-workspace-open')).toBe('closed')
     expect(text(container, '#any-open')).toBe('closed')
   })
 
@@ -78,16 +78,16 @@ describe('useAppOverlays', () => {
 
     click(container, '#open-clone')
     expect(text(container, '#clone-open')).toBe('open')
-    expect(text(container, '#open-repo-open')).toBe('closed')
+    expect(text(container, '#open-workspace-open')).toBe('closed')
     expect(text(container, '#any-open')).toBe('open')
 
-    click(container, '#open-repo')
+    click(container, '#open-workspace')
     expect(text(container, '#clone-open')).toBe('closed')
-    expect(text(container, '#open-repo-open')).toBe('open')
+    expect(text(container, '#open-workspace-open')).toBe('open')
 
     click(container, '#close-all')
     expect(text(container, '#clone-open')).toBe('closed')
-    expect(text(container, '#open-repo-open')).toBe('closed')
+    expect(text(container, '#open-workspace-open')).toBe('closed')
     expect(text(container, '#any-open')).toBe('closed')
   })
 })

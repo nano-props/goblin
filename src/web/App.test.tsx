@@ -70,8 +70,8 @@ function render(element: React.ReactNode) {
   return renderInJsdom(
     <LayoutOverlayActions
       value={{
-        openRepoPathDialog: vi.fn(),
-        openRemoteRepo: vi.fn(),
+        openWorkspacePathDialog: vi.fn(),
+        openRemoteWorkspace: vi.fn(),
         openCloneRepo: vi.fn(),
         openCreateWorktree: vi.fn(),
       }}

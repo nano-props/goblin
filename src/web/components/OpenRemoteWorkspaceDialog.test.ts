@@ -5,9 +5,9 @@ import {
   formatRemoteDialogError,
   remoteDiagnosticsAllowWorkspaceOpen,
   remotePathError,
-} from '#/web/components/OpenRemoteRepositoryDialog.tsx'
+} from '#/web/components/OpenRemoteWorkspaceDialog.tsx'
 
-describe('OpenRemoteRepositoryDialog helpers', () => {
+describe('OpenRemoteWorkspaceDialog helpers', () => {
   test('builds config-only remote inputs', () => {
     expect(buildRemoteConnectionInput('prod', '/srv/repo')).toEqual({ alias: 'prod', remotePath: '/srv/repo' })
     expect(buildRemoteConnectionInput('prod', '~/repo')).toEqual({ alias: 'prod', remotePath: '~/repo' })

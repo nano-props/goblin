@@ -41,7 +41,7 @@ export const ja: Record<DictKey, string> = {
   'menu.file.open-data-folder.win': 'エクスプローラーでデータフォルダを開く',
   'menu.file.close-window': 'ウィンドウを閉じる',
   'menu.file.close-workspace-tab-or-window': 'ワークスペースタブまたはウィンドウを閉じる',
-  'menu.file.close-tab': 'リポジトリを閉じる',
+  'menu.file.close-workspace': 'ワークスペースを閉じる',
   'menu.file.settings': '設定…',
   'menu.file.quit': '終了',
 
@@ -66,8 +66,8 @@ export const ja: Record<DictKey, string> = {
   'menu.view.toggle-dev-tools': '開発者ツールを切替',
 
   // ---- Menu — Window (goblin-specific) --------------------------------------
-  'menu.window.next-repo': '次のリポジトリ',
-  'menu.window.prev-repo': '前のリポジトリ',
+  'menu.window.next-workspace': '次のワークスペース',
+  'menu.window.prev-workspace': '前のワークスペース',
   'menu.window.reset-window': 'ウィンドウをリセット',
 
   // ---- Menu — Help -------------------------------------------------------
@@ -726,8 +726,8 @@ export const ja: Record<DictKey, string> = {
   'help.section.app': 'アプリ',
   'help.row.next-branch': '次のブランチ / コミット',
   'help.row.prev-branch': '前のブランチ / コミット',
-  'help.row.next-repo': '次のリポジトリ',
-  'help.row.prev-repo': '前のリポジトリ',
+  'help.row.next-workspace': '次のワークスペース',
+  'help.row.prev-workspace': '前のワークスペース',
   'help.row.view-status': 'ステータス',
   'help.row.view-changes': '変更',
   'help.row.view-log': 'ログ',
@@ -739,7 +739,7 @@ export const ja: Record<DictKey, string> = {
   'help.row.open-local-workspace': 'ワークスペースを開く',
   'help.row.clone-repo': 'リポジトリをクローン',
   'help.row.activate-window': 'Goblin ウィンドウを表示',
-  'help.row.close-repo': '現在のリポジトリを閉じる',
+  'help.row.close-workspace': '現在のワークスペースを閉じる',
   'help.row.close-workspace-tab-or-window': 'ワークスペースタブまたはウィンドウを閉じる',
   'help.row.close-window': 'ウィンドウを閉じる',
   'help.row.refresh': 'リポジトリを同期',
