@@ -13,9 +13,9 @@ import {
   workspaceSessionEntryId,
   sameWorkspaceSessionEntry,
   type RemoteWorkspaceSessionEntry,
-  type RemoteRepoTarget,
+  type RemoteWorkspaceTarget,
   type WorkspaceSessionEntry,
-} from '#/shared/remote-repo.ts'
+} from '#/shared/remote-workspace.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { readRepoProjection } from '#/server/modules/repo-read-paths.ts'
 import {
@@ -30,7 +30,7 @@ import { probeWorkspace } from '#/server/modules/workspace-probe.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 import { parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
+import { runRemoteWorkspaceLifecycleWrite } from '#/server/modules/remote-workspace-lifecycle-write-paths.ts'
 import { compareAndReplaceServerWorkspaceRepos, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
@@ -289,10 +289,10 @@ async function openRemoteWorkspace(
 ): Promise<OpenWorkspaceRepoResult> {
   return await withAcquiredWorkspaceRuntimeLease(input, entry.id, async (lease) => {
     const lifecycle = await abortableWorkspaceRestore(
-      runRemoteLifecycleWrite(
+      runRemoteWorkspaceLifecycleWrite(
         {
           userId: input.userId,
-          repoId: entry.id,
+          workspaceId: entry.id,
           workspaceRuntimeId: lease.workspaceRuntimeId,
           mode: 'ensure',
         },
@@ -420,7 +420,7 @@ interface OpenedWorkspaceRuntimeInput {
   entry: WorkspaceSessionEntry
   workspaceId: WorkspaceId
   name: string
-  target?: RemoteRepoTarget
+  target?: RemoteWorkspaceTarget
   workspaceProbe: WorkspaceProbeState
   lease: WorkspaceRuntimeMembershipLeaseEntry
 }

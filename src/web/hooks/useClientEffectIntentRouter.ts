@@ -13,7 +13,7 @@ import {
   handleWorkspaceClientIntent,
 } from '#/web/hooks/client-effect-intent-handlers.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { clientEffectIntentStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'

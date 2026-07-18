@@ -9,14 +9,14 @@ import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { getRemoteSshHosts, resolveRemoteRepositoryTarget, testRemoteRepoConnection } from '#/web/remote-client.ts'
+import { getRemoteSshHosts, resolveRemoteWorkspaceTarget, testRemoteWorkspaceConnection } from '#/web/remote-workspace-client.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { RemoteDiagnosticsPanel } from '#/web/components/RemoteDiagnosticsPanel.tsx'
-import { isResolvableRemotePathInput, remoteWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { isResolvableRemotePathInput, remoteWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { reportOpenWorkspacePostOpenEffects } from '#/web/lib/open-workspace-result-feedback.ts'
-import type { RemoteDiagnosticsResult, RemoteRepoTarget, SshConfigHost } from '#/shared/remote-repo.ts'
+import type { RemoteDiagnosticsResult, RemoteWorkspaceTarget, SshConfigHost } from '#/shared/remote-workspace.ts'
 import { isValidSshProfile } from '#/shared/workspace-locator.ts'
 interface Props {
   open: boolean
@@ -91,10 +91,10 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
     }
   }, [hasInclude, hosts.length, open, pending])
 
-  async function resolveCurrentTarget(pathOverride?: string): Promise<RemoteRepoTarget | null> {
+  async function resolveCurrentTarget(pathOverride?: string): Promise<RemoteWorkspaceTarget | null> {
     const input = buildRemoteConnectionInput(alias, pathOverride ?? remotePath)
     if (!input) return null
-    return resolveRemoteRepositoryTarget(input)
+    return resolveRemoteWorkspaceTarget(input)
   }
 
   async function runConnectionTest(options: { requireCanSubmit?: boolean } = {}) {
@@ -104,7 +104,7 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
     try {
       const nextTarget = await resolveCurrentTarget()
       if (!nextTarget) return
-      const result = await testRemoteRepoConnection(nextTarget)
+      const result = await testRemoteWorkspaceConnection(nextTarget)
       setDiagnostics(result)
     } catch (err) {
       setActionError(formatRemoteDialogError(t, err))
@@ -129,7 +129,7 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
       }
       const needsTest = !diagnostics?.ok || diagnostics.target.id !== nextTarget.id
       if (needsTest) {
-        const result = await testRemoteRepoConnection(nextTarget)
+        const result = await testRemoteWorkspaceConnection(nextTarget)
         if (!remoteDiagnosticsAllowWorkspaceOpen(result)) {
           setDiagnostics(result)
           setLoading(false)

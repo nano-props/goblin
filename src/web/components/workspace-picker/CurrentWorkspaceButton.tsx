@@ -5,7 +5,7 @@ import type { FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.
 import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
 import { toolbarTabChromeClassName } from '#/web/components/tab-strip/tab-variants.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
@@ -166,7 +166,7 @@ function CurrentWorkspaceButtonLeading({
 
 function CurrentWorkspaceButtonIcon({ workspace, size }: { workspace: WorkspacePickerItem; size: number }) {
   const WorkspaceIcon =
-    isRemoteRepoId(workspace.id) ? Server : workspace.gitCapability === 'available' ? FolderGit2 : Folder
+    isRemoteWorkspaceId(workspace.id) ? Server : workspace.gitCapability === 'available' ? FolderGit2 : Folder
   return <WorkspaceIcon size={size} className="text-foreground" aria-hidden />
 }
 

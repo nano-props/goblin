@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
+import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 
 const mocks = vi.hoisted(() => ({
   listSshConfigHosts: vi.fn(),
@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   resolveRemoteTarget: vi.fn(),
   resolveTrackedRemoteTarget: vi.fn(),
   runRemoteCommand: vi.fn(),
-  testRemoteRepo: vi.fn(),
+  testRemoteWorkspace: vi.fn(),
 }))
 
 vi.mock('#/system/ssh/commands.ts', () => ({
@@ -17,7 +17,7 @@ vi.mock('#/system/ssh/commands.ts', () => ({
 
 vi.mock('#/system/ssh/diagnostics.ts', () => ({
   makeUnresolvedTargetDiagnostic: mocks.makeUnresolvedTargetDiagnostic,
-  testRemoteRepo: mocks.testRemoteRepo,
+  testRemoteWorkspace: mocks.testRemoteWorkspace,
 }))
 
 vi.mock('#/system/ssh/config.ts', () => ({
@@ -49,7 +49,7 @@ describe('server remote target resolution', () => {
       timedOut: false,
     })
 
-    const { resolveServerRemoteTarget } = await import('#/server/modules/remote.ts')
+    const { resolveServerRemoteTarget } = await import('#/server/modules/remote-workspace.ts')
     const result = await resolveServerRemoteTarget({ alias: 'prod', remotePath: '~/service' })
 
     expect('target' in result).toBe(true)
@@ -74,16 +74,15 @@ describe('server remote target resolution', () => {
       port: 22,
       remotePath: '/srv/workspace',
     })!
-    const { resolveServerRemoteRepoConnection } = await import('#/server/modules/remote.ts')
+    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/modules/remote-workspace.ts')
 
     await expect(
-      resolveServerRemoteRepoConnection({ repoId: target.id }, undefined, {
+      resolveServerRemoteWorkspaceConnection({ workspaceId: target.id }, undefined, {
         resolveTarget: async () => ({ target }),
         probeRemote: async () => ({ ok: false, category: 'not-a-repo' }),
       }),
     ).resolves.toEqual({
       kind: 'ready',
-      repoId: target.id,
       name: 'prod:workspace',
       gitAvailable: false,
       lifecycle: { kind: 'ready', target },
@@ -98,8 +97,8 @@ describe('server remote target resolution', () => {
       port: 22,
       remotePath: '/srv/workspace',
     })!
-    const { resolveServerRemoteRepoConnection } = await import('#/server/modules/remote.ts')
-    const result = await resolveServerRemoteRepoConnection({ repoId: target.id }, undefined, {
+    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/modules/remote-workspace.ts')
+    const result = await resolveServerRemoteWorkspaceConnection({ workspaceId: target.id }, undefined, {
       resolveTarget: async () => ({ target }),
       probeRemote: async () => ({
         ok: false,
@@ -123,8 +122,8 @@ describe('server remote target resolution', () => {
       port: 22,
       remotePath: '/missing',
     })!
-    const { resolveServerRemoteRepoConnection } = await import('#/server/modules/remote.ts')
-    const result = await resolveServerRemoteRepoConnection({ repoId: target.id }, undefined, {
+    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/modules/remote-workspace.ts')
+    const result = await resolveServerRemoteWorkspaceConnection({ workspaceId: target.id }, undefined, {
       resolveTarget: async () => ({ target }),
       probeRemote: async () => ({
         ok: false,
@@ -147,9 +146,9 @@ describe('server remote target resolution', () => {
       port: 22,
       remotePath: '/srv/repo/child',
     })!
-    const { resolveServerRemoteRepoConnection } = await import('#/server/modules/remote.ts')
+    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/modules/remote-workspace.ts')
     await expect(
-      resolveServerRemoteRepoConnection({ repoId: target.id }, undefined, {
+      resolveServerRemoteWorkspaceConnection({ workspaceId: target.id }, undefined, {
         resolveTarget: async () => ({ target }),
         probeRemote: async () => ({ ok: true, gitAtWorkspaceRoot: false }),
       }),

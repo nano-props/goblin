@@ -32,20 +32,17 @@ import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
-import {
-  isCurrentWorkspaceRuntime,
-  workspaceRuntimeHasGitCapability,
-} from '#/server/modules/workspace-runtimes.ts'
+import { isCurrentWorkspaceRuntime, workspaceRuntimeHasGitCapability } from '#/server/modules/workspace-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { IpcError, type RepoLogResponse } from '#/shared/api-types.ts'
-import { isRemoteRepoRuntimeFailure } from '#/server/modules/remote-runtime-failure.ts'
-import { settleRemoteRuntimeFailure } from '#/server/modules/remote-runtime-failure-settlement.ts'
+import { isRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import { settleRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { ServerRepoMutationHost } from '#/server/repo-mutation/repo-mutation-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { readWorkspaceDirectoryOverview } from '#/server/modules/workspace-directory-overview.ts'
 
@@ -79,8 +76,8 @@ export function createRepoRoutes(options: {
       return await run()
     } catch (err) {
       if (signal?.aborted) throw err
-      if (isRemoteRepoRuntimeFailure(err)) {
-        settleRemoteRuntimeFailure(userId, err)
+      if (isRemoteWorkspaceRuntimeFailure(err)) {
+        await settleRemoteWorkspaceRuntimeFailure(userId, err)
         serverRepoNodeLog.warn({ err, label }, 'failed')
         throw new IpcError({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
       }
@@ -258,7 +255,9 @@ export function createRepoRoutes(options: {
       assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
       assertGitCapability(userId, cwd, workspaceRuntimeId)
     }
-    return c.json(await readRepoOperationsSnapshot(cwd, { includeSettled, workspaceRuntimeId, signal: c.req.raw.signal }))
+    return c.json(
+      await readRepoOperationsSnapshot(cwd, { includeSettled, workspaceRuntimeId, signal: c.req.raw.signal }),
+    )
   })
   app.post('/fetch', async (c) => {
     const { cwd, workspaceRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)
@@ -395,32 +394,38 @@ export function createRepoRoutes(options: {
     )
   })
   app.post('/open-terminal', async (c) => {
-    const { repoId, workspaceRuntimeId, worktreePath, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openTerminal, c)
+    const { workspaceId, workspaceRuntimeId, worktreePath, app } = await parseHttpBody(
+      REPO_PROCEDURE_SCHEMAS.openTerminal,
+      c,
+    )
     const userId = userIdFromContext(c)
-    assertCurrentWorkspaceRuntimeForRead(userId, repoId, workspaceRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, workspaceId, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => openRepoTerminal(repoId, worktreePath, app, c.req.raw.signal, { workspaceRuntimeId }),
+        () => openRepoTerminal(workspaceId, worktreePath, app, c.req.raw.signal, { workspaceRuntimeId }),
         'open-terminal',
       ),
     )
   })
   app.post('/open-editor', async (c) => {
-    const { repoId, workspaceRuntimeId, worktreePath, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openEditor, c)
+    const { workspaceId, workspaceRuntimeId, worktreePath, app } = await parseHttpBody(
+      REPO_PROCEDURE_SCHEMAS.openEditor,
+      c,
+    )
     const userId = userIdFromContext(c)
-    assertCurrentWorkspaceRuntimeForRead(userId, repoId, workspaceRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, workspaceId, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => openRepoEditor(repoId, worktreePath, app, c.req.raw.signal, { workspaceRuntimeId }),
+        () => openRepoEditor(workspaceId, worktreePath, app, c.req.raw.signal, { workspaceRuntimeId }),
         'open-editor',
       ),
     )
   })
   app.post('/open-in-finder', async (c) => {
-    const { repoId, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openInFinder, c)
-    return c.json(await jsonOr(() => openRepoInFinder(repoId, worktreePath), READ_REPO_ERROR, 'open-in-finder'))
+    const { workspaceId, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openInFinder, c)
+    return c.json(await jsonOr(() => openRepoInFinder(workspaceId, worktreePath), READ_REPO_ERROR, 'open-in-finder'))
   })
   app.post('/background-sync-repos', async (c) => {
     const { repoIds } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.backgroundSyncRepos, c)

@@ -11,13 +11,13 @@ import {
   type RemoteCommandRunner,
 } from '#/system/ssh/commands.ts'
 import { resolveKnownWorktree } from '#/shared/worktree-guards.ts'
-import { isRemoteRepoId, normalizeRemoteRepoRef, parseRemoteRepoId } from '#/shared/remote-repo.ts'
+import { isRemoteWorkspaceId, normalizeRemoteWorkspaceRef, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
   isCurrentWorkspaceRuntime,
   onWorkspaceRuntimeClosed,
   type WorkspaceRuntimeClosedEvent,
 } from '#/server/modules/workspace-runtimes.ts'
-import { remoteRuntimeFailureFromCommandResult } from '#/server/modules/remote-runtime-failure.ts'
+import { remoteWorkspaceRuntimeFailureFromCommandResult } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import {
   physicalWorktreeIdentityKey,
   type PhysicalWorktreeIdentity,
@@ -282,7 +282,7 @@ export class PhysicalWorktreeIdentityResolver {
     worktreePath: string,
     signal: AbortSignal,
   ): Promise<{ identity: PhysicalWorktreeIdentity; execution: PhysicalWorktreeExecutionBinding }> {
-    const repo = parseRemoteRepoId(input.repoRoot)
+    const repo = parseRemoteWorkspaceId(input.repoRoot)
     if (!repo) throw new Error('error.invalid-worktree-identity')
     const resolved = await this.deps.resolveRemoteTarget({ alias: repo.alias, remotePath: repo.remotePath }, signal)
     this.assertEpochActive(epoch)
@@ -392,8 +392,8 @@ export class PhysicalWorktreeIdentityResolver {
   private runtimeAwareRemoteRunner(input: { repoRoot: string; workspaceRuntimeId: string }): RemoteCommandRunner {
     return async (command, target, options) => {
       const result = await this.deps.runRemoteCommand(command, target, options)
-      const runtimeFailure = remoteRuntimeFailureFromCommandResult({
-        repoRoot: input.repoRoot,
+      const runtimeFailure = remoteWorkspaceRuntimeFailureFromCommandResult({
+        workspaceId: input.repoRoot,
         workspaceRuntimeId: input.workspaceRuntimeId,
         target,
         result,
@@ -486,8 +486,8 @@ function validEndpointMarkerPart(value: string): boolean {
 }
 
 function normalizedRemoteWorktreePath(input: ResolvePhysicalWorktreeIdentityInput): string {
-  const repo = parseRemoteRepoId(input.repoRoot)
-  const worktree = repo ? normalizeRemoteRepoRef({ alias: repo.alias, remotePath: input.worktreePath }) : null
+  const repo = parseRemoteWorkspaceId(input.repoRoot)
+  const worktree = repo ? normalizeRemoteWorkspaceRef({ alias: repo.alias, remotePath: input.worktreePath }) : null
   if (!repo || !worktree) throw new Error('error.invalid-worktree-identity')
   return worktree.remotePath
 }

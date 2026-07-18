@@ -19,7 +19,7 @@ import type {
   ThemeState,
 } from '#/shared/api-types.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import {
   nativeSettingsProjectionStateFromSettings,
   pickNativeSettingsProjectionPatch,

@@ -8,8 +8,8 @@ import {
   listWorkspaceRuntimes,
   runSerializedWorkspaceRefresh,
 } from '#/server/modules/workspace-runtimes.ts'
-import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
-import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
+import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/repo')
@@ -51,7 +51,7 @@ const mocks = vi.hoisted(() => ({
   getRepositoryFileViewer: vi.fn(),
   trashRepositoryFile: vi.fn(),
   publishRepoQueryInvalidation: vi.fn(),
-  publishUserRepoQueryInvalidation: vi.fn(),
+  publishUserWorkspaceRuntimeInvalidation: vi.fn(),
 }))
 
 vi.mock('#/server/modules/background-sync.ts', () => ({
@@ -100,7 +100,7 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
 }))
 vi.mock('#/server/modules/invalidation-broker.ts', () => ({
   publishRepoQueryInvalidation: mocks.publishRepoQueryInvalidation,
-  publishUserRepoQueryInvalidation: mocks.publishUserRepoQueryInvalidation,
+  publishUserWorkspaceRuntimeInvalidation: mocks.publishUserWorkspaceRuntimeInvalidation,
 }))
 vi.mock('#/server/common/identity.ts', () => ({
   userIdFromContext: () => 'user-test',
@@ -150,9 +150,7 @@ function createTestRepoRoutes(
   })
 }
 
-async function openTestWorkspaceRuntime(
-  repoRoot = WORKSPACE_ID,
-): Promise<string> {
+async function openTestWorkspaceRuntime(repoRoot = WORKSPACE_ID): Promise<string> {
   const workspaceRuntimeId = acquireWorkspaceRuntime('user-test', repoRoot, 'client-read-test')
   commitWorkspaceProbeState({
     userId: 'user-test',
@@ -376,7 +374,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       operations: [
         {
           id: 'repo-op-1',
-          repoId: WORKSPACE_ID,
+          workspaceId: WORKSPACE_ID,
           workspaceRuntimeId: null,
           kind: 'fetch',
           phase: 'running',
@@ -480,8 +478,8 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     const repoId = workspaceIdForTest('goblin+ssh://prod/home/alice/service')
     const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
     mocks.getRepoLog.mockRejectedValueOnce(
-      new RemoteRepoRuntimeFailureError({
-        repoRoot: repoId,
+      new RemoteWorkspaceRuntimeFailureError({
+        workspaceId: repoId,
         workspaceRuntimeId,
         reason: 'unreachable',
         target: {
@@ -508,9 +506,8 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(response.status).toBe(400)
     await expect(response.json()).resolves.toMatchObject({ ok: false, message: 'error.failed-read-repo' })
     await expectRemoteRuntimeFailed(app, repoId, workspaceRuntimeId)
-    expect(mocks.publishUserRepoQueryInvalidation).toHaveBeenCalledWith('user-test', {
-      repoId,
-      query: 'remote-lifecycle',
+    expect(mocks.publishUserWorkspaceRuntimeInvalidation).toHaveBeenCalledWith('user-test', {
+      workspaceId: repoId,
     })
   })
 
@@ -570,8 +567,8 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     const repoId = workspaceIdForTest('goblin+ssh://prod/home/alice/service')
     const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
     mock.mockRejectedValueOnce(
-      new RemoteRepoRuntimeFailureError({
-        repoRoot: repoId,
+      new RemoteWorkspaceRuntimeFailureError({
+        workspaceId: repoId,
         workspaceRuntimeId,
         reason: 'unreachable',
         message: 'connection refused',
@@ -589,9 +586,8 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(response.status).toBe(400)
     await expect(response.json()).resolves.toMatchObject({ ok: false, message: 'error.failed-read-repo' })
     await expectRemoteRuntimeFailed(app, repoId, workspaceRuntimeId)
-    expect(mocks.publishUserRepoQueryInvalidation).toHaveBeenCalledWith('user-test', {
-      repoId,
-      query: 'remote-lifecycle',
+    expect(mocks.publishUserWorkspaceRuntimeInvalidation).toHaveBeenCalledWith('user-test', {
+      workspaceId: repoId,
     })
   })
 
@@ -600,8 +596,8 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     const repoId = workspaceIdForTest('goblin+ssh://prod/home/alice/service')
     const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
     mocks.pullRepoBranch.mockRejectedValueOnce(
-      new RemoteRepoRuntimeFailureError({
-        repoRoot: repoId,
+      new RemoteWorkspaceRuntimeFailureError({
+        workspaceId: repoId,
         workspaceRuntimeId,
         reason: 'unreachable',
         message: 'connection refused',
@@ -807,7 +803,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/trash-file', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, worktreePath: '/tmp/repo', path: '../secret.txt' }),
+        body: JSON.stringify({
+          cwd: WORKSPACE_ID,
+          workspaceRuntimeId,
+          worktreePath: '/tmp/repo',
+          path: '../secret.txt',
+        }),
       }),
     )
     expect(response.status).toBe(400)
@@ -836,7 +837,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-test', branch: 'main', count: 2.5 }),
+        body: JSON.stringify({
+          cwd: WORKSPACE_ID,
+          workspaceRuntimeId: 'repo-runtime-test',
+          branch: 'main',
+          count: 2.5,
+        }),
       }),
     )
     expect(response.status).toBe(400)
@@ -852,7 +858,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-test', branch: 'main', count: '50' }),
+        body: JSON.stringify({
+          cwd: WORKSPACE_ID,
+          workspaceRuntimeId: 'repo-runtime-test',
+          branch: 'main',
+          count: '50',
+        }),
       }),
     )
     expect(response.status).toBe(400)
@@ -1068,7 +1079,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          repoId: WORKSPACE_ID,
+          workspaceId: WORKSPACE_ID,
           workspaceRuntimeId,
           worktreePath: '/tmp/repo',
           app: 'ghostty',
@@ -1080,7 +1091,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          repoId: WORKSPACE_ID,
+          workspaceId: WORKSPACE_ID,
           workspaceRuntimeId,
           worktreePath: '/tmp/repo',
           app: 'vscode',
@@ -1091,7 +1102,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       new Request('http://localhost/open-in-finder', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoId: WORKSPACE_ID, worktreePath: '/tmp/repo' }),
+        body: JSON.stringify({ workspaceId: WORKSPACE_ID, worktreePath: '/tmp/repo' }),
       }),
     )
 
@@ -1117,8 +1128,8 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     const repoId = target!.id
     const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
     mocks.openRepoTerminal.mockRejectedValue(
-      new RemoteRepoRuntimeFailureError({
-        repoRoot: repoId,
+      new RemoteWorkspaceRuntimeFailureError({
+        workspaceId: repoId,
         workspaceRuntimeId,
         reason: 'unreachable',
       }),
@@ -1129,7 +1140,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          repoId,
+          workspaceId: repoId,
           workspaceRuntimeId,
           worktreePath: '/srv/repo',
           app: 'ghostty',
@@ -1148,7 +1159,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          repoId: WORKSPACE_ID,
+          workspaceId: WORKSPACE_ID,
           worktreePath: '/tmp/repo',
           app: 'not-an-editor',
         }),

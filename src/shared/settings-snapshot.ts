@@ -1,4 +1,4 @@
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
 import type {
   RuntimeRecentWorkspacesState,

@@ -10,8 +10,8 @@ import type { NativeShortcutRegistrationState } from '#/server/modules/native-sh
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import { toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
 import type { RepoSettingsState, UserSettingsUpdateResponse } from '#/shared/api-types.ts'
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
-import { workspaceSessionEntryId } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import { workspaceSessionEntryId } from '#/shared/remote-workspace.ts'
 import { settingsInvalidationScopesForPrefsPatch } from '#/shared/server-invalidation.ts'
 
 /**

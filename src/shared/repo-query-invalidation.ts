@@ -1,4 +1,4 @@
-export const REPO_QUERY_KINDS = ['repo-snapshot', 'repo-runtime', 'remote-lifecycle'] as const
+export const REPO_QUERY_KINDS = ['repo-snapshot', 'repo-runtime'] as const
 
 export type RepoQueryKind = (typeof REPO_QUERY_KINDS)[number]
 

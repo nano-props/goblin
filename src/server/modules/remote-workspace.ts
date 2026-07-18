@@ -1,23 +1,23 @@
 import { runRemoteCommand, SSH_BOOT_PROBE_TIMEOUT_MS } from '#/system/ssh/commands.ts'
-import { makeUnresolvedTargetDiagnostic, testRemoteRepo } from '#/system/ssh/diagnostics.ts'
+import { makeUnresolvedTargetDiagnostic, testRemoteWorkspace } from '#/system/ssh/diagnostics.ts'
 import {
-  parseRemoteRepoId,
-  normalizeRemoteRepoRef,
+  parseRemoteWorkspaceId,
+  normalizeRemoteWorkspaceRef,
   REMOTE_DIAGNOSTIC_CATEGORIES,
-  toRemoteRepoFailureReason,
+  toRemoteWorkspaceFailureReason,
   isHomeRelativeRemotePath,
-  isRemoteRepoId,
+  isRemoteWorkspaceId,
   isResolvableRemotePathInput,
   normalizeRemoteTarget,
   type RemoteConnectionInput,
   type RemoteDiagnosticCategory,
   type RemoteDiagnosticsResult,
   type RemotePathSuggestionsInput,
-  type RemoteRepoConnectionResult,
-  type RemoteRepoTarget,
-  type ResolvedRemoteTarget,
+  type RemoteWorkspaceConnectionResult,
+  type RemoteWorkspaceTarget,
+  type ResolvedRemoteWorkspaceTarget,
   type SshConfigHostsResult,
-} from '#/shared/remote-repo.ts'
+} from '#/shared/remote-workspace.ts'
 import { openRemoteInPreferredEditor } from '#/system/editors.ts'
 import { openRemoteInPreferredTerminal } from '#/system/terminals.ts'
 import {
@@ -28,9 +28,10 @@ import {
 import { isSafeRemoteAbsolutePath } from '#/system/remote-shell.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
-import { remoteRuntimeFailureFromTargetResolutionError } from '#/server/modules/remote-runtime-failure.ts'
+import { remoteWorkspaceRuntimeFailureFromTargetResolutionError } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-async function resolveRemoteHomeDirectory(target: RemoteRepoTarget, signal?: AbortSignal): Promise<string> {
+async function resolveRemoteHomeDirectory(target: RemoteWorkspaceTarget, signal?: AbortSignal): Promise<string> {
   const homeResult = await runRemoteCommand(target, { type: 'printHome' }, { signal })
   const homePath = homeResult.ok ? (homeResult.stdout.trim().split(/\r?\n/, 1)[0]?.trim() ?? '') : ''
   if (!homePath.startsWith('/')) throw new Error('workspace-picker.open-remote-home-unavailable')
@@ -38,7 +39,7 @@ async function resolveRemoteHomeDirectory(target: RemoteRepoTarget, signal?: Abo
 }
 
 async function expandRemotePathInput(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   remotePath: string,
   signal?: AbortSignal,
 ): Promise<string> {
@@ -52,7 +53,7 @@ export async function getServerSshHosts(): Promise<SshConfigHostsResult> {
 }
 
 export type ResolveTargetResult =
-  | { target: RemoteRepoTarget }
+  | { target: RemoteWorkspaceTarget }
   // Error is an i18n key — callers (route layer / client) translate.
   | { error: string }
 
@@ -61,14 +62,14 @@ export async function resolveServerRemoteTarget(
   signal?: AbortSignal,
 ): Promise<ResolveTargetResult> {
   const needsHomeExpansion = input.remotePath.startsWith('~/')
-  let resolved: ResolvedRemoteTarget
+  let resolved: ResolvedRemoteWorkspaceTarget
   try {
     resolved = await resolveSshRemoteTarget(needsHomeExpansion ? { ...input, remotePath: '/' } : input, signal)
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'error.failed-read-repo' }
   }
   if (!needsHomeExpansion) return resolved
-  let normalized: RemoteRepoTarget | null
+  let normalized: RemoteWorkspaceTarget | null
   try {
     normalized = normalizeRemoteTarget({
       ...resolved.target,
@@ -82,19 +83,18 @@ export async function resolveServerRemoteTarget(
 }
 
 /**
- * Server-side unified boundary for the remote-repo lifecycle
- * (docs/goblin-remote-repo-refactor-plan.md §5).
+ * Server-side unified boundary for the remote-workspace lifecycle.
  *
  * Composes, in order:
- *   1. parse the `repoId` into a `RemoteRepoRef` (alias +
+ *   1. parse the `workspaceId` into a `RemoteWorkspaceRef` (alias +
  *      remotePath)
  *   2. resolve the SSH target via the existing
  *      `resolveServerRemoteTarget` (parses the SSH config, runs
  *      `ssh -G` to compute the effective config, expands `~/`)
- *   3. probe the remote repo via `testRemoteRepo` (SSH
+ *   3. probe the remote workspace via `testRemoteWorkspace` (SSH
  *      handshake + `checkShell`/`checkGit`/`revParseTopLevel`)
- *   4. classify the failure into a `RemoteRepoFailureReason`
- *   5. return a converged {@link RemoteRepoConnectionResult}
+ *   4. classify the failure into a `RemoteWorkspaceFailureReason`
+ *   5. return a converged {@link RemoteWorkspaceConnectionResult}
  *
  * This resolver returns only a terminal result. The owning WorkspaceRuntime wraps
  * it with the authoritative connecting state, attempt id, cancellation, and
@@ -103,20 +103,20 @@ export async function resolveServerRemoteTarget(
  * The signal is plumbed through the entire pipeline:
  *   - `resolveServerRemoteTarget` propagates to the `ssh -G`
  *     execa call (`system/ssh/config.ts:resolveEffectiveConfig`)
- *   - `testRemoteRepo` propagates to each per-stage
+ *   - `testRemoteWorkspace` propagates to each per-stage
  *     `runRemoteCommand` (the SSH handshake / checkShell / etc.
  *     execas in `system/ssh/commands.ts:runRemoteCommand`)
  *
  * WorkspaceRuntime aborts this signal when a newer attempt supersedes it or the
  * runtime closes, so slow SSH work releases server resources promptly.
  */
-export interface RemoteRepoConnectionDeps {
+export interface RemoteWorkspaceConnectionDeps {
   resolveTarget: (
     input: { alias: string; remotePath: string },
     signal?: AbortSignal,
-  ) => Promise<{ target: RemoteRepoTarget } | { error: string }>
+  ) => Promise<{ target: RemoteWorkspaceTarget } | { error: string }>
   probeRemote: (
-    target: RemoteRepoTarget,
+    target: RemoteWorkspaceTarget,
     options: { signal?: AbortSignal; timeoutMs: number },
   ) => Promise<{
     ok: boolean
@@ -127,40 +127,38 @@ export interface RemoteRepoConnectionDeps {
   }>
 }
 
-function defaultRemoteRepoConnectionDeps(): RemoteRepoConnectionDeps {
+function defaultRemoteWorkspaceConnectionDeps(): RemoteWorkspaceConnectionDeps {
   return {
     resolveTarget: resolveServerRemoteTarget,
-    probeRemote: testRemoteRepo,
+    probeRemote: testRemoteWorkspace,
   }
 }
 
-export async function resolveServerRemoteRepoConnection(
-  input: { repoId: string },
+export async function resolveServerRemoteWorkspaceConnection(
+  input: { workspaceId: WorkspaceId },
   signal?: AbortSignal,
-  deps: RemoteRepoConnectionDeps = defaultRemoteRepoConnectionDeps(),
-): Promise<RemoteRepoConnectionResult> {
-  const repoId = input.repoId
+  deps: RemoteWorkspaceConnectionDeps = defaultRemoteWorkspaceConnectionDeps(),
+): Promise<RemoteWorkspaceConnectionResult> {
+  const workspaceId = input.workspaceId
   // Defensive: local ids should never reach this server entry.
-  // The command client gates on `isRemoteRepoId` before calling;
+  // The command client gates on `isRemoteWorkspaceId` before calling;
   // if a non-remote id sneaks through, return a 'failed' with a
   // synthesized reason rather than letting the SSH resolver throw.
-  if (!isRemoteRepoId(repoId)) {
+  if (!isRemoteWorkspaceId(workspaceId)) {
     return {
       kind: 'failed',
-      repoId,
-      name: repoId,
+      name: workspaceId,
       lifecycle: { kind: 'failed', reason: 'not-a-repo' },
     }
   }
 
   // Step 1: parse the id into a ref.
-  const parsed = parseRemoteRepoId(repoId)
-  const ref = parsed ? normalizeRemoteRepoRef(parsed) : null
+  const parsed = parseRemoteWorkspaceId(workspaceId)
+  const ref = parsed ? normalizeRemoteWorkspaceRef(parsed) : null
   if (!ref) {
     return {
       kind: 'failed',
-      repoId,
-      name: parsed?.alias ?? repoId,
+      name: parsed?.alias ?? workspaceId,
       lifecycle: { kind: 'failed', reason: 'config-changed' },
     }
   }
@@ -170,17 +168,16 @@ export async function resolveServerRemoteRepoConnection(
   if ('error' in targetResult) {
     return {
       kind: 'failed',
-      repoId,
       name: ref.displayName,
       lifecycle: {
         kind: 'failed',
-        reason: toRemoteRepoFailureReason(targetResult.error),
+        reason: toRemoteWorkspaceFailureReason(targetResult.error),
       },
     }
   }
   const target = targetResult.target
 
-  // Step 3: probe the remote repo.
+  // Step 3: probe the remote workspace and derive its optional Git capability.
   const probe = await deps.probeRemote(target, {
     signal,
     timeoutMs: SSH_BOOT_PROBE_TIMEOUT_MS,
@@ -190,21 +187,19 @@ export async function resolveServerRemoteRepoConnection(
     if (pathStage?.status === 'failed') {
       return {
         kind: 'failed',
-        repoId,
         name: ref.displayName,
         lifecycle: {
           kind: 'failed',
-          reason: toRemoteRepoFailureReason(pathStage.category ?? 'path-missing'),
+          reason: toRemoteWorkspaceFailureReason(pathStage.category ?? 'path-missing'),
           target,
         },
       }
     }
-    const reason = toRemoteRepoFailureReason(probe.category ?? probe.message ?? 'unknown')
+    const reason = toRemoteWorkspaceFailureReason(probe.category ?? probe.message ?? 'unknown')
     const directoryReadable = probe.stages?.some((stage) => stage.name === 'path' && stage.status === 'passed')
     if (reason === 'not-a-repo' || directoryReadable) {
       return {
         kind: 'ready',
-        repoId,
         name: ref.displayName,
         gitAvailable: false,
         ...(probe.category === 'git-missing'
@@ -217,7 +212,6 @@ export async function resolveServerRemoteRepoConnection(
     }
     return {
       kind: 'failed',
-      repoId,
       name: ref.displayName,
       lifecycle: { kind: 'failed', reason, target },
     }
@@ -226,7 +220,6 @@ export async function resolveServerRemoteRepoConnection(
   if (probe.gitAtWorkspaceRoot === false) {
     return {
       kind: 'ready',
-      repoId,
       name: ref.displayName,
       gitAvailable: false,
       lifecycle: { kind: 'ready', target },
@@ -236,7 +229,6 @@ export async function resolveServerRemoteRepoConnection(
   // Step 4: success.
   return {
     kind: 'ready',
-    repoId,
     name: ref.displayName,
     gitAvailable: true,
     lifecycle: { kind: 'ready', target },
@@ -249,7 +241,7 @@ export async function getServerRemotePathSuggestions(
 ): Promise<string[]> {
   const prefix = input.prefix.trim()
   if (!isResolvableRemotePathInput(prefix)) return []
-  let target: RemoteRepoTarget
+  let target: RemoteWorkspaceTarget
   try {
     target = (await resolveSshRemoteTarget({ alias: input.alias, remotePath: '/' }, signal)).target
   } catch {
@@ -288,17 +280,17 @@ export async function getServerRemotePathSuggestions(
   return output.slice(0, 20)
 }
 
-export async function testServerRemoteRepo(
-  target: RemoteRepoTarget,
+export async function testServerRemoteWorkspace(
+  target: RemoteWorkspaceTarget,
   signal?: AbortSignal,
 ): Promise<RemoteDiagnosticsResult> {
   const normalized = normalizeRemoteTarget(target)
   if (!normalized || normalized.id !== target.id) {
-    throw new Error('Invalid remote repository target')
+    throw new Error('Invalid remote workspace target')
   }
   try {
     const resolved = await resolveTrackedRemoteTarget(normalized, signal)
-    return await testRemoteRepo(resolved.target, { signal })
+    return await testRemoteWorkspace(resolved.target, { signal })
   } catch (err) {
     // Translation key — client formats via i18n. resolveTrackedRemoteTarget
     // raises either an i18n key (e.g. error.ssh-config-changed) or a real
@@ -308,26 +300,26 @@ export async function testServerRemoteRepo(
   }
 }
 
-/** Open a remote worktree in the user's preferred editor. The repo id is
- *  parsed back into its alias / remotePath parts, then re-resolved so the
+/** Open a remote workspace path in the user's preferred editor. The workspace
+ *  id is parsed back into its alias / remotePath parts, then re-resolved so the
  *  SSH config hasn't been edited out from under us. */
 export async function openServerRemoteEditor(
-  input: { repoId: string; workspaceRuntimeId?: string; worktreePath: string; app: EditorApp },
+  input: { workspaceId: WorkspaceId; workspaceRuntimeId?: string; worktreePath: string; app: EditorApp },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
-  if (!isRemoteRepoId(input.repoId) || !isSafeRemoteAbsolutePath(input.worktreePath)) {
+  if (!isRemoteWorkspaceId(input.workspaceId) || !isSafeRemoteAbsolutePath(input.worktreePath)) {
     return { ok: false, message: 'error.invalid-path' }
   }
-  const ref = parseRemoteRepoId(input.repoId)
+  const ref = parseRemoteWorkspaceId(input.workspaceId)
   if (!ref) return { ok: false, message: 'error.invalid-arguments' }
 
-  let resolved: ResolvedRemoteTarget
+  let resolved: ResolvedRemoteWorkspaceTarget
   try {
     resolved = await resolveSshRemoteTarget(ref, signal)
   } catch (err) {
     if (input.workspaceRuntimeId) {
-      throw remoteRuntimeFailureFromTargetResolutionError({
-        repoRoot: input.repoId,
+      throw remoteWorkspaceRuntimeFailureFromTargetResolutionError({
+        workspaceId: input.workspaceId,
         workspaceRuntimeId: input.workspaceRuntimeId,
         error: err,
       })
@@ -339,22 +331,22 @@ export async function openServerRemoteEditor(
 }
 
 export async function openServerRemoteTerminal(
-  input: { repoId: string; workspaceRuntimeId?: string; worktreePath: string; app: TerminalApp },
+  input: { workspaceId: WorkspaceId; workspaceRuntimeId?: string; worktreePath: string; app: TerminalApp },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
-  if (!isRemoteRepoId(input.repoId) || !isSafeRemoteAbsolutePath(input.worktreePath)) {
+  if (!isRemoteWorkspaceId(input.workspaceId) || !isSafeRemoteAbsolutePath(input.worktreePath)) {
     return { ok: false, message: 'error.invalid-path' }
   }
-  const ref = parseRemoteRepoId(input.repoId)
+  const ref = parseRemoteWorkspaceId(input.workspaceId)
   if (!ref) return { ok: false, message: 'error.invalid-arguments' }
 
-  let resolved: ResolvedRemoteTarget
+  let resolved: ResolvedRemoteWorkspaceTarget
   try {
     resolved = await resolveSshRemoteTarget(ref, signal)
   } catch (err) {
     if (input.workspaceRuntimeId) {
-      throw remoteRuntimeFailureFromTargetResolutionError({
-        repoRoot: input.repoId,
+      throw remoteWorkspaceRuntimeFailureFromTargetResolutionError({
+        workspaceId: input.workspaceId,
         workspaceRuntimeId: input.workspaceRuntimeId,
         error: err,
       })

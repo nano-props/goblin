@@ -3,7 +3,23 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import type { WorkspaceRuntimeEntry, WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
 import { listWorkspaceRuntimes } from '#/web/workspace-client.ts'
 
-type WorkspaceRuntimeCachePatch = Pick<WorkspaceRuntimeEntry, 'workspaceId' | 'workspaceRuntimeId'> & Partial<WorkspaceRuntimeEntry>
+type WorkspaceRuntimeCachePatch = Pick<WorkspaceRuntimeEntry, 'workspaceId' | 'workspaceRuntimeId'> &
+  Partial<WorkspaceRuntimeEntry>
+
+interface WorkspaceRuntimeRefreshState {
+  running: Promise<WorkspaceRuntimesSnapshot> | null
+  trailing: boolean
+}
+
+const refreshStates = new WeakMap<QueryClient, WorkspaceRuntimeRefreshState>()
+
+async function waitForWorkspaceRuntimeRefresh(queryClient: QueryClient): Promise<void> {
+  const running = refreshStates.get(queryClient)?.running
+  if (!running) return
+  // A membership response remains authoritative even when the older read
+  // failed, so only use that read as an ordering barrier.
+  await running.catch(() => undefined)
+}
 
 export function workspaceRuntimesQueryKey() {
   return ['workspace-runtime', 'runtimes'] as const
@@ -21,16 +37,50 @@ export function workspaceRuntimesQueryOptions() {
 export async function refreshWorkspaceRuntimes(
   queryClient: QueryClient = primaryWindowQueryClient,
 ): Promise<WorkspaceRuntimesSnapshot> {
-  await queryClient.cancelQueries({ queryKey: workspaceRuntimesQueryKey(), exact: true })
-  await queryClient.invalidateQueries({ queryKey: workspaceRuntimesQueryKey(), exact: true, refetchType: 'none' })
-  return await queryClient.fetchQuery(workspaceRuntimesQueryOptions())
+  return await requestWorkspaceRuntimeRefresh(queryClient, false)
+}
+
+async function requestWorkspaceRuntimeRefresh(
+  queryClient: QueryClient,
+  requestTrailingRefresh: boolean,
+): Promise<WorkspaceRuntimesSnapshot> {
+  let state = refreshStates.get(queryClient)
+  if (!state) {
+    state = { running: null, trailing: false }
+    refreshStates.set(queryClient, state)
+  }
+  if (state.running) {
+    if (requestTrailingRefresh) state.trailing = true
+    return await state.running
+  }
+  const running = (async () => {
+    let snapshot: WorkspaceRuntimesSnapshot | undefined
+    do {
+      state.trailing = false
+      await queryClient.invalidateQueries({ queryKey: workspaceRuntimesQueryKey(), exact: true, refetchType: 'none' })
+      try {
+        snapshot = await queryClient.fetchQuery(workspaceRuntimesQueryOptions())
+      } catch (error) {
+        if (!state.trailing) throw error
+        continue
+      }
+    } while (state.trailing)
+    if (!snapshot) throw new Error('workspace runtime refresh completed without a snapshot')
+    return snapshot
+  })()
+  state.running = running
+  try {
+    return await running
+  } finally {
+    if (state.running === running) state.running = null
+  }
 }
 
 export async function updateWorkspaceRuntimeCache(
   entry: WorkspaceRuntimeCachePatch,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): Promise<void> {
-  await queryClient.cancelQueries({ queryKey: workspaceRuntimesQueryKey(), exact: true })
+  await waitForWorkspaceRuntimeRefresh(queryClient)
   queryClient.setQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey(), (current) => {
     const existing = current?.runtimes ?? []
     const previous = existing.find((item) => item.workspaceId === entry.workspaceId)
@@ -40,19 +90,11 @@ export async function updateWorkspaceRuntimeCache(
   })
 }
 
-export async function replaceWorkspaceRuntimeCache(
-  snapshot: WorkspaceRuntimesSnapshot,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): Promise<void> {
-  await queryClient.cancelQueries({ queryKey: workspaceRuntimesQueryKey(), exact: true })
-  queryClient.setQueryData(workspaceRuntimesQueryKey(), snapshot)
-}
-
 export async function removeWorkspaceRuntimeFromCache(
   entry: Pick<WorkspaceRuntimeEntry, 'workspaceId' | 'workspaceRuntimeId'>,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): Promise<void> {
-  await queryClient.cancelQueries({ queryKey: workspaceRuntimesQueryKey(), exact: true })
+  await waitForWorkspaceRuntimeRefresh(queryClient)
   let foundMatchingEntry = false
   queryClient.setQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey(), (current) => {
     if (!current) return current
@@ -71,5 +113,5 @@ export async function removeWorkspaceRuntimeFromCache(
 export async function invalidateWorkspaceRuntimes(
   queryClient: QueryClient = primaryWindowQueryClient,
 ): Promise<WorkspaceRuntimesSnapshot> {
-  return await refreshWorkspaceRuntimes(queryClient)
+  return await requestWorkspaceRuntimeRefresh(queryClient, true)
 }

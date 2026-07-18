@@ -12,14 +12,15 @@ import {
   testPhysicalWorktreeIdentity,
   testPhysicalWorktrees,
 } from '#/server/test-utils/physical-worktree-identity.ts'
-import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
+import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { WorkspacePaneRuntimeStaleError } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 import type * as WorkspaceRuntimesModule from '#/server/modules/workspace-runtimes.ts'
+import type * as RemoteWorkspaceFailureSettlement from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
 
-const failRemoteRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
+const failRemoteWorkspaceRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
 const workspaceProbeStateForRuntimeMock = vi.hoisted(() =>
   vi.fn<() => WorkspaceProbeState>(() => ({
     status: 'ready' as const,
@@ -32,9 +33,9 @@ const workspaceProbeStateForRuntimeMock = vi.hoisted(() =>
     diagnostics: [],
   })),
 )
-vi.mock('#/server/modules/remote-runtime-failure-settlement.ts', async (importActual) => {
-  const actual = await importActual<typeof import('#/server/modules/remote-runtime-failure-settlement.ts')>()
-  return { ...actual, failRemoteRuntimeIfNeeded: failRemoteRuntimeIfNeededMock }
+vi.mock('#/server/modules/remote-workspace-runtime-failure-settlement.ts', async (importActual) => {
+  const actual = await importActual<typeof RemoteWorkspaceFailureSettlement>()
+  return { ...actual, failRemoteWorkspaceRuntimeIfNeeded: failRemoteWorkspaceRuntimeIfNeededMock }
 })
 vi.mock('#/server/modules/workspace-runtimes.ts', async (importActual) => {
   const actual = await importActual<typeof WorkspaceRuntimesModule>()
@@ -47,7 +48,7 @@ const otherWorktreeRoot = canonicalWorkspaceLocator('goblin+file:///repo/other-w
 if (!workspaceId || !worktreeRoot || !otherWorktreeRoot) throw new Error('invalid workspace locator fixture')
 
 const request = {
-  repoRoot: 'goblin+file:///repo',
+  repoRoot: workspaceId,
   workspaceRuntimeId: 'repo-runtime-test',
   branch: 'main',
   worktreePath: '/repo/worktree',
@@ -310,14 +311,14 @@ describe('WorkspacePaneRuntimeApplication', () => {
   })
 
   test('reports remote runtime failure when physical worktree capture proves transport failure', async () => {
-    const failure = new RemoteRepoRuntimeFailureError({
-      repoRoot: request.repoRoot,
+    const failure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId: request.repoRoot,
       workspaceRuntimeId: request.workspaceRuntimeId,
       reason: 'unreachable',
     })
     const create = vi.fn()
     const ensureRuntimeTabForSession = vi.fn()
-    failRemoteRuntimeIfNeededMock.mockClear()
+    failRemoteWorkspaceRuntimeIfNeededMock.mockClear()
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: {
@@ -337,14 +338,14 @@ describe('WorkspacePaneRuntimeApplication', () => {
       runtimeType: 'terminal',
       message: 'unreachable',
     })
-    expect(failRemoteRuntimeIfNeededMock).toHaveBeenCalledWith('user-test', failure)
+    expect(failRemoteWorkspaceRuntimeIfNeededMock).toHaveBeenCalledWith('user-test', failure)
     expect(create).not.toHaveBeenCalled()
     expect(ensureRuntimeTabForSession).not.toHaveBeenCalled()
   })
 
   test('reports remote runtime failure when queued physical validation proves transport failure', async () => {
-    const failure = new RemoteRepoRuntimeFailureError({
-      repoRoot: request.repoRoot,
+    const failure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId: request.repoRoot,
       workspaceRuntimeId: request.workspaceRuntimeId,
       reason: 'unreachable',
       message: 'connection refused',
@@ -357,7 +358,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     })
     const create = vi.fn()
     const ensureRuntimeTabForSession = vi.fn()
-    failRemoteRuntimeIfNeededMock.mockClear()
+    failRemoteWorkspaceRuntimeIfNeededMock.mockClear()
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture: async () => capability },
@@ -373,7 +374,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       runtimeType: 'terminal',
       message: 'connection refused',
     })
-    expect(failRemoteRuntimeIfNeededMock).toHaveBeenCalledWith('user-test', failure)
+    expect(failRemoteWorkspaceRuntimeIfNeededMock).toHaveBeenCalledWith('user-test', failure)
     expect(create).not.toHaveBeenCalled()
     expect(ensureRuntimeTabForSession).not.toHaveBeenCalled()
   })

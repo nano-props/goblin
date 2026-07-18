@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultServerWorkspaceState, defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { githubCliQueryKey, lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { GitHubCliState, RepoSettingsState, WorkspaceRestoreResult } from '#/shared/api-types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 

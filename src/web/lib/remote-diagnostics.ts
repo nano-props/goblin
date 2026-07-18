@@ -1,8 +1,8 @@
 import {
   REMOTE_DIAGNOSTIC_CATEGORIES,
   type RemoteDiagnosticsResult,
-  type RemoteRepoTarget,
-} from '#/shared/remote-repo.ts'
+  type RemoteWorkspaceTarget,
+} from '#/shared/remote-workspace.ts'
 const SSH_SETTINGS_REASONS = new Set([
   'error.ssh-config-changed',
   'workspace-picker.open-remote-home-unavailable',
@@ -47,6 +47,6 @@ export function failedDiagnosticsCategory(diagnostics: RemoteDiagnosticsResult |
   )
 }
 
-export function remoteSshCommand(target: Pick<RemoteRepoTarget, 'alias'>): string {
+export function remoteSshCommand(target: Pick<RemoteWorkspaceTarget, 'alias'>): string {
   return `ssh ${target.alias}`
 }

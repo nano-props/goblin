@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'

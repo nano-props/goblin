@@ -1,5 +1,5 @@
 import { produce, type Draft } from 'immer'
-import { isRemoteRepoId, localWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { isRemoteWorkspaceId, localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { emptyWorkspaceOperations } from '#/web/stores/workspaces/operations.ts'
 import { emptyWorkspaceDataLoadBundle } from '#/web/stores/workspaces/repo-data-load-state.ts'
 import type { ExecResult } from '#/web/types.ts'
@@ -29,11 +29,11 @@ export function emptyWorkspace(id: string, name: string, workspaceRuntimeId: str
     workspaceRuntimeId,
     ui: { preferredWorkspacePaneTabByTarget: {} },
     session: {
-      entry: isRemoteRepoId(workspaceId) ? null : localWorkspaceSessionEntry(workspaceId),
+      entry: isRemoteWorkspaceId(workspaceId) ? null : localWorkspaceSessionEntry(workspaceId),
       projectionState: 'projected',
     },
     availability: { phase: 'available' },
-    admission: isRemoteRepoId(workspaceId)
+    admission: isRemoteWorkspaceId(workspaceId)
       ? { kind: 'remote', lifecycle: null, lifecycleAttemptId: null }
       : { kind: 'local' },
     capability: { kind: 'probing', probe: { status: 'probing' } },

@@ -15,8 +15,8 @@
 import path from 'node:path'
 import type { RepoTreeResult } from '#/shared/api-types.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import { remoteRuntimeAwareGitRunner, resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
+import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import { remoteRuntimeAwareGitRunner, resolveRemoteWorkspaceTarget } from '#/server/modules/repo-source.ts'
 import {
   type RepoTreeSourceOptions,
   getRepoTreeSourceLocal,
@@ -59,7 +59,7 @@ export async function getRepositoryTree(
   // `getRepoTreeSourceRemote`; local paths use the git-backed local
   // enumerator. Filetree is a display read, so it intentionally does
   // not depend on repo status, pull request state, or branch refresh.
-  const isRemote = isRemoteRepoId(cwd)
+  const isRemote = isRemoteWorkspaceId(cwd)
   const platform = process.platform === 'win32' ? 'win32' : 'posix'
   const locator = parseWorkspaceLocator(cwd, platform)
   if (!locator) throw new Error('error.workspace-locator-malformed')
@@ -72,9 +72,9 @@ export async function getRepositoryTree(
 
   // When the cwd is remote, resolve the SSH target once before
   // handing the worktree path to the remote source.
-  let remoteTarget: Awaited<ReturnType<typeof resolveRemoteRepoTarget>> | undefined
+  let remoteTarget: Awaited<ReturnType<typeof resolveRemoteWorkspaceTarget>> | undefined
   if (isRemote) {
-    remoteTarget = await resolveRemoteRepoTarget(
+    remoteTarget = await resolveRemoteWorkspaceTarget(
       cwd,
       options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
       options.signal,
@@ -128,8 +128,8 @@ export async function getRepositoryTree(
 }
 
 function requiredRemoteTarget(
-  target: Awaited<ReturnType<typeof resolveRemoteRepoTarget>> | undefined,
-): Awaited<ReturnType<typeof resolveRemoteRepoTarget>> {
+  target: Awaited<ReturnType<typeof resolveRemoteWorkspaceTarget>> | undefined,
+): Awaited<ReturnType<typeof resolveRemoteWorkspaceTarget>> {
   if (!target) throw new Error('error.workspace-transport-unavailable')
   return target
 }

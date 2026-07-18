@@ -1,6 +1,6 @@
 import { AlertCircle, RefreshCw, Shield, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { PanelInset } from '#/web/components/ui/panel.tsx'
@@ -25,7 +25,7 @@ export function UnavailableRepoView({ repo }: Props) {
   // `isRepoUnavailable` (which dispatches by repo kind) and
   // read the reason from the field that owns it for each kind.
   const isUnavailable = isRepoUnavailable(repo)
-  const isRemote = isRemoteRepoId(repo.id)
+  const isRemote = isRemoteWorkspaceId(repo.id)
   const reason = isRemote
     ? repo.admission.kind === 'remote' && repo.admission.lifecycle?.kind === 'failed'
       ? repo.admission.lifecycle.reason

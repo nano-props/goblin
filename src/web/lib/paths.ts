@@ -4,7 +4,7 @@ import {
   formatWorkspaceDisplayLocation as formatSharedWorkspaceDisplayLocation,
 } from '#/shared/repo-locator.ts'
 import { tildifyPath, untildifyPath } from '#/shared/paths.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 export { tildifyPath, untildifyPath } from '#/shared/paths.ts'
 
 /** Last segment of a path. Tolerant of either separator so worktree
@@ -55,10 +55,10 @@ export function untildify(path: string): string {
   return untildifyPath(path, homeDirectory())
 }
 
-export function formatWorkspaceDisplayLocation(workspaceId: string, target?: RemoteRepoTarget | null): string {
+export function formatWorkspaceDisplayLocation(workspaceId: string, target?: RemoteWorkspaceTarget | null): string {
   return formatSharedWorkspaceDisplayLocation(workspaceId, homeDirectory(), target)
 }
 
-export function formatWorktreePath(path: string, target?: RemoteRepoTarget | null): string {
+export function formatWorktreePath(path: string, target?: RemoteWorkspaceTarget | null): string {
   return target ? formatRemoteWorktreeLocator(target, path) : tildify(path)
 }

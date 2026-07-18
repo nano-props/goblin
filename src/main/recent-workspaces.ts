@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { applyMenuRuntimeState } from '#/main/menu-state.ts'
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 
 /**
  * Single authority for syncing the recent-workspaces list into every macOS

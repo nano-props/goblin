@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import React from 'react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
-import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
+import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import {
   createRepoBranch,
   repoPresentationFromQueryForTest,

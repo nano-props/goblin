@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -149,7 +149,7 @@ describe('runRemoteCommand', () => {
   })
 })
 
-function target(): RemoteRepoTarget {
+function target(): RemoteWorkspaceTarget {
   return {
     id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
     alias: 'prod',

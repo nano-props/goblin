@@ -1,10 +1,10 @@
 import { produce, type Draft } from 'immer'
 import {
-  isRemoteRepoId,
-  remoteRepoConnectionTarget,
-  type RemoteRepoConnectionLifecycle,
-  type RemoteRepoTarget,
-} from '#/shared/remote-repo.ts'
+  isRemoteWorkspaceId,
+  remoteWorkspaceConnectionTarget,
+  type RemoteWorkspaceConnectionLifecycle,
+  type RemoteWorkspaceTarget,
+} from '#/shared/remote-workspace.ts'
 import { deriveConnectivityLog } from '#/web/logger.ts'
 import type {
   GitWorkspaceProjection,
@@ -61,7 +61,7 @@ function gitProjectionAcrossProbeTransition(repo: WorkspaceState): GitWorkspaceP
 
 /**
  * Live SSH liveness state for remote workspaces. Derived — never stored —
- * from `isRemoteRepoId(id)` + `admission.lifecycle.kind`. The lifecycle
+ * from `isRemoteWorkspaceId(id)` + `admission.lifecycle.kind`. The lifecycle
  * union is the single source of truth; availability and target presence
  * are not used to infer connectivity.
  *   - `connecting`:  remote workspace whose lifecycle run has not
@@ -74,7 +74,7 @@ function gitProjectionAcrossProbeTransition(repo: WorkspaceState): GitWorkspaceP
 type RepoConnectivity = 'connecting' | 'connected' | 'unreachable'
 
 export function deriveConnectivity(repo: WorkspaceState): RepoConnectivity {
-  if (!isRemoteRepoId(repo.id)) return 'connected'
+  if (!isRemoteWorkspaceId(repo.id)) return 'connected'
   const lifecycle = requiredRemoteWorkspaceAdmission(repo).lifecycle
   if (lifecycle) {
     if (lifecycle.kind === 'failed') return 'unreachable'
@@ -100,9 +100,9 @@ export function deriveConnectivity(repo: WorkspaceState): RepoConnectivity {
  * any subset that carries the lifecycle (e.g. `BranchActionRepo`,
  * `RepoWorkspaceRepo`).
  */
-export function remoteRepoTarget(id: string, lifecycle: RemoteRepoConnectionLifecycle | null): RemoteRepoTarget | null {
-  if (!isRemoteRepoId(id)) return null
-  return remoteRepoConnectionTarget(lifecycle)
+export function remoteRepoTarget(id: string, lifecycle: RemoteWorkspaceConnectionLifecycle | null): RemoteWorkspaceTarget | null {
+  if (!isRemoteWorkspaceId(id)) return null
+  return remoteWorkspaceConnectionTarget(lifecycle)
 }
 
 /**
@@ -115,7 +115,7 @@ export function remoteRepoTarget(id: string, lifecycle: RemoteRepoConnectionLife
  * looking at a local or remote repo now just call this helper.
  */
 export function isRepoUnavailable(repo: WorkspaceState): boolean {
-  if (isRemoteRepoId(repo.id)) {
+  if (isRemoteWorkspaceId(repo.id)) {
     return requiredRemoteWorkspaceAdmission(repo).lifecycle?.kind === 'failed'
   }
   return repo.availability.phase === 'unavailable'

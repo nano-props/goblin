@@ -73,10 +73,10 @@ describe('repo web transport helpers', () => {
         target: { id: 'goblin+ssh://example/srv/repo', displayName: 'repo', alias: 'example', remotePath: '/srv/repo' },
       }),
     }))
-    const { resolveRemoteRepositoryTarget } = await import('#/web/remote-client.ts')
+    const { resolveRemoteWorkspaceTarget } = await import('#/web/remote-workspace-client.ts')
 
     await expect(
-      resolveRemoteRepositoryTarget({
+      resolveRemoteWorkspaceTarget({
         alias: 'example',
         remotePath: '/srv/repo',
       }),

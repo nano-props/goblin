@@ -1,5 +1,5 @@
 import { IpcError, type RestoredWorkspaceRuntime, type WorkspaceTabsRestoreResult } from '#/shared/api-types.ts'
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { readRepoProjection } from '#/server/modules/repo-read-paths.ts'
 import {
   isCurrentWorkspaceRuntimeMembership,
@@ -7,7 +7,7 @@ import {
   workspaceProbeStateForRuntime,
   isCurrentWorkspaceRuntime,
 } from '#/server/modules/workspace-runtimes.ts'
-import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
+import { runRemoteWorkspaceLifecycleWrite } from '#/server/modules/remote-workspace-lifecycle-write-paths.ts'
 import { confirmServerWorkspaceRepoEntry, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
 import {
   projectWorkspacePaneTabsWithMembershipGuard,
@@ -60,10 +60,10 @@ async function projectWorkspaceRepo(
 ): Promise<RestoredWorkspaceRuntime | null> {
   if (entry.kind === 'remote') {
     const lifecycle = await abortableWorkspaceRestore(
-      runRemoteLifecycleWrite(
+      runRemoteWorkspaceLifecycleWrite(
         {
           userId: input.userId,
-          repoId: entry.id,
+          workspaceId: entry.id,
           workspaceRuntimeId: input.workspaceRuntimeId,
           mode: 'ensure',
         },

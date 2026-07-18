@@ -1,8 +1,8 @@
 import path from 'node:path'
 import type { RepoFileViewerResult } from '#/shared/api-types.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import { remoteRuntimeAwareGitRunner, resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
+import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import { remoteRuntimeAwareGitRunner, resolveRemoteWorkspaceTarget } from '#/server/modules/repo-source.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { remoteCommandExists, remoteCommandExistsAtWorkspaceRoot, resolveRemoteWorktree } from '#/system/ssh/git.ts'
 import { userShellCommandExists } from '#/system/user-shell.ts'
@@ -27,8 +27,8 @@ export async function getRepositoryFileViewer(
   const workspacePath = resolveWorkspaceScopedPath(cwd, worktreePath)
   const executionPath = workspacePath ?? worktreePath
 
-  if (isRemoteRepoId(cwd)) {
-    const target = await resolveRemoteRepoTarget(
+  if (isRemoteWorkspaceId(cwd)) {
+    const target = await resolveRemoteWorkspaceTarget(
       cwd,
       options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
     )

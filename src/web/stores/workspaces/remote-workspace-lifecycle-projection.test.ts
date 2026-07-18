@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
+import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import {
-  acceptRemoteLifecycleProjection,
-  acceptRemoteLifecycleSnapshot,
-} from '#/web/stores/workspaces/remote-lifecycle-projection.ts'
+  acceptRemoteWorkspaceLifecycleProjection,
+  acceptRemoteWorkspaceLifecycleSnapshot,
+} from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceRemoteAdmission } from '#/web/workspace-capability.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -56,7 +56,7 @@ describe('remote lifecycle projection acceptance', () => {
   })
 
   test('applies only runtime entries represented by this window', () => {
-    acceptRemoteLifecycleSnapshot(useWorkspacesStore.setState, useWorkspacesStore.getState, {
+    acceptRemoteWorkspaceLifecycleSnapshot(useWorkspacesStore.setState, useWorkspacesStore.getState, {
       runtimes: [
         {
           workspaceId: repoRoot,
@@ -80,9 +80,9 @@ describe('remote lifecycle projection acceptance', () => {
 })
 
 function accept(
-  remoteLifecycle: NonNullable<Parameters<typeof acceptRemoteLifecycleProjection>[2]['remoteLifecycle']>,
+  remoteLifecycle: NonNullable<Parameters<typeof acceptRemoteWorkspaceLifecycleProjection>[2]['remoteLifecycle']>,
 ) {
-  return acceptRemoteLifecycleProjection(useWorkspacesStore.setState, useWorkspacesStore.getState, {
+  return acceptRemoteWorkspaceLifecycleProjection(useWorkspacesStore.setState, useWorkspacesStore.getState, {
     workspaceId: repoRoot,
     workspaceRuntimeId,
     remoteLifecycle,

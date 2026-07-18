@@ -23,7 +23,7 @@ export const EMBEDDED_SERVER_IPC_ROUTES = {
   'remote.listSshHosts': { route: '/api/remote/ssh-hosts', method: 'GET' },
   'remote.resolveTarget': { route: '/api/remote/resolve-target', method: 'POST' },
   'remote.listPathSuggestions': { route: '/api/remote/path-suggestions', method: 'POST' },
-  'remote.testRepo': { route: '/api/remote/test-repo', method: 'POST' },
+  'remote.testWorkspace': { route: '/api/remote/test-workspace', method: 'POST' },
 } as const
 
 export type EmbeddedServerIpcPath = keyof typeof EMBEDDED_SERVER_IPC_ROUTES

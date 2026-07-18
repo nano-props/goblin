@@ -185,8 +185,7 @@ upstream `@xterm/*` ships its own test helper.
   emails, tokens. Never reference real users, machines, or
   internal infrastructure.
 - Do not re-implement server logic in mocks. If a mock starts composing
-  the real server's behavior (e.g. `probe + resolveTarget →
-RemoteRepoConnectionResult`), prefer injecting the real function with
+  the real server's behavior (e.g. `probe + resolveTarget -> RemoteWorkspaceConnectionResult`), prefer injecting the real function with
   stubbed dependencies, or mark the test as a contract test that drives
   the real path through an in-memory transport. The composition
   duplicates the server and drifts silently.
@@ -297,7 +296,7 @@ items:
   inline `MockWebSocket`; it wraps the shared `installWebSocketMock`.
 - **Lifecycle mock backed by real server composition** —
   `src/web/stores/workspaces/workspace-session-test-utils.ts` injects test doubles
-  into the real `resolveServerRemoteRepoConnection` instead of
+  into the real `resolveServerRemoteWorkspaceConnection` instead of
   duplicating its compose logic.
 
 ### Known follow-ups (out of scope for this PR)

@@ -3,34 +3,35 @@ import type { ExecResult } from '#/shared/git-types.ts'
 import type {
   RemoteDiagnosticsResult,
   RemotePathSuggestionsInput,
-  RemoteRepoLifecycleCommandResult,
-  RemoteRepoTarget,
+  RemoteWorkspaceLifecycleCommandResult,
+  RemoteWorkspaceTarget,
   SshConfigHostsResult,
-} from '#/shared/remote-repo.ts'
+} from '#/shared/remote-workspace.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 /** Server-side result for resolve-target: concrete target or an i18n
  *  key (e.g. `error.ssh-config-changed`, `workspace-picker.open-remote-home-unavailable`).
  *  Callers localize the error message via `t()`. */
-type ResolveTargetResponse = { target: RemoteRepoTarget } | { error: string }
+type ResolveTargetResponse = { target: RemoteWorkspaceTarget } | { error: string }
 
-export async function resolveRemoteRepositoryTarget(
+export async function resolveRemoteWorkspaceTarget(
   ref: { alias: string; remotePath: string },
   signal?: AbortSignal,
-): Promise<RemoteRepoTarget> {
+): Promise<RemoteWorkspaceTarget> {
   const result = await postServerJson<typeof ref, ResolveTargetResponse>('/api/remote/resolve-target', ref, { signal })
   if ('error' in result) throw new Error(result.error)
   return result.target
 }
 
 /**
- * Submit one command to the server-owned repo-runtime lifecycle and return
+ * Submit one command to the server-owned workspace-runtime lifecycle and return
  * its accepted terminal projection.
  */
-export async function resolveRemoteRepoConnection(
-  input: { repoId: string; workspaceRuntimeId: string; mode?: 'restart' | 'ensure' },
+export async function resolveRemoteWorkspaceConnection(
+  input: { workspaceId: WorkspaceId; workspaceRuntimeId: string; mode?: 'restart' | 'ensure' },
   signal?: AbortSignal,
-): Promise<RemoteRepoLifecycleCommandResult> {
-  return await postServerJson<typeof input, RemoteRepoLifecycleCommandResult>('/api/remote/lifecycle', input, { signal })
+): Promise<RemoteWorkspaceLifecycleCommandResult> {
+  return await postServerJson<typeof input, RemoteWorkspaceLifecycleCommandResult>('/api/remote/lifecycle', input, { signal })
 }
 
 export async function getRemoteSshHosts(): Promise<SshConfigHostsResult> {
@@ -44,9 +45,9 @@ export async function getRemotePathSuggestions(
   return await postServerJson('/api/remote/path-suggestions', input, { signal })
 }
 
-export async function testRemoteRepoConnection(
-  target: RemoteRepoTarget,
+export async function testRemoteWorkspaceConnection(
+  target: RemoteWorkspaceTarget,
   signal?: AbortSignal,
 ): Promise<RemoteDiagnosticsResult> {
-  return await postServerJson('/api/remote/test-repo', { target }, { signal })
+  return await postServerJson('/api/remote/test-workspace', { target }, { signal })
 }

@@ -16,7 +16,7 @@ import {
   testPhysicalWorktrees,
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import { localWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const LOCAL_WORKSPACE_ENTRY = localWorkspaceSessionEntry(workspaceIdForTest('goblin+file:///repo'))

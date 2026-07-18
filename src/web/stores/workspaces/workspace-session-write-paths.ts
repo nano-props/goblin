@@ -16,13 +16,12 @@ import {
   openWorkspaceRuntimeForInput,
   reconcileWorkspaceRuntimeMemberships,
 } from '#/web/workspace-client.ts'
-import { resolveRemoteRepositoryTarget } from '#/web/remote-client.ts'
+import { resolveRemoteWorkspaceTarget } from '#/web/remote-workspace-client.ts'
 import { addRepoToWorkspace, recordRecentWorkspace, removeRepoFromWorkspace } from '#/web/settings-actions.ts'
 import {
   invalidateWorkspaceRuntimes,
   removeWorkspaceRuntimeFromCache,
   refreshWorkspaceRuntimes,
-  replaceWorkspaceRuntimeCache,
   updateWorkspaceRuntimeCache,
 } from '#/web/workspace-runtime-query.ts'
 import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -31,7 +30,7 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
-import { acceptRemoteLifecycleSnapshot } from '#/web/stores/workspaces/remote-lifecycle-projection.ts'
+import { acceptRemoteWorkspaceLifecycleSnapshot } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 import {
   markRepoUnavailable,
   markRemoteLifecycleFailed,
@@ -49,22 +48,22 @@ import type {
 } from '#/web/stores/workspaces/types.ts'
 import { nextRestoredRepoIdAfterWorkspaceClose } from '#/web/open-workspace-state.ts'
 import {
-  isRemoteRepoId,
+  isRemoteWorkspaceId,
   localWorkspaceSessionEntry,
-  normalizeRemoteRepoRef,
-  parseRemoteRepoId,
-  remoteRepoConnectionTarget,
+  normalizeRemoteWorkspaceRef,
+  parseRemoteWorkspaceId,
+  remoteWorkspaceConnectionTarget,
   remoteWorkspaceSessionEntry,
   sameWorkspaceSessionEntry,
-  type RemoteRepoTarget,
+  type RemoteWorkspaceTarget,
   type WorkspaceSessionEntry,
-} from '#/shared/remote-repo.ts'
+} from '#/shared/remote-workspace.ts'
 import { sameWorkspaceProbeState, type WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 
 interface ResolvedRepo {
   id: WorkspaceId
   name: string
-  target?: RemoteRepoTarget
+  target?: RemoteWorkspaceTarget
   workspaceProbe?: WorkspaceProbeState
   session?: {
     entry: WorkspaceSessionEntry
@@ -76,7 +75,7 @@ interface ProbeResult {
   input: string
   reason: string | null
   repo: ResolvedRepo | null
-  target?: RemoteRepoTarget
+  target?: RemoteWorkspaceTarget
 }
 
 export interface RuntimeOpenResolvedWorkspace {
@@ -102,8 +101,8 @@ type WorkspaceAdmissionInput =
 
 function workspaceAdmissionFromInput(input: string | WorkspaceSessionEntry): WorkspaceAdmissionInput {
   if (typeof input !== 'string') return { kind: 'workspace-entry', entry: input }
-  const parsed = parseRemoteRepoId(input)
-  const ref = parsed ? normalizeRemoteRepoRef(parsed) : null
+  const parsed = parseRemoteWorkspaceId(input)
+  const ref = parsed ? normalizeRemoteWorkspaceRef(parsed) : null
   return ref
     ? { kind: 'workspace-entry', entry: { kind: 'remote', id: ref.id, ref } }
     : { kind: 'command-input', input }
@@ -117,8 +116,8 @@ export async function resolveRepoPath(
   const admission = workspaceAdmissionFromInput(input)
   const value = admission.kind === 'workspace-entry' ? admission.entry : admission.input
   try {
-    let target: RemoteRepoTarget | undefined
-    if (typeof value !== 'string' && value.kind === 'remote') target = await resolveRemoteRepositoryTarget(value.ref)
+    let target: RemoteWorkspaceTarget | undefined
+    if (typeof value !== 'string' && value.kind === 'remote') target = await resolveRemoteWorkspaceTarget(value.ref)
     const repoInput = typeof value === 'string' ? value : value.id
     const probe = await probeRepo(repoInput)
     if (!probe?.ok || !probe.root) {
@@ -334,8 +333,8 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
       queryKey: ['repo-data', changed.workspaceId, changed.previousWorkspaceRuntimeId],
     })
   }
-  await replaceWorkspaceRuntimeCache({ runtimes: response.runtimes })
-  acceptRemoteLifecycleSnapshot(set, get, { runtimes: response.runtimes })
+  const runtimeSnapshot = await invalidateWorkspaceRuntimes()
+  acceptRemoteWorkspaceLifecycleSnapshot(set, get, runtimeSnapshot)
 
   return {
     kind: 'settled',
@@ -350,7 +349,7 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
       const currentWorkspaceRuntimeId = get().workspaces[workspaceId]?.workspaceRuntimeId
       if (
         !runtime ||
-        !isRemoteRepoId(workspaceId) ||
+        !isRemoteWorkspaceId(workspaceId) ||
         currentWorkspaceRuntimeId !== runtime.workspaceRuntimeId ||
         !['idle', 'connecting'].includes(runtime.remoteLifecycle?.kind ?? '')
       ) {
@@ -598,7 +597,10 @@ function buildNewWorkspace(
   return emptyWorkspace(id, name, workspaceRuntimeId)
 }
 
-function remoteTargetsEqual(a: RemoteRepoTarget | undefined | null, b: RemoteRepoTarget | undefined): boolean {
+function remoteTargetsEqual(
+  a: RemoteWorkspaceTarget | undefined | null,
+  b: RemoteWorkspaceTarget | undefined,
+): boolean {
   if (!a || !b) return false
   return (
     a.alias === b.alias &&
@@ -727,7 +729,7 @@ export function addResolvedWorkspace(
       }
       const lifecycleReady = existing.admission.kind === 'remote' && existing.admission.lifecycle?.kind === 'ready'
       const targetChanged = !remoteTargetsEqual(
-        existing.admission.kind === 'remote' ? remoteRepoConnectionTarget(existing.admission.lifecycle) : null,
+        existing.admission.kind === 'remote' ? remoteWorkspaceConnectionTarget(existing.admission.lifecycle) : null,
         resolvedRepo.target,
       )
       if (
@@ -789,7 +791,7 @@ export function addUnavailableWorkspace(
   id: WorkspaceId,
   reason: string,
   workspaceRuntimeId: string,
-  target?: RemoteRepoTarget,
+  target?: RemoteWorkspaceTarget,
   rankById?: ReadonlyMap<string, number>,
 ): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: WorkspaceId } {
   return upsertRepo(s, id, {
@@ -817,7 +819,7 @@ export function addUnavailableWorkspace(
       // passed repo's remote.
       const retainedTarget =
         target ??
-        (existing.admission.kind === 'remote' ? remoteRepoConnectionTarget(existing.admission.lifecycle) : null) ??
+        (existing.admission.kind === 'remote' ? remoteWorkspaceConnectionTarget(existing.admission.lifecycle) : null) ??
         undefined
       const next: WorkspaceState = {
         ...existing,
@@ -853,7 +855,7 @@ export function addUnavailableWorkspace(
  * calling this twice for the same entry is safe).
  *
  * Note: the ref only carries alias/remotePath; host/user/port require
- * `resolveRemoteRepositoryTarget`, which hasn't run yet. Until the probe
+ * `resolveRemoteWorkspaceTarget`, which hasn't run yet. Until the probe
  * succeeds and addResolvedWorkspace fills in the target, the placeholder lives
  * in a "known alias, unknown concrete host" state —
  * `deriveConnectivity(repo) === 'connecting'` is the signal callers should
@@ -875,7 +877,7 @@ export function insertPlaceholderWorkspace(
         projectionState: 'projected',
       }
       // Placeholders exist only to occupy the workspace switcher slot during a
-      // remote-repo lifecycle run. For a local placeholder the
+      // remote-workspace lifecycle run. For a local placeholder the
       // lifecycle stays null (local workspaces don't have one); for a
       // remote placeholder we mark `connecting` so deriveConnectivity
       // can show the spinner until addResolvedWorkspace /

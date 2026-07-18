@@ -2,12 +2,12 @@ import path from 'node:path'
 import { MAX_REPO_LOCATOR_LENGTH } from '#/shared/repo-locator.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
-  isRemoteRepoId,
-  normalizeRemoteRepoRef,
+  isRemoteWorkspaceId,
+  normalizeRemoteWorkspaceRef,
   normalizeWorkspaceSessionEntry,
-  parseRemoteRepoId,
+  parseRemoteWorkspaceId,
   type WorkspaceSessionEntry,
-} from '#/shared/remote-repo.ts'
+} from '#/shared/remote-workspace.ts'
 import {
   formatWorkspaceLocator,
   parseWorkspaceLocator,
@@ -61,9 +61,9 @@ export function toSafeSessionRepoEntry(value: unknown): WorkspaceSessionEntry | 
   const entry = normalizeWorkspaceSessionEntry(value)
   const id = toSafeRepoLocator(entry?.id ?? value)
   if (!id) return null
-  if (!isRemoteRepoId(id)) return entry?.kind === 'local' ? { kind: 'local', id } : null
-  const parsed = parseRemoteRepoId(id)
-  const ref = parsed ? normalizeRemoteRepoRef(parsed) : null
+  if (!isRemoteWorkspaceId(id)) return entry?.kind === 'local' ? { kind: 'local', id } : null
+  const parsed = parseRemoteWorkspaceId(id)
+  const ref = parsed ? normalizeRemoteWorkspaceRef(parsed) : null
   return ref && entry?.kind === 'remote' && entry.ref.id === id ? { kind: 'remote', id: ref.id, ref } : null
 }
 

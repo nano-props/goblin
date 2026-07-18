@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { PullRequestInfo } from '#/shared/git-types.ts'
 import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
-import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
+import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 
 const REPO_ID = 'goblin+file:///tmp/repo'
 const LINKED_REPO_ID = 'goblin+file:///tmp/repo-linked'
@@ -141,7 +141,7 @@ vi.mock('#/system/ssh/config.ts', () => ({
 }))
 
 vi.mock('#/system/ssh/diagnostics.ts', () => ({
-  testRemoteRepo: vi.fn(),
+  testRemoteWorkspace: vi.fn(),
 }))
 
 vi.mock('#/system/ssh/git.ts', () => ({
@@ -225,7 +225,7 @@ beforeEach(async () => {
   mocks.pruneServerRepoSettingsForRemovedWorktree.mockResolvedValue(false)
   mocks.resolveRemoteTarget.mockResolvedValue({
     target: {
-      id: normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' }),
+      id: normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' }),
       alias: 'prod',
       host: 'example.test',
       user: 'deploy',
@@ -254,13 +254,13 @@ beforeEach(async () => {
   mocks.isAncestor.mockResolvedValue(true)
 })
 
-describe('resolveRemoteRepoTarget', () => {
+describe('resolveRemoteWorkspaceTarget', () => {
   test('threads cancellation into SSH config resolution', async () => {
     const signal = new AbortController().signal
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
-    const { resolveRemoteRepoTarget } = await import('#/server/modules/repo-source.ts')
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const { resolveRemoteWorkspaceTarget } = await import('#/server/modules/repo-source.ts')
 
-    await resolveRemoteRepoTarget(repoId, { workspaceRuntimeId: 'runtime-test' }, signal)
+    await resolveRemoteWorkspaceTarget(repoId, { workspaceRuntimeId: 'runtime-test' }, signal)
 
     expect(mocks.resolveRemoteTarget).toHaveBeenCalledWith({ alias: 'prod', remotePath: '/srv/repo' }, signal)
   })
@@ -554,8 +554,8 @@ describe('fetchRepo invalidation publishing', () => {
   })
 
   test('user sync waits for an active remote background sync with the same alias', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
-    const linkedRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-linked' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-linked' })
     mocks.getRemoteRepoWorktreePaths.mockResolvedValue(['/srv/repo', '/srv/repo-linked'])
     const fetch = deferred<{ ok: true; message: string }>()
     mocks.fetchRemoteRepo.mockImplementationOnce(async () => await fetch.promise)
@@ -595,8 +595,8 @@ describe('fetchRepo invalidation publishing', () => {
   })
 
   test('user sync waits for an active linked remote background sync with the same alias', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
-    const linkedRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-linked' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-linked' })
     mocks.getRemoteRepoWorktreePaths.mockResolvedValue(['/srv/repo', '/srv/repo-linked'])
     const fetch = deferred<{ ok: true; message: string }>()
     mocks.fetchRemoteRepo.mockImplementationOnce(async () => await fetch.promise)
@@ -636,11 +636,11 @@ describe('fetchRepo invalidation publishing', () => {
   })
 
   test('remote syncs for different repos under the same alias use distinct write boundaries', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-a' })
-    const otherRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-b' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-a' })
+    const otherRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-b' })
     mocks.resolveRemoteTarget.mockImplementation(async (ref: { alias: string; remotePath: string }) => ({
       target: {
-        id: normalizeRemoteRepoId(ref),
+        id: normalizeRemoteWorkspaceId(ref),
         alias: ref.alias,
         host: 'example.test',
         user: 'deploy',
@@ -1525,8 +1525,8 @@ describe('repo mutation invalidation publishing', () => {
   })
 
   test('createRepoWorktree publishes remote invalidation when bootstrap fails after remote worktree creation', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
-    const worktreeRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-feature' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const worktreeRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-feature' })
     mocks.createRemoteWorktree.mockResolvedValueOnce({
       ok: true,
       message: 'created',
@@ -1649,8 +1649,8 @@ describe('repo mutation invalidation publishing', () => {
   })
 
   test('remote deleteRepoBranch forwards upstream deletion and refreshes affected remote worktrees after partial failure', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
-    const linkedRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-linked' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-linked' })
     mocks.getRemoteRepoWorktreePaths.mockResolvedValueOnce(['/srv/repo', '/srv/repo-linked'])
     mocks.deleteRemoteBranch.mockResolvedValueOnce({
       ok: false,

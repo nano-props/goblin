@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
-import { classifySshFailure, testRemoteRepo } from '#/system/ssh/diagnostics.ts'
+import { classifySshFailure, testRemoteWorkspace } from '#/system/ssh/diagnostics.ts'
 import type { RemoteCommandKind, RemoteCommandResult } from '#/system/ssh/commands.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const okShell: RemoteCommandResult = { ok: true, stdout: 'ok', stderr: '', message: 'ok', timedOut: false }
@@ -33,8 +33,8 @@ describe('classifySshFailure', () => {
   })
 })
 
-describe('testRemoteRepo parallel stages', () => {
-  const target: RemoteRepoTarget = {
+describe('testRemoteWorkspace parallel stages', () => {
+  const target: RemoteWorkspaceTarget = {
     id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
     alias: 'example',
     host: 'example.local',
@@ -64,7 +64,7 @@ describe('testRemoteRepo parallel stages', () => {
       return { ok: false, stdout: '', stderr: '', message: 'unexpected command', timedOut: false }
     })
 
-    const result = await testRemoteRepo(target, { run })
+    const result = await testRemoteWorkspace(target, { run })
 
     expect(result.ok).toBe(false)
     expect(result.category).toBe('git-missing')
@@ -90,7 +90,7 @@ describe('testRemoteRepo parallel stages', () => {
       return { ok: false, stdout: '', stderr: '', message: 'unexpected command', timedOut: false }
     })
 
-    const result = await testRemoteRepo(target, { run })
+    const result = await testRemoteWorkspace(target, { run })
 
     expect(result.ok).toBe(true)
     expect(result.gitAtWorkspaceRoot).toBe(true)
@@ -109,6 +109,6 @@ describe('testRemoteRepo parallel stages', () => {
       return { ok: false, stdout: '', stderr: '', message: 'unexpected', timedOut: false }
     })
 
-    await expect(testRemoteRepo(target, { run })).resolves.toMatchObject({ ok: true, gitAtWorkspaceRoot: false })
+    await expect(testRemoteWorkspace(target, { run })).resolves.toMatchObject({ ok: true, gitAtWorkspaceRoot: false })
   })
 })

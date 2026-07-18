@@ -9,6 +9,7 @@ import {
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { installGoblinTestBridge, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const REPO_ROOT = workspaceIdForTest('goblin+file:///tmp/runtime-membership-recovery')
 const REMOTE_REPO_ROOT = workspaceIdForTest('goblin+ssh://example/srv/runtime-membership-recovery')
@@ -172,7 +173,7 @@ describe('workspace runtime membership recovery', () => {
 
   test('does not block membership or scope recovery on remote lifecycle ensure', async () => {
     resetWorkspacesStore()
-    const remoteEnsure = Promise.withResolvers<{ kind: 'superseded'; repoId: string }>()
+    const remoteEnsure = Promise.withResolvers<{ kind: 'superseded'; workspaceId: WorkspaceId }>()
     const nextRemoteRuntimeId = 'repo-runtime-123456789012345678901'
     seedRepoWithReadModelForTest({ id: REMOTE_REPO_ROOT, branches: [] })
     installGoblinTestBridge({
@@ -199,6 +200,6 @@ describe('workspace runtime membership recovery', () => {
     ).resolves.toBe('repo-runtime-abcdefghijklmnopqrstu')
     await expect(recovery).resolves.toMatchObject({ kind: 'settled' })
 
-    remoteEnsure.resolve({ kind: 'superseded', repoId: REMOTE_REPO_ROOT })
+    remoteEnsure.resolve({ kind: 'superseded', workspaceId: REMOTE_REPO_ROOT })
   })
 })

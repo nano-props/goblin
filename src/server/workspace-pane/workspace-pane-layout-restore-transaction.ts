@@ -1,4 +1,4 @@
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspacePaneLayoutRepositorySnapshot } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 
 export type WorkspacePaneLayoutRestoreTransactionOutcome =

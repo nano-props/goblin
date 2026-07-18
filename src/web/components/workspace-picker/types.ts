@@ -1,5 +1,5 @@
 import type { GitRemoteInfo } from '#/web/types.ts'
-import type { RemoteRepoConnectionLifecycle } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceConnectionLifecycle } from '#/shared/remote-workspace.ts'
 export interface WorkspacePickerItem {
   id: string
   name: string
@@ -17,7 +17,7 @@ export interface WorkspacePickerItem {
    * for local workspaces. The picker reads `lifecycle.kind` directly
    * to decide which badge to show on the current workspace button.
    */
-  lifecycle: RemoteRepoConnectionLifecycle | null
+  lifecycle: RemoteWorkspaceConnectionLifecycle | null
 }
 
 export type WorkspacePickerSurface = 'toolbar' | 'sidebar'

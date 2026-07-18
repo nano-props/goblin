@@ -7,7 +7,7 @@ import { execa, ExecaError } from 'execa'
 import { FIELD_SEP, WORKTREE_STATUS_BATCH_BOUNDARY } from '#/system/git/parsers.ts'
 import { shellQuote } from '#/system/remote-shell.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 
 const SSH_COMMAND_TIMEOUT_MS = 15_000
@@ -28,7 +28,7 @@ export const SSH_BOOT_PROBE_TIMEOUT_MS = 10_000
 const SSH_CONTROL_DIR = path.join(os.homedir(), '.goblin', 'ssh')
 const SSH_CONTROL_PERSIST_SEC = 600
 
-function controlPathFor(target: RemoteRepoTarget): string {
+function controlPathFor(target: RemoteWorkspaceTarget): string {
   const key = target.sshConnection
     ? JSON.stringify([target.sshConnection.destination, ...target.sshConnection.options])
     : JSON.stringify([target.alias, target.host, target.port, target.user])
@@ -137,9 +137,9 @@ const REMOTE_COMMAND_STDERR_END_MARKER = '__GOBLIN_REMOTE_COMMAND_STDERR_END__'
 
 /** Converts one `ssh -G` result into argv-safe options that never consult config again. */
 export function buildCanonicalSshConnectionSnapshot(
-  target: Pick<RemoteRepoTarget, 'alias' | 'host' | 'user' | 'port'>,
+  target: Pick<RemoteWorkspaceTarget, 'alias' | 'host' | 'user' | 'port'>,
   effectiveConfig: string,
-): NonNullable<RemoteRepoTarget['sshConnection']> {
+): NonNullable<RemoteWorkspaceTarget['sshConnection']> {
   const options = effectiveConfig
     .split(/\r?\n/u)
     .map((line) => line.trim())
@@ -159,7 +159,7 @@ export function buildCanonicalSshConnectionSnapshot(
   })
 }
 
-function capturedConnectionArgs(target: RemoteRepoTarget): string[] {
+function capturedConnectionArgs(target: RemoteWorkspaceTarget): string[] {
   if (!target.sshConnection) return []
   const nullConfig = process.platform === 'win32' ? 'NUL' : '/dev/null'
   return ['-F', nullConfig, ...target.sshConnection.options.flatMap((option) => ['-o', option])]
@@ -167,12 +167,12 @@ function capturedConnectionArgs(target: RemoteRepoTarget): string[] {
 
 export type RemoteCommandRunner = (
   command: RemoteCommandKind,
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ) => Promise<RemoteCommandResult>
 
 export function buildRemoteCommandInvocation(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   command: RemoteCommandKind,
 ): RemoteCommandInvocation {
   const script = scriptForCommand(command)
@@ -180,7 +180,7 @@ export function buildRemoteCommandInvocation(
 }
 
 export function buildRemoteTerminalInvocation(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   remotePath: string,
   _size: { cols: number; rows: number },
   options: { startupShellCommand?: string } = {},
@@ -195,7 +195,7 @@ export function buildRemoteTerminalInvocation(
 }
 
 function buildCanonicalSshInvocation(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   script: string,
   ttyArgs: readonly string[],
 ): RemoteCommandInvocation {
@@ -224,7 +224,7 @@ function normalizeTerminalStartupShellCommand(command: string | undefined): stri
 }
 
 export async function runRemoteCommand(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   command: RemoteCommandKind,
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ): Promise<RemoteCommandResult> {

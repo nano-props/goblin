@@ -14,7 +14,7 @@ import type {
 } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
-import { localWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   workspacePaneRuntimeTabEntry,

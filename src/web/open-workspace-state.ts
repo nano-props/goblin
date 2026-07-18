@@ -1,10 +1,10 @@
 import {
-  isRemoteRepoId,
-  remoteRepoConnectionTarget,
-  remoteRepoRefFromTarget,
+  isRemoteWorkspaceId,
+  remoteWorkspaceConnectionTarget,
+  remoteWorkspaceRefFromTarget,
   remoteWorkspaceSessionEntry,
   type WorkspaceSessionEntry,
-} from '#/shared/remote-repo.ts'
+} from '#/shared/remote-workspace.ts'
 import type { WorkspaceAdmissionState } from '#/web/stores/workspaces/types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
@@ -27,7 +27,7 @@ export function persistedOpenWorkspaceEntries(
     const repo = workspaces[id]
     if (!repo) return []
     if (repo.session?.entry) return [repo.session.entry]
-    if (!isRemoteRepoId(repo.id)) return [{ kind: 'local', id: repo.id }]
+    if (!isRemoteWorkspaceId(repo.id)) return [{ kind: 'local', id: repo.id }]
     // For remote workspaces, reconstruct the session entry from the
     // last-known target (lifecycle.target). A failed lifecycle
     // may or may not have a retained target; without one we
@@ -36,9 +36,9 @@ export function persistedOpenWorkspaceEntries(
     // intentional trade-off: a placeholder with no target is just a
     // connecting spinner, not a repo the user explicitly opened.
     if (repo.admission.kind !== 'remote') return []
-    const target = remoteRepoConnectionTarget(repo.admission.lifecycle)
+    const target = remoteWorkspaceConnectionTarget(repo.admission.lifecycle)
     if (!target) return []
-    return [remoteWorkspaceSessionEntry(remoteRepoRefFromTarget(target))]
+    return [remoteWorkspaceSessionEntry(remoteWorkspaceRefFromTarget(target))]
   })
 }
 

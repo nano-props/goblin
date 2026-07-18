@@ -1,5 +1,5 @@
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import { toRemoteRepoFailureReason, type RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { toRemoteWorkspaceFailureReason, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 type RepoAvailabilityTarget = Pick<WorkspaceState, 'availability' | 'admission' | 'capability'>
 
 const UNAVAILABLE_REASONS = new Set([
@@ -24,7 +24,7 @@ export function markRepoUnavailable(repo: RepoAvailabilityTarget, reason: string
 
 /**
  * Set the remote lifecycle to `connecting` (entry point of a fresh
- * remote-repo run). The lifecycle union owns the target and the
+ * remote-workspace run). The lifecycle union owns the target and the
  * `connecting` variant has no slot for it. Pass-through to availability keeps the
  * refresh-pipeline call sites (refresh.ts) that flip
  * `availability` from `available` working unchanged — the
@@ -39,14 +39,11 @@ export function markRemoteLifecycleConnecting(repo: RepoAvailabilityTarget): voi
 
 /**
  * Set the remote lifecycle to `ready` with a concrete target. This is
- * the success terminus of a remote-repo run. Mirrors
+ * the success terminus of a remote-workspace run. Mirrors
  * `markRepoAvailable` on the availability field (kept as a hint
  * for the refresh-pipeline guards in refresh.ts).
  */
-export function markRemoteLifecycleReady(
-  repo: RepoAvailabilityTarget,
-  target: RemoteRepoTarget,
-): void {
+export function markRemoteLifecycleReady(repo: RepoAvailabilityTarget, target: RemoteWorkspaceTarget): void {
   const admission = remoteRepoAdmission(repo)
   admission.lifecycle = { kind: 'ready', target }
   markRepoAvailable(repo)
@@ -61,9 +58,9 @@ export function markRemoteLifecycleReady(
 export function markRemoteLifecycleFailed(
   repo: RepoAvailabilityTarget,
   reason: string,
-  target?: RemoteRepoTarget,
+  target?: RemoteWorkspaceTarget,
 ): void {
-  const lifecycleReason = toRemoteRepoFailureReason(reason)
+  const lifecycleReason = toRemoteWorkspaceFailureReason(reason)
   const admission = remoteRepoAdmission(repo)
   admission.lifecycle = target
     ? { kind: 'failed', reason: lifecycleReason, target }
@@ -77,7 +74,10 @@ function clearGitFetchFailure(repo: Pick<WorkspaceState, 'capability'>): void {
   repo.capability.git.remote.fetchError = null
 }
 
-function remoteRepoAdmission(repo: Pick<WorkspaceState, 'admission'>): Extract<WorkspaceState['admission'], { kind: 'remote' }> {
-  if (repo.admission.kind !== 'remote') throw new Error('Remote repository lifecycle requires remote workspace admission')
+function remoteRepoAdmission(
+  repo: Pick<WorkspaceState, 'admission'>,
+): Extract<WorkspaceState['admission'], { kind: 'remote' }> {
+  if (repo.admission.kind !== 'remote')
+    throw new Error('Remote repository lifecycle requires remote workspace admission')
   return repo.admission
 }

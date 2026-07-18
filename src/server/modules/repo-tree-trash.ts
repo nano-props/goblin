@@ -1,8 +1,8 @@
 import path from 'node:path'
 import { lstat } from 'node:fs/promises'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { ExecResult, WorktreeInfo } from '#/shared/git-types.ts'
-import { remoteRuntimeAwareGitRunner, resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
+import { remoteRuntimeAwareGitRunner, resolveRemoteWorkspaceTarget } from '#/server/modules/repo-source.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { trashRemoteFile } from '#/system/ssh/git.ts'
 import { movePathToTrash } from '#/system/trash.ts'
@@ -21,8 +21,8 @@ export async function trashRepositoryFile(
   const workspacePath = resolveWorkspaceScopedPath(cwd, worktreePath)
   const executionPath = workspacePath ?? worktreePath
 
-  if (isRemoteRepoId(cwd)) {
-    const target = await resolveRemoteRepoTarget(
+  if (isRemoteWorkspaceId(cwd)) {
+    const target = await resolveRemoteWorkspaceTarget(
       cwd,
       options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
     )

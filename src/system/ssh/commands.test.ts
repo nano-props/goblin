@@ -18,7 +18,7 @@ import {
   buildRemoteCommandInvocation,
   buildRemoteTerminalInvocation,
 } from '#/system/ssh/commands.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const originalPath = process.env.PATH
@@ -95,11 +95,11 @@ describe('remote ssh command builders', () => {
   })
 
   test('binds ControlPath to the complete captured SSH connection snapshot', () => {
-    const withConnection = (effectiveConfig: string): RemoteRepoTarget => {
+    const withConnection = (effectiveConfig: string): RemoteWorkspaceTarget => {
       const remote = target()
       return { ...remote, sshConnection: buildCanonicalSshConnectionSnapshot(remote, effectiveConfig) }
     }
-    const controlPath = (remote: RemoteRepoTarget): string | undefined =>
+    const controlPath = (remote: RemoteWorkspaceTarget): string | undefined =>
       buildRemoteCommandInvocation(remote, { type: 'printHome' }).args.find((arg) => arg.startsWith('ControlPath='))
     const base = ['hostname example.test', 'user deploy', 'port 22', 'proxycommand route-a %n %h'].join('\n')
     const changedProxy = ['hostname example.test', 'user deploy', 'port 22', 'proxycommand route-b %n %h'].join('\n')
@@ -670,7 +670,7 @@ async function initRepoWithWorktrees(
   return dir
 }
 
-function targetWithPath(repoPath: string): RemoteRepoTarget {
+function targetWithPath(repoPath: string): RemoteWorkspaceTarget {
   return {
     id: workspaceIdForTest(`goblin+ssh://prod${repoPath}`),
     alias: 'prod',
@@ -682,7 +682,7 @@ function targetWithPath(repoPath: string): RemoteRepoTarget {
   }
 }
 
-function target(): RemoteRepoTarget {
+function target(): RemoteWorkspaceTarget {
   return {
     id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
     alias: 'prod',

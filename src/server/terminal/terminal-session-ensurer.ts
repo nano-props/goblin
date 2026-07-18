@@ -1,5 +1,5 @@
 import { buildRemoteTerminalInvocation } from '#/system/ssh/commands.ts'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
   type TerminalCreateAction,
   terminalExecutionCoordinates,
@@ -98,7 +98,7 @@ class TerminalSessionEnsurer {
     input: TerminalSessionEnsureInput,
     context: TerminalSessionEnsureContext,
   ): Promise<TerminalSessionEnsureResult> {
-    if (isRemoteRepoId(terminalExecutionCoordinates(input.target).repoRoot)) {
+    if (isRemoteWorkspaceId(terminalExecutionCoordinates(input.target).repoRoot)) {
       return await this.ensureRemote(userId, input, context)
     }
     return await this.ensureLocal(userId, input, context)

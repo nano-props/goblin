@@ -1,4 +1,8 @@
 import { isRepoQueryInvalidationEvent, type RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
+import {
+  isWorkspaceRuntimeInvalidationEvent,
+  type WorkspaceRuntimeInvalidationEvent,
+} from '#/shared/workspace-runtime-invalidation.ts'
 
 export const SETTINGS_INVALIDATION_SCOPES = ['settings-snapshot', 'external-apps', 'i18n', 'theme'] as const
 
@@ -9,7 +13,10 @@ export interface SettingsInvalidationEvent {
   scopes: SettingsInvalidationScope[]
 }
 
-export type ServerInvalidationEvent = RepoQueryInvalidationEvent | SettingsInvalidationEvent
+export type ServerInvalidationEvent =
+  | RepoQueryInvalidationEvent
+  | WorkspaceRuntimeInvalidationEvent
+  | SettingsInvalidationEvent
 
 export function isSettingsInvalidationScope(value: unknown): value is SettingsInvalidationScope {
   return value === 'settings-snapshot' || value === 'external-apps' || value === 'i18n' || value === 'theme'
@@ -26,7 +33,11 @@ export function isSettingsInvalidationEvent(value: unknown): value is SettingsIn
 }
 
 export function isServerInvalidationEvent(value: unknown): value is ServerInvalidationEvent {
-  return isRepoQueryInvalidationEvent(value) || isSettingsInvalidationEvent(value)
+  return (
+    isRepoQueryInvalidationEvent(value) ||
+    isWorkspaceRuntimeInvalidationEvent(value) ||
+    isSettingsInvalidationEvent(value)
+  )
 }
 
 export function settingsInvalidationScopesForPrefsPatch(patch: Record<string, unknown>): SettingsInvalidationScope[] {

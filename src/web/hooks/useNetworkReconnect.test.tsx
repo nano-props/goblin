@@ -4,7 +4,7 @@ import { act, cleanup } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
-import { isRemoteRepoId, normalizeRemoteTarget, type RemoteRepoConnectionLifecycle } from '#/shared/remote-repo.ts'
+import { isRemoteWorkspaceId, normalizeRemoteTarget, type RemoteWorkspaceConnectionLifecycle } from '#/shared/remote-workspace.ts'
 import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import { goblinLog } from '#/web/logger.ts'
@@ -19,7 +19,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 vi.mock('#/web/stores/workspaces/remote-workspace-connection-command.ts', () => ({
   runRemoteWorkspaceConnection: vi.fn(async () => ({
     kind: 'superseded' as const,
-    repoRoot: workspaceIdForTest('goblin+file:///tmp/remote-workspace'),
+    workspaceId: workspaceIdForTest('goblin+ssh://example/remote-workspace'),
   })),
 }))
 
@@ -36,7 +36,7 @@ beforeEach(() => {
   vi.mocked(runRemoteWorkspaceConnection).mockClear()
   vi.mocked(runRemoteWorkspaceConnection).mockResolvedValue({
     kind: 'superseded',
-    repoRoot: workspaceIdForTest('goblin+file:///tmp/remote-workspace'),
+    workspaceId: workspaceIdForTest('goblin+ssh://example/remote-workspace'),
   })
 })
 
@@ -65,9 +65,9 @@ function remoteTargetFixture() {
   return target!
 }
 
-function seedRepo(id: ReturnType<typeof workspaceIdForTest>, lifecycle: RemoteRepoConnectionLifecycle | null) {
+function seedRepo(id: ReturnType<typeof workspaceIdForTest>, lifecycle: RemoteWorkspaceConnectionLifecycle | null) {
   const repo = emptyWorkspace(id, id, 'repo-runtime-test')
-  repo.admission = isRemoteRepoId(id) ? { kind: 'remote', lifecycle, lifecycleAttemptId: null } : { kind: 'local' }
+  repo.admission = isRemoteWorkspaceId(id) ? { kind: 'remote', lifecycle, lifecycleAttemptId: null } : { kind: 'local' }
   useWorkspacesStore.setState((s) => ({
     ...s,
     workspaces: {
@@ -161,7 +161,7 @@ describe('useNetworkReconnect', () => {
     const warn = vi.spyOn(goblinLog, 'warn').mockImplementation(() => undefined)
     vi.mocked(runRemoteWorkspaceConnection).mockResolvedValueOnce({
       kind: 'transport-failed',
-      repoRoot: workspaceIdForTest(target.id),
+      workspaceId: workspaceIdForTest(target.id),
       reason: 'unknown',
     })
     seedRepo(target.id, { kind: 'failed', reason: 'unreachable' })
@@ -170,6 +170,9 @@ describe('useNetworkReconnect', () => {
     fireOnline()
     await flushMicrotasks(10)
 
-    expect(warn).toHaveBeenCalledWith('remote reconnect command failed', { repoId: target.id, reason: 'unknown' })
+    expect(warn).toHaveBeenCalledWith('remote workspace reconnect command failed', {
+      workspaceId: target.id,
+      reason: 'unknown',
+    })
   })
 })

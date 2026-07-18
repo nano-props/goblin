@@ -1,9 +1,9 @@
 import { describe, expect, test, vi } from 'vitest'
 import { getRemoteDirectoryWalk } from '#/system/ssh/filesystem.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const target: RemoteRepoTarget = {
+const target: RemoteWorkspaceTarget = {
   id: workspaceIdForTest('goblin+ssh://mock-host/workspace'),
   alias: 'mock-host',
   remotePath: '/workspace',

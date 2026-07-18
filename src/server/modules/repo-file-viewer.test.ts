@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   getWorktrees: vi.fn(),
   userShellCommandExists: vi.fn(),
-  resolveRemoteRepoTarget: vi.fn(),
+  resolveRemoteWorkspaceTarget: vi.fn(),
   remoteRuntimeAwareGitRunner: vi.fn(),
   remoteCommandExists: vi.fn(),
   remoteCommandExistsAtWorkspaceRoot: vi.fn(),
@@ -19,7 +19,7 @@ vi.mock('#/system/user-shell.ts', () => ({
 }))
 
 vi.mock('#/server/modules/repo-source.ts', () => ({
-  resolveRemoteRepoTarget: mocks.resolveRemoteRepoTarget,
+  resolveRemoteWorkspaceTarget: mocks.resolveRemoteWorkspaceTarget,
   remoteRuntimeAwareGitRunner: mocks.remoteRuntimeAwareGitRunner,
 }))
 
@@ -30,7 +30,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
 }))
 
 import { getRepositoryFileViewer } from '#/server/modules/repo-file-viewer.ts'
-import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
+import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -122,7 +122,7 @@ describe('repo file viewer read layer', () => {
   })
 
   test('uses batcat for remote repos when bat is unavailable but batcat resolves', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const target = {
       id: repoId,
       alias: 'prod',
@@ -132,7 +132,7 @@ describe('repo file viewer read layer', () => {
       user: 'tester',
       port: 22,
     }
-    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.remoteCommandExists.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
 
     const result = await getRepositoryFileViewer(repoId, '/srv/repo-feature')
@@ -150,7 +150,7 @@ describe('repo file viewer read layer', () => {
   })
 
   test('resolves an SSH workspace locator without a Git worktree lookup', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/plain-workspace' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/plain-workspace' })
     const target = {
       id: repoId,
       alias: 'prod',
@@ -160,7 +160,7 @@ describe('repo file viewer read layer', () => {
       user: 'tester',
       port: 22,
     }
-    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.remoteCommandExistsAtWorkspaceRoot.mockResolvedValueOnce(true)
 
     await expect(getRepositoryFileViewer(repoId, repoId)).resolves.toEqual({
@@ -175,7 +175,7 @@ describe('repo file viewer read layer', () => {
   })
 
   test('matches remote worktree paths after POSIX normalization', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const target = {
       id: repoId,
       alias: 'prod',
@@ -185,7 +185,7 @@ describe('repo file viewer read layer', () => {
       user: 'tester',
       port: 22,
     }
-    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.remoteCommandExists.mockResolvedValueOnce(true)
 
     const result = await getRepositoryFileViewer(repoId, '/srv/repo-feature/')
@@ -200,7 +200,7 @@ describe('repo file viewer read layer', () => {
 
   test('uses the runtime-aware runner for remote viewer probes when provided', async () => {
     const workspaceRuntimeId = 'repo-runtime-file-viewer-test'
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const target = {
       id: repoId,
       alias: 'prod',
@@ -212,7 +212,7 @@ describe('repo file viewer read layer', () => {
     }
     const run = async () => ({ ok: true as const, stdout: '', stderr: '', code: 0 })
     mocks.remoteRuntimeAwareGitRunner.mockReturnValueOnce(run)
-    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.remoteCommandExists.mockResolvedValueOnce(true)
 
     await expect(getRepositoryFileViewer(repoId, '/srv/repo-feature', undefined, { workspaceRuntimeId })).resolves.toEqual({
@@ -221,7 +221,7 @@ describe('repo file viewer read layer', () => {
       executionRoot: '/srv/repo-feature',
     })
 
-    expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(repoId, { workspaceRuntimeId })
+    expect(mocks.resolveRemoteWorkspaceTarget).toHaveBeenCalledWith(repoId, { workspaceRuntimeId })
     expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(repoId, workspaceRuntimeId, target)
     expect(mocks.resolveRemoteWorktree).toHaveBeenCalledWith(target, '/srv/repo-feature', {
       signal: undefined,
@@ -236,7 +236,7 @@ describe('repo file viewer read layer', () => {
   })
 
   test('rejects unknown remote worktrees without probing viewer commands', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const target = {
       id: repoId,
       alias: 'prod',
@@ -246,7 +246,7 @@ describe('repo file viewer read layer', () => {
       user: 'tester',
       port: 22,
     }
-    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.resolveRemoteWorktree.mockRejectedValueOnce(new Error('unknown worktree path'))
 
     await expect(getRepositoryFileViewer(repoId, '/srv/missing')).rejects.toThrow('unknown worktree path')
@@ -255,7 +255,7 @@ describe('repo file viewer read layer', () => {
   })
 
   test('surfaces remote worktree read failures without falling back to cat', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const target = {
       id: repoId,
       alias: 'prod',
@@ -265,7 +265,7 @@ describe('repo file viewer read layer', () => {
       user: 'tester',
       port: 22,
     }
-    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.resolveRemoteWorktree.mockRejectedValueOnce(new Error('ssh unavailable'))
 
     await expect(getRepositoryFileViewer(repoId, '/srv/repo-feature')).rejects.toThrow('ssh unavailable')

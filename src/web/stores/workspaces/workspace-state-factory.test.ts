@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
+import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { deriveConnectivity } from '#/web/stores/workspaces/workspace-guards.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'

@@ -1,5 +1,5 @@
 import type { LangPref } from '#/shared/api-types.ts'
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 
 export interface MenuRuntimeState {
   recentWorkspaces: WorkspaceSessionEntry[]

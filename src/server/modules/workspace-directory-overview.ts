@@ -1,10 +1,10 @@
 import { lstat, opendir } from 'node:fs/promises'
 import path from 'node:path'
 import { localWorkspaceNativePath } from '#/server/modules/workspace-path.ts'
-import { resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
+import { resolveRemoteWorkspaceTarget } from '#/server/modules/repo-source.ts'
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
-import { remoteRuntimeFailureFromCommandResult } from '#/server/modules/remote-runtime-failure.ts'
+import { remoteWorkspaceRuntimeFailureFromCommandResult } from '#/server/modules/remote-workspace-runtime-failure.ts'
 
 const DIRECTORY_OVERVIEW_TIMEOUT_MS = 30_000
 
@@ -19,14 +19,14 @@ export async function readWorkspaceDirectoryOverview(
     )
   }
 
-  const target = await resolveRemoteRepoTarget(workspaceId, { workspaceRuntimeId: options.workspaceRuntimeId })
+  const target = await resolveRemoteWorkspaceTarget(workspaceId, { workspaceRuntimeId: options.workspaceRuntimeId })
   const result = await runRemoteCommand(
     target,
     { type: 'directoryOverview', path: target.remotePath },
     { signal: options.signal, timeoutMs: DIRECTORY_OVERVIEW_TIMEOUT_MS },
   )
-  const runtimeFailure = remoteRuntimeFailureFromCommandResult({
-    repoRoot: workspaceId,
+  const runtimeFailure = remoteWorkspaceRuntimeFailureFromCommandResult({
+    workspaceId: workspaceId,
     workspaceRuntimeId: options.workspaceRuntimeId,
     target,
     result,

@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
-import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
+import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceRuntimeClosedEvent } from '#/server/modules/workspace-runtimes.ts'
 import { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { validatePhysicalWorktreeExecution } from '#/server/worktree-removal/physical-worktree-capability.ts'
@@ -120,7 +120,7 @@ describe('PhysicalWorktreeIdentityResolver', () => {
   })
 
   test('marks a remote runtime stale when the execution endpoint changes under one SSH config', async () => {
-    const repoRoot = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const repoRoot = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     let remoteOutput = remoteIdentityOutput('0123456789abcdef0123456789abcdef', 'machine-a', 'mnt-a')
     const runRemoteCommand = vi.fn(async () => ({ ok: true, stdout: remoteOutput, stderr: '' }))
     const resolver = new PhysicalWorktreeIdentityResolver({
@@ -155,7 +155,7 @@ describe('PhysicalWorktreeIdentityResolver', () => {
   })
 
   test('classifies transport failures while resolving the remote worktree list', async () => {
-    const repoRoot = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const repoRoot = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const resolver = new PhysicalWorktreeIdentityResolver({
       async resolveRemoteTarget() {
         return {
@@ -190,8 +190,8 @@ describe('PhysicalWorktreeIdentityResolver', () => {
     await expect(
       resolver.capture({ ...LOCAL_INPUT, repoRoot, worktreePath: '/srv/worktrees/feature' }),
     ).rejects.toMatchObject({
-      name: 'RemoteRepoRuntimeFailureError',
-      repoRoot,
+      name: 'RemoteWorkspaceRuntimeFailureError',
+      workspaceId: repoRoot,
       workspaceRuntimeId: LOCAL_INPUT.workspaceRuntimeId,
       reason: 'handshake-failed',
     })

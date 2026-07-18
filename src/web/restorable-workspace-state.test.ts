@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { localWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import {
   restoreRestorableWorkspaceStateFromClientWorkspace,
   clientWorkspaceStateFromRestorableWorkspaceState,

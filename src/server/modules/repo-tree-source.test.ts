@@ -12,7 +12,7 @@ import {
   getWorkspaceTreeSourceRemote,
 } from '#/server/modules/repo-tree-source.ts'
 import { buildChildNodes, buildLimitedChildNodes } from '#/server/modules/repo-tree-source-pure.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 async function makeTempWorktree(files: Record<string, string>): Promise<string> {
@@ -187,7 +187,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
 }))
 vi.mock('#/system/ssh/filesystem.ts', () => ({ getRemoteDirectoryWalk: remoteMocks.getRemoteDirectoryWalk }))
 
-function remoteTarget(): RemoteRepoTarget {
+function remoteTarget(): RemoteWorkspaceTarget {
   return {
     id: workspaceIdForTest('goblin+ssh://mybox/myrepo'),
     alias: 'mybox',

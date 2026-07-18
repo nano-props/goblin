@@ -1,5 +1,5 @@
 import type { RestoredWorkspaceRuntime, ServerWorkspaceState } from '#/shared/api-types.ts'
-import { workspaceSessionEntryId, type WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { workspaceSessionEntryId, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { formatWorkspaceLocator, parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'

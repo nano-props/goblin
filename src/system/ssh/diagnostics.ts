@@ -4,17 +4,17 @@ import type {
   RemoteDiagnosticStage,
   RemoteDiagnosticStageName,
   RemoteDiagnosticsResult,
-  RemoteRepoTarget,
-} from '#/shared/remote-repo.ts'
+  RemoteWorkspaceTarget,
+} from '#/shared/remote-workspace.ts'
 
 type DiagnosticsRunner = (
   command: RemoteCommandKind,
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ) => Promise<RemoteCommandResult>
 
-export async function testRemoteRepo(
-  target: RemoteRepoTarget,
+export async function testRemoteWorkspace(
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: DiagnosticsRunner; timeoutMs?: number } = {},
 ): Promise<RemoteDiagnosticsResult> {
   const run: DiagnosticsRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
@@ -151,7 +151,7 @@ function hasOkMarker(stdout: string): boolean {
  *  shape that records the actual outcome of every stage that ran —
  *  see the Promise.all block above. */
 function failDiagnosticAt(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   stages: RemoteDiagnosticStage[],
   failedIndex: number,
   category: RemoteDiagnosticCategory,
@@ -175,7 +175,7 @@ function failDiagnosticAt(
  *  every subsequent stage as skipped, so the rendered failure matches
  *  the canonical stage ordering without callers having to mirror it. */
 export function makeUnresolvedTargetDiagnostic(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   category: RemoteDiagnosticCategory,
   message: string,
 ): RemoteDiagnosticsResult {

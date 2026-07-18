@@ -23,7 +23,7 @@ import {
 import { restorableWorkspacePaneTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import { bindWorkspacePaneTarget, type RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import { canonicalWorkspaceLocator, parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspacePaneTabsRestoreResult } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
 import {

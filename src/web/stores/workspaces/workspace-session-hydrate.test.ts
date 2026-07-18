@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { localWorkspaceSessionEntry, normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { localWorkspaceSessionEntry, normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
@@ -16,7 +16,7 @@ import {
   REPO_B,
   resetLifecycleTest,
 } from '#/web/stores/workspaces/workspace-session-test-utils.ts'
-import { acceptRemoteLifecycleProjection } from '#/web/stores/workspaces/remote-lifecycle-projection.ts'
+import { acceptRemoteWorkspaceLifecycleProjection } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
@@ -458,7 +458,7 @@ describe('repo session hydration', () => {
       restoredWorkspaceId: entry.id,
     })
     expect(
-      acceptRemoteLifecycleProjection(useWorkspacesStore.setState, useWorkspacesStore.getState, {
+      acceptRemoteWorkspaceLifecycleProjection(useWorkspacesStore.setState, useWorkspacesStore.getState, {
         workspaceId,
         workspaceRuntimeId,
         remoteLifecycle: { kind: 'failed', attemptId: 5, reason: 'unreachable', target },

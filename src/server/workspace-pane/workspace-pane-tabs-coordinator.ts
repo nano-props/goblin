@@ -9,7 +9,7 @@ import type {
 } from '#/shared/workspace-pane-tabs.ts'
 import { runtimeWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
   PhysicalWorktreeOperationPermit,

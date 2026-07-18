@@ -2,14 +2,14 @@ import path from 'node:path'
 import { constants as fsConstants } from 'node:fs'
 import { access, realpath, stat } from 'node:fs/promises'
 import { git } from '#/system/git/git-exec.ts'
-import { parseWorkspaceLocator, type WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
+import { formatWorkspaceLocator, parseWorkspaceLocator, type WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
 import {
   capabilitiesFromGitProbe,
   type WorkspaceGitProbeResult,
   type WorkspaceSettledProbeState,
   type WorkspaceUnavailableReason,
 } from '#/shared/workspace-runtime.ts'
-import { resolveServerRemoteRepoConnection } from '#/server/modules/remote.ts'
+import { resolveServerRemoteWorkspaceConnection } from '#/server/modules/remote-workspace.ts'
 import { parseGitHubRemoteUrl } from '#/system/github/graphql.ts'
 
 export interface LocalWorkspaceProbeDependencies {
@@ -72,7 +72,9 @@ export async function probeWorkspace(
   if (!locator) return { status: 'unavailable', reason: 'error.workspace-locator-malformed' }
   if (locator.transport === 'file') return await probeLocalWorkspace(input, platform, options)
 
-  const resolved = await resolveServerRemoteRepoConnection({ repoId: input }, options.signal)
+  const workspaceId = formatWorkspaceLocator(locator, platform)
+  if (!workspaceId) return { status: 'unavailable', reason: 'error.workspace-locator-malformed' }
+  const resolved = await resolveServerRemoteWorkspaceConnection({ workspaceId }, options.signal)
   if (resolved.kind === 'failed') {
     return {
       status: 'unavailable',

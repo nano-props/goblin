@@ -3,7 +3,7 @@ import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
   confirmServerWorkspaceRepoEntry: vi.fn(),
   probeRepo: vi.fn(),
   readRepoProjection: vi.fn(),
-  runRemoteLifecycleWrite: vi.fn(),
+  runRemoteWorkspaceLifecycleWrite: vi.fn(),
   workspaceProbeStateForRuntime: vi.fn(),
   probeWorkspace: vi.fn(),
 }))
@@ -55,8 +55,8 @@ vi.mock('#/server/modules/workspace-probe.ts', () => ({
   probeWorkspace: mocks.probeWorkspace,
 }))
 
-vi.mock('#/server/modules/remote-lifecycle-write-paths.ts', () => ({
-  runRemoteLifecycleWrite: mocks.runRemoteLifecycleWrite,
+vi.mock('#/server/modules/remote-workspace-lifecycle-write-paths.ts', () => ({
+  runRemoteWorkspaceLifecycleWrite: mocks.runRemoteWorkspaceLifecycleWrite,
 }))
 
 function gitProbe() {
@@ -277,7 +277,7 @@ describe('restoreRepoTabsForRepo', () => {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [entry],
     })
-    mocks.runRemoteLifecycleWrite.mockResolvedValue({
+    mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'ready', target: entry.ref },
       name: 'repo',
@@ -469,7 +469,7 @@ describe('restoreRepoTabsForRepo', () => {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [remoteEntry],
     })
-    mocks.runRemoteLifecycleWrite.mockResolvedValue({
+    mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'failed', reason: 'unreachable' },
       name: 'repo',

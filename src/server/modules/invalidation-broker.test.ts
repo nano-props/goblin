@@ -5,9 +5,11 @@ import {
   MAX_INVALIDATION_SOCKETS,
   publishRepoQueryInvalidation,
   publishUserRepoQueryInvalidation,
+  publishUserWorkspaceRuntimeInvalidation,
   registerInvalidationSocket,
   unregisterInvalidationSocket,
 } from '#/server/modules/invalidation-broker.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('invalidation broker', () => {
   beforeEach(() => {
@@ -55,5 +57,15 @@ describe('invalidation broker', () => {
 
     expect(first.send).toHaveBeenCalledOnce()
     expect(second.send).not.toHaveBeenCalled()
+  })
+
+  test('publishes workspace runtime invalidations with canonical workspace identity', () => {
+    const socket = { send: vi.fn(), close: vi.fn() }
+    registerInvalidationSocket(socket, 'user_a')
+    const workspaceId = workspaceIdForTest('goblin+ssh://example/workspace')
+
+    publishUserWorkspaceRuntimeInvalidation('user_a', { workspaceId })
+
+    expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: 'workspace-runtime-invalidated', workspaceId }))
   })
 })

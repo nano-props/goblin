@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { buildCanonicalSshConnectionSnapshot } from '#/system/ssh/commands.ts'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { physicalWorktreeIdentityKey, type PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { resolveRemoteTargetWithConfigFingerprint } from '#/system/ssh/config.ts'
 
@@ -27,7 +27,7 @@ export interface PhysicalWorktreeExecutionCapability {
 
 export interface PhysicalWorktreeExecutionScope extends PhysicalWorktreeExecutionInput {}
 
-type ResolvedRemoteTarget = Awaited<ReturnType<typeof resolveRemoteTargetWithConfigFingerprint>>['target']
+type ResolvedRemoteWorkspaceTarget = Awaited<ReturnType<typeof resolveRemoteTargetWithConfigFingerprint>>['target']
 export type PhysicalWorktreeExecutionBinding =
   | {
       readonly kind: 'local'
@@ -37,7 +37,7 @@ export type PhysicalWorktreeExecutionBinding =
   | {
       readonly kind: 'remote'
       readonly canonicalWorktreePath: string
-      readonly target: Readonly<ResolvedRemoteTarget>
+      readonly target: Readonly<ResolvedRemoteWorkspaceTarget>
       readonly configFingerprint: string
       readonly endpointMarker: PhysicalWorktreeEndpointMarker
     }
@@ -119,7 +119,7 @@ export function assertPhysicalWorktreeExecutionCapability(
   input: PhysicalWorktreeExecutionInput,
 ): void {
   const state = capabilityState(capability)
-  const worktreePath = isRemoteRepoId(input.repoRoot)
+  const worktreePath = isRemoteWorkspaceId(input.repoRoot)
     ? path.posix.resolve(input.worktreePath)
     : path.resolve(input.worktreePath)
   if (

@@ -1,7 +1,7 @@
 import * as v from 'valibot'
 import { COLOR_THEMES } from '#/shared/color-theme.ts'
-import { WorkspaceSessionEntrySchema } from '#/shared/remote-repo-schema.ts'
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { WorkspaceSessionEntrySchema } from '#/shared/remote-workspace-schema.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { UserSettings } from '#/shared/settings.ts'
 
 export const LANG_PREF_VALUES = ['auto', 'en', 'zh', 'ko', 'ja'] as const

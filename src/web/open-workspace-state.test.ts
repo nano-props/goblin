@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import {
   restoredWorkspaceIdAfterWorkspaceHydration,
   nextRestoredRepoIdAfterWorkspaceClose,

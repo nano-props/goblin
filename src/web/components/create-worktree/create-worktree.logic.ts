@@ -7,7 +7,7 @@
 
 import { defaultWorktreePath, formatWorktreePath, tildify, untildify } from '#/web/lib/paths.ts'
 import { validateBranchName } from '#/shared/refnames.ts'
-import { isResolvableRemotePathInput, type RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { isResolvableRemotePathInput, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { deriveLocalBranchFromRemoteRef, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 
@@ -56,7 +56,7 @@ interface CreateWorktreeFormRepo {
 export function deriveCreateWorktreeForm(
   state: CreateWorktreeFormState,
   repo: CreateWorktreeFormRepo,
-  remoteTarget: RemoteRepoTarget | null,
+  remoteTarget: RemoteWorkspaceTarget | null,
   t: Translate,
 ): CreateWorktreeDerived {
   const localBranchNames = repo.branchModel.branches.map((b) => b.name)

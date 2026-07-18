@@ -27,6 +27,7 @@ import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import { useWorkspaceDrop } from '#/web/hooks/useWorkspaceDrop.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
+import { useWorkspaceRuntimeInvalidationRefresh } from '#/web/hooks/useWorkspaceRuntimeInvalidationRefresh.ts'
 import { useRepoProjectionQueryEffects } from '#/web/repo-projection-query-effects.ts'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToast.ts'
@@ -510,6 +511,7 @@ function AuthenticatedWorkspaceSideEffects({
   useNetworkReconnect()
   useRepoProjectionQueryEffects()
   useRepoStoreInvalidationRefresh()
+  useWorkspaceRuntimeInvalidationRefresh()
   useSettingsQueryInvalidationSync()
   return null
 }

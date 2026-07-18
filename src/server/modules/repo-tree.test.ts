@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  resolveRemoteRepoTarget: vi.fn(),
+  resolveRemoteWorkspaceTarget: vi.fn(),
   remoteRuntimeAwareGitRunner: vi.fn(),
   getRepoTreeSourceLocal: vi.fn(),
   getWorkspaceTreeSourceLocal: vi.fn(),
@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#/server/modules/repo-source.ts', () => ({
-  resolveRemoteRepoTarget: mocks.resolveRemoteRepoTarget,
+  resolveRemoteWorkspaceTarget: mocks.resolveRemoteWorkspaceTarget,
   remoteRuntimeAwareGitRunner: mocks.remoteRuntimeAwareGitRunner,
 }))
 
@@ -27,16 +27,16 @@ vi.mock('#/system/git/worktrees.ts', () => ({
 }))
 
 import { getRepositoryTree } from '#/server/modules/repo-tree.ts'
-import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { canonicalRuntimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-validators.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const LOCAL_REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo')
-const remoteRepoId = normalizeRemoteRepoId({ alias: 'mybox', remotePath: '/srv/repos/myrepo' })
+const remoteRepoId = normalizeRemoteWorkspaceId({ alias: 'mybox', remotePath: '/srv/repos/myrepo' })
 const remoteWorkspaceId = workspaceIdForTest(remoteRepoId)
-const remoteTarget: RemoteRepoTarget = {
+const remoteTarget: RemoteWorkspaceTarget = {
   id: remoteRepoId,
   alias: 'mybox',
   remotePath: '/srv/repos/myrepo',
@@ -75,7 +75,7 @@ function localWorktreeTarget() {
 function remoteWorktreeTarget() {
   return gitWorktreeTarget(
     remoteWorkspaceId,
-    normalizeRemoteRepoId({ alias: 'mybox', remotePath: '/srv/repos/myrepo/.worktrees/feature' }),
+    normalizeRemoteWorkspaceId({ alias: 'mybox', remotePath: '/srv/repos/myrepo/.worktrees/feature' }),
   )
 }
 
@@ -174,7 +174,7 @@ describe('repo-tree — read layer', () => {
   })
 
   test('resolves a remote target and forwards to the remote source', async () => {
-    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(remoteTarget)
+    mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(remoteTarget)
     mocks.getRepoTreeSourceRemote.mockResolvedValueOnce({
       nodes: [{ id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' }],
       truncated: false,
@@ -183,7 +183,7 @@ describe('repo-tree — read layer', () => {
     const result = await getRepositoryTree(remoteWorktreeTarget(), { prefix: 'src' })
 
     expect(mocks.getWorktrees).not.toHaveBeenCalled()
-    expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(remoteRepoId, undefined, undefined)
+    expect(mocks.resolveRemoteWorkspaceTarget).toHaveBeenCalledWith(remoteRepoId, undefined, undefined)
     expect(mocks.getRepoTreeSourceRemote).toHaveBeenCalledWith(
       expect.objectContaining({
         target: remoteTarget,
@@ -195,7 +195,7 @@ describe('repo-tree — read layer', () => {
   })
 
   test('reads a remote workspace root without Git worktree membership', async () => {
-    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(remoteTarget)
+    mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(remoteTarget)
     mocks.getWorkspaceTreeSourceRemote.mockResolvedValueOnce({ nodes: [], truncated: false })
 
     await getRepositoryTree(workspaceRootTarget(remoteWorkspaceId))
@@ -212,7 +212,7 @@ describe('repo-tree — read layer', () => {
     const precomputedWorktrees = [
       { path: '/srv/repos/myrepo/.worktrees/feature', branch: 'feature', isBare: false, isPrimary: false },
     ]
-    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(remoteTarget)
+    mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(remoteTarget)
     mocks.getRepoTreeSourceRemote.mockResolvedValueOnce({ nodes: [], truncated: false })
 
     await getRepositoryTree(remoteWorktreeTarget(), { precomputedWorktrees })
@@ -225,7 +225,7 @@ describe('repo-tree — read layer', () => {
   test('threads the runtime-aware runner into remote tree reads', async () => {
     const run = async () => ({ ok: true as const, stdout: '', stderr: '', code: 0 })
     mocks.remoteRuntimeAwareGitRunner.mockReturnValueOnce(run)
-    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(remoteTarget)
+    mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(remoteTarget)
     mocks.getRepoTreeSourceRemote.mockResolvedValueOnce({ nodes: [], truncated: false })
 
     const signal = new AbortController().signal
@@ -234,7 +234,7 @@ describe('repo-tree — read layer', () => {
       signal,
     })
 
-    expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(
+    expect(mocks.resolveRemoteWorkspaceTarget).toHaveBeenCalledWith(
       remoteRepoId,
       {
         workspaceRuntimeId: 'repo-runtime-tree-test',
@@ -246,14 +246,14 @@ describe('repo-tree — read layer', () => {
   })
 
   test('rejects when remote target resolution fails', async () => {
-    mocks.resolveRemoteRepoTarget.mockRejectedValueOnce(new Error('ssh config not found'))
+    mocks.resolveRemoteWorkspaceTarget.mockRejectedValueOnce(new Error('ssh config not found'))
 
     await expect(getRepositoryTree(remoteWorktreeTarget())).rejects.toThrow('ssh config not found')
     expect(mocks.getRepoTreeSourceRemote).not.toHaveBeenCalled()
   })
 
   test('rejects a worktree locator from another SSH profile before I/O', async () => {
-    const otherProfileRoot = normalizeRemoteRepoId({
+    const otherProfileRoot = normalizeRemoteWorkspaceId({
       alias: 'other-mock-host',
       remotePath: '/srv/repos/myrepo/.worktrees/feature',
     })
@@ -261,7 +261,7 @@ describe('repo-tree — read layer', () => {
     expect(() => gitWorktreeTarget(remoteWorkspaceId, otherProfileRoot)).toThrow(
       'error.workspace-target-transport-mismatch',
     )
-    expect(mocks.resolveRemoteRepoTarget).not.toHaveBeenCalled()
+    expect(mocks.resolveRemoteWorkspaceTarget).not.toHaveBeenCalled()
     expect(mocks.getRepoTreeSourceRemote).not.toHaveBeenCalled()
   })
 

@@ -23,7 +23,7 @@ import {
   createTerminalBellIntentPlan,
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'

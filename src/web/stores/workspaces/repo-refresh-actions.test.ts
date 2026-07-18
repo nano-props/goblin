@@ -7,15 +7,11 @@ import {
   requestVisibleWorkspaceStatusRefresh,
 } from '#/web/stores/workspaces/repo-refresh-actions.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
-import { refreshWorkspaceRuntimes } from '#/web/workspace-runtime-query.ts'
-import { acceptRemoteLifecycleSnapshot } from '#/web/stores/workspaces/remote-lifecycle-projection.ts'
 
 vi.mock('#/web/stores/workspaces/worktree-status-refresh.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('#/web/stores/workspaces/worktree-status-refresh.ts')>()
   return { ...actual, refreshRepoWorktreeStatus: vi.fn(async () => {}) }
 })
-vi.mock('#/web/workspace-runtime-query.ts', () => ({ refreshWorkspaceRuntimes: vi.fn() }))
-vi.mock('#/web/stores/workspaces/remote-lifecycle-projection.ts', () => ({ acceptRemoteLifecycleSnapshot: vi.fn() }))
 
 function repoRefreshStoreAccess(workspaceRuntimeId = 'repo-runtime-test-9', unavailable = false) {
   const get: WorkspacesGet = () =>
@@ -38,8 +34,6 @@ describe('repo refresh actions', () => {
     primaryWindowQueryClient.clear()
     vi.mocked(refreshRepoWorktreeStatus).mockReset()
     vi.mocked(refreshRepoWorktreeStatus).mockResolvedValue(undefined)
-    vi.mocked(refreshWorkspaceRuntimes).mockReset()
-    vi.mocked(acceptRemoteLifecycleSnapshot).mockReset()
   })
 
   afterEach(() => primaryWindowQueryClient.clear())
@@ -82,20 +76,5 @@ describe('repo refresh actions', () => {
       { cancelRefetch: false },
     )
     invalidateSpy.mockRestore()
-  })
-
-  test('refreshes remote lifecycle state even while the repo is unavailable', async () => {
-    const store = repoRefreshStoreAccess('repo-runtime-test-9', true)
-    const snapshot = { runtimes: [] }
-    vi.mocked(refreshWorkspaceRuntimes).mockResolvedValue(snapshot)
-
-    await handleRepoInvalidationRefresh(
-      store,
-      { repoId: 'goblin+file:///repo', query: 'remote-lifecycle' },
-      'repo-runtime-test-9',
-    )
-
-    expect(refreshWorkspaceRuntimes).toHaveBeenCalledOnce()
-    expect(acceptRemoteLifecycleSnapshot).toHaveBeenCalledWith(store.set, store.get, snapshot)
   })
 })

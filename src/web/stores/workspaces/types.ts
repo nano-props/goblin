@@ -1,6 +1,6 @@
 import type { StoreApi } from 'zustand'
 import type { BranchSnapshotInfo, BrowserRemoteProvider, ExecResult, GitRemoteInfo } from '#/web/types.ts'
-import type { RemoteRepoConnectionLifecycle, WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceConnectionLifecycle, WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type {
   ClientWorkspaceState,
   WorkspaceTabsRestoreResult,
@@ -95,7 +95,7 @@ export interface GitRemoteProjection {
 /** Filesystem-transport admission state, independent from optional Git capability. */
 export type WorkspaceAdmissionState =
   | { kind: 'local' }
-  | { kind: 'remote'; lifecycle: RemoteRepoConnectionLifecycle | null; lifecycleAttemptId: number | null }
+  | { kind: 'remote'; lifecycle: RemoteWorkspaceConnectionLifecycle | null; lifecycleAttemptId: number | null }
 
 /** Git-only client state, owned exclusively by the Git capability. */
 export interface GitWorkspaceProjection {

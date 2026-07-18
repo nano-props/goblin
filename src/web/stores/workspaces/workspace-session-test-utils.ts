@@ -1,5 +1,5 @@
-import { normalizeRemoteRepoId, type WorkspaceSessionEntry, type RemoteRepoTarget } from '#/shared/remote-repo.ts'
-import { resolveServerRemoteRepoConnection, type RemoteRepoConnectionDeps } from '#/server/modules/remote.ts'
+import { normalizeRemoteWorkspaceId, type WorkspaceSessionEntry, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
+import { resolveServerRemoteWorkspaceConnection, type RemoteWorkspaceConnectionDeps } from '#/server/modules/remote-workspace.ts'
 import { createBranchSnapshot, installGoblinTestBridge, resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { flushMicrotasks } from '#/test-utils/index.ts'
@@ -38,7 +38,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       calls.resolveTarget.push({ alias, remotePath })
       return {
         target: {
-          id: normalizeRemoteRepoId({ alias, remotePath }),
+          id: normalizeRemoteWorkspaceId({ alias, remotePath }),
           alias,
           host: alias === 'example' ? 'example.com' : `${alias}.example.com`,
           user: 'alice',
@@ -71,12 +71,12 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
     else handlers[key] = handler
   }
   // Exercise the same server-side lifecycle boundary used in production:
-  // inject test doubles into `resolveServerRemoteRepoConnection` so the
+  // inject test doubles into `resolveServerRemoteWorkspaceConnection` so the
   // real classification / mapping code runs in tests.
-  const deps: RemoteRepoConnectionDeps = {
+  const deps: RemoteWorkspaceConnectionDeps = {
     resolveTarget: async ({ alias, remotePath }) => {
       const result = handlers['remote.resolveTarget']?.({ alias, remotePath }) as
-        { target: RemoteRepoTarget; error?: undefined } | { error: string; target?: undefined } | undefined
+        { target: RemoteWorkspaceTarget; error?: undefined } | { error: string; target?: undefined } | undefined
       if (!result) return { error: 'missing-resolve-target' }
       if ('target' in result && result.target !== undefined) return { target: result.target }
       return { error: result.error ?? 'resolve-target-error' }
@@ -90,18 +90,19 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
     },
   }
   if (!overrides['remote.lifecycle']) {
-    handlers['remote.lifecycle'] = async ({ repoId }: { repoId: string; workspaceRuntimeId: string }) => {
-      const result = await resolveServerRemoteRepoConnection({ repoId }, undefined, deps)
+    handlers['remote.lifecycle'] = async ({ workspaceId }: { workspaceId: string; workspaceRuntimeId: string }) => {
+      const canonicalWorkspaceId = workspaceIdForTest(workspaceId)
+      const result = await resolveServerRemoteWorkspaceConnection({ workspaceId: canonicalWorkspaceId }, undefined, deps)
       return result.kind === 'ready'
         ? {
             kind: 'settled',
-            repoId: result.repoId,
+            workspaceId: canonicalWorkspaceId,
             name: result.name,
             lifecycle: { ...result.lifecycle, attemptId: 1 },
           }
         : {
             kind: 'settled',
-            repoId: result.repoId,
+            workspaceId: canonicalWorkspaceId,
             name: result.name,
             lifecycle: { ...result.lifecycle, attemptId: 1 },
           }

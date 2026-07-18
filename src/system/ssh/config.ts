@@ -7,14 +7,14 @@ import SSHConfig, { LineType, type Line, type Section } from '#/system/ssh/vendo
 import { buildCanonicalSshConnectionSnapshot } from '#/system/ssh/commands.ts'
 import { isValidSshProfile } from '#/shared/workspace-locator.ts'
 import {
-  normalizeRemoteRepoRef,
+  normalizeRemoteWorkspaceRef,
   normalizeRemoteTarget,
   type RemoteConnectionInput,
-  type RemoteRepoRef,
-  type ResolvedRemoteTarget,
+  type RemoteWorkspaceRef,
+  type ResolvedRemoteWorkspaceTarget,
   type SshConfigHost,
   type SshConfigHostsResult,
-} from '#/shared/remote-repo.ts'
+} from '#/shared/remote-workspace.ts'
 
 const SSH_CONFIG_PATH = path.join(os.homedir(), '.ssh', 'config')
 const SSH_G_TIMEOUT_MS = 10_000
@@ -58,7 +58,7 @@ export function parseSshConfigHosts(content: string): SshConfigHost[] {
 export async function resolveRemoteTarget(
   input: RemoteConnectionInput,
   signal?: AbortSignal,
-): Promise<ResolvedRemoteTarget> {
+): Promise<ResolvedRemoteWorkspaceTarget> {
   const resolved = await resolveRemoteTargetWithConfigFingerprint(input, signal)
   return { target: resolved.target }
 }
@@ -66,7 +66,7 @@ export async function resolveRemoteTarget(
 export async function resolveRemoteTargetWithConfigFingerprint(
   input: RemoteConnectionInput,
   signal?: AbortSignal,
-): Promise<ResolvedRemoteTarget & { configFingerprint: string }> {
+): Promise<ResolvedRemoteWorkspaceTarget & { configFingerprint: string }> {
   const alias = input.alias
   if (!isValidSshProfile(alias)) throw new Error('Invalid SSH config host alias')
   const configState = await listSshConfigHosts()
@@ -91,10 +91,10 @@ export async function resolveRemoteTargetWithConfigFingerprint(
 }
 
 export async function resolveTrackedRemoteTarget(
-  ref: RemoteRepoRef,
+  ref: RemoteWorkspaceRef,
   signal?: AbortSignal,
-): Promise<ResolvedRemoteTarget> {
-  const normalized = normalizeRemoteRepoRef(ref)
+): Promise<ResolvedRemoteWorkspaceTarget> {
+  const normalized = normalizeRemoteWorkspaceRef(ref)
   if (!normalized) throw new Error('error.ssh-config-changed')
   return resolveRemoteTarget({ alias: normalized.alias, remotePath: normalized.remotePath }, signal)
 }
@@ -148,7 +148,7 @@ function toResolvedTarget(input: {
   user: string
   port: number
   remotePath: string
-}): ResolvedRemoteTarget {
+}): ResolvedRemoteWorkspaceTarget {
   const target = normalizeRemoteTarget(input)
   if (!target) throw new Error('Invalid remote repository target')
   return { target }

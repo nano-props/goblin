@@ -1,4 +1,4 @@
-import { isRemoteRepoId, type RemoteRepoRuntimeLifecycle } from '#/shared/remote-repo.ts'
+import { isRemoteWorkspaceId, type RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
 import type { WorkspaceRuntimeEntry, WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
 import {
   markRemoteLifecycleConnecting,
@@ -10,25 +10,25 @@ import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types
 
 const LIFECYCLE_PHASE_ORDER = { idle: 0, connecting: 1, ready: 2, failed: 2 } as const
 
-export function acceptRemoteLifecycleProjection(
+export function acceptRemoteWorkspaceLifecycleProjection(
   set: WorkspacesSet,
   get: WorkspacesGet,
   entry: Pick<WorkspaceRuntimeEntry, 'workspaceId' | 'workspaceRuntimeId' | 'remoteLifecycle'>,
   options: { name?: string } = {},
 ): boolean {
   const lifecycle = entry.remoteLifecycle
-  if (!lifecycle || !isRemoteRepoId(entry.workspaceId)) return false
+  if (!lifecycle || !isRemoteWorkspaceId(entry.workspaceId)) return false
   const current = get().workspaces[entry.workspaceId]
   if (!current || current.workspaceRuntimeId !== entry.workspaceRuntimeId) return false
   if (current.admission.kind !== 'remote') return false
-  if (!remoteLifecycleProjectionIsFresh(current.admission.lifecycleAttemptId, current.admission.lifecycle?.kind, lifecycle)) {
+  if (!remoteWorkspaceLifecycleProjectionIsFresh(current.admission.lifecycleAttemptId, current.admission.lifecycle?.kind, lifecycle)) {
     return false
   }
 
   let accepted = false
   updateIfFresh(set, entry.workspaceId, entry.workspaceRuntimeId, (repo) => {
     if (repo.admission.kind !== 'remote') return
-    if (!remoteLifecycleProjectionIsFresh(repo.admission.lifecycleAttemptId, repo.admission.lifecycle?.kind, lifecycle))
+    if (!remoteWorkspaceLifecycleProjectionIsFresh(repo.admission.lifecycleAttemptId, repo.admission.lifecycle?.kind, lifecycle))
       return
     repo.admission.lifecycleAttemptId = lifecycle.attemptId
     if (lifecycle.kind === 'idle') {
@@ -46,14 +46,14 @@ export function acceptRemoteLifecycleProjection(
   return accepted
 }
 
-export function acceptRemoteLifecycleSnapshot(set: WorkspacesSet, get: WorkspacesGet, snapshot: WorkspaceRuntimesSnapshot): void {
-  for (const entry of snapshot.runtimes) acceptRemoteLifecycleProjection(set, get, entry)
+export function acceptRemoteWorkspaceLifecycleSnapshot(set: WorkspacesSet, get: WorkspacesGet, snapshot: WorkspaceRuntimesSnapshot): void {
+  for (const entry of snapshot.runtimes) acceptRemoteWorkspaceLifecycleProjection(set, get, entry)
 }
 
-function remoteLifecycleProjectionIsFresh(
+function remoteWorkspaceLifecycleProjectionIsFresh(
   acceptedAttemptId: number | null,
   acceptedKind: 'connecting' | 'ready' | 'failed' | undefined,
-  incoming: RemoteRepoRuntimeLifecycle,
+  incoming: RemoteWorkspaceRuntimeLifecycle,
 ): boolean {
   if (acceptedAttemptId === null || incoming.attemptId > acceptedAttemptId) return true
   if (incoming.attemptId < acceptedAttemptId) return false

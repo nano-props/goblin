@@ -15,7 +15,7 @@ import {
   releaseWorkspaceRuntimeMembershipLease,
   replaceWorkspaceRuntimeMembershipsForClient,
   runSerializedWorkspaceRefresh,
-  runRepoRemoteLifecycle,
+  runRemoteWorkspaceLifecycle,
   workspaceRuntimeHasGitCapability,
 } from '#/server/modules/workspace-runtimes.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -426,13 +426,13 @@ describe('workspace runtimes', () => {
     }))
 
     await expect(
-      runRepoRemoteLifecycle(USER_ID, workspaceId, workspaceRuntimeId, failed, undefined, 'ensure'),
+      runRemoteWorkspaceLifecycle(USER_ID, workspaceId, workspaceRuntimeId, failed, undefined, 'ensure'),
     ).resolves.toMatchObject({
       kind: 'settled',
       lifecycle: { kind: 'failed' },
     })
     await expect(
-      runRepoRemoteLifecycle(USER_ID, workspaceId, workspaceRuntimeId, ready, undefined, 'ensure'),
+      runRemoteWorkspaceLifecycle(USER_ID, workspaceId, workspaceRuntimeId, ready, undefined, 'ensure'),
     ).resolves.toMatchObject({
       kind: 'settled',
       lifecycle: { kind: 'ready' },

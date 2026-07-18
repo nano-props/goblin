@@ -56,7 +56,7 @@ beforeEach(() => {
           json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
         }
       }
-      if (url.pathname === '/api/remote/test-repo') {
+      if (url.pathname === '/api/remote/test-workspace') {
         return {
           ok: true,
           json: async () => ({
@@ -162,7 +162,7 @@ describe('OpenRemoteWorkspaceDialog', () => {
             }),
           }
         }
-        if (url.pathname === '/api/remote/test-repo') {
+        if (url.pathname === '/api/remote/test-workspace') {
           return {
             ok: true,
             json: async () => ({
@@ -211,7 +211,7 @@ describe('OpenRemoteWorkspaceDialog', () => {
             json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
           }
         }
-        if (url.pathname === '/api/remote/test-repo') {
+        if (url.pathname === '/api/remote/test-workspace') {
           return {
             ok: true,
             json: () =>
@@ -261,7 +261,7 @@ describe('OpenRemoteWorkspaceDialog', () => {
             json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
           }
         }
-        if (url.pathname === '/api/remote/test-repo') {
+        if (url.pathname === '/api/remote/test-workspace') {
           return {
             ok: true,
             json: async () => ({
@@ -318,7 +318,7 @@ describe('OpenRemoteWorkspaceDialog', () => {
             json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
           }
         }
-        if (url.pathname === '/api/remote/test-repo') {
+        if (url.pathname === '/api/remote/test-workspace') {
           return {
             ok: true,
             json: async () => ({
@@ -393,7 +393,7 @@ describe('OpenRemoteWorkspaceDialog', () => {
             json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
           }
         }
-        if (url.pathname === '/api/remote/test-repo') {
+        if (url.pathname === '/api/remote/test-workspace') {
           return {
             ok: true,
             json: async () => ({
@@ -496,7 +496,7 @@ describe('OpenRemoteWorkspaceDialog', () => {
             json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
           }
         }
-        if (url.pathname === '/api/remote/test-repo') {
+        if (url.pathname === '/api/remote/test-workspace') {
           throw new Error('Permission denied')
         }
         if (url.pathname === '/api/remote/path-suggestions') {

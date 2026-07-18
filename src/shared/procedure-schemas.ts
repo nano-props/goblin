@@ -12,7 +12,7 @@ import {
   CwdInput,
   RemoteConnectionInputSchema,
   RemotePathSuggestionsInputSchema,
-  RemoteTargetSchema,
+  RemoteWorkspaceTargetSchema,
 } from '#/shared/api-types.ts'
 import { NativeHostProjectionSchema } from '#/shared/native-host-projection.ts'
 import { RepoTreePrefixSchema } from '#/shared/repo-tree-schema.ts'
@@ -46,7 +46,7 @@ const WorktreeBootstrapDecisionSchema = v.variant('kind', [
   v.object({ kind: v.literal('run'), configHash: WorktreeBootstrapConfigHashSchema, configTrusted: v.boolean() }),
 ])
 
-const RemoteRepoRefSchema = v.object({
+const RemoteWorkspaceRefSchema = v.object({
   id: WorkspaceIdSchema,
   alias: v.string(),
   remotePath: v.string(),
@@ -55,7 +55,7 @@ const RemoteRepoRefSchema = v.object({
 
 const WorkspaceSessionEntrySchema = v.variant('kind', [
   v.object({ kind: v.literal('local'), id: WorkspaceIdSchema }),
-  v.object({ kind: v.literal('remote'), id: WorkspaceIdSchema, ref: RemoteRepoRefSchema }),
+  v.object({ kind: v.literal('remote'), id: WorkspaceIdSchema, ref: RemoteWorkspaceRefSchema }),
 ])
 const ClientIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
 const WorkspaceRuntimeOpenSchema = v.union([
@@ -130,21 +130,25 @@ export const REPO_PROCEDURE_SCHEMAS = {
     forceDeleteBranch: v.optional(v.boolean()),
     deleteUpstream: v.optional(v.boolean()),
   }),
-  openUrl: v.object({ cwd: WorkspaceIdSchema, workspaceRuntimeId: WorkspaceRuntimeIdSchema, target: RepoUrlTargetSchema }),
+  openUrl: v.object({
+    cwd: WorkspaceIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
+    target: RepoUrlTargetSchema,
+  }),
   openTerminal: v.object({
-    repoId: WorkspaceIdSchema,
+    workspaceId: WorkspaceIdSchema,
     workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     worktreePath: v.string(),
     app: TerminalAppSchema,
   }),
   openEditor: v.object({
-    repoId: WorkspaceIdSchema,
+    workspaceId: WorkspaceIdSchema,
     workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     worktreePath: v.string(),
     app: EditorAppSchema,
   }),
   openInFinder: v.object({
-    repoId: WorkspaceIdSchema,
+    workspaceId: WorkspaceIdSchema,
     worktreePath: v.string(),
   }),
   backgroundSyncRepos: v.object({ repoIds: StringArray }),
@@ -198,15 +202,15 @@ export const REPO_PROCEDURE_SCHEMAS = {
 
 export const REMOTE_PROCEDURE_SCHEMAS = {
   resolveTarget: RemoteConnectionInputSchema,
-  // Starts a server-owned attempt for one repo-runtime generation and
+  // Starts a server-owned attempt for one workspace-runtime generation and
   // returns its accepted terminal lifecycle projection.
   remoteLifecycle: v.object({
-    repoId: WorkspaceIdSchema,
+    workspaceId: WorkspaceIdSchema,
     workspaceRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
     mode: v.optional(v.picklist(['restart', 'ensure'])),
   }),
   pathSuggestions: RemotePathSuggestionsInputSchema,
-  testRepo: v.object({ target: RemoteTargetSchema }),
+  testWorkspace: v.object({ target: RemoteWorkspaceTargetSchema }),
 } as const
 
 // Schemas for the settings command handlers. Each shape matches the typed

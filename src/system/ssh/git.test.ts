@@ -23,7 +23,7 @@ import {
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
 import { worktreeBootstrapConfigHash } from '#/system/git/worktree-bootstrap.ts'
-import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
+import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { WORKTREE_STATUS_BATCH_BOUNDARY } from '#/system/git/parsers.ts'
 
 const TARGET = normalizeRemoteTarget({

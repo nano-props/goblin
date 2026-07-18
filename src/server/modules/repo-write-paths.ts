@@ -31,8 +31,8 @@ import { cloneRepo as cloneGitRepo } from '#/system/git/clone.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
 import { openInPreferredTerminal } from '#/system/terminals.ts'
 import { openInFinder } from '#/system/finder.ts'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import { openServerRemoteEditor, openServerRemoteTerminal } from '#/server/modules/remote.ts'
+import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import { openServerRemoteEditor, openServerRemoteTerminal } from '#/server/modules/remote-workspace.ts'
 import { type ExecResult, type RepoUrlTarget } from '#/shared/git-types.ts'
 import type { NetworkOpKind, RepoServerOperationKind, RepoServerOperationTarget } from '#/shared/api-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
@@ -41,6 +41,7 @@ import { isValidCwd, isValidRepoLocator, toSafeRepoLocator } from '#/shared/inpu
 import { isRepoWorktreeBootstrapConfigTrusted } from '#/shared/repo-settings.ts'
 import { resolveWorkspaceScopedPath } from '#/server/modules/workspace-path.ts'
 import { type CloneRepoResult } from '#/shared/api-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { normalizeCreateWorktreeInput, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { constants as fsConstants, promises as fs } from 'node:fs'
 import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
@@ -557,34 +558,40 @@ export async function openRepoUrl(
 }
 
 export async function openRepoTerminal(
-  repoId: string,
+  workspaceId: WorkspaceId,
   worktreePath: string,
   app: TerminalApp,
   signal?: AbortSignal,
   options: { workspaceRuntimeId?: string } = {},
 ): Promise<ExecResult> {
-  const executionPath = resolveWorkspaceScopedPath(repoId, worktreePath) ?? worktreePath
-  if (isRemoteRepoId(repoId))
-    return await openServerRemoteTerminal({ repoId, worktreePath: executionPath, app, workspaceRuntimeId: options.workspaceRuntimeId }, signal)
+  const executionPath = resolveWorkspaceScopedPath(workspaceId, worktreePath) ?? worktreePath
+  if (isRemoteWorkspaceId(workspaceId))
+    return await openServerRemoteTerminal(
+      { workspaceId, worktreePath: executionPath, app, workspaceRuntimeId: options.workspaceRuntimeId },
+      signal,
+    )
   return await openInPreferredTerminal(executionPath, app)
 }
 
 export async function openRepoEditor(
-  repoId: string,
+  workspaceId: WorkspaceId,
   worktreePath: string,
   app: EditorApp,
   signal?: AbortSignal,
   options: { workspaceRuntimeId?: string } = {},
 ): Promise<ExecResult> {
-  const executionPath = resolveWorkspaceScopedPath(repoId, worktreePath) ?? worktreePath
-  if (isRemoteRepoId(repoId))
-    return await openServerRemoteEditor({ repoId, worktreePath: executionPath, app, workspaceRuntimeId: options.workspaceRuntimeId }, signal)
+  const executionPath = resolveWorkspaceScopedPath(workspaceId, worktreePath) ?? worktreePath
+  if (isRemoteWorkspaceId(workspaceId))
+    return await openServerRemoteEditor(
+      { workspaceId, worktreePath: executionPath, app, workspaceRuntimeId: options.workspaceRuntimeId },
+      signal,
+    )
   return await openInPreferredEditor(executionPath, app)
 }
 
-export async function openRepoInFinder(repoId: string, worktreePath: string): Promise<ExecResult> {
-  if (isRemoteRepoId(repoId)) return { ok: false, message: 'error.invalid-path' }
-  return await openInFinder(resolveWorkspaceScopedPath(repoId, worktreePath) ?? worktreePath)
+export async function openRepoInFinder(workspaceId: WorkspaceId, worktreePath: string): Promise<ExecResult> {
+  if (isRemoteWorkspaceId(workspaceId)) return { ok: false, message: 'error.invalid-path' }
+  return await openInFinder(resolveWorkspaceScopedPath(workspaceId, worktreePath) ?? worktreePath)
 }
 
 export async function abortRepoOperation(cwd: string): Promise<boolean> {

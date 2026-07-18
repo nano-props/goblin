@@ -19,7 +19,7 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import type { RepoBranchAction } from '#/web/stores/workspaces/branch-action-types.ts'
 import type { BranchViewMode } from '#/web/stores/workspaces/types.ts'
-import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
+import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { repoProjection } from '#/web/stores/workspaces/refresh-test-utils.ts'
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'

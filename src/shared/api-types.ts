@@ -35,14 +35,14 @@ import type {
   RemoteDiagnosticsResult,
   RemotePathSuggestionsInput,
   WorkspaceSessionEntry,
-  RemoteRepoTarget,
-  RemoteRepoRuntimeLifecycle,
-  ResolvedRemoteTarget,
+  RemoteWorkspaceTarget,
+  RemoteWorkspaceRuntimeLifecycle,
+  ResolvedRemoteWorkspaceTarget,
   SshConfigHostsResult,
-} from '#/shared/remote-repo.ts'
+} from '#/shared/remote-workspace.ts'
 import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
 import { type NativeHostProjection } from '#/shared/native-host-projection.ts'
-import { RemoteAbsolutePathSchema } from '#/shared/remote-repo-schema.ts'
+import { RemoteAbsolutePathSchema } from '#/shared/remote-workspace-schema.ts'
 import type { CreateWorktreeIpcInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
@@ -122,7 +122,7 @@ export interface RuntimeRecentWorkspacesState {
 export interface WorkspaceRuntimeEntry {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
-  remoteLifecycle?: RemoteRepoRuntimeLifecycle | null
+  remoteLifecycle?: RemoteWorkspaceRuntimeLifecycle | null
   workspaceProbe: WorkspaceProbeState
 }
 
@@ -140,7 +140,7 @@ interface RestoredWorkspaceRuntimeBase {
   workspaceRuntimeId: string
   name: string
   workspaceProbe: WorkspaceProbeState
-  target?: RemoteRepoTarget
+  target?: RemoteWorkspaceTarget
 }
 
 export interface ProjectedRestoredWorkspaceRuntime extends RestoredWorkspaceRuntimeBase {
@@ -376,8 +376,8 @@ export interface RepoWorktreeStatusSnapshot {
   loadedAt: number
 }
 
-export type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
-export { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
+export type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
+export { isRemoteWorkspaceId, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 
 /** Request envelope for the native Electron bridge IPC layer. */
 export interface IpcRequest {
@@ -473,13 +473,13 @@ export interface AppIpcHandlers {
     abort: (input: { cwd: string }) => Promise<boolean>
     openUrl: (input: { cwd: string; workspaceRuntimeId: string; target: RepoUrlTarget }) => Promise<ExecResult>
     openTerminal: (input: {
-      repoId: string
+      workspaceId: WorkspaceId
       workspaceRuntimeId: string
       worktreePath: string
       app: TerminalApp
     }) => Promise<ExecResult>
     openEditor: (input: {
-      repoId: string
+      workspaceId: WorkspaceId
       workspaceRuntimeId: string
       worktreePath: string
       app: EditorApp
@@ -488,9 +488,9 @@ export interface AppIpcHandlers {
   }
   remote: {
     listSshHosts: () => Promise<SshConfigHostsResult>
-    resolveTarget: (input: RemoteConnectionInput) => Promise<ResolvedRemoteTarget>
+    resolveTarget: (input: RemoteConnectionInput) => Promise<ResolvedRemoteWorkspaceTarget>
     listPathSuggestions: (input: RemotePathSuggestionsInput) => Promise<string[]>
-    testRepo: (input: { target: RemoteRepoTarget }) => Promise<RemoteDiagnosticsResult>
+    testWorkspace: (input: { target: RemoteWorkspaceTarget }) => Promise<RemoteDiagnosticsResult>
   }
   theme: {
     get: () => ThemeState
@@ -546,7 +546,7 @@ export const CwdInput = v.object({ cwd: WorkspaceIdSchema })
 /** Primitive valibot schema for `{ cwd, branch }`. */
 export const BranchInput = v.object({ cwd: v.string(), branch: v.string() })
 
-export const RemoteTargetSchema = v.object({
+export const RemoteWorkspaceTargetSchema = v.object({
   id: WorkspaceIdSchema,
   alias: v.string(),
   host: v.string(),

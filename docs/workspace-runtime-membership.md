@@ -131,7 +131,7 @@ Good candidates for React Query ownership:
 - workspace pane tabs reads
 - the user-scoped runtime snapshot used to project remote lifecycle state
 
-Remote lifecycle transitions publish a dedicated `remote-lifecycle`
+Remote lifecycle transitions publish a dedicated `workspace-runtime-invalidated`
 invalidation. Clients refresh the lightweight runtime snapshot and accept only
 entries matching a window-local workspace shell and `workspaceRuntimeId`; the snapshot
 never adds, removes, orders, or activates workspaces for a window. Command responses

@@ -24,7 +24,7 @@ import { serverLogger } from '#/server/logger.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { ServerTerminalCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
-import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure-settlement.ts'
+import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
 import { restorableWorkspacePaneTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import { runtimeWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
@@ -87,7 +87,7 @@ export class WorkspacePaneRuntimeApplication {
     try {
       physicalCapability = await this.capturePhysicalWorktree(userId, { repoRoot, workspaceRuntimeId }, worktreePath)
     } catch (error) {
-      failRemoteRuntimeIfNeeded(userId, error)
+      await failRemoteWorkspaceRuntimeIfNeeded(userId, error)
       return runtimeFailure(input.runtimeType, error instanceof Error ? error.message : String(error))
     }
     let result: { admitted: true; value: WorkspacePaneRuntimeOpenResult } | { admitted: false }
@@ -111,7 +111,7 @@ export class WorkspacePaneRuntimeApplication {
         }
       })
     } catch (error) {
-      failRemoteRuntimeIfNeeded(userId, error)
+      await failRemoteWorkspaceRuntimeIfNeeded(userId, error)
       return runtimeFailure(input.runtimeType, error instanceof Error ? error.message : String(error))
     }
     return result.admitted ? result.value : runtimeFailure(input.runtimeType, 'error.worktree-removal-in-progress')
@@ -135,20 +135,21 @@ export class WorkspacePaneRuntimeApplication {
         worktreePath,
       )
     } catch (error) {
-      failRemoteRuntimeIfNeeded(userId, error)
+      await failRemoteWorkspaceRuntimeIfNeeded(userId, error)
       return runtimeFailure(input.runtimeType, error instanceof Error ? error.message : String(error))
     }
     let result: { admitted: true; value: WorkspacePaneRuntimeCloseResult } | { admitted: false }
     try {
       result = await this.deps.worktreeOperations.runOperation(physicalCapability, async (permit) => {
-        if (!this.isCurrentTarget(userId, target)) return runtimeFailure(input.runtimeType, 'error.workspace-runtime-stale')
+        if (!this.isCurrentTarget(userId, target))
+          return runtimeFailure(input.runtimeType, 'error.workspace-runtime-stale')
         switch (input.runtimeType) {
           case 'terminal':
             return await this.closeTerminal(clientId, userId, target.target, worktreePath, input.sessionId, scope)
         }
       })
     } catch (error) {
-      failRemoteRuntimeIfNeeded(userId, error)
+      await failRemoteWorkspaceRuntimeIfNeeded(userId, error)
       return runtimeFailure(input.runtimeType, error instanceof Error ? error.message : String(error))
     }
     return result.admitted ? result.value : runtimeFailure(input.runtimeType, 'error.worktree-removal-in-progress')
@@ -195,7 +196,8 @@ export class WorkspacePaneRuntimeApplication {
         insertAfterIdentity: input.insertAfterIdentity,
         permit,
         physicalWorktreeCapability,
-        isRuntimeCurrent: () => this.deps.isCurrentWorkspaceRuntime(userId, target.workspaceId, target.workspaceRuntimeId),
+        isRuntimeCurrent: () =>
+          this.deps.isCurrentWorkspaceRuntime(userId, target.workspaceId, target.workspaceRuntimeId),
         commitAdmission: (canonicalBranch) => {
           const presentation =
             target.kind === 'workspace-root'

@@ -33,7 +33,7 @@ import { disposeAllRepoOperationSchedulers } from '#/web/stores/workspaces/repo-
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
-import type { RemoteRepoConnectionLifecycle, RemoteRepoRuntimeLifecycle } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceConnectionLifecycle, RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { resetAcceptedRepoProjectionReadModelState } from '#/web/stores/workspaces/projection-read-model-effects.ts'
 import { setRepoProjectionQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-data-query.ts'
@@ -143,7 +143,7 @@ export function seedRepoShellForTest(options: {
   preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType | null>
   workspaceRuntimeId?: string
   remote?: Partial<GitRemoteProjection>
-  remoteLifecycle?: RemoteRepoConnectionLifecycle | null
+  remoteLifecycle?: RemoteWorkspaceConnectionLifecycle | null
   workspaceProbe?: WorkspaceProbeState
 }): WorkspaceState {
   const workspaceId = workspaceIdForTest(options.id)
@@ -663,7 +663,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       currentWorkspaceRuntimeId: string | null
       members: Set<string>
       workspaceProbe?: WorkspaceProbeState
-      remoteLifecycle?: RemoteRepoRuntimeLifecycle
+      remoteLifecycle?: RemoteWorkspaceRuntimeLifecycle
     }
   >()
   const sessionStorageValues = new Map<string, string>()
@@ -1185,24 +1185,24 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return Promise.resolve(call('remote.lifecycle', body)).then((result) => {
             const value = result as {
               kind?: string
-              repoId?: string
+              workspaceId?: string
               name?: string
-              lifecycle?: RemoteRepoRuntimeLifecycle
+              lifecycle?: RemoteWorkspaceRuntimeLifecycle
             }
-            if (value.kind === 'settled' && value.repoId && value.lifecycle) {
+            if (value.kind === 'settled' && value.workspaceId && value.lifecycle) {
               const requestedRuntimeId =
                 typeof body.workspaceRuntimeId === 'string' ? body.workspaceRuntimeId : createOpaqueId('repo-runtime')
-              const state = workspaceRuntimeState.get(value.repoId) ?? {
+              const state = workspaceRuntimeState.get(value.workspaceId) ?? {
                 currentWorkspaceRuntimeId: requestedRuntimeId,
                 members: new Set<string>(),
               }
-              workspaceRuntimeState.set(value.repoId, state)
+              workspaceRuntimeState.set(value.workspaceId, state)
               if (state.currentWorkspaceRuntimeId === requestedRuntimeId) {
                 state.remoteLifecycle = value.lifecycle
                 if (value.lifecycle.kind === 'ready') {
                   state.workspaceProbe = {
                     status: 'ready',
-                    name: value.name ?? value.repoId,
+                    name: value.name ?? value.workspaceId,
                     capabilities: {
                       files: { read: true, write: true },
                       terminal: { available: true },
@@ -1217,7 +1217,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           })
         }
         if (url.pathname === '/api/remote/path-suggestions') return call('remote.listPathSuggestions', body)
-        if (url.pathname === '/api/remote/test-repo') return call('remote.testRepo', body)
+        if (url.pathname === '/api/remote/test-workspace') return call('remote.testWorkspace', body)
         if (url.pathname === '/api/repo/probe') return call('repo.probe', body)
         if (url.pathname === '/api/repo/log') return call('repo.log', body)
         if (url.pathname === '/api/repo/remote-branches') return call('repo.remoteBranches', body)
@@ -1327,7 +1327,7 @@ export function seedRepoWithReadModelForTest(options: {
   workspaceRuntimeId?: string
   status?: WorktreeStatus[]
   remote?: Partial<GitRemoteProjection>
-  remoteLifecycle?: RemoteRepoConnectionLifecycle | null
+  remoteLifecycle?: RemoteWorkspaceConnectionLifecycle | null
   workspaceProbe?: WorkspaceProbeState
 }): WorkspaceState {
   const branchesWithSnapshotWorktreeMetadata = options.branchSnapshots ?? options.branches ?? []

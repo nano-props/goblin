@@ -3,8 +3,6 @@ import { invalidateRepoDataQueries, invalidateRepoRuntimeProjectionQueries } fro
 import { isRepoUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { RepoRefreshStoreAccess } from '#/web/stores/workspaces/refresh.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
-import { refreshWorkspaceRuntimes } from '#/web/workspace-runtime-query.ts'
-import { acceptRemoteLifecycleSnapshot } from '#/web/stores/workspaces/remote-lifecycle-projection.ts'
 
 export function requestVisibleWorkspaceStatusRefresh(
   store: RepoRefreshStoreAccess,
@@ -27,10 +25,6 @@ export async function handleRepoInvalidationRefresh(
   const repoId = event.repoId
   const repo = store.get().workspaces[repoId]
   if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId) return
-  if (event.query === 'remote-lifecycle') {
-    acceptRemoteLifecycleSnapshot(store.set, store.get, await refreshWorkspaceRuntimes())
-    return
-  }
   if (isRepoUnavailable(repo)) return
   if (event.query === 'repo-runtime') {
     invalidateRepoRuntimeProjectionQueries(repoId, workspaceRuntimeId)

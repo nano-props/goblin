@@ -13,11 +13,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 
-vi.mock('#/web/remote-client.ts', () => ({
+vi.mock('#/web/remote-workspace-client.ts', () => ({
   getRemotePathSuggestions: vi.fn(),
 }))
 
-import { getRemotePathSuggestions } from '#/web/remote-client.ts'
+import { getRemotePathSuggestions } from '#/web/remote-workspace-client.ts'
 
 const mockedFetch = vi.mocked(getRemotePathSuggestions)
 

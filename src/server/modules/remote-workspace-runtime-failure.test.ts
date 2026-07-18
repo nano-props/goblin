@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import { remoteRuntimeFailureReasonFromCommandResult } from '#/server/modules/remote-runtime-failure.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import { remoteWorkspaceRuntimeFailureReasonFromCommandResult } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const target: RemoteRepoTarget = {
+const target: RemoteWorkspaceTarget = {
   id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
   alias: 'example',
   host: 'example.test',
@@ -20,7 +20,7 @@ const target: RemoteRepoTarget = {
 describe('remote runtime failure classification', () => {
   test('classifies SSH transport failures', () => {
     expect(
-      remoteRuntimeFailureReasonFromCommandResult({
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult({
         ok: false,
         stdout: '',
         stderr: '',
@@ -29,35 +29,35 @@ describe('remote runtime failure classification', () => {
       }),
     ).toBe('timeout')
     expect(
-      remoteRuntimeFailureReasonFromCommandResult({
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult({
         ok: false,
         stdout: '',
         stderr: 'ssh: connect to host example.test port 22: Operation timed out',
       }),
     ).toBe('unreachable')
     expect(
-      remoteRuntimeFailureReasonFromCommandResult({
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult({
         ok: false,
         stdout: '',
         stderr: 'kex_exchange_identification: read: Connection reset by peer',
       }),
     ).toBe('handshake-failed')
     expect(
-      remoteRuntimeFailureReasonFromCommandResult({
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult({
         ok: false,
         stdout: '',
         stderr: 'Host key verification failed.',
       }),
     ).toBe('host-key')
     expect(
-      remoteRuntimeFailureReasonFromCommandResult({
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult({
         ok: false,
         stdout: '',
         stderr: 'Received disconnect from 192.0.2.1 port 22:2: Too many authentication failures',
       }),
     ).toBe('auth-failed')
     expect(
-      remoteRuntimeFailureReasonFromCommandResult({
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult({
         ok: false,
         stdout: '',
         stderr: 'kex_exchange_identification: Connection closed by UNKNOWN port 65535',
@@ -67,7 +67,7 @@ describe('remote runtime failure classification', () => {
 
   test('does not classify remote command failures after the remote shell starts', () => {
     expect(
-      remoteRuntimeFailureReasonFromCommandResult({
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult({
         ok: false,
         stdout: '',
         stderr: 'git@github.com: Permission denied (publickey).',
@@ -77,7 +77,7 @@ describe('remote runtime failure classification', () => {
       }),
     ).toBeNull()
     expect(
-      remoteRuntimeFailureReasonFromCommandResult({
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult({
         ok: false,
         stdout: '',
         stderr: 'Host key verification failed.',
@@ -87,7 +87,7 @@ describe('remote runtime failure classification', () => {
       }),
     ).toBeNull()
     expect(
-      remoteRuntimeFailureReasonFromCommandResult({
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult({
         ok: false,
         stdout: '',
         stderr: 'timeout',
@@ -97,7 +97,7 @@ describe('remote runtime failure classification', () => {
       }),
     ).toBeNull()
     expect(
-      remoteRuntimeFailureReasonFromCommandResult({
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult({
         ok: false,
         stdout: '',
         stderr: '',
@@ -111,7 +111,7 @@ describe('remote runtime failure classification', () => {
 
   test('classifies current SSH session transport loss after the remote shell starts', () => {
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: '',
@@ -124,7 +124,7 @@ describe('remote runtime failure classification', () => {
       ),
     ).toBe('unreachable')
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: '',
@@ -137,7 +137,7 @@ describe('remote runtime failure classification', () => {
       ),
     ).toBe('unreachable')
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: '',
@@ -150,7 +150,7 @@ describe('remote runtime failure classification', () => {
       ),
     ).toBe('unreachable')
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: '',
@@ -163,7 +163,7 @@ describe('remote runtime failure classification', () => {
       ),
     ).toBe('unreachable')
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: '',
@@ -176,7 +176,7 @@ describe('remote runtime failure classification', () => {
       ),
     ).toBe('unreachable')
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: '',
@@ -189,7 +189,7 @@ describe('remote runtime failure classification', () => {
       ),
     ).toBe('unreachable')
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: '',
@@ -205,7 +205,7 @@ describe('remote runtime failure classification', () => {
 
   test('does not classify upstream SSH transport text after the remote shell starts', () => {
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: '',
@@ -218,7 +218,7 @@ describe('remote runtime failure classification', () => {
       ),
     ).toBeNull()
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: '',
@@ -231,7 +231,7 @@ describe('remote runtime failure classification', () => {
       ),
     ).toBeNull()
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: '',
@@ -244,7 +244,7 @@ describe('remote runtime failure classification', () => {
       ),
     ).toBeNull()
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: '',
@@ -257,7 +257,7 @@ describe('remote runtime failure classification', () => {
       ),
     ).toBeNull()
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: '',
@@ -270,7 +270,7 @@ describe('remote runtime failure classification', () => {
       ),
     ).toBeNull()
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: '',
@@ -283,7 +283,7 @@ describe('remote runtime failure classification', () => {
       ),
     ).toBeNull()
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: 'Connection to example closed by remote host.',
@@ -295,7 +295,7 @@ describe('remote runtime failure classification', () => {
       ),
     ).toBeNull()
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: '',
@@ -307,7 +307,7 @@ describe('remote runtime failure classification', () => {
       ),
     ).toBeNull()
     expect(
-      remoteRuntimeFailureReasonFromCommandResult(
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult(
         {
           ok: false,
           stdout: '',
@@ -324,14 +324,14 @@ describe('remote runtime failure classification', () => {
 
   test('does not classify ordinary command failures or stale runtime as reachability failures', () => {
     expect(
-      remoteRuntimeFailureReasonFromCommandResult({
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult({
         ok: false,
         stdout: '',
         stderr: 'fatal: not a git repository',
       }),
     ).toBeNull()
     expect(
-      remoteRuntimeFailureReasonFromCommandResult({
+      remoteWorkspaceRuntimeFailureReasonFromCommandResult({
         ok: false,
         stdout: '',
         stderr: '',

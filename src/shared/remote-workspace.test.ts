@@ -1,13 +1,13 @@
 import { describe, expect, test } from 'vitest'
 import {
-  isRemoteRepoTarget,
-  normalizeRemoteRepoRef,
+  isRemoteWorkspaceTarget,
+  normalizeRemoteWorkspaceRef,
   normalizeWorkspaceSessionEntry,
   normalizeRemoteTarget,
-  remoteRepoRefFromTarget,
+  remoteWorkspaceRefFromTarget,
   remoteWorkspaceSessionEntry,
   sameWorkspaceSessionEntry,
-} from '#/shared/remote-repo.ts'
+} from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('remote repository normalization', () => {
@@ -51,7 +51,7 @@ describe('remote repository normalization', () => {
 
   test('derives ref display names from the normalized remote path', () => {
     expect(
-      normalizeRemoteRepoRef({
+      normalizeRemoteWorkspaceRef({
         alias: 'prod',
         remotePath: '/home/alice/service',
         displayName: 'prod:/',
@@ -112,8 +112,8 @@ describe('remote repository normalization', () => {
       displayName: 'prod:/',
     }
 
-    expect(isRemoteRepoTarget(target)).toBe(false)
-    expect(remoteRepoRefFromTarget({ ...target, displayName: 'prod:repo' })).toEqual({
+    expect(isRemoteWorkspaceTarget(target)).toBe(false)
+    expect(remoteWorkspaceRefFromTarget({ ...target, displayName: 'prod:repo' })).toEqual({
       id: 'goblin+ssh://prod/srv/repo',
       alias: 'prod',
       remotePath: '/srv/repo',

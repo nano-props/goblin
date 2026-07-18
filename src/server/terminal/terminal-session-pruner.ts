@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { getWorktrees } from '#/system/git/worktrees.ts'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
   terminalExecutionPath,
   terminalSessionCoordinates,
@@ -31,7 +31,7 @@ class TerminalSessionPruner {
     assertCurrent: () => void
   }): Promise<{ pruned: number; remaining: number }> {
     const allSessions = await this.manager.listSessionsForUser(input.userId, input.scope)
-    if (isRemoteRepoId(input.repoRoot)) return { pruned: 0, remaining: allSessions.length }
+    if (isRemoteWorkspaceId(input.repoRoot)) return { pruned: 0, remaining: allSessions.length }
 
     const workspacePath = localWorkspaceNativePath(input.repoRoot)
     if (!workspacePath) throw new Error('error.workspace-locator-malformed')

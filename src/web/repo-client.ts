@@ -14,6 +14,7 @@ import type { ProbeResult } from '#/shared/api-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const REPO_REQUEST_TIMEOUT_MS = {
   gitNetwork: 240_000,
@@ -37,7 +38,6 @@ async function runRepoReadWithStableErrorKey<T>(read: () => Promise<T>, signal?:
 export async function probeRepo(cwd: string, signal?: AbortSignal): Promise<ProbeResult> {
   return await postServerJson('/api/repo/probe', { cwd }, { signal })
 }
-
 
 export async function cloneRepository(
   input: {
@@ -68,7 +68,13 @@ export async function getRepoLog(
 ): Promise<LogEntry[]> {
   const result = await postServerJson(
     '/api/repo/log',
-    { cwd, workspaceRuntimeId, branch, count: options?.count ?? DEFAULT_REPOSITORY_LOG_COUNT, skip: options?.skip ?? 0 },
+    {
+      cwd,
+      workspaceRuntimeId,
+      branch,
+      count: options?.count ?? DEFAULT_REPOSITORY_LOG_COUNT,
+      skip: options?.skip ?? 0,
+    },
     { signal: options?.signal },
   )
   const log = result as RepoLogResponse
@@ -264,25 +270,25 @@ export async function openRepoUrl(cwd: string, workspaceRuntimeId: string, targe
 }
 
 export async function openRepoTerminal(
-  repoId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
   worktreePath: string,
   app: TerminalApp,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-terminal', { repoId, workspaceRuntimeId, worktreePath, app })
+  return await postServerJson('/api/repo/open-terminal', { workspaceId, workspaceRuntimeId, worktreePath, app })
 }
 
 export async function openRepoEditor(
-  repoId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
   worktreePath: string,
   app: EditorApp,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-editor', { repoId, workspaceRuntimeId, worktreePath, app })
+  return await postServerJson('/api/repo/open-editor', { workspaceId, workspaceRuntimeId, worktreePath, app })
 }
 
-export async function openRepoInFinder(repoId: string, worktreePath: string): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-in-finder', { repoId, worktreePath })
+export async function openRepoInFinder(workspaceId: WorkspaceId, worktreePath: string): Promise<ExecResult> {
+  return await postServerJson('/api/repo/open-in-finder', { workspaceId, worktreePath })
 }
 
 export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {

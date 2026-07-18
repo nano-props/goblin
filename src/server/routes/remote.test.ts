@@ -6,8 +6,8 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#/server/common/identity.ts', () => ({ userIdFromContext: () => 'user-test' }))
-vi.mock('#/server/modules/remote-lifecycle-write-paths.ts', () => ({
-  runRemoteLifecycleWrite: mocks.runLifecycleWrite,
+vi.mock('#/server/modules/remote-workspace-lifecycle-write-paths.ts', () => ({
+  runRemoteWorkspaceLifecycleWrite: mocks.runLifecycleWrite,
 }))
 describe('remote lifecycle route', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -15,7 +15,7 @@ describe('remote lifecycle route', () => {
   test('passes authenticated and validated input to the write path', async () => {
     mocks.runLifecycleWrite.mockResolvedValue({
       kind: 'settled',
-      repoId: 'goblin+ssh://example/repo',
+      workspaceId: 'goblin+ssh://example/repo',
       name: 'repo',
       lifecycle: { kind: 'failed', attemptId: 1, reason: 'unreachable' },
     })
@@ -29,7 +29,7 @@ describe('remote lifecycle route', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          repoId: 'goblin+ssh://example/repo',
+          workspaceId: 'goblin+ssh://example/repo',
           workspaceRuntimeId: 'repo-runtime-test',
         }),
       }),
@@ -39,7 +39,7 @@ describe('remote lifecycle route', () => {
     expect(mocks.runLifecycleWrite).toHaveBeenCalledWith(
       {
         userId: 'user-test',
-        repoId: 'goblin+ssh://example/repo',
+        workspaceId: 'goblin+ssh://example/repo',
         workspaceRuntimeId: 'repo-runtime-test',
         mode: 'restart',
       },
@@ -73,7 +73,7 @@ describe('remote lifecycle route', () => {
           },
         },
       })
-      return { kind: 'settled', repoId: 'goblin+ssh://example/repo', name: 'repo', lifecycle: { kind: 'ready' } }
+      return { kind: 'settled', workspaceId: 'goblin+ssh://example/repo', name: 'repo', lifecycle: { kind: 'ready' } }
     })
 
     const response = await createRemoteRoutes({
@@ -82,7 +82,7 @@ describe('remote lifecycle route', () => {
       new Request('http://localhost/lifecycle', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoId: 'goblin+ssh://example/repo', workspaceRuntimeId: 'repo-runtime-test' }),
+        body: JSON.stringify({ workspaceId: 'goblin+ssh://example/repo', workspaceRuntimeId: 'repo-runtime-test' }),
       }),
     )
 
@@ -105,7 +105,7 @@ describe('remote lifecycle route', () => {
       new Request('http://localhost/lifecycle', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoId: 'goblin+ssh://example/repo', workspaceRuntimeId: '' }),
+        body: JSON.stringify({ workspaceId: 'goblin+ssh://example/repo', workspaceRuntimeId: '' }),
       }),
     )
 

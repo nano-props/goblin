@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   lstat: vi.fn(),
   getWorktrees: vi.fn(),
   movePathToTrash: vi.fn(),
-  resolveRemoteRepoTarget: vi.fn(),
+  resolveRemoteWorkspaceTarget: vi.fn(),
   remoteRuntimeAwareGitRunner: vi.fn(),
   trashRemoteFile: vi.fn(),
 }))
@@ -22,7 +22,7 @@ vi.mock('#/system/trash.ts', () => ({
 }))
 
 vi.mock('#/server/modules/repo-source.ts', () => ({
-  resolveRemoteRepoTarget: mocks.resolveRemoteRepoTarget,
+  resolveRemoteWorkspaceTarget: mocks.resolveRemoteWorkspaceTarget,
   remoteRuntimeAwareGitRunner: mocks.remoteRuntimeAwareGitRunner,
 }))
 
@@ -31,7 +31,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
 }))
 
 import { trashRepositoryFile } from '#/server/modules/repo-tree-trash.ts'
-import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
+import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -84,7 +84,7 @@ describe('repo-tree trash write layer', () => {
   })
 
   test('delegates remote repo files to the SSH trash helper', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const target = {
       id: repoId,
       alias: 'prod',
@@ -94,7 +94,7 @@ describe('repo-tree trash write layer', () => {
       user: 'tester',
       port: 22,
     }
-    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok', repositoryStateChanged: true })
 
     const result = await trashRepositoryFile(repoId, '/srv/repo-feature', 'README.md')
@@ -105,7 +105,7 @@ describe('repo-tree trash write layer', () => {
   })
 
   test('resolves an SSH workspace locator before trashing a file', async () => {
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/plain-workspace' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/plain-workspace' })
     const target = {
       id: repoId,
       alias: 'prod',
@@ -115,7 +115,7 @@ describe('repo-tree trash write layer', () => {
       user: 'tester',
       port: 22,
     }
-    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok' })
 
     await trashRepositoryFile(repoId, repoId, 'notes.txt')
@@ -126,7 +126,7 @@ describe('repo-tree trash write layer', () => {
 
   test('uses the runtime-aware runner for remote trash when provided', async () => {
     const workspaceRuntimeId = 'repo-runtime-trash-test'
-    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const target = {
       id: repoId,
       alias: 'prod',
@@ -137,7 +137,7 @@ describe('repo-tree trash write layer', () => {
       port: 22,
     }
     const run = async () => ({ ok: true as const, stdout: '', stderr: '', code: 0 })
-    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.remoteRuntimeAwareGitRunner.mockReturnValueOnce(run)
     mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok', repositoryStateChanged: true })
 
@@ -149,7 +149,7 @@ describe('repo-tree trash write layer', () => {
       repositoryStateChanged: true,
     })
 
-    expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(repoId, { workspaceRuntimeId })
+    expect(mocks.resolveRemoteWorkspaceTarget).toHaveBeenCalledWith(repoId, { workspaceRuntimeId })
     expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(repoId, workspaceRuntimeId, target)
     expect(mocks.trashRemoteFile).toHaveBeenCalledWith(target, '/srv/repo-feature', 'README.md', {
       signal: undefined,

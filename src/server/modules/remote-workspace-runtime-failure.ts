@@ -1,36 +1,37 @@
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
-import type { RemoteRepoFailureReason, RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceFailureReason, RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
+import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
-export class RemoteRepoRuntimeFailureError extends Error {
-  readonly repoRoot: string
+export class RemoteWorkspaceRuntimeFailureError extends Error {
+  readonly workspaceId: WorkspaceId
   readonly workspaceRuntimeId: string
-  readonly reason: RemoteRepoFailureReason
-  readonly target?: RemoteRepoTarget
+  readonly reason: RemoteWorkspaceFailureReason
+  readonly target?: RemoteWorkspaceTarget
 
   constructor(input: {
-    repoRoot: string
+    workspaceId: WorkspaceId
     workspaceRuntimeId: string
-    reason: RemoteRepoFailureReason
-    target?: RemoteRepoTarget
+    reason: RemoteWorkspaceFailureReason
+    target?: RemoteWorkspaceTarget
     message?: string
   }) {
     super(input.message ?? input.reason)
-    this.name = 'RemoteRepoRuntimeFailureError'
-    this.repoRoot = input.repoRoot
+    this.name = 'RemoteWorkspaceRuntimeFailureError'
+    this.workspaceId = input.workspaceId
     this.workspaceRuntimeId = input.workspaceRuntimeId
     this.reason = input.reason
     if (input.target) this.target = input.target
   }
 }
 
-export function isRemoteRepoRuntimeFailure(error: unknown): error is RemoteRepoRuntimeFailureError {
-  return error instanceof RemoteRepoRuntimeFailureError
+export function isRemoteWorkspaceRuntimeFailure(error: unknown): error is RemoteWorkspaceRuntimeFailureError {
+  return error instanceof RemoteWorkspaceRuntimeFailureError
 }
 
-export function remoteRuntimeFailureReasonFromCommandResult(
+export function remoteWorkspaceRuntimeFailureReasonFromCommandResult(
   result: RemoteCommandResult,
-  target?: RemoteRepoTarget,
-): RemoteRepoFailureReason | null {
+  target?: RemoteWorkspaceTarget,
+): RemoteWorkspaceFailureReason | null {
   if (result.ok || result.message === 'cancelled') return null
   // Before the remote-start marker, stderr is the local OpenSSH client's
   // startup stream. After the marker, only trust stderr that the runner
@@ -74,8 +75,8 @@ export function remoteRuntimeFailureReasonFromCommandResult(
 
 function remoteRuntimeTransportFailureAfterStart(
   result: RemoteCommandResult,
-  target?: RemoteRepoTarget,
-): RemoteRepoFailureReason | null {
+  target?: RemoteWorkspaceTarget,
+): RemoteWorkspaceFailureReason | null {
   // Post-start command stderr is ambiguous unless the SSH runner separated it
   // from the local client's diagnostics. Only classify the separated transport
   // stream; remote command stderr may include upstream Git/SSH failures.
@@ -96,7 +97,7 @@ function textMentionsOpenSshClientLoopTransportFailure(text: string): boolean {
   return false
 }
 
-function textMentionsTargetTransportFailure(text: string, target: RemoteRepoTarget): boolean {
+function textMentionsTargetTransportFailure(text: string, target: RemoteWorkspaceTarget): boolean {
   const destination = (target.sshConnection?.destination ?? target.alias).trim().toLowerCase()
   if (!destination) return false
   const prefix = `connection to ${destination}`
@@ -139,16 +140,16 @@ function isTargetPortTransportFailure(text: string): boolean {
   )
 }
 
-export function remoteRuntimeFailureFromCommandResult(input: {
-  repoRoot: string
+export function remoteWorkspaceRuntimeFailureFromCommandResult(input: {
+  workspaceId: string
   workspaceRuntimeId: string
-  target?: RemoteRepoTarget
+  target?: RemoteWorkspaceTarget
   result: RemoteCommandResult
-}): RemoteRepoRuntimeFailureError | null {
-  const reason = remoteRuntimeFailureReasonFromCommandResult(input.result, input.target)
+}): RemoteWorkspaceRuntimeFailureError | null {
+  const reason = remoteWorkspaceRuntimeFailureReasonFromCommandResult(input.result, input.target)
   if (!reason) return null
-  return new RemoteRepoRuntimeFailureError({
-    repoRoot: input.repoRoot,
+  return new RemoteWorkspaceRuntimeFailureError({
+    workspaceId: requiredWorkspaceId(input.workspaceId),
     workspaceRuntimeId: input.workspaceRuntimeId,
     reason,
     target: input.target,
@@ -156,11 +157,11 @@ export function remoteRuntimeFailureFromCommandResult(input: {
   })
 }
 
-export function remoteRuntimeFailureFromTargetResolutionError(input: {
-  repoRoot: string
+export function remoteWorkspaceRuntimeFailureFromTargetResolutionError(input: {
+  workspaceId: string
   workspaceRuntimeId: string
   error: unknown
-}): RemoteRepoRuntimeFailureError {
+}): RemoteWorkspaceRuntimeFailureError {
   const message = input.error instanceof Error ? input.error.message : String(input.error)
   const text = message.toLowerCase()
   const timedOut =
@@ -168,11 +169,17 @@ export function remoteRuntimeFailureFromTargetResolutionError(input: {
     input.error !== null &&
     'timedOut' in input.error &&
     (input.error as { timedOut?: unknown }).timedOut === true
-  const reason: RemoteRepoFailureReason = timedOut || text.includes('timed out') ? 'timeout' : 'config-changed'
-  return new RemoteRepoRuntimeFailureError({
-    repoRoot: input.repoRoot,
+  const reason: RemoteWorkspaceFailureReason = timedOut || text.includes('timed out') ? 'timeout' : 'config-changed'
+  return new RemoteWorkspaceRuntimeFailureError({
+    workspaceId: requiredWorkspaceId(input.workspaceId),
     workspaceRuntimeId: input.workspaceRuntimeId,
     reason,
     message,
   })
+}
+
+function requiredWorkspaceId(value: string): WorkspaceId {
+  const workspaceId = canonicalWorkspaceLocator(value)
+  if (!workspaceId) throw new Error('remote workspace runtime failure requires a canonical workspaceId')
+  return workspaceId
 }

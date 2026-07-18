@@ -30,7 +30,7 @@ describe('remote client web helpers', () => {
       ok: true,
       json: async () => ({ hosts: [{ alias: 'prod' }], hasInclude: true }),
     }))
-    const { getRemoteSshHosts } = await import('#/web/remote-client.ts')
+    const { getRemoteSshHosts } = await import('#/web/remote-workspace-client.ts')
 
     await expect(getRemoteSshHosts()).resolves.toEqual({ hosts: [{ alias: 'prod' }], hasInclude: true })
     expect(fetchMock).toHaveBeenCalledWith(
@@ -58,10 +58,10 @@ describe('remote client web helpers', () => {
         stages: [],
       }),
     }))
-    const { testRemoteRepoConnection } = await import('#/web/remote-client.ts')
+    const { testRemoteWorkspaceConnection } = await import('#/web/remote-workspace-client.ts')
 
     await expect(
-      testRemoteRepoConnection({
+      testRemoteWorkspaceConnection({
         id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
         alias: 'prod',
         host: 'example.com',

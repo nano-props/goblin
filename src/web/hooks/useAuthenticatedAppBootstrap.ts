@@ -15,7 +15,7 @@ import { useThemeStore } from '#/web/stores/theme.ts'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { readClientWorkspaceState } from '#/web/client-workspace-state.ts'
-import { workspaceSessionEntryId, type WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { workspaceSessionEntryId, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type AuthenticatedAppBootstrapState =

@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
 import { buildRemoteCommandInvocation } from '#/system/ssh/commands.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const target: RemoteRepoTarget = {
+const target: RemoteWorkspaceTarget = {
   id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
   alias: 'example',
   host: 'example.invalid',

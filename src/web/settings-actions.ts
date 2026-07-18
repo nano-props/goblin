@@ -1,6 +1,6 @@
 // Actions are the write boundary that commits to the server transport and
 // projects server-returned values into React Query.
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { settingsLog } from '#/web/logger.ts'
 import type { GlobalShortcutState, I18nSnapshot, ThemeState, WorkspaceRestoreResult } from '#/shared/api-types.ts'
 import {

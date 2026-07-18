@@ -4,6 +4,9 @@ import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bo
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const workspaceId = workspaceIdForTest('goblin+file:///workspace')
 
 function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
@@ -107,7 +110,9 @@ describe('repo-client', () => {
       json: async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }),
     }))
     const { openRepoUrl } = await import('#/web/repo-client.ts')
-    await expect(openRepoUrl('/tmp/repo', workspaceRuntimeId, { type: 'branch', branch: 'feature/test' })).resolves.toEqual({
+    await expect(
+      openRepoUrl('/tmp/repo', workspaceRuntimeId, { type: 'branch', branch: 'feature/test' }),
+    ).resolves.toEqual({
       ok: true,
       message: '',
     })
@@ -121,7 +126,11 @@ describe('repo-client', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ cwd: '/tmp/repo', workspaceRuntimeId, target: { type: 'branch', branch: 'feature/test' } }),
+        body: JSON.stringify({
+          cwd: '/tmp/repo',
+          workspaceRuntimeId,
+          target: { type: 'branch', branch: 'feature/test' },
+        }),
       }),
     )
   })
@@ -390,15 +399,15 @@ describe('repo-client', () => {
       },
     })
     const { openRepoEditor, openRepoInFinder, openRepoTerminal } = await import('#/web/repo-client.ts')
-    await expect(openRepoTerminal('/tmp/repo', 'repo-runtime-test', '/tmp/repo', 'ghostty')).resolves.toEqual({
+    await expect(openRepoTerminal(workspaceId, 'repo-runtime-test', '/workspace', 'ghostty')).resolves.toEqual({
       ok: true,
       message: 'server-terminal',
     })
-    await expect(openRepoEditor('/tmp/repo', 'repo-runtime-test', '/tmp/repo', 'vscode')).resolves.toEqual({
+    await expect(openRepoEditor(workspaceId, 'repo-runtime-test', '/workspace', 'vscode')).resolves.toEqual({
       ok: true,
       message: 'server-editor',
     })
-    await expect(openRepoInFinder('/tmp/repo', '/tmp/repo')).resolves.toEqual({
+    await expect(openRepoInFinder(workspaceId, '/workspace')).resolves.toEqual({
       ok: true,
       message: 'server-finder',
     })
@@ -411,9 +420,9 @@ describe('repo-client', () => {
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
         body: JSON.stringify({
-          repoId: '/tmp/repo',
+          workspaceId,
           workspaceRuntimeId: 'repo-runtime-test',
-          worktreePath: '/tmp/repo',
+          worktreePath: '/workspace',
           app: 'ghostty',
         }),
       }),
@@ -425,9 +434,9 @@ describe('repo-client', () => {
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
         body: JSON.stringify({
-          repoId: '/tmp/repo',
+          workspaceId,
           workspaceRuntimeId: 'repo-runtime-test',
-          worktreePath: '/tmp/repo',
+          worktreePath: '/workspace',
           app: 'vscode',
         }),
       }),
@@ -438,7 +447,7 @@ describe('repo-client', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ repoId: '/tmp/repo', worktreePath: '/tmp/repo' }),
+        body: JSON.stringify({ workspaceId, worktreePath: '/workspace' }),
       }),
     )
   })
@@ -452,8 +461,8 @@ describe('repo-client', () => {
         .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-editor' }) }),
     )
     const { openRepoEditor, openRepoTerminal } = await import('#/web/repo-client.ts')
-    await openRepoTerminal('/tmp/repo', 'repo-runtime-test', '/tmp/repo', 'ghostty')
-    await openRepoEditor('/tmp/repo', 'repo-runtime-test', '/tmp/repo', 'vscode')
+    await openRepoTerminal(workspaceId, 'repo-runtime-test', '/workspace', 'ghostty')
+    await openRepoEditor(workspaceId, 'repo-runtime-test', '/workspace', 'vscode')
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -461,9 +470,9 @@ describe('repo-client', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
-          repoId: '/tmp/repo',
+          workspaceId,
           workspaceRuntimeId: 'repo-runtime-test',
-          worktreePath: '/tmp/repo',
+          worktreePath: '/workspace',
           app: 'ghostty',
         }),
       }),
@@ -474,9 +483,9 @@ describe('repo-client', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
-          repoId: '/tmp/repo',
+          workspaceId,
           workspaceRuntimeId: 'repo-runtime-test',
-          worktreePath: '/tmp/repo',
+          worktreePath: '/workspace',
           app: 'vscode',
         }),
       }),

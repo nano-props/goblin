@@ -3,7 +3,7 @@ import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
-import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
   confirmServerWorkspaceRepoEntry: vi.fn(),
   probeRepo: vi.fn(),
   readRepoProjection: vi.fn(),
-  runRemoteLifecycleWrite: vi.fn(),
+  runRemoteWorkspaceLifecycleWrite: vi.fn(),
   workspaceProbes: new Map<string, unknown>(),
 }))
 
@@ -71,8 +71,8 @@ vi.mock('#/server/modules/workspace-probe.ts', () => ({
   ),
 }))
 
-vi.mock('#/server/modules/remote-lifecycle-write-paths.ts', () => ({
-  runRemoteLifecycleWrite: mocks.runRemoteLifecycleWrite,
+vi.mock('#/server/modules/remote-workspace-lifecycle-write-paths.ts', () => ({
+  runRemoteWorkspaceLifecycleWrite: mocks.runRemoteWorkspaceLifecycleWrite,
 }))
 
 describe('restoreServerWorkspace', () => {
@@ -104,7 +104,7 @@ describe('restoreServerWorkspace', () => {
       matched: true,
       workspace: { openWorkspaceEntries: [entry], workspacePaneTabsByTargetByWorkspace: {} },
     }))
-    mocks.runRemoteLifecycleWrite.mockResolvedValue({
+    mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'ready' },
       name: 'repo',
@@ -332,7 +332,7 @@ describe('restoreServerWorkspace', () => {
       openWorkspaceEntries: [remoteEntry],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.runRemoteLifecycleWrite.mockResolvedValue({
+    mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'failed', reason: 'unreachable' },
       name: 'repo',
@@ -483,7 +483,7 @@ describe('restoreServerWorkspace', () => {
     const controller = new AbortController()
     const abortReason = new Error('remote restore aborted')
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.runRemoteLifecycleWrite.mockImplementation(() => new Promise(() => {}))
+    mocks.runRemoteWorkspaceLifecycleWrite.mockImplementation(() => new Promise(() => {}))
     const workspacePaneTabsHost = {
       restoreTabs: vi.fn(async () => ({
         kind: 'restored' as const,
@@ -503,7 +503,7 @@ describe('restoreServerWorkspace', () => {
       workspacePaneTabsHost,
       signal: controller.signal,
     })
-    await vi.waitFor(() => expect(mocks.runRemoteLifecycleWrite).toHaveBeenCalled())
+    await vi.waitFor(() => expect(mocks.runRemoteWorkspaceLifecycleWrite).toHaveBeenCalled())
     controller.abort(abortReason)
 
     await expect(restore).rejects.toBe(abortReason)

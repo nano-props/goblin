@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   getServerWorkspaceState: vi.fn(),
   probeRepo: vi.fn(),
   readRepoProjection: vi.fn(),
-  runRemoteLifecycleWrite: vi.fn(),
+  runRemoteWorkspaceLifecycleWrite: vi.fn(),
 }))
 
 const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
@@ -34,8 +34,8 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   readRepoProjection: mocks.readRepoProjection,
 }))
 
-vi.mock('#/server/modules/remote-lifecycle-write-paths.ts', () => ({
-  runRemoteLifecycleWrite: mocks.runRemoteLifecycleWrite,
+vi.mock('#/server/modules/remote-workspace-lifecycle-write-paths.ts', () => ({
+  runRemoteWorkspaceLifecycleWrite: mocks.runRemoteWorkspaceLifecycleWrite,
 }))
 
 const USER_ID = 'user_restore_runtime'

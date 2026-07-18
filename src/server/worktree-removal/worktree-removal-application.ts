@@ -10,7 +10,7 @@ import type {
 import { serverLogger } from '#/server/logger.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
-import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure-settlement.ts'
+import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
 import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const worktreeRemovalLogger = serverLogger.child({ module: 'worktree-removal-application' })
@@ -62,7 +62,7 @@ export class WorktreeRemovalApplication {
         worktreePath,
       })
     } catch (error) {
-      failRemoteRuntimeIfNeeded(userId, error)
+      await failRemoteWorkspaceRuntimeIfNeeded(userId, error)
       return { ok: false, message: error instanceof Error ? error.message : String(error) }
     }
     try {
@@ -83,7 +83,8 @@ export class WorktreeRemovalApplication {
             {
               beforeRemove: async () => {
                 signal.throwIfAborted()
-                if (!this.isCurrentRuntime(userId, input)) return { ok: false, message: 'error.workspace-runtime-stale' }
+                if (!this.isCurrentRuntime(userId, input))
+                  return { ok: false, message: 'error.workspace-runtime-stale' }
                 const quiescence = await this.quiesce(input.repoRoot, worktreePath, physicalCapability)
                 signal.throwIfAborted()
                 affectedScopes = quiescence.scopes
@@ -135,7 +136,7 @@ export class WorktreeRemovalApplication {
       if (!result.admitted) return { ok: false, message: 'error.worktree-removal-in-progress' }
       return result.value
     } catch (error) {
-      failRemoteRuntimeIfNeeded(userId, error)
+      await failRemoteWorkspaceRuntimeIfNeeded(userId, error)
       return { ok: false, message: abortMessage(error) }
     }
   }
@@ -151,11 +152,23 @@ export class WorktreeRemovalApplication {
   ): Promise<
     | {
         ok: true
-        scopes: Array<{ userId: string; repoRoot: string; workspaceRuntimeId: string; scope: string; worktreePath: string }>
+        scopes: Array<{
+          userId: string
+          repoRoot: string
+          workspaceRuntimeId: string
+          scope: string
+          worktreePath: string
+        }>
       }
     | {
         ok: false
-        scopes: Array<{ userId: string; repoRoot: string; workspaceRuntimeId: string; scope: string; worktreePath: string }>
+        scopes: Array<{
+          userId: string
+          repoRoot: string
+          workspaceRuntimeId: string
+          scope: string
+          worktreePath: string
+        }>
         message: string
       }
   > {

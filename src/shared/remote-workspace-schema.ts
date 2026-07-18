@@ -6,7 +6,7 @@ export const RemoteAbsolutePathSchema = v.pipe(
   v.check((value) => value.startsWith('/') && !value.includes('\0'), 'Invalid remote path'),
 )
 
-export const RemoteRepoRefSchema = v.object({
+export const RemoteWorkspaceRefSchema = v.object({
   id: WorkspaceIdSchema,
   alias: v.string(),
   remotePath: RemoteAbsolutePathSchema,
@@ -21,6 +21,6 @@ export const WorkspaceSessionEntrySchema = v.union([
   v.object({
     kind: v.literal('remote'),
     id: WorkspaceIdSchema,
-    ref: RemoteRepoRefSchema,
+    ref: RemoteWorkspaceRefSchema,
   }),
 ])

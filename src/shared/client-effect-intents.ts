@@ -1,5 +1,5 @@
 import { isSettingsPage, type SettingsPage } from '#/shared/settings-pages.ts'
-import { normalizeWorkspaceSessionEntry, type WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { normalizeWorkspaceSessionEntry, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import { isWorkspacePaneTabType, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 

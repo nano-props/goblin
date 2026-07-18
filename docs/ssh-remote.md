@@ -1,8 +1,8 @@
-# SSH Remote Repositories
+# SSH Remote Workspaces
 
 ## Principle
 
-Remote repositories use a **local-decision, remote-execution** model:
+Remote workspaces use a **local-decision, remote-execution** model:
 
 - The local process decides what to run, quotes every argument, and parses the result.
 - The remote host only executes the command that was sent to it.
@@ -23,7 +23,7 @@ Connections are reused through a per-target SSH multiplexing socket kept under t
 
 ## Diagnostics
 
-Before first use, the backend verifies: SSH handshake, shell sanity, Git availability, path existence, and repository validity. Failures are classified so the UI can show actionable messages.
+Before first use, the backend verifies the SSH handshake, shell sanity, and path existence. Git detection enriches a readable directory with Git capabilities when available; a non-Git directory remains a valid workspace. Failures are classified so the UI can show actionable messages.
 
 ## Worktree bootstrap
 

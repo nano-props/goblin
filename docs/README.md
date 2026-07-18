@@ -5,7 +5,7 @@ Use these docs for app-level product and architecture decisions:
 - `ui-conventions.md`: UI and copy rules
 - `workspaces.md`: canonical workspace identity, capabilities, refresh, and pane targets
 - `arch.md`: app shell and process control
-- `ssh-remote.md`: SSH remote repository backend design
+- `ssh-remote.md`: SSH remote workspace backend design
 - `layering.md`: feature layering rules
 - `state-sync.md`: state control and sync model
 - `startup.md`: primary window startup, restore, routing, and persistence gates

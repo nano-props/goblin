@@ -9,7 +9,7 @@ import { readdir } from 'node:fs/promises'
 import { execa } from 'execa'
 import type { RepoTreeNode } from '#/shared/api-types.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
-import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { getRemoteTreeWalk, type RemoteGitRunner } from '#/system/ssh/git.ts'
 import { getRemoteDirectoryWalk } from '#/system/ssh/filesystem.ts'
 import {
@@ -57,7 +57,7 @@ export async function getWorkspaceTreeSourceLocal(
 }
 
 export interface GetRepoTreeSourceRemoteInput {
-  readonly target: RemoteRepoTarget
+  readonly target: RemoteWorkspaceTarget
   readonly worktreePath: string
   readonly options: RepoTreeSourceOptions
   readonly signal: AbortSignal | undefined

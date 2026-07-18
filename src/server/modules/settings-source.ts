@@ -13,7 +13,7 @@ import {
   writeUserSettingsJson,
 } from '#/server/modules/settings-persistence.ts'
 import type { LangPref, ServerWorkspaceState, UserSettings, ThemePref } from '#/shared/api-types.ts'
-import { workspaceSessionEntryId, sameWorkspaceSessionEntry, type WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
+import { workspaceSessionEntryId, sameWorkspaceSessionEntry, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { recordWithoutKey } from '#/shared/record.ts'
 import {
   isKnownWorkspaceExternalAppItemId,

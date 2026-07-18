@@ -2,8 +2,8 @@ import { describe, expect, test } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   formatLocalRepoLocator,
-  formatRemoteRepoRefLocator,
-  formatRemoteRepoTargetLocator,
+  formatRemoteWorkspaceRefLocator,
+  formatRemoteWorkspaceTargetLocator,
   formatRemoteWorktreeLocator,
   formatWorkspaceDisplayLocation,
   formatWorkspaceSessionEntryLocator,
@@ -29,13 +29,13 @@ describe('repo locators', () => {
   })
 
   test('formats concrete remote target locators with connection identity', () => {
-    expect(formatRemoteRepoTargetLocator({ user: 'git', host: 'example.test', remotePath: '/srv/repo' })).toBe(
+    expect(formatRemoteWorkspaceTargetLocator({ user: 'git', host: 'example.test', remotePath: '/srv/repo' })).toBe(
       'git@example.test:/srv/repo',
     )
   })
 
   test('formats persisted remote ref locators with the SSH alias', () => {
-    expect(formatRemoteRepoRefLocator({ alias: 'prod', remotePath: '/srv/repo' })).toBe('prod:/srv/repo')
+    expect(formatRemoteWorkspaceRefLocator({ alias: 'prod', remotePath: '/srv/repo' })).toBe('prod:/srv/repo')
   })
 
   test('formats repo locators from the best available remote metadata', () => {

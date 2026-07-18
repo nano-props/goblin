@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import type { ExecResult } from '#/web/types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
@@ -65,7 +65,7 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
   const canRemoveWorktree = !!branch.worktree?.path && !worktreeState?.isMain
   const canCopyPatch = !!branch.worktree?.path && (worktreeState?.dirty ?? false)
   const hasWorktree = !!branch.worktree?.path
-  const isRemoteRepo = isRemoteRepoId(repo.id)
+  const isRemoteRepo = isRemoteWorkspaceId(repo.id)
   return {
     canRemoveWorktree,
     isRegularBranch,
@@ -191,7 +191,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   function openFinder() {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
-    if (isRemoteRepoId(repo.id)) return
+    if (isRemoteWorkspaceId(repo.id)) return
     return runUiAction('finder', () => openRepoInFinder(repo.id, worktreePath))
   }
 

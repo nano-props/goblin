@@ -1,5 +1,3 @@
-export type RepoKind = 'local' | 'remote'
-
 import {
   canonicalWorkspaceLocator,
   formatWorkspaceLocator,
@@ -7,14 +5,14 @@ import {
   type WorkspaceId,
 } from '#/shared/workspace-locator.ts'
 
-export interface RemoteRepoRef {
+export interface RemoteWorkspaceRef {
   id: WorkspaceId
   alias: string
   remotePath: string
   displayName: string
 }
 
-export interface RemoteRepoTarget extends RemoteRepoRef {
+export interface RemoteWorkspaceTarget extends RemoteWorkspaceRef {
   host: string
   user: string
   port: number
@@ -26,7 +24,7 @@ export interface RemoteRepoTarget extends RemoteRepoRef {
 }
 
 export type LocalWorkspaceSessionEntry = { kind: 'local'; id: WorkspaceId }
-export type RemoteWorkspaceSessionEntry = { kind: 'remote'; id: WorkspaceId; ref: RemoteRepoRef }
+export type RemoteWorkspaceSessionEntry = { kind: 'remote'; id: WorkspaceId; ref: RemoteWorkspaceRef }
 export type WorkspaceSessionEntry = LocalWorkspaceSessionEntry | RemoteWorkspaceSessionEntry
 
 export function sameWorkspaceSessionEntry(
@@ -61,8 +59,8 @@ export interface RemotePathSuggestionsInput extends RemoteConnectionInput {
   prefix: string
 }
 
-export interface ResolvedRemoteTarget {
-  target: RemoteRepoTarget
+export interface ResolvedRemoteWorkspaceTarget {
+  target: RemoteWorkspaceTarget
 }
 
 export type RemoteDiagnosticStageName = 'ssh' | 'shell' | 'git' | 'path' | 'repo'
@@ -110,7 +108,7 @@ export interface RemoteDiagnosticStage {
 }
 
 export interface RemoteDiagnosticsResult {
-  target: RemoteRepoTarget
+  target: RemoteWorkspaceTarget
   ok: boolean
   stages: RemoteDiagnosticStage[]
   category?: RemoteDiagnosticCategory
@@ -121,7 +119,7 @@ export interface RemoteDiagnosticsResult {
 }
 
 /**
- * Lifecycle-level failure reason for a remote repo.
+ * Lifecycle-level failure reason for a remote workspace.
  *
  * This is intentionally coarser than {@link RemoteDiagnosticCategory}:
  * the diagnostic category explains *why* a probe step failed (with
@@ -131,7 +129,7 @@ export interface RemoteDiagnosticsResult {
  * failures map to `unknown` here — the lifecycle command caller decides
  * whether to retry.
  */
-export type RemoteRepoFailureReason =
+export type RemoteWorkspaceFailureReason =
   | 'config-changed'
   | 'auth-failed'
   | 'host-key'
@@ -142,7 +140,7 @@ export type RemoteRepoFailureReason =
   | 'timeout'
   | 'unknown'
 
-export const REMOTE_REPO_FAILURE_REASONS: readonly RemoteRepoFailureReason[] = [
+export const REMOTE_WORKSPACE_FAILURE_REASONS: readonly RemoteWorkspaceFailureReason[] = [
   'config-changed',
   'auth-failed',
   'host-key',
@@ -154,20 +152,20 @@ export const REMOTE_REPO_FAILURE_REASONS: readonly RemoteRepoFailureReason[] = [
   'unknown',
 ]
 
-export function isRemoteRepoFailureReason(value: unknown): value is RemoteRepoFailureReason {
-  return typeof value === 'string' && (REMOTE_REPO_FAILURE_REASONS as readonly string[]).includes(value)
+export function isRemoteWorkspaceFailureReason(value: unknown): value is RemoteWorkspaceFailureReason {
+  return typeof value === 'string' && (REMOTE_WORKSPACE_FAILURE_REASONS as readonly string[]).includes(value)
 }
 
 /**
  * Map a raw failure source (i18n key, `RemoteDiagnosticCategory`, or
- * arbitrary string) to a {@link RemoteRepoFailureReason}. Shared
+ * arbitrary string) to a {@link RemoteWorkspaceFailureReason}. Shared
  * between the server lifecycle boundary and web-side failure writes.
- * The lifecycle union takes a `RemoteRepoFailureReason` directly, and this
+ * The lifecycle union takes a `RemoteWorkspaceFailureReason` directly, and this
  * helper keeps the `RemoteDiagnosticCategory` / i18n-key mapping in one
  * definition.
  */
-export function toRemoteRepoFailureReason(reason: string): RemoteRepoFailureReason {
-  if (isRemoteRepoFailureReason(reason)) return reason
+export function toRemoteWorkspaceFailureReason(reason: string): RemoteWorkspaceFailureReason {
+  if (isRemoteWorkspaceFailureReason(reason)) return reason
   switch (reason) {
     case 'error.ssh-config-changed':
     case 'config-changed':
@@ -197,7 +195,7 @@ export function toRemoteRepoFailureReason(reason: string): RemoteRepoFailureReas
 }
 
 /**
- * The single source-of-truth lifecycle state for a remote repo.
+ * The single source-of-truth lifecycle state for a remote workspace.
  *
  * Three orthogonal meanings collapse into one union:
  *   - `connecting`: lifecycle started, has not yet converged
@@ -208,32 +206,32 @@ export function toRemoteRepoFailureReason(reason: string): RemoteRepoFailureReas
  * `target` is intentionally only accessible inside the union so callers
  * cannot infer connectivity from unrelated remote fields.
  */
-export type RemoteRepoConnectionLifecycle =
+export type RemoteWorkspaceConnectionLifecycle =
   | { kind: 'connecting' }
-  | { kind: 'ready'; target: RemoteRepoTarget }
-  | { kind: 'failed'; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget }
+  | { kind: 'ready'; target: RemoteWorkspaceTarget }
+  | { kind: 'failed'; reason: RemoteWorkspaceFailureReason; target?: RemoteWorkspaceTarget }
 
-/** Authoritative lifecycle owned by one server repo-runtime generation. */
-export type RemoteRepoRuntimeLifecycle =
+/** Authoritative lifecycle owned by one server workspace-runtime generation. */
+export type RemoteWorkspaceRuntimeLifecycle =
   | { kind: 'idle'; attemptId: number }
   | { kind: 'connecting'; attemptId: number }
-  | { kind: 'ready'; attemptId: number; target: RemoteRepoTarget }
-  | { kind: 'failed'; attemptId: number; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget }
+  | { kind: 'ready'; attemptId: number; target: RemoteWorkspaceTarget }
+  | { kind: 'failed'; attemptId: number; reason: RemoteWorkspaceFailureReason; target?: RemoteWorkspaceTarget }
 
-export type RemoteRepoLifecycleCommandResult =
+export type RemoteWorkspaceLifecycleCommandResult =
   | {
       kind: 'settled'
-      repoId: string
+      workspaceId: WorkspaceId
       name: string
-      lifecycle: Extract<RemoteRepoRuntimeLifecycle, { kind: 'ready' | 'failed' }>
+      lifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
     }
-  | { kind: 'superseded'; repoId: string }
-  | { kind: 'stale-runtime'; repoId: string }
+  | { kind: 'superseded'; workspaceId: WorkspaceId }
+  | { kind: 'stale-runtime'; workspaceId: WorkspaceId }
 
 /** Narrow a lifecycle to its concrete target, if any. */
-export function remoteRepoConnectionTarget(
-  lifecycle: RemoteRepoConnectionLifecycle | null | undefined,
-): RemoteRepoTarget | null {
+export function remoteWorkspaceConnectionTarget(
+  lifecycle: RemoteWorkspaceConnectionLifecycle | null | undefined,
+): RemoteWorkspaceTarget | null {
   if (!lifecycle) return null
   if (lifecycle.kind === 'ready') return lifecycle.target
   if (lifecycle.kind === 'failed') return lifecycle.target ?? null
@@ -241,47 +239,47 @@ export function remoteRepoConnectionTarget(
 }
 
 /** Whether the lifecycle is in the transient `connecting` state. */
-export function isRemoteRepoConnectionConnecting(lifecycle: RemoteRepoConnectionLifecycle | null | undefined): boolean {
+export function isRemoteWorkspaceConnectionConnecting(
+  lifecycle: RemoteWorkspaceConnectionLifecycle | null | undefined,
+): boolean {
   return !!lifecycle && lifecycle.kind === 'connecting'
 }
 
 /** Whether the lifecycle has converged to a terminal state. */
-export function isRemoteRepoConnectionTerminal(
-  lifecycle: RemoteRepoConnectionLifecycle | null | undefined,
+export function isRemoteWorkspaceConnectionTerminal(
+  lifecycle: RemoteWorkspaceConnectionLifecycle | null | undefined,
 ): lifecycle is
-  | { kind: 'ready'; target: RemoteRepoTarget }
-  | { kind: 'failed'; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget } {
+  | { kind: 'ready'; target: RemoteWorkspaceTarget }
+  | { kind: 'failed'; reason: RemoteWorkspaceFailureReason; target?: RemoteWorkspaceTarget } {
   return !!lifecycle && (lifecycle.kind === 'ready' || lifecycle.kind === 'failed')
 }
 
 /**
- * Server-side converged result for a remote-repo lifecycle run.
+ * Server-side converged result for a remote-workspace lifecycle run.
  *
  * This is the terminal output of the server resolver. WorkspaceRuntime owns the
  * surrounding `connecting -> ready|failed` lifecycle and attempt generation.
  *
- * `lifecycle.target` is the same `RemoteRepoTarget` the
+ * `lifecycle.target` is the same `RemoteWorkspaceTarget` the
  * runtime publishes in its canonical lifecycle. The `target?` in the failed
  * variant retains the last-known target so the UI keeps
- * showing the remote locator on a failed repository.
+ * showing the remote locator on a failed workspace.
  */
-export type RemoteRepoConnectionResult =
+export type RemoteWorkspaceConnectionResult =
   | {
       kind: 'ready'
-      repoId: string
       name: string
       gitAvailable: boolean
       gitDiagnostic?: string
-      lifecycle: { kind: 'ready'; target: RemoteRepoTarget }
+      lifecycle: { kind: 'ready'; target: RemoteWorkspaceTarget }
     }
   | {
       kind: 'failed'
-      repoId: string
       name: string
-      lifecycle: { kind: 'failed'; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget }
+      lifecycle: { kind: 'failed'; reason: RemoteWorkspaceFailureReason; target?: RemoteWorkspaceTarget }
     }
 
-export interface RemoteRepoTargetInput {
+export interface RemoteWorkspaceTargetInput {
   alias?: unknown
   host?: unknown
   user?: unknown
@@ -290,31 +288,31 @@ export interface RemoteRepoTargetInput {
   displayName?: unknown
 }
 
-export interface RemoteRepoRefInput {
+export interface RemoteWorkspaceRefInput {
   alias?: unknown
   remotePath?: unknown
   displayName?: unknown
 }
 
-export function normalizeRemoteRepoId(input: RemoteRepoRefInput): WorkspaceId {
+export function normalizeRemoteWorkspaceId(input: RemoteWorkspaceRefInput): WorkspaceId {
   const normalized = remoteRefFields(input)
-  if (!normalized) throw new TypeError('Invalid remote repository reference')
+  if (!normalized) throw new TypeError('Invalid remote workspace reference')
   const locator = formatWorkspaceLocator(
     { transport: 'ssh', profile: normalized.alias, path: normalized.remotePath },
     'posix',
   )
-  if (!locator) throw new TypeError('Invalid remote repository reference')
+  if (!locator) throw new TypeError('Invalid remote workspace reference')
   return locator
 }
 
-export function isRemoteRepoId(value: string): boolean {
+export function isRemoteWorkspaceId(value: string): value is WorkspaceId {
   return parseWorkspaceLocator(value, 'posix')?.transport === 'ssh'
 }
 
-export function normalizeRemoteRepoRef(input: RemoteRepoRefInput): RemoteRepoRef | null {
+export function normalizeRemoteWorkspaceRef(input: unknown): RemoteWorkspaceRef | null {
   const fields = remoteRefFields(input)
   if (!fields) return null
-  const id = normalizeRemoteRepoId(fields)
+  const id = normalizeRemoteWorkspaceId(fields)
   return {
     id,
     alias: fields.alias,
@@ -323,8 +321,8 @@ export function normalizeRemoteRepoRef(input: RemoteRepoRefInput): RemoteRepoRef
   }
 }
 
-export function normalizeRemoteTarget(input: RemoteRepoTargetInput): RemoteRepoTarget | null {
-  const ref = normalizeRemoteRepoRef(input)
+export function normalizeRemoteTarget(input: unknown): RemoteWorkspaceTarget | null {
+  const ref = normalizeRemoteWorkspaceRef(input)
   const fields = remoteTargetFields(input)
   if (!ref || !fields) return null
   return {
@@ -335,7 +333,7 @@ export function normalizeRemoteTarget(input: RemoteRepoTargetInput): RemoteRepoT
   }
 }
 
-export function remoteDisplayName(target: Pick<RemoteRepoTargetInput, 'alias' | 'host' | 'remotePath'>): string {
+export function remoteDisplayName(target: Pick<RemoteWorkspaceTargetInput, 'alias' | 'host' | 'remotePath'>): string {
   const alias = typeof target.alias === 'string' && safeText(target.alias) ? target.alias.trim() : null
   const host = typeof target.host === 'string' && safeText(target.host) ? target.host.trim() : 'remote'
   const remotePath =
@@ -343,11 +341,14 @@ export function remoteDisplayName(target: Pick<RemoteRepoTargetInput, 'alias' | 
   return `${alias ?? host}:${basename(remotePath ?? '/')}`
 }
 
-export function isRemoteRepoTarget(value: unknown): value is RemoteRepoTarget {
+export function isRemoteWorkspaceTarget(value: unknown): value is RemoteWorkspaceTarget {
   if (!value || typeof value !== 'object') return false
-  const target = value as RemoteRepoTarget
-  const normalized = normalizeRemoteTarget(target)
-  return !!normalized && normalized.id === target.id && normalized.displayName === target.displayName
+  const normalized = normalizeRemoteTarget(value)
+  return (
+    !!normalized &&
+    normalized.id === Reflect.get(value, 'id') &&
+    normalized.displayName === Reflect.get(value, 'displayName')
+  )
 }
 
 export function workspaceSessionEntryId(entry: WorkspaceSessionEntry): WorkspaceId {
@@ -358,54 +359,61 @@ export function localWorkspaceSessionEntry(id: WorkspaceId): LocalWorkspaceSessi
   return { kind: 'local', id }
 }
 
-export function remoteWorkspaceSessionEntry(ref: RemoteRepoRef | RemoteRepoTarget): RemoteWorkspaceSessionEntry {
-  const normalized = normalizeRemoteRepoRef(ref)
-  if (!normalized) throw new TypeError('Invalid remote repository reference')
+export function remoteWorkspaceSessionEntry(
+  ref: RemoteWorkspaceRef | RemoteWorkspaceTarget,
+): RemoteWorkspaceSessionEntry {
+  const normalized = normalizeRemoteWorkspaceRef(ref)
+  if (!normalized) throw new TypeError('Invalid remote workspace reference')
   return { kind: 'remote', id: normalized.id, ref: normalized }
 }
 
 export function normalizeWorkspaceSessionEntry(input: unknown): WorkspaceSessionEntry | null {
   if (!input || typeof input !== 'object') return null
-  const entry = input as Partial<WorkspaceSessionEntry> & { ref?: unknown }
-  if (entry.kind === 'local') {
-    if (typeof entry.id !== 'string') return null
-    const id = canonicalWorkspaceLocator(entry.id)
-    const parsed = id ? parseWorkspaceLocator(id, 'posix') ?? parseWorkspaceLocator(id, 'win32') : null
+  const kind = Reflect.get(input, 'kind')
+  const rawId = Reflect.get(input, 'id')
+  if (kind === 'local') {
+    if (typeof rawId !== 'string') return null
+    const id = canonicalWorkspaceLocator(rawId)
+    const parsed = id ? (parseWorkspaceLocator(id, 'posix') ?? parseWorkspaceLocator(id, 'win32')) : null
     return id && parsed?.transport === 'file' ? { kind: 'local', id } : null
   }
-  if (entry.kind === 'remote') {
-    if (typeof entry.id !== 'string') return null
-    const ref = normalizeRemoteRepoRef(entry.ref as RemoteRepoRefInput)
-    if (!ref || entry.id !== ref.id) return null
+  if (kind === 'remote') {
+    if (typeof rawId !== 'string') return null
+    const ref = normalizeRemoteWorkspaceRef(Reflect.get(input, 'ref'))
+    if (!ref || rawId !== ref.id) return null
     return { kind: 'remote', id: ref.id, ref }
   }
   return null
 }
 
-export function parseRemoteRepoId(repoId: string): Pick<RemoteRepoRef, 'alias' | 'remotePath'> | null {
-  const parsed = parseWorkspaceLocator(repoId, 'posix')
+export function parseRemoteWorkspaceId(workspaceId: string): Pick<RemoteWorkspaceRef, 'alias' | 'remotePath'> | null {
+  const parsed = parseWorkspaceLocator(workspaceId, 'posix')
   return parsed?.transport === 'ssh' ? { alias: parsed.profile, remotePath: parsed.path } : null
 }
 
-export function remoteRepoRefFromTarget(target: RemoteRepoTarget): RemoteRepoRef {
-  const ref = normalizeRemoteRepoRef(target)
-  if (!ref) throw new TypeError('Invalid remote repository target')
+export function remoteWorkspaceRefFromTarget(target: RemoteWorkspaceTarget): RemoteWorkspaceRef {
+  const ref = normalizeRemoteWorkspaceRef(target)
+  if (!ref) throw new TypeError('Invalid remote workspace target')
   return ref
 }
 
-function remoteTargetFields(input: RemoteRepoTargetInput): Pick<RemoteRepoTarget, 'host' | 'user' | 'port'> | null {
+function remoteTargetFields(input: unknown): Pick<RemoteWorkspaceTarget, 'host' | 'user' | 'port'> | null {
   if (!input || typeof input !== 'object') return null
-  const host = typeof input.host === 'string' ? input.host.trim() : ''
-  const user = typeof input.user === 'string' ? input.user.trim() : ''
-  const port = normalizePort(input.port)
+  const rawHost = Reflect.get(input, 'host')
+  const rawUser = Reflect.get(input, 'user')
+  const host = typeof rawHost === 'string' ? rawHost.trim() : ''
+  const user = typeof rawUser === 'string' ? rawUser.trim() : ''
+  const port = normalizePort(Reflect.get(input, 'port'))
   if (!safeText(host) || !safeText(user) || port === null) return null
   return { host, user, port }
 }
 
-function remoteRefFields(input: RemoteRepoRefInput): Pick<RemoteRepoRef, 'alias' | 'remotePath'> | null {
+function remoteRefFields(input: unknown): Pick<RemoteWorkspaceRef, 'alias' | 'remotePath'> | null {
   if (!input || typeof input !== 'object') return null
-  const alias = typeof input.alias === 'string' ? input.alias : ''
-  const remotePath = typeof input.remotePath === 'string' ? input.remotePath : ''
+  const rawAlias = Reflect.get(input, 'alias')
+  const rawRemotePath = Reflect.get(input, 'remotePath')
+  const alias = typeof rawAlias === 'string' ? rawAlias : ''
+  const remotePath = typeof rawRemotePath === 'string' ? rawRemotePath : ''
   const locator = formatWorkspaceLocator({ transport: 'ssh', profile: alias, path: remotePath }, 'posix')
   if (!locator) return null
   return { alias, remotePath }

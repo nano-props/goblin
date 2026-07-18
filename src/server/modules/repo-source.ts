@@ -48,7 +48,7 @@ import { isValidCwd } from '#/shared/input-validation.ts'
 import { validateBranchDeletionPolicy, validateRemovableWorktreeState } from '#/shared/repo-action-policy.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { resolveRemoteTarget as resolveSshRemoteTarget } from '#/system/ssh/config.ts'
-import { testRemoteRepo } from '#/system/ssh/diagnostics.ts'
+import { testRemoteWorkspace } from '#/system/ssh/diagnostics.ts'
 import { SSH_BOOT_PROBE_TIMEOUT_MS } from '#/system/ssh/commands.ts'
 import {
   bootstrapRemoteWorktreeAfterCreate,
@@ -74,20 +74,20 @@ import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { getBranchPullRequests, getBranchPullRequestsForRepoRef } from '#/system/git/pull-requests.ts'
 import { parseGitHubRemoteUrl, type GitHubRepoRef } from '#/system/github/graphql.ts'
 import {
-  isRemoteRepoId,
-  parseRemoteRepoId,
+  isRemoteWorkspaceId,
+  parseRemoteWorkspaceId,
   type ProbeResult,
   type PullRequestEntry,
-  type RemoteRepoTarget,
+  type RemoteWorkspaceTarget,
   type RepoSnapshot,
 } from '#/shared/api-types.ts'
-import { normalizeRemoteRepoRef } from '#/shared/remote-repo.ts'
+import { normalizeRemoteWorkspaceRef } from '#/shared/remote-workspace.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import {
-  isRemoteRepoRuntimeFailure,
-  remoteRuntimeFailureFromCommandResult,
-  remoteRuntimeFailureFromTargetResolutionError,
-} from '#/server/modules/remote-runtime-failure.ts'
+  isRemoteWorkspaceRuntimeFailure,
+  remoteWorkspaceRuntimeFailureFromCommandResult,
+  remoteWorkspaceRuntimeFailureFromTargetResolutionError,
+} from '#/server/modules/remote-workspace-runtime-failure.ts'
 import {
   formatWorkspaceLocator,
   parseWorkspaceLocator,
@@ -168,19 +168,19 @@ export interface RepoSourceRuntimeContext {
   workspaceRuntimeId: string
 }
 
-export async function resolveRemoteRepoTarget(
+export async function resolveRemoteWorkspaceTarget(
   repoId: string,
   runtime?: RepoSourceRuntimeContext,
   signal?: AbortSignal,
-): Promise<RemoteRepoTarget> {
+): Promise<RemoteWorkspaceTarget> {
   try {
-    const parsed = parseRemoteRepoId(repoId)
+    const parsed = parseRemoteWorkspaceId(repoId)
     if (!parsed) throw new Error('error.ssh-config-changed')
     return (await resolveSshRemoteTarget(parsed, signal)).target
   } catch (err) {
     if (!runtime) throw err
-    throw remoteRuntimeFailureFromTargetResolutionError({
-      repoRoot: repoId,
+    throw remoteWorkspaceRuntimeFailureFromTargetResolutionError({
+      workspaceId: repoId,
       workspaceRuntimeId: runtime.workspaceRuntimeId,
       error: err,
     })
@@ -243,10 +243,10 @@ async function resolveLocalRepoWriteBoundary(repoId: string, signal?: AbortSigna
 
 async function resolveRemoteRepoWriteBoundary(repoId: string, signal?: AbortSignal): Promise<RepoWriteBoundary> {
   try {
-    const target = await resolveRemoteRepoTarget(repoId)
+    const target = await resolveRemoteWorkspaceTarget(repoId)
     const writeGroupPath = await getRemoteRepoWriteGroupPath(target, { signal })
     signal?.throwIfAborted()
-    const writeGroupRef = writeGroupPath ? normalizeRemoteRepoRef({ ...target, remotePath: writeGroupPath }) : null
+    const writeGroupRef = writeGroupPath ? normalizeRemoteWorkspaceRef({ ...target, remotePath: writeGroupPath }) : null
     return { kind: 'remote-git', repoId: writeGroupRef?.id ?? repoId }
   } catch {
     signal?.throwIfAborted()
@@ -256,7 +256,7 @@ async function resolveRemoteRepoWriteBoundary(repoId: string, signal?: AbortSign
 
 export async function resolveRepoWriteBoundaryKey(repoId: string, signal?: AbortSignal): Promise<string> {
   return repoWriteBoundaryKey(
-    isRemoteRepoId(repoId)
+    isRemoteWorkspaceId(repoId)
       ? await resolveRemoteRepoWriteBoundary(repoId, signal)
       : await resolveLocalRepoWriteBoundary(repoId, signal),
   )
@@ -280,10 +280,10 @@ function localWorkspaceId(worktreePath: string): string | null {
   return formatWorkspaceLocator({ transport: 'file', platform, path: worktreePath }, platform)
 }
 
-function remoteWorktreeRepoIds(target: RemoteRepoTarget, worktreePaths: readonly string[] | undefined): string[] {
+function remoteWorktreeRepoIds(target: RemoteWorkspaceTarget, worktreePaths: readonly string[] | undefined): string[] {
   if (!worktreePaths) return []
   return worktreePaths.flatMap((remotePath) => {
-    const ref = normalizeRemoteRepoRef({ alias: target.alias, remotePath })
+    const ref = normalizeRemoteWorkspaceRef({ alias: target.alias, remotePath })
     return ref ? [ref.id] : []
   })
 }
@@ -297,7 +297,7 @@ async function readLocalAffectedRepoIds(repoId: string, signal?: AbortSignal): P
 }
 
 async function readRemoteAffectedRepoIds(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   signal?: AbortSignal,
   run?: RemoteGitRunner,
 ): Promise<string[]> {
@@ -612,18 +612,18 @@ function createLocalRepoSource(
 
 async function createRemoteRepoSource(
   repoId: string,
-  capturedTarget?: RemoteRepoTarget,
+  capturedTarget?: RemoteWorkspaceTarget,
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability | null = null,
   runtime?: RepoSourceRuntimeContext,
 ): Promise<RepoSource> {
-  const target = capturedTarget ?? (await resolveRemoteRepoTarget(repoId, runtime))
+  const target = capturedTarget ?? (await resolveRemoteWorkspaceTarget(repoId, runtime))
   const capabilities: RepoSourceCapabilities = { pullRequests: 'derived-github-repo' }
   const run = runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.workspaceRuntimeId, target) : undefined
   return {
     id: repoId,
     kind: 'remote',
     async probe() {
-      const result = await testRemoteRepo(target, { timeoutMs: SSH_BOOT_PROBE_TIMEOUT_MS })
+      const result = await testRemoteWorkspace(target, { timeoutMs: SSH_BOOT_PROBE_TIMEOUT_MS })
       if (!result.ok) return { ok: false, message: result.message || 'error.failed-read-repo' }
       return { ok: true, root: target.id, name: target.displayName }
     },
@@ -725,7 +725,7 @@ async function createRemoteRepoSource(
                 await validatePhysicalWorktreeExecution(physicalWorktreeCapability, signal)
                 return { ok: true, message: '' }
               } catch (error) {
-                if (isRemoteRepoRuntimeFailure(error)) throw error
+                if (isRemoteWorkspaceRuntimeFailure(error)) throw error
                 return { ok: false, message: error instanceof Error ? error.message : 'error.workspace-runtime-stale' }
               }
             }
@@ -745,12 +745,12 @@ async function createRemoteRepoSource(
 export function remoteRuntimeAwareGitRunner(
   repoRoot: string,
   workspaceRuntimeId: string,
-  sourceTarget: RemoteRepoTarget,
+  sourceTarget: RemoteWorkspaceTarget,
 ): RemoteGitRunner {
   return async (command, target, options) => {
     const result = await runRemoteCommand(target, command, options)
-    const failure = remoteRuntimeFailureFromCommandResult({
-      repoRoot,
+    const failure = remoteWorkspaceRuntimeFailureFromCommandResult({
+      workspaceId: repoRoot,
       workspaceRuntimeId,
       target: sourceTarget,
       result,
@@ -784,7 +784,7 @@ function pullRequestEntries(prs: Map<string, PullRequestInfo> | null): PullReque
 }
 
 async function remotePullRequestRepoRef(
-  target: RemoteRepoTarget,
+  target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<GitHubRepoRef | null> {
   const snapshot = await getRemoteSnapshot(target, { signal: options.signal, run: options.run })
