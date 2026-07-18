@@ -167,7 +167,7 @@ function allVisibleCapabilities(): BranchActionCapabilities {
 function repo(): BranchActionRepo {
   return {
     id: 'goblin+file:///tmp/goblin-action-items',
-    repoRuntimeId: 'repo-runtime-test',
+    workspaceRuntimeId: 'repo-runtime-test',
     branchModel: {
       currentBranch: 'main',
       status: [],

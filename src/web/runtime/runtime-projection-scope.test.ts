@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { createRuntimeProjectionScopeRegistry, RuntimeProjectionScope } from '#/web/runtime/runtime-projection-scope.ts'
 
-const TARGET = { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-1' }
+const TARGET = { repoRoot: '/repo', workspaceRuntimeId: 'repo-runtime-1' }
 
 describe('RuntimeProjectionScope', () => {
   afterEach(() => {
@@ -85,8 +85,8 @@ describe('RuntimeProjectionScope', () => {
 
 describe('RuntimeProjectionScopeRegistry', () => {
   test('runtime replacement disposes the old target and suppresses late success and failure', async () => {
-    let currentRuntimeId = TARGET.repoRuntimeId
-    const registry = createRuntimeProjectionScopeRegistry((target) => target.repoRuntimeId === currentRuntimeId)
+    let currentRuntimeId = TARGET.workspaceRuntimeId
+    const registry = createRuntimeProjectionScopeRegistry((target) => target.workspaceRuntimeId === currentRuntimeId)
     const oldScope = registry.scopeFor(TARGET)
     const lateSuccess = Promise.withResolvers<string>()
     const lateFailure = Promise.withResolvers<string>()
@@ -96,7 +96,7 @@ describe('RuntimeProjectionScopeRegistry', () => {
     oldScope.runLatest('failure', async () => await lateFailure.promise, publish, reject)
 
     currentRuntimeId = 'repo-runtime-2'
-    const replacement = registry.scopeFor({ repoRoot: TARGET.repoRoot, repoRuntimeId: currentRuntimeId })
+    const replacement = registry.scopeFor({ repoRoot: TARGET.repoRoot, workspaceRuntimeId: currentRuntimeId })
     lateSuccess.resolve('stale')
     lateFailure.reject(new Error('stale failure'))
     await Promise.resolve()
@@ -113,7 +113,7 @@ describe('RuntimeProjectionScopeRegistry', () => {
     const unsubscribe = vi.fn()
     const registry = createRuntimeProjectionScopeRegistry(() => true)
     const first = registry.scopeFor(TARGET)
-    const second = registry.scopeFor({ repoRoot: '/repo-2', repoRuntimeId: 'repo-runtime-2' })
+    const second = registry.scopeFor({ repoRoot: '/repo-2', workspaceRuntimeId: 'repo-runtime-2' })
     registry.track(unsubscribe)
 
     registry.dispose()

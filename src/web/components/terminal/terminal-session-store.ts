@@ -165,13 +165,13 @@ export function useTerminalSessionSummaries(terminalWorktreeKey: string | null):
 }
 
 export function useTerminalRepoProjectionPhase(repoRoot: string | null): TerminalProjectionHydrationPhase {
-  const repoRuntimeId = useReposStore((s) => (repoRoot ? s.repos[repoRoot]?.repoRuntimeId : undefined))
-  return useTerminalProjectionHydrationPhase(repoRoot, repoRuntimeId)
+  const workspaceRuntimeId = useReposStore((s) => (repoRoot ? s.repos[repoRoot]?.workspaceRuntimeId : undefined))
+  return useTerminalProjectionHydrationPhase(repoRoot, workspaceRuntimeId)
 }
 
 export function useTerminalRepoProjectionHydrationEntry(repoRoot: string | null): TerminalProjectionHydrationEntry {
-  const repoRuntimeId = useReposStore((s) => (repoRoot ? s.repos[repoRoot]?.repoRuntimeId : undefined))
-  return useTerminalProjectionHydrationEntry(repoRoot, repoRuntimeId)
+  const workspaceRuntimeId = useReposStore((s) => (repoRoot ? s.repos[repoRoot]?.workspaceRuntimeId : undefined))
+  return useTerminalProjectionHydrationEntry(repoRoot, workspaceRuntimeId)
 }
 
 export function useTerminalRepoProjectionReady(repoRoot: string | null): boolean {

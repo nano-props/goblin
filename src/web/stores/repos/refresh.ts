@@ -2,16 +2,16 @@ import { appendRepoEvent, errorEvent } from '#/web/stores/repos/repo-state-facto
 import { updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import { isRepoUnavailableReason, markRepoUnavailable } from '#/web/stores/repos/availability.ts'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
-import { resolveActionRepoRuntimeId } from '#/web/stores/repos/refresh-state.ts'
+import { resolveActionWorkspaceRuntimeId } from '#/web/stores/repos/refresh-state.ts'
 import { createRefreshSyncHelpers } from '#/web/stores/repos/refresh-sync.ts'
 import { cancelDataLoad, finishDataLoadError, startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
 import { refreshRepoProjectionReadModel } from '#/web/repo-data-query.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { acceptRepoProjectionReadModel } from '#/web/stores/repos/projection-read-model-effects.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
-import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
+import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
-import { refreshWorkspace } from '#/web/repo-client.ts'
+import { refreshWorkspace } from '#/web/workspace-client.ts'
 
 export interface RepoRefreshStoreAccess {
   set: ReposSet
@@ -21,9 +21,9 @@ export interface RepoRefreshStoreAccess {
 async function runRepoProjectionReadModelRefresh(
   store: RepoRefreshStoreAccess,
   id: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
 ): Promise<void> {
-  updateIfFresh(store.set, id, repoRuntimeId, (r) => {
+  updateIfFresh(store.set, id, workspaceRuntimeId, (r) => {
     startDataLoad(r.dataLoads.repoReadModel, {
       hasData: (readRepoBranchSnapshotQueryProjection(r)?.branches.length ?? 0) > 0,
     })
@@ -32,25 +32,25 @@ async function runRepoProjectionReadModelRefresh(
     set: store.set,
     get: store.get,
     id,
-    repoRuntimeId,
+    workspaceRuntimeId,
     lane: 'read',
     operationKey: 'repo-read-model',
     priority: 50,
     targets: [{ key: 'repoReadModel', reason: 'repo-read-model' }],
-    task: (signal) => refreshRepoProjectionReadModel(id, repoRuntimeId, null, 'full', { signal }),
+    task: (signal) => refreshRepoProjectionReadModel(id, workspaceRuntimeId, null, 'full', { signal }),
     errorFromResult: (projection) => (projection.snapshot ? null : 'error.failed-read-repo'),
-    onResult: (projection: RepoRuntimeProjection, ctx) => {
+    onResult: (projection: WorkspaceRuntimeProjection, ctx) => {
       if (!ctx.isCurrent()) return
       acceptRepoProjectionReadModel(
         store.set,
         store.get,
-        { repoRoot: id, repoRuntimeId, projection },
+        { repoRoot: id, workspaceRuntimeId, projection },
         { scope: 'repo-read-model' },
       )
     },
     onError: (message, ctx) => {
       const ownsReadModelLoad = ctx.ownsTarget('repoReadModel')
-      updateIfFresh(store.set, id, repoRuntimeId, (r) => {
+      updateIfFresh(store.set, id, workspaceRuntimeId, (r) => {
         if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
         if (ownsReadModelLoad) finishDataLoadError(r.dataLoads.repoReadModel, message)
         r.events = appendRepoEvent(r.events, errorEvent(message))
@@ -59,7 +59,7 @@ async function runRepoProjectionReadModelRefresh(
     onStale: (ctx) => {
       const ownsReadModelLoad = ctx.ownsTarget('repoReadModel')
       if (!ownsReadModelLoad) return
-      updateIfFresh(store.set, id, repoRuntimeId, (r) => {
+      updateIfFresh(store.set, id, workspaceRuntimeId, (r) => {
         if (ownsReadModelLoad) cancelDataLoad(r.dataLoads.repoReadModel)
       })
     },
@@ -69,14 +69,14 @@ async function runRepoProjectionReadModelRefresh(
 export async function requestRepoProjectionReadModelRefresh(
   store: RepoRefreshStoreAccess,
   id: string,
-  options?: { repoRuntimeId?: string },
+  options?: { workspaceRuntimeId?: string },
 ): Promise<void> {
-  const resolved = resolveActionRepoRuntimeId(store.get, id, options?.repoRuntimeId)
+  const resolved = resolveActionWorkspaceRuntimeId(store.get, id, options?.workspaceRuntimeId)
   if (!resolved) return
-  const { repoRuntimeId } = resolved
+  const { workspaceRuntimeId } = resolved
   await Promise.all([
-    runRepoProjectionReadModelRefresh(store, id, repoRuntimeId),
-    refreshRepoWorktreeStatus(store, id, repoRuntimeId),
+    runRepoProjectionReadModelRefresh(store, id, workspaceRuntimeId),
+    refreshRepoWorktreeStatus(store, id, workspaceRuntimeId),
   ])
 }
 
@@ -88,32 +88,32 @@ export async function requestRepoProjectionReadModelRefresh(
 export async function runManualRepoSync(
   store: RepoRefreshStoreAccess,
   id: string,
-  options?: { repoRuntimeId?: string },
+  options?: { workspaceRuntimeId?: string },
 ): Promise<void> {
-  const resolved = resolveActionRepoRuntimeId(store.get, id, options?.repoRuntimeId)
+  const resolved = resolveActionWorkspaceRuntimeId(store.get, id, options?.workspaceRuntimeId)
   if (!resolved) return
-  const { repoRuntimeId } = resolved
+  const { workspaceRuntimeId } = resolved
   const { runManualSyncPipeline } = createRefreshSyncHelpers(store.set, store.get, {
-    refreshProjectionReadModel: async (repoId, nextRepoRuntimeId) => {
-      await requestRepoProjectionReadModelRefresh(store, repoId, { repoRuntimeId: nextRepoRuntimeId })
+    refreshProjectionReadModel: async (repoId, nextWorkspaceRuntimeId) => {
+      await requestRepoProjectionReadModelRefresh(store, repoId, { workspaceRuntimeId: nextWorkspaceRuntimeId })
     },
   })
   await runExclusiveOperation({
     set: store.set,
     get: store.get,
     id,
-    repoRuntimeId,
+    workspaceRuntimeId,
     lane: 'read',
     priority: 100,
     targets: [{ key: 'manualRefresh', reason: 'manual-refresh' }],
     task: async (signal) => {
-      const refreshed = await refreshWorkspace(id, repoRuntimeId, signal)
-      if (refreshed.kind === 'stale-runtime') throw new Error('error.repo-runtime-stale')
+      const refreshed = await refreshWorkspace(id, workspaceRuntimeId, signal)
+      if (refreshed.kind === 'stale-runtime') throw new Error('error.workspace-runtime-stale')
       if (refreshed.kind === 'failed') {
         const diagnostic = refreshed.probe.status === 'ready' ? refreshed.probe.diagnostics[0]?.message : undefined
         throw new Error(diagnostic ?? 'error.failed-read-repo')
       }
-      updateIfFresh(store.set, id, repoRuntimeId, (repo) => {
+      updateIfFresh(store.set, id, workspaceRuntimeId, (repo) => {
         repo.workspaceProbe = refreshed.probe
       })
       if (
@@ -122,10 +122,10 @@ export async function runManualRepoSync(
       ) {
         return
       }
-      await runManualSyncPipeline(id, repoRuntimeId)
+      await runManualSyncPipeline(id, workspaceRuntimeId)
     },
     onError: (message) => {
-      updateIfFresh(store.set, id, repoRuntimeId, (repo) => {
+      updateIfFresh(store.set, id, workspaceRuntimeId, (repo) => {
         repo.events = appendRepoEvent(repo.events, errorEvent(message))
       })
     },

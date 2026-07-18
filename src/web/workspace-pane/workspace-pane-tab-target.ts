@@ -38,7 +38,7 @@ export const workspacePanePreferenceTargetOptions: WorkspacePaneTabTargetOptions
 
 export interface WorkspacePaneDestinationTargetLease {
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   branchName: string
   worktreePath: string | null
 }
@@ -62,7 +62,7 @@ export function resolveWorkspacePaneDestinationTarget(
     kind: 'ready',
     lease: {
       repoId,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName,
       worktreePath,
     },
@@ -80,14 +80,14 @@ export function resolveWorkspacePaneDestinationTargetLease(
 export function workspacePaneTargetLeaseIsCurrent(lease: WorkspacePaneTargetLease): boolean {
   const current = resolveWorkspacePaneDestinationTargetLease(lease.repoId, lease.branchName)
   return (
-    current !== null && current.repoRuntimeId === lease.repoRuntimeId && current.worktreePath === lease.worktreePath
+    current !== null && current.workspaceRuntimeId === lease.workspaceRuntimeId && current.worktreePath === lease.worktreePath
   )
 }
 
 export function workspacePaneCommittedRuntimeTargetIsCurrent(target: WorkspacePaneTargetLease): boolean {
   if (!target.worktreePath) return false
   const repo = useReposStore.getState().repos[target.repoId]
-  if (!repo || repo.repoRuntimeId !== target.repoRuntimeId) return false
+  if (!repo || repo.workspaceRuntimeId !== target.workspaceRuntimeId) return false
   return (
     readRepoBranchSnapshotQueryProjection(repo)?.branches.some(
       (branch) => branch.worktree?.path === target.worktreePath,
@@ -132,7 +132,7 @@ function resolveWorkspacePaneTabTarget(
   if (!repo) return { kind: 'missing' }
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     repoRoot: repoId,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath,
   })
   const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget(
@@ -140,9 +140,9 @@ function resolveWorkspacePaneTabTarget(
       ? {
           kind: 'workspace-root',
           repoRoot: repoId,
-          repoRuntimeId: repo.repoRuntimeId,
+          workspaceRuntimeId: repo.workspaceRuntimeId,
         }
-      : { ...requiredGitWorkspacePaneTabsTarget(repoId, branchName, worktreePath), repoRuntimeId: repo.repoRuntimeId },
+      : { ...requiredGitWorkspacePaneTabsTarget(repoId, branchName, worktreePath), workspaceRuntimeId: repo.workspaceRuntimeId },
   )
   if (tabEntriesProjection.phase !== 'ready') {
     return {
@@ -158,7 +158,7 @@ function resolveWorkspacePaneTabTarget(
     kind: 'ready',
     target: createRepoWorkspaceTabModel({
       repoId,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       paneTarget: preferenceTarget,
       worktreeHead:
         preferenceTarget.kind === 'git-worktree' && branchName
@@ -188,17 +188,17 @@ export function workspacePaneTabTargetForPaneTarget(
   const worktreePath = workspacePaneTabsTargetWorktreePath(paneTarget)
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     repoRoot: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath,
   })
   const tabsProjection = readWorkspacePaneTabsProjectionForTarget({
     ...paneTarget,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
   })
   if (tabsProjection.phase !== 'ready') return null
   return createRepoWorkspaceTabModel({
     repoId: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     paneTarget,
     worktreeHead,
     preferredTab: preferredWorkspacePaneTabForRoute(repo.ui, paneTarget, { workspacePaneRoute }),
@@ -238,7 +238,7 @@ export function workspacePaneRouteNavigationBlockedForBranch(repoId: string, bra
     return true
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     repoRoot: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath: branch.worktree?.path ?? null,
   })
   return Object.values(runtimeProjection.runtimeTabStateByType).some((state) => state.createPending)

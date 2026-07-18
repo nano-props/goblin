@@ -10,7 +10,7 @@ const DIRECTORY_OVERVIEW_TIMEOUT_MS = 30_000
 
 export async function readWorkspaceDirectoryOverview(
   workspaceId: string,
-  options: { repoRuntimeId: string; signal?: AbortSignal },
+  options: { workspaceRuntimeId: string; signal?: AbortSignal },
 ): Promise<WorkspaceDirectoryOverview> {
   const localPath = localWorkspaceNativePath(workspaceId)
   if (localPath) {
@@ -19,7 +19,7 @@ export async function readWorkspaceDirectoryOverview(
     )
   }
 
-  const target = await resolveRemoteRepoTarget(workspaceId, { repoRuntimeId: options.repoRuntimeId })
+  const target = await resolveRemoteRepoTarget(workspaceId, { workspaceRuntimeId: options.workspaceRuntimeId })
   const result = await runRemoteCommand(
     target,
     { type: 'directoryOverview', path: target.remotePath },
@@ -27,7 +27,7 @@ export async function readWorkspaceDirectoryOverview(
   )
   const runtimeFailure = remoteRuntimeFailureFromCommandResult({
     repoRoot: workspaceId,
-    repoRuntimeId: options.repoRuntimeId,
+    workspaceRuntimeId: options.workspaceRuntimeId,
     target,
     result,
   })

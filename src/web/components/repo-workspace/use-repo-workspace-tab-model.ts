@@ -22,7 +22,7 @@ import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { GitHead } from '#/shared/git-head.ts'
 
 export function useRepoWorkspaceTabModel(
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'ui'>,
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'workspaceRuntimeId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
 ) {
@@ -37,7 +37,7 @@ export function useRepoWorkspaceTabModel(
  * projection.
  */
 export function useRepoWorkspaceTabModelInput(
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'ui'>,
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'workspaceRuntimeId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
 ): RepoWorkspaceTabModelInput {
@@ -46,10 +46,10 @@ export function useRepoWorkspaceTabModelInput(
   const worktreePath = branch?.worktree?.path ?? null
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
     repoRoot: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath,
   })
-  const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.repoRuntimeId)
+  const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.workspaceRuntimeId)
   const requestedSessionIdByRuntimeType = useMemo(
     () => (workspacePaneRoute?.kind === 'terminal' ? { terminal: workspacePaneRoute.terminalSessionId } : undefined),
     [workspacePaneRoute],
@@ -63,7 +63,7 @@ export function useRepoWorkspaceTabModelInput(
           ? requiredGitWorkspacePaneTabsTarget(repo.id, branchName, worktreePath)
           : { kind: 'inactive', repoRoot: repo.id, branchName: null, worktreePath: null },
       ),
-    [workspacePaneTabsQuery.data, repo.id, repo.repoRuntimeId, branchName, worktreePath],
+    [workspacePaneTabsQuery.data, repo.id, repo.workspaceRuntimeId, branchName, worktreePath],
   )
 
   const preferredTab = useMemo(() => {
@@ -80,7 +80,7 @@ export function useRepoWorkspaceTabModelInput(
   const input = useMemo<RepoWorkspaceTabModelInput>(
     () => ({
       repoId: repo.id,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       paneTarget: branchName
         ? requiredGitWorkspacePaneTabsTarget(repo.id, branchName, worktreePath)
         : { kind: 'inactive', repoRoot: repo.id },
@@ -95,7 +95,7 @@ export function useRepoWorkspaceTabModelInput(
     }),
     [
       repo.id,
-      repo.repoRuntimeId,
+      repo.workspaceRuntimeId,
       branchName,
       worktreePath,
       preferredTab,
@@ -112,14 +112,14 @@ export function useRepoWorkspaceTabModelInput(
 }
 
 export function useWorkspaceRootTabModel(
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'ui'>,
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'workspaceRuntimeId' | 'ui'>,
 ): RepoWorkspaceTabModel {
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
     repoRoot: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath: repo.id,
   })
-  const tabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.repoRuntimeId)
+  const tabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.workspaceRuntimeId)
   const target = useMemo(() => ({ kind: 'workspace-root' as const, repoRoot: repo.id }), [repo.id])
   const tabEntries = useMemo(
     () => workspacePaneTabsForTargetFromQueryData(tabsQuery.data ?? { revision: 0, entries: [] }, target),
@@ -130,7 +130,7 @@ export function useWorkspaceRootTabModel(
   const input = useMemo<RepoWorkspaceTabModelInput>(
     () => ({
       repoId: repo.id,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       paneTarget: target,
       preferredTab,
       tabEntries,
@@ -141,7 +141,7 @@ export function useWorkspaceRootTabModel(
     [
       preferredTab,
       repo.id,
-      repo.repoRuntimeId,
+      repo.workspaceRuntimeId,
       runtimeProjection.runtimeTabStateByType,
       runtimeProjection.runtimeTabViews,
       tabEntries,
@@ -154,7 +154,7 @@ export function useWorkspaceRootTabModel(
 }
 
 export function useFilesystemWorkspaceTabModel(
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'ui'>,
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'workspaceRuntimeId' | 'ui'>,
   target: WorkspacePaneTabsTarget,
   worktreeHead: GitHead,
   worktreePath: string,
@@ -163,10 +163,10 @@ export function useFilesystemWorkspaceTabModel(
 ): RepoWorkspaceTabModel {
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
     repoRoot: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath,
   })
-  const tabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.repoRuntimeId)
+  const tabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.workspaceRuntimeId)
   const tabEntries = useMemo(
     () => workspacePaneTabsForTargetFromQueryData(tabsQuery.data ?? { revision: 0, entries: [] }, target),
     [tabsQuery.data, target],
@@ -179,7 +179,7 @@ export function useFilesystemWorkspaceTabModel(
   const input = useMemo<RepoWorkspaceTabModelInput>(
     () => ({
       repoId: repo.id,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       paneTarget: target,
       worktreeHead: target.kind === 'git-worktree' ? worktreeHead : undefined,
       preferredTab,
@@ -192,7 +192,7 @@ export function useFilesystemWorkspaceTabModel(
     [
       preferredTab,
       repo.id,
-      repo.repoRuntimeId,
+      repo.workspaceRuntimeId,
       requestedSessionId,
       requestedTab,
       runtimeProjection.runtimeTabStateByType,

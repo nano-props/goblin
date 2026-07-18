@@ -7,7 +7,7 @@ import type { resolveRemoteTargetWithConfigFingerprint } from '#/system/ssh/conf
 export interface PhysicalWorktreeExecutionInput {
   userId: string
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   worktreePath: string
 }
 
@@ -83,7 +83,7 @@ export function physicalWorktreeExecutionScope(
   capability: PhysicalWorktreeExecutionCapability,
 ): PhysicalWorktreeExecutionScope {
   const state = capabilityState(capability)
-  return { userId: state.userId, repoRoot: state.repoRoot, repoRuntimeId: state.repoRuntimeId, worktreePath: state.worktreePath }
+  return { userId: state.userId, repoRoot: state.repoRoot, workspaceRuntimeId: state.workspaceRuntimeId, worktreePath: state.worktreePath }
 }
 
 export async function validatePhysicalWorktreeExecution(
@@ -125,7 +125,7 @@ export function assertPhysicalWorktreeExecutionCapability(
   if (
     state.userId !== input.userId ||
     state.repoRoot !== input.repoRoot ||
-    state.repoRuntimeId !== input.repoRuntimeId ||
+    state.workspaceRuntimeId !== input.workspaceRuntimeId ||
     state.worktreePath !== worktreePath
   ) throw new Error('error.invalid-worktree-capability')
 }

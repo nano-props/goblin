@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 import {
-  acquireRepoRuntimeLease,
-  clearRepoRuntimesForUser,
-  isCurrentRepoRuntime,
-  isCurrentRepoRuntimeMembership,
-  releaseRepoRuntimeMembershipLease,
-} from '#/server/modules/repo-runtimes.ts'
+  acquireWorkspaceRuntimeLease,
+  clearWorkspaceRuntimesForUser,
+  isCurrentWorkspaceRuntime,
+  isCurrentWorkspaceRuntimeMembership,
+  releaseWorkspaceRuntimeMembershipLease,
+} from '#/server/modules/workspace-runtimes.ts'
 
 const mocks = vi.hoisted(() => ({
   getServerWorkspaceState: vi.fn(),
@@ -44,7 +44,7 @@ const REPO_ROOT = 'goblin+file:///repo'
 
 describe('session restore runtime ownership', () => {
   beforeEach(() => {
-    clearRepoRuntimesForUser(USER_ID)
+    clearWorkspaceRuntimesForUser(USER_ID)
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ kind: 'local', id: REPO_ROOT }],
@@ -54,8 +54,8 @@ describe('session restore runtime ownership', () => {
   })
 
   test('preserves the existing stub membership when lazy projection fails', async () => {
-    const lease = acquireRepoRuntimeLease(USER_ID, REPO_ROOT, CLIENT_ID)
-    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, lease.repoRuntimeId, CLIENT_ID)).toBe(true)
+    const lease = acquireWorkspaceRuntimeLease(USER_ID, REPO_ROOT, CLIENT_ID)
+    expect(isCurrentWorkspaceRuntimeMembership(USER_ID, REPO_ROOT, lease.workspaceRuntimeId, CLIENT_ID)).toBe(true)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
@@ -65,13 +65,13 @@ describe('session restore runtime ownership', () => {
         userId: USER_ID,
         clientId: CLIENT_ID,
         repoRoot: REPO_ROOT,
-        repoRuntimeId: lease.repoRuntimeId,
+        workspaceRuntimeId: lease.workspaceRuntimeId,
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
 
-    expect(isCurrentRepoRuntime(USER_ID, REPO_ROOT, lease.repoRuntimeId)).toBe(true)
-    expect(releaseRepoRuntimeMembershipLease(USER_ID, CLIENT_ID, lease)).toEqual({
+    expect(isCurrentWorkspaceRuntime(USER_ID, REPO_ROOT, lease.workspaceRuntimeId)).toBe(true)
+    expect(releaseWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID, lease)).toEqual({
       released: true,
       runtimeClosed: true,
     })

@@ -125,7 +125,7 @@ describe('repo-tree trash write layer', () => {
   })
 
   test('uses the runtime-aware runner for remote trash when provided', async () => {
-    const repoRuntimeId = 'repo-runtime-trash-test'
+    const workspaceRuntimeId = 'repo-runtime-trash-test'
     const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
     const target = {
       id: repoId,
@@ -142,15 +142,15 @@ describe('repo-tree trash write layer', () => {
     mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok', repositoryStateChanged: true })
 
     await expect(
-      trashRepositoryFile(repoId, '/srv/repo-feature', 'README.md', undefined, { repoRuntimeId }),
+      trashRepositoryFile(repoId, '/srv/repo-feature', 'README.md', undefined, { workspaceRuntimeId }),
     ).resolves.toEqual({
       ok: true,
       message: 'ok',
       repositoryStateChanged: true,
     })
 
-    expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(repoId, { repoRuntimeId })
-    expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(repoId, repoRuntimeId, target)
+    expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(repoId, { workspaceRuntimeId })
+    expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(repoId, workspaceRuntimeId, target)
     expect(mocks.trashRemoteFile).toHaveBeenCalledWith(target, '/srv/repo-feature', 'README.md', {
       signal: undefined,
       run,

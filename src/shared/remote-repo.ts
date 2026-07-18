@@ -252,7 +252,7 @@ export function isRemoteRepoConnectionTerminal(
 /**
  * Server-side converged result for a remote-repo lifecycle run.
  *
- * This is the terminal output of the server resolver. RepoRuntime owns the
+ * This is the terminal output of the server resolver. WorkspaceRuntime owns the
  * surrounding `connecting -> ready|failed` lifecycle and attempt generation.
  *
  * `lifecycle.target` is the same `RemoteRepoTarget` the

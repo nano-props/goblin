@@ -6,7 +6,7 @@ import {
   runSerializedInitialWorkspaceProbe,
   runSerializedWorkspaceRefresh,
   workspaceProbeStateForRuntime,
-} from '#/server/modules/repo-runtimes.ts'
+} from '#/server/modules/workspace-runtimes.ts'
 import type { RemoteRepoLifecycleCommandResult } from '#/shared/remote-repo.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
@@ -14,7 +14,7 @@ import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capabili
 export interface RunRemoteLifecycleInput {
   userId: string
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   mode: 'restart' | 'ensure'
 }
 
@@ -26,12 +26,12 @@ export async function runRemoteLifecycleWrite(
   input: RunRemoteLifecycleInput,
   options: RunRemoteLifecycleOptions = {},
 ): Promise<RemoteRepoLifecycleCommandResult> {
-  const { userId, repoId, repoRuntimeId, mode } = input
+  const { userId, repoId, workspaceRuntimeId, mode } = input
   const observed: { gitCapability: { available: boolean; diagnostic?: string } | null } = { gitCapability: null }
   const result = await runRepoRemoteLifecycle(
     userId,
     repoId,
-    repoRuntimeId,
+    workspaceRuntimeId,
     async (signal) => {
       const resolved = await resolveServerRemoteRepoConnection({ repoId }, signal)
       if (resolved.kind === 'ready') {
@@ -47,12 +47,12 @@ export async function runRemoteLifecycleWrite(
   )
   if (result.kind !== 'settled') return { kind: result.kind, repoId }
   if (result.lifecycle.kind === 'failed') {
-    const current = workspaceProbeStateForRuntime(userId, repoId, repoRuntimeId)
+    const current = workspaceProbeStateForRuntime(userId, repoId, workspaceRuntimeId)
     if (current?.status === 'probing') {
       const committed = commitOrReadInitialWorkspaceProbeState({
         userId,
-        repoRoot: repoId,
-        repoRuntimeId,
+        workspaceId: repoId,
+        workspaceRuntimeId,
         probe: {
           status: 'unavailable',
           reason:
@@ -78,12 +78,12 @@ export async function runRemoteLifecycleWrite(
       },
       diagnostics: gitCapability.diagnostic ? [{ scope: 'git', message: gitCapability.diagnostic }] : [],
     }
-    const current = workspaceProbeStateForRuntime(userId, repoId, repoRuntimeId)
+    const current = workspaceProbeStateForRuntime(userId, repoId, workspaceRuntimeId)
     if (current?.status === 'probing') {
       const committed = await runSerializedInitialWorkspaceProbe({
         userId,
-        repoRoot: repoId,
-        repoRuntimeId,
+        workspaceId: repoId,
+        workspaceRuntimeId,
         probe: async () => probe,
         beforeCommit: options.beforeCapabilityCommit,
       })
@@ -91,8 +91,8 @@ export async function runRemoteLifecycleWrite(
     } else {
       const committed = await runSerializedWorkspaceRefresh({
         userId,
-        repoRoot: repoId,
-        repoRuntimeId,
+        workspaceId: repoId,
+        workspaceRuntimeId,
         probe: async () => probe,
         beforeCommit: async (transition) => {
           if (workspaceGitCleanupRequired(transition.before, transition.after) && !options.beforeCapabilityCommit) {
@@ -104,6 +104,6 @@ export async function runRemoteLifecycleWrite(
       if (committed.kind === 'stale-runtime') return { kind: 'stale-runtime', repoId }
     }
   }
-  if (!workspaceProbeStateForRuntime(userId, repoId, repoRuntimeId)) return { kind: 'stale-runtime', repoId }
+  if (!workspaceProbeStateForRuntime(userId, repoId, workspaceRuntimeId)) return { kind: 'stale-runtime', repoId }
   return { kind: 'settled', repoId, name: result.name, lifecycle: result.lifecycle }
 }

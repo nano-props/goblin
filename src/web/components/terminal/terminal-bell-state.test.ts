@@ -13,7 +13,7 @@ const descriptor = terminalDescriptorForTest({
   terminalSessionId: 'term-111111111111111111111',
   index: 1,
   repoRoot: '/tmp/repo',
-  repoRuntimeId: 'repo-runtime-test',
+  workspaceRuntimeId: 'repo-runtime-test',
   branch: 'feature/test',
   worktreePath: '/tmp/repo-worktree',
 })

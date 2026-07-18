@@ -141,19 +141,19 @@ function evaluateRepoBranchActionSchedule(repo: RepoState, action: RepoBranchAct
   })
 }
 
-function throwIfStale(get: ReposGet, id: string, repoRuntimeId: string): void {
-  if (get().repos[id]?.repoRuntimeId !== repoRuntimeId) throw new RepoOperationCancelledError()
+function throwIfStale(get: ReposGet, id: string, workspaceRuntimeId: string): void {
+  if (get().repos[id]?.workspaceRuntimeId !== workspaceRuntimeId) throw new RepoOperationCancelledError()
 }
 
 function settleNetworkFetchDataLoadState(
   set: ReposSet,
   id: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   ownsFetchDataLoad: boolean,
   result: ExecResult | { ok: false; message: string },
 ): void {
   if (!ownsFetchDataLoad) return
-  updateIfFresh(set, id, repoRuntimeId, (r) => {
+  updateIfFresh(set, id, workspaceRuntimeId, (r) => {
     if (result.message === 'cancelled') {
       cancelDataLoad(r.dataLoads.fetch)
       return
@@ -219,20 +219,20 @@ function waitForBranchActionIdle(
 function runBranchActionIpc(
   action: RepoBranchAction,
   repoId: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   switch (action.kind) {
     case 'pull':
-      return pullRepoBranch(repoId, repoRuntimeId, action.branch, action.worktreePath, signal)
+      return pullRepoBranch(repoId, workspaceRuntimeId, action.branch, action.worktreePath, signal)
     case 'push':
-      return pushRepoBranch(repoId, repoRuntimeId, action.branch, signal)
+      return pushRepoBranch(repoId, workspaceRuntimeId, action.branch, signal)
     case 'createWorktree':
-      return createRepoWorktree(repoId, repoRuntimeId, action.input, action.worktreeBootstrap, signal)
+      return createRepoWorktree(repoId, workspaceRuntimeId, action.input, action.worktreeBootstrap, signal)
     case 'deleteBranch':
       return deleteRepoBranch(
         repoId,
-        repoRuntimeId,
+        workspaceRuntimeId,
         action.branch,
         { force: action.force, deleteUpstream: action.deleteUpstream },
         signal,
@@ -240,7 +240,7 @@ function runBranchActionIpc(
     case 'removeWorktree':
       return removeRepoWorktree(
         repoId,
-        repoRuntimeId,
+        workspaceRuntimeId,
         {
           branch: action.branch,
           worktreePath: action.worktreePath,
@@ -259,8 +259,8 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
   return {
     submitBranchAction(id: string, action: RepoBranchAction, options?: RunBranchActionOptions): void {
       const repo = get().repos[id]
-      const repoRuntimeId = options?.repoRuntimeId ?? repo?.repoRuntimeId
-      if (!repo || repo.repoRuntimeId !== repoRuntimeId) return
+      const workspaceRuntimeId = options?.workspaceRuntimeId ?? repo?.workspaceRuntimeId
+      if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId) return
       void get().runBranchAction(id, action, options)
     },
 
@@ -271,8 +271,8 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
     ): Promise<ExecResult | null> {
       const repoBefore = get().repos[id]
       if (!repoBefore) return null
-      const repoRuntimeId = options?.repoRuntimeId ?? repoBefore.repoRuntimeId
-      if (repoBefore.repoRuntimeId !== repoRuntimeId) return null
+      const workspaceRuntimeId = options?.workspaceRuntimeId ?? repoBefore.workspaceRuntimeId
+      if (repoBefore.workspaceRuntimeId !== workspaceRuntimeId) return null
       const network = isNetworkBranchAction(action)
       const branchOperation = repoOperation(id, 'branchAction')
       if (isRepoUnavailable(repoBefore)) {
@@ -296,10 +296,10 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
       const schedule = evaluateRepoBranchActionSchedule(repoBefore, action)
       if (schedule.blockedMessage) {
         const result = { ok: false, message: schedule.blockedMessage }
-        get().setLastResult(id, result, repoRuntimeId)
+        get().setLastResult(id, result, workspaceRuntimeId)
         return result
       }
-      updateIfFresh(set, id, repoRuntimeId, (r) => {
+      updateIfFresh(set, id, workspaceRuntimeId, (r) => {
         if (network) startDataLoad(r.dataLoads.fetch, { hasData: r.dataLoads.fetch.loadedAt !== null })
       })
       const ownsNetworkFetchDataLoad = (ctx: Pick<RepoOperationContext, 'ownsTarget'>) =>
@@ -307,25 +307,25 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
       const refreshAfterBranchAction = async (result: ExecResult): Promise<void> => {
         if (!shouldRefreshBranchActionProjection(result, options)) return
         const repo = get().repos[id]
-        if (repo?.repoRuntimeId !== repoRuntimeId) return
-        await requestRepoProjectionReadModelRefresh({ get, set }, id, { repoRuntimeId })
+        if (repo?.workspaceRuntimeId !== workspaceRuntimeId) return
+        await requestRepoProjectionReadModelRefresh({ get, set }, id, { workspaceRuntimeId })
       }
       const handleResult = async (result: ExecResult, ctx: RepoOperationContext) => {
         const ownsFetchDataLoad = ownsNetworkFetchDataLoad(ctx)
-        settleNetworkFetchDataLoadState(set, id, repoRuntimeId, ownsFetchDataLoad, result)
+        settleNetworkFetchDataLoadState(set, id, workspaceRuntimeId, ownsFetchDataLoad, result)
         if (!shouldSuppressBranchActionResultMessage(result, options)) {
-          get().setLastResult(id, result, repoRuntimeId, { action: branchActionEventAction(action) })
+          get().setLastResult(id, result, workspaceRuntimeId, { action: branchActionEventAction(action) })
         }
         if (!requiresProjectionRefreshBeforeCompletion(action, result)) await refreshAfterBranchAction(result)
-        if (result.ok && ownsFetchDataLoad) get().clearFetchFailed(id, repoRuntimeId)
+        if (result.ok && ownsFetchDataLoad) get().clearFetchFailed(id, workspaceRuntimeId)
       }
       const handleError = (message: string, ctx: RepoOperationContext) => {
-        settleNetworkFetchDataLoadState(set, id, repoRuntimeId, ownsNetworkFetchDataLoad(ctx), { ok: false, message })
+        settleNetworkFetchDataLoadState(set, id, workspaceRuntimeId, ownsNetworkFetchDataLoad(ctx), { ok: false, message })
         if (message === 'cancelled') return
-        get().setLastResult(id, { ok: false, message }, repoRuntimeId, { action: branchActionEventAction(action) })
+        get().setLastResult(id, { ok: false, message }, workspaceRuntimeId, { action: branchActionEventAction(action) })
       }
       const handleStale = (ctx: RepoOperationContext) => {
-        settleNetworkFetchDataLoadState(set, id, repoRuntimeId, ownsNetworkFetchDataLoad(ctx), {
+        settleNetworkFetchDataLoadState(set, id, workspaceRuntimeId, ownsNetworkFetchDataLoad(ctx), {
           ok: false,
           message: 'cancelled',
         })
@@ -342,9 +342,9 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
           if (message === BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE) return branchActionErrorResult(message)
           throw err
         }
-        throwIfStale(get, id, repoRuntimeId)
+        throwIfStale(get, id, workspaceRuntimeId)
         ctx.setPhase('running')
-        return runBranchActionIpc(action, id, repoRuntimeId, signal)
+        return runBranchActionIpc(action, id, workspaceRuntimeId, signal)
       }
 
       const completionBarrier = async (result: ExecResult) => {
@@ -356,7 +356,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
           set,
           get,
           id,
-          repoRuntimeId,
+          workspaceRuntimeId,
           lane: 'network',
           operationKey: BRANCH_NETWORK_OPERATION_KEY,
           priority: 100,
@@ -377,7 +377,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         set,
         get,
         id,
-        repoRuntimeId,
+        workspaceRuntimeId,
         lane: 'write',
         priority: 100,
         targets: [branchActionTarget(action)],

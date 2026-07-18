@@ -42,7 +42,7 @@ function descriptor(): TerminalDescriptor {
     terminalSessionId: 'term-111111111111111111111',
     index: 1,
     repoRoot: '/repo',
-    repoRuntimeId: 'repo-runtime-test',
+    workspaceRuntimeId: 'repo-runtime-test',
     branch: 'main',
     worktreePath: '/repo',
   })

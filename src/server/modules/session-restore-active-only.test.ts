@@ -7,9 +7,9 @@ import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 
 const mocks = vi.hoisted(() => ({
-  acquireRepoRuntimeLease: vi.fn(),
-  releaseRepoRuntimeMembershipLease: vi.fn(),
-  isCurrentRepoRuntimeMembership: vi.fn(),
+  acquireWorkspaceRuntimeLease: vi.fn(),
+  releaseWorkspaceRuntimeMembershipLease: vi.fn(),
+  isCurrentWorkspaceRuntimeMembership: vi.fn(),
   getServerWorkspaceState: vi.fn(),
   compareAndReplaceServerWorkspaceRepos: vi.fn(),
   confirmServerWorkspaceRepoEntry: vi.fn(),
@@ -23,26 +23,26 @@ const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
   commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
 }
 
-vi.mock('#/server/modules/repo-runtimes.ts', () => ({
-  acquireRepoRuntimeLease: mocks.acquireRepoRuntimeLease,
-  releaseRepoRuntimeMembershipLease: mocks.releaseRepoRuntimeMembershipLease,
-  isCurrentRepoRuntimeMembership: mocks.isCurrentRepoRuntimeMembership,
+vi.mock('#/server/modules/workspace-runtimes.ts', () => ({
+  acquireWorkspaceRuntimeLease: mocks.acquireWorkspaceRuntimeLease,
+  releaseWorkspaceRuntimeMembershipLease: mocks.releaseWorkspaceRuntimeMembershipLease,
+  isCurrentWorkspaceRuntimeMembership: mocks.isCurrentWorkspaceRuntimeMembership,
   commitWorkspaceProbeState: vi.fn((input) => {
-    mocks.workspaceProbes.set(input.repoRoot, input.probe)
+    mocks.workspaceProbes.set(input.workspaceId, input.probe)
     return true
   }),
   commitOrReadInitialWorkspaceProbeState: vi.fn((input) => {
-    const current = mocks.workspaceProbes.get(input.repoRoot)
+    const current = mocks.workspaceProbes.get(input.workspaceId)
     if (current) return current
-    mocks.workspaceProbes.set(input.repoRoot, input.probe)
+    mocks.workspaceProbes.set(input.workspaceId, input.probe)
     return input.probe
   }),
   runSerializedInitialWorkspaceProbe: vi.fn(async (input) => {
-    const current = mocks.workspaceProbes.get(input.repoRoot)
+    const current = mocks.workspaceProbes.get(input.workspaceId)
     if (current && (current as { status: string }).status !== 'probing') return current
     const probe = await input.probe()
     await input.beforeCommit?.({ before: { status: 'probing' }, after: probe })
-    mocks.workspaceProbes.set(input.repoRoot, probe)
+    mocks.workspaceProbes.set(input.workspaceId, probe)
     return probe
   }),
   workspaceProbeStateForRuntime: vi.fn(
@@ -74,12 +74,12 @@ describe('restoreServerWorkspace — active-only restore', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     mocks.workspaceProbes.clear()
-    mocks.acquireRepoRuntimeLease.mockImplementation((_userId: string, repoRoot: string) => ({
-      repoRoot,
-      repoRuntimeId: `runtime-${repoRoot.replace(/[^a-z0-9]/gi, '_')}`,
+    mocks.acquireWorkspaceRuntimeLease.mockImplementation((_userId: string, workspaceId: string) => ({
+      workspaceId,
+      workspaceRuntimeId: `runtime-${workspaceId.replace(/[^a-z0-9]/gi, '_')}`,
       generation: 1,
     }))
-    mocks.isCurrentRepoRuntimeMembership.mockReturnValue(true)
+    mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(true)
     mocks.probeRepo.mockImplementation(async (repoRoot: string) => ({ ok: true, root: repoRoot, name: 'repo' }))
     mocks.runRemoteLifecycleWrite.mockResolvedValue({
       kind: 'settled',
@@ -137,25 +137,25 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(mocks.probeRepo).toHaveBeenCalledWith('goblin+file:///repo-active')
     expect(mocks.probeRepo).toHaveBeenCalledWith('goblin+file:///repo-stub')
     expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
-    const repos = result.runtime.repos
-    const active = repos.find((r) => r.repoRoot === 'goblin+file:///repo-active')!
-    const stub = repos.find((r) => r.repoRoot === 'goblin+file:///repo-stub')!
+    const repos = result.runtime.workspaces
+    const active = repos.find((r) => r.workspaceId === 'goblin+file:///repo-active')!
+    const stub = repos.find((r) => r.workspaceId === 'goblin+file:///repo-stub')!
     expect(active.projection).not.toBeNull()
     expect(stub.projection).toBeNull()
-    expect(stub.repoRuntimeId).toBe('runtime-goblin_file____repo_stub')
+    expect(stub.workspaceRuntimeId).toBe('runtime-goblin_file____repo_stub')
     expect(stub.name).toBe('repo')
     // Every readable workspace contributes its workspace-level tabs scope;
     // only the active repo performs the Git projection read.
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
     expect(result.runtime.workspacePaneTabs).toEqual([
       {
-        repoRoot: 'goblin+file:///repo-active',
-        repoRuntimeId: 'runtime-goblin_file____repo_active',
+        workspaceId: 'goblin+file:///repo-active',
+        workspaceRuntimeId: 'runtime-goblin_file____repo_active',
         snapshot: { revision: 0, entries: [] },
       },
       {
-        repoRoot: 'goblin+file:///repo-stub',
-        repoRuntimeId: 'runtime-goblin_file____repo_stub',
+        workspaceId: 'goblin+file:///repo-stub',
+        workspaceRuntimeId: 'runtime-goblin_file____repo_stub',
         snapshot: { revision: 0, entries: [] },
       },
     ])
@@ -182,18 +182,18 @@ describe('restoreServerWorkspace — active-only restore', () => {
     })
 
     expect(result.openWorkspaceEntries).toEqual([repoA, repoB])
-    expect(mocks.acquireRepoRuntimeLease).toHaveBeenCalledTimes(2)
-    expect(mocks.acquireRepoRuntimeLease).toHaveBeenCalledWith(
+    expect(mocks.acquireWorkspaceRuntimeLease).toHaveBeenCalledTimes(2)
+    expect(mocks.acquireWorkspaceRuntimeLease).toHaveBeenCalledWith(
       'user-test',
       'goblin+file:///repo-a',
       'client_test000000000000',
     )
-    expect(mocks.acquireRepoRuntimeLease).toHaveBeenCalledWith(
+    expect(mocks.acquireWorkspaceRuntimeLease).toHaveBeenCalledWith(
       'user-test',
       'goblin+file:///repo-b',
       'client_test000000000000',
     )
-    expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 
   test('releases only a repo removed while restore is in flight', async () => {
@@ -217,12 +217,12 @@ describe('restoreServerWorkspace — active-only restore', () => {
     })
 
     expect(result.openWorkspaceEntries).toEqual([repoB])
-    expect(mocks.acquireRepoRuntimeLease).toHaveBeenCalledTimes(2)
-    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledTimes(1)
-    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith(
+    expect(mocks.acquireWorkspaceRuntimeLease).toHaveBeenCalledTimes(2)
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledTimes(1)
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith(
       'user-test',
       'client_test000000000000',
-      expect.objectContaining({ repoRoot: 'goblin+file:///repo-a' }),
+      expect.objectContaining({ workspaceId: 'goblin+file:///repo-a' }),
     )
   })
 
@@ -248,7 +248,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     })
 
     expect(result.openWorkspaceEntries).toEqual([repoA, repoB])
-    expect(mocks.acquireRepoRuntimeLease).toHaveBeenCalledTimes(2)
+    expect(mocks.acquireWorkspaceRuntimeLease).toHaveBeenCalledTimes(2)
   })
 
   test('releases every attempt lease after persistent membership conflicts', async () => {
@@ -271,8 +271,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
       }),
     ).rejects.toThrow('workspace membership restore was superseded too many times')
 
-    expect(mocks.acquireRepoRuntimeLease).toHaveBeenCalledOnce()
-    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledOnce()
+    expect(mocks.acquireWorkspaceRuntimeLease).toHaveBeenCalledOnce()
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledOnce()
   })
 
   test('uses activeRepoRoot instead of restoredRepoId to choose the eager restore repo', async () => {
@@ -308,8 +308,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(mocks.probeRepo).toHaveBeenCalledWith('goblin+file:///repo-a')
     expect(mocks.probeRepo).toHaveBeenCalledWith('goblin+file:///repo-b')
     expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
-    expect(result.runtime.repos.find((r) => r.repoRoot === 'goblin+file:///repo-a')?.projection).toBeNull()
-    expect(result.runtime.repos.find((r) => r.repoRoot === 'goblin+file:///repo-b')?.projection).not.toBeNull()
+    expect(result.runtime.workspaces.find((r) => r.workspaceId === 'goblin+file:///repo-a')?.projection).toBeNull()
+    expect(result.runtime.workspaces.find((r) => r.workspaceId === 'goblin+file:///repo-b')?.projection).not.toBeNull()
   })
 
   test('rebuilds when a non-active local entry is not canonical', async () => {
@@ -347,9 +347,9 @@ describe('restoreServerWorkspace — active-only restore', () => {
 
     expect(result.status).toBe('restored')
     expect(result.openWorkspaceEntries).toEqual(workspace.openWorkspaceEntries)
-    expect(result.runtime.repos).toHaveLength(2)
-    expect(result.runtime.repos[1]).toMatchObject({
-      repoRoot: 'goblin+file:///repo-stub/src',
+    expect(result.runtime.workspaces).toHaveLength(2)
+    expect(result.runtime.workspaces[1]).toMatchObject({
+      workspaceId: 'goblin+file:///repo-stub/src',
       projection: null,
       workspaceProbe: { capabilities: { git: { status: 'unavailable' } } },
     })
@@ -398,10 +398,10 @@ describe('restoreServerWorkspace — active-only restore', () => {
       workspacePaneTabsHost,
     })
 
-    const remoteStub = result.runtime.repos.find((r) => r.repoRoot === remoteEntry.id)!
+    const remoteStub = result.runtime.workspaces.find((r) => r.workspaceId === remoteEntry.id)!
     expect(remoteStub).toMatchObject({
       entry: remoteEntry,
-      repoRoot: remoteEntry.id,
+      workspaceId: remoteEntry.id,
       name: 'prod:repo',
       projection: null,
     })
@@ -476,7 +476,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.runtime.repos[0]).toMatchObject({ projection: null, workspaceProbe: { status: 'ready' } })
+    expect(result.runtime.workspaces[0]).toMatchObject({ projection: null, workspaceProbe: { status: 'ready' } })
     expect(mocks.readRepoProjection).not.toHaveBeenCalled()
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {

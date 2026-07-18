@@ -222,12 +222,12 @@ describe('repo-tree — read layer', () => {
 
     const signal = new AbortController().signal
     await getRepositoryTree(remoteWorktreeTarget(), {
-      repoRuntimeId: 'repo-runtime-tree-test',
+      workspaceRuntimeId: 'repo-runtime-tree-test',
       signal,
     })
 
     expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(remoteRepoId, {
-      repoRuntimeId: 'repo-runtime-tree-test',
+      workspaceRuntimeId: 'repo-runtime-tree-test',
     }, signal)
     expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(
       remoteRepoId,

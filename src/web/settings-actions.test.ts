@@ -45,13 +45,13 @@ const appDataClientMocks = vi.hoisted(() => ({
   restoreServerWorkspace: vi.fn<RestoreServerWorkspaceMock>(async () => ({
     status: 'restored' as const,
     openWorkspaceEntries: [],
-    runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
+    runtime: { workspaces: [], workspacePaneTabs: [], restoredRepoId: null },
   })),
   restoreRepoWorkspaceTabs: vi.fn(async () => ({
-    repo: {
+    workspace: {
       entry: { kind: 'local' as const, id: 'goblin+file:///tmp/repo-a' },
-      repoRoot: 'goblin+file:///tmp/repo-a',
-      repoRuntimeId: 'repo_runtime_test',
+      workspaceId: 'goblin+file:///tmp/repo-a',
+      workspaceRuntimeId: 'repo_runtime_test',
       name: 'repo-a',
       projection: {
         snapshot: { current: 'main', branches: [] },
@@ -122,14 +122,14 @@ describe('settings actions', () => {
     appDataClientMocks.restoreServerWorkspace.mockResolvedValue({
       status: 'restored',
       openWorkspaceEntries: [],
-      runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
+      runtime: { workspaces: [], workspacePaneTabs: [], restoredRepoId: null },
     })
     appDataClientMocks.restoreRepoWorkspaceTabs.mockReset()
     appDataClientMocks.restoreRepoWorkspaceTabs.mockResolvedValue({
-      repo: {
+      workspace: {
         entry: { kind: 'local', id: 'goblin+file:///tmp/repo-a' },
-        repoRoot: 'goblin+file:///tmp/repo-a',
-        repoRuntimeId: 'repo_runtime_test',
+        workspaceId: 'goblin+file:///tmp/repo-a',
+        workspaceRuntimeId: 'repo_runtime_test',
         name: 'repo-a',
         projection: {
           snapshot: { current: 'main', branches: [] },
@@ -197,7 +197,7 @@ describe('settings actions', () => {
     appDataClientMocks.restoreServerWorkspace.mockResolvedValue({
       status: 'repaired',
       openWorkspaceEntries: session.openWorkspaceEntries,
-      runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
+      runtime: { workspaces: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
     })
     const { restoreWorkspaceAtBoot } = await import('#/web/settings-actions.ts')
 
@@ -206,7 +206,7 @@ describe('settings actions', () => {
     expect(result).toEqual({
       status: 'repaired',
       openWorkspaceEntries: session.openWorkspaceEntries,
-      runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
+      runtime: { workspaces: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
     })
     expect(appDataClientMocks.restoreServerWorkspace).toHaveBeenCalledWith('client_test000000000000', undefined)
   })
@@ -216,7 +216,7 @@ describe('settings actions', () => {
     await expect(
       restoreRepoTabsOnView('client_test000000000000', 'goblin+file:///tmp/repo-a', 'repo_runtime_test'),
     ).resolves.toMatchObject({
-      repo: { repoRoot: 'goblin+file:///tmp/repo-a', repoRuntimeId: 'repo_runtime_test' },
+      workspace: { workspaceId: 'goblin+file:///tmp/repo-a', workspaceRuntimeId: 'repo_runtime_test' },
       snapshot: null,
     })
 

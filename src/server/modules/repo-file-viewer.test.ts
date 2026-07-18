@@ -199,7 +199,7 @@ describe('repo file viewer read layer', () => {
   })
 
   test('uses the runtime-aware runner for remote viewer probes when provided', async () => {
-    const repoRuntimeId = 'repo-runtime-file-viewer-test'
+    const workspaceRuntimeId = 'repo-runtime-file-viewer-test'
     const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
     const target = {
       id: repoId,
@@ -215,14 +215,14 @@ describe('repo file viewer read layer', () => {
     mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
     mocks.remoteCommandExists.mockResolvedValueOnce(true)
 
-    await expect(getRepositoryFileViewer(repoId, '/srv/repo-feature', undefined, { repoRuntimeId })).resolves.toEqual({
+    await expect(getRepositoryFileViewer(repoId, '/srv/repo-feature', undefined, { workspaceRuntimeId })).resolves.toEqual({
       viewer: 'bat',
       shell: 'posix',
       executionRoot: '/srv/repo-feature',
     })
 
-    expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(repoId, { repoRuntimeId })
-    expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(repoId, repoRuntimeId, target)
+    expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(repoId, { workspaceRuntimeId })
+    expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(repoId, workspaceRuntimeId, target)
     expect(mocks.resolveRemoteWorktree).toHaveBeenCalledWith(target, '/srv/repo-feature', {
       signal: undefined,
       run,

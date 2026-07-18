@@ -38,7 +38,7 @@ vi.mock('#/web/hooks/openBranchExternalTarget.ts', () => ({
 const openExternalMock = vi.mocked(openBranchExternalTarget)
 
 const REPO_ID = 'goblin+file:///tmp/goblin-pr-row-test-repo'
-const REPO_RUNTIME_ID = 'repo-runtime-pr-row-test'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-pr-row-test'
 const BRANCH_NAME = 'feature/pr'
 
 beforeEach(() => {
@@ -54,7 +54,7 @@ describe('PullRequestStatusRow', () => {
     renderInJsdom(
       <PullRequestStatusRow
         repoId={REPO_ID}
-        repoRuntimeId={REPO_RUNTIME_ID}
+        workspaceRuntimeId={WORKSPACE_RUNTIME_ID}
         branchName={BRANCH_NAME}
         pullRequest={pullRequest}
       />,
@@ -79,7 +79,7 @@ describe('PullRequestStatusRow', () => {
     renderInJsdom(
       <PullRequestStatusRow
         repoId={REPO_ID}
-        repoRuntimeId={REPO_RUNTIME_ID}
+        workspaceRuntimeId={WORKSPACE_RUNTIME_ID}
         branchName={BRANCH_NAME}
         pullRequest={pullRequest}
       />,
@@ -89,7 +89,7 @@ describe('PullRequestStatusRow', () => {
     fireEvent.click(chip)
 
     expect(openExternalMock).toHaveBeenCalledTimes(1)
-    expect(openExternalMock).toHaveBeenCalledWith(REPO_ID, REPO_RUNTIME_ID, { name: BRANCH_NAME, pullRequest })
+    expect(openExternalMock).toHaveBeenCalledWith(REPO_ID, WORKSPACE_RUNTIME_ID, { name: BRANCH_NAME, pullRequest })
   })
 
   test('absorbs accidental double-clicks within the latch window', () => {
@@ -102,7 +102,7 @@ describe('PullRequestStatusRow', () => {
       renderInJsdom(
         <PullRequestStatusRow
           repoId={REPO_ID}
-          repoRuntimeId={REPO_RUNTIME_ID}
+          workspaceRuntimeId={WORKSPACE_RUNTIME_ID}
           branchName={BRANCH_NAME}
           pullRequest={pullRequest}
         />,

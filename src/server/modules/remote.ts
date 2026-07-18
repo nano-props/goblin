@@ -96,7 +96,7 @@ export async function resolveServerRemoteTarget(
  *   4. classify the failure into a `RemoteRepoFailureReason`
  *   5. return a converged {@link RemoteRepoConnectionResult}
  *
- * This resolver returns only a terminal result. The owning RepoRuntime wraps
+ * This resolver returns only a terminal result. The owning WorkspaceRuntime wraps
  * it with the authoritative connecting state, attempt id, cancellation, and
  * stale-generation checks.
  *
@@ -107,7 +107,7 @@ export async function resolveServerRemoteTarget(
  *     `runRemoteCommand` (the SSH handshake / checkShell / etc.
  *     execas in `system/ssh/commands.ts:runRemoteCommand`)
  *
- * RepoRuntime aborts this signal when a newer attempt supersedes it or the
+ * WorkspaceRuntime aborts this signal when a newer attempt supersedes it or the
  * runtime closes, so slow SSH work releases server resources promptly.
  */
 export interface RemoteRepoConnectionDeps {
@@ -312,7 +312,7 @@ export async function testServerRemoteRepo(
  *  parsed back into its alias / remotePath parts, then re-resolved so the
  *  SSH config hasn't been edited out from under us. */
 export async function openServerRemoteEditor(
-  input: { repoId: string; repoRuntimeId?: string; worktreePath: string; app: EditorApp },
+  input: { repoId: string; workspaceRuntimeId?: string; worktreePath: string; app: EditorApp },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   if (!isRemoteRepoId(input.repoId) || !isSafeRemoteAbsolutePath(input.worktreePath)) {
@@ -325,10 +325,10 @@ export async function openServerRemoteEditor(
   try {
     resolved = await resolveSshRemoteTarget(ref, signal)
   } catch (err) {
-    if (input.repoRuntimeId) {
+    if (input.workspaceRuntimeId) {
       throw remoteRuntimeFailureFromTargetResolutionError({
         repoRoot: input.repoId,
-        repoRuntimeId: input.repoRuntimeId,
+        workspaceRuntimeId: input.workspaceRuntimeId,
         error: err,
       })
     }
@@ -339,7 +339,7 @@ export async function openServerRemoteEditor(
 }
 
 export async function openServerRemoteTerminal(
-  input: { repoId: string; repoRuntimeId?: string; worktreePath: string; app: TerminalApp },
+  input: { repoId: string; workspaceRuntimeId?: string; worktreePath: string; app: TerminalApp },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   if (!isRemoteRepoId(input.repoId) || !isSafeRemoteAbsolutePath(input.worktreePath)) {
@@ -352,10 +352,10 @@ export async function openServerRemoteTerminal(
   try {
     resolved = await resolveSshRemoteTarget(ref, signal)
   } catch (err) {
-    if (input.repoRuntimeId) {
+    if (input.workspaceRuntimeId) {
       throw remoteRuntimeFailureFromTargetResolutionError({
         repoRoot: input.repoId,
-        repoRuntimeId: input.repoRuntimeId,
+        workspaceRuntimeId: input.workspaceRuntimeId,
         error: err,
       })
     }

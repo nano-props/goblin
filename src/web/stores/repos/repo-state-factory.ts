@@ -12,11 +12,11 @@ const MAX_REPO_EVENTS = 50
 type RepoMutator = (repo: Draft<RepoState>) => void
 type ReposPatch = Pick<ReposStore, 'repos'>
 
-export function emptyRepo(id: string, name: string, repoRuntimeId: string): RepoState {
+export function emptyRepo(id: string, name: string, workspaceRuntimeId: string): RepoState {
   return {
     id,
     name,
-    repoRuntimeId,
+    workspaceRuntimeId,
     dataLoads: emptyRepoDataLoadBundle(),
     operations: emptyRepoOperations(),
     ui: {

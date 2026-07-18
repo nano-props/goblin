@@ -104,7 +104,7 @@ describe('simplified worktree hooks read the right field', () => {
     const descriptor = terminalDescriptorForTest({
       terminalSessionId: SESSION_ID,
       index: 0,
-      repoRuntimeId: 'rt:1',
+      workspaceRuntimeId: 'rt:1',
       repoRoot: '/r',
       branch: 'main',
       worktreePath: '/r',

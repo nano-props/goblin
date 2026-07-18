@@ -53,7 +53,7 @@ type TestTerminalSessionViewProps = Omit<
 > & {
   createTerminalForSlot?: ComponentProps<typeof TerminalSessionViewComponent>['createTerminalForSlot']
   repoRoot?: string
-  repoRuntimeId?: string
+  workspaceRuntimeId?: string
   branch?: string | null
   worktreePath?: string
 }
@@ -63,7 +63,7 @@ const defaultCreateTerminalForSlot = vi.fn(async () => {})
 function TerminalSessionView({
   createTerminalForSlot = defaultCreateTerminalForSlot,
   repoRoot = '/repo',
-  repoRuntimeId = 'repo-runtime-test',
+  workspaceRuntimeId = 'repo-runtime-test',
   branch = 'feature',
   worktreePath = '/worktree',
   ...props
@@ -71,7 +71,7 @@ function TerminalSessionView({
   return (
     <TerminalSessionViewComponent
       {...props}
-      base={terminalBaseForTest(repoRoot, repoRuntimeId, branch, worktreePath)}
+      base={terminalBaseForTest(repoRoot, workspaceRuntimeId, branch, worktreePath)}
       createTerminalForSlot={createTerminalForSlot}
     />
   )
@@ -79,19 +79,19 @@ function TerminalSessionView({
 
 function terminalBaseForTest(
   repoRoot: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   branch: string | null,
   worktreePath: string,
 ): TerminalSessionBase {
   const workspaceId = requiredWorkspaceLocator(repoRoot)
   if (branch === null) {
-    return { target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: repoRuntimeId }, presentation: { kind: 'workspace-root' } }
+    return { target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: workspaceRuntimeId }, presentation: { kind: 'workspace-root' } }
   }
   return {
     target: {
       kind: 'git-worktree' as const,
       workspaceId,
-      workspaceRuntimeId: repoRuntimeId,
+      workspaceRuntimeId: workspaceRuntimeId,
       root: requiredWorkspaceLocator(worktreePath),
     },
     presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: branch } },
@@ -215,7 +215,7 @@ async function renderTerminalSession() {
       <TerminalSessionReadContext value={readContext}>
         <TerminalSessionView
           repoRoot="/repo"
-          repoRuntimeId={'repo-runtime-test'}
+          workspaceRuntimeId={'repo-runtime-test'}
           branch="feature"
           worktreePath="/worktree"
         />
@@ -368,7 +368,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
             selectedTerminalSessionId="term-222222222222222222222"
@@ -472,7 +472,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -586,7 +586,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -657,7 +657,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -735,7 +735,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -796,11 +796,11 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId="repo-runtime-test"
+            workspaceRuntimeId="repo-runtime-test"
             branch="feature"
             worktreePath="/worktree"
             projectionPhase="failed"
-            projectionErrorMessage="error.repo-runtime-stale"
+            projectionErrorMessage="error.workspace-runtime-stale"
           />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
@@ -808,7 +808,7 @@ describe('TerminalSessionView', () => {
 
     try {
       expect(container.textContent).toContain('terminal.load-failed')
-      expect(container.textContent).toContain('error.repo-runtime-stale')
+      expect(container.textContent).toContain('error.workspace-runtime-stale')
     } finally {
       unmount()
     }
@@ -889,7 +889,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -996,7 +996,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -1109,7 +1109,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -1224,7 +1224,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -1351,7 +1351,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -1477,7 +1477,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -1590,7 +1590,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -1718,7 +1718,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -2002,7 +2002,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -2060,7 +2060,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-222222222222222222222',
       index: 1,
 
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       branch: 'feature',
       worktreePath: '/worktree-other',
       repoRoot: '/repo',
@@ -2164,7 +2164,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
@@ -2199,7 +2199,7 @@ describe('TerminalSessionView', () => {
           <TerminalSessionReadContext value={readContext}>
             <TerminalSessionView
               repoRoot="/repo"
-              repoRuntimeId={'repo-runtime-test'}
+              workspaceRuntimeId={'repo-runtime-test'}
               branch="feature"
               worktreePath="/worktree-other"
             />
@@ -2272,7 +2272,7 @@ describe('TerminalSessionView', () => {
         <TerminalSessionReadContext value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
-            repoRuntimeId={'repo-runtime-test'}
+            workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
             createTerminalForSlot={createTerminalForSlot}

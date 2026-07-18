@@ -7,7 +7,7 @@ export interface ServerWorktreeRemovalHost {
     userId: string,
     input: {
       repoRoot: string
-      repoRuntimeId: string
+      workspaceRuntimeId: string
       worktreePath: string
       branchName: string
       deleteBranch: boolean

@@ -1,4 +1,4 @@
-import { failRepoRemoteLifecycle } from '#/server/modules/repo-runtimes.ts'
+import { failRepoRemoteLifecycle } from '#/server/modules/workspace-runtimes.ts'
 import { publishUserRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
 import {
   isRemoteRepoRuntimeFailure,
@@ -16,8 +16,8 @@ import {
 export function settleRemoteRuntimeFailure(userId: string, error: RemoteRepoRuntimeFailureError): void {
   const failed = failRepoRemoteLifecycle({
     userId,
-    repoRoot: error.repoRoot,
-    repoRuntimeId: error.repoRuntimeId,
+    workspaceId: error.repoRoot,
+    workspaceRuntimeId: error.workspaceRuntimeId,
     reason: error.reason,
     ...(error.target ? { target: error.target } : {}),
   })

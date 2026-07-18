@@ -26,14 +26,14 @@ type WorkspacePaneTabsReadTarget =
 let workspacePaneTabsPersistenceVersion = 0
 const workspacePaneTabsPersistenceListeners = new Set<() => void>()
 
-export function workspacePaneTabsQueryKey(repoRoot: string, repoRuntimeId: string) {
-  return ['workspace-pane-tabs', repoRoot, repoRuntimeId] as const
+export function workspacePaneTabsQueryKey(repoRoot: string, workspaceRuntimeId: string) {
+  return ['workspace-pane-tabs', repoRoot, workspaceRuntimeId] as const
 }
 
-export function workspacePaneTabsQueryOptions(repoRoot: string, repoRuntimeId: string) {
+export function workspacePaneTabsQueryOptions(repoRoot: string, workspaceRuntimeId: string) {
   return queryOptions({
-    queryKey: workspacePaneTabsQueryKey(repoRoot, repoRuntimeId),
-    queryFn: async () => await fetchWorkspacePaneTabsSnapshot(repoRoot, repoRuntimeId),
+    queryKey: workspacePaneTabsQueryKey(repoRoot, workspaceRuntimeId),
+    queryFn: async () => await fetchWorkspacePaneTabsSnapshot(repoRoot, workspaceRuntimeId),
     structuralSharing: (oldData, newData) =>
       acceptedWorkspacePaneTabsSnapshot(
         oldData as WorkspacePaneTabsSnapshot | undefined,
@@ -46,11 +46,11 @@ export function workspacePaneTabsQueryOptions(repoRoot: string, repoRuntimeId: s
 
 export function useWorkspacePaneTabsQuery(
   repoRoot: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   options: { enabled?: boolean } = {},
 ) {
   const query = useQuery({
-    ...workspacePaneTabsQueryOptions(repoRoot, repoRuntimeId),
+    ...workspacePaneTabsQueryOptions(repoRoot, workspaceRuntimeId),
     enabled: options.enabled !== false,
   })
   useEffect(() => {
@@ -60,21 +60,21 @@ export function useWorkspacePaneTabsQuery(
 }
 
 export function readWorkspacePaneTabsForTarget(
-  target: WorkspacePaneTabsReadTarget & { repoRuntimeId: string },
+  target: WorkspacePaneTabsReadTarget & { workspaceRuntimeId: string },
   queryClient: QueryClient = primaryWindowQueryClient,
 ): WorkspacePaneTabEntry[] {
   const snapshot = queryClient.getQueryData<WorkspacePaneTabsQueryData>(
-    workspacePaneTabsQueryKey(target.repoRoot, target.repoRuntimeId),
+    workspacePaneTabsQueryKey(target.repoRoot, target.workspaceRuntimeId),
   )
   return workspacePaneTabsForTargetFromQueryData(snapshot ?? emptyWorkspacePaneTabsSnapshot(), target)
 }
 
 export function readWorkspacePaneTabsProjectionForTarget(
-  target: WorkspacePaneTabsReadTarget & { repoRuntimeId: string },
+  target: WorkspacePaneTabsReadTarget & { workspaceRuntimeId: string },
   queryClient: QueryClient = primaryWindowQueryClient,
 ): WorkspacePaneTabsTargetProjection {
   const state = queryClient.getQueryState<WorkspacePaneTabsQueryData>(
-    workspacePaneTabsQueryKey(target.repoRoot, target.repoRuntimeId),
+    workspacePaneTabsQueryKey(target.repoRoot, target.workspaceRuntimeId),
   )
   if (state?.status === 'error') return { phase: 'failed', tabs: [] }
   if (state?.status !== 'success') return { phase: 'pending', tabs: [] }
@@ -100,14 +100,14 @@ export function workspacePaneTabsForTargetFromQueryData(
  */
 export function writeWorkspacePaneTabsSnapshotQueryData(
   repoRoot: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   snapshot: WorkspacePaneTabsSnapshot | null,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): boolean {
   if (!snapshot) return false
   let accepted = false
   queryClient.setQueryData<WorkspacePaneTabsQueryData>(
-    workspacePaneTabsQueryKey(repoRoot, repoRuntimeId),
+    workspacePaneTabsQueryKey(repoRoot, workspaceRuntimeId),
     (current) => {
       const next = acceptedWorkspacePaneTabsSnapshot(current, snapshot)
       accepted = next !== current
@@ -120,25 +120,25 @@ export function writeWorkspacePaneTabsSnapshotQueryData(
 
 export function refreshWorkspacePaneTabs(
   repoRoot: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  void refreshWorkspacePaneTabsQueryData(repoRoot, repoRuntimeId, queryClient).catch((err) => {
-    goblinLog.warn('workspace pane tabs refresh failed', { repoRoot, repoRuntimeId, err })
+  void refreshWorkspacePaneTabsQueryData(repoRoot, workspaceRuntimeId, queryClient).catch((err) => {
+    goblinLog.warn('workspace pane tabs refresh failed', { repoRoot, workspaceRuntimeId, err })
   })
 }
 
 export async function refreshWorkspacePaneTabsQueryData(
   repoRoot: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): Promise<void> {
-  const snapshot = await fetchWorkspacePaneTabsSnapshot(repoRoot, repoRuntimeId)
-  writeWorkspacePaneTabsSnapshotQueryData(repoRoot, repoRuntimeId, snapshot, queryClient)
+  const snapshot = await fetchWorkspacePaneTabsSnapshot(repoRoot, workspaceRuntimeId)
+  writeWorkspacePaneTabsSnapshotQueryData(repoRoot, workspaceRuntimeId, snapshot, queryClient)
 }
 
-export function clearWorkspacePaneTabsProjectionState(repoRoot: string, repoRuntimeId: string): void {
-  primaryWindowQueryClient.removeQueries({ queryKey: workspacePaneTabsQueryKey(repoRoot, repoRuntimeId), exact: true })
+export function clearWorkspacePaneTabsProjectionState(repoRoot: string, workspaceRuntimeId: string): void {
+  primaryWindowQueryClient.removeQueries({ queryKey: workspacePaneTabsQueryKey(repoRoot, workspaceRuntimeId), exact: true })
 }
 
 export function workspacePaneTabsByTargetFromQueryData(
@@ -167,9 +167,9 @@ export function workspacePaneTabsPersistenceSnapshot(): number {
   return workspacePaneTabsPersistenceVersion
 }
 
-export function workspacePaneTabsProjectionRevision(repoRoot: string, repoRuntimeId: string): number | null {
+export function workspacePaneTabsProjectionRevision(repoRoot: string, workspaceRuntimeId: string): number | null {
   return primaryWindowQueryClient.getQueryData<WorkspacePaneTabsSnapshot>(
-    workspacePaneTabsQueryKey(repoRoot, repoRuntimeId),
+    workspacePaneTabsQueryKey(repoRoot, workspaceRuntimeId),
   )?.revision ?? null
 }
 
@@ -180,10 +180,10 @@ function notifyWorkspacePaneTabsPersistenceChanged(): void {
 
 async function fetchWorkspacePaneTabsSnapshot(
   repoRoot: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
 ): Promise<WorkspacePaneTabsSnapshot> {
   return normalizeWorkspacePaneTabsSnapshot(
-    await workspacePaneTabsClient.list({ workspaceId: repoRoot, workspaceRuntimeId: repoRuntimeId }),
+    await workspacePaneTabsClient.list({ workspaceId: repoRoot, workspaceRuntimeId: workspaceRuntimeId }),
   )
 }
 

@@ -172,10 +172,10 @@ describe('useBranchActionDialogDisplay', () => {
       branches: [createRepoBranch('feature/query', { tracking: 'origin/feature/query', trackingGone: false })],
       currentBranchName: 'feature/query',
     })
-    setRepoOperationsQueryData(repo.id, repo.repoRuntimeId, false, {
+    setRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId, false, {
       loadedAt: 123,
       operations: [
-        serverOperation({ repoRuntimeId: repo.repoRuntimeId, kind: 'delete-branch', branch: 'feature/query' }),
+        serverOperation({ workspaceRuntimeId: repo.workspaceRuntimeId, kind: 'delete-branch', branch: 'feature/query' }),
       ],
     })
     const entry: BranchActionDialogEntry<string> = {
@@ -414,12 +414,12 @@ describe('useBranchActionDialogDisplay', () => {
 })
 
 function serverOperation(
-  overrides: Pick<RepoServerOperationState, 'kind'> & { branch: string; repoRuntimeId: string },
+  overrides: Pick<RepoServerOperationState, 'kind'> & { branch: string; workspaceRuntimeId: string },
 ): RepoServerOperationState {
   return {
     id: `repo-op-${overrides.kind}`,
     repoId: REPO_ID,
-    repoRuntimeId: overrides.repoRuntimeId,
+    workspaceRuntimeId: overrides.workspaceRuntimeId,
     kind: overrides.kind,
     phase: 'running',
     source: 'user',

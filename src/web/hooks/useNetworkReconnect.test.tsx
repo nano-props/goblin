@@ -19,7 +19,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 vi.mock('#/web/stores/repos/remote-workspace-connection-command.ts', () => ({
   runRemoteWorkspaceConnection: vi.fn(async () => ({
     kind: 'superseded' as const,
-    workspaceId: workspaceIdForTest('goblin+file:///tmp/remote-workspace'),
+    repoRoot: workspaceIdForTest('goblin+file:///tmp/remote-workspace'),
   })),
 }))
 
@@ -36,7 +36,7 @@ beforeEach(() => {
   vi.mocked(runRemoteWorkspaceConnection).mockClear()
   vi.mocked(runRemoteWorkspaceConnection).mockResolvedValue({
     kind: 'superseded',
-    workspaceId: workspaceIdForTest('goblin+file:///tmp/remote-workspace'),
+    repoRoot: workspaceIdForTest('goblin+file:///tmp/remote-workspace'),
   })
 })
 
@@ -160,7 +160,7 @@ describe('useNetworkReconnect', () => {
     const warn = vi.spyOn(goblinLog, 'warn').mockImplementation(() => undefined)
     vi.mocked(runRemoteWorkspaceConnection).mockResolvedValueOnce({
       kind: 'transport-failed',
-      workspaceId: workspaceIdForTest(target.id),
+      repoRoot: workspaceIdForTest(target.id),
       reason: 'unknown',
     })
     seedRepo(target.id, { kind: 'failed', reason: 'unreachable' })

@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => ({
   clientIdMock: vi.fn(() => 'client_local'),
 }))
 
-const REPO_RUNTIME_ID = 'repo-runtime-test'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 
 vi.mock('#/web/terminal.ts', () => ({
   terminalClient: {
@@ -194,7 +194,7 @@ let originalResizeObserver: typeof ResizeObserver | undefined
 function makeRuntimeMembershipIndex() {
   return {
     [REPO_ROOT]: {
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     },
   }
 }
@@ -203,7 +203,7 @@ function terminalBase() {
   const target = runtimeWorkspacePaneTargetForTest({
     kind: 'git-worktree' as const,
     repoRoot: REPO_ROOT,
-    repoRuntimeId: REPO_RUNTIME_ID,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     worktreePath: WORKTREE_PATH,
   })
   if (target.kind !== 'git-worktree') throw new Error('expected git worktree target')
@@ -328,7 +328,7 @@ describe('TerminalSessionProjection create flow', () => {
 
   test('advances catalog coverage with a continuous create delta', async () => {
     projection.reconcileServerSessionsSnapshot(
-      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       { revision: 10, sessions: [] },
       'client_local',
     )
@@ -338,7 +338,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect(
       projection.reconcileServerSessionsSnapshot(
-        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
         { revision: 10, sessions: [] },
         'client_local',
       ),
@@ -347,7 +347,7 @@ describe('TerminalSessionProjection create flow', () => {
   })
 
   test('materializes an unseen unchanged reuse without advancing catalog coverage', async () => {
-    const scope = { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }
+    const scope = { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
     projection.reconcileServerSessionsSnapshot(scope, { revision: 2, sessions: [] }, 'client_local')
     mocks.createMock.mockResolvedValueOnce(
       makeCreateResult({
@@ -489,7 +489,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     first.resolve(makeCreateResult())
     const firstResult = await firstCreate
-    expect(mocks.writeWorkspaceTabsSnapshotMock).toHaveBeenCalledWith(REPO_ROOT, REPO_RUNTIME_ID, {
+    expect(mocks.writeWorkspaceTabsSnapshotMock).toHaveBeenCalledWith(REPO_ROOT, WORKSPACE_RUNTIME_ID, {
       revision: 7,
       entries: [],
     })
@@ -594,7 +594,7 @@ describe('TerminalSessionProjection create flow', () => {
   })
 
   test.each(['created', 'reused', 'restored'] as const)(
-    'keeps a committed %s create result when the current repo runtime projection has moved on',
+    'keeps a committed %s create result when the current workspace runtime projection has moved on',
     async (resourceDisposition) => {
       const createResponse = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
       mocks.createMock.mockReturnValueOnce(createResponse.promise)
@@ -604,7 +604,7 @@ describe('TerminalSessionProjection create flow', () => {
 
       projection.setRuntimeMembershipIndex({
         [REPO_ROOT]: {
-          repoRuntimeId: 'repo-runtime-new',
+          workspaceRuntimeId: 'repo-runtime-new',
         },
       })
       createResponse.resolve(makeCreateResult({ action: resourceDisposition }))
@@ -952,7 +952,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     projection.setRuntimeMembershipIndex({
       [REPO_ROOT]: {
-        repoRuntimeId: REPO_RUNTIME_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       },
     })
 

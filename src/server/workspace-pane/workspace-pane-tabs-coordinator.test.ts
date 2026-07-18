@@ -30,7 +30,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
     })
     const commitAdmission = vi.fn()
     const captureSnapshotForUser = vi.fn(async () => ({ revision: 0, liveSessions: [] }))
@@ -80,7 +80,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
     })
     const commitAdmission = vi.fn()
     const repository = memoryRepository()
@@ -134,7 +134,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
     })
     const aggregate = aggregateFor(memoryRepository())
     const projection = testRuntimeTargetProjection({
@@ -198,7 +198,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
     })
     const aggregate = aggregateFor(repository)
     const projection = testRuntimeTargetProjection({
@@ -242,7 +242,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
     })
     const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')!
     const projection: WorkspacePaneTargetProjection = {
@@ -302,7 +302,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/repo/detached', {
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
     })
     const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')!
     const root = canonicalWorkspaceLocator('goblin+file:///repo/detached')!
@@ -345,7 +345,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/private/repo', {
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
       worktreePath: '/repo',
     })
     const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')!
@@ -406,7 +406,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/repo/other', {
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
     })
     const projection = testRuntimeTargetProjection({
       repoRoot: 'goblin+file:///repo',
@@ -447,7 +447,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-b',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-b',
+      workspaceRuntimeId: 'runtime-b',
     })
     const projection = testRuntimeTargetProjection({
       repoRoot: 'goblin+file:///repo',
@@ -488,7 +488,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
     })
     const targets: TestWorkspacePaneTarget[] = [
       {
@@ -555,7 +555,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
     })
     let targets: TestWorkspacePaneTarget[] = [
       {
@@ -673,7 +673,7 @@ describe('workspace pane tabs coordinator queues', () => {
         await operation.validateMembershipAndSnapshot({
           userId: 'user-a',
           repoRoot: 'goblin+file:///repo',
-          repoRuntimeId: 'runtime-a',
+          workspaceRuntimeId: 'runtime-a',
           validTargets: [
             testRuntimeTargetProjection({
               repoRoot: 'goblin+file:///repo',
@@ -765,7 +765,7 @@ describe('workspace pane tabs coordinator queues', () => {
       {
         userId: 'user-a',
         scope: 'goblin+file:///repo\0runtime-a',
-        repoRuntimeId: 'runtime-a',
+        workspaceRuntimeId: 'runtime-a',
         target: testRuntimeTargetProjection({
           repoRoot: 'goblin+file:///repo',
           branchName: 'main',
@@ -826,7 +826,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
     })
     let releaseRemoval!: () => void
     const removalGate = new Promise<void>((resolve) => {
@@ -873,7 +873,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
     })
     let releaseFinalSample!: () => void
     const finalSampleGate = new Promise<void>((resolve) => {
@@ -947,12 +947,12 @@ describe('workspace pane tabs coordinator queues', () => {
     const capabilityA = testPhysicalWorktreeExecutionCapability('/repo/worktree-a', {
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
     })
     const capabilityC = testPhysicalWorktreeExecutionCapability('/repo/worktree-c', {
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
     })
     let releaseStableSample!: () => void
     const stableSampleGate = new Promise<void>((resolve) => {
@@ -1035,7 +1035,7 @@ describe('workspace pane tabs coordinator queues', () => {
       {
         userId: 'user-a',
         scope: 'goblin+file:///repo\0runtime-a',
-        repoRuntimeId: 'runtime-a',
+        workspaceRuntimeId: 'runtime-a',
         target: testRuntimeTargetProjection({
           repoRoot: 'goblin+file:///repo',
           branchName: 'c',
@@ -1061,7 +1061,7 @@ describe('workspace pane tabs coordinator queues', () => {
       identity: testPhysicalWorktreeIdentity('/repo/worktree-x'),
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
       worktreePath: '/repo/worktree-x',
       validateExecution: async () => {
         if (!executionExists) throw new Error('ENOENT')
@@ -1139,7 +1139,7 @@ describe('workspace pane tabs coordinator queues', () => {
       identity: testPhysicalWorktreeIdentity('/repo/worktree-x'),
       userId: 'user-a',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'runtime-a',
+      workspaceRuntimeId: 'runtime-a',
       worktreePath: '/repo/worktree-x',
       validateExecution: async () => {
         if (!executionExists) throw new Error('ENOENT')

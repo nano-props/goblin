@@ -41,12 +41,12 @@ vi.mock('#/system/ssh/config.ts', () => ({
 
 const USER_ID = 'user_terminal_ensurer'
 const REPO_ROOT = 'goblin+file:///repo'
-const REPO_RUNTIME_ID = 'repo-runtime-ensure'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-ensure'
 const WORKTREE_PATH = '/repo/worktree'
 const LOCAL_TARGET = {
   kind: 'git-worktree' as const,
   workspaceId: canonicalWorkspaceLocator(REPO_ROOT)!,
-  workspaceRuntimeId: REPO_RUNTIME_ID,
+  workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
   root: canonicalWorkspaceLocator('goblin+file:///repo/worktree')!,
 }
 const BRANCH_NAME = 'feature/worktree'
@@ -55,7 +55,7 @@ const REMOTE_WORKTREE_PATH = '/srv/repo'
 const REMOTE_TARGET = {
   kind: 'workspace-root' as const,
   workspaceId: canonicalWorkspaceLocator(REMOTE_REPO_ROOT)!,
-  workspaceRuntimeId: REPO_RUNTIME_ID,
+  workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
 }
 
 function ensureContext(context: Omit<TerminalSessionEnsureContext, 'signal'>): TerminalSessionEnsureContext {
@@ -166,7 +166,7 @@ describe('terminal session ensurer', () => {
         target: {
           kind: 'workspace-root',
           workspaceId: canonicalWorkspaceLocator('goblin+file:///tmp/workspace')!,
-          workspaceRuntimeId: REPO_RUNTIME_ID,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         },
         clientId: 'client_terminal_ensurer',
       },

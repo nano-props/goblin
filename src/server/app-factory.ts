@@ -18,6 +18,7 @@ import { createRealtimeRoutes } from '#/server/routes/realtime.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createSettingsRoutes } from '#/server/routes/settings.ts'
+import { createWorkspaceRoutes } from '#/server/routes/workspace.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
@@ -188,6 +189,14 @@ export function createApp(options: ServerAppOptions): Hono {
       onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
     }),
   )
+  app.use('/api/workspace/*', createAccessTokenMiddleware(options.accessToken))
+  app.use(
+    '/api/workspace/*',
+    bodyLimit({
+      maxSize: API_BODY_LIMIT_BYTES,
+      onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
+    }),
+  )
   app.use('/api/clipboard/*', createAccessTokenMiddleware(options.accessToken))
   // MAX_PASTE_BATCH_BYTES (12 MiB) is the *success* ceiling. The
   // failure case is also bounded but the timing depends on the
@@ -247,6 +256,10 @@ export function createApp(options: ServerAppOptions): Hono {
     }),
   )
   app.route('/api/repo', createRepoViewRoutes())
+  app.route(
+    '/api/workspace',
+    createWorkspaceRoutes({ workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost }),
+  )
   app.route('/api/clipboard', createClipboardRoutes())
   app.route('/ws', createRealtimeRoutes({ accessToken: options.accessToken, appRealtimeHost: options.appRealtimeHost }))
 

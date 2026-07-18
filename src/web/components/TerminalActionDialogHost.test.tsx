@@ -59,7 +59,7 @@ describe('TerminalActionDialogHost', () => {
         terminalSessionId: 'term-111111111111111111111',
         terminalBase: terminalSessionBaseForTest({
           repoRoot: '/repo',
-          repoRuntimeId: 'repo-runtime-test',
+          workspaceRuntimeId: 'repo-runtime-test',
           branch: 'main',
           worktreePath: '/repo-worktree',
         }),

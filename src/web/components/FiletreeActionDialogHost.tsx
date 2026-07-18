@@ -39,7 +39,7 @@ export function FiletreeActionDialogHost({ currentRepoId }: Props) {
         if (!trashFileConfirm) return
         const result = await trashRepositoryFile(
           trashFileConfirm.repoId,
-          trashFileConfirm.repoRuntimeId,
+          trashFileConfirm.workspaceRuntimeId,
           trashFileConfirm.worktreePath,
           trashFileConfirm.path,
         )

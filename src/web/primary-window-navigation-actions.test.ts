@@ -254,10 +254,10 @@ describe('createPrimaryWindowNavigationActions', () => {
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })
-    primaryWindowQueryClient.removeQueries({ queryKey: workspacePaneTabsQueryKey(REPO_ID, repo.repoRuntimeId) })
+    primaryWindowQueryClient.removeQueries({ queryKey: workspacePaneTabsQueryKey(REPO_ID, repo.workspaceRuntimeId) })
     await primaryWindowQueryClient
       .fetchQuery({
-        queryKey: workspacePaneTabsQueryKey(REPO_ID, repo.repoRuntimeId),
+        queryKey: workspacePaneTabsQueryKey(REPO_ID, repo.workspaceRuntimeId),
         queryFn: async () => {
           throw new Error('tabs unavailable')
         },

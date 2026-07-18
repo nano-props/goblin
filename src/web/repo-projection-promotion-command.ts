@@ -1,15 +1,15 @@
-import type { RestoredWorkspaceRepoRuntime } from '#/shared/api-types.ts'
+import type { RestoredWorkspaceRuntime } from '#/shared/api-types.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { restoreRepoTabsOnView } from '#/web/settings-actions.ts'
 
 export type RepoProjectionPromotionResult =
-  | { ok: true; repo: RestoredWorkspaceRepoRuntime; snapshot: WorkspacePaneTabsSnapshot | null }
+  | { ok: true; workspace: RestoredWorkspaceRuntime; snapshot: WorkspacePaneTabsSnapshot | null }
   | { ok: false; message: string }
 
 export interface RepoProjectionPromotionTarget {
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
 }
 
 const inFlightPromotions = new Map<string, Promise<RepoProjectionPromotionResult>>()
@@ -17,12 +17,12 @@ const inFlightPromotions = new Map<string, Promise<RepoProjectionPromotionResult
 export function runRepoProjectionPromotion(
   target: RepoProjectionPromotionTarget,
 ): Promise<RepoProjectionPromotionResult> {
-  const key = `${target.repoRoot}\0${target.repoRuntimeId}`
+  const key = `${target.repoRoot}\0${target.workspaceRuntimeId}`
   const existing = inFlightPromotions.get(key)
   if (existing) return existing
 
-  const command = restoreRepoTabsOnView(readOrCreateWebTerminalClientId(), target.repoRoot, target.repoRuntimeId).then(
-    (response) => ({ ok: true as const, repo: response.repo, snapshot: response.snapshot }),
+  const command = restoreRepoTabsOnView(readOrCreateWebTerminalClientId(), target.repoRoot, target.workspaceRuntimeId).then(
+    (response) => ({ ok: true as const, workspace: response.workspace, snapshot: response.snapshot }),
     (err: unknown) => ({ ok: false as const, message: err instanceof Error ? err.message : String(err) }),
   )
   inFlightPromotions.set(key, command)

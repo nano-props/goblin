@@ -87,10 +87,10 @@ const TerminalResizeInputSchema = TerminalAttachInputSchema
 const TerminalSessionInputSchema = v.object({
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
 })
-const RepoRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
+const WorkspaceRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
 const TerminalListSessionsInputSchema = v.object({
   repoRoot: WorkspaceIdSchema,
-  repoRuntimeId: RepoRuntimeIdSchema,
+  workspaceRuntimeId: WorkspaceRuntimeIdSchema,
 })
 export const TerminalCreateInputSchema = v.strictObject({
   kind: v.picklist(['primary', 'additional']),
@@ -102,7 +102,7 @@ export const TerminalCreateInputSchema = v.strictObject({
 })
 const TerminalPruneInputSchema = v.object({
   repoRoot: WorkspaceIdSchema,
-  repoRuntimeId: RepoRuntimeIdSchema,
+  workspaceRuntimeId: WorkspaceRuntimeIdSchema,
 })
 const TerminalPresentationSchema = v.variant('kind', [
   v.strictObject({ kind: v.literal('workspace-root') }),
@@ -268,7 +268,7 @@ const TerminalExitEventSchema = v.object({
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   terminalSessionId: v.string(),
   repoRoot: WorkspaceIdSchema,
-  repoRuntimeId: RepoRuntimeIdSchema,
+  workspaceRuntimeId: WorkspaceRuntimeIdSchema,
 })
 const TerminalSessionClosedEventSchema = v.strictObject({
   type: v.literal('session-closed'),
@@ -307,7 +307,7 @@ const TerminalRealtimeMessageVariants = [
   v.object({
     type: v.literal('sessions-changed'),
     repoRoot: WorkspaceIdSchema,
-    repoRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
   }),
   TerminalSessionClosedEventSchema,

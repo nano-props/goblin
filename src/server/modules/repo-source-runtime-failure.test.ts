@@ -45,10 +45,10 @@ describe('repo source runtime failure classification', () => {
     })
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
 
-    await expect(getRepoLog(target.id, 'main', { repoRuntimeId: 'repo-runtime-test' })).rejects.toMatchObject({
+    await expect(getRepoLog(target.id, 'main', { workspaceRuntimeId: 'repo-runtime-test' })).rejects.toMatchObject({
       name: 'RemoteRepoRuntimeFailureError',
       repoRoot: target.id,
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       reason: 'unreachable',
     } satisfies Partial<RemoteRepoRuntimeFailureError>)
   })
@@ -65,7 +65,7 @@ describe('repo source runtime failure classification', () => {
     await expect(fetchRepo(target.id, 'user', undefined, 'repo-runtime-test')).rejects.toMatchObject({
       name: 'RemoteRepoRuntimeFailureError',
       repoRoot: target.id,
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       reason: 'unreachable',
     } satisfies Partial<RemoteRepoRuntimeFailureError>)
   })
@@ -86,10 +86,10 @@ describe('repo source runtime failure classification', () => {
     mocks.resolveRemoteTarget.mockRejectedValueOnce(new Error('error.ssh-config-changed'))
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
 
-    await expect(getRepoLog(target.id, 'main', { repoRuntimeId: 'repo-runtime-test' })).rejects.toMatchObject({
+    await expect(getRepoLog(target.id, 'main', { workspaceRuntimeId: 'repo-runtime-test' })).rejects.toMatchObject({
       name: 'RemoteRepoRuntimeFailureError',
       repoRoot: target.id,
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       reason: 'config-changed',
     } satisfies Partial<RemoteRepoRuntimeFailureError>)
   })

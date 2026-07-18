@@ -1,4 +1,4 @@
-import type { RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
+import type { WorkspaceRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
 import type { BranchSnapshotInfo, PullRequestInfo } from '#/web/types.ts'
 import {
   createBranchSnapshot,
@@ -30,8 +30,8 @@ export function pullRequestWithHealth(number: number): PullRequestInfo {
 
 export function repoProjection(
   snapshot: RepoSnapshot | null,
-  options: Partial<Pick<RepoRuntimeProjection, 'pullRequests' | 'operations' | 'requested' | 'loadedAt'>> = {},
-): RepoRuntimeProjection {
+  options: Partial<Pick<WorkspaceRuntimeProjection, 'pullRequests' | 'operations' | 'requested' | 'loadedAt'>> = {},
+): WorkspaceRuntimeProjection {
   return {
     snapshot,
     pullRequests: options.pullRequests ?? null,
@@ -41,11 +41,11 @@ export function repoProjection(
   }
 }
 
-export function seedRepo(branches: BranchSnapshotInfo[], repoRuntimeId = 'repo-runtime-test'): string {
+export function seedRepo(branches: BranchSnapshotInfo[], workspaceRuntimeId = 'repo-runtime-test'): string {
   return seedRepoWithReadModelForTest({
     id: REPO_ID,
     branchSnapshots: branches,
-    repoRuntimeId,
+    workspaceRuntimeId,
     remote: {
       remotes: ['origin'],
       hasRemotes: true,
@@ -54,7 +54,7 @@ export function seedRepo(branches: BranchSnapshotInfo[], repoRuntimeId = 'repo-r
       remoteProviders: { origin: 'github' },
       hasGitHubRemote: true,
     },
-  }).repoRuntimeId
+  }).workspaceRuntimeId
 }
 
 export function resetRefreshTest(): void {
@@ -67,8 +67,8 @@ export function resetRefreshTest(): void {
     openWorkspaceEntries: [],
     workspacePaneTabsByTargetByWorkspace: {},
   })
-  ipcHandlers['repo.worktreeStatus'] = ({ repoRuntimeId }: { repoRuntimeId: string }) => ({
-    repoRuntimeId,
+  ipcHandlers['repo.worktreeStatus'] = ({ workspaceRuntimeId }: { workspaceRuntimeId: string }) => ({
+    workspaceRuntimeId,
     status: [],
     loadedAt: Date.now(),
   })

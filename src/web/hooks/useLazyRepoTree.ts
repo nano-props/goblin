@@ -43,32 +43,32 @@ const EMPTY_EXPANDED_KEYS: readonly string[] = []
 interface CachedLazyRepoTreeStateInput {
   readonly queryClient: QueryClient
   readonly repoId: string
-  readonly repoRuntimeId: string
+  readonly workspaceRuntimeId: string
   readonly worktreePath: string
   readonly expandedKeys: readonly string[]
 }
 
-function repoTreeChildrenQueryKey(repoId: string, repoRuntimeId: string, worktreePath: string, prefix: string) {
-  return ['repo-tree-children', repoId, repoRuntimeId, worktreePath, prefix] as const
+function repoTreeChildrenQueryKey(repoId: string, workspaceRuntimeId: string, worktreePath: string, prefix: string) {
+  return ['repo-tree-children', repoId, workspaceRuntimeId, worktreePath, prefix] as const
 }
 
 export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeResult {
   const { target } = input
   const repoId = target.workspaceId
-  const repoRuntimeId = target.workspaceRuntimeId
+  const workspaceRuntimeId = target.workspaceRuntimeId
   const worktreePath = workspacePaneFilesystemExecutionPath(target)
   const expandedKeys = input.expandedKeys ?? EMPTY_EXPANDED_KEYS
   const queryClient = useQueryClient()
-  const enabled = repoId.length > 0 && repoRuntimeId.length > 0 && worktreePath.length > 0
+  const enabled = repoId.length > 0 && workspaceRuntimeId.length > 0 && worktreePath.length > 0
   const rootQueryKey = useMemo(
-    () => repoTreeChildrenQueryKey(repoId, repoRuntimeId, worktreePath, ''),
-    [repoId, repoRuntimeId, worktreePath],
+    () => repoTreeChildrenQueryKey(repoId, workspaceRuntimeId, worktreePath, ''),
+    [repoId, workspaceRuntimeId, worktreePath],
   )
   const expandedKeysCacheSignal = useMemo(() => expandedKeys.map(normalizePrefix).join('\0'), [expandedKeys])
   const cachedExpandedPrefixes = useMemo(() => cachedPrefixesForExpandedKeys(expandedKeys), [expandedKeysCacheSignal])
   const [treeState, dispatchTreeState] = useReducer(
     lazyRepoTreeReducer,
-    { queryClient, repoId, repoRuntimeId, worktreePath, expandedKeys },
+    { queryClient, repoId, workspaceRuntimeId, worktreePath, expandedKeys },
     cachedLazyRepoTreeState,
   )
   const expandedKeysRef = useRef(expandedKeys)
@@ -96,23 +96,23 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
       state: cachedLazyRepoTreeState({
         queryClient,
         repoId,
-        repoRuntimeId,
+        workspaceRuntimeId,
         worktreePath,
         expandedKeys: expandedKeysRef.current,
       }),
     })
-  }, [queryClient, repoId, repoRuntimeId, worktreePath])
+  }, [queryClient, repoId, workspaceRuntimeId, worktreePath])
 
   useEffect(() => {
     if (!enabled) return
     for (const prefix of cachedExpandedPrefixes) {
       const result = queryClient.getQueryData<RepoTreeResult>(
-        repoTreeChildrenQueryKey(repoId, repoRuntimeId, worktreePath, prefix),
+        repoTreeChildrenQueryKey(repoId, workspaceRuntimeId, worktreePath, prefix),
       )
       if (!result) continue
       dispatchTreeState({ type: 'childrenLoaded', prefix, result })
     }
-  }, [cachedExpandedPrefixes, enabled, queryClient, repoId, repoRuntimeId, worktreePath])
+  }, [cachedExpandedPrefixes, enabled, queryClient, repoId, workspaceRuntimeId, worktreePath])
 
   useEffect(() => {
     if (!rootData) return
@@ -130,7 +130,7 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
       dispatchTreeState({ type: 'childrenLoading', prefix: normalizedPrefix })
       try {
         const result = await queryClient.fetchQuery({
-          queryKey: repoTreeChildrenQueryKey(repoId, repoRuntimeId, worktreePath, normalizedPrefix),
+          queryKey: repoTreeChildrenQueryKey(repoId, workspaceRuntimeId, worktreePath, normalizedPrefix),
           queryFn: ({ signal }) =>
             getRepositoryTree(target, { prefix: normalizedPrefix || undefined, signal }),
           retry: false,
@@ -147,7 +147,7 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
       enabled,
       queryClient,
       repoId,
-      repoRuntimeId,
+      workspaceRuntimeId,
       treeState.errorPrefixes,
       treeState.loadedPrefixes,
       treeState.loadingPrefixes,
@@ -172,9 +172,9 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
       if (event.query !== 'repo-snapshot') return
       if (event.repoId !== repoId) return
       dispatchTreeState({ type: 'markForReload' })
-      void queryClient.invalidateQueries({ queryKey: ['repo-tree-children', repoId, repoRuntimeId, worktreePath] })
+      void queryClient.invalidateQueries({ queryKey: ['repo-tree-children', repoId, workspaceRuntimeId, worktreePath] })
     })
-  }, [queryClient, repoId, repoRuntimeId, worktreePath])
+  }, [queryClient, repoId, workspaceRuntimeId, worktreePath])
 
   useEffect(() => {
     if (!rootData) return
@@ -206,7 +206,7 @@ function normalizePrefix(prefix: string): string {
 function cachedLazyRepoTreeState({
   queryClient,
   repoId,
-  repoRuntimeId,
+  workspaceRuntimeId,
   worktreePath,
   expandedKeys,
 }: CachedLazyRepoTreeStateInput): LazyRepoTreeState {
@@ -214,7 +214,7 @@ function cachedLazyRepoTreeState({
   let state = emptyLazyRepoTreeState()
   for (const prefix of cachedPrefixesForExpandedKeys(expandedKeys)) {
     const result = queryClient.getQueryData<RepoTreeResult>(
-      repoTreeChildrenQueryKey(repoId, repoRuntimeId, worktreePath, prefix),
+      repoTreeChildrenQueryKey(repoId, workspaceRuntimeId, worktreePath, prefix),
     )
     if (!result) continue
     state = lazyRepoTreeReducer(state, { type: 'childrenLoaded', prefix, result })

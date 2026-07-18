@@ -14,7 +14,7 @@ import {
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 
-export const RepoRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
+export const WorkspaceRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
 
 export const WorkspacePaneTabIdentitySchema = v.pipe(
   v.string(),
@@ -25,25 +25,25 @@ export const WorkspacePaneOptionalTabIdentitySchema = v.optional(v.nullable(Work
 
 export const WorkspacePaneTabsListInputSchema = v.object({
   workspaceId: WorkspaceIdSchema,
-  workspaceRuntimeId: RepoRuntimeIdSchema,
+  workspaceRuntimeId: WorkspaceRuntimeIdSchema,
 })
 
 export const RuntimeWorkspacePaneTargetSchema = v.variant('kind', [
   v.strictObject({
     kind: v.literal('workspace-root'),
     workspaceId: WorkspaceIdSchema,
-    workspaceRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
   }),
   v.strictObject({
     kind: v.literal('git-branch'),
     workspaceId: WorkspaceIdSchema,
-    workspaceRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     branch: v.pipe(v.string(), v.minLength(1)),
   }),
   v.strictObject({
     kind: v.literal('git-worktree'),
     workspaceId: WorkspaceIdSchema,
-    workspaceRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     root: v.string(),
   }),
 ])
@@ -54,12 +54,12 @@ export const WorkspacePaneFilesystemExecutionTargetSchema = v.pipe(
     v.strictObject({
       kind: v.literal('workspace-root'),
       workspaceId: WorkspaceIdSchema,
-      workspaceRuntimeId: RepoRuntimeIdSchema,
+      workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     }),
     v.strictObject({
       kind: v.literal('git-worktree'),
       workspaceId: WorkspaceIdSchema,
-      workspaceRuntimeId: RepoRuntimeIdSchema,
+      workspaceRuntimeId: WorkspaceRuntimeIdSchema,
       root: WorkspaceIdSchema,
     }),
   ]),
@@ -87,14 +87,14 @@ export const WorkspacePaneTabEntrySchema = v.union([
 
 export const WorkspacePaneTabsReplaceInputSchema = v.object({
   workspaceId: WorkspaceIdSchema,
-  workspaceRuntimeId: RepoRuntimeIdSchema,
+  workspaceRuntimeId: WorkspaceRuntimeIdSchema,
   target: RuntimeWorkspacePaneTargetSchema,
   tabs: v.array(WorkspacePaneTabEntrySchema),
 })
 
 export const WorkspacePaneTabsUpdateInputSchema = v.object({
   workspaceId: WorkspaceIdSchema,
-  workspaceRuntimeId: RepoRuntimeIdSchema,
+  workspaceRuntimeId: WorkspaceRuntimeIdSchema,
   target: RuntimeWorkspacePaneTargetSchema,
   operation: v.variant('type', [
     v.object({

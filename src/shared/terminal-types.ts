@@ -43,7 +43,7 @@ export type TerminalSessionBase =
 
 export interface TerminalExecutionCoordinates {
   repoRoot: WorkspaceId
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   worktreeId: WorkspaceId
 }
 
@@ -51,7 +51,7 @@ export interface TerminalExecutionCoordinates {
 export function terminalExecutionCoordinates(target: TerminalExecutionTarget): TerminalExecutionCoordinates {
   return {
     repoRoot: target.workspaceId,
-    repoRuntimeId: target.workspaceRuntimeId,
+    workspaceRuntimeId: target.workspaceRuntimeId,
     worktreeId: target.kind === 'workspace-root' ? target.workspaceId : target.root,
   }
 }
@@ -69,9 +69,9 @@ export function terminalPresentationBranch(presentation: TerminalPresentation): 
   return presentation.kind === 'git-worktree' ? gitHeadBranch(presentation.head) : null
 }
 
-export interface RepoRuntimeInput {
+export interface WorkspaceRuntimeInput {
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
 }
 
 export interface TerminalAttachInput {
@@ -262,12 +262,12 @@ export interface TerminalTestNotificationInput {
 
 export interface TerminalListSessionsInput {
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
 }
 
 export interface TerminalPruneInput {
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
 }
 
 interface TerminalSessionSummaryFields {
@@ -303,7 +303,7 @@ export interface TerminalSessionsSnapshot {
 
 export interface TerminalSessionsChangedEvent {
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   revision: number
 }
 
@@ -363,7 +363,7 @@ export interface TerminalExitEvent {
   terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
 }
 
 /**

@@ -8,7 +8,7 @@ import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { REMOTE_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
-import { isCurrentRepoRuntime } from '#/server/modules/repo-runtimes.ts'
+import { isCurrentWorkspaceRuntime } from '#/server/modules/workspace-runtimes.ts'
 import {
   commitGitCapabilityRemovalOrThrow,
   type WorkspaceCapabilityTransitionHost,
@@ -25,20 +25,20 @@ export function createRemoteRoutes(options: { workspaceCapabilityTransitionHost:
   app.post('/lifecycle', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { repoId, repoRuntimeId, mode } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.remoteLifecycle, c)
+    const { repoId, workspaceRuntimeId, mode } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.remoteLifecycle, c)
     return c.json(
       await runRemoteLifecycleWrite(
-        { userId, repoId, repoRuntimeId, mode: mode ?? 'restart' },
+        { userId, repoId, workspaceRuntimeId, mode: mode ?? 'restart' },
         {
           beforeCapabilityCommit: async ({ before, after }) => {
             if (!workspaceGitCleanupRequired(before, after)) return
             await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
               userId,
               workspaceId: repoId,
-              workspaceRuntimeId: repoRuntimeId,
+              workspaceRuntimeId: workspaceRuntimeId,
               assertCurrent: () => {
-                if (!isCurrentRepoRuntime(userId, repoId, repoRuntimeId)) {
-                  throw new Error('error.repo-runtime-stale')
+                if (!isCurrentWorkspaceRuntime(userId, repoId, workspaceRuntimeId)) {
+                  throw new Error('error.workspace-runtime-stale')
                 }
               },
             })

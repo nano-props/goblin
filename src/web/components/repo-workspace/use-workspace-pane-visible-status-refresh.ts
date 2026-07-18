@@ -6,13 +6,13 @@ import { workspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 
 export function useWorkspacePaneVisibleStatusRefresh({
   repoId,
-  repoRuntimeId,
+  workspaceRuntimeId,
   branchName,
   renderedTab,
   unavailable,
 }: {
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   branchName: string | null
   renderedTab: WorkspacePaneTabType | null
   unavailable: boolean
@@ -25,18 +25,18 @@ export function useWorkspacePaneVisibleStatusRefresh({
       lastRequestedKeyRef.current = null
       return
     }
-    const key = [repoId, repoRuntimeId, branchName, renderedTab].join('\0')
+    const key = [repoId, workspaceRuntimeId, branchName, renderedTab].join('\0')
     if (key === lastRequestedKeyRef.current) return
     if (unavailable) return
     if (
       requestVisibleWorkspaceStatusRefresh(
         { get: useReposStore.getState, set: useReposStore.setState },
         repoId,
-        repoRuntimeId,
+        workspaceRuntimeId,
         branchName,
       )
     ) {
       lastRequestedKeyRef.current = key
     }
-  }, [branchName, renderedTab, repoId, repoRuntimeId, unavailable])
+  }, [branchName, renderedTab, repoId, workspaceRuntimeId, unavailable])
 }

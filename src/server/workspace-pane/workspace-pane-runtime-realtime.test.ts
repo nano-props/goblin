@@ -16,7 +16,7 @@ const input = {
   runtimeType: 'terminal' as const,
   request: {
     repoRoot: '/repo',
-    repoRuntimeId: 'repo-runtime-test',
+    workspaceRuntimeId: 'repo-runtime-test',
     target: { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: 'repo-runtime-test', root: worktreeRoot },
     branch: 'main',
     worktreePath: '/repo/worktree',
@@ -88,7 +88,7 @@ describe('workspace pane runtime realtime', () => {
             JSON.stringify({
               type: 'sessions-changed',
               repoRoot: workspaceId,
-              repoRuntimeId: 'repo-runtime-test',
+              workspaceRuntimeId: 'repo-runtime-test',
               revision: 1,
             }),
           )
@@ -115,7 +115,7 @@ describe('workspace pane runtime realtime', () => {
     expect(JSON.parse(socket.send.mock.calls[1]?.[0] ?? '')).toEqual({
       type: 'sessions-changed',
       repoRoot: workspaceId,
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       revision: 1,
     })
     expect(socket.send).toHaveBeenCalledTimes(2)

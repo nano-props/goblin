@@ -49,7 +49,7 @@ describe('workspace pane runtime tab command actions', () => {
   test('resolves the ordinary workspace root while pane tabs are still pending', () => {
     const repo = seedRepoWithReadModelForTest({
       id: terminalCoordinates.repoRoot,
-      repoRuntimeId: terminalCoordinates.repoRuntimeId,
+      workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
       branches: [],
       currentBranchName: null,
     })
@@ -62,7 +62,7 @@ describe('workspace pane runtime tab command actions', () => {
 
     const workspaceId = canonicalWorkspaceLocator(repo.id)
     if (!workspaceId) throw new Error('expected canonical workspace fixture')
-    const target = { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: repo.repoRuntimeId }
+    const target = { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: repo.workspaceRuntimeId }
     expect(resolveWorkspacePaneTerminalExecutionTarget(target, { kind: 'workspace-root' })).toEqual({
       target,
       presentation: { kind: 'workspace-root' },
@@ -70,19 +70,19 @@ describe('workspace pane runtime tab command actions', () => {
     expect(
       captureWorkspacePaneActiveTabIdentity(
         { kind: 'workspace-root', repoRoot: repo.id },
-        repo.repoRuntimeId,
+        repo.workspaceRuntimeId,
         { workspacePaneRoute: undefined },
       ),
     ).toBeNull()
     expect(
       recordWorkspacePaneTabOpener(
         { kind: 'workspace-root', repoRoot: repo.id },
-        repo.repoRuntimeId,
+        repo.workspaceRuntimeId,
         'terminal:term-111111111111111111111',
         'workspace-pane:files',
       ),
     ).toBe('recorded')
-    expect(workspacePaneTabOpener({ kind: 'workspace-root', repoRoot: repo.id }, repo.repoRuntimeId, 'terminal:term-111111111111111111111')).toBe(
+    expect(workspacePaneTabOpener({ kind: 'workspace-root', repoRoot: repo.id }, repo.workspaceRuntimeId, 'terminal:term-111111111111111111111')).toBe(
       'workspace-pane:files',
     )
   })
@@ -92,7 +92,7 @@ describe('workspace pane runtime tab command actions', () => {
     if (!branchName) throw new Error('expected Git worktree terminal fixture')
     seedRepoWithReadModelForTest({
       id: terminalCoordinates.repoRoot,
-      repoRuntimeId: terminalCoordinates.repoRuntimeId,
+      workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
       branches: [createRepoBranch(branchName, { worktree: { path: terminalExecutionPath(terminalBase.target) } })],
       currentBranchName: branchName,
     })
@@ -103,7 +103,7 @@ describe('workspace pane runtime tab command actions', () => {
     expect(
       captureWorkspacePaneActiveTabIdentity(
         terminalPaneTarget,
-        terminalCoordinates.repoRuntimeId,
+        terminalCoordinates.workspaceRuntimeId,
         { workspacePaneRoute: undefined },
       ),
     ).toBeNull()
@@ -114,7 +114,7 @@ describe('workspace pane runtime tab command actions', () => {
     if (!branchName) throw new Error('expected Git worktree terminal fixture')
     seedRepoWithReadModelForTest({
       id: terminalCoordinates.repoRoot,
-      repoRuntimeId: terminalCoordinates.repoRuntimeId,
+      workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
       branches: [createRepoBranch(branchName, { worktree: { path: terminalExecutionPath(terminalBase.target) } })],
       currentBranchName: branchName,
     })
@@ -190,7 +190,7 @@ describe('workspace pane runtime tab command actions', () => {
       {
         kind: 'git-worktree' as const,
         repoId: terminalCoordinates.repoRoot,
-        repoRuntimeId: terminalCoordinates.repoRuntimeId,
+        workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
         worktreePath: terminalExecutionPath(terminalBase.target),
       },
       async () => {

@@ -77,7 +77,7 @@ function repoWorkspaceRepoShellEqual(
     (!!a &&
       !!b &&
       a.id === b.id &&
-      a.repoRuntimeId === b.repoRuntimeId &&
+      a.workspaceRuntimeId === b.workspaceRuntimeId &&
       a.ui.currentBranchName === b.ui.currentBranchName &&
       a.ui.preferredWorkspacePaneTabByTarget === b.ui.preferredWorkspacePaneTabByTarget &&
       a.unavailable === b.unavailable &&
@@ -109,7 +109,7 @@ export function RepoWorkspace({
       return repo
         ? {
             id: repo.id,
-            repoRuntimeId: repo.repoRuntimeId,
+            workspaceRuntimeId: repo.workspaceRuntimeId,
             ui: {
               currentBranchName: currentBranch,
               preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
@@ -181,7 +181,7 @@ function RepoWorkspaceLoaded(props: {
       <WorkspaceRootPane
         repo={{
           id: props.repoShell.id,
-          repoRuntimeId: props.repoShell.repoRuntimeId,
+          workspaceRuntimeId: props.repoShell.workspaceRuntimeId,
           ui: props.repoShell.ui,
           workspaceProbe: props.repoShell.workspaceProbe,
         }}
@@ -212,7 +212,7 @@ function GitWorktreeFilesystemPane({
   onBackToNavigator?: () => void
 }) {
   const t = useT()
-  const statusReadModel = useRepoWorktreeStatusReadModel(repo.id, repo.repoRuntimeId, true)
+  const statusReadModel = useRepoWorktreeStatusReadModel(repo.id, repo.workspaceRuntimeId, true)
   const worktree = statusReadModel.data?.status.find((candidate) => candidate.path === worktreePath)
   const target = gitWorktreeWorkspacePaneTabsTarget(repo.id, worktreePath)
   if (statusReadModel.isPending) {
@@ -267,7 +267,7 @@ function GitWorktreeFilesystemPaneReady({
   const requestedSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
   const requestedTab = route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
   const model = useFilesystemWorkspaceTabModel(repo, target, head, worktreePath, requestedTab, requestedSessionId)
-  const runtimeTarget = runtimeWorkspacePaneTarget(target, repo.repoRuntimeId)
+  const runtimeTarget = runtimeWorkspacePaneTarget(target, repo.workspaceRuntimeId)
   const selectedTerminalSessionId =
     model.selection?.kind === 'materialized-tab' && model.selection.materializedTab.kind === 'runtime'
       ? model.selection.materializedTab.sessionId
@@ -275,7 +275,7 @@ function GitWorktreeFilesystemPaneReady({
   const surfaceTarget = {
     kind: 'git-worktree' as const,
     workspaceId: repo.id,
-    workspaceRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     rootPath: worktreePath,
     head,
     capabilities: workspaceProbe.capabilities,
@@ -340,13 +340,13 @@ function GitRepoWorkspaceLoaded({
   const currentBranchName = repoShell.ui.currentBranchName
   const projectionReadModel = useRepoProjectionReadModel(
     repoShell.id,
-    repoShell.repoRuntimeId,
+    repoShell.workspaceRuntimeId,
     currentBranchName,
     'full',
     true,
   )
   const projection = projectionReadModel.data
-  const statusReadModel = useRepoWorktreeStatusReadModel(repoShell.id, repoShell.repoRuntimeId, true)
+  const statusReadModel = useRepoWorktreeStatusReadModel(repoShell.id, repoShell.workspaceRuntimeId, true)
   const statusSnapshot = statusReadModel.data
   if (projection?.snapshot && !statusSnapshot && statusReadModel.isError) {
     const statusErrorKey =
@@ -357,7 +357,7 @@ function GitRepoWorkspaceLoaded({
           messageKey={statusErrorKey}
           retrying={statusReadModel.isFetching}
           onRetry={() => {
-            void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repoShell.id, repoShell.repoRuntimeId)
+            void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repoShell.id, repoShell.workspaceRuntimeId)
           }}
         />
       </section>
@@ -435,7 +435,7 @@ function WorkspaceRootPane({
   toolbarTrafficLightOffset,
   onBackToNavigator,
 }: {
-  repo: Pick<RepoWorkspaceRepoShell, 'id' | 'repoRuntimeId' | 'ui'> & { workspaceProbe: WorkspaceReadyProbeState }
+  repo: Pick<RepoWorkspaceRepoShell, 'id' | 'workspaceRuntimeId' | 'ui'> & { workspaceProbe: WorkspaceReadyProbeState }
   workspacePaneId: string
   toolbarTrafficLightOffset: boolean
   onBackToNavigator?: () => void
@@ -443,10 +443,10 @@ function WorkspaceRootPane({
   const t = useT()
   const model = useWorkspaceRootTabModel(repo)
   const target = { kind: 'workspace-root' as const, repoRoot: repo.id }
-  const runtimeTarget = runtimeWorkspacePaneTarget(target, repo.repoRuntimeId)
+  const runtimeTarget = runtimeWorkspacePaneTarget(target, repo.workspaceRuntimeId)
   const terminalAvailable = repo.workspaceProbe.capabilities.terminal.available
   const activePanel = model.selection?.tab === 'terminal' && !terminalAvailable ? null : (model.selection?.tab ?? null)
-  const overviewReadModel = useWorkspaceDirectoryOverview(repo.id, repo.repoRuntimeId, activePanel === 'status')
+  const overviewReadModel = useWorkspaceDirectoryOverview(repo.id, repo.workspaceRuntimeId, activePanel === 'status')
   const selectedTerminalSessionId =
     model.selection?.kind === 'materialized-tab' && model.selection.materializedTab.kind === 'runtime'
       ? model.selection.materializedTab.sessionId
@@ -457,7 +457,7 @@ function WorkspaceRootPane({
         target={{
           kind: 'workspace-root',
           workspaceId: repo.id,
-          workspaceRuntimeId: repo.repoRuntimeId,
+          workspaceRuntimeId: repo.workspaceRuntimeId,
           rootPath: repo.id,
           capabilities: repo.workspaceProbe.capabilities,
         }}
@@ -487,7 +487,7 @@ function WorkspaceRootPane({
             target={{
               kind: 'workspace-root',
               workspaceId: repo.id,
-              workspaceRuntimeId: repo.repoRuntimeId,
+              workspaceRuntimeId: repo.workspaceRuntimeId,
               rootPath: repo.id,
               capabilities: repo.workspaceProbe.capabilities,
             }}
@@ -537,7 +537,7 @@ function RepoWorkspacePane({
   const workspacePaneTabModel = useRepoWorkspaceTabModel(repo, detail, workspacePaneRoute)
   useWorkspacePaneVisibleStatusRefresh({
     repoId: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     branchName: workspacePaneTabModel.branchName,
     renderedTab: workspacePaneTabModel.renderedTab,
     unavailable: repo.unavailable,
@@ -570,7 +570,7 @@ function RepoWorkspacePane({
         workspacePaneTabModel={workspacePaneTabModel}
         onBackToBranchNavigator={onBackToBranchNavigator}
         onRetryStatus={() => {
-          void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repo.id, repo.repoRuntimeId)
+          void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repo.id, repo.workspaceRuntimeId)
         }}
       />
     </>

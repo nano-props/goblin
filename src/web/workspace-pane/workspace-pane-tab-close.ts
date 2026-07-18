@@ -33,7 +33,7 @@ export function beginWorkspacePaneTabEntryClose(
   const closeTarget = target.worktreePath
     ? workspacePaneTerminalBaseFromCoordinates({
         workspaceId: target.repoId,
-        workspaceRuntimeId: target.repoRuntimeId,
+        workspaceRuntimeId: target.workspaceRuntimeId,
         branchName: target.branchName,
         rootPath: target.worktreePath,
       })
@@ -61,7 +61,7 @@ function closeStaticTabWithCommit(target: RepoWorkspaceTabModel) {
     if (target.paneTarget.kind === 'inactive') return false
     const persistenceTarget = target.paneTarget
     const result = await updateWorkspacePaneTabs({
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       ...persistenceTarget,
       operation: { type: 'close-static', tabType: type },
     })

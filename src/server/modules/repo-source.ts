@@ -165,7 +165,7 @@ interface RepoSourceCapabilities {
 }
 
 export interface RepoSourceRuntimeContext {
-  repoRuntimeId: string
+  workspaceRuntimeId: string
 }
 
 export async function resolveRemoteRepoTarget(
@@ -181,7 +181,7 @@ export async function resolveRemoteRepoTarget(
     if (!runtime) throw err
     throw remoteRuntimeFailureFromTargetResolutionError({
       repoRoot: repoId,
-      repoRuntimeId: runtime.repoRuntimeId,
+      workspaceRuntimeId: runtime.workspaceRuntimeId,
       error: err,
     })
   }
@@ -561,10 +561,10 @@ function createLocalRepoSource(
             currentStat.dev.toString(10) !== exactExecution.endpointMarker.deviceId ||
             currentStat.ino.toString(10) !== exactExecution.endpointMarker.inode
           )
-            throw new Error('error.repo-runtime-stale')
+            throw new Error('error.workspace-runtime-stale')
         } catch (error) {
           await lifecycle.afterRemoveFailed()
-          return { ok: false, message: error instanceof Error ? error.message : 'error.repo-runtime-stale' }
+          return { ok: false, message: error instanceof Error ? error.message : 'error.workspace-runtime-stale' }
         }
       }
       let removed: Awaited<ReturnType<typeof removeWorktree>>
@@ -618,7 +618,7 @@ async function createRemoteRepoSource(
 ): Promise<RepoSource> {
   const target = capturedTarget ?? (await resolveRemoteRepoTarget(repoId, runtime))
   const capabilities: RepoSourceCapabilities = { pullRequests: 'derived-github-repo' }
-  const run = runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.repoRuntimeId, target) : undefined
+  const run = runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.workspaceRuntimeId, target) : undefined
   return {
     id: repoId,
     kind: 'remote',
@@ -726,7 +726,7 @@ async function createRemoteRepoSource(
                 return { ok: true, message: '' }
               } catch (error) {
                 if (isRemoteRepoRuntimeFailure(error)) throw error
-                return { ok: false, message: error instanceof Error ? error.message : 'error.repo-runtime-stale' }
+                return { ok: false, message: error instanceof Error ? error.message : 'error.workspace-runtime-stale' }
               }
             }
           : undefined,
@@ -744,14 +744,14 @@ async function createRemoteRepoSource(
 
 export function remoteRuntimeAwareGitRunner(
   repoRoot: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   sourceTarget: RemoteRepoTarget,
 ): RemoteGitRunner {
   return async (command, target, options) => {
     const result = await runRemoteCommand(target, command, options)
     const failure = remoteRuntimeFailureFromCommandResult({
       repoRoot,
-      repoRuntimeId,
+      workspaceRuntimeId,
       target: sourceTarget,
       result,
     })

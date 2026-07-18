@@ -47,7 +47,7 @@ describe('WorkspacePaneTargetCatalog', () => {
       },
     ])
     expect(readIdentities).toHaveBeenCalledOnce()
-    expect(readIdentities).toHaveBeenCalledWith('goblin+file:///repo', { repoRuntimeId: 'runtime-a' })
+    expect(readIdentities).toHaveBeenCalledWith('goblin+file:///repo', { workspaceRuntimeId: 'runtime-a' })
   })
 
   test('does not query Git identity for a plain workspace runtime', async () => {

@@ -11,7 +11,7 @@ import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 export interface WorkspacePaneNavigationObservation {
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   branchName: string
   worktreePath: string | null
   route: ParsedWorkspacePaneRoute | null
@@ -51,7 +51,7 @@ export function seedInitialObservedWorkspacePaneRouteForTest(
         : null
   observeWorkspacePaneRouteForTest({
     repoId: target.repoId,
-    repoRuntimeId: target.repoRuntimeId,
+    workspaceRuntimeId: target.workspaceRuntimeId,
     branchName: target.branchName,
     worktreePath: target.worktreePath,
     route,
@@ -79,7 +79,7 @@ export function observedWorkspacePaneRouteCommitForTest(
     if (!target?.branchName) return
     const observation = {
       repoId: target.repoId,
-      repoRuntimeId: target.repoRuntimeId,
+      workspaceRuntimeId: target.workspaceRuntimeId,
       branchName: target.branchName,
       worktreePath: target.worktreePath,
       route,
@@ -152,7 +152,7 @@ export function observedWorkspacePaneRouteForTarget(
   const route = observedWorkspacePaneRoutes.get(
     workspacePaneObservationKey({
       repoId: target.repoId,
-      repoRuntimeId: target.repoRuntimeId,
+      workspaceRuntimeId: target.workspaceRuntimeId,
       branchName: target.branchName,
       worktreePath: target.worktreePath,
     }),
@@ -161,7 +161,7 @@ export function observedWorkspacePaneRouteForTarget(
 }
 
 function workspacePaneObservationKey(observation: Omit<WorkspacePaneNavigationObservation, 'route'>): string {
-  return [observation.repoId, observation.repoRuntimeId, observation.branchName, observation.worktreePath ?? ''].join(
+  return [observation.repoId, observation.workspaceRuntimeId, observation.branchName, observation.worktreePath ?? ''].join(
     '\0',
   )
 }

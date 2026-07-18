@@ -16,7 +16,7 @@ vi.mock('#/web/filetree-client.ts', () => ({
 }))
 
 const listeners = new Set<(event: unknown) => void>()
-const REPO_RUNTIME_ID = 'repo-runtime-lazy-tree-test'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-lazy-tree-test'
 
 vi.mock('#/web/repo-query-invalidation-ingress.ts', () => ({
   subscribeRepoQueryInvalidation(listener: (event: unknown) => void) {
@@ -37,24 +37,24 @@ type HarnessSnapshot = {
 
 interface HarnessProps {
   readonly repoId: string
-  readonly repoRuntimeId?: string
+  readonly workspaceRuntimeId?: string
   readonly worktreePath: string
   readonly expandedKeys?: readonly string[]
   readonly onSnapshot: (snapshot: HarnessSnapshot) => void
 }
 
-function Harness({ repoId, repoRuntimeId = REPO_RUNTIME_ID, worktreePath, expandedKeys, onSnapshot }: HarnessProps) {
-  const target = mockExecutionTarget(repoId, repoRuntimeId, worktreePath)
+function Harness({ repoId, workspaceRuntimeId = WORKSPACE_RUNTIME_ID, worktreePath, expandedKeys, onSnapshot }: HarnessProps) {
+  const target = mockExecutionTarget(repoId, workspaceRuntimeId, worktreePath)
   const result = useLazyRepoTree({ target, expandedKeys })
   onSnapshot(result)
   return null
 }
 
-function mockExecutionTarget(repoId: string, repoRuntimeId: string, worktreePath: string) {
+function mockExecutionTarget(repoId: string, workspaceRuntimeId: string, worktreePath: string) {
   const workspaceId = canonicalWorkspaceLocator(`goblin+file://${repoId}`)
   const root = workspaceId ? workspaceLocatorForPath(workspaceId, worktreePath) : null
   if (!workspaceId || !root) throw new Error('invalid mock workspace target')
-  return { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: repoRuntimeId, root }
+  return { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: workspaceRuntimeId, root }
 }
 
 let container: HTMLDivElement | null = null
@@ -131,7 +131,7 @@ async function flush() {
 describe('useLazyRepoTree', () => {
   test('hydrates the initial aggregate from cached root data without an empty-tree flash', async () => {
     const snapshots: HarnessSnapshot[] = []
-    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', 'goblin+file:///repo-a', REPO_RUNTIME_ID, '/repo-a/main', ''], {
+    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', ''], {
       nodes: [{ id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' }],
       truncated: false,
     })
@@ -151,15 +151,15 @@ describe('useLazyRepoTree', () => {
 
   test('hydrates cached restored children and ancestors into the initial aggregate', async () => {
     const snapshots: HarnessSnapshot[] = []
-    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', 'goblin+file:///repo-a', REPO_RUNTIME_ID, '/repo-a/main', ''], {
+    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', ''], {
       nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
       truncated: false,
     })
-    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', 'goblin+file:///repo-a', REPO_RUNTIME_ID, '/repo-a/main', 'src'], {
+    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', 'src'], {
       nodes: [{ id: 'src/web', path: 'src/web', name: 'web', parentId: 'src', kind: 'directory', status: 'clean' }],
       truncated: false,
     })
-    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', 'goblin+file:///repo-a', REPO_RUNTIME_ID, '/repo-a/main', 'src/web'], {
+    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', 'src/web'], {
       nodes: [
         {
           id: 'src/web/FiletreeView.tsx',
@@ -204,7 +204,7 @@ describe('useLazyRepoTree', () => {
     })
 
     expect(mocks.getRepositoryTree).toHaveBeenCalledWith(
-      mockExecutionTarget('/repo-a', REPO_RUNTIME_ID, '/repo-a/main'),
+      mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main'),
       {},
     )
     expect(lastSnapshot?.loading).toBe(true)
@@ -318,7 +318,7 @@ describe('useLazyRepoTree', () => {
 
     expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
     expect(mocks.getRepositoryTree.mock.calls[1]?.[0]).toEqual(
-      mockExecutionTarget('/repo-a', REPO_RUNTIME_ID, '/repo-a/feature'),
+      mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/feature'),
     )
 
     // Resolving the first superseded promise must not clobber the
@@ -463,7 +463,7 @@ describe('useLazyRepoTree', () => {
     await flush()
 
     expect(mocks.getRepositoryTree).toHaveBeenLastCalledWith(
-      mockExecutionTarget('/repo-a', REPO_RUNTIME_ID, '/repo-a/main'),
+      mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main'),
       expect.objectContaining({ prefix: 'src', signal: expect.any(AbortSignal) }),
     )
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/index.ts'])

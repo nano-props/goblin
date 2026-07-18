@@ -1,6 +1,6 @@
 export interface RuntimeProjectionTarget {
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
 }
 
 interface RuntimeProjectionOperation {
@@ -165,7 +165,7 @@ export class RuntimeProjectionScopeRegistry {
   scopeFor(target: RuntimeProjectionTarget): RuntimeProjectionScope {
     if (!this.active) throw new Error('runtime projection scope registry disposed')
     const current = this.scopesByRepoRoot.get(target.repoRoot)
-    if (current?.target.repoRuntimeId === target.repoRuntimeId && current.isActive()) return current
+    if (current?.target.workspaceRuntimeId === target.workspaceRuntimeId && current.isActive()) return current
     current?.dispose()
     const scope = new RuntimeProjectionScope(target, this.isTargetCurrent)
     this.scopesByRepoRoot.set(target.repoRoot, scope)

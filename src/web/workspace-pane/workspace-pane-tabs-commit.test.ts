@@ -24,14 +24,14 @@ import {
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 
 const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-tabs-commit-repo'
-const REPO_RUNTIME_ID = 'repo-runtime-test'
-const NEXT_REPO_RUNTIME_ID = 'repo-runtime-next'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
+const NEXT_WORKSPACE_RUNTIME_ID = 'repo-runtime-next'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tabs-commit-worktree'
 
 beforeEach(() => {
   resetReposStore()
-  seedWorkspacePaneTabsRepo(REPO_RUNTIME_ID)
+  seedWorkspacePaneTabsRepo(WORKSPACE_RUNTIME_ID)
 })
 
 afterEach(() => {
@@ -96,14 +96,14 @@ describe('commitWorkspacePaneTabs', () => {
     expect(
       writeCanonicalWorkspacePaneTabsSnapshot(
         REPO_ROOT,
-        REPO_RUNTIME_ID,
+        WORKSPACE_RUNTIME_ID,
         snapshot(9, [workspacePaneStaticTabEntry('history')]),
       ),
     ).toBe(true)
     expect(
       writeCanonicalWorkspacePaneTabsSnapshot(
         REPO_ROOT,
-        REPO_RUNTIME_ID,
+        WORKSPACE_RUNTIME_ID,
         snapshot(8, [workspacePaneStaticTabEntry('status')]),
       ),
     ).toBe(false)
@@ -171,7 +171,7 @@ describe('updateWorkspacePaneTabs', () => {
     expect(readTabs()).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
-  test('does not project a successful response after repoRuntimeId changes', async () => {
+  test('does not project a successful response after workspaceRuntimeId changes', async () => {
     const serverTabs = Promise.withResolvers<WorkspacePaneTabEntry[]>()
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: async () => await serverTabs.promise })
     seedTabs([workspacePaneStaticTabEntry('status')])
@@ -181,7 +181,7 @@ describe('updateWorkspacePaneTabs', () => {
       operation: { type: 'open-static', tabType: 'history' },
     })
     await Promise.resolve()
-    seedWorkspacePaneTabsRepo(NEXT_REPO_RUNTIME_ID)
+    seedWorkspacePaneTabsRepo(NEXT_WORKSPACE_RUNTIME_ID)
     serverTabs.resolve([workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')])
 
     await expect(update).resolves.toMatchObject({ ok: true, projectionApplied: false })
@@ -193,7 +193,7 @@ function target() {
   return {
     kind: 'git-worktree' as const,
     repoRoot: REPO_ROOT,
-    repoRuntimeId: REPO_RUNTIME_ID,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     worktreePath: WORKTREE_PATH,
   }
 }
@@ -217,7 +217,7 @@ function snapshot(revision: number, tabs: WorkspacePaneTabEntry[]): WorkspacePan
       target: runtimeWorkspacePaneTargetForTest({
         kind: 'git-worktree' as const,
         repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         worktreePath: WORKTREE_PATH,
       }),
       tabs,
@@ -225,10 +225,10 @@ function snapshot(revision: number, tabs: WorkspacePaneTabEntry[]): WorkspacePan
   }
 }
 
-function seedWorkspacePaneTabsRepo(repoRuntimeId: string): void {
+function seedWorkspacePaneTabsRepo(workspaceRuntimeId: string): void {
   seedRepoWithReadModelForTest({
     id: REPO_ROOT,
-    repoRuntimeId,
+    workspaceRuntimeId,
     branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
     currentBranchName: BRANCH_NAME,
   })

@@ -30,7 +30,7 @@ A session is the long-lived terminal business object.
 It owns:
 
 - session identity
-- stable target identity (`repoRoot`, `repoRuntimeId`, `worktreePath`, physical worktree identity)
+- stable target identity (`repoRoot`, `workspaceRuntimeId`, `worktreePath`, physical worktree identity)
 - the current canonical branch label for that target
 - canonical geometry
 - PTY lifecycle association
@@ -115,7 +115,7 @@ with its Workspace target or epoch.
 At a high level, the server-side session model should evolve toward:
 
 - session identity and scope
-- stable target identity: `repoRoot`, `repoRuntimeId`, `worktreePath`, physical worktree identity
+- stable target identity: `repoRoot`, `workspaceRuntimeId`, `worktreePath`, physical worktree identity
 - mutable canonical target label: `branch`
 - lifecycle phase
 - canonical geometry

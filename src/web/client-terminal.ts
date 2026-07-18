@@ -56,8 +56,8 @@ export function createServerTerminalClient(options: {
     takeover(input) {
       return options.realtime.request('takeover', input)
     },
-    pruneTerminals(repoRoot, repoRuntimeId) {
-      return options.realtime.request('prune', { repoRoot, repoRuntimeId })
+    pruneTerminals(repoRoot, workspaceRuntimeId) {
+      return options.realtime.request('prune', { repoRoot, workspaceRuntimeId })
     },
     recoverSessions(input) {
       return options.realtime.request('recover-sessions', input).then((value) => {

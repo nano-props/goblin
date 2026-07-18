@@ -2498,7 +2498,7 @@ describe('TerminalSession', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-999999999999999999999',
         repoRoot: '/repo',
-        repoRuntimeId: 'repo-runtime-1',
+        workspaceRuntimeId: 'repo-runtime-1',
       }),
     ).toBe(false)
     expect(
@@ -2507,7 +2507,7 @@ describe('TerminalSession', () => {
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         repoRoot: '/repo',
-        repoRuntimeId: 'repo-runtime-1',
+        workspaceRuntimeId: 'repo-runtime-1',
       }),
     ).toBe(true)
     session.dispose()

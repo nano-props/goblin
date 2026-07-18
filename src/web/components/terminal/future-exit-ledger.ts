@@ -3,7 +3,7 @@ export interface FutureExitBinding {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: number
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
 }
 
 interface FutureExitLedgerOptions {
@@ -148,6 +148,6 @@ function bindingKey(binding: FutureExitBinding): string {
   return `${scopeKey(binding)}:${binding.terminalSessionId}:${binding.terminalRuntimeSessionId}:${binding.terminalRuntimeGeneration}`
 }
 
-function scopeKey(binding: Pick<FutureExitBinding, 'repoRoot' | 'repoRuntimeId'>): string {
-  return JSON.stringify([binding.repoRoot, binding.repoRuntimeId])
+function scopeKey(binding: Pick<FutureExitBinding, 'repoRoot' | 'workspaceRuntimeId'>): string {
+  return JSON.stringify([binding.repoRoot, binding.workspaceRuntimeId])
 }

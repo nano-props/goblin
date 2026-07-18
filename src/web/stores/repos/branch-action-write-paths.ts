@@ -20,7 +20,7 @@ export function removeWorktreeNeedsForceConfirm(
 
 export async function dispatchRepoBranchAction(
   repoId: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   action: RepoBranchAction,
   runBranchAction: (
     id: string,
@@ -33,7 +33,7 @@ export async function dispatchRepoBranchAction(
   },
 ): Promise<ExecResult | null> {
   const result = await runBranchAction(repoId, action, {
-    repoRuntimeId: repoRuntimeId,
+    workspaceRuntimeId: workspaceRuntimeId,
     deferResultMessages: options?.deferResultMessages,
   })
   if (!result || (!result.ok && result.message === 'cancelled')) return null
@@ -43,10 +43,10 @@ export async function dispatchRepoBranchAction(
 
 export async function dispatchRepoUiAction(
   repoId: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   op: string,
   fn: () => Promise<ExecResult>,
-  setLastResult: (repoId: string, result: ExecResult, repoRuntimeId: string) => void,
+  setLastResult: (repoId: string, result: ExecResult, workspaceRuntimeId: string) => void,
   options?: {
     silentSuccessOps?: Set<string>
     handleResult?: (result: ExecResult) => boolean
@@ -63,6 +63,6 @@ export async function dispatchRepoUiAction(
   // they can inspect it instead of double-toasting from the dispatcher path.
   if (options?.handleResult?.(result)) return result
   const skipSuccessToast = result.ok && options?.silentSuccessOps?.has(op)
-  if (!skipSuccessToast) setLastResult(repoId, result, repoRuntimeId)
+  if (!skipSuccessToast) setLastResult(repoId, result, workspaceRuntimeId)
   return result
 }

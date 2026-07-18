@@ -36,7 +36,7 @@ describe('workspace pane tab target read model', () => {
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'workspace-root',
       repoRoot: REPO_ID,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
 
       tabs: [workspacePaneStaticTabEntry('files')],
     })
@@ -80,7 +80,7 @@ describe('workspace pane tab target read model', () => {
       branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
       currentBranch: 'feature/query',
     })
-    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId) })
+    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
     expect(
       resolveWorkspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions),
     ).toEqual({
@@ -104,11 +104,11 @@ describe('workspace pane tab target read model', () => {
       branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
       currentBranch: 'feature/query',
     })
-    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId) })
+    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'git-worktree' as const,
       repoRoot: REPO_ID,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
     })
@@ -134,7 +134,7 @@ describe('workspace pane tab target read model', () => {
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'git-worktree' as const,
       repoRoot: REPO_ID,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
     })
@@ -181,14 +181,14 @@ describe('workspace pane tab target read model', () => {
 
     recordWorkspacePaneTabOpener(
       { kind: 'git-branch', repoRoot: REPO_ID, branchName: 'feature/query' },
-      repo.repoRuntimeId,
+      repo.workspaceRuntimeId,
       'workspace-pane:changes',
       'workspace-pane:status',
     )
 
     expect(
       useReposStore.getState().tabOpenerIdentityByScope[
-        `${tabOpenerScopeKey({ kind: 'git-branch', repoRoot: REPO_ID, branchName: 'feature/query' })}\0${repo.repoRuntimeId}`
+        `${tabOpenerScopeKey({ kind: 'git-branch', repoRoot: REPO_ID, branchName: 'feature/query' })}\0${repo.workspaceRuntimeId}`
       ]?.['workspace-pane:changes'],
     ).toBe('workspace-pane:status')
   })
@@ -207,7 +207,7 @@ describe('workspace pane tab target read model', () => {
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
         },
-        repo.repoRuntimeId,
+        repo.workspaceRuntimeId,
         'workspace-pane:changes',
         'workspace-pane:status',
       ),
@@ -221,7 +221,7 @@ describe('workspace pane tab target read model', () => {
       kind: 'git-worktree',
       repoRoot: REPO_ID,
       worktreePath: WORKTREE_PATH,
-    }, repo.repoRuntimeId, 'workspace-pane:changes')).toBe(
+    }, repo.workspaceRuntimeId, 'workspace-pane:changes')).toBe(
       'workspace-pane:status',
     )
   })
@@ -244,19 +244,19 @@ describe('workspace pane tab target read model', () => {
     expect(
       recordWorkspacePaneTabOpener(
         detachedTarget,
-        repo.repoRuntimeId,
+        repo.workspaceRuntimeId,
         'terminal:term-111111111111111111111',
         'workspace-pane:files',
       ),
     ).toBe('recorded')
     expect(
-      workspacePaneTabOpener(detachedTarget, repo.repoRuntimeId, 'terminal:term-111111111111111111111'),
+      workspacePaneTabOpener(detachedTarget, repo.workspaceRuntimeId, 'terminal:term-111111111111111111111'),
     ).toBe('workspace-pane:files')
     expect(
-      workspacePaneTabOpener(workspaceTarget, repo.repoRuntimeId, 'terminal:term-111111111111111111111'),
+      workspacePaneTabOpener(workspaceTarget, repo.workspaceRuntimeId, 'terminal:term-111111111111111111111'),
     ).toBeNull()
     expect(
-      workspacePaneTabOpener(branchTarget, repo.repoRuntimeId, 'terminal:term-111111111111111111111'),
+      workspacePaneTabOpener(branchTarget, repo.workspaceRuntimeId, 'terminal:term-111111111111111111111'),
     ).toBeNull()
   })
 
@@ -271,7 +271,7 @@ describe('workspace pane tab target read model', () => {
     expect(
       recordWorkspacePaneTabOpener(
         { kind: 'git-branch', repoRoot: REPO_ID, branchName: 'feature/query' },
-        repo.repoRuntimeId,
+        repo.workspaceRuntimeId,
         'workspace-pane:changes',
         'workspace-pane:status',
       ),

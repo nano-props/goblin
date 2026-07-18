@@ -12,7 +12,7 @@ import {
   type WorkspacePaneTabsSocketAction,
 } from '#/shared/workspace-pane-tabs.ts'
 import {
-  RepoRuntimeIdSchema,
+  WorkspaceRuntimeIdSchema,
   WorkspacePaneTabsListInputSchema,
   WorkspacePaneTabsReplaceInputSchema,
   WorkspacePaneTabsSnapshotSchema,
@@ -94,7 +94,7 @@ const AppRealtimeNonTerminalServerMessageSchema = v.variant('type', [
     type: v.literal(WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
     change: v.literal('revision'),
     repoRoot: WorkspaceIdSchema,
-    workspaceRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
   }),
   v.object({

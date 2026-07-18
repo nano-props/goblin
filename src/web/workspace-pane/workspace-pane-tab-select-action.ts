@@ -167,7 +167,7 @@ function queuedWorkspacePaneTargetMatches(queued: RepoWorkspaceTabModel, current
   return (
     workspacePaneTabControllerTargetIsCurrent(queued) &&
     current.repoId === queued.repoId &&
-    current.repoRuntimeId === queued.repoRuntimeId &&
+    current.workspaceRuntimeId === queued.workspaceRuntimeId &&
     current.branchName === queued.branchName &&
     current.worktreePath === queued.worktreePath
   )
@@ -203,7 +203,7 @@ function paneTargetPresentationBranch(target: WorkspacePaneTabsTarget, worktreeH
 function workspacePaneQueuedActionTarget(model: RepoWorkspaceTabModel) {
   return workspacePaneActionTargetFromCoordinates({
     repoId: model.repoId,
-    repoRuntimeId: model.repoRuntimeId,
+    workspaceRuntimeId: model.workspaceRuntimeId,
     branchName: model.branchName,
     worktreePath: model.worktreePath,
   })

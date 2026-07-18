@@ -5,7 +5,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 
 export interface TerminalRuntimeMembershipEntry {
   id: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
 }
 
 export function useTerminalRuntimeMembershipIndex(): TerminalRuntimeMembershipIndex {
@@ -23,7 +23,7 @@ export function runtimeMembershipIndexFromEntries(
   const index: TerminalRuntimeMembershipIndex = {}
   entries.forEach((repo) => {
     index[repo.id] = {
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
     }
   })
   return index
@@ -41,7 +41,7 @@ export function runtimeMembershipIndexEqual(
     const current = a[repoRoot]
     const next = b[repoRoot]
     if (!current || !next) return false
-    if (current.repoRuntimeId !== next.repoRuntimeId) return false
+    if (current.workspaceRuntimeId !== next.workspaceRuntimeId) return false
   }
   return true
 }
@@ -49,7 +49,7 @@ export function runtimeMembershipIndexEqual(
 function terminalRuntimeMembershipEntriesFromRepos(repos: ReposStore['repos']): TerminalRuntimeMembershipEntry[] {
   return Object.values(repos).map((repo) => ({
     id: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
   }))
 }
 
@@ -64,7 +64,7 @@ function entriesEqual(
     const next = b[index]
     if (!current || !next) return false
     if (current.id !== next.id) return false
-    if (current.repoRuntimeId !== next.repoRuntimeId) return false
+    if (current.workspaceRuntimeId !== next.workspaceRuntimeId) return false
   }
   return true
 }

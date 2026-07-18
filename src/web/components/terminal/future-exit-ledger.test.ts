@@ -7,7 +7,7 @@ function binding(index: number): FutureExitBinding {
     terminalRuntimeSessionId: `pty-${index}`,
     terminalRuntimeGeneration: 1,
     repoRoot: '/repo-a',
-    repoRuntimeId: 'repo-runtime-a-1',
+    workspaceRuntimeId: 'repo-runtime-a-1',
   }
 }
 
@@ -86,7 +86,7 @@ describe('FutureExitLedger', () => {
     const repoB = {
       ...binding(2),
       repoRoot: '/repo-b',
-      repoRuntimeId: 'repo-runtime-b-1',
+      workspaceRuntimeId: 'repo-runtime-b-1',
     }
     ledger.record(repoA)
     ledger.record(repoB)
@@ -125,7 +125,7 @@ describe('FutureExitLedger', () => {
     const repoB = {
       ...binding(2),
       repoRoot: '/repo-b',
-      repoRuntimeId: 'repo-runtime-b-1',
+      workspaceRuntimeId: 'repo-runtime-b-1',
     }
     ledger.record(repoA)
     ledger.record(repoB)

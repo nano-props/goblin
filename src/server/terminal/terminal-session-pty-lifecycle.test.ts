@@ -52,10 +52,10 @@ describe('TerminalPtyBinding aborted spawn retirement', () => {
     const runtime = new AbortController()
 
     const spawn = binding.spawn(session, session.cols, session.rows, runtime.signal)
-    runtime.abort(new Error('error.repo-runtime-stale'))
+    runtime.abort(new Error('error.workspace-runtime-stale'))
     await expect(spawn).resolves.toEqual({
       generation: 1,
-      result: { ok: false, message: 'error.repo-runtime-stale' },
+      result: { ok: false, message: 'error.workspace-runtime-stale' },
     })
 
     const lateHandle = createPtyHandle('pty_late_handle_123456')

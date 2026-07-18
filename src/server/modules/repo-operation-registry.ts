@@ -12,7 +12,7 @@ import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-brok
 interface BeginRepoServerOperationInput {
   id?: string
   repoId?: string | null
-  repoRuntimeId?: string | null
+  workspaceRuntimeId?: string | null
   kind: RepoServerOperationKind
   source: RepoServerOperationSource
   target?: RepoServerOperationTarget | null
@@ -22,7 +22,7 @@ interface BeginRepoServerOperationInput {
 
 interface ListRepoServerOperationsOptions {
   repoId?: string
-  repoRuntimeId?: string
+  workspaceRuntimeId?: string
   includeSettled?: boolean
 }
 
@@ -80,7 +80,7 @@ export function beginRepoServerOperation(input: BeginRepoServerOperationInput): 
   const operation: RepoServerOperationState = {
     id,
     repoId: input.repoId ?? null,
-    repoRuntimeId: input.repoRuntimeId ?? null,
+    workspaceRuntimeId: input.workspaceRuntimeId ?? null,
     kind: input.kind,
     phase: 'queued',
     source: input.source,
@@ -171,7 +171,7 @@ export function listRepoServerOperations(options: ListRepoServerOperationsOption
   return sortedOperations(
     [...operations.values()].filter((operation) => {
       if (options.repoId && operation.repoId !== options.repoId) return false
-      if (options.repoRuntimeId && operation.repoRuntimeId && operation.repoRuntimeId !== options.repoRuntimeId) {
+      if (options.workspaceRuntimeId && operation.workspaceRuntimeId && operation.workspaceRuntimeId !== options.workspaceRuntimeId) {
         return false
       }
       if (!includeSettled && (operation.phase === 'done' || operation.phase === 'failed')) return false

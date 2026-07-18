@@ -76,15 +76,15 @@ describe('normalizeRepoSnapshotCache', () => {
 })
 
 describe('persistRepoSnapshotCacheEntry', () => {
-  test('does not write a stale cache entry after the repo runtime changes', () => {
+  test('does not write a stale cache entry after the workspace runtime changes', () => {
     const staleRepo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       branches: [createRepoBranch('main')],
       currentBranch: 'main',
       currentBranchName: 'main',
     })
-    seedRepoWithReadModelForTest({ id: 'goblin+file:///repo', repoRuntimeId: 'repo-runtime-test-2' })
+    seedRepoWithReadModelForTest({ id: 'goblin+file:///repo', workspaceRuntimeId: 'repo-runtime-test-2' })
 
     persistRepoSnapshotCacheEntry(useReposStore.setState, staleRepo, 'repo-runtime-test')
 
@@ -94,7 +94,7 @@ describe('persistRepoSnapshotCacheEntry', () => {
   test('persists branch references without dynamic worktree or pull request state', () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       branchSnapshots: [
         createBranchSnapshot('feature/a', {
           worktree: {
@@ -129,7 +129,7 @@ describe('persistRepoSnapshotCacheEntry', () => {
   test('persists the React Query branch read model when it is newer than the store projection', () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       branches: [createRepoBranch('main')],
       currentBranch: 'main',
       currentBranchName: 'main',

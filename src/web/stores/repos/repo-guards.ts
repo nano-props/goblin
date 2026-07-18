@@ -72,18 +72,18 @@ export function isRepoUnavailable(repo: RepoState): boolean {
 
 type RepoMutator = (repo: Draft<RepoState>) => void
 
-export function currentRepoRuntimeId(state: Pick<ReposStore, 'repos'>, repoRoot: string): string | null {
-  return state.repos[repoRoot]?.repoRuntimeId ?? null
+export function currentWorkspaceRuntimeId(state: Pick<ReposStore, 'repos'>, repoRoot: string): string | null {
+  return state.repos[repoRoot]?.workspaceRuntimeId ?? null
 }
 
-/** Apply `mutator` to the repo at `id` only if its repoRuntimeId still
+/** Apply `mutator` to the repo at `id` only if its workspaceRuntimeId still
  *  matches the captured one. The check runs inside the functional
  *  setter so it reads the freshest store state, not the caller's
  *  pre-await snapshot. */
-export function updateIfFresh(set: ReposSet, id: string, repoRuntimeId: string, mutator: RepoMutator): void {
+export function updateIfFresh(set: ReposSet, id: string, workspaceRuntimeId: string, mutator: RepoMutator): void {
   set((s) => {
     const repo = s.repos[id]
-    if (!repo || repo.repoRuntimeId !== repoRuntimeId) return s
+    if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId) return s
     const nextRepo = produce(repo, mutator)
     return nextRepo === repo ? s : { ...s, repos: { ...s.repos, [id]: nextRepo } }
   })

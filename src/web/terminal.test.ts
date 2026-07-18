@@ -11,7 +11,7 @@ import {
 } from '#/shared/workspace-pane-tabs.ts'
 import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 let wsMock: WebSocketMockHandle
-const REPO_RUNTIME_ID = 'repo-runtime-test'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const WORKSPACE_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/tmp/repo' }, 'posix')!
 describe('terminal web host client', () => {
   beforeEach(() => {
@@ -204,7 +204,7 @@ describe('terminal web host client', () => {
     const fetchMock = mockFetch()
     const { workspacePaneTabsClient } = await import('#/web/workspace-pane/workspace-pane-tabs-client.ts')
 
-    const listPromise = workspacePaneTabsClient.list({ workspaceId: WORKSPACE_ID, workspaceRuntimeId: REPO_RUNTIME_ID })
+    const listPromise = workspacePaneTabsClient.list({ workspaceId: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
     const socket = wsMock.instances[0]
     socket?.emitOpen()
     await Promise.resolve()
@@ -216,7 +216,7 @@ describe('terminal web host client', () => {
       action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
       input: {
         workspaceId: WORKSPACE_ID,
-        workspaceRuntimeId: REPO_RUNTIME_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       },
     })
     socket?.emitMessage(
@@ -238,7 +238,7 @@ describe('terminal web host client', () => {
     const { terminalClient } = await import('#/web/terminal.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
-    const prunePromise = terminalClient.pruneTerminals('goblin+file:///tmp/repo', REPO_RUNTIME_ID)
+    const prunePromise = terminalClient.pruneTerminals('goblin+file:///tmp/repo', WORKSPACE_RUNTIME_ID)
 
     socket?.close()
 
@@ -252,14 +252,14 @@ describe('terminal web host client', () => {
     const { terminalClient } = await import('#/web/terminal.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
-    const prunePromise = terminalClient.pruneTerminals('goblin+file:///tmp/repo', REPO_RUNTIME_ID)
+    const prunePromise = terminalClient.pruneTerminals('goblin+file:///tmp/repo', WORKSPACE_RUNTIME_ID)
     socket?.emitOpen()
     await Promise.resolve()
     const request = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
     expect(request).toMatchObject({
       type: 'request',
       action: 'prune',
-      input: { repoRoot: 'goblin+file:///tmp/repo', repoRuntimeId: REPO_RUNTIME_ID },
+      input: { repoRoot: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
     })
     socket?.emitMessage(
       JSON.stringify({
@@ -278,7 +278,7 @@ describe('terminal web host client', () => {
 
   test('closes an idle terminal socket after a one-shot websocket request resolves without subscribers', async () => {
     const { terminalClient } = await import('#/web/terminal.ts')
-    const prunePromise = terminalClient.pruneTerminals('goblin+file:///tmp/repo', REPO_RUNTIME_ID)
+    const prunePromise = terminalClient.pruneTerminals('goblin+file:///tmp/repo', WORKSPACE_RUNTIME_ID)
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
 
@@ -303,7 +303,7 @@ describe('terminal web host client', () => {
     vi.useFakeTimers()
     try {
       const { terminalClient } = await import('#/web/terminal.ts')
-      const prunePromise = terminalClient.pruneTerminals('goblin+file:///tmp/repo', REPO_RUNTIME_ID)
+      const prunePromise = terminalClient.pruneTerminals('goblin+file:///tmp/repo', WORKSPACE_RUNTIME_ID)
       const socket = wsMock.instances[0]
       if (!socket) throw new Error('missing web terminal socket')
 
@@ -313,7 +313,7 @@ describe('terminal web host client', () => {
       expect(request).toMatchObject({
         type: 'request',
         action: 'prune',
-        input: { repoRoot: 'goblin+file:///tmp/repo', repoRuntimeId: REPO_RUNTIME_ID },
+        input: { repoRoot: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       })
       const expectation = expect(prunePromise).rejects.toThrow('App realtime request timed out')
 
@@ -353,13 +353,13 @@ describe('terminal web host client', () => {
       if (!socket) throw new Error('missing web terminal socket')
       socket.emitOpen()
       await vi.advanceTimersByTimeAsync(1_000)
-      const prunePromise = terminalClient.pruneTerminals('goblin+file:///tmp/repo', REPO_RUNTIME_ID)
+      const prunePromise = terminalClient.pruneTerminals('goblin+file:///tmp/repo', WORKSPACE_RUNTIME_ID)
       await Promise.resolve()
       const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
       expect(request).toMatchObject({
         type: 'request',
         action: 'prune',
-        input: { repoRoot: 'goblin+file:///tmp/repo', repoRuntimeId: REPO_RUNTIME_ID },
+        input: { repoRoot: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       })
       socket.send = vi.fn(() => {
         throw new Error('send failed')
@@ -388,13 +388,13 @@ describe('terminal web host client', () => {
       socket.emitOpen()
       await Promise.resolve()
 
-      const prunePromise = terminalClient.pruneTerminals('goblin+file:///tmp/repo', REPO_RUNTIME_ID)
+      const prunePromise = terminalClient.pruneTerminals('goblin+file:///tmp/repo', WORKSPACE_RUNTIME_ID)
       await Promise.resolve()
       const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
       expect(request).toMatchObject({
         type: 'request',
         action: 'prune',
-        input: { repoRoot: 'goblin+file:///tmp/repo', repoRuntimeId: REPO_RUNTIME_ID },
+        input: { repoRoot: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       })
       const expectation = expect(prunePromise).rejects.toThrow('App realtime request timed out')
 
@@ -480,7 +480,7 @@ describe('terminal web host client', () => {
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: 'goblin+file:///tmp/repo',
-          repoRuntimeId: 'repo-runtime-1',
+          workspaceRuntimeId: 'repo-runtime-1',
         },
       }),
     )
@@ -492,7 +492,7 @@ describe('terminal web host client', () => {
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: 'goblin+file:///tmp/repo',
-          repoRuntimeId: 'repo-runtime-1',
+          workspaceRuntimeId: 'repo-runtime-1',
           controller: null,
           canonicalCols: 100,
           canonicalRows: 30,
@@ -516,7 +516,7 @@ describe('terminal web host client', () => {
       JSON.stringify({
         type: 'sessions-changed',
         repoRoot: 'goblin+file:///tmp/repo',
-        repoRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: 'repo-runtime-test',
         revision: 1,
       }),
     )
@@ -557,7 +557,7 @@ describe('terminal web host client', () => {
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       repoRoot: 'goblin+file:///tmp/repo',
-      repoRuntimeId: 'repo-runtime-1',
+      workspaceRuntimeId: 'repo-runtime-1',
     })
     expect(onIdentity).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
@@ -579,7 +579,7 @@ describe('terminal web host client', () => {
     expect(onSessionsChanged).toHaveBeenCalledWith({
       type: 'sessions-changed',
       repoRoot: 'goblin+file:///tmp/repo',
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       revision: 1,
     })
     expect(onWorkspaceTabsChanged).toHaveBeenCalledWith({

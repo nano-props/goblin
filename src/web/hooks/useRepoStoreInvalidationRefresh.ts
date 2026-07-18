@@ -9,11 +9,11 @@ export function useRepoStoreInvalidationRefresh() {
       const state = useReposStore.getState()
       const repo = state.repos[event.repoId]
       if (!repo) return
-      const repoRuntimeId = repo.repoRuntimeId
+      const workspaceRuntimeId = repo.workspaceRuntimeId
       void handleRepoInvalidationRefresh(
         { get: useReposStore.getState, set: useReposStore.setState },
         event,
-        repoRuntimeId,
+        workspaceRuntimeId,
       ).catch((error) => {
         goblinLog.warn('repo invalidation refresh failed', { repoId: event.repoId, query: event.query, error })
       })

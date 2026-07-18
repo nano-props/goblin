@@ -17,7 +17,7 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { WorkspacePaneRuntimeStaleError } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
-import type * as RepoRuntimesModule from '#/server/modules/repo-runtimes.ts'
+import type * as WorkspaceRuntimesModule from '#/server/modules/workspace-runtimes.ts'
 
 const failRemoteRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
 const workspaceProbeStateForRuntimeMock = vi.hoisted(() =>
@@ -36,8 +36,8 @@ vi.mock('#/server/modules/remote-runtime-failure-settlement.ts', async (importAc
   const actual = await importActual<typeof import('#/server/modules/remote-runtime-failure-settlement.ts')>()
   return { ...actual, failRemoteRuntimeIfNeeded: failRemoteRuntimeIfNeededMock }
 })
-vi.mock('#/server/modules/repo-runtimes.ts', async (importActual) => {
-  const actual = await importActual<typeof RepoRuntimesModule>()
+vi.mock('#/server/modules/workspace-runtimes.ts', async (importActual) => {
+  const actual = await importActual<typeof WorkspaceRuntimesModule>()
   return { ...actual, workspaceProbeStateForRuntime: workspaceProbeStateForRuntimeMock }
 })
 
@@ -48,7 +48,7 @@ if (!workspaceId || !worktreeRoot || !otherWorktreeRoot) throw new Error('invali
 
 const request = {
   repoRoot: 'goblin+file:///repo',
-  repoRuntimeId: 'repo-runtime-test',
+  workspaceRuntimeId: 'repo-runtime-test',
   branch: 'main',
   worktreePath: '/repo/worktree',
   target: { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: 'repo-runtime-test', root: worktreeRoot },
@@ -79,7 +79,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -101,7 +101,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: vi.fn(), close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -141,7 +141,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -168,7 +168,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged,
     })
 
@@ -211,7 +211,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(
       'user-test',
       request.repoRoot,
-      request.repoRuntimeId,
+      request.workspaceRuntimeId,
       paneTabsSnapshot.revision,
     )
   })
@@ -228,7 +228,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
         close: () => false,
       },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged,
     })
 
@@ -245,7 +245,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const target = {
       kind: 'workspace-root' as const,
       workspaceId,
-      workspaceRuntimeId: request.repoRuntimeId,
+      workspaceRuntimeId: request.workspaceRuntimeId,
     }
     const workspaceRequest = { ...request, worktreePath: workspaceId, target }
     const createAdmitted = vi.fn(async () => ({ ok: false as const, message: 'expected-stop' }))
@@ -256,7 +256,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -275,7 +275,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const target = {
       kind: 'workspace-root' as const,
       workspaceId,
-      workspaceRuntimeId: request.repoRuntimeId,
+      workspaceRuntimeId: request.workspaceRuntimeId,
     }
     const close = vi.fn(() => true)
     const application = createWorkspacePaneRuntimeApplication({
@@ -295,7 +295,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       },
       terminal: { createAdmitted: async () => ({ ok: false, message: 'unexpected' }), close },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -312,7 +312,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
   test('reports remote runtime failure when physical worktree capture proves transport failure', async () => {
     const failure = new RemoteRepoRuntimeFailureError({
       repoRoot: request.repoRoot,
-      repoRuntimeId: request.repoRuntimeId,
+      workspaceRuntimeId: request.workspaceRuntimeId,
       reason: 'unreachable',
     })
     const create = vi.fn()
@@ -328,7 +328,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -345,7 +345,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
   test('reports remote runtime failure when queued physical validation proves transport failure', async () => {
     const failure = new RemoteRepoRuntimeFailureError({
       repoRoot: request.repoRoot,
-      repoRuntimeId: request.repoRuntimeId,
+      workspaceRuntimeId: request.workspaceRuntimeId,
       reason: 'unreachable',
       message: 'connection refused',
     })
@@ -364,7 +364,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -379,7 +379,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
   })
 
   test.each(['created', 'reused', 'restored'] as const)(
-    'rechecks repo runtime authority at the tab commit boundary for a %s terminal',
+    'rechecks workspace runtime authority at the tab commit boundary for a %s terminal',
     async (action) => {
       const runtime = terminalCreateSuccess(action)
       const retire = vi.fn()
@@ -388,7 +388,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
           ? { ...runtime.admission, kind: 'prepared', abort: retire }
           : { ...runtime.admission, kind: 'existing', abort: vi.fn() }
       const close = vi.fn(() => true)
-      const stale = { ok: false as const, runtimeType: 'terminal' as const, message: 'error.repo-runtime-stale' }
+      const stale = { ok: false as const, runtimeType: 'terminal' as const, message: 'error.workspace-runtime-stale' }
       const ensureRuntimeTabForSession = vi.fn(async (input: { isRuntimeCurrent: () => boolean }) =>
         input.isRuntimeCurrent()
           ? { kind: 'committed' as const, snapshot: paneTabsSnapshot }
@@ -402,14 +402,14 @@ describe('WorkspacePaneRuntimeApplication', () => {
         current = false
         return result
       })
-      const isCurrentRepoRuntime = vi.fn(() => current)
+      const isCurrentWorkspaceRuntime = vi.fn(() => current)
       const application = createWorkspacePaneRuntimeApplication({
         worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
         physicalWorktrees: testPhysicalWorktrees,
         terminalWorktree: { listSessionsForUser: async () => [] },
         terminal: { createAdmitted: create, close },
         workspaceTabsCoordinator: { ensureRuntimeTabForSession },
-        isCurrentRepoRuntime,
+        isCurrentWorkspaceRuntime,
         broadcastWorkspaceTabsChanged,
       })
 
@@ -419,7 +419,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       providerResult.resolve(runtime)
       await expect(open).resolves.toEqual(stale)
       expect(current).toBe(false)
-      expect(isCurrentRepoRuntime).toHaveBeenCalledTimes(2)
+      expect(isCurrentWorkspaceRuntime).toHaveBeenCalledTimes(2)
       expect(ensureRuntimeTabForSession).toHaveBeenCalledOnce()
       expect(retire).toHaveBeenCalledTimes(action === 'created' ? 1 : 0)
       expect(close).not.toHaveBeenCalled()
@@ -438,7 +438,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: listSessions },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged,
     })
 
@@ -474,7 +474,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -503,12 +503,12 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const workspaceTarget = {
       kind: 'workspace-root' as const,
       workspaceId,
-      workspaceRuntimeId: request.repoRuntimeId,
+      workspaceRuntimeId: request.workspaceRuntimeId,
     }
     const primaryWorktreeTarget = {
       kind: 'git-worktree' as const,
       workspaceId,
-      workspaceRuntimeId: request.repoRuntimeId,
+      workspaceRuntimeId: request.workspaceRuntimeId,
       root: workspaceId,
     }
     const session = {
@@ -526,7 +526,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [session] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -536,7 +536,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
         sessionId: session.terminalSessionId,
         target: { target: workspaceTarget },
       }),
-    ).resolves.toEqual({ ok: false, runtimeType: 'terminal', message: 'error.repo-runtime-stale' })
+    ).resolves.toEqual({ ok: false, runtimeType: 'terminal', message: 'error.workspace-runtime-stale' })
     expect(close).not.toHaveBeenCalled()
   })
 
@@ -567,7 +567,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [session] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -577,7 +577,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
         sessionId: session.terminalSessionId,
         target: { target: request.target },
       }),
-    ).resolves.toEqual({ ok: false, runtimeType: 'terminal', message: 'error.repo-runtime-stale' })
+    ).resolves.toEqual({ ok: false, runtimeType: 'terminal', message: 'error.workspace-runtime-stale' })
     expect(close).not.toHaveBeenCalled()
   })
 
@@ -589,7 +589,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [session] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close: async () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -622,7 +622,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
           return { kind: 'committed' as const, snapshot: paneTabsSnapshot }
         },
       },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: () => {},
     })
 
@@ -664,7 +664,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
           return { kind: 'committed' as const, snapshot: paneTabsSnapshot }
         },
       },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -698,7 +698,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -728,7 +728,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
           throw new Error('projection failed')
         },
       },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged,
     })
 
@@ -756,14 +756,14 @@ describe('WorkspacePaneRuntimeApplication', () => {
           throw new WorkspacePaneRuntimeStaleError()
         },
       },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
     await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual({
       ok: false,
       runtimeType: 'terminal',
-      message: 'error.repo-runtime-stale',
+      message: 'error.workspace-runtime-stale',
     })
     expect(abort).toHaveBeenCalledOnce()
   })
@@ -778,7 +778,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: async () => runtime, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: async () => ({ kind: 'target-stale' }) },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -809,7 +809,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
           throw new Error('invariant failure after admission')
         },
       },
-      isCurrentRepoRuntime: () => true,
+      isCurrentWorkspaceRuntime: () => true,
       broadcastWorkspaceTabsChanged,
     })
 

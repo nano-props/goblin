@@ -23,8 +23,8 @@ export function captureWorkspacePaneActiveTabIdentity(
   options: WorkspacePaneTabTargetOptions,
 ): string | null {
   const repo = useReposStore.getState().repos[target.repoRoot]
-  if (!repo || repo.repoRuntimeId !== workspaceRuntimeId) return null
-  const projection = readWorkspacePaneTabsProjectionForTarget({ ...target, repoRuntimeId: workspaceRuntimeId })
+  if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId) return null
+  const projection = readWorkspacePaneTabsProjectionForTarget({ ...target, workspaceRuntimeId: workspaceRuntimeId })
   if (projection.phase !== 'ready') return null
   const tabs = projection.tabs
   const route = options.workspacePaneRoute
@@ -53,7 +53,7 @@ export function recordWorkspacePaneTabOpener(
 ): WorkspacePaneTabOpenerRecordResult {
   const state = useReposStore.getState()
   const repo = state.repos[target.repoRoot]
-  if (!repo || repo.repoRuntimeId !== workspaceRuntimeId) return 'missing'
+  if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId) return 'missing'
   state.setTabOpener(runtimeScopedTabOpenerKey(target, workspaceRuntimeId), childIdentity, openerIdentity)
   return 'recorded'
 }

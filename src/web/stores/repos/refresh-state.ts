@@ -26,25 +26,25 @@ export function applyRepoSnapshotShellState(r: RepoState, snap: RepoSnapshot, lo
   finishDataLoadSuccess(r.dataLoads.repoReadModel, loadedAt)
 }
 
-export function shouldAttemptFetch(repo: RepoState | null | undefined, repoRuntimeId: string): boolean {
-  return !!repo && repo.repoRuntimeId === repoRuntimeId && repo.remote.hasRemotes === true && !isRepoUnavailable(repo)
+export function shouldAttemptFetch(repo: RepoState | null | undefined, workspaceRuntimeId: string): boolean {
+  return !!repo && repo.workspaceRuntimeId === workspaceRuntimeId && repo.remote.hasRemotes === true && !isRepoUnavailable(repo)
 }
 
-export function repoIfFresh(get: ReposGet, id: string, repoRuntimeId: string): RepoState | null {
+export function repoIfFresh(get: ReposGet, id: string, workspaceRuntimeId: string): RepoState | null {
   const repo = get().repos[id]
-  return repo && repo.repoRuntimeId === repoRuntimeId ? repo : null
+  return repo && repo.workspaceRuntimeId === workspaceRuntimeId ? repo : null
 }
 
-export function resolveActionRepoRuntimeId(
+export function resolveActionWorkspaceRuntimeId(
   get: ReposGet,
   id: string,
-  requestedRepoRuntimeId?: string,
-): { repo: RepoState; repoRuntimeId: string } | null {
+  requestedWorkspaceRuntimeId?: string,
+): { repo: RepoState; workspaceRuntimeId: string } | null {
   const repo = get().repos[id]
   if (!repo) return null
-  const repoRuntimeId = requestedRepoRuntimeId ?? repo.repoRuntimeId
-  if (repo.repoRuntimeId !== repoRuntimeId) return null
-  return { repo, repoRuntimeId }
+  const workspaceRuntimeId = requestedWorkspaceRuntimeId ?? repo.workspaceRuntimeId
+  if (repo.workspaceRuntimeId !== workspaceRuntimeId) return null
+  return { repo, workspaceRuntimeId }
 }
 
 export function applyFetchDataLoadResult(r: RepoState, result: ExecResult): void {

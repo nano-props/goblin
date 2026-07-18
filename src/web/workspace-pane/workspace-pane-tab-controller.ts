@@ -36,7 +36,7 @@ import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 export type WorkspacePaneTabControllerRoute = WorkspacePaneRouteTarget
 export interface WorkspacePaneControllerTarget {
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   branchName: string | null
   worktreePath: string | null
   paneTarget: RepoWorkspacePaneModelTarget
@@ -88,7 +88,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
   if (toRoute === undefined) return null
   const target: WorkspacePaneControllerTarget = {
     repoId: input.target.repoId,
-    repoRuntimeId: input.target.repoRuntimeId,
+    workspaceRuntimeId: input.target.workspaceRuntimeId,
     branchName,
     worktreePath: input.target.worktreePath,
     paneTarget: input.target.paneTarget,
@@ -352,7 +352,7 @@ export async function commitWorkspacePaneExactTargetRoute(
 
 export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneControllerTarget): boolean {
   if (target.paneTarget.kind === 'inactive' || target.paneTarget.repoRoot !== target.repoId) return false
-  if (useReposStore.getState().repos[target.repoId]?.repoRuntimeId !== target.repoRuntimeId) return false
+  if (useReposStore.getState().repos[target.repoId]?.workspaceRuntimeId !== target.workspaceRuntimeId) return false
   if (target.paneTarget.kind === 'git-branch') {
     return (
       target.branchName === target.paneTarget.branchName &&

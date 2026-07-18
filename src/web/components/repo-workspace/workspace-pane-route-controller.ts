@@ -62,7 +62,7 @@ export function useWorkspacePaneRouteController({
       workspacePaneRouteIntentPending(
         workspacePaneActionTargetFromCoordinates({
           repoId,
-          repoRuntimeId: model.repoRuntimeId,
+          workspaceRuntimeId: model.workspaceRuntimeId,
           branchName,
           worktreePath,
         }),
@@ -95,7 +95,7 @@ export function useWorkspacePaneRouteController({
   useReconcileWorkspacePaneRoute({
     enabled,
     repoId,
-    repoRuntimeId: model.repoRuntimeId,
+    workspaceRuntimeId: model.workspaceRuntimeId,
     branchName,
     worktreePath,
     route,
@@ -110,7 +110,7 @@ export function useWorkspacePaneRouteController({
 function useReconcileWorkspacePaneRoute({
   enabled,
   repoId,
-  repoRuntimeId,
+  workspaceRuntimeId,
   branchName,
   worktreePath,
   route,
@@ -120,7 +120,7 @@ function useReconcileWorkspacePaneRoute({
 }: {
   enabled: boolean
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   branchName: string | null
   worktreePath: string | null
   route: ParsedWorkspacePaneRouteTarget
@@ -132,7 +132,7 @@ function useReconcileWorkspacePaneRoute({
     if (!enabled) return
     let cancelled = false
     void runWorkspacePaneAction(
-      workspacePaneActionTargetFromCoordinates({ repoId, repoRuntimeId, branchName, worktreePath }),
+      workspacePaneActionTargetFromCoordinates({ repoId, workspaceRuntimeId, branchName, worktreePath }),
       () => {
         if (cancelled) return
         if (!branchName) return
@@ -143,7 +143,7 @@ function useReconcileWorkspacePaneRoute({
     return () => {
       cancelled = true
     }
-  }, [branchName, enabled, navigation, reconciliation, repoId, repoRuntimeId, routeIntentPending, worktreePath])
+  }, [branchName, enabled, navigation, reconciliation, repoId, workspaceRuntimeId, routeIntentPending, worktreePath])
 }
 
 function useWorkspacePaneNavigationHistory({

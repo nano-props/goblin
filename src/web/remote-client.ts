@@ -27,7 +27,7 @@ export async function resolveRemoteRepositoryTarget(
  * its accepted terminal projection.
  */
 export async function resolveRemoteRepoConnection(
-  input: { repoId: string; repoRuntimeId: string; mode?: 'restart' | 'ensure' },
+  input: { repoId: string; workspaceRuntimeId: string; mode?: 'restart' | 'ensure' },
   signal?: AbortSignal,
 ): Promise<RemoteRepoLifecycleCommandResult> {
   return await postServerJson<typeof input, RemoteRepoLifecycleCommandResult>('/api/remote/lifecycle', input, { signal })

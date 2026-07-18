@@ -65,7 +65,7 @@ export type WorkspaceIntentPlan =
   | { kind: 'close-workspace'; workspaceId: string }
   | { kind: 'close-window' }
   | { kind: 'cycle-workspace'; direction: 1 | -1 }
-  | { kind: 'refresh-repo'; repoId: string; repoRuntimeId: string }
+  | { kind: 'refresh-repo'; repoId: string; workspaceRuntimeId: string }
   | { kind: 'show-workspace-pane-tab'; repoId: string; target: WorkspacePaneCommandTarget; tab: WorkspacePaneTabType }
   | { kind: 'terminal-primary-action'; repoId: string; target: WorkspacePaneCommandTarget }
   | { kind: 'toggle-zen-mode' }
@@ -81,7 +81,7 @@ interface WorkspaceIntentPlanContext {
   workspaceShortcutSuppressed: boolean
   terminalFocused: boolean
   currentWorkspaceId: string | null
-  currentRepo: Pick<RepoState, 'id' | 'repoRuntimeId' | 'workspaceProbe'> | null
+  currentRepo: Pick<RepoState, 'id' | 'workspaceRuntimeId' | 'workspaceProbe'> | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
 }
 
@@ -194,7 +194,7 @@ export function createWorkspaceIntentPlan(
     case 'repo-refresh-requested':
       if (context.workspaceShortcutSuppressed || context.terminalFocused || !context.currentRepo)
         return { kind: 'noop' }
-      return { kind: 'refresh-repo', repoId: context.currentRepo.id, repoRuntimeId: context.currentRepo.repoRuntimeId }
+      return { kind: 'refresh-repo', repoId: context.currentRepo.id, workspaceRuntimeId: context.currentRepo.workspaceRuntimeId }
     case 'show-workspace-pane-tab-requested':
       if (context.workspaceShortcutSuppressed || !context.currentWorkspaceId || !context.currentWorkspacePaneCommandTarget)
         return { kind: 'noop' }

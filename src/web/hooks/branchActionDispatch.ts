@@ -58,7 +58,7 @@ export function dispatchDeleteBranch({
   if (!actionRepo) return Promise.resolve(recordRepoDataUnavailable(repo))
   return dispatchRepoBranchAction(
     actionRepo.id,
-    actionRepo.repoRuntimeId,
+    actionRepo.workspaceRuntimeId,
     { kind: 'deleteBranch', branch: branchName, force, deleteUpstream },
     useReposStore.getState().runBranchAction,
     {
@@ -98,7 +98,7 @@ export async function dispatchRemoveWorktree({
   if (!actionRepo) return recordRepoDataUnavailable(repo)
   return await dispatchRepoBranchAction(
     actionRepo.id,
-    actionRepo.repoRuntimeId,
+    actionRepo.workspaceRuntimeId,
     {
       kind: 'removeWorktree',
       branch: target.branch,
@@ -137,7 +137,7 @@ export function dispatchPush({
   if (!actionRepo) return Promise.resolve(recordRepoDataUnavailable(repo))
   return dispatchRepoBranchAction(
     actionRepo.id,
-    actionRepo.repoRuntimeId,
+    actionRepo.workspaceRuntimeId,
     { kind: 'push', branch: branchName },
     useReposStore.getState().runBranchAction,
   )
@@ -158,6 +158,6 @@ function repoForBranchActionDispatch(repo: BranchActionRepo): BranchActionRepo |
 
 function recordRepoDataUnavailable(repo: BranchActionRepo): ExecResult {
   const result = { ok: false as const, message: 'error.failed-read-repo' }
-  useReposStore.getState().setLastResult(repo.id, result, repo.repoRuntimeId)
+  useReposStore.getState().setLastResult(repo.id, result, repo.workspaceRuntimeId)
   return result
 }

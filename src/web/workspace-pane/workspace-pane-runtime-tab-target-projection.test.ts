@@ -99,7 +99,7 @@ describe('workspace pane runtime tab target projection', () => {
 
     const projection = readWorkspacePaneRuntimeTabTargetProjection({
       repoRoot: REPO_ID,
-      repoRuntimeId: 'repo-runtime-1',
+      workspaceRuntimeId: 'repo-runtime-1',
       worktreePath: WORKTREE_PATH,
     })
 
@@ -135,7 +135,7 @@ describe('workspace pane runtime tab target projection', () => {
 
     const projection = readWorkspacePaneRuntimeTabTargetProjection({
       repoRoot: REPO_ID,
-      repoRuntimeId: 'repo-runtime-1',
+      workspaceRuntimeId: 'repo-runtime-1',
       worktreePath: WORKTREE_PATH,
     })
 

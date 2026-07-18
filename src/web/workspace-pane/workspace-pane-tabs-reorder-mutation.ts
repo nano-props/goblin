@@ -22,7 +22,7 @@ import {
 } from '#/shared/workspace-pane-tabs-target.ts'
 
 export type WorkspacePaneTabsReorderMutationInput = WorkspacePaneTabsTarget & {
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   canonicalTabs: readonly WorkspacePaneTabEntry[]
   onReorderRejected?: () => void
 }
@@ -38,8 +38,8 @@ export function useWorkspacePaneTabsReorderMutation(
   const target = useMemo(() => {
     const paneTarget =
       input
-    return runtimeWorkspacePaneTarget(paneTarget, input.repoRuntimeId)
-      ? { ...paneTarget, repoRuntimeId: input.repoRuntimeId }
+    return runtimeWorkspacePaneTarget(paneTarget, input.workspaceRuntimeId)
+      ? { ...paneTarget, workspaceRuntimeId: input.workspaceRuntimeId }
       : null
   }, [input])
   const canonicalTabsIdentity = useMemo(
@@ -83,7 +83,7 @@ async function runWorkspacePaneTabsReorderInQueue(
       ...target,
       operation: { type: 'reorder', tabIdentities: draggedTabs.map(workspacePaneTabEntryIdentity) },
     })
-    writeCanonicalWorkspacePaneTabsSnapshot(target.repoRoot, target.repoRuntimeId, snapshot, queryClient)
+    writeCanonicalWorkspacePaneTabsSnapshot(target.repoRoot, target.workspaceRuntimeId, snapshot, queryClient)
   } catch (err) {
     reportWorkspacePaneTabsFailure({
       operation: 'reorder',
@@ -96,12 +96,12 @@ async function runWorkspacePaneTabsReorderInQueue(
   }
 }
 
-type WorkspacePaneTabsReorderTarget = WorkspacePaneTabsTarget & { repoRuntimeId: string }
+type WorkspacePaneTabsReorderTarget = WorkspacePaneTabsTarget & { workspaceRuntimeId: string }
 
 function workspacePaneReorderActionTarget(target: WorkspacePaneTabsReorderTarget): WorkspacePaneActionTarget {
   return workspacePaneActionTargetFromCoordinates({
     repoId: target.repoRoot,
-    repoRuntimeId: target.repoRuntimeId,
+    workspaceRuntimeId: target.workspaceRuntimeId,
     branchName: workspacePaneTabsBranchIdentity(target),
     worktreePath: workspacePaneTabsTargetWorktreePath(target),
   })

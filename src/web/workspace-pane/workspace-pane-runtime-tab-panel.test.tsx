@@ -67,13 +67,13 @@ beforeEach(() => {
   resetReposStore()
   seedRepoWithReadModelForTest({
     id: 'goblin+file:///repo',
-    repoRuntimeId: 'repo-runtime-1',
+    workspaceRuntimeId: 'repo-runtime-1',
     branches: [createRepoBranch('main', { worktree: { path: '/repo-worktree' } })],
     currentBranchName: 'main',
   })
   observeWorkspacePaneRouteForTest({
     repoId: 'goblin+file:///repo',
-    repoRuntimeId: 'repo-runtime-1',
+    workspaceRuntimeId: 'repo-runtime-1',
     branchName: 'main',
     worktreePath: '/repo-worktree',
     route: null,

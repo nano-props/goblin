@@ -8,7 +8,7 @@ import {
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
 const repoRoot = 'goblin+ssh://example/repo'
-const repoRuntimeId = 'repo-runtime-test-1'
+const workspaceRuntimeId = 'repo-runtime-test-1'
 const target = normalizeRemoteTarget({
   alias: 'example',
   host: 'example.test',
@@ -19,7 +19,7 @@ const target = normalizeRemoteTarget({
 
 describe('remote lifecycle projection acceptance', () => {
   beforeEach(() => {
-    const repo = emptyRepo(repoRoot, 'repo', repoRuntimeId)
+    const repo = emptyRepo(repoRoot, 'repo', workspaceRuntimeId)
     useReposStore.setState({ repos: { [repoRoot]: repo }, order: [repoRoot] })
   })
 
@@ -45,7 +45,7 @@ describe('remote lifecycle projection acceptance', () => {
 
   test('rejects a projection for a replaced runtime generation', () => {
     useReposStore.setState((state) => ({
-      repos: { ...state.repos, [repoRoot]: { ...state.repos[repoRoot]!, repoRuntimeId: 'repo-runtime-test-2' } },
+      repos: { ...state.repos, [repoRoot]: { ...state.repos[repoRoot]!, workspaceRuntimeId: 'repo-runtime-test-2' } },
     }))
     expect(accept({ kind: 'ready', attemptId: 1, target })).toBe(false)
   })
@@ -54,14 +54,14 @@ describe('remote lifecycle projection acceptance', () => {
     acceptRemoteLifecycleSnapshot(useReposStore.setState, useReposStore.getState, {
       runtimes: [
         {
-          repoRoot,
-          repoRuntimeId,
+          workspaceId: repoRoot,
+          workspaceRuntimeId,
           workspaceProbe: { status: 'probing' },
           remoteLifecycle: { kind: 'ready', attemptId: 1, target },
         },
         {
-          repoRoot: 'goblin+ssh://other/repo',
-          repoRuntimeId: 'repo-runtime-other',
+          workspaceId: 'goblin+ssh://other/repo',
+          workspaceRuntimeId: 'repo-runtime-other',
           workspaceProbe: { status: 'probing' },
           remoteLifecycle: { kind: 'failed', attemptId: 4, reason: 'timeout' },
         },
@@ -76,8 +76,8 @@ function accept(
   remoteLifecycle: NonNullable<Parameters<typeof acceptRemoteLifecycleProjection>[2]['remoteLifecycle']>,
 ) {
   return acceptRemoteLifecycleProjection(useReposStore.setState, useReposStore.getState, {
-    repoRoot,
-    repoRuntimeId,
+    workspaceId: repoRoot,
+    workspaceRuntimeId,
     remoteLifecycle,
   })
 }

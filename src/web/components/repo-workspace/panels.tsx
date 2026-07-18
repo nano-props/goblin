@@ -47,7 +47,7 @@ const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
 export interface WorkspacePanePanelRenderInput {
   type: WorkspacePaneTabType
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'branchModel' | 'ui' | 'workspaceProbe'> & {
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'workspaceRuntimeId' | 'branchModel' | 'ui' | 'workspaceProbe'> & {
     branchModel: RepoWorkspaceRepo['branchModel']
   }
   detail: CurrentRepoWorkspacePresentation
@@ -78,7 +78,7 @@ export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInpu
     const branchName = branch.name
     const worktreePath = branch.worktree.path
     const tabsTarget = gitWorktreeWorkspacePaneTabsTarget(input.repo.id, worktreePath)
-    const runtimeTarget = tabsTarget ? runtimeWorkspacePaneTarget(tabsTarget, input.repo.repoRuntimeId) : null
+    const runtimeTarget = tabsTarget ? runtimeWorkspacePaneTarget(tabsTarget, input.repo.workspaceRuntimeId) : null
     if (!runtimeTarget || !worktreePath) return null
     return renderWorkspacePaneRuntimeTabPanel({
       type,
@@ -114,7 +114,7 @@ function StatusWorkspacePanePanel({ repo, workspacePaneId, panelLabel, detail }:
       busy={detail.loading.pullRequests || detail.loading.status}
     >
       <ScrollPane>
-        <BranchStatus detail={detail} repoRuntimeId={repo.repoRuntimeId} />
+        <BranchStatus detail={detail} workspaceRuntimeId={repo.workspaceRuntimeId} />
       </ScrollPane>
     </WorkspacePanePanelFrame>
   )
@@ -126,7 +126,7 @@ function HistoryWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }
   return (
     <BranchHistoryTab
       repoId={repo.id}
-      repoRuntimeId={repo.repoRuntimeId}
+      workspaceRuntimeId={repo.workspaceRuntimeId}
       branchName={branch.name}
       workspacePaneId={workspacePaneId}
       panelLabel={panelLabel}
@@ -165,7 +165,7 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
         target={{
           kind: 'git-worktree',
           workspaceId: repo.id,
-          workspaceRuntimeId: repo.repoRuntimeId,
+          workspaceRuntimeId: repo.workspaceRuntimeId,
           head: gitHead(branch.name),
           rootPath: worktreePath,
           capabilities,
@@ -181,11 +181,11 @@ export function FiletreeTab({
   target: WorkspacePaneFilesystemTarget
 }) {
   const repoId = target.workspaceId
-  const repoRuntimeId = target.workspaceRuntimeId
+  const workspaceRuntimeId = target.workspaceRuntimeId
   const worktreePath = target.rootPath
   const executionTarget = useMemo(
     () => workspacePaneFilesystemRuntimeTarget(target),
-    [repoId, repoRuntimeId, target.kind, worktreePath],
+    [repoId, workspaceRuntimeId, target.kind, worktreePath],
   )
   if (!executionTarget || executionTarget.kind === 'git-branch') throw new Error('filesystem target is invalid')
   const t = useT()
@@ -275,7 +275,7 @@ export function FiletreeTab({
           insertAfterIdentity: openerIdentity,
           options: {
             resolveStartupShellCommand: async () => {
-              const viewerResult = await getRepositoryFileViewer(repoId, worktreePath, { repoRuntimeId })
+              const viewerResult = await getRepositoryFileViewer(repoId, worktreePath, { workspaceRuntimeId })
               return fileReadCommand(viewerResult, absoluteFilePathForTerminal(viewerResult.executionRoot, node.path))
             },
           },
@@ -293,7 +293,7 @@ export function FiletreeTab({
       openingFileKeyPrefix,
       navigation,
       repoId,
-      repoRuntimeId,
+      workspaceRuntimeId,
       t,
       worktreePath,
       target,
@@ -303,9 +303,9 @@ export function FiletreeTab({
   const requestTrashFile = useCallback(
     (node: RepoTreeNode) => {
       if (node.kind !== 'file') return
-      openTrashFileConfirm({ repoId, repoRuntimeId, worktreePath, path: node.path, name: node.name })
+      openTrashFileConfirm({ repoId, workspaceRuntimeId, worktreePath, path: node.path, name: node.name })
     },
-    [openTrashFileConfirm, repoId, repoRuntimeId, worktreePath],
+    [openTrashFileConfirm, repoId, workspaceRuntimeId, worktreePath],
   )
 
   return (
@@ -368,19 +368,19 @@ function usePendingKeySet() {
 
 function BranchHistoryTab({
   repoId,
-  repoRuntimeId,
+  workspaceRuntimeId,
   branchName,
   workspacePaneId,
   panelLabel,
 }: {
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   branchName: string
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
 }) {
   const t = useT()
-  const historyQuery = useRepoLogQuery(repoId, repoRuntimeId, branchName, {
+  const historyQuery = useRepoLogQuery(repoId, workspaceRuntimeId, branchName, {
     count: DEFAULT_REPOSITORY_LOG_COUNT,
   })
   const entries = historyQuery.data ?? []
@@ -397,7 +397,7 @@ function BranchHistoryTab({
         <EmptyState title={t('log.empty-for-branch', { branch: branchName })} />
       ) : (
         <ScrollPane>
-          <HistoryCommitGraph repoId={repoId} repoRuntimeId={repoRuntimeId} entries={entries} />
+          <HistoryCommitGraph repoId={repoId} workspaceRuntimeId={workspaceRuntimeId} entries={entries} />
         </ScrollPane>
       )}
     </WorkspacePanePanelFrame>

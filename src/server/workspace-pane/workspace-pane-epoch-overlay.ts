@@ -18,7 +18,7 @@ import {
 export interface WorkspacePaneEpochScope {
   userId: string
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
 }
 
 export interface WorkspacePaneRuntimePlacementHint {
@@ -306,13 +306,13 @@ export function providerRevisionMap(
 }
 
 function epochKey(scope: WorkspacePaneEpochScope): string {
-  return `${scope.userId}\0${scope.repoRoot}\0${scope.repoRuntimeId}`
+  return `${scope.userId}\0${scope.repoRoot}\0${scope.workspaceRuntimeId}`
 }
 
 function scopeFromEpochKey(key: string): WorkspacePaneEpochScope {
-  const [userId, repoRoot, repoRuntimeId] = key.split('\0')
-  if (!userId || !repoRoot || !repoRuntimeId) throw new Error('invalid workspace pane epoch key')
-  return { userId, repoRoot, repoRuntimeId }
+  const [userId, repoRoot, workspaceRuntimeId] = key.split('\0')
+  if (!userId || !repoRoot || !workspaceRuntimeId) throw new Error('invalid workspace pane epoch key')
+  return { userId, repoRoot, workspaceRuntimeId }
 }
 
 function epochTargetKey(scope: WorkspacePaneEpochScope, targetKey: string): string {
@@ -333,7 +333,7 @@ function cloneTargetRef(ref: WorkspacePaneEpochTargetRef): WorkspacePaneEpochTar
   return {
     userId: ref.userId,
     repoRoot: ref.repoRoot,
-    repoRuntimeId: ref.repoRuntimeId,
+    workspaceRuntimeId: ref.workspaceRuntimeId,
     target: { ...ref.target },
   }
 }

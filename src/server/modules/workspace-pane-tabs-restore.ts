@@ -1,4 +1,4 @@
-import type { RestoredWorkspaceRepoRuntime, ServerWorkspaceState } from '#/shared/api-types.ts'
+import type { RestoredWorkspaceRuntime, ServerWorkspaceState } from '#/shared/api-types.ts'
 import { workspaceSessionEntryId, type WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { formatWorkspaceLocator, parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
@@ -15,21 +15,21 @@ interface WorkspacePaneTabsRestoreInput {
 
 export async function projectWorkspacePaneTabsWithMembershipGuard(input: {
   restoreInput: WorkspacePaneTabsRestoreInput
-  repos: RestoredWorkspaceRepoRuntime[]
+  workspaces: RestoredWorkspaceRuntime[]
   confirmMembership: () => Promise<ServerWorkspaceMatchOutcome>
   membershipPolicy: 'transaction-authoritative' | 'confirm-after-restore'
   assertCurrent?: () => void
 }): Promise<
   | {
       matched: true
-      snapshots: Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>
+      snapshots: Array<{ workspaceId: string; workspaceRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>
       repaired: boolean
     }
   | { matched: false; latestWorkspace: ServerWorkspaceState }
 > {
   input.restoreInput.signal?.throwIfAborted()
   for (;;) {
-    const restored = await restoreWorkspacePaneTabsForRepos(input.restoreInput, input.repos)
+    const restored = await restoreWorkspacePaneTabsForWorkspaces(input.restoreInput, input.workspaces)
     if (restored.kind === 'restored') {
       input.assertCurrent?.()
       input.restoreInput.signal?.throwIfAborted()
@@ -44,35 +44,39 @@ export async function projectWorkspacePaneTabsWithMembershipGuard(input: {
   }
 }
 
-async function restoreWorkspacePaneTabsForRepos(
+async function restoreWorkspacePaneTabsForWorkspaces(
   input: WorkspacePaneTabsRestoreInput,
-  repos: RestoredWorkspaceRepoRuntime[],
+  workspaces: RestoredWorkspaceRuntime[],
 ) {
-  const snapshots: Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }> = []
+  const snapshots: Array<{ workspaceId: string; workspaceRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }> = []
   let repaired = false
-  for (const repo of repos) {
+  for (const workspace of workspaces) {
     input.signal?.throwIfAborted()
-    const targets = restorableTargetsForRepo(repo)
+    const targets = restorableTargetsForWorkspace(workspace)
     if (!targets) continue
     const result = await input.workspacePaneTabsHost.restoreTabs(input.userId, {
-      workspaceId: repo.repoRoot,
-      workspaceRuntimeId: repo.repoRuntimeId,
-      expectedRepoEntry: repo.entry,
+      workspaceId: workspace.workspaceId,
+      workspaceRuntimeId: workspace.workspaceRuntimeId,
+      expectedRepoEntry: workspace.entry,
       targets,
     })
     if (result.kind === 'membership-conflict') return result
-    snapshots.push({ repoRoot: repo.repoRoot, repoRuntimeId: repo.repoRuntimeId, snapshot: result.snapshot })
+    snapshots.push({
+      workspaceId: workspace.workspaceId,
+      workspaceRuntimeId: workspace.workspaceRuntimeId,
+      snapshot: result.snapshot,
+    })
     if (result.repaired) repaired = true
   }
   return { kind: 'restored' as const, snapshots, repaired }
 }
 
-function restorableTargetsForRepo(repo: RestoredWorkspaceRepoRuntime) {
-  if (repo.workspaceProbe.status !== 'ready') return null
-  if (repo.projection) {
-    const gitTargets = (repo.projection.snapshot?.branches ?? []).flatMap((branch) => {
+function restorableTargetsForWorkspace(workspace: RestoredWorkspaceRuntime) {
+  if (workspace.workspaceProbe.status !== 'ready') return null
+  if (workspace.projection) {
+    const gitTargets = (workspace.projection.snapshot?.branches ?? []).flatMap((branch) => {
       const target: RestorableWorkspacePaneTarget | null = branch.worktree
-        ? restorableWorktreeTarget(repo.repoRoot, branch.worktree.path)
+        ? restorableWorktreeTarget(workspace.workspaceId, branch.worktree.path)
         : { kind: 'git-branch', branch: branch.name }
       return target ? [target] : []
     })

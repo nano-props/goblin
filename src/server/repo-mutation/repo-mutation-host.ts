@@ -5,7 +5,7 @@ export interface ServerRepoMutationHost {
     userId: string,
     input: {
       repoRoot: string
-      repoRuntimeId: string
+      workspaceRuntimeId: string
       branchName: string
       deleteBranch(): Promise<ExecResult>
     },

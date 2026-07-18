@@ -6,8 +6,8 @@ import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { createRepoBranch, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { removeRepoRuntimeFromCache, repoRuntimesQueryKey } from '#/web/repo-runtime-query.ts'
-import type { RepoRuntimesSnapshot } from '#/shared/api-types.ts'
+import { removeWorkspaceRuntimeFromCache, workspaceRuntimesQueryKey } from '#/web/workspace-runtime-query.ts'
+import type { WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
 import {
   branchSnapshot,
   flushIpc,
@@ -42,11 +42,11 @@ describe('repo lifecycle', () => {
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
 
     expect(result).toMatchObject({ ok: true, workspaceId: REPO_A })
-    const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())
+    const cached = primaryWindowQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())
     expect(cached?.runtimes).toEqual([
       {
-        repoRoot: REPO_A,
-        repoRuntimeId: useReposStore.getState().repos[REPO_A]!.repoRuntimeId,
+        workspaceId: REPO_A,
+        workspaceRuntimeId: useReposStore.getState().repos[REPO_A]!.workspaceRuntimeId,
         workspaceProbe: expect.objectContaining({ status: 'ready' }),
       },
     ])
@@ -74,14 +74,14 @@ describe('repo lifecycle', () => {
       },
     })
     await expect(useReposStore.getState().ensureWorkspaceOpen(REPO_A)).resolves.toMatchObject({ ok: true })
-    const repoRuntimeId = useReposStore.getState().repos[REPO_A]!.repoRuntimeId
+    const workspaceRuntimeId = useReposStore.getState().repos[REPO_A]!.workspaceRuntimeId
 
     await expect(useReposStore.getState().closeWorkspace(REPO_A)).resolves.toEqual({
       ok: false,
       message: 'error.failed-read-repo',
     })
 
-    expect(useReposStore.getState().repos[REPO_A]?.repoRuntimeId).toBe(repoRuntimeId)
+    expect(useReposStore.getState().repos[REPO_A]?.workspaceRuntimeId).toBe(workspaceRuntimeId)
     expect(useReposStore.getState().order).toContain(REPO_A)
   })
 
@@ -157,11 +157,11 @@ describe('repo lifecycle', () => {
       { kind: 'recent-workspace', message: 'recent write failed' },
     ])
     expect(useReposStore.getState().repos[REPO_A]).toBeDefined()
-    const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())
+    const cached = primaryWindowQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())
     expect(cached?.runtimes).toEqual([
       {
-        repoRoot: REPO_A,
-        repoRuntimeId: useReposStore.getState().repos[REPO_A]!.repoRuntimeId,
+        workspaceId: REPO_A,
+        workspaceRuntimeId: useReposStore.getState().repos[REPO_A]!.workspaceRuntimeId,
         workspaceProbe: expect.objectContaining({ status: 'ready' }),
       },
     ])
@@ -227,7 +227,7 @@ describe('repo lifecycle', () => {
       expect(calls.projection).toEqual([REPO_A, REPO_B])
     })
   })
-  test('initial refresh results from a closed repo runtime do not overwrite a reopened repo', async () => {
+  test('initial refresh results from a closed workspace runtime do not overwrite a reopened repo', async () => {
     const snapshotResolvers: Array<(value: { branches: BranchSnapshotInfo[]; current: string }) => void> = []
     installGoblin({
       projection: () =>
@@ -244,11 +244,11 @@ describe('repo lifecycle', () => {
     await vi.waitFor(() => {
       expect(snapshotResolvers).toHaveLength(1)
     })
-    const firstToken = useReposStore.getState().repos[REPO_A]?.repoRuntimeId
+    const firstToken = useReposStore.getState().repos[REPO_A]?.workspaceRuntimeId
     await useReposStore.getState().closeWorkspace(REPO_A)
     const second = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     if (second.ok) useReposStore.setState({ restoredRepoId: second.workspaceId })
-    const secondToken = useReposStore.getState().repos[REPO_A]?.repoRuntimeId
+    const secondToken = useReposStore.getState().repos[REPO_A]?.workspaceRuntimeId
     await vi.waitFor(() => {
       expect(snapshotResolvers).toHaveLength(2)
     })
@@ -276,12 +276,12 @@ describe('repo lifecycle', () => {
 
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     expect(result).toMatchObject({ ok: true, workspaceId: REPO_A })
-    const repoRuntimeId = useReposStore.getState().repos[REPO_A]!.repoRuntimeId
+    const workspaceRuntimeId = useReposStore.getState().repos[REPO_A]!.workspaceRuntimeId
 
     await useReposStore.getState().closeWorkspace(REPO_A)
     await vi.waitFor(() => {
-      const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())
-      expect(cached?.runtimes).not.toContainEqual({ repoRoot: REPO_A, repoRuntimeId })
+      const cached = primaryWindowQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())
+      expect(cached?.runtimes).not.toContainEqual({ repoRoot: REPO_A, workspaceRuntimeId })
     })
   })
 
@@ -290,21 +290,21 @@ describe('repo lifecycle', () => {
 
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     expect(result).toMatchObject({ ok: true, workspaceId: REPO_A })
-    const repoRuntimeId = useReposStore.getState().repos[REPO_A]!.repoRuntimeId
-    primaryWindowQueryClient.setQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey(), {
+    const workspaceRuntimeId = useReposStore.getState().repos[REPO_A]!.workspaceRuntimeId
+    primaryWindowQueryClient.setQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey(), {
       runtimes: [
-        { repoRoot: REPO_B, repoRuntimeId: 'repo-runtime-stale-cache', workspaceProbe: { status: 'probing' } },
+        { workspaceId: REPO_B, workspaceRuntimeId: 'repo-runtime-stale-cache', workspaceProbe: { status: 'probing' } },
       ],
     })
 
-    await removeRepoRuntimeFromCache({
-      repoRoot: REPO_A,
-      repoRuntimeId: 'repo-runtime-not-in-cache',
+    await removeWorkspaceRuntimeFromCache({
+      workspaceId: REPO_A,
+      workspaceRuntimeId: 'repo-runtime-not-in-cache',
     })
 
-    const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey())
+    const cached = primaryWindowQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())
     expect(cached?.runtimes).toEqual([
-      { repoRoot: REPO_A, repoRuntimeId, workspaceProbe: expect.objectContaining({ status: 'ready' }) },
+      { workspaceId: REPO_A, workspaceRuntimeId, workspaceProbe: expect.objectContaining({ status: 'ready' }) },
     ])
   })
 

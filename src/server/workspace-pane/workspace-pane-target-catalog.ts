@@ -1,5 +1,5 @@
 import { getWorkspacePaneTargetIdentities } from '#/server/modules/repo-read-paths.ts'
-import { workspaceRuntimeHasGitCapability } from '#/server/modules/repo-runtimes.ts'
+import { workspaceRuntimeHasGitCapability } from '#/server/modules/workspace-runtimes.ts'
 import type { WorkspacePaneTargetProjection } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
 import type { WorkspacePaneTargetProjectionProvider } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import {
@@ -15,8 +15,8 @@ type WorkspacePaneCatalogIdentity =
   | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
 
 interface WorkspacePaneTargetCatalogDependencies {
-  hasGitCapability(userId: string, repoRoot: string, repoRuntimeId: string): boolean
-  readIdentities(repoRoot: string, options: { repoRuntimeId: string }): Promise<
+  hasGitCapability(userId: string, repoRoot: string, workspaceRuntimeId: string): boolean
+  readIdentities(repoRoot: string, options: { workspaceRuntimeId: string }): Promise<
     readonly WorkspacePaneCatalogIdentity[]
   >
 }
@@ -34,18 +34,18 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
   }
 
   async captureTargets(userId: string, repoRoot: string, scope: string): Promise<readonly WorkspacePaneTargetProjection[]> {
-    const repoRuntimeId = runtimeIdFromScope(scope)
+    const workspaceRuntimeId = runtimeIdFromScope(scope)
     const workspaceId = canonicalWorkspaceLocator(repoRoot)
     if (!workspaceId) throw new Error('invalid workspace pane workspace id')
     const workspace = parseCanonicalWorkspaceLocator(workspaceId)
     if (!workspace) throw new Error('invalid workspace pane workspace id')
     const workspaceTarget: WorkspacePaneTargetProjection = {
-      target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: repoRuntimeId },
+      target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: workspaceRuntimeId },
       nativeWorktreePath: workspace.path,
       canonicalBranch: null,
     }
-    if (!this.dependencies.hasGitCapability(userId, repoRoot, repoRuntimeId)) return [workspaceTarget]
-    const identities = await this.dependencies.readIdentities(repoRoot, { repoRuntimeId })
+    if (!this.dependencies.hasGitCapability(userId, repoRoot, workspaceRuntimeId)) return [workspaceTarget]
+    const identities = await this.dependencies.readIdentities(repoRoot, { workspaceRuntimeId })
     return [
       workspaceTarget,
       ...identities.map((identity): WorkspacePaneTargetProjection =>
@@ -54,7 +54,7 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
               target: {
                 kind: 'git-worktree',
                 workspaceId,
-                workspaceRuntimeId: repoRuntimeId,
+                workspaceRuntimeId: workspaceRuntimeId,
                 root: workspaceLocatorForNativePath(workspaceId, identity.worktreePath),
               },
               nativeWorktreePath: identity.worktreePath,
@@ -64,7 +64,7 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
               target: {
                 kind: 'git-branch',
                 workspaceId,
-                workspaceRuntimeId: repoRuntimeId,
+                workspaceRuntimeId: workspaceRuntimeId,
                 branch: identity.branchName,
               },
               nativeWorktreePath: null,

@@ -11,7 +11,7 @@ Use this doc for app shell and process control rules.
 - Let the server own settings and app data.
 - Prefer server-first runtime authority. The client should send intent plus explicit preconditions, and the server should accept or reject with fast-fail semantics.
 - Keep user commands sequential. Resolve route/state supplements at the action boundary, perform the accepted write, then navigate to the precomputed result. Do not use effects, background observers, or client-only tokens to repair command state after the fact.
-- Model runtime lifecycle as server-owned state transitions, not client-synchronized snapshots. For repo runtimes this means the server mints the live `repoRuntimeId` on open and invalidates it on close/reopen.
+- Model runtime lifecycle as server-owned state transitions, not client-synchronized snapshots. For workspace runtimes this means the server mints the live `workspaceRuntimeId` on open and invalidates it on close/reopen.
 - Do not treat a stable locator such as `repoRoot` as a full runtime identity when reopen/recreate can mint a new live runtime.
 - Do not add client-side freshness heuristics when the server can reject stale work directly. Push runtime validity checks into shared protocol contracts first, and let stale mutations fail instead of trying to "heal" them in the client.
 - When a server-owned runtime id already identifies the write target precisely enough, use that id directly and let the server decide. Do not add a second client-side freshness dependency "just in case" if it can only make a valid server action fail locally.
@@ -89,7 +89,7 @@ Runtime creation follows three responsibility layers:
 2. `WorkspacePaneRuntimeApplication` owns runtime open and single close,
    joining provider lifecycle with canonical runtime-tab membership. The
    separate `WorktreeRemovalApplication` owns physical worktree removal across
-   every user and repo runtime. Its physical-target admission rejects later
+   every user and workspace runtime. Its physical-target admission rejects later
    runtime/tab writes, while explicit server operation permits let mutations
    admitted earlier finish in queue order. After repository validation it awaits provider
    quiescence, runs the Git removal past a non-cancelable commit point, then

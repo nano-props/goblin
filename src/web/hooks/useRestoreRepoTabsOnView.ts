@@ -8,13 +8,13 @@ export type RepoProjectionPromotionViewState =
 
 interface LazyRestoreTarget {
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   projectionState: 'projected' | 'stub'
 }
 
 interface PromotionTargetIdentity {
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
 }
 
 interface TargetPromotionViewState {
@@ -32,7 +32,7 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
       if (!repo) return null
       return {
         repoRoot: repo.id,
-        repoRuntimeId: repo.repoRuntimeId,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
         projectionState: repo.session.projectionState,
       }
     }),
@@ -42,19 +42,22 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
 
   useEffect(() => {
     if (target?.projectionState !== 'stub') return
-    const targetIdentity = { repoRoot: target.repoRoot, repoRuntimeId: target.repoRuntimeId }
+    const targetIdentity = { repoRoot: target.repoRoot, workspaceRuntimeId: target.workspaceRuntimeId }
     let current = true
     setTargetState({ target: targetIdentity, state: { phase: 'promoting' } })
     void runRepoProjectionPromotion({
       repoRoot: target.repoRoot,
-      repoRuntimeId: target.repoRuntimeId,
+      workspaceRuntimeId: target.workspaceRuntimeId,
     }).then((result) => {
       if (!current) return
       if (!result.ok) {
         setTargetState({ target: targetIdentity, state: { phase: 'failed', message: result.message } })
         return
       }
-      useReposStore.getState().promoteRestoredWorkspaceRepo({ repo: result.repo, snapshot: result.snapshot })
+      useReposStore.getState().promoteRestoredWorkspaceRepo({
+        workspace: result.workspace,
+        snapshot: result.snapshot,
+      })
     })
     return () => {
       current = false
@@ -74,7 +77,7 @@ function promotionStateForCurrentTarget(
     !targetState ||
     target?.projectionState !== 'stub' ||
     targetState.target.repoRoot !== target.repoRoot ||
-    targetState.target.repoRuntimeId !== target.repoRuntimeId
+    targetState.target.workspaceRuntimeId !== target.workspaceRuntimeId
   ) {
     return IDLE_PROMOTION_VIEW_STATE
   }

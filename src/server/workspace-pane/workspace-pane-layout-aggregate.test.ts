@@ -27,7 +27,7 @@ import {
 import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-const scope = { userId: 'user-a', repoRoot: 'goblin+file:///repo', repoRuntimeId: 'runtime-a' }
+const scope = { userId: 'user-a', repoRoot: 'goblin+file:///repo', workspaceRuntimeId: 'runtime-a' }
 const target = { branchName: 'feature/worktree', worktreePath: '/repo/worktree' }
 const workspaceId = canonicalWorkspaceLocator(scope.repoRoot)
 const worktreeRoot = canonicalWorkspaceLocator('goblin+file:///repo/worktree')
@@ -36,14 +36,14 @@ const canonicalWorkspaceId = workspaceId
 const runtimeWorktreeTarget = {
   kind: 'git-worktree' as const,
   workspaceId: canonicalWorkspaceId,
-  workspaceRuntimeId: scope.repoRuntimeId,
+  workspaceRuntimeId: scope.workspaceRuntimeId,
   root: worktreeRoot,
 }
 const worktreeMutationTarget = { target: runtimeWorktreeTarget, nativeWorktreePath: target.worktreePath }
 
 function branchProjection(
   branch: string,
-  workspaceRuntimeId = scope.repoRuntimeId,
+  workspaceRuntimeId = scope.workspaceRuntimeId,
 ): WorkspacePaneLayoutValidationInput['validTargets'][number] {
   return {
     target: { kind: 'git-branch', workspaceId: canonicalWorkspaceId, workspaceRuntimeId, branch },
@@ -753,10 +753,10 @@ describe('workspace pane layout aggregate', () => {
         expectedRepoEntry: { kind: 'local', id: 'goblin+file:///repo' },
         providerSnapshots: [],
         assertCurrent: () => {
-          if (!current) throw new Error('error.repo-runtime-stale')
+          if (!current) throw new Error('error.workspace-runtime-stale')
         },
       }),
-    ).rejects.toThrow('error.repo-runtime-stale')
+    ).rejects.toThrow('error.workspace-runtime-stale')
     expect(aggregate.activeEpochs('/repo')).toEqual([])
   })
 
@@ -858,7 +858,7 @@ describe('workspace pane layout aggregate', () => {
     const mainTarget = branchProjection('main')
     await readSnapshot(
       aggregate,
-      { ...scope, userId: 'user-b', repoRuntimeId: 'runtime-b' },
+      { ...scope, userId: 'user-b', workspaceRuntimeId: 'runtime-b' },
       [branchProjection('main', 'runtime-b')],
       [],
     )

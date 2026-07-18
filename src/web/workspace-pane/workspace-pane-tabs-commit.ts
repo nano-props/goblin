@@ -2,7 +2,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
 import { goblinLog } from '#/web/logger.ts'
-import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
+import { currentWorkspaceRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
@@ -15,7 +15,7 @@ import {
 } from '#/shared/workspace-pane-tabs-target.ts'
 
 type WorkspacePaneTabsMutationTarget = WorkspacePaneTabsTarget & {
-  repoRuntimeId: string
+  workspaceRuntimeId: string
 }
 
 export type CommitWorkspacePaneTabsInput = WorkspacePaneTabsMutationTarget & {
@@ -154,7 +154,7 @@ async function commitWorkspacePaneTabsNow(
 ): Promise<WorkspacePaneTabsMutationResult> {
   try {
     const snapshot = await replaceWorkspacePaneTabsOnServer(input)
-    const accepted = writeCanonicalWorkspacePaneTabsSnapshot(input.repoRoot, input.repoRuntimeId, snapshot)
+    const accepted = writeCanonicalWorkspacePaneTabsSnapshot(input.repoRoot, input.workspaceRuntimeId, snapshot)
     return { ok: true, projectionApplied: accepted }
   } catch (err) {
     return reportWorkspacePaneTabsFailure({
@@ -172,7 +172,7 @@ async function updateWorkspacePaneTabsNow(
 ): Promise<WorkspacePaneTabsMutationResult> {
   try {
     const snapshot = await updateWorkspacePaneTabsOnServer(input)
-    const accepted = writeCanonicalWorkspacePaneTabsSnapshot(input.repoRoot, input.repoRuntimeId, snapshot)
+    const accepted = writeCanonicalWorkspacePaneTabsSnapshot(input.repoRoot, input.workspaceRuntimeId, snapshot)
     return { ok: true, projectionApplied: accepted }
   } catch (err) {
     return reportWorkspacePaneTabsFailure({
@@ -187,22 +187,22 @@ async function updateWorkspacePaneTabsNow(
 
 export function writeCanonicalWorkspacePaneTabsSnapshot(
   repoRoot: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   snapshot: WorkspacePaneTabsSnapshot,
   queryClient?: QueryClient,
 ): boolean {
-  if (!workspacePaneTabsProjectionScopeAccepted({ repoRoot, repoRuntimeId })) return false
-  return writeWorkspacePaneTabsSnapshotQueryData(repoRoot, repoRuntimeId, snapshot, queryClient)
+  if (!workspacePaneTabsProjectionScopeAccepted({ repoRoot, workspaceRuntimeId })) return false
+  return writeWorkspacePaneTabsSnapshotQueryData(repoRoot, workspaceRuntimeId, snapshot, queryClient)
 }
 
 export async function replaceWorkspacePaneTabsOnServer(
   input: CommitWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsSnapshot> {
-  const target = runtimeWorkspacePaneTarget(input, input.repoRuntimeId)
+  const target = runtimeWorkspacePaneTarget(input, input.workspaceRuntimeId)
   if (!target) throw new Error('error.workspace-tabs-target-invalid')
   return await workspacePaneTabsClient.replace({
     workspaceId: input.repoRoot,
-    workspaceRuntimeId: input.repoRuntimeId,
+    workspaceRuntimeId: input.workspaceRuntimeId,
     target,
     tabs: input.tabs,
   })
@@ -211,18 +211,18 @@ export async function replaceWorkspacePaneTabsOnServer(
 export async function updateWorkspacePaneTabsOnServer(
   input: UpdateWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsSnapshot> {
-  const target = runtimeWorkspacePaneTarget(input, input.repoRuntimeId)
+  const target = runtimeWorkspacePaneTarget(input, input.workspaceRuntimeId)
   if (!target) throw new Error('error.workspace-tabs-target-invalid')
   return await workspacePaneTabsClient.update({
     workspaceId: input.repoRoot,
-    workspaceRuntimeId: input.repoRuntimeId,
+    workspaceRuntimeId: input.workspaceRuntimeId,
     target,
     operation: input.operation,
   })
 }
 
 function workspacePaneTabsProjectionScopeAccepted(
-  input: Pick<CommitWorkspacePaneTabsInput, 'repoRoot' | 'repoRuntimeId'>,
+  input: Pick<CommitWorkspacePaneTabsInput, 'repoRoot' | 'workspaceRuntimeId'>,
 ): boolean {
-  return currentRepoRuntimeId(useReposStore.getState(), input.repoRoot) === input.repoRuntimeId
+  return currentWorkspaceRuntimeId(useReposStore.getState(), input.repoRoot) === input.workspaceRuntimeId
 }

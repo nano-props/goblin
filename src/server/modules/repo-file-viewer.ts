@@ -19,7 +19,7 @@ export async function getRepositoryFileViewer(
   cwd: string,
   worktreePath: string,
   signal?: AbortSignal,
-  options: { repoRuntimeId?: string } = {},
+  options: { workspaceRuntimeId?: string } = {},
 ): Promise<RepoFileViewerResult> {
   const fallbackViewer = localFallbackViewer()
   if (signal?.aborted) throw new Error('aborted')
@@ -30,9 +30,9 @@ export async function getRepositoryFileViewer(
   if (isRemoteRepoId(cwd)) {
     const target = await resolveRemoteRepoTarget(
       cwd,
-      options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
+      options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
     )
-    const run = options.repoRuntimeId ? remoteRuntimeAwareGitRunner(cwd, options.repoRuntimeId, target) : undefined
+    const run = options.workspaceRuntimeId ? remoteRuntimeAwareGitRunner(cwd, options.workspaceRuntimeId, target) : undefined
     const worktree = workspacePath
       ? null
       : await resolveRemoteWorktree(target, executionPath, { signal, ...(run ? { run } : {}) })

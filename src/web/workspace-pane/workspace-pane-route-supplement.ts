@@ -7,7 +7,7 @@ import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs
 
 export interface WorkspacePaneRouteSupplementTarget {
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   branchName: string
   worktreePath: string | null
 }
@@ -18,7 +18,7 @@ export function commitWorkspacePaneRouteSupplement(
 ): boolean {
   const state = useReposStore.getState()
   const repo = state.repos[target.repoId]
-  if (!repo || repo.repoRuntimeId !== target.repoRuntimeId) return false
+  if (!repo || repo.workspaceRuntimeId !== target.workspaceRuntimeId) return false
   const branchModel = readRepoBranchSnapshotQueryProjection(repo)
   const branch = branchModel?.branches.find((candidate) => candidate.name === target.branchName)
   if (!branch || (branch.worktree?.path ?? null) !== target.worktreePath) return false

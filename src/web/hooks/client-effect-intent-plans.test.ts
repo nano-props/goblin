@@ -11,7 +11,7 @@ import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key
 
 const CURRENT_GIT_REPO = {
   id: 'goblin+file:///tmp/repo',
-  repoRuntimeId: 'repo-runtime-test-7',
+  workspaceRuntimeId: 'repo-runtime-test-7',
   workspaceProbe: {
     status: 'ready' as const,
     name: 'repo',
@@ -212,7 +212,7 @@ describe('client effect intent plans', () => {
           filesystemTarget: {
             kind: 'workspace-root',
             workspaceId: CURRENT_DIRECTORY_REPO.id,
-            workspaceRuntimeId: CURRENT_DIRECTORY_REPO.repoRuntimeId,
+            workspaceRuntimeId: CURRENT_DIRECTORY_REPO.workspaceRuntimeId,
             rootPath: '/workspace/directory',
             capabilities: CURRENT_DIRECTORY_REPO.workspaceProbe.capabilities,
           },
@@ -223,7 +223,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('creates a refresh plan from the current repo runtime id', () => {
+  test('creates a refresh plan from the current workspace runtime id', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'repo-refresh-requested' },
       {
@@ -239,7 +239,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({
       kind: 'refresh-repo',
       repoId: 'goblin+file:///tmp/repo',
-      repoRuntimeId: 'repo-runtime-test-7',
+      workspaceRuntimeId: 'repo-runtime-test-7',
     })
   })
 
@@ -322,7 +322,7 @@ describe('client effect intent plans', () => {
           filesystemTarget: {
             kind: 'workspace-root',
             workspaceId: CURRENT_DIRECTORY_REPO.id,
-            workspaceRuntimeId: CURRENT_DIRECTORY_REPO.repoRuntimeId,
+            workspaceRuntimeId: CURRENT_DIRECTORY_REPO.workspaceRuntimeId,
             rootPath: '/workspace/directory',
             capabilities: CURRENT_DIRECTORY_REPO.workspaceProbe.capabilities,
           },

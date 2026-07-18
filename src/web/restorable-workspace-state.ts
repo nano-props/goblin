@@ -115,7 +115,7 @@ function clientWorkspaceRepoProjections(
 }
 
 function workspacePaneTabsByTargetByWorkspaceFromQueryCache(
-  repos: Record<string, Pick<ReposStore['repos'][string], 'repoRuntimeId' | 'session'> | undefined>,
+  repos: Record<string, Pick<ReposStore['repos'][string], 'workspaceRuntimeId' | 'session'> | undefined>,
   order: readonly string[],
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
   const byRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
@@ -124,7 +124,7 @@ function workspacePaneTabsByTargetByWorkspaceFromQueryCache(
     if (!repo) continue
     if (repo.session.projectionState === 'stub') continue
     const data = primaryWindowQueryClient.getQueryData<WorkspacePaneTabsQueryData>(
-      workspacePaneTabsQueryKey(id, repo.repoRuntimeId),
+      workspacePaneTabsQueryKey(id, repo.workspaceRuntimeId),
     )
     if (!data) continue
     const byTarget = workspacePaneTabsByTargetFromQueryData(data)

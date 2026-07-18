@@ -177,7 +177,7 @@ describe('openWorkspacePaneTab', () => {
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
         },
-        repo.repoRuntimeId,
+        repo.workspaceRuntimeId,
         workspacePaneTabEntryIdentity(terminalEntry),
         'workspace-pane:status',
       ),
@@ -198,7 +198,7 @@ describe('openWorkspacePaneTab', () => {
       readWorkspacePaneTabsForTarget({
         kind: 'git-worktree' as const,
         repoRoot: REPO_ID,
-        repoRuntimeId: repo.repoRuntimeId,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
         worktreePath: WORKTREE_PATH,
       }).map(workspacePaneTabEntryIdentity),
     ).toEqual([
@@ -247,10 +247,10 @@ describe('openWorkspacePaneTab', () => {
 
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
     const navigation = navigationWithStoreActions(showRepoBranchWorkspacePaneTab)
-    const repoRuntimeId = useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
+    const workspaceRuntimeId = useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId
     observeWorkspacePaneRouteForTest({
       repoId: REPO_ID,
-      repoRuntimeId,
+      workspaceRuntimeId,
       branchName: 'feature/no-worktree',
       worktreePath: null,
       route: null,
@@ -292,7 +292,7 @@ describe('openWorkspacePaneTab', () => {
     'refreshes repo-scoped visible status after opening %s',
     async (type) => {
       seedWorktreeRepo(type)
-      const repoRuntimeId = useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
+      const workspaceRuntimeId = useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId
 
       await expect(
         openWorkspacePaneTab({
@@ -309,7 +309,7 @@ describe('openWorkspacePaneTab', () => {
       expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledWith(
         expect.any(Object),
         REPO_ID,
-        repoRuntimeId,
+        workspaceRuntimeId,
         'feature/worktree',
       )
     },
@@ -478,7 +478,7 @@ describe('openWorkspacePaneTab', () => {
     expect(openers[openerScopeKey(REPO_ID, 'feature/b', null)]).toBeUndefined()
   })
 
-  test('does not record an opener when the server rejects a stale repo runtime commit', async () => {
+  test('does not record an opener when the server rejects a stale workspace runtime commit', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: WORKTREE_PATH } })],
@@ -513,7 +513,7 @@ describe('openWorkspacePaneTab', () => {
     await commitStarted
 
     await useReposStore.getState().closeWorkspace(REPO_ID)
-    rejectCommit(new Error('error.repo-runtime-stale'))
+    rejectCommit(new Error('error.workspace-runtime-stale'))
     await expect(openPromise).resolves.toBe(false)
 
     expect(
@@ -521,7 +521,7 @@ describe('openWorkspacePaneTab', () => {
     ).toBeUndefined()
   })
 
-  test('does not select a stale opened tab when the server rejects a stale repo runtime commit', async () => {
+  test('does not select a stale opened tab when the server rejects a stale workspace runtime commit', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: WORKTREE_PATH } })],
@@ -572,7 +572,7 @@ describe('openWorkspacePaneTab', () => {
         'feature/reopened': [workspacePaneStaticTabEntry('status')],
       },
     })
-    rejectCommit(new Error('error.repo-runtime-stale'))
+    rejectCommit(new Error('error.workspace-runtime-stale'))
 
     await expect(openPromise).resolves.toBe(false)
 
@@ -580,7 +580,7 @@ describe('openWorkspacePaneTab', () => {
     expect(preferredWorkspacePaneTab('feature/reopened')).toBe('status')
   })
 
-  test('does not select a stale opened tab when the old repo runtime commit succeeds after reopen', async () => {
+  test('does not select a stale opened tab when the old workspace runtime commit succeeds after reopen', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/a', { worktree: { path: WORKTREE_PATH } })],
@@ -624,7 +624,7 @@ describe('openWorkspacePaneTab', () => {
     await useReposStore.getState().closeWorkspace(REPO_ID)
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      repoRuntimeId: 'repo-runtime-reopened',
+      workspaceRuntimeId: 'repo-runtime-reopened',
       branchSnapshots: [createBranchSnapshot('feature/reopened', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/reopened',
       preferredWorkspacePaneTab: 'status',
@@ -738,7 +738,7 @@ describe('openWorkspacePaneTab', () => {
 
   test('refreshes a committed open even when a newer presentation supersedes its route', async () => {
     seedWorktreeRepo('status')
-    const repoRuntimeId = useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
+    const workspaceRuntimeId = useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId
     const mutation = Promise.withResolvers<WorkspacePaneTabEntry[]>()
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: async () => await mutation.promise })
 
@@ -758,7 +758,7 @@ describe('openWorkspacePaneTab', () => {
     expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledWith(
       expect.any(Object),
       REPO_ID,
-      repoRuntimeId,
+      workspaceRuntimeId,
       'feature/worktree',
     )
   })
@@ -785,7 +785,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
       )
     : null
   return workspacePaneStaticTabsFromEntries(
-    target ? readWorkspacePaneTabsForTarget({ ...target, repoRuntimeId: repo.repoRuntimeId }) : [],
+    target ? readWorkspacePaneTabsForTarget({ ...target, workspaceRuntimeId: repo.workspaceRuntimeId }) : [],
   )
 }
 
@@ -813,8 +813,8 @@ function openerScopeKey(repoRoot: string, branchName: string, worktreePath: stri
           head: { kind: 'branch' as const, branchName },
         }
   const baseKey = tabOpenerScopeKey(target)
-  const repoRuntimeId = useReposStore.getState().repos[repoRoot]?.repoRuntimeId
-  if (repoRuntimeId) return `${baseKey}\0${repoRuntimeId}`
+  const workspaceRuntimeId = useReposStore.getState().repos[repoRoot]?.workspaceRuntimeId
+  if (workspaceRuntimeId) return `${baseKey}\0${workspaceRuntimeId}`
   return (
     Object.keys(useReposStore.getState().tabOpenerIdentityByScope).find((key) => key.startsWith(`${baseKey}\0`)) ??
     `${baseKey}\0missing-runtime`

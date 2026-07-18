@@ -11,12 +11,12 @@ describe('terminal repo index', () => {
     const entries: TerminalRuntimeMembershipEntry[] = [
       {
         id: REPO_ID,
-        repoRuntimeId: 'repo-runtime-terminal-index',
+        workspaceRuntimeId: 'repo-runtime-terminal-index',
       },
     ]
 
     const index = runtimeMembershipIndexFromEntries(entries)
 
-    expect(index).toEqual({ [REPO_ID]: { repoRuntimeId: 'repo-runtime-terminal-index' } })
+    expect(index).toEqual({ [REPO_ID]: { workspaceRuntimeId: 'repo-runtime-terminal-index' } })
   })
 })

@@ -1,10 +1,10 @@
 import PQueue from 'p-queue'
 import { omit } from 'es-toolkit'
 import {
-  isProjectedRestoredWorkspaceRepo,
-  type ProjectedRestoredWorkspaceRepoRuntime,
-  type RepoRuntimeProjection,
-  type RestoredWorkspaceRepoRuntime,
+  isProjectedRestoredWorkspaceRuntime,
+  type ProjectedRestoredWorkspaceRuntime,
+  type WorkspaceRuntimeProjection,
+  type RestoredWorkspaceRuntime,
   type WorkspaceRestoreResult,
   type WorkspaceRuntimeRestoreSnapshot,
   type ServerWorkspaceState,
@@ -19,13 +19,13 @@ import {
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { readRepoProjection } from '#/server/modules/repo-read-paths.ts'
 import {
-  acquireRepoRuntimeLease,
-  isCurrentRepoRuntimeMembership,
-  releaseRepoRuntimeMembershipLease,
+  acquireWorkspaceRuntimeLease,
+  isCurrentWorkspaceRuntimeMembership,
+  releaseWorkspaceRuntimeMembershipLease,
   runSerializedInitialWorkspaceProbe,
   workspaceProbeStateForRuntime,
-  type RepoRuntimeMembershipLeaseEntry,
-} from '#/server/modules/repo-runtimes.ts'
+  type WorkspaceRuntimeMembershipLeaseEntry,
+} from '#/server/modules/workspace-runtimes.ts'
 import { probeWorkspace } from '#/server/modules/workspace-probe.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 import { parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
@@ -53,12 +53,12 @@ export interface RestoreServerWorkspaceInput {
   signal?: AbortSignal
 }
 
-type OpenWorkspaceRepoResult = { kind: 'opened'; opened: OpenedWorkspaceRepo } | { kind: 'invalid' }
-type OpenedWorkspaceRepo = RestoredWorkspaceRepoRuntime & {
-  lease: RepoRuntimeMembershipLeaseEntry
+type OpenWorkspaceRepoResult = { kind: 'opened'; opened: OpenedWorkspaceRuntime } | { kind: 'invalid' }
+type OpenedWorkspaceRuntime = RestoredWorkspaceRuntime & {
+  lease: WorkspaceRuntimeMembershipLeaseEntry
 }
-type OpenedProjectedWorkspaceRepo = ProjectedRestoredWorkspaceRepoRuntime & {
-  lease: RepoRuntimeMembershipLeaseEntry
+type OpenedProjectedWorkspaceRepo = ProjectedRestoredWorkspaceRuntime & {
+  lease: WorkspaceRuntimeMembershipLeaseEntry
 }
 
 const MAX_WORKSPACE_MEMBERSHIP_CONFLICT_RETRIES = 3
@@ -76,7 +76,7 @@ export async function restoreServerWorkspace(input: RestoreServerWorkspaceInput)
         ...input,
         activeRepoRoot: input.activeRepoRoot ?? workspace.openWorkspaceEntries[0]?.id ?? null,
       }
-      const openedByRoot = new Map<string, OpenedWorkspaceRepo>()
+      const openedByRoot = new Map<string, OpenedWorkspaceRuntime>()
       let repaired = false
       let committed = false
       try {
@@ -96,7 +96,7 @@ export async function restoreServerWorkspace(input: RestoreServerWorkspaceInput)
           workspace = outcome.latestWorkspace
         }
       } finally {
-        if (!committed) releaseOpenedRepoRuntimes(input, openedByRoot.values())
+        if (!committed) releaseOpenedWorkspaceRuntimes(input, openedByRoot.values())
       }
     })
   } finally {
@@ -126,7 +126,7 @@ type RestoreServerWorkspaceSnapshotOutcome =
 async function restoreServerWorkspaceSnapshot(
   input: RestoreServerWorkspaceInput,
   source: ServerWorkspaceState,
-  openedByRoot: Map<string, OpenedWorkspaceRepo>,
+  openedByRoot: Map<string, OpenedWorkspaceRuntime>,
 ): Promise<RestoreServerWorkspaceSnapshotOutcome> {
   input.signal?.throwIfAborted()
   let repoRestoreFailed = false
@@ -134,14 +134,14 @@ async function restoreServerWorkspaceSnapshot(
   reconcileOpenedRepoMemberships(input, source.openWorkspaceEntries, openedByRoot)
   for (const entry of source.openWorkspaceEntries) {
     if (openedByRoot.has(workspaceSessionEntryId(entry))) continue
-    const result = await openWorkspaceRepo(input, entry, {
+    const result = await openWorkspaceRuntime(input, entry, {
       active: workspaceSessionEntryId(entry) === activeRepoRoot,
     })
     if (result.kind === 'invalid') {
       repoRestoreFailed = true
       continue
     }
-    openedByRoot.set(result.opened.repoRoot, result.opened)
+    openedByRoot.set(result.opened.workspaceId, result.opened)
   }
 
   input.signal?.throwIfAborted()
@@ -165,7 +165,7 @@ async function restoreServerWorkspaceSnapshot(
   const expectedMembership = membership.workspace.openWorkspaceEntries
   const projectedTabs = await projectWorkspacePaneTabsWithMembershipGuard({
     restoreInput: input,
-    repos: openedForLayoutRestore,
+    workspaces: openedForLayoutRestore,
     confirmMembership: async () => await compareAndReplaceServerWorkspaceRepos(expectedMembership, expectedMembership),
     membershipPolicy: 'confirm-after-restore',
   })
@@ -183,7 +183,7 @@ async function restoreServerWorkspaceSnapshot(
       openWorkspaceEntries: opened.map((repo) => repo.entry),
       runtime: runtimeSnapshotFromOpened(
         opened,
-        activeRepoRootForOpened(input.activeRepoRoot, opened),
+        activeWorkspaceIdForOpened(input.activeRepoRoot, opened),
         projectedTabs.snapshots,
       ),
     },
@@ -197,18 +197,18 @@ function readableWorkspace(probe: WorkspaceProbeState): boolean {
 function reconcileOpenedRepoMemberships(
   input: RestoreServerWorkspaceInput,
   entries: readonly WorkspaceSessionEntry[],
-  openedByRoot: Map<string, OpenedWorkspaceRepo>,
+  openedByRoot: Map<string, OpenedWorkspaceRuntime>,
 ): void {
   const expectedByRoot = new Map(entries.map((entry) => [workspaceSessionEntryId(entry), entry]))
   for (const [repoRoot, opened] of openedByRoot) {
     const expected = expectedByRoot.get(repoRoot)
     if (sameWorkspaceSessionEntry(opened.entry, expected)) continue
-    releaseWorkspaceRepoRuntime(input, opened.lease)
+    releaseWorkspaceRuntimeLease(input, opened.lease)
     openedByRoot.delete(repoRoot)
   }
 }
 
-async function openWorkspaceRepo(
+async function openWorkspaceRuntime(
   input: RestoreServerWorkspaceInput,
   entry: WorkspaceSessionEntry,
   options: { active: boolean },
@@ -216,17 +216,17 @@ async function openWorkspaceRepo(
   input.signal?.throwIfAborted()
   if (!parseWorkspaceLocator(entry.id, serverLocatorPlatform())) return { kind: 'invalid' }
   if (entry.kind === 'remote') return await openRemoteWorkspace(input, entry, options)
-  return await withAcquiredWorkspaceRepoLease(input, entry.id, async (lease) => {
-    let authoritativeProbe = workspaceProbeStateForRuntime(input.userId, entry.id, lease.repoRuntimeId)
+  return await withAcquiredWorkspaceRuntimeLease(input, entry.id, async (lease) => {
+    let authoritativeProbe = workspaceProbeStateForRuntime(input.userId, entry.id, lease.workspaceRuntimeId)
     if (authoritativeProbe?.status === 'probing') {
       authoritativeProbe = await runSerializedInitialWorkspaceProbe({
         userId: input.userId,
-        repoRoot: entry.id,
-        repoRuntimeId: lease.repoRuntimeId,
+        workspaceId: entry.id,
+        workspaceRuntimeId: lease.workspaceRuntimeId,
         probe: async () => await probeWorkspace(entry.id, serverLocatorPlatform(), { signal: input.signal }),
         beforeCommit: async ({ before, after }) => {
           if (!workspaceGitCleanupRequired(before, after)) return
-          await commitGitCapabilityRemoval(input, entry.id, lease.repoRuntimeId)
+          await commitGitCapabilityRemoval(input, entry.id, lease.workspaceRuntimeId)
         },
       })
     }
@@ -243,7 +243,7 @@ async function openWorkspaceRepo(
         kind: 'opened',
         opened: stubWorkspaceRepo({
           entry,
-          repoRoot: entry.id,
+          workspaceId: entry.id,
           name,
           workspaceProbe: authoritativeProbe,
           lease,
@@ -251,7 +251,7 @@ async function openWorkspaceRepo(
       }
     }
     const projection = await readRepoProjection(entry.id, {
-      repoRuntimeId: lease.repoRuntimeId,
+      workspaceRuntimeId: lease.workspaceRuntimeId,
       signal: input.signal,
       mode: 'full',
     })
@@ -260,7 +260,7 @@ async function openWorkspaceRepo(
         kind: 'opened',
         opened: stubWorkspaceRepo({
           entry,
-          repoRoot: entry.id,
+          workspaceId: entry.id,
           name,
           workspaceProbe: authoritativeProbe,
           lease,
@@ -271,7 +271,7 @@ async function openWorkspaceRepo(
       kind: 'opened',
       opened: projectedWorkspaceRepo({
         entry,
-        repoRoot: entry.id,
+        workspaceId: entry.id,
         name,
         workspaceProbe: authoritativeProbe,
         projection,
@@ -286,16 +286,16 @@ async function openRemoteWorkspace(
   entry: RemoteWorkspaceSessionEntry,
   options: { active: boolean },
 ): Promise<OpenWorkspaceRepoResult> {
-  return await withAcquiredWorkspaceRepoLease(input, entry.id, async (lease) => {
+  return await withAcquiredWorkspaceRuntimeLease(input, entry.id, async (lease) => {
     const lifecycle = await abortableWorkspaceRestore(
       runRemoteLifecycleWrite(
         {
           userId: input.userId,
           repoId: entry.id,
-          repoRuntimeId: lease.repoRuntimeId,
+          workspaceRuntimeId: lease.workspaceRuntimeId,
           mode: 'ensure',
         },
-        remoteCapabilityTransitionOptions(input, entry.id, lease.repoRuntimeId),
+        remoteCapabilityTransitionOptions(input, entry.id, lease.workspaceRuntimeId),
       ),
       input.signal,
     )
@@ -305,16 +305,16 @@ async function openRemoteWorkspace(
           kind: 'opened',
           opened: stubWorkspaceRepo({
             entry,
-            repoRoot: entry.id,
+            workspaceId: entry.id,
             name: lifecycle.name,
-            workspaceProbe: requiredWorkspaceProbe(input.userId, entry.id, lease.repoRuntimeId),
+            workspaceProbe: requiredWorkspaceProbe(input.userId, entry.id, lease.workspaceRuntimeId),
             lease,
           }),
         }
       }
-      throw new Error('workspace repo runtime was superseded during restore')
+      throw new Error('workspace workspace runtime was superseded during restore')
     }
-    const workspaceProbe = requiredWorkspaceProbe(input.userId, entry.id, lease.repoRuntimeId)
+    const workspaceProbe = requiredWorkspaceProbe(input.userId, entry.id, lease.workspaceRuntimeId)
     if (
       workspaceProbe.status !== 'ready' ||
       workspaceProbe.capabilities.git.status === 'unavailable' ||
@@ -324,7 +324,7 @@ async function openRemoteWorkspace(
         kind: 'opened',
         opened: stubWorkspaceRepo({
           entry,
-          repoRoot: entry.id,
+          workspaceId: entry.id,
           name: lifecycle.name,
           target: lifecycle.lifecycle.target,
           workspaceProbe,
@@ -333,7 +333,7 @@ async function openRemoteWorkspace(
       }
     }
     const projection = await readRepoProjection(entry.id, {
-      repoRuntimeId: lease.repoRuntimeId,
+      workspaceRuntimeId: lease.workspaceRuntimeId,
       signal: input.signal,
       mode: 'full',
     })
@@ -342,7 +342,7 @@ async function openRemoteWorkspace(
         kind: 'opened',
         opened: stubWorkspaceRepo({
           entry,
-          repoRoot: entry.id,
+          workspaceId: entry.id,
           name: lifecycle.name,
           target: lifecycle.lifecycle.target,
           workspaceProbe,
@@ -354,7 +354,7 @@ async function openRemoteWorkspace(
       kind: 'opened',
       opened: projectedWorkspaceRepo({
         entry,
-        repoRoot: entry.id,
+        workspaceId: entry.id,
         name: lifecycle.name,
         target: lifecycle.lifecycle.target,
         workspaceProbe,
@@ -394,38 +394,38 @@ async function commitGitCapabilityRemoval(
     workspaceId,
     workspaceRuntimeId,
     assertCurrent: () => {
-      if (!isCurrentRepoRuntimeMembership(input.userId, workspaceId, workspaceRuntimeId, input.clientId)) {
-        throw new Error('error.repo-runtime-stale')
+      if (!isCurrentWorkspaceRuntimeMembership(input.userId, workspaceId, workspaceRuntimeId, input.clientId)) {
+        throw new Error('error.workspace-runtime-stale')
       }
     },
   })
 }
 
-async function withAcquiredWorkspaceRepoLease<T>(
+async function withAcquiredWorkspaceRuntimeLease<T>(
   input: RestoreServerWorkspaceInput,
-  repoRoot: string,
-  open: (lease: RepoRuntimeMembershipLeaseEntry) => Promise<T>,
+  workspaceId: string,
+  open: (lease: WorkspaceRuntimeMembershipLeaseEntry) => Promise<T>,
 ): Promise<T> {
-  const lease = acquireRepoRuntimeLease(input.userId, repoRoot, input.clientId)
+  const lease = acquireWorkspaceRuntimeLease(input.userId, workspaceId, input.clientId)
   try {
     return await open(lease)
   } catch (err) {
-    releaseWorkspaceRepoRuntime(input, lease)
+    releaseWorkspaceRuntimeLease(input, lease)
     throw err
   }
 }
 
-interface OpenedWorkspaceRepoInput {
+interface OpenedWorkspaceRuntimeInput {
   entry: WorkspaceSessionEntry
-  repoRoot: string
+  workspaceId: string
   name: string
   target?: RemoteRepoTarget
   workspaceProbe: WorkspaceProbeState
-  lease: RepoRuntimeMembershipLeaseEntry
+  lease: WorkspaceRuntimeMembershipLeaseEntry
 }
 
-function requiredWorkspaceProbe(userId: string, repoRoot: string, repoRuntimeId: string): WorkspaceProbeState {
-  const probe = workspaceProbeStateForRuntime(userId, repoRoot, repoRuntimeId)
+function requiredWorkspaceProbe(userId: string, workspaceId: string, workspaceRuntimeId: string): WorkspaceProbeState {
+  const probe = workspaceProbeStateForRuntime(userId, workspaceId, workspaceRuntimeId)
   if (!probe) throw new Error('workspace runtime was superseded during restore')
   return probe
 }
@@ -434,55 +434,55 @@ function serverLocatorPlatform(): 'posix' | 'win32' {
   return process.platform === 'win32' ? 'win32' : 'posix'
 }
 
-function stubWorkspaceRepo(input: OpenedWorkspaceRepoInput): OpenedWorkspaceRepo {
+function stubWorkspaceRepo(input: OpenedWorkspaceRuntimeInput): OpenedWorkspaceRuntime {
   return {
     ...input,
-    repoRuntimeId: input.lease.repoRuntimeId,
+    workspaceRuntimeId: input.lease.workspaceRuntimeId,
     projection: null,
   }
 }
 
 function projectedWorkspaceRepo(
-  input: OpenedWorkspaceRepoInput & { projection: RepoRuntimeProjection },
-): OpenedWorkspaceRepo {
+  input: OpenedWorkspaceRuntimeInput & { projection: WorkspaceRuntimeProjection },
+): OpenedWorkspaceRuntime {
   return {
     ...input,
-    repoRuntimeId: input.lease.repoRuntimeId,
+    workspaceRuntimeId: input.lease.workspaceRuntimeId,
   }
 }
 
-function isOpenedProjectedRepo(repo: OpenedWorkspaceRepo): repo is OpenedProjectedWorkspaceRepo {
-  return isProjectedRestoredWorkspaceRepo(repo)
+function isOpenedProjectedRepo(repo: OpenedWorkspaceRuntime): repo is OpenedProjectedWorkspaceRepo {
+  return isProjectedRestoredWorkspaceRuntime(repo)
 }
 
-function activeRepoRootForOpened(
+function activeWorkspaceIdForOpened(
   activeRepoRoot: string | null | undefined,
-  opened: OpenedWorkspaceRepo[],
+  opened: OpenedWorkspaceRuntime[],
 ): string | null {
-  if (activeRepoRoot && opened.some((repo) => repo.repoRoot === activeRepoRoot)) return activeRepoRoot
-  return opened[0]?.repoRoot ?? null
+  if (activeRepoRoot && opened.some((repo) => repo.workspaceId === activeRepoRoot)) return activeRepoRoot
+  return opened[0]?.workspaceId ?? null
 }
 
-function openedRepoByRoot<T extends RestoredWorkspaceRepoRuntime>(opened: T[]): Map<string, T> {
-  return new Map(opened.map((repo) => [repo.repoRoot, repo]))
+function openedWorkspaceByRoot<T extends RestoredWorkspaceRuntime>(opened: T[]): Map<string, T> {
+  return new Map(opened.map((repo) => [repo.workspaceId, repo]))
 }
 
 function runtimeSnapshotFromOpened(
-  opened: OpenedWorkspaceRepo[],
+  opened: OpenedWorkspaceRuntime[],
   restoredRepoId: string | null,
-  workspacePaneTabs: Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>,
+  workspacePaneTabs: Array<{ workspaceId: string; workspaceRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>,
 ): WorkspaceRuntimeRestoreSnapshot {
   return {
-    repos: opened.map((repo) => omit(repo, ['lease'])),
+    workspaces: opened.map((repo) => omit(repo, ['lease'])),
     workspacePaneTabs,
     restoredRepoId,
   }
 }
 
-function releaseOpenedRepoRuntimes(input: RestoreServerWorkspaceInput, opened: Iterable<OpenedWorkspaceRepo>): void {
-  for (const repo of opened) releaseWorkspaceRepoRuntime(input, repo.lease)
+function releaseOpenedWorkspaceRuntimes(input: RestoreServerWorkspaceInput, opened: Iterable<OpenedWorkspaceRuntime>): void {
+  for (const repo of opened) releaseWorkspaceRuntimeLease(input, repo.lease)
 }
 
-function releaseWorkspaceRepoRuntime(input: RestoreServerWorkspaceInput, lease: RepoRuntimeMembershipLeaseEntry): void {
-  releaseRepoRuntimeMembershipLease(input.userId, input.clientId, lease)
+function releaseWorkspaceRuntimeLease(input: RestoreServerWorkspaceInput, lease: WorkspaceRuntimeMembershipLeaseEntry): void {
+  releaseWorkspaceRuntimeMembershipLease(input.userId, input.clientId, lease)
 }

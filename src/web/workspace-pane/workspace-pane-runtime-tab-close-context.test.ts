@@ -13,12 +13,12 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
 import { terminalRuntimeTabCloseContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 
-const REPO_RUNTIME_ID = 'repo-runtime-test'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const terminalBase: TerminalSessionBase = {
   target: {
     kind: 'git-worktree' as const,
     workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
-    workspaceRuntimeId: REPO_RUNTIME_ID,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
   },
   presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },

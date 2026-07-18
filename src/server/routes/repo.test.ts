@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 import {
-  clearRepoRuntimesForUser,
+  acquireWorkspaceRuntime,
+  clearWorkspaceRuntimesForUser,
   commitWorkspaceProbeState,
+  listWorkspaceRuntimes,
   runSerializedWorkspaceRefresh,
-} from '#/server/modules/repo-runtimes.ts'
+} from '#/server/modules/workspace-runtimes.ts'
 import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 
@@ -105,7 +107,7 @@ vi.mock('#/server/common/identity.ts', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
-  clearRepoRuntimesForUser('user-test')
+  clearWorkspaceRuntimesForUser('user-test')
   mocks.probeLocalWorkspace.mockResolvedValue({
     status: 'ready',
     name: 'workspace',
@@ -147,22 +149,14 @@ function createTestRepoRoutes(
   })
 }
 
-async function openTestRepoRuntime(
-  app: ReturnType<typeof createTestRepoRoutes>,
+async function openTestWorkspaceRuntime(
   repoRoot = WORKSPACE_ID,
 ): Promise<string> {
-  const response = await app.request(
-    new Request('http://localhost/runtime-open', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ repoRoot, clientId: 'client-read-test' }),
-    }),
-  )
-  const json = (await response.json()) as { ok: true; repoRuntimeId: string }
+  const workspaceRuntimeId = acquireWorkspaceRuntime('user-test', repoRoot, 'client-read-test')
   commitWorkspaceProbeState({
     userId: 'user-test',
-    repoRoot,
-    repoRuntimeId: json.repoRuntimeId,
+    workspaceId: repoRoot,
+    workspaceRuntimeId,
     probe: {
       status: 'ready',
       name: 'repo',
@@ -174,30 +168,23 @@ async function openTestRepoRuntime(
       diagnostics: [],
     },
   })
-  return json.repoRuntimeId
+  return workspaceRuntimeId
 }
 
 async function expectRemoteRuntimeFailed(
-  app: ReturnType<typeof createTestRepoRoutes>,
+  _app: ReturnType<typeof createTestRepoRoutes>,
   repoId: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
 ): Promise<void> {
-  const listResponse = await app.request(
-    new Request('http://localhost/runtime-list', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({}),
-    }),
+  expect(listWorkspaceRuntimes('user-test')).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        workspaceId: repoId,
+        workspaceRuntimeId,
+        remoteLifecycle: expect.objectContaining({ kind: 'failed', reason: 'unreachable' }),
+      }),
+    ]),
   )
-  await expect(listResponse.json()).resolves.toMatchObject({
-    runtimes: [
-      {
-        repoRoot: repoId,
-        repoRuntimeId,
-        remoteLifecycle: { kind: 'failed', reason: 'unreachable' },
-      },
-    ],
-  })
 }
 
 describe('repo routes — POST body validation (read endpoints)', () => {
@@ -265,224 +252,14 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(mocks.probeRepo).toHaveBeenCalledWith(WORKSPACE_ID)
   })
 
-  test('runtime-open with repoInput preserves the opened directory identity', async () => {
-    mocks.probeLocalWorkspace.mockResolvedValue({
-      status: 'ready',
-      name: 'subdir',
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: true },
-        git: { status: 'unavailable' },
-      },
-      diagnostics: [],
-    })
-    const commitGitCapabilityRemoval = vi.fn(async () => ({ kind: 'committed' as const }))
-    const app = createTestRepoRoutes(undefined, undefined, { commitGitCapabilityRemoval })
-
-    const response = await app.request(
-      new Request('http://localhost/runtime-open', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoInput: '/tmp/repo/subdir', clientId: 'client-test' }),
-      }),
-    )
-
-    expect(response.status).toBe(200)
-    const json = (await response.json()) as {
-      ok: true
-      repo: { id: string; name: string }
-      repoRuntimeId: string
-    }
-    expect(json).toMatchObject({
-      ok: true,
-      repo: { id: 'goblin+file:///tmp/repo/subdir', name: 'subdir' },
-      capabilities: { git: { status: 'unavailable' } },
-    })
-    expect(json.repoRuntimeId).toMatch(/^repo-runtime-/)
-    expect(mocks.probeLocalWorkspace).toHaveBeenCalledWith(
-      'goblin+file:///tmp/repo/subdir',
-      process.platform === 'win32' ? 'win32' : 'posix',
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    )
-    expect(commitGitCapabilityRemoval).toHaveBeenCalledOnce()
-    expect(commitGitCapabilityRemoval).toHaveBeenCalledWith({
-      userId: 'user-test',
-      workspaceId: 'goblin+file:///tmp/repo/subdir',
-      workspaceRuntimeId: json.repoRuntimeId,
-      assertCurrent: expect.any(Function),
-    })
-  })
-
-  test('defers initial diagnostic Git cleanup until unavailability becomes conclusive', async () => {
-    mocks.probeLocalWorkspace.mockResolvedValue({
-      status: 'ready',
-      name: 'workspace',
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: true },
-        git: { status: 'unavailable' },
-      },
-      diagnostics: [{ scope: 'git', message: 'Git probe timed out' }],
-    })
-    const commitGitCapabilityRemoval = vi.fn(async () => ({ kind: 'committed' as const }))
-    const app = createTestRepoRoutes(undefined, undefined, { commitGitCapabilityRemoval })
-    const opened = await app.request(
-      new Request('http://localhost/runtime-open', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoInput: '/tmp/diagnostic', clientId: 'client-test' }),
-      }),
-    )
-    const openedJson = (await opened.json()) as { ok: true; repo: { id: string }; repoRuntimeId: string }
-    expect(commitGitCapabilityRemoval).not.toHaveBeenCalled()
-
-    mocks.probeWorkspace.mockResolvedValue({
-      status: 'ready',
-      name: 'workspace',
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: true },
-        git: { status: 'unavailable' },
-      },
-      diagnostics: [],
-    })
-    await app.request(
-      new Request('http://localhost/workspace-refresh', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ workspaceId: openedJson.repo.id, workspaceRuntimeId: openedJson.repoRuntimeId }),
-      }),
-    )
-    await app.request(
-      new Request('http://localhost/workspace-refresh', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ workspaceId: openedJson.repo.id, workspaceRuntimeId: openedJson.repoRuntimeId }),
-      }),
-    )
-
-    expect(commitGitCapabilityRemoval).toHaveBeenCalledOnce()
-  })
-
-  test('runtime-open with repoInput fails without minting a runtime id when probe fails', async () => {
-    mocks.probeLocalWorkspace.mockResolvedValue({ status: 'unavailable', reason: 'error.workspace-path-not-found' })
-    const app = createTestRepoRoutes()
-
-    const response = await app.request(
-      new Request('http://localhost/runtime-open', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoInput: '/missing', clientId: 'client-test' }),
-      }),
-    )
-
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({
-      ok: false,
-      input: '/missing',
-      reason: 'error.workspace-path-not-found',
-    })
-  })
-
-  test('runtime-list returns the server-owned open runtimes for the user', async () => {
-    const app = createTestRepoRoutes()
-
-    const openResponse = await app.request(
-      new Request('http://localhost/runtime-open', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoRoot: 'goblin+file:///tmp/runtime-list-repo', clientId: 'client-test' }),
-      }),
-    )
-    const opened = (await openResponse.json()) as { ok: true; repoRuntimeId: string }
-
-    const response = await app.request(
-      new Request('http://localhost/runtime-list', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({}),
-      }),
-    )
-
-    expect(response.status).toBe(200)
-    const json = (await response.json()) as { runtimes: Array<{ repoRoot: string; repoRuntimeId: string }> }
-    expect(json.runtimes).toContainEqual({
-      repoRoot: 'goblin+file:///tmp/runtime-list-repo',
-      repoRuntimeId: opened.repoRuntimeId,
-      remoteLifecycle: null,
-      workspaceProbe: { status: 'probing' },
-    })
-  })
-
-  test('rejects raw paths at runtime membership admission', async () => {
-    const app = createTestRepoRoutes()
-    const post = async (path: string, body: object) =>
-      await app.request(
-        new Request(`http://localhost${path}`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(body),
-        }),
-      )
-
-    const opened = await post('/runtime-open', { repoRoot: '/tmp/raw-path', clientId: 'client-test' })
-    expect(opened.status).toBe(400)
-    await expect(opened.json()).resolves.toMatchObject({ message: 'repoRoot: Invalid workspace ID' })
-
-    const reconciled = await post('/runtime-reconcile', {
-      clientId: 'client-test',
-      repoRoots: ['goblin+file:///tmp/valid', '/tmp/raw-path'],
-    })
-    expect(reconciled.status).toBe(400)
-    await expect(reconciled.json()).resolves.toMatchObject({ message: 'repoRoots.1: Invalid workspace ID' })
-    const listed = await post('/runtime-list', {})
-    await expect(listed.json()).resolves.toEqual({ runtimes: [] })
-  })
-
-  test('workspace-refresh commits a conclusive capability result for the current runtime', async () => {
-    const commitGitCapabilityRemoval = vi.fn(async () => ({ kind: 'committed' as const }))
-    const app = createTestRepoRoutes(undefined, undefined, { commitGitCapabilityRemoval })
-    const workspaceId = 'goblin+file:///tmp/workspace-refresh'
-    const workspaceRuntimeId = await openTestRepoRuntime(app, workspaceId)
-    mocks.probeLocalWorkspace.mockResolvedValue({
-      status: 'ready',
-      name: 'workspace-refresh',
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: true },
-        git: { status: 'unavailable' },
-      },
-      diagnostics: [],
-    })
-
-    const response = await app.request(
-      new Request('http://localhost/workspace-refresh', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ workspaceId, workspaceRuntimeId }),
-      }),
-    )
-
-    await expect(response.json()).resolves.toMatchObject({
-      kind: 'committed',
-      probe: { status: 'ready', capabilities: { git: { status: 'unavailable' } } },
-    })
-    expect(commitGitCapabilityRemoval).toHaveBeenCalledWith({
-      userId: 'user-test',
-      workspaceId,
-      workspaceRuntimeId,
-      assertCurrent: expect.any(Function),
-    })
-  })
-
   test('rejects Git reads after the server commits Git unavailable', async () => {
     const app = createTestRepoRoutes()
     const workspaceId = 'goblin+file:///tmp/plain-workspace'
-    const workspaceRuntimeId = await openTestRepoRuntime(app, workspaceId)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime(workspaceId)
     await runSerializedWorkspaceRefresh({
       userId: 'user-test',
-      repoRoot: workspaceId,
-      repoRuntimeId: workspaceRuntimeId,
+      workspaceId: workspaceId,
+      workspaceRuntimeId: workspaceRuntimeId,
       probe: async () => ({
         status: 'ready',
         name: 'plain-workspace',
@@ -499,124 +276,13 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/projection', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: workspaceId, repoRuntimeId: workspaceRuntimeId }),
+        body: JSON.stringify({ cwd: workspaceId, workspaceRuntimeId: workspaceRuntimeId }),
       }),
     )
 
     expect(response.status).toBe(400)
     await expect(response.json()).resolves.toMatchObject({ message: 'error.workspace-git-unavailable' })
     expect(mocks.readRepoProjection).not.toHaveBeenCalled()
-  })
-
-  test('keeps one shared runtime until the last client membership closes', async () => {
-    const app = createTestRepoRoutes()
-    const open = async (clientId: string) =>
-      (await (
-        await app.request(
-          new Request('http://localhost/runtime-open', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ repoRoot: 'goblin+file:///tmp/shared-runtime', clientId }),
-          }),
-        )
-      ).json()) as { repoRuntimeId: string }
-    const first = await open('client-a')
-    const second = await open('client-b')
-    expect(second.repoRuntimeId).toBe(first.repoRuntimeId)
-    const close = async (clientId: string) =>
-      await (
-        await app.request(
-          new Request('http://localhost/runtime-close', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
-              repoRoot: 'goblin+file:///tmp/shared-runtime',
-              repoRuntimeId: first.repoRuntimeId,
-              clientId,
-            }),
-          }),
-        )
-      ).json()
-    await expect(close('client-a')).resolves.toEqual({ ok: true, released: true, runtimeClosed: false })
-    await expect(close('client-b')).resolves.toEqual({ ok: true, released: true, runtimeClosed: true })
-  })
-
-  test.each([
-    ['/runtime-open', { repoRoot: '/tmp/invalid-client', clientId: '' }],
-    ['/runtime-open', { repoRoot: '/tmp/invalid-client', clientId: 'x'.repeat(129) }],
-    ['/runtime-close', { repoRoot: '/tmp/invalid-client', repoRuntimeId: 'repo-runtime-test', clientId: '' }],
-    [
-      '/runtime-close',
-      { repoRoot: '/tmp/invalid-client', repoRuntimeId: 'repo-runtime-test', clientId: 'x'.repeat(129) },
-    ],
-    ['/runtime-reconcile', { repoRoots: ['/tmp/invalid-client'], clientId: '' }],
-    ['/runtime-reconcile', { repoRoots: ['/tmp/invalid-client'], clientId: 'x'.repeat(129) }],
-  ])('returns 400 when %s receives an invalid clientId', async (path, body) => {
-    const response = await createTestRepoRoutes().request(
-      new Request(`http://localhost${path}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      }),
-    )
-
-    expect(response.status).toBe(400)
-  })
-
-  test('returns 400 when runtime reconcile contains an empty repo root', async () => {
-    const response = await createTestRepoRoutes().request(
-      new Request('http://localhost/runtime-reconcile', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ clientId: 'client-a', repoRoots: ['/tmp/valid', ''] }),
-      }),
-    )
-
-    expect(response.status).toBe(400)
-  })
-
-  test('reconciles a client window membership declaration in one request', async () => {
-    const app = createTestRepoRoutes()
-    const post = async (path: string, body: object) =>
-      await app.request(
-        new Request(`http://localhost${path}`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(body),
-        }),
-      )
-    const old = (await (
-      await post('/runtime-open', {
-        repoRoot: 'goblin+file:///tmp/reconcile-old',
-        clientId: 'client-a',
-      })
-    ).json()) as { repoRuntimeId: string }
-    await post('/runtime-open', { repoRoot: 'goblin+file:///tmp/reconcile-old', clientId: 'client-b' })
-
-    const response = await post('/runtime-reconcile', {
-      clientId: 'client-a',
-      repoRoots: ['goblin+file:///tmp/reconcile-new'],
-    })
-
-    expect(response.status).toBe(200)
-    const reconciled = (await response.json()) as {
-      runtimes: Array<{ repoRoot: string; repoRuntimeId: string }>
-    }
-    expect(reconciled.runtimes).toContainEqual(
-      expect.objectContaining({
-        repoRoot: 'goblin+file:///tmp/reconcile-new',
-        repoRuntimeId: expect.stringMatching(/^repo-runtime-/),
-      }),
-    )
-    const listed = (await (await post('/runtime-list', {})).json()) as {
-      runtimes: Array<{ repoRoot: string; repoRuntimeId: string }>
-    }
-    expect(listed.runtimes).toContainEqual(
-      expect.objectContaining({
-        repoRoot: 'goblin+file:///tmp/reconcile-old',
-        repoRuntimeId: old.repoRuntimeId,
-      }),
-    )
   })
 
   test('passes worktree bootstrap preview requests through to the module layer', async () => {
@@ -633,13 +299,13 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       },
     })
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
 
     const response = await app.request(
       new Request('http://localhost/worktree-bootstrap-preview', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId }),
       }),
     )
 
@@ -647,7 +313,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(await response.json()).toMatchObject({ ok: true, preview: { hasOperations: false } })
     expect(mocks.getRepoWorktreeBootstrapPreview).toHaveBeenCalledWith(WORKSPACE_ID, {
       signal: expect.any(AbortSignal),
-      repoRuntimeId,
+      workspaceRuntimeId,
     })
   })
 
@@ -660,12 +326,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       loadedAt: 123,
     })
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
       new Request('http://localhost/projection', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, branch: 'feature/a' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, branch: 'feature/a' }),
       }),
     )
 
@@ -674,16 +340,16 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       branch: 'feature/a',
       mode: 'full',
       signal: expect.any(AbortSignal),
-      repoRuntimeId,
+      workspaceRuntimeId,
     })
     expect(await response.json()).toMatchObject({ requested: { branch: 'feature/a', pullRequestMode: 'full' } })
   })
 
   test('returns a complete repo-runtime-scoped worktree status snapshot', async () => {
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     mocks.readRepoWorktreeStatus.mockResolvedValue({
-      repoRuntimeId,
+      workspaceRuntimeId,
       status: [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [] }],
       loadedAt: 123,
     })
@@ -692,16 +358,16 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/worktree-status', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId }),
       }),
     )
 
     expect(response.status).toBe(200)
     expect(mocks.readRepoWorktreeStatus).toHaveBeenCalledWith(WORKSPACE_ID, {
       signal: expect.any(AbortSignal),
-      repoRuntimeId,
+      workspaceRuntimeId,
     })
-    expect(await response.json()).toMatchObject({ repoRuntimeId, status: [{ path: '/tmp/repo' }] })
+    expect(await response.json()).toMatchObject({ workspaceRuntimeId, status: [{ path: '/tmp/repo' }] })
   })
 
   test('returns repo operation state snapshots', async () => {
@@ -710,7 +376,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
         {
           id: 'repo-op-1',
           repoId: WORKSPACE_ID,
-          repoRuntimeId: null,
+          workspaceRuntimeId: null,
           kind: 'fetch',
           phase: 'running',
           source: 'background',
@@ -734,19 +400,19 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       loadedAt: 123,
     })
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
       new Request('http://localhost/operations', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, includeSettled: true }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, includeSettled: true }),
       }),
     )
 
     expect(response.status).toBe(200)
     expect(mocks.readRepoOperationsSnapshot).toHaveBeenCalledWith(WORKSPACE_ID, {
       includeSettled: true,
-      repoRuntimeId,
+      workspaceRuntimeId,
       signal: expect.any(AbortSignal),
     })
     expect(await response.json()).toMatchObject({ operations: [{ kind: 'fetch', phase: 'running' }] })
@@ -755,30 +421,30 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   test('passes patch body through to getRepoPatch', async () => {
     mocks.getRepoPatch.mockResolvedValue({ ok: true, message: 'diff --git a b' })
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
       new Request('http://localhost/patch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
       }),
     )
     expect(response.status).toBe(200)
     expect(mocks.getRepoPatch).toHaveBeenCalledWith(WORKSPACE_ID, '/tmp/repo/.worktrees/feature', {
       signal: expect.any(AbortSignal),
-      repoRuntimeId,
+      workspaceRuntimeId,
     })
   })
 
   test('hard-fails when repo log reading fails', async () => {
     mocks.getRepoLog.mockRejectedValueOnce(new Error('fatal: bad revision'))
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, branch: 'feature/work', count: 50 }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, branch: 'feature/work', count: 50 }),
       }),
     )
 
@@ -787,35 +453,35 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       count: 50,
       skip: 0,
       signal: expect.any(AbortSignal),
-      repoRuntimeId,
+      workspaceRuntimeId,
     })
   })
 
   test('rejects stale runtime-scoped repo reads before the module layer', async () => {
     const app = createTestRepoRoutes()
-    await openTestRepoRuntime(app)
+    await openTestWorkspaceRuntime()
 
     const response = await app.request(
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId: 'repo-runtime-stale', branch: 'feature/work' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-stale', branch: 'feature/work' }),
       }),
     )
 
     expect(response.status).toBe(400)
-    await expect(response.json()).resolves.toMatchObject({ ok: false, message: 'error.repo-runtime-stale' })
+    await expect(response.json()).resolves.toMatchObject({ ok: false, message: 'error.workspace-runtime-stale' })
     expect(mocks.getRepoLog).not.toHaveBeenCalled()
   })
 
   test('marks remote lifecycle failed when a runtime-scoped repo read hits transport failure', async () => {
     const app = createTestRepoRoutes()
     const repoId = 'goblin+ssh://prod/home/alice/service'
-    const repoRuntimeId = await openTestRepoRuntime(app, repoId)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
     mocks.getRepoLog.mockRejectedValueOnce(
       new RemoteRepoRuntimeFailureError({
         repoRoot: repoId,
-        repoRuntimeId,
+        workspaceRuntimeId,
         reason: 'unreachable',
         target: {
           id: repoId,
@@ -834,28 +500,13 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: repoId, repoRuntimeId, branch: 'feature/work' }),
+        body: JSON.stringify({ cwd: repoId, workspaceRuntimeId, branch: 'feature/work' }),
       }),
     )
 
     expect(response.status).toBe(400)
     await expect(response.json()).resolves.toMatchObject({ ok: false, message: 'error.failed-read-repo' })
-    const listResponse = await app.request(
-      new Request('http://localhost/runtime-list', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({}),
-      }),
-    )
-    await expect(listResponse.json()).resolves.toMatchObject({
-      runtimes: [
-        {
-          repoRoot: repoId,
-          repoRuntimeId,
-          remoteLifecycle: { kind: 'failed', reason: 'unreachable' },
-        },
-      ],
-    })
+    await expectRemoteRuntimeFailed(app, repoId, workspaceRuntimeId)
     expect(mocks.publishUserRepoQueryInvalidation).toHaveBeenCalledWith('user-test', {
       repoId,
       query: 'remote-lifecycle',
@@ -866,17 +517,17 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     {
       name: 'worktree-bootstrap-preview',
       path: '/worktree-bootstrap-preview',
-      body: (repoId: string, repoRuntimeId: string) => ({ cwd: repoId, repoRuntimeId }),
+      body: (repoId: string, workspaceRuntimeId: string) => ({ cwd: repoId, workspaceRuntimeId }),
       mock: mocks.getRepoWorktreeBootstrapPreview,
     },
     {
       name: 'tree',
       path: '/tree',
-      body: (repoId: string, repoRuntimeId: string) => ({
+      body: (repoId: string, workspaceRuntimeId: string) => ({
         target: {
           kind: 'git-worktree',
           workspaceId: repoId,
-          workspaceRuntimeId: repoRuntimeId,
+          workspaceRuntimeId: workspaceRuntimeId,
           root: 'goblin+ssh://prod/home/alice/service/.worktrees/feature',
         },
       }),
@@ -885,9 +536,9 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     {
       name: 'file-viewer',
       path: '/file-viewer',
-      body: (repoId: string, repoRuntimeId: string) => ({
+      body: (repoId: string, workspaceRuntimeId: string) => ({
         cwd: repoId,
-        repoRuntimeId,
+        workspaceRuntimeId,
         worktreePath: '/home/alice/service/.worktrees/feature',
       }),
       mock: mocks.getRepositoryFileViewer,
@@ -895,9 +546,9 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     {
       name: 'open-url',
       path: '/open-url',
-      body: (repoId: string, repoRuntimeId: string) => ({
+      body: (repoId: string, workspaceRuntimeId: string) => ({
         cwd: repoId,
-        repoRuntimeId,
+        workspaceRuntimeId,
         target: { type: 'branch' as const, branch: 'feature/work' },
       }),
       mock: mocks.openRepoUrl,
@@ -905,9 +556,9 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     {
       name: 'trash-file',
       path: '/trash-file',
-      body: (repoId: string, repoRuntimeId: string) => ({
+      body: (repoId: string, workspaceRuntimeId: string) => ({
         cwd: repoId,
-        repoRuntimeId,
+        workspaceRuntimeId,
         worktreePath: '/home/alice/service/.worktrees/feature',
         path: 'src/index.ts',
       }),
@@ -916,11 +567,11 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   ])('marks remote lifecycle failed when /$name hits transport failure', async ({ path, body, mock }) => {
     const app = createTestRepoRoutes()
     const repoId = 'goblin+ssh://prod/home/alice/service'
-    const repoRuntimeId = await openTestRepoRuntime(app, repoId)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
     mock.mockRejectedValueOnce(
       new RemoteRepoRuntimeFailureError({
         repoRoot: repoId,
-        repoRuntimeId,
+        workspaceRuntimeId,
         reason: 'unreachable',
         message: 'connection refused',
       }),
@@ -930,13 +581,13 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request(`http://localhost${path}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body(repoId, repoRuntimeId)),
+        body: JSON.stringify(body(repoId, workspaceRuntimeId)),
       }),
     )
 
     expect(response.status).toBe(400)
     await expect(response.json()).resolves.toMatchObject({ ok: false, message: 'error.failed-read-repo' })
-    await expectRemoteRuntimeFailed(app, repoId, repoRuntimeId)
+    await expectRemoteRuntimeFailed(app, repoId, workspaceRuntimeId)
     expect(mocks.publishUserRepoQueryInvalidation).toHaveBeenCalledWith('user-test', {
       repoId,
       query: 'remote-lifecycle',
@@ -946,11 +597,11 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   test('marks remote lifecycle failed when a runtime-scoped repo write hits transport failure', async () => {
     const app = createTestRepoRoutes()
     const repoId = 'goblin+ssh://prod/home/alice/service'
-    const repoRuntimeId = await openTestRepoRuntime(app, repoId)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
     mocks.pullRepoBranch.mockRejectedValueOnce(
       new RemoteRepoRuntimeFailureError({
         repoRoot: repoId,
-        repoRuntimeId,
+        workspaceRuntimeId,
         reason: 'unreachable',
         message: 'connection refused',
       }),
@@ -960,31 +611,16 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/pull', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: repoId, repoRuntimeId, branch: 'feature/work' }),
+        body: JSON.stringify({ cwd: repoId, workspaceRuntimeId, branch: 'feature/work' }),
       }),
     )
 
     expect(response.status).toBe(400)
     await expect(response.json()).resolves.toMatchObject({ ok: false, message: 'error.failed-read-repo' })
     expect(mocks.pullRepoBranch).toHaveBeenCalledWith(repoId, 'feature/work', undefined, expect.any(AbortSignal), {
-      repoRuntimeId,
+      workspaceRuntimeId,
     })
-    const listResponse = await app.request(
-      new Request('http://localhost/runtime-list', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({}),
-      }),
-    )
-    await expect(listResponse.json()).resolves.toMatchObject({
-      runtimes: [
-        {
-          repoRoot: repoId,
-          repoRuntimeId,
-          remoteLifecycle: { kind: 'failed', reason: 'unreachable' },
-        },
-      ],
-    })
+    await expectRemoteRuntimeFailed(app, repoId, workspaceRuntimeId)
   })
 
   test('passes /tree requests through to the read layer', async () => {
@@ -1003,13 +639,13 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       truncated: false,
     })
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
       new Request('http://localhost/tree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          target: treeTarget(repoRuntimeId),
+          target: treeTarget(workspaceRuntimeId),
           prefix: 'src',
         }),
       }),
@@ -1018,9 +654,9 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     const json = (await response.json()) as { nodes: Array<{ id: string }>; truncated: boolean }
     expect(json.nodes.map((n) => n.id)).toEqual(['src', 'src/index.ts'])
     expect(json.truncated).toBe(false)
-    expect(mocks.getRepositoryTree).toHaveBeenCalledWith(treeTarget(repoRuntimeId), {
+    expect(mocks.getRepositoryTree).toHaveBeenCalledWith(treeTarget(workspaceRuntimeId), {
       prefix: 'src',
-      repoRuntimeId,
+      workspaceRuntimeId,
       signal: expect.any(AbortSignal),
     })
   })
@@ -1028,28 +664,28 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   test('passes the HTTP request signal into /tree reads', async () => {
     mocks.getRepositoryTree.mockResolvedValueOnce({ nodes: [], truncated: false })
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
       new Request('http://localhost/tree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ target: treeTarget(repoRuntimeId) }),
+        body: JSON.stringify({ target: treeTarget(workspaceRuntimeId) }),
       }),
     )
 
     expect(response.status).toBe(200)
     const options = mocks.getRepositoryTree.mock.calls[0]?.[1] as { signal?: AbortSignal } | undefined
-    expect(options).toEqual({ prefix: undefined, repoRuntimeId, signal: expect.any(AbortSignal) })
+    expect(options).toEqual({ prefix: undefined, workspaceRuntimeId, signal: expect.any(AbortSignal) })
   })
 
   test('returns 400 when /tree prefix is invalid', async () => {
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
       new Request('http://localhost/tree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ target: treeTarget(repoRuntimeId), prefix: '../secret' }),
+        body: JSON.stringify({ target: treeTarget(workspaceRuntimeId), prefix: '../secret' }),
       }),
     )
     expect(response.status).toBe(400)
@@ -1058,7 +694,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
   test('returns 400 before the read layer for a cross-transport tree target', async () => {
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
       new Request('http://localhost/tree', {
         method: 'POST',
@@ -1067,7 +703,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
           target: {
             kind: 'git-worktree',
             workspaceId: WORKSPACE_ID,
-            workspaceRuntimeId: repoRuntimeId,
+            workspaceRuntimeId: workspaceRuntimeId,
             root: 'goblin+file:///C:/mock-worktree',
           },
         }),
@@ -1081,12 +717,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   test('hard-fails when /tree read fails', async () => {
     mocks.getRepositoryTree.mockRejectedValueOnce(new Error('boom'))
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
       new Request('http://localhost/tree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ target: treeTarget(repoRuntimeId) }),
+        body: JSON.stringify({ target: treeTarget(workspaceRuntimeId) }),
       }),
     )
     expect(response.status).toBe(500)
@@ -1099,12 +735,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       executionRoot: '/tmp/repo/.worktrees/feature',
     })
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
       new Request('http://localhost/file-viewer', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
       }),
     )
     expect(response.status).toBe(200)
@@ -1117,19 +753,19 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       WORKSPACE_ID,
       '/tmp/repo/.worktrees/feature',
       expect.any(AbortSignal),
-      { repoRuntimeId },
+      { workspaceRuntimeId },
     )
   })
 
   test('hard-fails when /file-viewer read fails', async () => {
     mocks.getRepositoryFileViewer.mockRejectedValueOnce(new Error('boom'))
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
       new Request('http://localhost/file-viewer', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
       }),
     )
     expect(response.status).toBe(500)
@@ -1138,14 +774,14 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   test('passes /trash-file requests through to the filetree write layer', async () => {
     mocks.trashRepositoryFile.mockResolvedValueOnce({ ok: true, message: 'ok' })
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
       new Request('http://localhost/trash-file', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           cwd: WORKSPACE_ID,
-          repoRuntimeId,
+          workspaceRuntimeId,
           worktreePath: '/tmp/repo/.worktrees/feature',
           path: 'src/index.ts',
         }),
@@ -1159,18 +795,18 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       '/tmp/repo/.worktrees/feature',
       'src/index.ts',
       expect.any(AbortSignal),
-      { repoRuntimeId },
+      { workspaceRuntimeId },
     )
   })
 
   test('returns 400 when /trash-file path escapes the worktree', async () => {
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
       new Request('http://localhost/trash-file', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, worktreePath: '/tmp/repo', path: '../secret.txt' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, worktreePath: '/tmp/repo', path: '../secret.txt' }),
       }),
     )
     expect(response.status).toBe(400)
@@ -1185,7 +821,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId: 'repo-runtime-test', branch: 'main', count: 0 }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-test', branch: 'main', count: 0 }),
       }),
     )
     expect(response.status).toBe(400)
@@ -1199,7 +835,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId: 'repo-runtime-test', branch: 'main', count: 2.5 }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-test', branch: 'main', count: 2.5 }),
       }),
     )
     expect(response.status).toBe(400)
@@ -1215,7 +851,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId: 'repo-runtime-test', branch: 'main', count: '50' }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-test', branch: 'main', count: '50' }),
       }),
     )
     expect(response.status).toBe(400)
@@ -1267,16 +903,16 @@ describe('repo routes — POST body validation (action endpoints)', () => {
   test('fetch route forwards the request abort signal', async () => {
     mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
       new Request('http://localhost/fetch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId }),
       }),
     )
     expect(response.status).toBe(200)
-    expect(mocks.fetchRepo).toHaveBeenCalledWith(WORKSPACE_ID, 'user', expect.any(AbortSignal), repoRuntimeId)
+    expect(mocks.fetchRepo).toHaveBeenCalledWith(WORKSPACE_ID, 'user', expect.any(AbortSignal), workspaceRuntimeId)
   })
 
   test('clone route forwards url/parentPath/directoryName and the request abort signal', async () => {
@@ -1318,14 +954,14 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       return prepared.ok ? { ok: true, message: 'removed' } : prepared
     })
     const app = createTestRepoRoutes(worktreeRemovalApplication)
-    const repoRuntimeId = await openTestRepoRuntime(app, WORKSPACE_ID)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime(WORKSPACE_ID)
     const response = await app.request(
       new Request('http://localhost/remove-worktree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           cwd: WORKSPACE_ID,
-          repoRuntimeId,
+          workspaceRuntimeId,
           branch: 'feature/remove',
           worktreePath: '/tmp/repo-remove',
           deleteBranch: false,
@@ -1339,7 +975,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       'user-test',
       expect.objectContaining({
         repoRoot: WORKSPACE_ID,
-        repoRuntimeId,
+        workspaceRuntimeId,
         worktreePath: '/tmp/repo-remove',
       }),
     )
@@ -1365,19 +1001,19 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         }),
       }),
       expect.any(AbortSignal),
-      { repoRuntimeId },
+      { workspaceRuntimeId },
     )
   })
 
   test('open-url route forwards repo URL targets', async () => {
     mocks.openRepoUrl.mockResolvedValue({ ok: true, message: 'https://github.com/acme/repo/commit/abcdef1' })
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     const response = await app.request(
       new Request('http://localhost/open-url', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, target: { type: 'commit', hash: 'abcdef1' } }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, target: { type: 'commit', hash: 'abcdef1' } }),
       }),
     )
 
@@ -1386,26 +1022,26 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       WORKSPACE_ID,
       { type: 'commit', hash: 'abcdef1' },
       expect.any(AbortSignal),
-      { repoRuntimeId },
+      { workspaceRuntimeId },
     )
   })
 
   test('delegates branch deletion to the repo mutation application', async () => {
     const deleteBranch = vi.fn(async (_userId, input) => await input.deleteBranch())
     const app = createTestRepoRoutes(undefined, { deleteBranch })
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
     mocks.deleteRepoBranch.mockResolvedValueOnce({ ok: true, message: 'ok' })
 
     const response = await app.request('/delete-branch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, branch: 'feature/retired' }),
+      body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, branch: 'feature/retired' }),
     })
 
     expect(response.status).toBe(200)
     expect(deleteBranch).toHaveBeenCalledWith('user-test', {
       repoRoot: WORKSPACE_ID,
-      repoRuntimeId,
+      workspaceRuntimeId,
       branchName: 'feature/retired',
       deleteBranch: expect.any(Function),
     })
@@ -1414,7 +1050,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     await app.request('/delete-branch', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ cwd: WORKSPACE_ID, repoRuntimeId, branch: 'feature/kept' }),
+      body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, branch: 'feature/kept' }),
     })
     expect(deleteBranch).toHaveBeenCalledTimes(2)
   })
@@ -1424,7 +1060,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     mocks.openRepoEditor.mockResolvedValue({ ok: true, message: '' })
     mocks.openRepoInFinder.mockResolvedValue({ ok: true, message: '' })
     const app = createTestRepoRoutes()
-    const repoRuntimeId = await openTestRepoRuntime(app)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
 
     await app.request(
       new Request('http://localhost/open-terminal', {
@@ -1432,7 +1068,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           repoId: WORKSPACE_ID,
-          repoRuntimeId,
+          workspaceRuntimeId,
           worktreePath: '/tmp/repo',
           app: 'ghostty',
         }),
@@ -1444,7 +1080,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           repoId: WORKSPACE_ID,
-          repoRuntimeId,
+          workspaceRuntimeId,
           worktreePath: '/tmp/repo',
           app: 'vscode',
         }),
@@ -1459,10 +1095,10 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     )
 
     expect(mocks.openRepoTerminal).toHaveBeenCalledWith(WORKSPACE_ID, '/tmp/repo', 'ghostty', expect.any(AbortSignal), {
-      repoRuntimeId,
+      workspaceRuntimeId,
     })
     expect(mocks.openRepoEditor).toHaveBeenCalledWith(WORKSPACE_ID, '/tmp/repo', 'vscode', expect.any(AbortSignal), {
-      repoRuntimeId,
+      workspaceRuntimeId,
     })
     expect(mocks.openRepoInFinder).toHaveBeenCalledWith(WORKSPACE_ID, '/tmp/repo')
   })
@@ -1478,11 +1114,11 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     })
     expect(target).not.toBeNull()
     const repoId = target!.id
-    const repoRuntimeId = await openTestRepoRuntime(app, repoId)
+    const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
     mocks.openRepoTerminal.mockRejectedValue(
       new RemoteRepoRuntimeFailureError({
         repoRoot: repoId,
-        repoRuntimeId,
+        workspaceRuntimeId,
         reason: 'unreachable',
       }),
     )
@@ -1493,7 +1129,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           repoId,
-          repoRuntimeId,
+          workspaceRuntimeId,
           worktreePath: '/srv/repo',
           app: 'ghostty',
         }),
@@ -1501,7 +1137,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     )
 
     expect(response.status).toBe(400)
-    await expectRemoteRuntimeFailed(app, repoId, repoRuntimeId)
+    await expectRemoteRuntimeFailed(app, repoId, workspaceRuntimeId)
   })
 
   test('returns 400 for invalid external app choices', async () => {

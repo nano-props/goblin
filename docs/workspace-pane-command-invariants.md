@@ -54,7 +54,7 @@ Target repair and branch retirement use the same aggregate boundary. Repair vali
 
 ## Invariants
 
-1. Every queued command keeps its admission lease: `repoRuntimeId`, branch, and worktree. It cannot cross an epoch or worktree replacement.
+1. Every queued command keeps its admission lease: `workspaceRuntimeId`, branch, and worktree. It cannot cross an epoch or worktree replacement.
 2. Relative intent remains relative until execution and runs once in queue order. Absolute intent remains absolute and may rebase only within its current target.
 3. Router currentness comes from the router capability, never store supplements. Only an accepted router commit writes route supplements.
 4. Server write, projection acceptance, and route commit are separate outcomes; later failure cannot undo or report failure as success for an earlier fact.

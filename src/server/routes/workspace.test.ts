@@ -1,0 +1,207 @@
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { createWorkspaceRoutes } from '#/server/routes/workspace.ts'
+import { clearWorkspaceRuntimesForUser, commitWorkspaceProbeState } from '#/server/modules/workspace-runtimes.ts'
+
+const USER_ID = 'workspace-route-user'
+const WORKSPACE_ID = 'goblin+file:///tmp/workspace-route'
+const CLIENT_ID = 'workspace-route-client'
+
+const mocks = vi.hoisted(() => ({
+  probeLocalWorkspace: vi.fn(),
+  probeWorkspace: vi.fn(),
+}))
+
+vi.mock('#/server/modules/workspace-probe.ts', () => ({
+  probeLocalWorkspace: mocks.probeLocalWorkspace,
+  probeWorkspace: mocks.probeWorkspace,
+}))
+
+vi.mock('#/server/common/identity.ts', () => ({
+  userIdFromContext: () => USER_ID,
+}))
+
+const readyPlainWorkspace = {
+  status: 'ready' as const,
+  name: 'workspace-route',
+  capabilities: {
+    files: { read: true as const, write: true },
+    terminal: { available: true },
+    git: { status: 'unavailable' as const },
+  },
+  diagnostics: [],
+}
+
+describe('workspace routes', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    clearWorkspaceRuntimesForUser(USER_ID)
+    mocks.probeLocalWorkspace.mockResolvedValue(readyPlainWorkspace)
+    mocks.probeWorkspace.mockResolvedValue(readyPlainWorkspace)
+  })
+
+  test('opens a command input as one canonical workspace runtime', async () => {
+    const commitGitCapabilityRemoval = vi.fn(async () => ({ kind: 'committed' as const }))
+    const app = createWorkspaceRoutes({ workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval } })
+    const response = await post(app, '/runtime-open', {
+      workspaceInput: '/tmp/workspace-route',
+      clientId: CLIENT_ID,
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      workspace: { id: WORKSPACE_ID, name: 'workspace-route' },
+      workspaceRuntimeId: expect.stringMatching(/^workspace-runtime-/),
+      capabilities: { git: { status: 'unavailable' } },
+    })
+    expect(commitGitCapabilityRemoval).toHaveBeenCalledOnce()
+  })
+
+  test('does not mint a runtime when command-input probing fails', async () => {
+    mocks.probeLocalWorkspace.mockResolvedValue({ status: 'unavailable', reason: 'error.path-not-found' })
+    const app = createTestWorkspaceRoutes()
+    const response = await post(app, '/runtime-open', {
+      workspaceInput: '/tmp/missing-workspace',
+      clientId: CLIENT_ID,
+    })
+
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      input: '/tmp/missing-workspace',
+      reason: 'error.path-not-found',
+    })
+    await expect((await post(app, '/runtime-list', {})).json()).resolves.toEqual({ runtimes: [] })
+  })
+
+  test('defers Git cleanup until an unavailable probe becomes conclusive', async () => {
+    mocks.probeLocalWorkspace.mockResolvedValue({
+      ...readyPlainWorkspace,
+      diagnostics: [{ scope: 'git', message: 'Git probe timed out' }],
+    })
+    const commitGitCapabilityRemoval = vi.fn(async () => ({ kind: 'committed' as const }))
+    const app = createWorkspaceRoutes({ workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval } })
+    const opened = (await (
+      await post(app, '/runtime-open', { workspaceInput: '/tmp/workspace-route', clientId: CLIENT_ID })
+    ).json()) as { workspaceRuntimeId: string }
+    expect(commitGitCapabilityRemoval).not.toHaveBeenCalled()
+
+    await post(app, '/refresh', { workspaceId: WORKSPACE_ID, workspaceRuntimeId: opened.workspaceRuntimeId })
+    await post(app, '/refresh', { workspaceId: WORKSPACE_ID, workspaceRuntimeId: opened.workspaceRuntimeId })
+    expect(commitGitCapabilityRemoval).toHaveBeenCalledOnce()
+  })
+
+  test('lists and closes the shared epoch only after its last client releases', async () => {
+    const app = createTestWorkspaceRoutes()
+    const first = (await (await post(app, '/runtime-open', { workspaceId: WORKSPACE_ID, clientId: CLIENT_ID })).json()) as {
+      workspaceRuntimeId: string
+    }
+    const secondClientId = 'workspace-route-client-two'
+    const second = (await (
+      await post(app, '/runtime-open', { workspaceId: WORKSPACE_ID, clientId: secondClientId })
+    ).json()) as { workspaceRuntimeId: string }
+    expect(second.workspaceRuntimeId).toBe(first.workspaceRuntimeId)
+    await expect((await post(app, '/runtime-list', {})).json()).resolves.toMatchObject({
+      runtimes: [{ workspaceId: WORKSPACE_ID, workspaceRuntimeId: first.workspaceRuntimeId }],
+    })
+
+    await expect(
+      (
+        await post(app, '/runtime-close', {
+          workspaceId: WORKSPACE_ID,
+          workspaceRuntimeId: first.workspaceRuntimeId,
+          clientId: CLIENT_ID,
+        })
+      ).json(),
+    ).resolves.toEqual({ ok: true, released: true, runtimeClosed: false })
+    await expect(
+      (
+        await post(app, '/runtime-close', {
+          workspaceId: WORKSPACE_ID,
+          workspaceRuntimeId: first.workspaceRuntimeId,
+          clientId: secondClientId,
+        })
+      ).json(),
+    ).resolves.toEqual({ ok: true, released: true, runtimeClosed: true })
+  })
+
+  test('reconciles one client complete workspace declaration atomically', async () => {
+    const app = createTestWorkspaceRoutes()
+    const oldWorkspaceId = 'goblin+file:///tmp/workspace-old'
+    const nextWorkspaceId = 'goblin+file:///tmp/workspace-next'
+    await post(app, '/runtime-open', { workspaceId: oldWorkspaceId, clientId: CLIENT_ID })
+
+    const response = await post(app, '/runtime-reconcile', {
+      clientId: CLIENT_ID,
+      workspaceIds: [nextWorkspaceId],
+    })
+    await expect(response.json()).resolves.toMatchObject({
+      runtimes: [{ workspaceId: nextWorkspaceId, workspaceRuntimeId: expect.stringMatching(/^workspace-runtime-/) }],
+    })
+  })
+
+  test('refreshes the current workspace capability projection', async () => {
+    const commitGitCapabilityRemoval = vi.fn(async () => ({ kind: 'committed' as const }))
+    const app = createWorkspaceRoutes({ workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval } })
+    const opened = (await (
+      await post(app, '/runtime-open', { workspaceId: WORKSPACE_ID, clientId: CLIENT_ID })
+    ).json()) as { workspaceRuntimeId: string }
+    commitWorkspaceProbeState({
+      userId: USER_ID,
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: opened.workspaceRuntimeId,
+      probe: {
+        ...readyPlainWorkspace,
+        capabilities: {
+          ...readyPlainWorkspace.capabilities,
+          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        },
+      },
+    })
+
+    const response = await post(app, '/refresh', {
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: opened.workspaceRuntimeId,
+    })
+    await expect(response.json()).resolves.toMatchObject({
+      kind: 'committed',
+      probe: { status: 'ready', capabilities: { git: { status: 'unavailable' } } },
+    })
+    expect(commitGitCapabilityRemoval).toHaveBeenCalledOnce()
+  })
+
+  test.each([
+    ['/runtime-open', { workspaceId: '/tmp/raw-path', clientId: CLIENT_ID }],
+    ['/runtime-open', { workspaceId: WORKSPACE_ID, clientId: '' }],
+    ['/runtime-open', { workspaceId: WORKSPACE_ID, clientId: 'x'.repeat(129) }],
+    ['/runtime-close', { workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test', clientId: '' }],
+    [
+      '/runtime-close',
+      { workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test', clientId: 'x'.repeat(129) },
+    ],
+    ['/runtime-reconcile', { workspaceIds: [WORKSPACE_ID], clientId: '' }],
+    ['/runtime-reconcile', { workspaceIds: [WORKSPACE_ID], clientId: 'x'.repeat(129) }],
+    ['/runtime-reconcile', { workspaceIds: ['/tmp/raw-path'], clientId: CLIENT_ID }],
+    ['/runtime-reconcile', { workspaceIds: [WORKSPACE_ID, ''], clientId: CLIENT_ID }],
+  ])('rejects invalid runtime membership input for %s', async (path, body) => {
+    const response = await post(createTestWorkspaceRoutes(), path, body)
+    expect(response.status).toBe(400)
+  })
+})
+
+function createTestWorkspaceRoutes() {
+  return createWorkspaceRoutes({
+    workspaceCapabilityTransitionHost: {
+      commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
+    },
+  })
+}
+
+async function post(app: ReturnType<typeof createWorkspaceRoutes>, route: string, body: object): Promise<Response> {
+  return await app.request(
+    new Request(`http://localhost${route}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  )
+}

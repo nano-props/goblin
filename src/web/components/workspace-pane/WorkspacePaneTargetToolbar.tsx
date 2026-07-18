@@ -153,12 +153,12 @@ export function WorkspacePaneTargetToolbar({
   )
   const { visualTabs, stageDragPreview, clearDragPreview } = useWorkspacePaneTabDragPreview({
     ...persistenceTarget,
-    repoRuntimeId: target.workspaceRuntimeId,
+    workspaceRuntimeId: target.workspaceRuntimeId,
     canonicalTabs: model.tabEntries,
   })
   const { reorderTabs } = useWorkspacePaneTabsReorderMutation({
     ...persistenceTarget,
-    repoRuntimeId: target.workspaceRuntimeId,
+    workspaceRuntimeId: target.workspaceRuntimeId,
     canonicalTabs: model.tabEntries,
     onReorderRejected: clearDragPreview,
   })

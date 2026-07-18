@@ -1,6 +1,6 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
+import { currentWorkspaceRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
@@ -62,7 +62,7 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
 ): Promise<WorkspacePaneActionOutcome> {
   const repo = useReposStore.getState().repos[input.repoId]
   if (!repo || input.paneTarget.repoRoot !== input.repoId) return { kind: 'target-missing' }
-  const repoRuntimeId = repo.repoRuntimeId
+  const workspaceRuntimeId = repo.workspaceRuntimeId
   const worktreePath = workspacePaneTabsTargetWorktreePath(input.paneTarget)
   const branchName =
     input.paneTarget.kind === 'git-branch'
@@ -78,18 +78,18 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
   const presentationToken = beginPrimaryWindowPresentation()
   const actionTarget = workspacePaneActionTargetFromCoordinates({
     repoId: input.repoId,
-    repoRuntimeId,
+    workspaceRuntimeId,
     branchName,
     worktreePath,
   })
   return await runWorkspacePaneAction(actionTarget, async () => {
     if (!primaryWindowPresentationIsCurrent(presentationToken)) return { kind: 'superseded' }
-    const target = { ...input.paneTarget, repoRuntimeId }
+    const target = { ...input.paneTarget, workspaceRuntimeId }
     const currentTabs = readWorkspacePaneTabsForTarget(target)
     const alreadyOpen = currentTabs.some((entry) => entry.type === input.type)
     const openerIdentity = alreadyOpen
       ? null
-      : captureWorkspacePaneActiveTabIdentity(input.paneTarget, repoRuntimeId, {
+      : captureWorkspacePaneActiveTabIdentity(input.paneTarget, workspaceRuntimeId, {
           workspacePaneRoute: input.workspacePaneRoute,
         })
     const committed = await updateWorkspacePaneTabs({
@@ -106,7 +106,7 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
     if (openerIdentity) {
       recordWorkspacePaneTabOpener(
         input.paneTarget,
-        repoRuntimeId,
+        workspaceRuntimeId,
         workspacePaneStaticTabId(input.type),
         openerIdentity,
       )
@@ -115,7 +115,7 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
       void requestVisibleWorkspaceStatusRefresh(
         { get: useReposStore.getState, set: useReposStore.setState },
         input.repoId,
-        repoRuntimeId,
+        workspaceRuntimeId,
         branchName,
       )
     }
@@ -150,7 +150,7 @@ type ResolvedOpenWorkspacePaneStaticTabActionOptions = Omit<
   OpenWorkspacePaneStaticTabActionOptions,
   'worktreePath' | 'workspacePaneRoute'
 > & {
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   worktreePath: string | null
   sourceRoute: ParsedWorkspacePaneRoute | null | undefined
   placement: WorkspacePaneStaticTabPlacement
@@ -172,13 +172,13 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
     return { kind: 'unsupported', reason: 'worktree-required' }
   }
   const paneTarget = requiredGitWorkspacePaneTabsTarget(repoId, lease.branchName, lease.worktreePath)
-  const openerIdentity = captureWorkspacePaneActiveTabIdentity(paneTarget, lease.repoRuntimeId, {
+  const openerIdentity = captureWorkspacePaneActiveTabIdentity(paneTarget, lease.workspaceRuntimeId, {
     workspacePaneRoute,
   })
   const presentation = beginWorkspacePaneDestinationPresentation(lease)
   const input: ResolvedOpenWorkspacePaneStaticTabActionOptions = {
     repoId,
-    repoRuntimeId: lease.repoRuntimeId,
+    workspaceRuntimeId: lease.workspaceRuntimeId,
     branchName: lease.branchName,
     worktreePath: lease.worktreePath,
     type,
@@ -197,11 +197,11 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
 export async function dispatchOpenWorkspacePaneStaticTabAction(
   input: OpenWorkspacePaneStaticTabActionOptions,
 ): Promise<boolean> {
-  const repoRuntimeId = currentRepoRuntimeId(useReposStore.getState(), input.repoId)
-  if (!repoRuntimeId) return false
+  const workspaceRuntimeId = currentWorkspaceRuntimeId(useReposStore.getState(), input.repoId)
+  if (!workspaceRuntimeId) return false
   const sourceRoute = input.workspacePaneRoute
   const paneTarget = requiredGitWorkspacePaneTabsTarget(input.repoId, input.branchName, input.worktreePath ?? null)
-  const openerIdentity = captureWorkspacePaneActiveTabIdentity(paneTarget, repoRuntimeId, {
+  const openerIdentity = captureWorkspacePaneActiveTabIdentity(paneTarget, workspaceRuntimeId, {
     workspacePaneRoute: sourceRoute,
   })
   const placement: WorkspacePaneStaticTabPlacement = openerIdentity
@@ -209,7 +209,7 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
     : { kind: 'append', openerIdentity: null }
   const resolvedInput: ResolvedOpenWorkspacePaneStaticTabActionOptions = {
     repoId: input.repoId,
-    repoRuntimeId,
+    workspaceRuntimeId,
     branchName: input.branchName,
     worktreePath: input.worktreePath ?? null,
     type: input.type,
@@ -221,7 +221,7 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
   const outcome = await runWorkspacePaneAction(
     workspacePaneActionTargetFromCoordinates({
       repoId: input.repoId,
-      repoRuntimeId,
+      workspaceRuntimeId,
       branchName: input.branchName,
       worktreePath: resolvedInput.worktreePath,
     }),
@@ -268,18 +268,18 @@ async function openWorkspacePaneStaticTabAction(
   const state = useReposStore.getState()
   const repo = state.repos[input.repoId]
   if (!repo) return { kind: 'target-missing' }
-  if (repo.repoRuntimeId !== input.repoRuntimeId) return { kind: 'superseded' }
+  if (repo.workspaceRuntimeId !== input.workspaceRuntimeId) return { kind: 'superseded' }
   const branchName = input.branchName
   const coordinatorTarget = {
     repoId: input.repoId,
-    repoRuntimeId: input.repoRuntimeId,
+    workspaceRuntimeId: input.workspaceRuntimeId,
     branchName,
     worktreePath: input.worktreePath,
   }
   const sourceRoute = input.sourceRoute
   const target = {
     ...requiredGitWorkspacePaneTabsTarget(input.repoId, branchName, input.worktreePath),
-    repoRuntimeId: input.repoRuntimeId,
+    workspaceRuntimeId: input.workspaceRuntimeId,
   }
   // Chrome-tab-style opener tracking: reopening/refocusing an already-open
   // static tab shouldn't overwrite its opener.
@@ -298,9 +298,9 @@ async function openWorkspacePaneStaticTabAction(
   if (!committed.ok) return { kind: 'mutation-failed' }
   const liveTarget = resolveWorkspacePaneDestinationTarget(input.repoId, branchName)
   if (
-    currentRepoRuntimeId(useReposStore.getState(), input.repoId) !== input.repoRuntimeId ||
+    currentWorkspaceRuntimeId(useReposStore.getState(), input.repoId) !== input.workspaceRuntimeId ||
     liveTarget.kind !== 'ready' ||
-    liveTarget.lease.repoRuntimeId !== input.repoRuntimeId ||
+    liveTarget.lease.workspaceRuntimeId !== input.workspaceRuntimeId ||
     liveTarget.lease.worktreePath !== input.worktreePath
   ) {
     return { kind: 'superseded' }
@@ -308,7 +308,7 @@ async function openWorkspacePaneStaticTabAction(
   if (openerIdentity) {
     recordWorkspacePaneTabOpener(
       target,
-      input.repoRuntimeId,
+      input.workspaceRuntimeId,
       workspacePaneStaticTabId(input.type),
       openerIdentity,
     )
@@ -329,7 +329,7 @@ function requestVisibleStatusRefreshOnOpen(input: ResolvedOpenWorkspacePaneStati
   void requestVisibleWorkspaceStatusRefresh(
     { get: useReposStore.getState, set: useReposStore.setState },
     input.repoId,
-    input.repoRuntimeId,
+    input.workspaceRuntimeId,
     input.branchName,
   )
 }
@@ -337,7 +337,7 @@ function requestVisibleStatusRefreshOnOpen(input: ResolvedOpenWorkspacePaneStati
 async function commitWorkspacePaneStaticTab(
   input: {
     repoId: string
-    repoRuntimeId: string
+    workspaceRuntimeId: string
     branchName: string
     worktreePath: string | null
     type: WorkspacePaneStaticTabType
@@ -353,7 +353,7 @@ async function commitWorkspacePaneStaticTab(
   const committed = await commitWorkspacePaneCurrentTargetRoute(
     {
       repoId: input.repoId,
-      repoRuntimeId: input.repoRuntimeId,
+      workspaceRuntimeId: input.workspaceRuntimeId,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
       paneTarget: requiredGitWorkspacePaneTabsTarget(input.repoId, input.branchName, input.worktreePath),

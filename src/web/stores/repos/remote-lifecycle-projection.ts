@@ -1,5 +1,5 @@
 import { isRemoteRepoId, type RemoteRepoRuntimeLifecycle } from '#/shared/remote-repo.ts'
-import type { RepoRuntimeEntry, RepoRuntimesSnapshot } from '#/shared/api-types.ts'
+import type { WorkspaceRuntimeEntry, WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
 import {
   markRemoteLifecycleConnecting,
   markRemoteLifecycleFailed,
@@ -13,19 +13,19 @@ const LIFECYCLE_PHASE_ORDER = { idle: 0, connecting: 1, ready: 2, failed: 2 } as
 export function acceptRemoteLifecycleProjection(
   set: ReposSet,
   get: ReposGet,
-  entry: Pick<RepoRuntimeEntry, 'repoRoot' | 'repoRuntimeId' | 'remoteLifecycle'>,
+  entry: Pick<WorkspaceRuntimeEntry, 'workspaceId' | 'workspaceRuntimeId' | 'remoteLifecycle'>,
   options: { name?: string } = {},
 ): boolean {
   const lifecycle = entry.remoteLifecycle
-  if (!lifecycle || !isRemoteRepoId(entry.repoRoot)) return false
-  const current = get().repos[entry.repoRoot]
-  if (!current || current.repoRuntimeId !== entry.repoRuntimeId) return false
+  if (!lifecycle || !isRemoteRepoId(entry.workspaceId)) return false
+  const current = get().repos[entry.workspaceId]
+  if (!current || current.workspaceRuntimeId !== entry.workspaceRuntimeId) return false
   if (!remoteLifecycleProjectionIsFresh(current.remote.lifecycleAttemptId, current.remote.lifecycle?.kind, lifecycle)) {
     return false
   }
 
   let accepted = false
-  updateIfFresh(set, entry.repoRoot, entry.repoRuntimeId, (repo) => {
+  updateIfFresh(set, entry.workspaceId, entry.workspaceRuntimeId, (repo) => {
     if (!remoteLifecycleProjectionIsFresh(repo.remote.lifecycleAttemptId, repo.remote.lifecycle?.kind, lifecycle))
       return
     repo.remote.lifecycleAttemptId = lifecycle.attemptId
@@ -42,7 +42,7 @@ export function acceptRemoteLifecycleProjection(
   return accepted
 }
 
-export function acceptRemoteLifecycleSnapshot(set: ReposSet, get: ReposGet, snapshot: RepoRuntimesSnapshot): void {
+export function acceptRemoteLifecycleSnapshot(set: ReposSet, get: ReposGet, snapshot: WorkspaceRuntimesSnapshot): void {
   for (const entry of snapshot.runtimes) acceptRemoteLifecycleProjection(set, get, entry)
 }
 

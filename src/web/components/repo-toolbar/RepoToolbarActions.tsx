@@ -60,13 +60,13 @@ function WorktreeFilterToggle({ repoId }: Props) {
       const repo = s.repos[repoId]
       return {
         id: repo?.id ?? '',
-        repoRuntimeId: repo?.repoRuntimeId ?? '',
+        workspaceRuntimeId: repo?.workspaceRuntimeId ?? '',
         branchViewMode: repo?.ui.branchViewMode ?? 'all',
         exists: !!repo,
       }
     }),
   )
-  const branchReadModel = useRepoBranchReadModel(repoView.id, repoView.repoRuntimeId, repoView.exists)
+  const branchReadModel = useRepoBranchReadModel(repoView.id, repoView.workspaceRuntimeId, repoView.exists)
   return (
     <BranchViewModeControl
       value={repoView.branchViewMode}
@@ -116,7 +116,7 @@ function useCreateWorktreeTrigger(repoId: string) {
       return repo
         ? {
             id: repo.id,
-            repoRuntimeId: repo.repoRuntimeId,
+            workspaceRuntimeId: repo.workspaceRuntimeId,
             operations: {
               branchAction: repo.operations.branchAction,
             },
@@ -128,12 +128,12 @@ function useCreateWorktreeTrigger(repoId: string) {
       (!!a &&
         !!b &&
         a.id === b.id &&
-        a.repoRuntimeId === b.repoRuntimeId &&
+        a.workspaceRuntimeId === b.workspaceRuntimeId &&
         a.operations.branchAction.phase === b.operations.branchAction.phase &&
         a.operations.branchAction.reason === b.operations.branchAction.reason &&
         a.operations.branchAction.target === b.operations.branchAction.target),
   )
-  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? '', repoShell?.repoRuntimeId ?? '', {
+  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? '', repoShell?.workspaceRuntimeId ?? '', {
     enabled: !!repoShell,
   })
   const branchAction = repoShell

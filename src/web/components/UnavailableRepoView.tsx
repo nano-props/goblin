@@ -75,7 +75,7 @@ export function UnavailableRepoView({ repo }: Props) {
                   void runManualRepoSync(
                     { get: useReposStore.getState, set: useReposStore.setState },
                     repo.id,
-                    { repoRuntimeId: repo.repoRuntimeId },
+                    { workspaceRuntimeId: repo.workspaceRuntimeId },
                   )
                 }
               >

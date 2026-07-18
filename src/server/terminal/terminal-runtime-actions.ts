@@ -20,7 +20,7 @@ import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
 import { isValidTerminalRuntimeSessionId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
-import { isCurrentRepoRuntime as isCurrentRepoRuntimeOpen } from '#/server/modules/repo-runtimes.ts'
+import { isCurrentWorkspaceRuntime as isCurrentWorkspaceRuntimeOpen } from '#/server/modules/workspace-runtimes.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
@@ -30,9 +30,9 @@ interface TerminalSessionServiceLike {
     clientId: string,
     userId: string,
     repoRoot: string,
-    repoRuntimeId: string,
+    workspaceRuntimeId: string,
   ): Promise<{ pruned: number; remaining: number }>
-  listSessions(userId: string, repoRoot: string, repoRuntimeId: string): Promise<TerminalSessionSummary[]>
+  listSessions(userId: string, repoRoot: string, workspaceRuntimeId: string): Promise<TerminalSessionSummary[]>
 }
 
 interface TerminalRuntimeActionDependencies {
@@ -115,8 +115,8 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     ): Promise<{ pruned: number; remaining: number }> {
       if (!isValidTerminalClientId(clientId)) return { pruned: 0, remaining: 0 }
       if (!isValidRepoLocator(input.repoRoot)) return { pruned: 0, remaining: 0 }
-      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-      return await sessionService.prune(clientId, userId, input.repoRoot, input.repoRuntimeId)
+      assertCurrentWorkspaceRuntime(userId, input.repoRoot, input.workspaceRuntimeId)
+      return await sessionService.prune(clientId, userId, input.repoRoot, input.workspaceRuntimeId)
     },
 
     async write(clientId: string, userId: string, input: TerminalWriteInput): Promise<TerminalWriteResult> {
@@ -189,8 +189,8 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (!isValidTerminalClientId(clientId) || !isValidRepoLocator(input.repoRoot)) {
         return { revision: 0, sessions: [] }
       }
-      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-      const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
+      assertCurrentWorkspaceRuntime(userId, input.repoRoot, input.workspaceRuntimeId)
+      const scope = terminalSessionRuntimeScope(input.repoRoot, input.workspaceRuntimeId)
       return manager.terminalSessionsSnapshotForUser(userId, scope)
     },
 
@@ -201,14 +201,14 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     ): Promise<TerminalSessionSummary[]> {
       if (!isValidTerminalClientId(clientId)) return []
       if (!isValidRepoLocator(input.repoRoot)) return []
-      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-      return await sessionService.listSessions(userId, input.repoRoot, input.repoRuntimeId)
+      assertCurrentWorkspaceRuntime(userId, input.repoRoot, input.workspaceRuntimeId)
+      return await sessionService.listSessions(userId, input.repoRoot, input.workspaceRuntimeId)
     },
   }
 
-  function assertCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): void {
-    if (!isCurrentRepoRuntimeOpen(userId, repoRoot, repoRuntimeId)) {
-      throw new Error('error.repo-runtime-stale')
+  function assertCurrentWorkspaceRuntime(userId: string, repoRoot: string, workspaceRuntimeId: string): void {
+    if (!isCurrentWorkspaceRuntimeOpen(userId, repoRoot, workspaceRuntimeId)) {
+      throw new Error('error.workspace-runtime-stale')
     }
   }
 }

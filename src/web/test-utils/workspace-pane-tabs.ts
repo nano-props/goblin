@@ -18,10 +18,10 @@ import {
 
 export function setWorkspacePaneTabsForTargetQueryData(
   input:
-    | (WorkspacePaneTabsTarget & { repoRuntimeId: string; tabs: readonly WorkspacePaneTabEntry[] })
+    | (WorkspacePaneTabsTarget & { workspaceRuntimeId: string; tabs: readonly WorkspacePaneTabEntry[] })
     | {
         repoRoot: string
-        repoRuntimeId: string
+        workspaceRuntimeId: string
         branchName: string
         worktreePath: string | null
         tabs: readonly WorkspacePaneTabEntry[]
@@ -29,20 +29,20 @@ export function setWorkspacePaneTabsForTargetQueryData(
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
   const resolvedTarget: WorkspacePaneTabsTarget & {
-    repoRuntimeId: string
+    workspaceRuntimeId: string
     tabs: readonly WorkspacePaneTabEntry[]
   } =
     'kind' in input
       ? input
       : {
           ...requiredGitWorkspacePaneTabsTarget(input.repoRoot, input.branchName, input.worktreePath),
-          repoRuntimeId: input.repoRuntimeId,
+          workspaceRuntimeId: input.workspaceRuntimeId,
           tabs: input.tabs,
         }
-  const current = currentSnapshot(input.repoRoot, input.repoRuntimeId, queryClient)
+  const current = currentSnapshot(input.repoRoot, input.workspaceRuntimeId, queryClient)
   writeWorkspacePaneTabsSnapshotQueryData(
     input.repoRoot,
-    input.repoRuntimeId,
+    input.workspaceRuntimeId,
     {
       revision: current.revision,
       entries: [
@@ -65,22 +65,22 @@ export function setWorkspacePaneTabsForTargetQueryData(
 
 export function replaceWorkspacePaneTabsQueryData(
   repoRoot: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   entries: readonly WorkspacePaneTabsEntry[],
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  const current = currentSnapshot(repoRoot, repoRuntimeId, queryClient)
+  const current = currentSnapshot(repoRoot, workspaceRuntimeId, queryClient)
   writeWorkspacePaneTabsSnapshotQueryData(
     repoRoot,
-    repoRuntimeId,
+    workspaceRuntimeId,
     { revision: current.revision, entries: [...entries] },
     queryClient,
   )
 }
 
-function currentSnapshot(repoRoot: string, repoRuntimeId: string, queryClient: QueryClient): WorkspacePaneTabsSnapshot {
+function currentSnapshot(repoRoot: string, workspaceRuntimeId: string, queryClient: QueryClient): WorkspacePaneTabsSnapshot {
   return (
-    queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(repoRoot, repoRuntimeId)) ?? {
+    queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(repoRoot, workspaceRuntimeId)) ?? {
       revision: 0,
       entries: [],
     }
@@ -88,30 +88,30 @@ function currentSnapshot(repoRoot: string, repoRuntimeId: string, queryClient: Q
 }
 
 export function runtimeWorkspacePaneTargetForTest(
-  input: Extract<WorkspacePaneTabsTarget, { kind: 'workspace-root' }> & { repoRuntimeId: string },
+  input: Extract<WorkspacePaneTabsTarget, { kind: 'workspace-root' }> & { workspaceRuntimeId: string },
 ): Extract<RuntimeWorkspacePaneTarget, { kind: 'workspace-root' }>
 export function runtimeWorkspacePaneTargetForTest(
-  input: Extract<WorkspacePaneTabsTarget, { kind: 'git-worktree' }> & { repoRuntimeId: string },
+  input: Extract<WorkspacePaneTabsTarget, { kind: 'git-worktree' }> & { workspaceRuntimeId: string },
 ): Extract<RuntimeWorkspacePaneTarget, { kind: 'git-worktree' }>
 export function runtimeWorkspacePaneTargetForTest(input: {
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   branchName: string
   worktreePath: string
 }): Extract<RuntimeWorkspacePaneTarget, { kind: 'git-worktree' }>
 export function runtimeWorkspacePaneTargetForTest(
-  input: WorkspacePaneTabsTarget & { repoRuntimeId: string },
+  input: WorkspacePaneTabsTarget & { workspaceRuntimeId: string },
 ): RuntimeWorkspacePaneTarget
 export function runtimeWorkspacePaneTargetForTest(
   input:
-    | (WorkspacePaneTabsTarget & { repoRuntimeId: string })
-    | { repoRoot: string; repoRuntimeId: string; branchName: string; worktreePath: string },
+    | (WorkspacePaneTabsTarget & { workspaceRuntimeId: string })
+    | { repoRoot: string; workspaceRuntimeId: string; branchName: string; worktreePath: string },
 ) {
   const paneTarget =
     'kind' in input
       ? input
       : requiredGitWorkspacePaneTabsTarget(input.repoRoot, input.branchName, input.worktreePath)
-  const target = runtimeWorkspacePaneTarget(paneTarget, input.repoRuntimeId)
+  const target = runtimeWorkspacePaneTarget(paneTarget, input.workspaceRuntimeId)
   if (!target) throw new Error('workspace pane test target requires a canonical target')
   return target
 }

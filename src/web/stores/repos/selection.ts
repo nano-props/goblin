@@ -133,41 +133,41 @@ function createRestorableWorkspaceActions(set: ReposSet): RestorableWorkspaceAct
 function createRuntimeWorkspacePreferenceActions(set: ReposSet, get: ReposGet): RuntimeWorkspacePreferenceActions {
   // Shared post-write effects for view preferences that affect warm restore or
   // visible branch data. Centralized so each preference write stays coherent.
-  function afterWorkspacePreferenceChange(id: string, repoRuntimeId: string): void {
+  function afterWorkspacePreferenceChange(id: string, workspaceRuntimeId: string): void {
     const repo = get().repos[id]
     if (!repo) return
-    persistRepoSnapshotCacheEntry(set, repo, repoRuntimeId)
+    persistRepoSnapshotCacheEntry(set, repo, workspaceRuntimeId)
   }
 
   function setWorkspacePaneTabForTarget(target: WorkspacePaneTabsTarget, tab: WorkspacePaneTabType | null): void {
     let changed = false
-    let repoRuntimeId: string | undefined
+    let workspaceRuntimeId: string | undefined
     set((s) => {
       const repo = s.repos[target.repoRoot]
       if (!repo || preferredWorkspacePaneTabForTarget(repo.ui, target) === tab) return s
       changed = true
-      repoRuntimeId = repo.repoRuntimeId
+      workspaceRuntimeId = repo.workspaceRuntimeId
       return replaceRepoState(s, repo, (r) => {
         r.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(r.ui, target, tab)
       })
     })
-    if (changed && repoRuntimeId !== undefined) afterWorkspacePreferenceChange(target.repoRoot, repoRuntimeId)
+    if (changed && workspaceRuntimeId !== undefined) afterWorkspacePreferenceChange(target.repoRoot, workspaceRuntimeId)
   }
 
   return {
     setBranchViewMode(id: string, viewMode: BranchViewMode) {
       let changed = false
-      let repoRuntimeId: string | undefined
+      let workspaceRuntimeId: string | undefined
       set((s) => {
         const repo = s.repos[id]
         if (!repo || repo.ui.branchViewMode === viewMode) return s
         changed = true
-        repoRuntimeId = repo.repoRuntimeId
+        workspaceRuntimeId = repo.workspaceRuntimeId
         return replaceRepoState(s, repo, (r) => {
           r.ui.branchViewMode = viewMode
         })
       })
-      if (changed && repoRuntimeId !== undefined) afterWorkspacePreferenceChange(id, repoRuntimeId)
+      if (changed && workspaceRuntimeId !== undefined) afterWorkspacePreferenceChange(id, workspaceRuntimeId)
     },
 
     setWorkspacePaneTab(id: string, branch: string, tab: WorkspacePaneTabType | null) {

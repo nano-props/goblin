@@ -28,7 +28,7 @@ describe('restorable-workspace-state', () => {
         'feature/worktree': [workspacePaneStaticTabEntry('status')],
       },
     })
-    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(repo.id, repo.repoRuntimeId) })
+    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(repo.id, repo.workspaceRuntimeId) })
 
     expect(
       clientWorkspaceStateFromRestorableWorkspaceState({

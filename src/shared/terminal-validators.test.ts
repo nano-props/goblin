@@ -348,7 +348,7 @@ describe('shared terminal validators', () => {
     ).toBeNull()
   })
 
-  test('rejects prune requests without a repo runtime id', () => {
+  test('rejects prune requests without a workspace runtime id', () => {
     expect(
       normalizeTerminalClientMessage({
         type: 'request',
@@ -367,7 +367,7 @@ describe('shared terminal validators', () => {
         action: 'prune',
         input: {
           repoRoot: 'goblin+file:///repo',
-          repoRuntimeId: 'repo-runtime-test',
+          workspaceRuntimeId: 'repo-runtime-test',
         },
       }),
     ).toMatchObject({ type: 'request', action: 'prune' })
@@ -383,7 +383,7 @@ describe('shared terminal validators', () => {
         presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'main' } },
         worktreePath: '/repo',
         kind: 'additional',
-        repoRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: 'repo-runtime-test',
       },
     }
     expect(normalizeTerminalClientMessage(unsupportedCreateRequest)).toBeNull()
@@ -1115,7 +1115,7 @@ describe('terminal runtime generation validation', () => {
         terminalSessionId: 'term-generation-validation',
         terminalRuntimeGeneration: 0,
         repoRoot: 'goblin+file:///repo',
-        repoRuntimeId: 'repo-runtime-validation',
+        workspaceRuntimeId: 'repo-runtime-validation',
       },
     }
     expect(normalizeTerminalRealtimeMessage(message)).toEqual(message)
@@ -1123,7 +1123,7 @@ describe('terminal runtime generation validation', () => {
       normalizeTerminalRealtimeMessage({ ...message, event: { ...message.event, repoRoot: undefined } }),
     ).toBeNull()
     expect(
-      normalizeTerminalRealtimeMessage({ ...message, event: { ...message.event, repoRuntimeId: undefined } }),
+      normalizeTerminalRealtimeMessage({ ...message, event: { ...message.event, workspaceRuntimeId: undefined } }),
     ).toBeNull()
     for (const terminalRuntimeGeneration of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
       expect(

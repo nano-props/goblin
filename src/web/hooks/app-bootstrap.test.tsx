@@ -561,10 +561,10 @@ function restoredRuntimeForWorkspace(
   restoredRepoId: string | null,
 ): WorkspaceRuntimeRestoreSnapshot {
   return {
-    repos: serverWorkspace.openWorkspaceEntries.map((entry) => ({
+    workspaces: serverWorkspace.openWorkspaceEntries.map((entry) => ({
       entry,
-      repoRoot: entry.id,
-      repoRuntimeId: `repo-runtime-${entry.id}`,
+      workspaceId: entry.id,
+      workspaceRuntimeId: `repo-runtime-${entry.id}`,
       name: entry.id.split('/').pop() || entry.id,
       workspaceProbe: {
         status: 'ready',
@@ -620,6 +620,6 @@ function defaultExternalAppsSnapshot() {
   }
 }
 
-function branchTargetKey(repoRoot: string, branchName: string): string {
-  return workspacePaneTabsTargetIdentityKey({ kind: 'git-branch', repoRoot, branchName })
+function branchTargetKey(workspaceId: string, branchName: string): string {
+  return workspacePaneTabsTargetIdentityKey({ kind: 'git-branch', repoRoot: workspaceId, branchName })
 }

@@ -51,7 +51,7 @@ export function RepoWorkspaceToolbar({
     ? {
         kind: 'git-worktree',
         workspaceId: repo.id,
-        workspaceRuntimeId: repo.repoRuntimeId,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
         head: gitHead(branch.name),
         rootPath: branch.worktree.path,
         capabilities: repo.workspaceProbe.capabilities,
@@ -59,7 +59,7 @@ export function RepoWorkspaceToolbar({
     : {
         kind: 'git-branch',
         workspaceId: repo.id,
-        workspaceRuntimeId: repo.repoRuntimeId,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
         branchName: branch.name,
         capabilities: repo.workspaceProbe.capabilities,
       }

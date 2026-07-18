@@ -15,8 +15,8 @@ import {
 } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
 
 const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-tab-drag-preview-repo'
-const REPO_RUNTIME_ID = 'repo-runtime-test'
-const NEXT_REPO_RUNTIME_ID = 'repo-runtime-next'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
+const NEXT_WORKSPACE_RUNTIME_ID = 'repo-runtime-next'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-drag-preview-worktree'
 
@@ -49,7 +49,7 @@ describe('useWorkspacePaneTabDragPreview', () => {
       {
         kind: 'git-worktree' as const,
         repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         worktreePath: WORKTREE_PATH,
         tabs: sourceTabs,
       },
@@ -158,7 +158,7 @@ describe('useWorkspacePaneTabDragPreview', () => {
     expect(currentControls().visualTabs).toEqual(sourceTabs)
   })
 
-  test('clears a staged preview when the repo runtime changes', () => {
+  test('clears a staged preview when the workspace runtime changes', () => {
     const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
     const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
     const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
@@ -172,7 +172,7 @@ describe('useWorkspacePaneTabDragPreview', () => {
       renderResult.rerender(
         <HookHost
           input={previewInput({
-            repoRuntimeId: NEXT_REPO_RUNTIME_ID,
+            workspaceRuntimeId: NEXT_WORKSPACE_RUNTIME_ID,
             canonicalTabs: sourceTabs,
           })}
         />,
@@ -186,7 +186,7 @@ describe('useWorkspacePaneTabDragPreview', () => {
 interface PreviewInputOverrides {
   kind?: 'workspace-root' | 'inactive'
   repoRoot?: string
-  repoRuntimeId?: string
+  workspaceRuntimeId?: string
   branchName?: string | null
   worktreePath?: string | null
   canonicalTabs?: readonly WorkspacePaneTabEntry[]
@@ -198,13 +198,13 @@ function renderPreviewHook(input: PreviewInputOverrides = {}) {
 
 function previewInput(input: PreviewInputOverrides = {}): WorkspacePaneTabDragPreviewInput {
   const repoRoot = input.repoRoot ?? REPO_ROOT
-  const repoRuntimeId = input.repoRuntimeId ?? REPO_RUNTIME_ID
+  const workspaceRuntimeId = input.workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID
   const canonicalTabs = input.canonicalTabs ?? []
   if (input.kind === 'workspace-root') {
     return {
       kind: 'workspace-root',
       repoRoot,
-      repoRuntimeId,
+      workspaceRuntimeId,
 
       canonicalTabs,
     }
@@ -213,7 +213,7 @@ function previewInput(input: PreviewInputOverrides = {}): WorkspacePaneTabDragPr
     return {
       kind: 'inactive',
       repoRoot,
-      repoRuntimeId,
+      workspaceRuntimeId,
       branchName: null,
       worktreePath: null,
       canonicalTabs,
@@ -222,7 +222,7 @@ function previewInput(input: PreviewInputOverrides = {}): WorkspacePaneTabDragPr
   return {
     kind: 'git-worktree',
     repoRoot,
-    repoRuntimeId,
+    workspaceRuntimeId,
     worktreePath: input.worktreePath ?? WORKTREE_PATH,
     canonicalTabs,
   }
@@ -243,7 +243,7 @@ function readWorkspacePaneTabsFromQueryCache(queryClient: QueryClient): Workspac
     {
       kind: 'git-worktree' as const,
       repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       worktreePath: WORKTREE_PATH,
     },
     queryClient,

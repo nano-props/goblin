@@ -44,7 +44,7 @@ import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { dispatchOpenWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 interface Props {
   detail: CurrentRepoWorkspace
-  repoRuntimeId: string
+  workspaceRuntimeId: string
 }
 
 function SyncValue({
@@ -122,13 +122,13 @@ function StatusCopyPatchButton({ action }: { action: BranchCopyPatchAction }) {
 // remote instead of guessing from the local branch's tracking config.
 function UpstreamLink({
   repoId,
-  repoRuntimeId,
+  workspaceRuntimeId,
   tracking,
   title,
   tone,
 }: {
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   tracking: string
   title: string
   tone?: Tone
@@ -137,12 +137,12 @@ function UpstreamLink({
     () =>
       throttle(
         () => {
-          void openUpstreamBranchExternalTarget(repoId, repoRuntimeId, tracking).catch(() => {})
+          void openUpstreamBranchExternalTarget(repoId, workspaceRuntimeId, tracking).catch(() => {})
         },
         500,
         { edges: ['leading'] },
       ),
-    [repoId, repoRuntimeId, tracking],
+    [repoId, workspaceRuntimeId, tracking],
   )
   return (
     <StatusLink mono title={title} data-upstream-link="" tone={tone} truncate onClick={handleClick}>
@@ -151,7 +151,7 @@ function UpstreamLink({
   )
 }
 
-export function BranchStatus({ detail, repoRuntimeId }: Props) {
+export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
   const { mainItems, destructiveItems, copyPatchAction } = useBranchActionSurface()
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
@@ -282,7 +282,7 @@ export function BranchStatus({ detail, repoRuntimeId }: Props) {
   const upstreamValue = branch.tracking ? (
     <UpstreamLink
       repoId={detail.repoId}
-      repoRuntimeId={repoRuntimeId}
+      workspaceRuntimeId={workspaceRuntimeId}
       tracking={branch.tracking}
       title={t('branch-status.upstream.open-externally')}
       tone={branch.trackingGone ? 'attention' : undefined}
@@ -406,7 +406,7 @@ export function BranchStatus({ detail, repoRuntimeId }: Props) {
             {branch.lastCommitHash ? (
               <CommitHashLink
                 repoId={detail.repoId}
-                repoRuntimeId={repoRuntimeId}
+                workspaceRuntimeId={workspaceRuntimeId}
                 hash={branch.lastCommitHash}
                 shortHash={branch.lastCommitShortHash}
                 title={t('branch-status.commit.open-externally')}
@@ -449,7 +449,7 @@ export function BranchStatus({ detail, repoRuntimeId }: Props) {
       )}
       <PullRequestStatusRow
         repoId={detail.repoId}
-        repoRuntimeId={repoRuntimeId}
+        workspaceRuntimeId={workspaceRuntimeId}
         branchName={branch.name}
         pullRequest={pullRequest}
         tooltipSide={compact ? 'top' : 'bottom'}

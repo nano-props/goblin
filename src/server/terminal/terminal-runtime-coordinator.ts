@@ -1,10 +1,10 @@
 import { DelayedPresenceExpiry } from '#/server/realtime/delayed-presence-expiry.ts'
 import { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import {
-  captureRepoRuntimeMembershipLease,
-  expireRepoRuntimeMembershipLease,
-  onRepoRuntimeMembershipAcquired,
-} from '#/server/modules/repo-runtimes.ts'
+  captureWorkspaceRuntimeMembershipLease,
+  expireWorkspaceRuntimeMembershipLease,
+  onWorkspaceRuntimeMembershipAcquired,
+} from '#/server/modules/workspace-runtimes.ts'
 import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
@@ -38,12 +38,12 @@ export function createTerminalRuntimeCoordinator(
   const broker = new RealtimeBroker<AppRealtimeMessage>({
     heartbeatTimeoutReason: 'terminal heartbeat timeout',
     onClientPresenceChanged(event) {
-      const clientKey = repoRuntimeClientLeaseKey(event.userId, event.clientId)
+      const clientKey = workspaceRuntimeClientLeaseKey(event.userId, event.clientId)
       if (event.online) {
         detachedUsers.cancel(event.userId)
         detachedClients.cancel(clientKey)
       } else {
-        scheduleRepoRuntimeMembershipExpiry(event.userId, event.clientId)
+        scheduleWorkspaceRuntimeMembershipExpiry(event.userId, event.clientId)
       }
       manager.handleClientPresenceChanged(event.userId, event.clientId, event.previousOnline)
     },
@@ -61,13 +61,13 @@ export function createTerminalRuntimeCoordinator(
       }
     },
   })
-  const unsubscribeMembershipAcquired = onRepoRuntimeMembershipAcquired(({ userId, clientId }) => {
-    const clientKey = repoRuntimeClientLeaseKey(userId, clientId)
+  const unsubscribeMembershipAcquired = onWorkspaceRuntimeMembershipAcquired(({ userId, clientId }) => {
+    const clientKey = workspaceRuntimeClientLeaseKey(userId, clientId)
     if (broker.isClientOnline(userId, clientId)) {
       detachedClients.cancel(clientKey)
       return
     }
-    scheduleRepoRuntimeMembershipExpiry(userId, clientId)
+    scheduleWorkspaceRuntimeMembershipExpiry(userId, clientId)
   })
 
   return {
@@ -89,16 +89,16 @@ export function createTerminalRuntimeCoordinator(
     await workspaceTabsCoordinator.closeUser({ userId })
   }
 
-  function scheduleRepoRuntimeMembershipExpiry(userId: string, clientId: string): void {
-    const lease = captureRepoRuntimeMembershipLease(userId, clientId)
+  function scheduleWorkspaceRuntimeMembershipExpiry(userId: string, clientId: string): void {
+    const lease = captureWorkspaceRuntimeMembershipLease(userId, clientId)
     detachedClients.schedule(
-      repoRuntimeClientLeaseKey(userId, clientId),
+      workspaceRuntimeClientLeaseKey(userId, clientId),
       () => broker.isClientOnline(userId, clientId),
-      () => expireRepoRuntimeMembershipLease(lease),
+      () => expireWorkspaceRuntimeMembershipLease(lease),
     )
   }
 }
 
-function repoRuntimeClientLeaseKey(userId: string, clientId: string): string {
+function workspaceRuntimeClientLeaseKey(userId: string, clientId: string): string {
   return `${userId}\0${clientId}`
 }

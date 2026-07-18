@@ -42,9 +42,9 @@ describe('RepoDashboardPane', () => {
       },
     }))
     primaryWindowQueryClient.removeQueries({
-      queryKey: repoProjectionQueryKey(REPO_ID, repo.repoRuntimeId, null, 'summary'),
+      queryKey: repoProjectionQueryKey(REPO_ID, repo.workspaceRuntimeId, null, 'summary'),
     })
-    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId) })
+    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
 
     renderInJsdom(
       <QueryClientProvider client={primaryWindowQueryClient}>
@@ -53,11 +53,11 @@ describe('RepoDashboardPane', () => {
     )
 
     const projectionState = primaryWindowQueryClient.getQueryState(
-      repoProjectionQueryKey(REPO_ID, repo.repoRuntimeId, null, 'summary'),
+      repoProjectionQueryKey(REPO_ID, repo.workspaceRuntimeId, null, 'summary'),
     )
-    const statusState = primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId))
+    const statusState = primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId))
     const overviewState = primaryWindowQueryClient.getQueryState(
-      workspaceDirectoryOverviewQueryKey(REPO_ID, repo.repoRuntimeId),
+      workspaceDirectoryOverviewQueryKey(REPO_ID, repo.workspaceRuntimeId),
     )
     for (const queryState of [projectionState, statusState, overviewState]) {
       expect(queryState?.fetchStatus).not.toBe('fetching')
@@ -85,7 +85,7 @@ describe('RepoDashboardPane', () => {
         },
       },
     }))
-    primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(REPO_ID, repo.repoRuntimeId), {
+    primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(REPO_ID, repo.workspaceRuntimeId), {
       topLevelFileCount: 4,
       topLevelDirectoryCount: 2,
       totalSizeBytes: 2048,
@@ -103,7 +103,7 @@ describe('RepoDashboardPane', () => {
     expect(container.textContent).toContain('/tmp/repo-dashboard-pane-test')
     expect(container.textContent).not.toContain('goblin+file://')
     expect(
-      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId))?.fetchStatus,
+      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId))?.fetchStatus,
     ).not.toBe('fetching')
   })
 
@@ -113,14 +113,14 @@ describe('RepoDashboardPane', () => {
       branches: [createRepoBranch('main')],
       currentBranchName: 'main',
     })
-    setRepoProjectionQueryData(REPO_ID, repo.repoRuntimeId, null, 'summary', {
+    setRepoProjectionQueryData(REPO_ID, repo.workspaceRuntimeId, null, 'summary', {
       snapshot: { current: 'main', branches: [createRepoBranch('main')] },
       pullRequests: null,
       operations: { operations: [], loadedAt: 123 },
       requested: { branch: null, pullRequestMode: 'summary' },
       loadedAt: 123,
     })
-    const statusQueryKey = repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId)
+    const statusQueryKey = repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId)
     primaryWindowQueryClient.removeQueries({ queryKey: statusQueryKey })
     primaryWindowQueryClient.setQueryDefaults(statusQueryKey, { refetchOnMount: false })
     await expect(
@@ -152,14 +152,14 @@ describe('RepoDashboardPane', () => {
       branches: [mainBranch],
       currentBranchName: 'main',
     })
-    setRepoProjectionQueryData(REPO_ID, repo.repoRuntimeId, null, 'summary', {
+    setRepoProjectionQueryData(REPO_ID, repo.workspaceRuntimeId, null, 'summary', {
       snapshot: { current: 'main', branches: [mainBranch] },
       pullRequests: null,
       operations: { operations: [], loadedAt: 123 },
       requested: { branch: null, pullRequestMode: 'summary' },
       loadedAt: 123,
     })
-    const statusQueryKey = repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId)
+    const statusQueryKey = repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId)
     primaryWindowQueryClient.setQueryDefaults(statusQueryKey, { refetchOnMount: false })
     await expect(
       primaryWindowQueryClient.fetchQuery({
@@ -209,7 +209,7 @@ describe('RepoDashboardPane', () => {
       branches: [featureBranch, mainBranch],
       currentBranchName: 'main',
     })
-    setRepoProjectionQueryData(REPO_ID, repo.repoRuntimeId, null, 'summary', {
+    setRepoProjectionQueryData(REPO_ID, repo.workspaceRuntimeId, null, 'summary', {
       snapshot: { current: 'main', branches: [featureBranch, mainBranch] },
       pullRequests: [
         {

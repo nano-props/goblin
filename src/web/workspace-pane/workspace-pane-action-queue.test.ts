@@ -15,7 +15,7 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 const TARGET = {
   kind: 'git-worktree' as const,
   repoId: 'goblin+file:///repo',
-  repoRuntimeId: 'repo-runtime-1',
+  workspaceRuntimeId: 'repo-runtime-1',
   worktreePath: '/worktree-a',
 } as const
 
@@ -44,7 +44,7 @@ describe('workspace pane action queue', () => {
     const workspaceTarget = {
       kind: 'workspace-root' as const,
       repoId: 'goblin+file:///workspace',
-      repoRuntimeId: 'repo-runtime-1',
+      workspaceRuntimeId: 'repo-runtime-1',
     }
     const order: string[] = []
     const release = Promise.withResolvers<void>()
@@ -65,7 +65,7 @@ describe('workspace pane action queue', () => {
     expect(
       workspacePaneActionTargetFromCoordinates({
         repoId: TARGET.repoId,
-        repoRuntimeId: TARGET.repoRuntimeId,
+        workspaceRuntimeId: TARGET.workspaceRuntimeId,
         branchName: null,
         worktreePath: TARGET.worktreePath,
       }),
@@ -73,14 +73,14 @@ describe('workspace pane action queue', () => {
   })
 
   test.each([
-    ['runtime', { ...TARGET, repoRuntimeId: 'repo-runtime-2' }],
+    ['runtime', { ...TARGET, workspaceRuntimeId: 'repo-runtime-2' }],
     ['worktree', { ...TARGET, worktreePath: '/worktree-b' }],
     [
       'branch',
       {
         kind: 'git-branch' as const,
         repoId: TARGET.repoId,
-        repoRuntimeId: TARGET.repoRuntimeId,
+        workspaceRuntimeId: TARGET.workspaceRuntimeId,
         branchName: 'feature/b',
       },
     ],
@@ -102,14 +102,14 @@ describe('workspace pane action queue', () => {
       workspacePaneActionTargetKey({
         kind: 'workspace-root',
         repoId: 'goblin+file:///repo',
-        repoRuntimeId: 'runtime',
+        workspaceRuntimeId: 'runtime',
       }),
     ).toBe('goblin+file:///repo\0runtime\0workspace-root')
     expect(
       workspacePaneActionTargetKey({
         kind: 'git-branch',
         repoId: 'goblin+file:///repo',
-        repoRuntimeId: 'runtime',
+        workspaceRuntimeId: 'runtime',
         branchName: 'main',
       }),
     ).toBe('goblin+file:///repo\0runtime\0git-branch\0main')
@@ -117,7 +117,7 @@ describe('workspace pane action queue', () => {
       workspacePaneActionTargetKey({
         kind: 'git-worktree' as const,
         repoId: 'goblin+file:///repo',
-        repoRuntimeId: 'runtime',
+        workspaceRuntimeId: 'runtime',
         worktreePath: '/repo-worktree',
       }),
     ).toBe('goblin+file:///repo\0runtime\0git-worktree\0/repo-worktree')
@@ -138,13 +138,13 @@ describe('workspace pane action queue', () => {
     ).toEqual({
       kind: 'git-worktree',
       repoId: workspaceId,
-      repoRuntimeId: 'runtime',
+      workspaceRuntimeId: 'runtime',
       worktreePath: '/repo-detached',
     })
     expect(
       workspacePaneActionTargetFromCoordinates({
         repoId: workspaceId,
-        repoRuntimeId: 'runtime',
+        workspaceRuntimeId: 'runtime',
         branchName: null,
         worktreePath: '/repo-detached',
       }),
@@ -155,7 +155,7 @@ describe('workspace pane action queue', () => {
     const intentId = beginWorkspacePaneRouteIntent(TARGET, 'static:files')
 
     expect(workspacePaneRouteIntentPending(TARGET, 'static:files')).toBe(true)
-    expect(workspacePaneRouteIntentPending({ ...TARGET, repoRuntimeId: 'repo-runtime-2' }, 'static:files')).toBe(false)
+    expect(workspacePaneRouteIntentPending({ ...TARGET, workspaceRuntimeId: 'repo-runtime-2' }, 'static:files')).toBe(false)
     expect(workspacePaneActionQueueStatsForTest().pendingRouteIntents).toBe(1)
 
     finishWorkspacePaneRouteIntent(intentId)

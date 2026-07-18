@@ -128,7 +128,7 @@ export interface TerminalEventSink<TUser extends string | number> {
 export interface TerminalPhysicalWorktreeScope<TUser extends string | number> {
   userId: TUser
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   scope: string
 }
 
@@ -175,7 +175,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 
   prepareSession(input: TerminalEnsureSessionInput<TUser>): TerminalSessionPrepareResult {
-    if (input.signal?.aborted) return { ok: false, message: 'error.repo-runtime-stale' }
+    if (input.signal?.aborted) return { ok: false, message: 'error.workspace-runtime-stale' }
     const size = normalizeTerminalSize(input.cols, input.rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
 
@@ -183,7 +183,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     const userId = input.userId
     if (!this.isValidUserId(userId)) return { ok: false, message: 'error.invalid-arguments' }
     const coordinates = terminalExecutionCoordinates(input.target)
-    const scope = terminalSessionRuntimeScope(coordinates.repoRoot, coordinates.repoRuntimeId)
+    const scope = terminalSessionRuntimeScope(coordinates.repoRoot, coordinates.workspaceRuntimeId)
     const existing = this.directory.getByDurableId(userId, input.terminalSessionId)
     if (existing) {
       if (!sameTerminalScope(existing, input)) {
@@ -381,7 +381,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       this.applyIdentityEffect(session, identityEffect)
       return await this.snapshotAttachResult(session)
     }
-    if (signal?.aborted) return { ok: false, message: 'error.repo-runtime-stale' }
+    if (signal?.aborted) return { ok: false, message: 'error.workspace-runtime-stale' }
     if (session.render.sequence !== 0) return { ok: false, message: 'error.unavailable' }
 
     // A prepared session has no history to recover. Spawn only after the
@@ -473,7 +473,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       return { result: { ok: false, message: authorityReasonToMessage(denyReason) }, projectionChanged: null }
     }
     restartTerminalClientControl(session, clientId, this.sessionPresence(session))
-    if (signal?.aborted) return { result: { ok: false, message: 'error.repo-runtime-stale' }, projectionChanged: null }
+    if (signal?.aborted) return { result: { ok: false, message: 'error.workspace-runtime-stale' }, projectionChanged: null }
     const spawn = await this.restartAndAttachSession(session, size.cols, size.rows, signal)
     if (!spawn.result.ok && session.ptyBinding.isCurrentSpawn(session, spawn.generation)) {
       if (markTerminalSessionError(session, spawn.result.message)) this.emitLifecycle(session)
@@ -576,7 +576,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     return await this.retireSessions(sessions, 'detached-user')
   }
 
-  commitRepoRuntimeSessionInvalidation(userId: TUser, scope: string): TerminalSessionInvalidationCommit {
+  commitWorkspaceRuntimeSessionInvalidation(userId: TUser, scope: string): TerminalSessionInvalidationCommit {
     return this.commitSessionInvalidation(userId, scope, () => true)
   }
 
@@ -741,7 +741,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       affected.set(key, {
         userId: session.userId,
         repoRoot: coordinates.repoRoot,
-        repoRuntimeId: coordinates.repoRuntimeId,
+        workspaceRuntimeId: coordinates.workspaceRuntimeId,
         scope: session.scope,
       })
       const closed = await this.requestSessionRetirement(session.id, 'scope')
@@ -844,12 +844,12 @@ export class TerminalSessionManager<TUser extends string | number> {
   terminalSessionsChangedEventForScope(
     userId: TUser,
     repoRoot: string,
-    repoRuntimeId: string,
+    workspaceRuntimeId: string,
   ): TerminalSessionsChangedEvent {
     return {
       repoRoot,
-      repoRuntimeId,
-      revision: this.projectionRevision(userId, terminalSessionRuntimeScope(repoRoot, repoRuntimeId)),
+      workspaceRuntimeId,
+      revision: this.projectionRevision(userId, terminalSessionRuntimeScope(repoRoot, workspaceRuntimeId)),
     }
   }
 
@@ -1182,7 +1182,7 @@ export class TerminalSessionManager<TUser extends string | number> {
           ...event,
           ...this.terminalSessionIdentity(session),
           repoRoot: terminalExecutionCoordinates(session.target).repoRoot,
-          repoRuntimeId: terminalExecutionCoordinates(session.target).repoRuntimeId,
+          workspaceRuntimeId: terminalExecutionCoordinates(session.target).workspaceRuntimeId,
         }),
       confirmedExit: (session, terminalRuntimeGeneration) => {
         this.confirmSessionExit(session, terminalRuntimeGeneration)
@@ -1218,7 +1218,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     const coordinates = terminalExecutionCoordinates(session.target)
     return {
       repoRoot: coordinates.repoRoot,
-      repoRuntimeId: coordinates.repoRuntimeId,
+      workspaceRuntimeId: coordinates.workspaceRuntimeId,
       revision: this.projectionRevision(session.userId, session.scope),
     }
   }
@@ -1295,7 +1295,7 @@ function sameTerminalScope<TUser extends string | number>(
     session.scope !==
       terminalSessionRuntimeScope(
         terminalExecutionCoordinates(input.target).repoRoot,
-        terminalExecutionCoordinates(input.target).repoRuntimeId,
+        terminalExecutionCoordinates(input.target).workspaceRuntimeId,
       ) ||
     session.target.kind !== input.target.kind
   ) {
@@ -1305,7 +1305,7 @@ function sameTerminalScope<TUser extends string | number>(
   const requested = terminalExecutionCoordinates(input.target)
   return (
     current.repoRoot === requested.repoRoot &&
-    current.repoRuntimeId === requested.repoRuntimeId &&
+    current.workspaceRuntimeId === requested.workspaceRuntimeId &&
     current.worktreeId === requested.worktreeId
   )
 }

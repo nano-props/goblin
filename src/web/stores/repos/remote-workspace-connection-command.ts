@@ -7,33 +7,33 @@ import {
 import { resolveRemoteRepoConnection } from '#/web/remote-client.ts'
 import { acceptRemoteLifecycleSnapshot } from '#/web/stores/repos/remote-lifecycle-projection.ts'
 import { acceptWorkspaceProbeSnapshot } from '#/web/stores/repos/workspace-probe-projection.ts'
-import { refreshRepoRuntimes } from '#/web/repo-runtime-query.ts'
+import { refreshWorkspaceRuntimes } from '#/web/workspace-runtime-query.ts'
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/repos/refresh.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type RemoteWorkspaceConnectionOutcome =
-  | { kind: 'ready'; workspaceId: WorkspaceId; name: string; target: RemoteRepoTarget }
-  | { kind: 'failed'; workspaceId: WorkspaceId; name: string; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget }
-  | { kind: 'superseded'; workspaceId: WorkspaceId }
-  | { kind: 'stale-runtime'; workspaceId: WorkspaceId }
-  | { kind: 'cancelled'; workspaceId: WorkspaceId }
-  | { kind: 'transport-failed'; workspaceId: WorkspaceId; reason: 'unknown' }
+  | { kind: 'ready'; repoRoot: WorkspaceId; name: string; target: RemoteRepoTarget }
+  | { kind: 'failed'; repoRoot: WorkspaceId; name: string; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget }
+  | { kind: 'superseded'; repoRoot: WorkspaceId }
+  | { kind: 'stale-runtime'; repoRoot: WorkspaceId }
+  | { kind: 'cancelled'; repoRoot: WorkspaceId }
+  | { kind: 'transport-failed'; repoRoot: WorkspaceId; reason: 'unknown' }
 
 function commandOutcome(
   result: RemoteRepoLifecycleCommandResult,
-  workspaceId: WorkspaceId,
+  repoRoot: WorkspaceId,
 ): RemoteWorkspaceConnectionOutcome {
-  if (result.repoId !== workspaceId) return { kind: 'stale-runtime', workspaceId }
-  if (result.kind !== 'settled') return { kind: result.kind, workspaceId }
+  if (result.repoId !== repoRoot) return { kind: 'stale-runtime', repoRoot }
+  if (result.kind !== 'settled') return { kind: result.kind, repoRoot }
   const lifecycle = result.lifecycle
   if (lifecycle.kind === 'ready') {
-    return { kind: 'ready', workspaceId, name: result.name, target: lifecycle.target }
+    return { kind: 'ready', repoRoot, name: result.name, target: lifecycle.target }
   }
   if (lifecycle.kind === 'failed') {
     return {
       kind: 'failed',
-      workspaceId,
+      repoRoot,
       name: result.name,
       reason: lifecycle.reason,
       target: lifecycle.target,
@@ -53,40 +53,40 @@ function commandOutcome(
 export async function runRemoteWorkspaceConnection(
   set: ReposSet,
   get: ReposGet,
-  workspaceId: WorkspaceId,
-  options: { repoRuntimeId?: string; signal?: AbortSignal; mode?: 'restart' | 'ensure' } = {},
+  repoRoot: WorkspaceId,
+  options: { workspaceRuntimeId?: string; signal?: AbortSignal; mode?: 'restart' | 'ensure' } = {},
 ): Promise<RemoteWorkspaceConnectionOutcome | null> {
-  if (!isRemoteRepoId(workspaceId)) return null
-  const repoRuntimeId = options.repoRuntimeId ?? get().repos[workspaceId]?.repoRuntimeId
-  if (!repoRuntimeId) return null
+  if (!isRemoteRepoId(repoRoot)) return null
+  const workspaceRuntimeId = options.workspaceRuntimeId ?? get().repos[repoRoot]?.workspaceRuntimeId
+  if (!workspaceRuntimeId) return null
 
   let result: RemoteRepoLifecycleCommandResult
   try {
-    result = await resolveRemoteRepoConnection({ repoId: workspaceId, repoRuntimeId, mode: options.mode }, options.signal)
+    result = await resolveRemoteRepoConnection({ repoId: repoRoot, workspaceRuntimeId, mode: options.mode }, options.signal)
   } catch (error) {
-    if (options.signal?.aborted || isAbortError(error)) return { kind: 'cancelled', workspaceId }
-    return { kind: 'transport-failed', workspaceId, reason: 'unknown' }
+    if (options.signal?.aborted || isAbortError(error)) return { kind: 'cancelled', repoRoot }
+    return { kind: 'transport-failed', repoRoot, reason: 'unknown' }
   }
-  if (result.repoId !== workspaceId) return { kind: 'stale-runtime', workspaceId }
+  if (result.repoId !== repoRoot) return { kind: 'stale-runtime', repoRoot }
   if (result.kind === 'settled') {
-    const snapshot = await refreshRepoRuntimes()
+    const snapshot = await refreshWorkspaceRuntimes()
     acceptRemoteLifecycleSnapshot(set, get, snapshot)
     acceptWorkspaceProbeSnapshot(set, get, snapshot)
     const runtime = snapshot.runtimes.find(
-      (entry) => entry.repoRoot === workspaceId && entry.repoRuntimeId === repoRuntimeId,
+      (entry) => entry.workspaceId === repoRoot && entry.workspaceRuntimeId === workspaceRuntimeId,
     )
-    if (!runtime || get().repos[workspaceId]?.repoRuntimeId !== repoRuntimeId) {
-      return { kind: 'stale-runtime', workspaceId }
+    if (!runtime || get().repos[repoRoot]?.workspaceRuntimeId !== workspaceRuntimeId) {
+      return { kind: 'stale-runtime', repoRoot }
     }
     if (
       result.lifecycle.kind === 'ready' &&
       runtime.workspaceProbe.status === 'ready' &&
       runtime.workspaceProbe.capabilities.git.status === 'available'
     ) {
-      void requestRepoProjectionReadModelRefresh({ get, set }, workspaceId, { repoRuntimeId })
+      void requestRepoProjectionReadModelRefresh({ get, set }, repoRoot, { workspaceRuntimeId })
     }
   }
-  return commandOutcome(result, workspaceId)
+  return commandOutcome(result, repoRoot)
 }
 
 function isAbortError(error: unknown): boolean {

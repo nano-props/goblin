@@ -17,11 +17,11 @@ interface HistoryCommitNode {
 
 export function HistoryCommitGraph({
   repoId,
-  repoRuntimeId,
+  workspaceRuntimeId,
   entries,
 }: {
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   entries: LogEntry[]
 }) {
   const commits = entries.map(historyCommitNode)
@@ -31,7 +31,7 @@ export function HistoryCommitGraph({
         <HistoryCommitRow
           key={commit.key}
           repoId={repoId}
-          repoRuntimeId={repoRuntimeId}
+          workspaceRuntimeId={workspaceRuntimeId}
           commit={commit}
           position={commitPosition(index, commits.length)}
         />
@@ -62,12 +62,12 @@ export function HistoryCommitGraphSkeleton({ rows = 8 }: { rows?: number }) {
 
 function HistoryCommitRow({
   repoId,
-  repoRuntimeId,
+  workspaceRuntimeId,
   commit,
   position,
 }: {
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   commit: HistoryCommitNode
   position: CommitPosition
 }) {
@@ -78,7 +78,7 @@ function HistoryCommitRow({
       title={commit.title}
     >
       <HistoryCommitRail position={position} />
-      <HistoryCommitContent repoId={repoId} repoRuntimeId={repoRuntimeId} commit={commit} />
+      <HistoryCommitContent repoId={repoId} workspaceRuntimeId={workspaceRuntimeId} commit={commit} />
     </li>
   )
 }
@@ -95,16 +95,16 @@ function HistoryCommitRail({ position }: { position: CommitPosition }) {
 
 function HistoryCommitContent({
   repoId,
-  repoRuntimeId,
+  workspaceRuntimeId,
   commit,
 }: {
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   commit: HistoryCommitNode
 }) {
   return (
     <div className="grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] gap-x-2 gap-y-0.5 rounded-md px-1.5 py-1 hover:bg-muted/70">
-      <HistoryCommitHash repoId={repoId} repoRuntimeId={repoRuntimeId} commit={commit} />
+      <HistoryCommitHash repoId={repoId} workspaceRuntimeId={workspaceRuntimeId} commit={commit} />
       {commit.message ? (
         <span className="min-w-0 truncate text-sm leading-5 text-foreground" data-history-log-message="">
           {commit.message}
@@ -117,17 +117,17 @@ function HistoryCommitContent({
 
 function HistoryCommitHash({
   repoId,
-  repoRuntimeId,
+  workspaceRuntimeId,
   commit,
 }: {
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   commit: HistoryCommitNode
 }) {
   return (
     <CommitHashLink
       repoId={repoId}
-      repoRuntimeId={repoRuntimeId}
+      workspaceRuntimeId={workspaceRuntimeId}
       hash={commit.fullHash}
       shortHash={commit.hash}
       tone="warning"

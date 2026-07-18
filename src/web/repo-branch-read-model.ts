@@ -42,11 +42,11 @@ export function repoBranchReadModelFromSnapshot(
 
 export function useRepoBranchReadModel(
   repoRoot: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   enabled: boolean,
 ): RepoBranchReadModelData | null {
-  const projectionReadModel = useRepoProjectionReadModel(repoRoot, repoRuntimeId, null, 'full', enabled)
-  const statusReadModel = useRepoWorktreeStatusReadModel(repoRoot, repoRuntimeId, enabled)
+  const projectionReadModel = useRepoProjectionReadModel(repoRoot, workspaceRuntimeId, null, 'full', enabled)
+  const statusReadModel = useRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, enabled)
   if (!enabled) return null
   const projection = projectionReadModel.data
   if (!projection?.snapshot) return null
@@ -55,29 +55,29 @@ export function useRepoBranchReadModel(
 }
 
 export function readRepoBranchQueryProjection(
-  repo: Pick<RepoState, 'id' | 'repoRuntimeId'>,
+  repo: Pick<RepoState, 'id' | 'workspaceRuntimeId'>,
   queryClient?: QueryClient,
 ): RepoBranchReadModelData | null {
   const projection =
-    getRepoProjectionQueryData(repo.id, repo.repoRuntimeId, null, 'full', queryClient) ??
-    getRepoProjectionPlaceholderData(repo.id, repo.repoRuntimeId, null, 'full', queryClient)
-  const status = getRepoWorktreeStatusQueryData(repo.id, repo.repoRuntimeId, queryClient)
+    getRepoProjectionQueryData(repo.id, repo.workspaceRuntimeId, null, 'full', queryClient) ??
+    getRepoProjectionPlaceholderData(repo.id, repo.workspaceRuntimeId, null, 'full', queryClient)
+  const status = getRepoWorktreeStatusQueryData(repo.id, repo.workspaceRuntimeId, queryClient)
   if (projection?.snapshot && status) return repoBranchReadModelFromSnapshot(projection.snapshot, status.status)
   return null
 }
 
 export function readRepoBranchSnapshotQueryProjection(
-  repo: Pick<RepoState, 'id' | 'repoRuntimeId'>,
+  repo: Pick<RepoState, 'id' | 'workspaceRuntimeId'>,
   queryClient?: QueryClient,
 ): RepoBranchSnapshotData | null {
   const projection =
-    getRepoProjectionQueryData(repo.id, repo.repoRuntimeId, null, 'full', queryClient) ??
-    getRepoProjectionPlaceholderData(repo.id, repo.repoRuntimeId, null, 'full', queryClient)
+    getRepoProjectionQueryData(repo.id, repo.workspaceRuntimeId, null, 'full', queryClient) ??
+    getRepoProjectionPlaceholderData(repo.id, repo.workspaceRuntimeId, null, 'full', queryClient)
   return projection?.snapshot ? repoBranchSnapshotDataFromSnapshot(projection.snapshot) : null
 }
 
 export function requireRepoBranchSnapshotQueryProjection(
-  repo: Pick<RepoState, 'id' | 'repoRuntimeId'>,
+  repo: Pick<RepoState, 'id' | 'workspaceRuntimeId'>,
   queryClient?: QueryClient,
 ): RepoBranchSnapshotData {
   const projection = readRepoBranchSnapshotQueryProjection(repo, queryClient)

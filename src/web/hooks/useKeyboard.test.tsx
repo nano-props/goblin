@@ -114,7 +114,7 @@ describe('useKeyboard', () => {
     })
     seedInitialObservedWorkspacePaneRouteForTest({
       repoId: REPO_ID,
-      repoRuntimeId: repoRuntimeIdForTest(),
+      workspaceRuntimeId: workspaceRuntimeIdForTest(),
       branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
       route: { kind: 'static', tab: 'status' },
@@ -155,7 +155,7 @@ describe('useKeyboard', () => {
     })
     seedInitialObservedWorkspacePaneRouteForTest({
       repoId: REPO_ID,
-      repoRuntimeId: repoRuntimeIdForTest(),
+      workspaceRuntimeId: workspaceRuntimeIdForTest(),
       branchName: 'feature/no-worktree',
       worktreePath: null,
       route: { kind: 'static', tab: 'status' },
@@ -246,7 +246,7 @@ describe('useKeyboard', () => {
     })
     seedInitialObservedWorkspacePaneRouteForTest({
       repoId: REPO_ID,
-      repoRuntimeId: repoRuntimeIdForTest(),
+      workspaceRuntimeId: workspaceRuntimeIdForTest(),
       branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
       route: { kind: 'static', tab: 'status' },
@@ -301,7 +301,7 @@ describe('useKeyboard', () => {
         filesystemTarget: {
           kind: 'git-worktree',
           workspaceId: REPO_ID,
-          workspaceRuntimeId: repoRuntimeIdForTest(),
+          workspaceRuntimeId: workspaceRuntimeIdForTest(),
           rootPath: WORKTREE_PATH,
           head: { kind: 'branch', branchName: 'feature/worktree' },
           capabilities: FILESYSTEM_CAPABILITIES,
@@ -357,7 +357,7 @@ describe('useKeyboard', () => {
         filesystemTarget: {
           kind: 'workspace-root',
           workspaceId: REPO_ID,
-          workspaceRuntimeId: repoRuntimeIdForTest(),
+          workspaceRuntimeId: workspaceRuntimeIdForTest(),
           rootPath: REPO_PATH,
           capabilities: {
             files: { read: true, write: true },
@@ -376,7 +376,7 @@ describe('useKeyboard', () => {
     expect(createTerminal).toHaveBeenCalledWith(
       terminalSessionBaseForTest({
         repoRoot: REPO_ID,
-        repoRuntimeId: repoRuntimeIdForTest(),
+        workspaceRuntimeId: workspaceRuntimeIdForTest(),
         branch: null,
         worktreePath: REPO_PATH,
       }),
@@ -482,8 +482,8 @@ describe('useKeyboard', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/worktree',
     })
-    setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
-      operations: [serverOperation(repo.repoRuntimeId, { kind: 'create-worktree', phase: 'running' })],
+    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
+      operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'create-worktree', phase: 'running' })],
       loadedAt: 123,
     })
     const openCreateWorktree = vi.fn()
@@ -591,7 +591,7 @@ describe('useKeyboard', () => {
         filesystemTarget: {
           kind: 'git-worktree',
           workspaceId: REPO_ID,
-          workspaceRuntimeId: repoRuntimeIdForTest(),
+          workspaceRuntimeId: workspaceRuntimeIdForTest(),
           rootPath: WORKTREE_PATH,
           head: { kind: 'branch', branchName: 'feature/worktree' },
           capabilities: FILESYSTEM_CAPABILITIES,
@@ -612,7 +612,7 @@ describe('useKeyboard', () => {
       'term-111111111111111111111',
       terminalSessionBaseForTest({
         repoRoot: REPO_ID,
-        repoRuntimeId: repoRuntimeIdForTest(),
+        workspaceRuntimeId: workspaceRuntimeIdForTest(),
         branch: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
       }),
@@ -625,13 +625,13 @@ function renderHookHost(overrides: Partial<HookHostOptions> = {}) {
 }
 
 function serverOperation(
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   overrides: Pick<RepoServerOperationState, 'kind' | 'phase'>,
 ): RepoServerOperationState {
   return {
     id: `repo-op-${overrides.kind}-${overrides.phase}`,
     repoId: REPO_ID,
-    repoRuntimeId,
+    workspaceRuntimeId,
     kind: overrides.kind,
     phase: overrides.phase,
     source: 'user',
@@ -670,7 +670,7 @@ function HookHost(overrides: Partial<HookHostOptions>) {
           filesystemTarget: {
             kind: 'git-worktree' as const,
             workspaceId: repo.id,
-            workspaceRuntimeId: repo.repoRuntimeId,
+            workspaceRuntimeId: repo.workspaceRuntimeId,
             rootPath: branch.worktree.path,
             head: { kind: 'branch' as const, branchName: overrides.currentBranchName },
             capabilities: repo.workspaceProbe.capabilities,
@@ -719,10 +719,10 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
   return navigation
 }
 
-function repoRuntimeIdForTest(): string {
+function workspaceRuntimeIdForTest(): string {
   const repo = useReposStore.getState().repos[REPO_ID]
   if (!repo) throw new Error(`expected seeded repo ${REPO_ID}`)
-  return repo.repoRuntimeId
+  return repo.workspaceRuntimeId
 }
 
 function installNativeBridgeStub() {
@@ -745,7 +745,7 @@ function terminalWorktreeSnapshot(): TerminalWorktreeSnapshot {
       index: 1,
       repoRoot: REPO_ID,
 
-      repoRuntimeId: repoRuntimeIdForTest(),
+      workspaceRuntimeId: workspaceRuntimeIdForTest(),
 
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,

@@ -27,8 +27,8 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       calls.projection.push(cwd)
       return { snapshot: { branches: [], current: '' }, pullRequests: null }
     },
-    'repo.worktreeStatus': ({ repoRuntimeId }: { repoRuntimeId: string }) => ({
-      repoRuntimeId,
+    'repo.worktreeStatus': ({ workspaceRuntimeId }: { workspaceRuntimeId: string }) => ({
+      workspaceRuntimeId,
       status: [],
       loadedAt: Date.now(),
     }),
@@ -89,7 +89,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
     },
   }
   if (!overrides['remote.lifecycle']) {
-    handlers['remote.lifecycle'] = async ({ repoId }: { repoId: string; repoRuntimeId: string }) => {
+    handlers['remote.lifecycle'] = async ({ repoId }: { repoId: string; workspaceRuntimeId: string }) => {
       const result = await resolveServerRemoteRepoConnection({ repoId }, undefined, deps)
       return result.kind === 'ready'
         ? {

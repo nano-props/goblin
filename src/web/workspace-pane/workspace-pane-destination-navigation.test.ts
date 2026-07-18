@@ -77,7 +77,7 @@ describe('workspace pane destination navigation', () => {
     useReposStore.setState((state) => {
       const repo = state.repos[REPO_ID]
       if (!repo) return state
-      return { repos: { ...state.repos, [REPO_ID]: { ...repo, repoRuntimeId: 'repo-runtime-reopened' } } }
+      return { repos: { ...state.repos, [REPO_ID]: { ...repo, workspaceRuntimeId: 'repo-runtime-reopened' } } }
     })
     const commitWorkspacePaneRoute = acceptedRouteCommit()
 

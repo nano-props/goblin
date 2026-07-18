@@ -35,7 +35,7 @@ const EMPTY_EVENTS: RepoEvent[] = []
 
 type RepoActivityControlRepo = Pick<
   RepoState,
-  'id' | 'repoRuntimeId' | 'dataLoads' | 'availability' | 'projection' | 'remote'
+  'id' | 'workspaceRuntimeId' | 'dataLoads' | 'availability' | 'projection' | 'remote'
 > &
   RepoActivityProjectionRepo
 
@@ -57,7 +57,7 @@ function repoActivityControlRepoEqual(
     (!!a &&
       !!b &&
       a.id === b.id &&
-      a.repoRuntimeId === b.repoRuntimeId &&
+      a.workspaceRuntimeId === b.workspaceRuntimeId &&
       a.dataLoads === b.dataLoads &&
       a.branchAction === b.branchAction &&
       a.availability === b.availability &&
@@ -74,7 +74,7 @@ export function RepoActivityControl({ repoId }: Props) {
       return repo
         ? {
             id: repo.id,
-            repoRuntimeId: repo.repoRuntimeId,
+            workspaceRuntimeId: repo.workspaceRuntimeId,
             dataLoads: repo.dataLoads,
             branchAction: repo.operations.branchAction,
             availability: repo.availability,
@@ -90,7 +90,7 @@ export function RepoActivityControl({ repoId }: Props) {
 }
 
 function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
-  const operationsReadModel = useRepoOperationsReadModel(repo.id, repo.repoRuntimeId)
+  const operationsReadModel = useRepoOperationsReadModel(repo.id, repo.workspaceRuntimeId)
   const visibleActivity = useRepoActivityControlPresentation(repo, operationsReadModel.data)
   const completion = useRepoCompletion(repo.id)
   const view = getRepoActivityControlView({
@@ -157,11 +157,11 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
   const label = t('action.refresh')
 
   function handleSync() {
-    const repoRuntimeId = repo.repoRuntimeId
+    const workspaceRuntimeId = repo.workspaceRuntimeId
     // Fire-and-forget so AsyncButton's internal pending state does not fight
     // the external manualSyncBusy prop. The visual loading state is owned by
     // the operation, not the click promise.
-    void runManualRepoSync({ get: useReposStore.getState, set: useReposStore.setState }, repo.id, { repoRuntimeId })
+    void runManualRepoSync({ get: useReposStore.getState, set: useReposStore.setState }, repo.id, { workspaceRuntimeId })
   }
 
   const fetchTooltipKey = repo.remote.hasRemotes === false ? 'action.fetch-local-title' : 'action.fetch-title'

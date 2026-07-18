@@ -31,8 +31,8 @@ interface Props {
 export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterSelect, onAfterOpenStatus }: Props) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
-  const repoRuntimeId = useReposStore((state) => state.repos[repoId]?.repoRuntimeId ?? null)
-  const statusReadModel = useRepoWorktreeStatusReadModel(repoId, repoRuntimeId ?? '', repoRuntimeId !== null)
+  const workspaceRuntimeId = useReposStore((state) => state.repos[repoId]?.workspaceRuntimeId ?? null)
+  const statusReadModel = useRepoWorktreeStatusReadModel(repoId, workspaceRuntimeId ?? '', workspaceRuntimeId !== null)
   const repo = useBranchListRepo(repoId)
 
   const branches = useMemo(
@@ -73,11 +73,11 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
   const statusError = statusReadModel.error
   const statusErrorKey = statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
   const retryStatus = () => {
-    if (!repoRuntimeId) return
-    void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repoId, repoRuntimeId)
+    if (!workspaceRuntimeId) return
+    void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repoId, workspaceRuntimeId)
   }
 
-  if (!repo && !statusReadModel.data && statusReadModel.isError && repoRuntimeId) {
+  if (!repo && !statusReadModel.data && statusReadModel.isError && workspaceRuntimeId) {
     return (
       <RepoStatusFailureView
         messageKey={statusErrorKey ?? 'error.failed-read-repo'}

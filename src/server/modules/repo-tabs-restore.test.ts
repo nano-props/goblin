@@ -7,9 +7,9 @@ import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 
 const mocks = vi.hoisted(() => ({
-  acquireRepoRuntimeLease: vi.fn(),
-  releaseRepoRuntimeMembershipLease: vi.fn(),
-  isCurrentRepoRuntimeMembership: vi.fn(),
+  acquireWorkspaceRuntimeLease: vi.fn(),
+  releaseWorkspaceRuntimeMembershipLease: vi.fn(),
+  isCurrentWorkspaceRuntimeMembership: vi.fn(),
   getServerWorkspaceState: vi.fn(),
   compareAndReplaceServerWorkspaceRepos: vi.fn(),
   confirmServerWorkspaceRepoEntry: vi.fn(),
@@ -24,10 +24,10 @@ const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
   commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
 }
 
-vi.mock('#/server/modules/repo-runtimes.ts', () => ({
-  acquireRepoRuntimeLease: mocks.acquireRepoRuntimeLease,
-  releaseRepoRuntimeMembershipLease: mocks.releaseRepoRuntimeMembershipLease,
-  isCurrentRepoRuntimeMembership: mocks.isCurrentRepoRuntimeMembership,
+vi.mock('#/server/modules/workspace-runtimes.ts', () => ({
+  acquireWorkspaceRuntimeLease: mocks.acquireWorkspaceRuntimeLease,
+  releaseWorkspaceRuntimeMembershipLease: mocks.releaseWorkspaceRuntimeMembershipLease,
+  isCurrentWorkspaceRuntimeMembership: mocks.isCurrentWorkspaceRuntimeMembership,
   commitWorkspaceProbeState: vi.fn(() => true),
   workspaceProbeStateForRuntime: mocks.workspaceProbeStateForRuntime,
   runSerializedInitialWorkspaceProbe: vi.fn(async (input) => {
@@ -78,12 +78,12 @@ function plainWorkspaceProbe() {
 describe('restoreRepoTabsForRepo', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.acquireRepoRuntimeLease.mockImplementation((_userId: string, repoRoot: string) => ({
-      repoRoot,
-      repoRuntimeId: 'repo-runtime-test',
+    mocks.acquireWorkspaceRuntimeLease.mockImplementation((_userId: string, workspaceId: string) => ({
+      workspaceId,
+      workspaceRuntimeId: 'repo-runtime-test',
       generation: 1,
     }))
-    mocks.isCurrentRepoRuntimeMembership.mockReturnValue(true)
+    mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(true)
     mocks.workspaceProbeStateForRuntime.mockReturnValue(gitProbe())
     mocks.probeWorkspace.mockResolvedValue(gitProbe())
     mocks.probeRepo.mockImplementation(async (repoRoot: string) => ({ ok: true, root: repoRoot, name: 'repo' }))
@@ -132,21 +132,21 @@ describe('restoreRepoTabsForRepo', () => {
       userId: 'user-test',
       clientId: 'client_test000000000000',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       workspacePaneTabsHost,
     })
 
-    expect(result.repo).toMatchObject({
+    expect(result.workspace).toMatchObject({
       entry: { kind: 'local', id: 'goblin+file:///repo' },
-      repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceId: 'goblin+file:///repo',
+      workspaceRuntimeId: 'repo-runtime-test',
       name: 'repo',
     })
-    expect(result.repo.projection).not.toBeNull()
+    expect(result.workspace.projection).not.toBeNull()
     expect(result.snapshot).toEqual({ revision: 5, entries: [] })
     expect(mocks.probeRepo).not.toHaveBeenCalled()
-    expect(mocks.acquireRepoRuntimeLease).not.toHaveBeenCalled()
-    expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
+    expect(mocks.acquireWorkspaceRuntimeLease).not.toHaveBeenCalled()
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
       workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
@@ -186,12 +186,12 @@ describe('restoreRepoTabsForRepo', () => {
       userId: 'user-test',
       clientId: 'client_test000000000000',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       workspacePaneTabsHost,
     })
 
     expect(result.snapshot).toEqual({ revision: 0, entries: [] })
-    expect(result.repo.projection).not.toBeNull()
+    expect(result.workspace.projection).not.toBeNull()
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
       workspaceId: 'goblin+file:///repo',
@@ -217,11 +217,11 @@ describe('restoreRepoTabsForRepo', () => {
       userId: 'user-test',
       clientId: 'client_test000000000000',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       workspacePaneTabsHost,
     })
 
-    expect(result.repo).toMatchObject({ projection: null, workspaceProbe: { status: 'ready' } })
+    expect(result.workspace).toMatchObject({ projection: null, workspaceProbe: { status: 'ready' } })
     expect(mocks.readRepoProjection).not.toHaveBeenCalled()
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).toHaveBeenCalledWith({
       userId: 'user-test',
@@ -256,7 +256,7 @@ describe('restoreRepoTabsForRepo', () => {
       userId: 'user-test',
       clientId: 'client_test000000000000',
       repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       workspacePaneTabsHost,
     })
 
@@ -287,11 +287,11 @@ describe('restoreRepoTabsForRepo', () => {
       userId: 'user-test',
       clientId: 'client_test000000000000',
       repoRoot: entry.id,
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       workspacePaneTabsHost,
     })
 
-    expect(result.repo.projection).toBeNull()
+    expect(result.workspace.projection).toBeNull()
     expect(mocks.readRepoProjection).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
       workspaceId: entry.id,
@@ -301,13 +301,13 @@ describe('restoreRepoTabsForRepo', () => {
     })
   })
 
-  test('throws repo-runtime-stale when clientId/repoRuntimeId does not match the active lease', async () => {
+  test('throws repo-runtime-stale when clientId/workspaceRuntimeId does not match the active lease', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.isCurrentRepoRuntimeMembership.mockReturnValue(false)
+    mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(false)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
@@ -317,10 +317,10 @@ describe('restoreRepoTabsForRepo', () => {
         userId: 'user-test',
         clientId: 'client_test000000000000',
         repoRoot: 'goblin+file:///repo',
-        repoRuntimeId: 'stale-runtime',
+        workspaceRuntimeId: 'stale-runtime',
         workspacePaneTabsHost,
       }),
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.repo-runtime-stale' })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
     expect(mocks.probeRepo).not.toHaveBeenCalled()
   })
 
@@ -339,10 +339,10 @@ describe('restoreRepoTabsForRepo', () => {
         userId: 'user-test',
         clientId: 'client_test000000000000',
         repoRoot: 'goblin+file:///repo',
-        repoRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: 'repo-runtime-test',
         workspacePaneTabsHost,
       }),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.workspace-not-in-session' })
     expect(mocks.getServerWorkspaceState).toHaveBeenCalledOnce()
   })
 
@@ -365,10 +365,10 @@ describe('restoreRepoTabsForRepo', () => {
         userId: 'user-test',
         clientId: 'client_test000000000000',
         repoRoot: 'goblin+file:///repo',
-        repoRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: 'repo-runtime-test',
         workspacePaneTabsHost,
       }),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.workspace-not-in-session' })
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledOnce()
   })
 
@@ -390,10 +390,10 @@ describe('restoreRepoTabsForRepo', () => {
         userId: 'user-test',
         clientId: 'client_test000000000000',
         repoRoot: 'goblin+file:///repo',
-        repoRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: 'repo-runtime-test',
         workspacePaneTabsHost,
       }),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.workspace-not-in-session' })
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledOnce()
   })
 
@@ -425,10 +425,10 @@ describe('restoreRepoTabsForRepo', () => {
         userId: 'user-test',
         clientId: 'client_test000000000000',
         repoRoot: 'goblin+file:///repo',
-        repoRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: 'repo-runtime-test',
         workspacePaneTabsHost,
       }),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.workspace-not-in-session' })
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledOnce()
   })
 
@@ -447,12 +447,12 @@ describe('restoreRepoTabsForRepo', () => {
         userId: 'user-test',
         clientId: 'client_test000000000000',
         repoRoot: 'goblin+file:///repo',
-        repoRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: 'repo-runtime-test',
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
-    expect(mocks.acquireRepoRuntimeLease).not.toHaveBeenCalled()
-    expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
+    expect(mocks.acquireWorkspaceRuntimeLease).not.toHaveBeenCalled()
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 
   test('keeps the existing membership when lazy remote ensure fails', async () => {
@@ -479,12 +479,12 @@ describe('restoreRepoTabsForRepo', () => {
         userId: 'user-test',
         clientId: 'client_test000000000000',
         repoRoot: remoteEntry.id,
-        repoRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: 'repo-runtime-test',
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
-    expect(mocks.acquireRepoRuntimeLease).not.toHaveBeenCalled()
-    expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
+    expect(mocks.acquireWorkspaceRuntimeLease).not.toHaveBeenCalled()
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 
   test('rejects a projection if the membership becomes stale while reading', async () => {
@@ -492,7 +492,7 @@ describe('restoreRepoTabsForRepo', () => {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
     })
-    mocks.isCurrentRepoRuntimeMembership
+    mocks.isCurrentWorkspaceRuntimeMembership
       .mockReturnValueOnce(true)
       .mockReturnValueOnce(true)
       .mockReturnValueOnce(true)
@@ -506,10 +506,10 @@ describe('restoreRepoTabsForRepo', () => {
         userId: 'user-test',
         clientId: 'client_test000000000000',
         repoRoot: 'goblin+file:///repo',
-        repoRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: 'repo-runtime-test',
         workspacePaneTabsHost,
       }),
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.repo-runtime-stale' })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
   })
 })

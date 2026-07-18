@@ -3,13 +3,13 @@ import type { RemoteRepoFailureReason, RemoteRepoTarget } from '#/shared/remote-
 
 export class RemoteRepoRuntimeFailureError extends Error {
   readonly repoRoot: string
-  readonly repoRuntimeId: string
+  readonly workspaceRuntimeId: string
   readonly reason: RemoteRepoFailureReason
   readonly target?: RemoteRepoTarget
 
   constructor(input: {
     repoRoot: string
-    repoRuntimeId: string
+    workspaceRuntimeId: string
     reason: RemoteRepoFailureReason
     target?: RemoteRepoTarget
     message?: string
@@ -17,7 +17,7 @@ export class RemoteRepoRuntimeFailureError extends Error {
     super(input.message ?? input.reason)
     this.name = 'RemoteRepoRuntimeFailureError'
     this.repoRoot = input.repoRoot
-    this.repoRuntimeId = input.repoRuntimeId
+    this.workspaceRuntimeId = input.workspaceRuntimeId
     this.reason = input.reason
     if (input.target) this.target = input.target
   }
@@ -141,7 +141,7 @@ function isTargetPortTransportFailure(text: string): boolean {
 
 export function remoteRuntimeFailureFromCommandResult(input: {
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   target?: RemoteRepoTarget
   result: RemoteCommandResult
 }): RemoteRepoRuntimeFailureError | null {
@@ -149,7 +149,7 @@ export function remoteRuntimeFailureFromCommandResult(input: {
   if (!reason) return null
   return new RemoteRepoRuntimeFailureError({
     repoRoot: input.repoRoot,
-    repoRuntimeId: input.repoRuntimeId,
+    workspaceRuntimeId: input.workspaceRuntimeId,
     reason,
     target: input.target,
     message: input.result.message,
@@ -158,7 +158,7 @@ export function remoteRuntimeFailureFromCommandResult(input: {
 
 export function remoteRuntimeFailureFromTargetResolutionError(input: {
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   error: unknown
 }): RemoteRepoRuntimeFailureError {
   const message = input.error instanceof Error ? input.error.message : String(input.error)
@@ -171,7 +171,7 @@ export function remoteRuntimeFailureFromTargetResolutionError(input: {
   const reason: RemoteRepoFailureReason = timedOut || text.includes('timed out') ? 'timeout' : 'config-changed'
   return new RemoteRepoRuntimeFailureError({
     repoRoot: input.repoRoot,
-    repoRuntimeId: input.repoRuntimeId,
+    workspaceRuntimeId: input.workspaceRuntimeId,
     reason,
     message,
   })

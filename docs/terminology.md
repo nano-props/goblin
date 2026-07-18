@@ -143,7 +143,7 @@ Canonical examples:
 | Status read                 | `getRepoStatus`                       | `getRepositoryStatus`                            |
 | Log read                    | `getRepoLog`                          | `getRepositoryLog`                               |
 | Bulk read                   | `RepoBulkReadResult` / `readRepoBulk` | `RepositoryComposite` / `getRepositoryComposite` |
-| Operation scheduler         | `RepoOperationScheduler`              | `RepoRuntime`                                    |
+| Operation scheduler         | `RepoOperationScheduler`              | `WorkspaceRuntime`                                    |
 | Operation lane              | `RepoOperationLane`                   | `RepoTaskLane`, `RepoLane`                       |
 | Data load state             | `RepoDataLoadState`                   | `RepoResourcesState`                             |
 | Right-pane surface          | `RepoWorkspace`                       | `branch-workspace/`                              |

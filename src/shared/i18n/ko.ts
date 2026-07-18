@@ -519,7 +519,7 @@ export const ko: Record<DictKey, string> = {
   'error.trash-unavailable': '시스템 휴지통을 사용할 수 없습니다',
   'error.failed-trash-file': '파일을 휴지통으로 이동할 수 없습니다',
   'error.invalid-arguments': '인수가 올바르지 않습니다',
-  'error.repo-runtime-stale': '리포지토리 런타임이 만료되었습니다',
+  'error.workspace-runtime-stale': '워크스페이스 런타임이 만료되었습니다',
   'error.workspace-target-stale': '워크스페이스 대상이 변경되었습니다. 다시 시도해 주세요.',
   'error.worktree-removal-in-progress': '이 작업 트리를 삭제하는 중입니다',
   'error.not-controller': '이 터미널은 다른 세션이 제어하고 있습니다',

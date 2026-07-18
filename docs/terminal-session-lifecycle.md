@@ -218,7 +218,7 @@ turning into session deletion.
 sessions and the workspace-pane tab strip.
 
 When the server lists workspace tabs it purely projects stored layout intent
-against live terminal sessions for the same user and repo runtime:
+against live terminal sessions for the same user and workspace runtime:
 
 - live sessions materialize missing terminal runtime tab entries
 - stale terminal runtime tab entries are removed

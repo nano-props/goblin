@@ -51,7 +51,7 @@ import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalActionHost, type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import { isCurrentRepoRuntime, onRepoRuntimeClosed } from '#/server/modules/repo-runtimes.ts'
+import { isCurrentWorkspaceRuntime, onWorkspaceRuntimeClosed } from '#/server/modules/workspace-runtimes.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts'
 import { createWorktreeRemovalApplication } from '#/server/worktree-removal/worktree-removal-application.ts'
@@ -68,7 +68,7 @@ const TERMINAL_DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 // A window's repo membership survives the same long disconnect window as its
 // terminals, but remains a separate policy input so the two lifecycles are not
 // structurally coupled if product retention changes later.
-const REPO_RUNTIME_MEMBERSHIP_TTL_MS = 24 * 60 * 60 * 1000
+const WORKSPACE_RUNTIME_MEMBERSHIP_TTL_MS = 24 * 60 * 60 * 1000
 const INVALIDATED_SCOPE_RETIREMENT_RETRY_BASE_MS = 100
 const INVALIDATED_SCOPE_RETIREMENT_RETRY_MAX_MS = 5_000
 const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })
@@ -151,7 +151,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     manager,
     workspaceTabsCoordinator,
     detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
-    repoMembershipTtlMs: REPO_RUNTIME_MEMBERSHIP_TTL_MS,
+    repoMembershipTtlMs: WORKSPACE_RUNTIME_MEMBERSHIP_TTL_MS,
   })
   broker = coordinator.broker
   sessionService = createTerminalSessionService({
@@ -159,7 +159,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isValidTerminalSessionId,
     manager,
     workspaceTabsCoordinator,
-    isCurrentRepoRuntime: isCurrentRepoRuntime,
+    isCurrentWorkspaceRuntime: isCurrentWorkspaceRuntime,
     broadcastWorkspaceTabsChanged(userId, repoRoot) {
       broadcastRepoWorkspaceTabsChanged(userId, repoRoot)
     },
@@ -170,30 +170,35 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     {
       userId: string
       repoRoot: string
-      repoRuntimeId: string
+      workspaceRuntimeId: string
       scope: string
       attempts: number
       running: boolean
       timer: ReturnType<typeof setTimeout> | null
     }
   >()
-  const unsubscribeRepoRuntimeClosed = onRepoRuntimeClosed((event) => {
-    const scope = terminalSessionRuntimeScope(event.repoRoot, event.repoRuntimeId)
-    const invalidation = manager.commitRepoRuntimeSessionInvalidation(event.userId, scope)
+  const unsubscribeWorkspaceRuntimeClosed = onWorkspaceRuntimeClosed((event) => {
+    const scope = terminalSessionRuntimeScope(event.workspaceId, event.workspaceRuntimeId)
+    const invalidation = manager.commitWorkspaceRuntimeSessionInvalidation(event.userId, scope)
     const sessionsChangedEvent = manager.terminalSessionsChangedEventForScope(
       event.userId,
-      event.repoRoot,
-      event.repoRuntimeId,
+      event.workspaceId,
+      event.workspaceRuntimeId,
     )
     manager.releaseProjectionRevisionForScope(event.userId, scope)
-    scheduleInvalidatedScopeRetirement({ ...event, scope })
+    scheduleInvalidatedScopeRetirement({
+      userId: event.userId,
+      repoRoot: event.workspaceId,
+      workspaceRuntimeId: event.workspaceRuntimeId,
+      scope,
+    })
     invalidation.publishEffects()
     try {
       broadcastRepoSessionsChanged(event.userId, sessionsChangedEvent)
     } catch (error) {
       terminalRuntimeLogger.warn(
-        { userId: event.userId, repoRoot: event.repoRoot, repoRuntimeId: event.repoRuntimeId, err: error },
-        'failed to publish invalidated repo runtime sessions',
+        { userId: event.userId, workspaceId: event.workspaceId, workspaceRuntimeId: event.workspaceRuntimeId, err: error },
+        'failed to publish invalidated workspace runtime sessions',
       )
     }
   })
@@ -201,7 +206,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   function scheduleInvalidatedScopeRetirement(input: {
     userId: string
     repoRoot: string
-    repoRuntimeId: string
+    workspaceRuntimeId: string
     scope: string
   }): void {
     if (shuttingDown) return
@@ -217,7 +222,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     retirement: {
       userId: string
       repoRoot: string
-      repoRuntimeId: string
+      workspaceRuntimeId: string
       scope: string
       attempts: number
       running: boolean
@@ -242,10 +247,10 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
           {
             userId: retirement.userId,
             repoRoot: retirement.repoRoot,
-            repoRuntimeId: retirement.repoRuntimeId,
+            workspaceRuntimeId: retirement.workspaceRuntimeId,
             err: error,
           },
-          'failed to publish retired repo runtime workspace tabs',
+          'failed to publish retired workspace runtime workspace tabs',
         )
       }
     } catch (error) {
@@ -254,11 +259,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         {
           userId: retirement.userId,
           repoRoot: retirement.repoRoot,
-          repoRuntimeId: retirement.repoRuntimeId,
+          workspaceRuntimeId: retirement.workspaceRuntimeId,
           attempt: retirement.attempts,
           err: error,
         },
-        'failed to retire invalidated repo runtime workspace tabs; retrying',
+        'failed to retire invalidated workspace runtime workspace tabs; retrying',
       )
       if (invalidatedScopeRetirements.get(key) !== retirement) return
       if (shuttingDown) {
@@ -294,7 +299,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     physicalWorktrees,
     terminal: { ...terminalCreateProvider, close: actions.close },
     terminalWorktree: manager,
-    isCurrentRepoRuntime,
+    isCurrentWorkspaceRuntime,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsRevision,
   })
   const worktreeRemovalApplication = createWorktreeRemovalApplication({
@@ -302,11 +307,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     physicalWorktrees,
     terminalWorktree: manager,
     workspaceTabs: workspaceTabsCoordinator,
-    isCurrentRepoRuntime,
-    broadcastSessionsChanged(userId, repoRoot, repoRuntimeId) {
+    isCurrentWorkspaceRuntime,
+    broadcastSessionsChanged(userId, repoRoot, workspaceRuntimeId) {
       broadcastRepoSessionsChanged(
         userId,
-        manager.terminalSessionsChangedEventForScope(userId, repoRoot, repoRuntimeId),
+        manager.terminalSessionsChangedEventForScope(userId, repoRoot, workspaceRuntimeId),
       )
     },
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
@@ -322,7 +327,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const workspacePaneTabsActions = createWorkspacePaneTabsActions({
     sessionService,
     isValidClientId: isValidTerminalClientId,
-    isCurrentRepoRuntime: isCurrentRepoRuntime,
+    isCurrentWorkspaceRuntime: isCurrentWorkspaceRuntime,
   })
   const workspacePaneTabsHost: ServerWorkspacePaneTabsHost = {
     async restoreTabs(userId, input) {
@@ -399,7 +404,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     onShutdown() {
       if (shuttingDown) return
       shuttingDown = true
-      unsubscribeRepoRuntimeClosed()
+      unsubscribeWorkspaceRuntimeClosed()
       for (const retirement of invalidatedScopeRetirements.values()) {
         if (retirement.timer) clearTimeout(retirement.timer)
       }
@@ -438,7 +443,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       scheduleInvalidatedScopeRetirement({
         userId,
         repoRoot: workspaceId,
-        repoRuntimeId: workspaceRuntimeId,
+        workspaceRuntimeId: workspaceRuntimeId,
         scope,
       })
       const terminalInvalidation = manager.commitGitSessionInvalidation(userId, scope)
@@ -499,7 +504,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     const coordinates = terminalSessionCoordinates(session)
     broadcastRepoSessionsChanged(
       userId,
-      manager.terminalSessionsChangedEventForScope(userId, coordinates.repoRoot, coordinates.repoRuntimeId),
+      manager.terminalSessionsChangedEventForScope(userId, coordinates.repoRoot, coordinates.workspaceRuntimeId),
     )
     void sessionService
       .reconcileTerminalTabsForSession(userId, session)

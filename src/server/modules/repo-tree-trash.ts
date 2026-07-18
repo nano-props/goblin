@@ -14,7 +14,7 @@ export async function trashRepositoryFile(
   worktreePath: string,
   filePath: string,
   signal?: AbortSignal,
-  options: { repoRuntimeId?: string } = {},
+  options: { workspaceRuntimeId?: string } = {},
 ): Promise<ExecResult> {
   if (signal?.aborted) return { ok: false, message: 'cancelled' }
   if (!hasUsableWorktreePath(worktreePath)) return { ok: false, message: 'error.invalid-worktree-path' }
@@ -24,9 +24,9 @@ export async function trashRepositoryFile(
   if (isRemoteRepoId(cwd)) {
     const target = await resolveRemoteRepoTarget(
       cwd,
-      options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
+      options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
     )
-    const run = options.repoRuntimeId ? remoteRuntimeAwareGitRunner(cwd, options.repoRuntimeId, target) : undefined
+    const run = options.workspaceRuntimeId ? remoteRuntimeAwareGitRunner(cwd, options.workspaceRuntimeId, target) : undefined
     return await trashRemoteFile(target, executionPath, filePath, { signal, ...(run ? { run } : {}) })
   }
 

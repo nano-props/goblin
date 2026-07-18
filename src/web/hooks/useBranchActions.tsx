@@ -90,8 +90,8 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   const setLastResult = useReposStore((s) => s.setLastResult)
   const runBranchAction = useReposStore((s) => s.runBranchAction)
   const copyPatchMutation = useMutation({
-    mutationKey: ['repo-data', repo.id, repo.repoRuntimeId, 'patch'],
-    mutationFn: async (worktreePath: string) => await getRepoPatch(repo.id, repo.repoRuntimeId, worktreePath),
+    mutationKey: ['repo-data', repo.id, repo.workspaceRuntimeId, 'patch'],
+    mutationFn: async (worktreePath: string) => await getRepoPatch(repo.id, repo.workspaceRuntimeId, worktreePath),
   })
   const branchActionBusy = isBranchActionBlocked(repo)
   const branchBusyAction = branchActionBusyItemId(repo, branch.name)
@@ -113,7 +113,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     options?: { deferResultMessages?: string[]; handleResult?: (result: ExecResult) => boolean },
   ): void {
     if (guardBusy()) return
-    void dispatchRepoBranchAction(repo.id, repo.repoRuntimeId, action, runBranchAction, {
+    void dispatchRepoBranchAction(repo.id, repo.workspaceRuntimeId, action, runBranchAction, {
       deferResultMessages: options?.deferResultMessages,
       handleResult: options?.handleResult,
     })
@@ -126,7 +126,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   ): Promise<ExecResult | null> {
     if (guardBusy()) return Promise.resolve(null)
     const pending = runPendingLocalAction(op, async () => {
-      const result = await dispatchRepoUiAction(repo.id, repo.repoRuntimeId, op, fn, setLastResult, {
+      const result = await dispatchRepoUiAction(repo.id, repo.workspaceRuntimeId, op, fn, setLastResult, {
         silentSuccessOps: SILENT_SUCCESS_OPS,
         handleResult: options?.handleResult,
       })
@@ -179,13 +179,13 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   function openTerminal(app: TerminalApp) {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
-    return runUiAction('terminal', () => openRepoTerminal(repo.id, repo.repoRuntimeId, worktreePath, app))
+    return runUiAction('terminal', () => openRepoTerminal(repo.id, repo.workspaceRuntimeId, worktreePath, app))
   }
 
   function openEditor(app: EditorApp) {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
-    return runUiAction('editor', () => openRepoEditor(repo.id, repo.repoRuntimeId, worktreePath, app))
+    return runUiAction('editor', () => openRepoEditor(repo.id, repo.workspaceRuntimeId, worktreePath, app))
   }
 
   function openFinder() {

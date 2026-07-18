@@ -143,7 +143,7 @@ export interface TerminalCreateOptions {
 }
 
 export interface TerminalRuntimeMembership {
-  repoRuntimeId: string
+  workspaceRuntimeId: string
 }
 
 export type TerminalRuntimeMembershipIndex = Record<string, TerminalRuntimeMembership>

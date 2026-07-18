@@ -39,7 +39,7 @@ export function resolveWorkspacePaneRoute(
   if (!target) return { kind: 'missing' }
   const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget({
     ...target,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
   })
   if (tabEntriesProjection.phase !== 'ready') {
     return {
@@ -49,12 +49,12 @@ export function resolveWorkspacePaneRoute(
   }
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     repoRoot: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath: workspacePaneTabsTargetWorktreePath(target),
   })
   const model = createRepoWorkspaceTabModel({
     repoId: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreeHead: target.kind === 'git-worktree' ? { kind: 'branch', branchName } : undefined,
     paneTarget: target,
     preferredTab: preferredWorkspacePaneTabForTarget(repo.ui, target),

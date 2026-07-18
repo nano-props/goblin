@@ -46,7 +46,7 @@ export function createTerminalSessionCreateProvider(deps: {
       assertPhysicalWorktreeExecutionCapability(admission.physicalWorktreeCapability, {
         userId,
         repoRoot: coordinates.repoRoot,
-        repoRuntimeId: coordinates.repoRuntimeId,
+        workspaceRuntimeId: coordinates.workspaceRuntimeId,
         worktreePath: terminalExecutionPath(input.target),
       })
       const context = deps.worktreeOperations.assertPermit(admission.physicalWorktreeCapability, admission.permit)

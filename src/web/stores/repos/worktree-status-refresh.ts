@@ -8,19 +8,19 @@ interface RepoWorktreeStatusRefreshAccess {
   get: ReposGet
 }
 
-function statusRefreshable(store: RepoWorktreeStatusRefreshAccess, repoRoot: string, repoRuntimeId: string): boolean {
+function statusRefreshable(store: RepoWorktreeStatusRefreshAccess, repoRoot: string, workspaceRuntimeId: string): boolean {
   const repo = store.get().repos[repoRoot]
-  return !!repo && repo.repoRuntimeId === repoRuntimeId && !isRepoUnavailable(repo)
+  return !!repo && repo.workspaceRuntimeId === workspaceRuntimeId && !isRepoUnavailable(repo)
 }
 
 export async function refreshRepoWorktreeStatus(
   store: RepoWorktreeStatusRefreshAccess,
   repoRoot: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
 ): Promise<void> {
-  if (!statusRefreshable(store, repoRoot, repoRuntimeId)) return
+  if (!statusRefreshable(store, repoRoot, workspaceRuntimeId)) return
   try {
-    await refreshRepoWorktreeStatusReadModel(repoRoot, repoRuntimeId)
+    await refreshRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId)
   } catch (err) {
     if (isExpectedRepoOperationCancellation(err)) return
     const message = err instanceof Error ? err.message : String(err)

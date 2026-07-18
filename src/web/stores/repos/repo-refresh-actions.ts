@@ -3,38 +3,38 @@ import { invalidateRepoDataQueries, invalidateRepoRuntimeProjectionQueries } fro
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoRefreshStoreAccess } from '#/web/stores/repos/refresh.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/repos/worktree-status-refresh.ts'
-import { refreshRepoRuntimes } from '#/web/repo-runtime-query.ts'
+import { refreshWorkspaceRuntimes } from '#/web/workspace-runtime-query.ts'
 import { acceptRemoteLifecycleSnapshot } from '#/web/stores/repos/remote-lifecycle-projection.ts'
 
 export function requestVisibleWorkspaceStatusRefresh(
   store: RepoRefreshStoreAccess,
   id: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   branchName: string | null,
 ): boolean {
   const repo = store.get().repos[id]
-  if (!repo || repo.repoRuntimeId !== repoRuntimeId || !branchName) return false
+  if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId || !branchName) return false
   if (isRepoUnavailable(repo)) return false
-  void refreshRepoWorktreeStatus(store, id, repoRuntimeId)
+  void refreshRepoWorktreeStatus(store, id, workspaceRuntimeId)
   return true
 }
 
 export async function handleRepoInvalidationRefresh(
   store: RepoRefreshStoreAccess,
   event: Pick<RepoQueryInvalidationEvent, 'repoId' | 'query'>,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
 ): Promise<void> {
   const repoId = event.repoId
   const repo = store.get().repos[repoId]
-  if (!repo || repo.repoRuntimeId !== repoRuntimeId) return
+  if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId) return
   if (event.query === 'remote-lifecycle') {
-    acceptRemoteLifecycleSnapshot(store.set, store.get, await refreshRepoRuntimes())
+    acceptRemoteLifecycleSnapshot(store.set, store.get, await refreshWorkspaceRuntimes())
     return
   }
   if (isRepoUnavailable(repo)) return
   if (event.query === 'repo-runtime') {
-    invalidateRepoRuntimeProjectionQueries(repoId, repoRuntimeId)
+    invalidateRepoRuntimeProjectionQueries(repoId, workspaceRuntimeId)
     return
   }
-  invalidateRepoDataQueries(repoId, repoRuntimeId)
+  invalidateRepoDataQueries(repoId, workspaceRuntimeId)
 }

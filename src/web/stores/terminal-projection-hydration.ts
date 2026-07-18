@@ -2,7 +2,7 @@
 //
 // Terminal sessions are server-owned runtime state. The client keeps a local
 // projection for UI rendering; this store records whether that server ->
-// client projection has hydrated for each live repo runtime.
+// client projection has hydrated for each live workspace runtime.
 
 import { useMemo } from 'react'
 import { create } from 'zustand'
@@ -13,7 +13,7 @@ const DEFAULT_REFRESH_COOLDOWN_MS = 2000
 export type TerminalProjectionHydrationPhase = WorkspacePaneRuntimeProjectionPhase
 
 export interface TerminalProjectionHydrationEntry {
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   phase: TerminalProjectionHydrationPhase
   errorMessage?: string
 }
@@ -25,9 +25,9 @@ interface TerminalProjectionHydrationState {
   hydrationByRepo: Map<string, TerminalProjectionHydrationEntry>
   /** repoRoot -> ms-since-epoch recorded by the latest successful projection hydrate. */
   refreshedAtByRepo: Map<string, number>
-  beginProjectionHydration: (repoRoot: string, repoRuntimeId: string) => void
-  markProjectionReady: (repoRoot: string, repoRuntimeId: string) => void
-  markProjectionFailed: (repoRoot: string, repoRuntimeId: string, errorMessage?: string) => void
+  beginProjectionHydration: (repoRoot: string, workspaceRuntimeId: string) => void
+  markProjectionReady: (repoRoot: string, workspaceRuntimeId: string) => void
+  markProjectionFailed: (repoRoot: string, workspaceRuntimeId: string, errorMessage?: string) => void
   shouldRefreshProjection: (repoRoot: string) => boolean
 }
 
@@ -35,33 +35,33 @@ export const useTerminalProjectionHydrationStore = create<TerminalProjectionHydr
   refreshCooldownMs: DEFAULT_REFRESH_COOLDOWN_MS,
   hydrationByRepo: new Map(),
   refreshedAtByRepo: new Map(),
-  beginProjectionHydration: (repoRoot, repoRuntimeId) => {
+  beginProjectionHydration: (repoRoot, workspaceRuntimeId) => {
     const current = get().hydrationByRepo.get(repoRoot)
-    if (current?.repoRuntimeId === repoRuntimeId && current.phase === 'pending') return
+    if (current?.workspaceRuntimeId === workspaceRuntimeId && current.phase === 'pending') return
     set((s) => {
       const hydrationByRepo = new Map(s.hydrationByRepo)
-      hydrationByRepo.set(repoRoot, { repoRuntimeId, phase: 'pending' })
+      hydrationByRepo.set(repoRoot, { workspaceRuntimeId, phase: 'pending' })
       return { hydrationByRepo }
     })
   },
-  markProjectionReady: (repoRoot, repoRuntimeId) => {
+  markProjectionReady: (repoRoot, workspaceRuntimeId) => {
     const current = get().hydrationByRepo.get(repoRoot)
-    if (current?.repoRuntimeId === repoRuntimeId && current.phase === 'ready') return
+    if (current?.workspaceRuntimeId === workspaceRuntimeId && current.phase === 'ready') return
     set((s) => {
       const hydrationByRepo = new Map(s.hydrationByRepo)
-      hydrationByRepo.set(repoRoot, { repoRuntimeId, phase: 'ready' })
+      hydrationByRepo.set(repoRoot, { workspaceRuntimeId, phase: 'ready' })
       const refreshedAtByRepo = new Map(s.refreshedAtByRepo)
       refreshedAtByRepo.set(repoRoot, Date.now())
       return { hydrationByRepo, refreshedAtByRepo }
     })
   },
-  markProjectionFailed: (repoRoot, repoRuntimeId, errorMessage) => {
+  markProjectionFailed: (repoRoot, workspaceRuntimeId, errorMessage) => {
     const current = get().hydrationByRepo.get(repoRoot)
-    if (current?.repoRuntimeId === repoRuntimeId && current.phase === 'failed' && current.errorMessage === errorMessage)
+    if (current?.workspaceRuntimeId === workspaceRuntimeId && current.phase === 'failed' && current.errorMessage === errorMessage)
       return
     set((s) => {
       const hydrationByRepo = new Map(s.hydrationByRepo)
-      hydrationByRepo.set(repoRoot, { repoRuntimeId, phase: 'failed', errorMessage })
+      hydrationByRepo.set(repoRoot, { workspaceRuntimeId, phase: 'failed', errorMessage })
       return { hydrationByRepo }
     })
   },
@@ -73,31 +73,31 @@ export const useTerminalProjectionHydrationStore = create<TerminalProjectionHydr
 
 export function useTerminalProjectionHydrationPhase(
   repoRoot: string | null | undefined,
-  repoRuntimeId: string | null | undefined,
+  workspaceRuntimeId: string | null | undefined,
 ): TerminalProjectionHydrationPhase {
-  return useTerminalProjectionHydrationEntry(repoRoot, repoRuntimeId).phase
+  return useTerminalProjectionHydrationEntry(repoRoot, workspaceRuntimeId).phase
 }
 
 export function useTerminalProjectionHydrationEntry(
   repoRoot: string | null | undefined,
-  repoRuntimeId: string | null | undefined,
+  workspaceRuntimeId: string | null | undefined,
 ): TerminalProjectionHydrationEntry {
   const hydrationByRepo = useTerminalProjectionHydrationStore((s) => s.hydrationByRepo)
   return useMemo(() => {
-    if (!repoRoot || !repoRuntimeId) return { repoRuntimeId: repoRuntimeId ?? '', phase: 'pending' }
+    if (!repoRoot || !workspaceRuntimeId) return { workspaceRuntimeId: workspaceRuntimeId ?? '', phase: 'pending' }
     const current = hydrationByRepo.get(repoRoot)
-    return current?.repoRuntimeId === repoRuntimeId ? current : { repoRuntimeId, phase: 'pending' }
-  }, [hydrationByRepo, repoRuntimeId, repoRoot])
+    return current?.workspaceRuntimeId === workspaceRuntimeId ? current : { workspaceRuntimeId, phase: 'pending' }
+  }, [hydrationByRepo, workspaceRuntimeId, repoRoot])
 }
 
 export function useIsInitialTerminalProjectionHydrating(
   repoRoot: string | null | undefined,
-  repoRuntimeId: string | null | undefined,
+  workspaceRuntimeId: string | null | undefined,
 ): boolean {
   const hydrationByRepo = useTerminalProjectionHydrationStore((s) => s.hydrationByRepo)
   return useMemo(() => {
-    if (!repoRoot || !repoRuntimeId) return false
+    if (!repoRoot || !workspaceRuntimeId) return false
     const current = hydrationByRepo.get(repoRoot)
-    return (current?.repoRuntimeId === repoRuntimeId ? current.phase : 'pending') === 'pending'
-  }, [hydrationByRepo, repoRuntimeId, repoRoot])
+    return (current?.workspaceRuntimeId === workspaceRuntimeId ? current.phase : 'pending') === 'pending'
+  }, [hydrationByRepo, workspaceRuntimeId, repoRoot])
 }

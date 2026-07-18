@@ -19,7 +19,7 @@ export type { RepoOperationTarget }
 
 export interface RepoOperationContext {
   id: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   operationId: number
   isCurrent: () => boolean
   ownsTarget: (key: string) => boolean
@@ -30,7 +30,7 @@ interface RepoOperationBaseFields<T> {
   set: ReposSet
   get: ReposGet
   id: string
-  repoRuntimeId?: string
+  workspaceRuntimeId?: string
   lane: RepoOperationLane
   priority: number
   targets: [RepoOperationTarget, ...RepoOperationTarget[]]
@@ -65,12 +65,12 @@ type InternalRepoOperationOptions<T> =
 function operationCurrent(
   get: ReposGet,
   id: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   operationId: number,
   target: RepoOperationTarget,
 ) {
   const repo = get().repos[id]
-  return !!repo && repo.repoRuntimeId === repoRuntimeId && repoOperationCurrent(id, target.key, operationId)
+  return !!repo && repo.workspaceRuntimeId === workspaceRuntimeId && repoOperationCurrent(id, target.key, operationId)
 }
 
 function anyTargetBusy(id: string, targets: RepoOperationTarget[]) {
@@ -79,25 +79,25 @@ function anyTargetBusy(id: string, targets: RepoOperationTarget[]) {
 
 function markOperationState<T>(
   options: InternalRepoOperationOptions<T>,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   operationId: number,
   phase: 'queued' | 'running',
   wasQueued = false,
 ) {
   markRepoOperationTargets(options.id, operationId, options.targets, phase, wasQueued)
-  updateIfFresh(options.set, options.id, repoRuntimeId, (repo) => {
+  updateIfFresh(options.set, options.id, workspaceRuntimeId, (repo) => {
     markRepoOperationViews(repo.operations, operationId, options.targets, phase, wasQueued)
   })
 }
 
 function settleOperationState<T>(
   options: InternalRepoOperationOptions<T>,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   operationId: number,
   error: string | null,
 ) {
   settleRepoOperationTargets(options.id, operationId, options.targets, error)
-  updateIfFresh(options.set, options.id, repoRuntimeId, (repo) => {
+  updateIfFresh(options.set, options.id, workspaceRuntimeId, (repo) => {
     settleRepoOperationViews(repo.operations, operationId, options.targets, error)
   })
 }
@@ -105,8 +105,8 @@ function settleOperationState<T>(
 async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Promise<T | null> {
   const repoBefore = options.get().repos[options.id]
   if (!repoBefore) return null
-  const repoRuntimeId = options.repoRuntimeId ?? repoBefore.repoRuntimeId
-  if (repoBefore.repoRuntimeId !== repoRuntimeId) return null
+  const workspaceRuntimeId = options.workspaceRuntimeId ?? repoBefore.workspaceRuntimeId
+  if (repoBefore.workspaceRuntimeId !== workspaceRuntimeId) return null
   const primary = options.targets[0]
   let ownedTargetKeysAtSettle: Set<string> | null = null
   if (options.policy !== 'latest-wins') {
@@ -117,17 +117,17 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
   const operationId = nextRepoOperationId(options.id)
   const ctx: RepoOperationContext = {
     id: options.id,
-    repoRuntimeId,
+    workspaceRuntimeId,
     operationId,
-    isCurrent: () => operationCurrent(options.get, options.id, repoRuntimeId, operationId, primary),
+    isCurrent: () => operationCurrent(options.get, options.id, workspaceRuntimeId, operationId, primary),
     ownsTarget: (key) =>
       ownedTargetKeysAtSettle
         ? ownedTargetKeysAtSettle.has(key)
         : options.targets.some(
-            (target) => target.key === key && operationCurrent(options.get, options.id, repoRuntimeId, operationId, target),
+            (target) => target.key === key && operationCurrent(options.get, options.id, workspaceRuntimeId, operationId, target),
           ),
     setPhase: (phase) => {
-      if (ctx.isCurrent()) markOperationState(options, repoRuntimeId, operationId, phase)
+      if (ctx.isCurrent()) markOperationState(options, workspaceRuntimeId, operationId, phase)
     },
   }
 
@@ -145,8 +145,8 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
       priority: options.priority,
       replaceQueuedKey:
         options.policy === 'latest-wins' ? `${options.lane}:${options.operationKey ?? primary.key}` : undefined,
-      onQueued: () => markOperationState(options, repoRuntimeId, operationId, 'queued'),
-      onStart: (wasQueued: boolean) => markOperationState(options, repoRuntimeId, operationId, 'running', wasQueued),
+      onQueued: () => markOperationState(options, workspaceRuntimeId, operationId, 'queued'),
+      onStart: (wasQueued: boolean) => markOperationState(options, workspaceRuntimeId, operationId, 'running', wasQueued),
     }
     const result = await scheduleRepoOperation<T>(
       options.id,
@@ -179,11 +179,11 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
   // Settle operation state exactly once before running side effects.
   ownedTargetKeysAtSettle = new Set(
     options.targets
-      .filter((target) => operationCurrent(options.get, options.id, repoRuntimeId, operationId, target))
+      .filter((target) => operationCurrent(options.get, options.id, workspaceRuntimeId, operationId, target))
       .map((target) => target.key),
   )
   const settleError = outcome.kind === 'success' ? outcome.error : outcome.kind === 'error' ? outcome.error : null
-  settleOperationState(options, repoRuntimeId, operationId, settleError)
+  settleOperationState(options, workspaceRuntimeId, operationId, settleError)
 
   if (outcome.kind === 'stale') {
     await options.onStale?.(ctx)

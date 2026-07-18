@@ -171,7 +171,7 @@ describe('repo write operation coordinator', () => {
     await enqueueRepoWriteOperation(
       '/tmp/repo',
       undefined,
-      { repoId: '/tmp/repo', repoRuntimeId: 'repo-runtime-current', kind: 'delete-branch', source: 'user' },
+      { repoId: '/tmp/repo', workspaceRuntimeId: 'repo-runtime-current', kind: 'delete-branch', source: 'user' },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true, message: 'current' })
@@ -181,7 +181,7 @@ describe('repo write operation coordinator', () => {
     await enqueueRepoWriteOperation(
       '/tmp/repo',
       undefined,
-      { repoId: '/tmp/repo', repoRuntimeId: 'repo-runtime-stale', kind: 'remove-worktree', source: 'user' },
+      { repoId: '/tmp/repo', workspaceRuntimeId: 'repo-runtime-stale', kind: 'remove-worktree', source: 'user' },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true, message: 'stale' })
@@ -190,10 +190,10 @@ describe('repo write operation coordinator', () => {
     )
 
     await expect(
-      listRepoWriteOperationsForRepo('/tmp/repo', { repoRuntimeId: 'repo-runtime-current', includeSettled: true }),
+      listRepoWriteOperationsForRepo('/tmp/repo', { workspaceRuntimeId: 'repo-runtime-current', includeSettled: true }),
     ).resolves.toMatchObject([
-      { kind: 'fetch', repoRuntimeId: null },
-      { kind: 'delete-branch', repoRuntimeId: 'repo-runtime-current' },
+      { kind: 'fetch', workspaceRuntimeId: null },
+      { kind: 'delete-branch', workspaceRuntimeId: 'repo-runtime-current' },
     ])
   })
 

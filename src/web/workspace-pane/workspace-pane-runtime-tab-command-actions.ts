@@ -283,7 +283,7 @@ function terminalCoordinatorTarget(base: TerminalSessionBase): WorkspacePaneActi
   const workspaceRoot = base.target.kind === 'workspace-root'
   return workspacePaneActionTargetFromCoordinates({
     repoId: coordinates.repoRoot,
-    repoRuntimeId: coordinates.repoRuntimeId,
+    workspaceRuntimeId: coordinates.workspaceRuntimeId,
     branchName: workspaceRoot ? null : terminalPresentationBranch(base.presentation),
     worktreePath: workspaceRoot ? null : terminalExecutionPath(base.target),
   })

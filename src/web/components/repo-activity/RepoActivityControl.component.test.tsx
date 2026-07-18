@@ -32,8 +32,8 @@ beforeEach(() => {
 describe('RepoActivityControl component', () => {
   test('disables the primary refresh button while server projection reports a user fetch', () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
-    setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
-      operations: [serverOperation(repo.repoRuntimeId, { kind: 'fetch', phase: 'running', source: 'user' })],
+    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
+      operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'fetch', phase: 'running', source: 'user' })],
       loadedAt: 123,
     })
 
@@ -45,8 +45,8 @@ describe('RepoActivityControl component', () => {
 
   test('keeps the primary refresh button idle while server projection reports a background fetch', () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
-    setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
-      operations: [serverOperation(repo.repoRuntimeId, { kind: 'fetch', phase: 'running', source: 'background' })],
+    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
+      operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'fetch', phase: 'running', source: 'background' })],
       loadedAt: 123,
     })
 
@@ -58,9 +58,9 @@ describe('RepoActivityControl component', () => {
 
   test('renders branch action activity from server operation projection', async () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
-    setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
+    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
       operations: [
-        serverOperation(repo.repoRuntimeId, {
+        serverOperation(repo.workspaceRuntimeId, {
           kind: 'push',
           phase: 'queued',
           source: 'user',
@@ -157,18 +157,18 @@ function renderControl() {
 
 function seedRepoForControl(input: Parameters<typeof seedRepoShellForTest>[0]) {
   const repo = seedRepoShellForTest(input)
-  setRepoOperationsQueryData(repo.id, repo.repoRuntimeId, false, { operations: [], loadedAt: 0 })
+  setRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId, false, { operations: [], loadedAt: 0 })
   return repo
 }
 
 function serverOperation(
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   overrides: Pick<RepoServerOperationState, 'kind' | 'phase' | 'source'> & { branch?: string },
 ): RepoServerOperationState {
   return {
     id: `repo-op-${overrides.kind}-${overrides.phase}`,
     repoId: REPO_ID,
-    repoRuntimeId,
+    workspaceRuntimeId,
     kind: overrides.kind,
     phase: overrides.phase,
     source: overrides.source,

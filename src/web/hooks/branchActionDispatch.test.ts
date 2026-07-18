@@ -63,7 +63,7 @@ describe('branch action dispatch', () => {
         deleteUpstream: false,
       },
       {
-        repoRuntimeId: repo.repoRuntimeId,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
         deferResultMessages: [],
       },
     )

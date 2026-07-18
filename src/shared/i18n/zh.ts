@@ -507,7 +507,7 @@ export const zh: Record<DictKey, string> = {
   'error.trash-unavailable': '系统废纸篓不可用',
   'error.failed-trash-file': '无法将文件移到废纸篓',
   'error.invalid-arguments': '参数无效',
-  'error.repo-runtime-stale': '仓库运行时已失效',
+  'error.workspace-runtime-stale': '工作区运行时已失效',
   'error.workspace-target-stale': '工作区目标已发生变化，请重试',
   'error.worktree-removal-in-progress': '正在删除此工作树',
   'error.not-controller': '此终端正由另一个会话控制',

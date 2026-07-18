@@ -30,7 +30,7 @@ describe('remote lifecycle route', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           repoId: 'goblin+ssh://example/repo',
-          repoRuntimeId: 'repo-runtime-test',
+          workspaceRuntimeId: 'repo-runtime-test',
         }),
       }),
     )
@@ -40,7 +40,7 @@ describe('remote lifecycle route', () => {
       {
         userId: 'user-test',
         repoId: 'goblin+ssh://example/repo',
-        repoRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: 'repo-runtime-test',
         mode: 'restart',
       },
       { beforeCapabilityCommit: expect.any(Function) },
@@ -82,7 +82,7 @@ describe('remote lifecycle route', () => {
       new Request('http://localhost/lifecycle', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoId: 'goblin+ssh://example/repo', repoRuntimeId: 'repo-runtime-test' }),
+        body: JSON.stringify({ repoId: 'goblin+ssh://example/repo', workspaceRuntimeId: 'repo-runtime-test' }),
       }),
     )
 
@@ -105,7 +105,7 @@ describe('remote lifecycle route', () => {
       new Request('http://localhost/lifecycle', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoId: 'goblin+ssh://example/repo', repoRuntimeId: '' }),
+        body: JSON.stringify({ repoId: 'goblin+ssh://example/repo', workspaceRuntimeId: '' }),
       }),
     )
 

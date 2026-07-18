@@ -7,9 +7,9 @@ import type { WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 
 const mocks = vi.hoisted(() => ({
-  acquireRepoRuntimeLease: vi.fn(),
-  releaseRepoRuntimeMembershipLease: vi.fn(),
-  isCurrentRepoRuntimeMembership: vi.fn(),
+  acquireWorkspaceRuntimeLease: vi.fn(),
+  releaseWorkspaceRuntimeMembershipLease: vi.fn(),
+  isCurrentWorkspaceRuntimeMembership: vi.fn(),
   getServerWorkspaceState: vi.fn(),
   compareAndReplaceServerWorkspaceRepos: vi.fn(),
   confirmServerWorkspaceRepoEntry: vi.fn(),
@@ -23,26 +23,26 @@ const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
   commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
 }
 
-vi.mock('#/server/modules/repo-runtimes.ts', () => ({
-  acquireRepoRuntimeLease: mocks.acquireRepoRuntimeLease,
-  releaseRepoRuntimeMembershipLease: mocks.releaseRepoRuntimeMembershipLease,
-  isCurrentRepoRuntimeMembership: mocks.isCurrentRepoRuntimeMembership,
+vi.mock('#/server/modules/workspace-runtimes.ts', () => ({
+  acquireWorkspaceRuntimeLease: mocks.acquireWorkspaceRuntimeLease,
+  releaseWorkspaceRuntimeMembershipLease: mocks.releaseWorkspaceRuntimeMembershipLease,
+  isCurrentWorkspaceRuntimeMembership: mocks.isCurrentWorkspaceRuntimeMembership,
   commitWorkspaceProbeState: vi.fn((input) => {
-    mocks.workspaceProbes.set(input.repoRoot, input.probe)
+    mocks.workspaceProbes.set(input.workspaceId, input.probe)
     return true
   }),
   commitOrReadInitialWorkspaceProbeState: vi.fn((input) => {
-    const current = mocks.workspaceProbes.get(input.repoRoot)
+    const current = mocks.workspaceProbes.get(input.workspaceId)
     if (current) return current
-    mocks.workspaceProbes.set(input.repoRoot, input.probe)
+    mocks.workspaceProbes.set(input.workspaceId, input.probe)
     return input.probe
   }),
   runSerializedInitialWorkspaceProbe: vi.fn(async (input) => {
-    const current = mocks.workspaceProbes.get(input.repoRoot)
+    const current = mocks.workspaceProbes.get(input.workspaceId)
     if (current && (current as { status: string }).status !== 'probing') return current
     const probe = await input.probe()
     await input.beforeCommit?.({ before: { status: 'probing' }, after: probe })
-    mocks.workspaceProbes.set(input.repoRoot, probe)
+    mocks.workspaceProbes.set(input.workspaceId, probe)
     return probe
   }),
   workspaceProbeStateForRuntime: vi.fn(
@@ -74,12 +74,12 @@ describe('restoreServerWorkspace', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     mocks.workspaceProbes.clear()
-    mocks.acquireRepoRuntimeLease.mockImplementation((_userId: string, repoRoot: string) => ({
-      repoRoot,
-      repoRuntimeId: 'repo-runtime-test',
+    mocks.acquireWorkspaceRuntimeLease.mockImplementation((_userId: string, workspaceId: string) => ({
+      workspaceId,
+      workspaceRuntimeId: 'repo-runtime-test',
       generation: 1,
     }))
-    mocks.isCurrentRepoRuntimeMembership.mockReturnValue(true)
+    mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(true)
     mocks.probeRepo.mockResolvedValue({ ok: true, root: '/repo', name: 'repo' })
     mocks.readRepoProjection.mockResolvedValue({
       snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: '/repo' } }] },
@@ -149,16 +149,16 @@ describe('restoreServerWorkspace', () => {
     })
     expect(result.runtime).toMatchObject({
       restoredRepoId: 'goblin+file:///repo',
-      repos: [
+      workspaces: [
         {
           entry: { kind: 'local', id: 'goblin+file:///repo' },
-          repoRoot: 'goblin+file:///repo',
-          repoRuntimeId: 'repo-runtime-test',
+          workspaceId: 'goblin+file:///repo',
+          workspaceRuntimeId: 'repo-runtime-test',
           name: 'repo',
         },
       ],
       workspacePaneTabs: [
-        { repoRoot: 'goblin+file:///repo', repoRuntimeId: 'repo-runtime-test', snapshot: { revision: 1, entries: [] } },
+        { workspaceId: 'goblin+file:///repo', workspaceRuntimeId: 'repo-runtime-test', snapshot: { revision: 1, entries: [] } },
       ],
     })
   })
@@ -191,9 +191,9 @@ describe('restoreServerWorkspace', () => {
 
     expect(result.status).toBe('restored')
     expect(result.openWorkspaceEntries).toEqual(workspace.openWorkspaceEntries)
-    expect(result.runtime.repos).toEqual([
+    expect(result.runtime.workspaces).toEqual([
       expect.objectContaining({
-        repoRoot: 'goblin+file:///repo/src',
+        workspaceId: 'goblin+file:///repo/src',
         projection: null,
         workspaceProbe: expect.objectContaining({
           capabilities: expect.objectContaining({ git: { status: 'unavailable' } }),
@@ -244,7 +244,7 @@ describe('restoreServerWorkspace', () => {
       targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
     expect(result.runtime.workspacePaneTabs).toEqual([
-      { repoRoot: 'goblin+file:///repo', repoRuntimeId: 'repo-runtime-test', snapshot: { revision: 3, entries: [] } },
+      { workspaceId: 'goblin+file:///repo', workspaceRuntimeId: 'repo-runtime-test', snapshot: { revision: 3, entries: [] } },
     ])
   })
 
@@ -276,14 +276,14 @@ describe('restoreServerWorkspace', () => {
 
     expect(result.status).toBe('restored')
     expect(result.openWorkspaceEntries).toEqual(workspace.openWorkspaceEntries)
-    expect(result.runtime.repos).toEqual([
+    expect(result.runtime.workspaces).toEqual([
       expect.objectContaining({
-        repoRoot: 'goblin+file:///repo',
-        repoRuntimeId: 'repo-runtime-test',
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-test',
         projection: null,
       }),
     ])
-    expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 
   test('keeps a local repo declaration as a stub when its path is temporarily unavailable', async () => {
@@ -305,15 +305,15 @@ describe('restoreServerWorkspace', () => {
 
     expect(result.status).toBe('restored')
     expect(result.openWorkspaceEntries).toEqual([entry])
-    expect(result.runtime.repos).toEqual([
+    expect(result.runtime.workspaces).toEqual([
       expect.objectContaining({
         entry,
-        repoRoot: 'goblin+file:///repo',
-        repoRuntimeId: 'repo-runtime-test',
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-test',
         projection: null,
       }),
     ])
-    expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 
   test('keeps an active remote repo as a stub when lifecycle is temporarily unavailable', async () => {
@@ -357,14 +357,14 @@ describe('restoreServerWorkspace', () => {
 
     expect(result.status).toBe('restored')
     expect(result.openWorkspaceEntries).toEqual(workspace.openWorkspaceEntries)
-    expect(result.runtime.repos).toEqual([expect.not.objectContaining({ target: expect.anything() })])
-    expect(result.runtime.repos[0]).toMatchObject({
-      repoRoot: remoteEntry.id,
-      repoRuntimeId: 'repo-runtime-test',
+    expect(result.runtime.workspaces).toEqual([expect.not.objectContaining({ target: expect.anything() })])
+    expect(result.runtime.workspaces[0]).toMatchObject({
+      workspaceId: remoteEntry.id,
+      workspaceRuntimeId: 'repo-runtime-test',
       projection: null,
       workspaceProbe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
     })
-    expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 
   test('releases opened runtimes when workspace tab commit fails unexpectedly', async () => {
@@ -401,9 +401,9 @@ describe('restoreServerWorkspace', () => {
       }),
     ).rejects.toBe(commitError)
 
-    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
-      repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test',
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
+      workspaceId: 'goblin+file:///repo',
+      workspaceRuntimeId: 'repo-runtime-test',
       generation: 1,
     })
   })
@@ -458,9 +458,9 @@ describe('restoreServerWorkspace', () => {
     ).rejects.toBe(abortReason)
 
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
-    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
-      repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test',
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
+      workspaceId: 'goblin+file:///repo',
+      workspaceRuntimeId: 'repo-runtime-test',
       generation: 1,
     })
   })
@@ -502,10 +502,10 @@ describe('restoreServerWorkspace', () => {
     controller.abort(abortReason)
 
     await expect(restore).rejects.toBe(abortReason)
-    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledOnce()
-    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
-      repoRoot: remoteEntry.id,
-      repoRuntimeId: 'repo-runtime-test',
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledOnce()
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
+      workspaceId: remoteEntry.id,
+      workspaceRuntimeId: 'repo-runtime-test',
       generation: 1,
     })
   })
@@ -544,9 +544,9 @@ describe('restoreServerWorkspace', () => {
       }),
     ).rejects.toBe(persistError)
 
-    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
-      repoRoot: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test',
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
+      workspaceId: 'goblin+file:///repo',
+      workspaceRuntimeId: 'repo-runtime-test',
       generation: 1,
     })
   })
@@ -598,7 +598,7 @@ describe('restoreServerWorkspace', () => {
     })
 
     expect(result.status).toBe('restored')
-    expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
+    expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 })
 

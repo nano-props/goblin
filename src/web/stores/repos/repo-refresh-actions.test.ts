@@ -7,23 +7,23 @@ import {
   requestVisibleWorkspaceStatusRefresh,
 } from '#/web/stores/repos/repo-refresh-actions.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
-import { refreshRepoRuntimes } from '#/web/repo-runtime-query.ts'
+import { refreshWorkspaceRuntimes } from '#/web/workspace-runtime-query.ts'
 import { acceptRemoteLifecycleSnapshot } from '#/web/stores/repos/remote-lifecycle-projection.ts'
 
 vi.mock('#/web/stores/repos/worktree-status-refresh.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('#/web/stores/repos/worktree-status-refresh.ts')>()
   return { ...actual, refreshRepoWorktreeStatus: vi.fn(async () => {}) }
 })
-vi.mock('#/web/repo-runtime-query.ts', () => ({ refreshRepoRuntimes: vi.fn() }))
+vi.mock('#/web/workspace-runtime-query.ts', () => ({ refreshWorkspaceRuntimes: vi.fn() }))
 vi.mock('#/web/stores/repos/remote-lifecycle-projection.ts', () => ({ acceptRemoteLifecycleSnapshot: vi.fn() }))
 
-function repoRefreshStoreAccess(repoRuntimeId = 'repo-runtime-test-9', unavailable = false) {
+function repoRefreshStoreAccess(workspaceRuntimeId = 'repo-runtime-test-9', unavailable = false) {
   const get: ReposGet = () =>
     ({
       repos: {
         'goblin+file:///repo': {
           id: 'goblin+file:///repo',
-          repoRuntimeId,
+          workspaceRuntimeId,
           availability: unavailable
             ? { phase: 'unavailable', reason: 'offline', checkedAt: 1 }
             : { phase: 'available' },
@@ -38,7 +38,7 @@ describe('repo refresh actions', () => {
     primaryWindowQueryClient.clear()
     vi.mocked(refreshRepoWorktreeStatus).mockReset()
     vi.mocked(refreshRepoWorktreeStatus).mockResolvedValue(undefined)
-    vi.mocked(refreshRepoRuntimes).mockReset()
+    vi.mocked(refreshWorkspaceRuntimes).mockReset()
     vi.mocked(acceptRemoteLifecycleSnapshot).mockReset()
   })
 
@@ -87,7 +87,7 @@ describe('repo refresh actions', () => {
   test('refreshes remote lifecycle state even while the repo is unavailable', async () => {
     const store = repoRefreshStoreAccess('repo-runtime-test-9', true)
     const snapshot = { runtimes: [] }
-    vi.mocked(refreshRepoRuntimes).mockResolvedValue(snapshot)
+    vi.mocked(refreshWorkspaceRuntimes).mockResolvedValue(snapshot)
 
     await handleRepoInvalidationRefresh(
       store,
@@ -95,7 +95,7 @@ describe('repo refresh actions', () => {
       'repo-runtime-test-9',
     )
 
-    expect(refreshRepoRuntimes).toHaveBeenCalledOnce()
+    expect(refreshWorkspaceRuntimes).toHaveBeenCalledOnce()
     expect(acceptRemoteLifecycleSnapshot).toHaveBeenCalledWith(store.set, store.get, snapshot)
   })
 })

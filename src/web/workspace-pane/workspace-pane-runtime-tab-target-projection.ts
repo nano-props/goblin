@@ -19,7 +19,7 @@ export interface WorkspacePaneRuntimeTabTargetProjectionInput {
 
 export function readWorkspacePaneRuntimeTabTargetProjection(input: {
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   worktreePath: string | null
 }): WorkspacePaneRuntimeTabTargetProjection {
   return workspacePaneRuntimeTabTargetProjection({

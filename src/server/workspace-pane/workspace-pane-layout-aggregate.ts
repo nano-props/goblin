@@ -518,7 +518,7 @@ function providerTargets(
   const targets = new Map<string, WorkspacePaneTargetProjection>()
   for (const provider of providers) {
     for (const session of provider.liveSessions) {
-      if (session.target.workspaceId !== scope.repoRoot || session.target.workspaceRuntimeId !== scope.repoRuntimeId) {
+      if (session.target.workspaceId !== scope.repoRoot || session.target.workspaceRuntimeId !== scope.workspaceRuntimeId) {
         throw new Error('error.workspace-tabs-target-invalid')
       }
       const key = runtimeTargetKey(session.target)
@@ -579,7 +579,7 @@ function canonicalTabsForTarget(
 }
 
 function durableTargetKey(
-  scope: Pick<WorkspacePaneEpochScope, 'repoRoot' | 'repoRuntimeId'>,
+  scope: Pick<WorkspacePaneEpochScope, 'repoRoot' | 'workspaceRuntimeId'>,
   target: RestorableWorkspacePaneTarget,
 ): string {
   const runtime = workspacePaneTabsTargetFromRestorable(scope.repoRoot, target)
@@ -588,10 +588,10 @@ function durableTargetKey(
   if (!workspaceId) throw new Error('error.workspace-tabs-target-invalid')
   const bound =
     target.kind === 'workspace-root'
-      ? { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: scope.repoRuntimeId }
+      ? { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: scope.workspaceRuntimeId }
       : target.kind === 'git-branch'
-        ? { ...target, workspaceId, workspaceRuntimeId: scope.repoRuntimeId }
-        : { ...target, workspaceId, workspaceRuntimeId: scope.repoRuntimeId }
+        ? { ...target, workspaceId, workspaceRuntimeId: scope.workspaceRuntimeId }
+        : { ...target, workspaceId, workspaceRuntimeId: scope.workspaceRuntimeId }
   return runtimeTargetKey(bound)
 }
 
@@ -606,7 +606,7 @@ function targetProjectionKey(projection: WorkspacePaneTargetProjection): string 
 }
 
 function epochKey(scope: WorkspacePaneEpochScope): string {
-  return `${scope.userId}\0${scope.repoRoot}\0${scope.repoRuntimeId}`
+  return `${scope.userId}\0${scope.repoRoot}\0${scope.workspaceRuntimeId}`
 }
 
 function mapsEqual(a: Map<string, number>, b: Map<string, number>): boolean {

@@ -26,7 +26,7 @@ const StringArray = v.array(v.string())
 const TerminalAppSchema = v.picklist(['ghostty', 'terminal', 'windowsTerminal'])
 const EditorAppSchema = v.picklist(['vscode'])
 const WorktreeBootstrapConfigHashSchema = v.pipe(v.string(), v.regex(WORKTREE_BOOTSTRAP_CONFIG_HASH_RE))
-const RepoRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
+const WorkspaceRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
 const RepoUrlTargetSchema = v.variant('type', [
   v.object({ type: v.literal('root') }),
   // `remote` is an optional hint for which remote to resolve the URL against
@@ -58,27 +58,36 @@ const WorkspaceSessionEntrySchema = v.variant('kind', [
   v.object({ kind: v.literal('remote'), id: WorkspaceIdSchema, ref: RemoteRepoRefSchema }),
 ])
 const ClientIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
-const RepoRootSchema = WorkspaceIdSchema
-const RepoRuntimeOpenSchema = v.union([
-  v.object({ repoRoot: RepoRootSchema, clientId: ClientIdSchema }),
-  v.object({ repoInput: v.string(), clientId: ClientIdSchema }),
+const WorkspaceRuntimeOpenSchema = v.union([
+  v.object({ workspaceId: WorkspaceIdSchema, clientId: ClientIdSchema }),
+  v.object({ workspaceInput: v.string(), clientId: ClientIdSchema }),
 ])
-const RepoRuntimeCloseSchema = v.object({
-  repoRoot: RepoRootSchema,
-  repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+const WorkspaceRuntimeCloseSchema = v.object({
+  workspaceId: WorkspaceIdSchema,
+  workspaceRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
   clientId: ClientIdSchema,
 })
 const EmptyBodySchema = v.optional(v.object({}))
 
+export const WORKSPACE_PROCEDURE_SCHEMAS = {
+  refresh: v.object({
+    workspaceId: WorkspaceIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
+  }),
+  runtimeOpen: WorkspaceRuntimeOpenSchema,
+  runtimeReconcile: v.object({
+    clientId: ClientIdSchema,
+    workspaceIds: v.pipe(v.array(WorkspaceIdSchema), v.maxLength(100)),
+  }),
+  runtimeList: EmptyBodySchema,
+  runtimeClose: WorkspaceRuntimeCloseSchema,
+} as const
+
 export const REPO_PROCEDURE_SCHEMAS = {
   // Action endpoints — POST with a JSON body.
-  workspaceRefresh: v.object({
-    workspaceId: RepoRootSchema,
-    workspaceRuntimeId: RepoRuntimeIdSchema,
-  }),
   fetch: v.strictObject({
     cwd: WorkspaceIdSchema,
-    repoRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
   }),
   clone: v.object({
     url: v.string(),
@@ -87,14 +96,14 @@ export const REPO_PROCEDURE_SCHEMAS = {
   }),
   pull: v.object({
     cwd: WorkspaceIdSchema,
-    repoRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     branch: v.string(),
     worktreePath: v.optional(v.string()),
   }),
-  push: v.object({ cwd: WorkspaceIdSchema, repoRuntimeId: RepoRuntimeIdSchema, branch: v.string() }),
+  push: v.object({ cwd: WorkspaceIdSchema, workspaceRuntimeId: WorkspaceRuntimeIdSchema, branch: v.string() }),
   createWorktree: v.object({
     cwd: WorkspaceIdSchema,
-    repoRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     worktreePath: v.string(),
     mode: v.variant('kind', [
       v.object({ kind: v.literal('newBranch'), newBranch: v.string(), baseRef: v.string() }),
@@ -103,59 +112,52 @@ export const REPO_PROCEDURE_SCHEMAS = {
     ]),
     worktreeBootstrap: WorktreeBootstrapDecisionSchema,
   }),
-  getRemoteBranches: v.object({ cwd: WorkspaceIdSchema, repoRuntimeId: RepoRuntimeIdSchema }),
-  worktreeBootstrapPreview: v.object({ cwd: WorkspaceIdSchema, repoRuntimeId: RepoRuntimeIdSchema }),
+  getRemoteBranches: v.object({ cwd: WorkspaceIdSchema, workspaceRuntimeId: WorkspaceRuntimeIdSchema }),
+  worktreeBootstrapPreview: v.object({ cwd: WorkspaceIdSchema, workspaceRuntimeId: WorkspaceRuntimeIdSchema }),
   deleteBranch: v.object({
     cwd: WorkspaceIdSchema,
-    repoRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     branch: v.string(),
     force: v.optional(v.boolean()),
     deleteUpstream: v.optional(v.boolean()),
   }),
   removeWorktree: v.object({
     cwd: WorkspaceIdSchema,
-    repoRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     branch: v.string(),
     worktreePath: v.string(),
     deleteBranch: v.boolean(),
     forceDeleteBranch: v.optional(v.boolean()),
     deleteUpstream: v.optional(v.boolean()),
   }),
-  openUrl: v.object({ cwd: WorkspaceIdSchema, repoRuntimeId: RepoRuntimeIdSchema, target: RepoUrlTargetSchema }),
+  openUrl: v.object({ cwd: WorkspaceIdSchema, workspaceRuntimeId: WorkspaceRuntimeIdSchema, target: RepoUrlTargetSchema }),
   openTerminal: v.object({
-    repoId: RepoRootSchema,
-    repoRuntimeId: RepoRuntimeIdSchema,
+    repoId: WorkspaceIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     worktreePath: v.string(),
     app: TerminalAppSchema,
   }),
   openEditor: v.object({
-    repoId: RepoRootSchema,
-    repoRuntimeId: RepoRuntimeIdSchema,
+    repoId: WorkspaceIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     worktreePath: v.string(),
     app: EditorAppSchema,
   }),
   openInFinder: v.object({
-    repoId: RepoRootSchema,
+    repoId: WorkspaceIdSchema,
     worktreePath: v.string(),
   }),
   backgroundSyncRepos: v.object({ repoIds: StringArray }),
-  runtimeOpen: RepoRuntimeOpenSchema,
-  runtimeReconcile: v.object({
-    clientId: ClientIdSchema,
-    repoRoots: v.pipe(v.array(RepoRootSchema), v.maxLength(100)),
-  }),
-  runtimeList: EmptyBodySchema,
-  runtimeClose: RepoRuntimeCloseSchema,
   abort: CwdInput,
   probe: CwdInput,
   log: v.object({
     cwd: WorkspaceIdSchema,
-    repoRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     branch: v.string(),
     count: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200))),
     skip: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100_000))),
   }),
-  patch: v.object({ cwd: WorkspaceIdSchema, repoRuntimeId: RepoRuntimeIdSchema, worktreePath: v.string() }),
+  patch: v.object({ cwd: WorkspaceIdSchema, workspaceRuntimeId: WorkspaceRuntimeIdSchema, worktreePath: v.string() }),
   // Filesystem-target-scoped file tree (docs/filetree.md). The route
   // returns direct children of `prefix`; omitted prefix means the root.
   tree: v.object({
@@ -164,32 +166,32 @@ export const REPO_PROCEDURE_SCHEMAS = {
   }),
   trashFile: v.object({
     cwd: WorkspaceIdSchema,
-    repoRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     worktreePath: v.string(),
     path: RepoTreePrefixSchema,
   }),
   fileViewer: v.object({
     cwd: WorkspaceIdSchema,
-    repoRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     worktreePath: v.string(),
   }),
   projection: v.object({
     cwd: WorkspaceIdSchema,
-    repoRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     branch: v.optional(v.string()),
     mode: v.optional(v.picklist(['summary', 'full'])),
   }),
   worktreeStatus: v.object({
     cwd: WorkspaceIdSchema,
-    repoRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
   }),
   workspaceOverview: v.object({
     cwd: WorkspaceIdSchema,
-    repoRuntimeId: RepoRuntimeIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
   }),
   operations: v.object({
     cwd: v.optional(WorkspaceIdSchema),
-    repoRuntimeId: v.optional(RepoRuntimeIdSchema),
+    workspaceRuntimeId: v.optional(WorkspaceRuntimeIdSchema),
     includeSettled: v.optional(v.boolean()),
   }),
 } as const
@@ -200,7 +202,7 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
   // returns its accepted terminal lifecycle projection.
   remoteLifecycle: v.object({
     repoId: WorkspaceIdSchema,
-    repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+    workspaceRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
     mode: v.optional(v.picklist(['restart', 'ensure'])),
   }),
   pathSuggestions: RemotePathSuggestionsInputSchema,
@@ -252,16 +254,16 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
   githubCli: GITHUB_CLI_REFRESH_SCHEMA,
   workspaceRestore: v.object({
     clientId: ClientIdSchema,
-    activeRepoRoot: v.optional(v.nullable(RepoRootSchema)),
+    activeRepoRoot: v.optional(v.nullable(WorkspaceIdSchema)),
   }),
   workspaceRepoAdd: v.object({ entry: WorkspaceSessionEntrySchema }),
-  workspaceRepoRemove: v.object({ repoRoot: RepoRootSchema }),
+  workspaceRepoRemove: v.object({ repoRoot: WorkspaceIdSchema }),
   // Lazy per-repo restore endpoint — fires when the user navigates to a
   // non-active repo that was hydrated as a stub at cold start.
   restoreRepoTabs: v.object({
     clientId: ClientIdSchema,
-    repoRoot: RepoRootSchema,
-    repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+    repoRoot: WorkspaceIdSchema,
+    workspaceRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
   }),
 } as const
 

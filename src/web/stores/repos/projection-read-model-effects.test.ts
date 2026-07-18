@@ -10,7 +10,7 @@ import {
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
+import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 
 beforeEach(() => {
   resetReposStore()
@@ -18,7 +18,7 @@ beforeEach(() => {
 })
 
 describe('repo projection read-model effects', () => {
-  function acceptedProjection(branch: string | null = null, mode: 'summary' | 'full' = 'full'): RepoRuntimeProjection {
+  function acceptedProjection(branch: string | null = null, mode: 'summary' | 'full' = 'full'): WorkspaceRuntimeProjection {
     const loadedAt = Date.now()
     return {
       snapshot: {
@@ -36,7 +36,7 @@ describe('repo projection read-model effects', () => {
     installGoblinTestBridge({})
     const repo = seedRepoShellForTest({
       id: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test-2',
+      workspaceRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
     })
     seedRepoReadModelQueryData(repo, {
@@ -49,7 +49,7 @@ describe('repo projection read-model effects', () => {
       useReposStore.getState,
       {
         repoRoot: 'goblin+file:///repo',
-        repoRuntimeId: repo.repoRuntimeId,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
         projection: acceptedProjection(),
       },
       { scope: 'repo-read-model' },
@@ -72,7 +72,7 @@ describe('repo projection read-model effects', () => {
     })
     const repo = seedRepoShellForTest({
       id: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test-2',
+      workspaceRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
     })
     seedRepoReadModelQueryData(repo, {
@@ -86,7 +86,7 @@ describe('repo projection read-model effects', () => {
         useReposStore.getState,
         {
           repoRoot: 'goblin+file:///repo',
-          repoRuntimeId: repo.repoRuntimeId,
+          workspaceRuntimeId: repo.workspaceRuntimeId,
           projection: acceptedProjection(),
         },
         { scope: 'repo-read-model' },
@@ -101,7 +101,7 @@ describe('repo projection read-model effects', () => {
     })
     const repo = seedRepoShellForTest({
       id: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test-2',
+      workspaceRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
     })
     seedRepoReadModelQueryData(repo, {
@@ -114,7 +114,7 @@ describe('repo projection read-model effects', () => {
       useReposStore.getState,
       {
         repoRoot: 'goblin+file:///repo',
-        repoRuntimeId: 'repo-runtime-stale',
+        workspaceRuntimeId: 'repo-runtime-stale',
         projection: acceptedProjection(),
       },
       { scope: 'repo-read-model' },
@@ -128,11 +128,11 @@ describe('repo projection read-model effects', () => {
     installGoblinTestBridge({})
     const repo = seedRepoShellForTest({
       id: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test-2',
+      workspaceRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
     })
     const loadedAt = 123
-    const firstProjection: RepoRuntimeProjection = {
+    const firstProjection: WorkspaceRuntimeProjection = {
       ...acceptedProjection(),
       snapshot: {
         branches: [createBranchSnapshot('feature/a')],
@@ -141,7 +141,7 @@ describe('repo projection read-model effects', () => {
       operations: { operations: [], loadedAt },
       loadedAt,
     }
-    const secondProjection: RepoRuntimeProjection = {
+    const secondProjection: WorkspaceRuntimeProjection = {
       ...firstProjection,
       snapshot: {
         branches: [createBranchSnapshot('feature/b')],
@@ -149,25 +149,25 @@ describe('repo projection read-model effects', () => {
       },
     }
 
-    setRepoProjectionQueryData('goblin+file:///repo', repo.repoRuntimeId, null, 'full', firstProjection)
+    setRepoProjectionQueryData('goblin+file:///repo', repo.workspaceRuntimeId, null, 'full', firstProjection)
     acceptRepoProjectionReadModel(
       useReposStore.setState,
       useReposStore.getState,
       {
         repoRoot: 'goblin+file:///repo',
-        repoRuntimeId: repo.repoRuntimeId,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
         projection: firstProjection,
       },
       { scope: 'repo-read-model' },
     )
 
-    setRepoProjectionQueryData('goblin+file:///repo', repo.repoRuntimeId, null, 'full', secondProjection)
+    setRepoProjectionQueryData('goblin+file:///repo', repo.workspaceRuntimeId, null, 'full', secondProjection)
     acceptRepoProjectionReadModel(
       useReposStore.setState,
       useReposStore.getState,
       {
         repoRoot: 'goblin+file:///repo',
-        repoRuntimeId: repo.repoRuntimeId,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
         projection: secondProjection,
       },
       { scope: 'repo-read-model' },
@@ -188,7 +188,7 @@ describe('repo projection read-model effects', () => {
     })
     const repo = seedRepoShellForTest({
       id: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-test-2',
+      workspaceRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
     })
     useReposStore.setState((state) => {
@@ -212,7 +212,7 @@ describe('repo projection read-model effects', () => {
       useReposStore.getState,
       {
         repoRoot: 'goblin+file:///repo',
-        repoRuntimeId: repo.repoRuntimeId,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
         projection: acceptedProjection(null, 'summary'),
       },
       { scope: 'query-cache' },

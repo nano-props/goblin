@@ -9,7 +9,7 @@ describe('repo mutation application', () => {
     await expect(
       application.deleteBranch('user-a', {
         repoRoot: '/repo',
-        repoRuntimeId: 'runtime-a',
+        workspaceRuntimeId: 'runtime-a',
         branchName: 'feature/retired',
         deleteBranch: async () => ({ ok: true, message: 'deleted' }),
       }),
@@ -19,7 +19,7 @@ describe('repo mutation application', () => {
     await expect(
       application.deleteBranch('user-a', {
         repoRoot: '/repo',
-        repoRuntimeId: 'runtime-a',
+        workspaceRuntimeId: 'runtime-a',
         branchName: 'feature/kept',
         deleteBranch: async () => ({ ok: false, message: 'failed' }),
       }),
@@ -36,7 +36,7 @@ describe('repo mutation application', () => {
     await expect(
       application.deleteBranch('user-a', {
         repoRoot: '/repo',
-        repoRuntimeId: 'runtime-a',
+        workspaceRuntimeId: 'runtime-a',
         branchName: 'feature/deleted',
         deleteBranch: async () => ({ ok: true, message: 'deleted' }),
       }),

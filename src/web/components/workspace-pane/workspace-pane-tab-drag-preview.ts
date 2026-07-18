@@ -17,7 +17,7 @@ type WorkspacePaneTabDragPreviewTarget =
   WorkspacePaneTabsTarget | { kind: 'inactive'; repoRoot: string; branchName: null; worktreePath: null }
 
 export type WorkspacePaneTabDragPreviewInput = WorkspacePaneTabDragPreviewTarget & {
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   canonicalTabs: readonly WorkspacePaneTabEntry[]
 }
 
@@ -84,8 +84,8 @@ export function useWorkspacePaneTabDragPreview(
 }
 
 function workspacePaneTabDragPreviewTargetKey(
-  input: WorkspacePaneTabDragPreviewTarget & { repoRuntimeId: string },
+  input: WorkspacePaneTabDragPreviewTarget & { workspaceRuntimeId: string },
 ): string | null {
   if (input.kind === 'inactive') return null
-  return `${workspacePaneTabsTargetIdentityKey(input)}::${input.repoRuntimeId}`
+  return `${workspacePaneTabsTargetIdentityKey(input)}::${input.workspaceRuntimeId}`
 }

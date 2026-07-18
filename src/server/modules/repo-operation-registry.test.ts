@@ -42,19 +42,19 @@ describe('repo operation registry', () => {
     const repoScoped = beginRepoServerOperation({ repoId: '/tmp/repo', kind: 'fetch', source: 'background' })
     const current = beginRepoServerOperation({
       repoId: '/tmp/repo',
-      repoRuntimeId: 'repo-runtime-current',
+      workspaceRuntimeId: 'repo-runtime-current',
       kind: 'delete-branch',
       source: 'user',
     })
     beginRepoServerOperation({
       repoId: '/tmp/repo',
-      repoRuntimeId: 'repo-runtime-stale',
+      workspaceRuntimeId: 'repo-runtime-stale',
       kind: 'remove-worktree',
       source: 'user',
     })
 
     expect(
-      listRepoServerOperations({ repoId: '/tmp/repo', repoRuntimeId: 'repo-runtime-current' }).map(
+      listRepoServerOperations({ repoId: '/tmp/repo', workspaceRuntimeId: 'repo-runtime-current' }).map(
         (operation) => operation.id,
       ),
     ).toEqual([repoScoped.id, current.id])

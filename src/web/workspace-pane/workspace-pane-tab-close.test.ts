@@ -93,7 +93,7 @@ test('closes a workspace-root static tab through the shared tab transaction', as
   const target = {
     kind: 'workspace-root' as const,
     repoRoot: REPO_ID,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
 
   }
   setWorkspacePaneTabsForTargetQueryData({
@@ -115,11 +115,11 @@ test('closes a workspace-root static tab through the shared tab transaction', as
 
   expect(updateWorkspaceTabs).toHaveBeenCalledWith({
     workspaceId: REPO_ID,
-    workspaceRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     target: {
       kind: 'workspace-root',
       workspaceId: REPO_ID,
-      workspaceRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
     },
     operation: { type: 'close-static', tabType: 'status' },
   })
@@ -168,7 +168,7 @@ test('sends a detached worktree close to the server without requiring a branch',
   const runtimeTarget = runtimeWorkspacePaneTargetForTest({
     kind: 'git-worktree' as const,
     repoRoot: REPO_ID,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath: WORKTREE_PATH,
   })
   const closeTerminalByDescriptor = vi.fn(async () => {
@@ -234,7 +234,7 @@ test('confirmed workspace terminal close selects Files without inventing a branc
   const targetInput = {
     kind: 'workspace-root' as const,
     repoRoot: REPO_ID,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
 
   }
   const runtimeTarget = runtimeWorkspacePaneTargetForTest(targetInput)
@@ -330,14 +330,14 @@ test('does not let a late close from an old runtime navigate or clear the replac
   expect(
     recordWorkspacePaneTabOpener(
       WORKTREE_PANE_TARGET,
-      repo.repoRuntimeId,
+      repo.workspaceRuntimeId,
       'workspace-pane:files',
       'workspace-pane:status',
     ),
   ).toBe('recorded')
   observeWorkspacePaneRouteForTest({
     repoId: REPO_ID,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
     route: { kind: 'static', tab: 'files' },
@@ -353,7 +353,7 @@ test('does not let a late close from an old runtime navigate or clear the replac
   await vi.waitFor(() => expect(updateWorkspaceTabs).toHaveBeenCalledOnce())
 
   const replacementRuntimeId = 'repo-runtime-replacement'
-  const replacementRepo = { ...repo, repoRuntimeId: replacementRuntimeId }
+  const replacementRepo = { ...repo, workspaceRuntimeId: replacementRuntimeId }
   useReposStore.setState((state) => ({
     repos: {
       ...state.repos,
@@ -367,7 +367,7 @@ test('does not let a late close from an old runtime navigate or clear the replac
   setWorkspacePaneTabsForTargetQueryData({
     kind: 'git-worktree' as const,
     repoRoot: REPO_ID,
-    repoRuntimeId: replacementRuntimeId,
+    workspaceRuntimeId: replacementRuntimeId,
     worktreePath: WORKTREE_PATH,
     tabs: [workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('status')],
   })
@@ -381,7 +381,7 @@ test('does not let a late close from an old runtime navigate or clear the replac
   ).toBe('recorded')
   observeWorkspacePaneRouteForTest({
     repoId: REPO_ID,
-    repoRuntimeId: replacementRuntimeId,
+    workspaceRuntimeId: replacementRuntimeId,
     branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
     route: { kind: 'static', tab: 'files' },

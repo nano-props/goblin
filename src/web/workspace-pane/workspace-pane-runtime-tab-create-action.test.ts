@@ -15,7 +15,7 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 
 const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-runtime-create-repo'
-const REPO_RUNTIME_ID = 'repo-runtime-workspace-pane-create'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-workspace-pane-create'
 const BRANCH_NAME = 'main'
 const WORKTREE_PATH = '/tmp/workspace-pane-runtime-create-worktree'
 const TERMINAL_SESSION_ID = 'term-111111111111111111111'
@@ -23,7 +23,7 @@ const BASE: TerminalSessionBase = {
   target: {
     kind: 'git-worktree' as const,
     workspaceId: canonicalWorkspaceLocator(REPO_ROOT)!,
-    workspaceRuntimeId: REPO_RUNTIME_ID,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     root: canonicalWorkspaceLocator('goblin+file:///tmp/workspace-pane-runtime-create-worktree')!,
   },
   presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH_NAME } },
@@ -40,7 +40,7 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
 
 beforeEach(() => {
   resetReposStore()
-  seedCurrentRepoRuntime(REPO_RUNTIME_ID)
+  seedCurrentWorkspaceRuntime(WORKSPACE_RUNTIME_ID)
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockReset()
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockResolvedValue({
     ok: true,
@@ -137,7 +137,7 @@ describe('workspace pane runtime tab create action', () => {
   test('records the opener and commits the exact route without another projection request', async () => {
     const admission = createAdmission()
     const showCreatedTerminalTab = vi.fn(() => {
-      expect(workspacePaneTabOpener(PANE_TARGET, REPO_RUNTIME_ID, `terminal:${TERMINAL_SESSION_ID}`)).toBe(
+      expect(workspacePaneTabOpener(PANE_TARGET, WORKSPACE_RUNTIME_ID, `terminal:${TERMINAL_SESSION_ID}`)).toBe(
         'workspace-pane:status',
       )
       return true
@@ -159,7 +159,7 @@ describe('workspace pane runtime tab create action', () => {
   })
 
   test('does not navigate or record opener after the command target runtime is superseded', async () => {
-    seedCurrentRepoRuntime('repo-runtime-replacement')
+    seedCurrentWorkspaceRuntime('repo-runtime-replacement')
     const showCreatedTerminalTab = vi.fn(() => true)
 
     await expect(
@@ -172,8 +172,8 @@ describe('workspace pane runtime tab create action', () => {
     ).resolves.toEqual({ status: 'superseded' })
 
     expect(showCreatedTerminalTab).not.toHaveBeenCalled()
-    expect(workspacePaneTabOpener(PANE_TARGET, REPO_RUNTIME_ID, `terminal:${TERMINAL_SESSION_ID}`)).toBeNull()
-    expect(useReposStore.getState().repos[REPO_ROOT]?.repoRuntimeId).toBe('repo-runtime-replacement')
+    expect(workspacePaneTabOpener(PANE_TARGET, WORKSPACE_RUNTIME_ID, `terminal:${TERMINAL_SESSION_ID}`)).toBeNull()
+    expect(useReposStore.getState().repos[REPO_ROOT]?.workspaceRuntimeId).toBe('repo-runtime-replacement')
   })
 
   test('marks the terminal create action busy only while terminal creation is pending', () => {
@@ -212,10 +212,10 @@ function runtimeTabState(input: { createPending?: boolean } = {}): WorkspacePane
   return { terminal: { createPending: input.createPending ?? false } }
 }
 
-function seedCurrentRepoRuntime(repoRuntimeId: string): void {
+function seedCurrentWorkspaceRuntime(workspaceRuntimeId: string): void {
   seedRepoWithReadModelForTest({
     id: REPO_ROOT,
-    repoRuntimeId,
+    workspaceRuntimeId,
     branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
     currentBranchName: BRANCH_NAME,
   })

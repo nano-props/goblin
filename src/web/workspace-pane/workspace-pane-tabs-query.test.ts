@@ -28,7 +28,7 @@ vi.mock('#/web/workspace-pane/workspace-pane-tabs-client.ts', () => ({
 }))
 
 const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-tabs-query-repo'
-const REPO_RUNTIME_ID = 'repo-runtime-test'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 
 beforeEach(() => {
   vi.mocked(workspacePaneTabsClient.list).mockReset()
@@ -39,7 +39,7 @@ test('test target construction rejects legacy raw workspace ids', () => {
     runtimeWorkspacePaneTargetForTest({
       kind: 'git-worktree' as const,
       repoRoot: '/tmp/legacy-workspace-id',
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       worktreePath: '/tmp/legacy-workspace-id',
     }),
   ).toThrow('workspace pane test target requires a canonical target')
@@ -54,13 +54,13 @@ describe('workspace pane tabs revisioned query cache', () => {
     ]
     writeWorkspacePaneTabsSnapshotQueryData(
       REPO_ROOT,
-      REPO_RUNTIME_ID,
+      WORKSPACE_RUNTIME_ID,
       snapshot(1, [
         {
           target: runtimeWorkspacePaneTargetForTest({
             kind: 'workspace-root',
             repoRoot: REPO_ROOT,
-            repoRuntimeId: REPO_RUNTIME_ID,
+            workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
 
           }),
           tabs,
@@ -74,7 +74,7 @@ describe('workspace pane tabs revisioned query cache', () => {
         {
           kind: 'workspace-root',
           repoRoot: REPO_ROOT,
-          repoRuntimeId: REPO_RUNTIME_ID,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
 
         },
         queryClient,
@@ -85,15 +85,15 @@ describe('workspace pane tabs revisioned query cache', () => {
   test('accepts an identical same-revision snapshot as current', () => {
     const queryClient = new QueryClient()
     const current = snapshot(4, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])])
-    expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, REPO_RUNTIME_ID, current, queryClient)).toBe(true)
-    expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, REPO_RUNTIME_ID, current, queryClient)).toBe(true)
+    expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, current, queryClient)).toBe(true)
+    expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, current, queryClient)).toBe(true)
   })
 
   test('normalizes the complete snapshot and keeps no-worktree targets static-only', () => {
     const queryClient = new QueryClient()
     const accepted = writeWorkspacePaneTabsSnapshotQueryData(
       REPO_ROOT,
-      REPO_RUNTIME_ID,
+      WORKSPACE_RUNTIME_ID,
       snapshot(4, [
         entry('feature/no-worktree', null, [
           workspacePaneStaticTabEntry('status'),
@@ -107,7 +107,7 @@ describe('workspace pane tabs revisioned query cache', () => {
     expect(accepted).toBe(true)
     expect(readTabs(queryClient, 'feature/no-worktree', null)).toEqual([workspacePaneStaticTabEntry('status')])
     expect(
-      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID)),
+      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID)),
     ).toEqual(snapshot(4, [entry('feature/no-worktree', null, [workspacePaneStaticTabEntry('status')])]))
   })
 
@@ -115,7 +115,7 @@ describe('workspace pane tabs revisioned query cache', () => {
     const queryClient = new QueryClient()
     writeWorkspacePaneTabsSnapshotQueryData(
       REPO_ROOT,
-      REPO_RUNTIME_ID,
+      WORKSPACE_RUNTIME_ID,
       snapshot(8, [
         entry('feature/a', null, [workspacePaneStaticTabEntry('history')]),
         entry('feature/b', null, [workspacePaneStaticTabEntry('status')]),
@@ -126,7 +126,7 @@ describe('workspace pane tabs revisioned query cache', () => {
     expect(
       writeWorkspacePaneTabsSnapshotQueryData(
         REPO_ROOT,
-        REPO_RUNTIME_ID,
+        WORKSPACE_RUNTIME_ID,
         snapshot(7, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])]),
         queryClient,
       ),
@@ -140,7 +140,7 @@ describe('workspace pane tabs revisioned query cache', () => {
     const queryClient = new QueryClient()
     writeWorkspacePaneTabsSnapshotQueryData(
       REPO_ROOT,
-      REPO_RUNTIME_ID,
+      WORKSPACE_RUNTIME_ID,
       snapshot(3, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])]),
       queryClient,
     )
@@ -148,7 +148,7 @@ describe('workspace pane tabs revisioned query cache', () => {
     expect(
       writeWorkspacePaneTabsSnapshotQueryData(
         REPO_ROOT,
-        REPO_RUNTIME_ID,
+        WORKSPACE_RUNTIME_ID,
         snapshot(3, [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])]),
         queryClient,
       ),
@@ -165,9 +165,9 @@ describe('workspace pane tabs revisioned query cache', () => {
       return await request.promise
     })
 
-    const olderRequest = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_RUNTIME_ID, queryClient)
+    const olderRequest = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)
     await vi.waitFor(() => expect(requests).toHaveLength(1))
-    const newerRequest = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_RUNTIME_ID, queryClient)
+    const newerRequest = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)
     await vi.waitFor(() => expect(requests).toHaveLength(2))
 
     requests[1]!.resolve(snapshot(12, [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])]))
@@ -182,7 +182,7 @@ describe('workspace pane tabs revisioned query cache', () => {
     const queryClient = new QueryClient()
     writeWorkspacePaneTabsSnapshotQueryData(
       REPO_ROOT,
-      REPO_RUNTIME_ID,
+      WORKSPACE_RUNTIME_ID,
       snapshot(20, [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])]),
       queryClient,
     )
@@ -190,24 +190,24 @@ describe('workspace pane tabs revisioned query cache', () => {
       snapshot(19, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])]),
     )
     await queryClient.invalidateQueries({
-      queryKey: workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID),
+      queryKey: workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID),
       exact: true,
     })
 
-    await queryClient.fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT, REPO_RUNTIME_ID))
+    await queryClient.fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT, WORKSPACE_RUNTIME_ID))
 
     expect(readTabs(queryClient, 'feature/a', null)).toEqual([workspacePaneStaticTabEntry('history')])
   })
 
   test('test target seeds preserve the cached server revision', () => {
     const queryClient = new QueryClient()
-    writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, REPO_RUNTIME_ID, snapshot(5, []), queryClient)
+    writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, snapshot(5, []), queryClient)
 
     setWorkspacePaneTabsForTargetQueryData(
       {
         kind: 'git-branch' as const,
         repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         branchName: 'feature/a',
         tabs: [workspacePaneStaticTabEntry('status')],
       },
@@ -215,7 +215,7 @@ describe('workspace pane tabs revisioned query cache', () => {
     )
 
     expect(
-      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID)),
+      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID)),
     ).toEqual(snapshot(5, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])]))
   })
 
@@ -258,7 +258,7 @@ function readTabs(queryClient: QueryClient, branchName: string, worktreePath: st
           worktreePath,
         }
   return readWorkspacePaneTabsForTarget(
-    { ...target, repoRuntimeId: REPO_RUNTIME_ID },
+    { ...target, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
     queryClient,
   )
 }
@@ -281,7 +281,7 @@ function entry(
             repoRoot: REPO_ROOT,
             worktreePath,
           }),
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     }),
     tabs,
   }

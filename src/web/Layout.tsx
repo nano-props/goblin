@@ -172,7 +172,7 @@ function AuthenticatedWorkspaceShell() {
             filesystemTarget: {
               kind: 'git-worktree',
               workspaceId: commandRepo.id,
-              workspaceRuntimeId: commandRepo.repoRuntimeId,
+              workspaceRuntimeId: commandRepo.workspaceRuntimeId,
               rootPath: commandBranch.worktree.path,
               head: gitHead(commandBranch.name),
               capabilities: commandCapabilities,
@@ -190,7 +190,7 @@ function AuthenticatedWorkspaceShell() {
             filesystemTarget: {
               kind: 'git-worktree',
               workspaceId: commandRepo.id,
-              workspaceRuntimeId: commandRepo.repoRuntimeId,
+              workspaceRuntimeId: commandRepo.workspaceRuntimeId,
               rootPath: commandWorktreePath,
               head: { kind: 'detached' },
               capabilities: commandCapabilities,
@@ -203,7 +203,7 @@ function AuthenticatedWorkspaceShell() {
               filesystemTarget: {
                 kind: 'workspace-root',
                 workspaceId: commandRepo.id,
-                workspaceRuntimeId: commandRepo.repoRuntimeId,
+                workspaceRuntimeId: commandRepo.workspaceRuntimeId,
                 rootPath: commandWorkspace.path,
                 capabilities: commandCapabilities,
               },

@@ -20,7 +20,7 @@ import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 const REPO_ID = 'goblin+file:///tmp/goblin-repo-workspace-tab-model-repo'
-const REPO_RUNTIME_ID = 'repo-runtime-test'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/tmp/goblin-repo-workspace-tab-model-worktree'
 const WORKTREE_KEY = formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH)
 
@@ -33,7 +33,7 @@ describe('repo workspace pane tab model', () => {
   test('projects only tabs supported by a detached worktree surface and selects a valid fallback', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       paneTarget: { kind: 'git-worktree', repoRoot: REPO_ID, worktreePath: WORKTREE_PATH },
       worktreeHead: { kind: 'detached' },
       preferredTab: 'history',
@@ -51,7 +51,7 @@ describe('repo workspace pane tab model', () => {
     const repoId = 'goblin+file:///tmp/plain-workspace'
     const model = createRepoWorkspaceTabModel({
       repoId,
-      repoRuntimeId: 'repo-runtime-plain',
+      workspaceRuntimeId: 'repo-runtime-plain',
       paneTarget: { kind: 'workspace-root', repoRoot: repoId },
       preferredTab: 'files',
       tabEntries: [workspacePaneStaticTabEntry('files')],
@@ -68,7 +68,7 @@ describe('repo workspace pane tab model', () => {
     const repoId = 'goblin+file:///tmp/plain-workspace'
     const model = createRepoWorkspaceTabModel({
       repoId,
-      repoRuntimeId: 'repo-runtime-plain',
+      workspaceRuntimeId: 'repo-runtime-plain',
       paneTarget: { kind: 'workspace-root', repoRoot: repoId },
       preferredTab: 'terminal',
       tabEntries: [
@@ -98,7 +98,7 @@ describe('repo workspace pane tab model', () => {
     const terminalSessionId = 'term-111111111111111111111'
     const model = createRepoWorkspaceTabModel({
       repoId,
-      repoRuntimeId: 'repo-runtime-plain',
+      workspaceRuntimeId: 'repo-runtime-plain',
       paneTarget: { kind: 'workspace-root', repoRoot: repoId },
       preferredTab: 'terminal',
       allowPreferredTabFallback: false,
@@ -122,7 +122,7 @@ describe('repo workspace pane tab model', () => {
   test('projects a mixed tab list across static and terminal tabs', () => {
     const model = createModel({
       repoId: REPO_ID,
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'status',
@@ -153,7 +153,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -180,7 +180,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -211,7 +211,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -233,7 +233,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -261,7 +261,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -289,7 +289,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -314,7 +314,7 @@ describe('repo workspace pane tab model', () => {
   test('defaults runtime tab state by runtime type when no input state is provided', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       paneTarget: requiredGitWorkspacePaneTabsTarget(REPO_ID, 'feature/model', WORKTREE_PATH),
       worktreeHead: { kind: 'branch', branchName: 'feature/model' },
       preferredTab: 'status',
@@ -336,7 +336,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -360,7 +360,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -379,7 +379,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -408,7 +408,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -437,7 +437,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -463,7 +463,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'changes',
@@ -491,7 +491,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'changes',
@@ -512,7 +512,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'history',
@@ -539,7 +539,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: null,
       preferredTab: 'status',
@@ -564,7 +564,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -593,7 +593,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -620,7 +620,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -648,7 +648,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -678,7 +678,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -703,7 +703,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: null,
       worktreePath: null,
       preferredTab: 'status',
@@ -725,7 +725,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: null,
@@ -747,7 +747,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -768,7 +768,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'status',
@@ -791,7 +791,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'status',
@@ -816,7 +816,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'status',
@@ -841,7 +841,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -859,7 +859,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -889,7 +889,7 @@ describe('repo workspace pane tab model', () => {
     const model = createModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -913,11 +913,11 @@ describe('repo workspace pane tab model', () => {
 
 type RepoWorkspaceTabModelTestInput = Omit<
   RepoWorkspaceTabModelInput,
-  'repoRuntimeId' | 'runtimeTabStateByType' | 'paneTarget' | 'worktreeHead'
+  'workspaceRuntimeId' | 'runtimeTabStateByType' | 'paneTarget' | 'worktreeHead'
 > & {
   branchName: string | null
   worktreePath: string | null
-  repoRuntimeId?: string
+  workspaceRuntimeId?: string
   runtimeTabStateByType?: RepoWorkspaceRuntimeTabStateInputByType
   terminalCreatePending?: boolean
   terminalProjectionPhase?: WorkspacePaneRuntimeProjectionPhase
@@ -929,7 +929,7 @@ function createModel(input: RepoWorkspaceTabModelTestInput): RepoWorkspaceTabMod
   const {
     branchName,
     worktreePath,
-    repoRuntimeId,
+    workspaceRuntimeId,
     runtimeTabStateByType,
     terminalCreatePending,
     terminalProjectionPhase,
@@ -942,7 +942,7 @@ function createModel(input: RepoWorkspaceTabModelTestInput): RepoWorkspaceTabMod
     ? Object.prototype.hasOwnProperty.call(terminalState, 'selectedSessionId')
     : false
   return createRepoWorkspaceTabModel({
-    repoRuntimeId: repoRuntimeId ?? REPO_RUNTIME_ID,
+    workspaceRuntimeId: workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID,
     ...modelInput,
     paneTarget: branchName
       ? requiredGitWorkspacePaneTabsTarget(modelInput.repoId, branchName, worktreePath)

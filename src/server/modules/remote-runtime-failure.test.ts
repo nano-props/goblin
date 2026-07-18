@@ -334,7 +334,7 @@ describe('remote runtime failure classification', () => {
         ok: false,
         stdout: '',
         stderr: '',
-        message: 'error.repo-runtime-stale',
+        message: 'error.workspace-runtime-stale',
       }),
     ).toBeNull()
   })

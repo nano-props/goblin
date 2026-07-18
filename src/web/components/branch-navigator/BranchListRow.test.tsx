@@ -97,7 +97,7 @@ function branchListRowRepo(): BranchActionRepo {
   })
   return {
     id: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     branchModel: repo.branchModel,
     branchAction: repo.operations.branchAction,
     remote: repo.remote,

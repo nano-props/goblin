@@ -82,7 +82,7 @@ export interface TerminalPtyBindingEvents<TSession extends TerminalPtySessionSta
   emitOutput(session: TSession, event: Omit<TerminalOutputEvent, 'terminalSessionId'>): void
   emitBell(session: TSession, event: Omit<TerminalBellRealtimeEvent, 'terminalSessionId' | 'repoRoot'>): void
   emitTitle(session: TSession, event: Omit<TerminalTitleEvent, 'terminalSessionId' | 'repoRoot'>): void
-  emitExit(session: TSession, event: Omit<TerminalExitEvent, 'terminalSessionId' | 'repoRoot' | 'repoRuntimeId'>): void
+  emitExit(session: TSession, event: Omit<TerminalExitEvent, 'terminalSessionId' | 'repoRoot' | 'workspaceRuntimeId'>): void
   confirmedExit(session: TSession, terminalRuntimeGeneration: number): void
 }
 
@@ -572,7 +572,7 @@ function abortablePtySpawn(
 ): AbortablePtySpawn {
   if (signal?.aborted) {
     return {
-      result: Promise.resolve({ ok: false, message: 'error.repo-runtime-stale' }),
+      result: Promise.resolve({ ok: false, message: 'error.workspace-runtime-stale' }),
       ownership: Promise.resolve(),
     }
   }
@@ -593,7 +593,7 @@ function abortablePtySpawn(
     if (settled) return
     abandoned = true
     settled = true
-    result.resolve({ ok: false, message: 'error.repo-runtime-stale' })
+    result.resolve({ ok: false, message: 'error.workspace-runtime-stale' })
   }
   signal.addEventListener('abort', aborted, { once: true })
   const ownership = spawn.then(

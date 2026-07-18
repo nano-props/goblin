@@ -118,7 +118,7 @@ export type RepoWorkspaceSelection =
 
 export interface RepoWorkspaceTabModel {
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   branchName: string | null
   worktreePath: string | null
   paneTarget: RepoWorkspacePaneModelTarget
@@ -150,7 +150,7 @@ export interface RepoWorkspaceTabModel {
 
 export interface RepoWorkspaceTabModelInput {
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   paneTarget: RepoWorkspacePaneModelTarget
   worktreeHead?: GitHead
   preferredTab: WorkspacePaneTabType | null
@@ -232,7 +232,7 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
 
   return {
     repoId: input.repoId,
-    repoRuntimeId: input.repoRuntimeId,
+    workspaceRuntimeId: input.workspaceRuntimeId,
     branchName,
     worktreePath,
     paneTarget: input.paneTarget,

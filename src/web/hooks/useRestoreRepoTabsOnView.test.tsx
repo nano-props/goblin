@@ -50,12 +50,12 @@ vi.mock('#/web/stores/repos/store.ts', async (importActual) => {
 
 function stubRepo(
   id: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   options: { projectionState?: 'projected' | 'stub'; loadedAt?: number | null } = {},
 ) {
   return {
     id,
-    repoRuntimeId,
+    workspaceRuntimeId,
     session: {
       entry: { kind: 'local' as const, id },
       projectionState: options.projectionState ?? 'stub',
@@ -114,7 +114,7 @@ describe('useRestoreRepoTabsOnView', () => {
       promoteRestoredWorkspaceRepo: mocks.promoteRestoredWorkspaceRepo,
     }
     mocks.restoreRepoTabsOnView.mockResolvedValue({
-      repo: { repoRoot: 'repo-a', repoRuntimeId: 'rta' },
+      workspace: { workspaceId: 'repo-a', workspaceRuntimeId: 'rta' },
       snapshot: null,
     })
 
@@ -135,7 +135,7 @@ describe('useRestoreRepoTabsOnView', () => {
       promoteRestoredWorkspaceRepo: mocks.promoteRestoredWorkspaceRepo,
     }
     mocks.restoreRepoTabsOnView.mockResolvedValue({
-      repo: { repoRoot: '/r/a', repoRuntimeId: 'rta' },
+      workspace: { workspaceId: '/r/a', workspaceRuntimeId: 'rta' },
       snapshot: { tabs: [{ key: 'status' }] },
     })
 
@@ -143,7 +143,7 @@ describe('useRestoreRepoTabsOnView', () => {
     await waitFor(() => expect(mocks.restoreRepoTabsOnView).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(mocks.promoteRestoredWorkspaceRepo).toHaveBeenCalledTimes(1))
     expect(mocks.promoteRestoredWorkspaceRepo).toHaveBeenCalledWith({
-      repo: { repoRoot: '/r/a', repoRuntimeId: 'rta' },
+      workspace: { workspaceId: '/r/a', workspaceRuntimeId: 'rta' },
       snapshot: { tabs: [{ key: 'status' }] },
     })
   })
@@ -158,14 +158,14 @@ describe('useRestoreRepoTabsOnView', () => {
       promoteRestoredWorkspaceRepo: mocks.promoteRestoredWorkspaceRepo,
     }
     mocks.restoreRepoTabsOnView.mockResolvedValue({
-      repo: { repoRoot: '/r/a', repoRuntimeId: 'rta' },
+      workspace: { workspaceId: '/r/a', workspaceRuntimeId: 'rta' },
       snapshot: null,
     })
 
     renderInJsdom(<Host />)
     await waitFor(() => expect(mocks.promoteRestoredWorkspaceRepo).toHaveBeenCalledTimes(1))
     expect(mocks.promoteRestoredWorkspaceRepo).toHaveBeenCalledWith({
-      repo: { repoRoot: '/r/a', repoRuntimeId: 'rta' },
+      workspace: { workspaceId: '/r/a', workspaceRuntimeId: 'rta' },
       snapshot: null,
     })
   })
@@ -196,7 +196,7 @@ describe('useRestoreRepoTabsOnView', () => {
       promoteRestoredWorkspaceRepo: mocks.promoteRestoredWorkspaceRepo,
     }
     await act(async () => {
-      resolveFetch?.({ repo: { repoRoot: 'repo-a', repoRuntimeId: 'rta' }, snapshot: null })
+      resolveFetch?.({ workspace: { workspaceId: 'repo-a', workspaceRuntimeId: 'rta' }, snapshot: null })
       await Promise.resolve()
     })
 
@@ -245,7 +245,7 @@ describe('useRestoreRepoTabsOnView', () => {
     await waitFor(() => expect(mocks.restoreRepoTabsOnView).toHaveBeenCalledTimes(2))
   })
 
-  test('does not expose a previous failure after the repo runtime changes', async () => {
+  test('does not expose a previous failure after the workspace runtime changes', async () => {
     mocks.storeState = {
       repos: { 'repo-a': stubRepo('repo-a', 'runtime-old') },
       promoteRestoredWorkspaceRepo: mocks.promoteRestoredWorkspaceRepo,
@@ -285,7 +285,7 @@ describe('useRestoreRepoTabsOnView', () => {
     }
     mocks.restoreRepoTabsOnView
       .mockRejectedValueOnce(new Error('boom'))
-      .mockResolvedValueOnce({ repo: { repoRoot: 'repo-retry', repoRuntimeId: 'rtr' }, snapshot: null })
+      .mockResolvedValueOnce({ workspace: { workspaceId: 'repo-retry', workspaceRuntimeId: 'rtr' }, snapshot: null })
 
     const host = renderInJsdom(<Host />)
     await waitFor(() => expect(host.container.textContent).toBe('boom'))
@@ -321,7 +321,7 @@ describe('useRestoreRepoTabsOnView', () => {
     expect(mocks.restoreRepoTabsOnView).toHaveBeenCalledTimes(1)
 
     await act(async () => {
-      resolveFetch?.({ repo: { repoRoot: '/r/d', repoRuntimeId: 'rtd' }, snapshot: null })
+      resolveFetch?.({ workspace: { workspaceId: '/r/d', workspaceRuntimeId: 'rtd' }, snapshot: null })
       await waitFor(() => expect(mocks.promoteRestoredWorkspaceRepo).toHaveBeenCalledTimes(2))
     })
     hostA.unmount()

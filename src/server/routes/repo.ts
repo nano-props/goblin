@@ -33,15 +33,9 @@ import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-brok
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import {
-  acquireRepoRuntime,
-  isCurrentRepoRuntime,
-  listRepoRuntimes,
-  releaseRepoRuntime,
-  replaceRepoRuntimeMembershipsForClient,
-  runSerializedInitialWorkspaceProbe,
-  runSerializedWorkspaceRefresh,
+  isCurrentWorkspaceRuntime,
   workspaceRuntimeHasGitCapability,
-} from '#/server/modules/repo-runtimes.ts'
+} from '#/server/modules/workspace-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { IpcError, type RepoLogResponse } from '#/shared/api-types.ts'
 import { isRemoteRepoRuntimeFailure } from '#/server/modules/remote-runtime-failure.ts'
@@ -52,18 +46,7 @@ import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktre
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import { probeLocalWorkspace, probeWorkspace } from '#/server/modules/workspace-probe.ts'
-import {
-  formatWorkspaceLocator,
-  parseWorkspaceLocator,
-  type WorkspaceLocatorPlatform,
-} from '#/shared/workspace-locator.ts'
-import path from 'node:path'
-import {
-  commitGitCapabilityRemovalOrThrow,
-  type WorkspaceCapabilityTransitionHost,
-} from '#/server/workspace-capability-transition-host.ts'
-import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
+import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { readWorkspaceDirectoryOverview } from '#/server/modules/workspace-directory-overview.ts'
 
 // Soft-fail envelope returned by `jsonOr` for every repo action that
@@ -105,17 +88,17 @@ export function createRepoRoutes(options: {
       throw err
     }
   }
-  function assertCurrentRepoRuntimeForRead(
+  function assertCurrentWorkspaceRuntimeForRead(
     userId: string | null | undefined,
     repoRoot: string,
-    repoRuntimeId: string,
+    workspaceRuntimeId: string,
   ): asserts userId is string {
-    if (!userId || !isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId)) {
-      throw new IpcError({ code: 'BAD_REQUEST', message: 'error.repo-runtime-stale' })
+    if (!userId || !isCurrentWorkspaceRuntime(userId, repoRoot, workspaceRuntimeId)) {
+      throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
     }
   }
-  function assertGitCapability(userId: string, repoRoot: string, repoRuntimeId: string): void {
-    if (!workspaceRuntimeHasGitCapability(userId, repoRoot, repoRuntimeId)) {
+  function assertGitCapability(userId: string, repoRoot: string, workspaceRuntimeId: string): void {
+    if (!workspaceRuntimeHasGitCapability(userId, repoRoot, workspaceRuntimeId)) {
       throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-git-unavailable' })
     }
   }
@@ -124,34 +107,11 @@ export function createRepoRoutes(options: {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.probe, c)
     return c.json(await jsonOr(() => probeRepo(cwd), READ_REPO_ERROR, 'probe'))
   })
-  app.post('/workspace-refresh', async (c) => {
-    const { workspaceId, workspaceRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.workspaceRefresh, c)
-    const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, workspaceId, workspaceRuntimeId)
-    const platform = serverLocatorPlatform()
-    return c.json(
-      await runSerializedWorkspaceRefresh({
-        userId,
-        repoRoot: workspaceId,
-        repoRuntimeId: workspaceRuntimeId,
-        probe: async () => await probeWorkspace(workspaceId, platform, { signal: c.req.raw.signal }),
-        beforeCommit: async ({ before, after }) => {
-          if (!workspaceGitCleanupRequired(before, after)) return
-          await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
-            userId,
-            workspaceId,
-            workspaceRuntimeId,
-            assertCurrent: () => assertCurrentRepoRuntimeForRead(userId, workspaceId, workspaceRuntimeId),
-          })
-        },
-      }),
-    )
-  })
   app.post('/log', async (c) => {
-    const { cwd, repoRuntimeId, branch, count, skip } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.log, c)
+    const { cwd, workspaceRuntimeId, branch, count, skip } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.log, c)
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
-    assertGitCapability(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
+    assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow<RepoLogResponse>(
         userId,
@@ -160,47 +120,47 @@ export function createRepoRoutes(options: {
             count: count ?? DEFAULT_REPOSITORY_LOG_COUNT,
             skip: skip ?? 0,
             signal: c.req.raw.signal,
-            repoRuntimeId,
+            workspaceRuntimeId,
           }),
         'log',
       ),
     )
   })
   app.post('/remote-branches', async (c) => {
-    const { cwd, repoRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.getRemoteBranches, c)
+    const { cwd, workspaceRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.getRemoteBranches, c)
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
-    assertGitCapability(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
+    assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => getRepoRemoteBranches(cwd, { signal: c.req.raw.signal, repoRuntimeId }),
+        () => getRepoRemoteBranches(cwd, { signal: c.req.raw.signal, workspaceRuntimeId }),
         'remote-branches',
       ),
     )
   })
   app.post('/worktree-bootstrap-preview', async (c) => {
-    const { cwd, repoRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.worktreeBootstrapPreview, c)
+    const { cwd, workspaceRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.worktreeBootstrapPreview, c)
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
-    assertGitCapability(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
+    assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => getRepoWorktreeBootstrapPreview(cwd, { signal: c.req.raw.signal, repoRuntimeId }),
+        () => getRepoWorktreeBootstrapPreview(cwd, { signal: c.req.raw.signal, workspaceRuntimeId }),
         'worktree-bootstrap-preview',
       ),
     )
   })
   app.post('/patch', async (c) => {
-    const { cwd, repoRuntimeId, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.patch, c)
+    const { cwd, workspaceRuntimeId, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.patch, c)
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
-    assertGitCapability(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
+    assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => getRepoPatch(cwd, worktreePath, { signal: c.req.raw.signal, repoRuntimeId }),
+        () => getRepoPatch(cwd, worktreePath, { signal: c.req.raw.signal, workspaceRuntimeId }),
         'patch',
       ),
     )
@@ -212,14 +172,14 @@ export function createRepoRoutes(options: {
       throw new Error('error.workspace-target-transport-mismatch')
     }
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, executionTarget.workspaceId, executionTarget.workspaceRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, executionTarget.workspaceId, executionTarget.workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
         () =>
           getRepositoryTree(executionTarget, {
             prefix,
-            repoRuntimeId: executionTarget.workspaceRuntimeId,
+            workspaceRuntimeId: executionTarget.workspaceRuntimeId,
             signal: c.req.raw.signal,
           }),
         'tree',
@@ -228,24 +188,24 @@ export function createRepoRoutes(options: {
     )
   })
   app.post('/file-viewer', async (c) => {
-    const { cwd, repoRuntimeId, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fileViewer, c)
+    const { cwd, workspaceRuntimeId, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fileViewer, c)
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => getRepositoryFileViewer(cwd, worktreePath, c.req.raw.signal, { repoRuntimeId }),
+        () => getRepositoryFileViewer(cwd, worktreePath, c.req.raw.signal, { workspaceRuntimeId }),
         'file-viewer',
       ),
     )
   })
   app.post('/trash-file', async (c) => {
-    const { cwd, repoRuntimeId, worktreePath, path } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.trashFile, c)
+    const { cwd, workspaceRuntimeId, worktreePath, path } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.trashFile, c)
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
     const result = await runtimeReadJsonOrThrow(
       userId,
-      () => trashRepositoryFile(cwd, worktreePath, path, c.req.raw.signal, { repoRuntimeId }),
+      () => trashRepositoryFile(cwd, worktreePath, path, c.req.raw.signal, { workspaceRuntimeId }),
       'trash-file',
     )
     if (result.ok || result.repositoryStateChanged === true) {
@@ -254,59 +214,59 @@ export function createRepoRoutes(options: {
     return c.json(result)
   })
   app.post('/projection', async (c) => {
-    const { cwd, repoRuntimeId, branch, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.projection, c)
+    const { cwd, workspaceRuntimeId, branch, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.projection, c)
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
-    assertGitCapability(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
+    assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => readRepoProjection(cwd, { branch, mode: mode ?? 'full', signal: c.req.raw.signal, repoRuntimeId }),
+        () => readRepoProjection(cwd, { branch, mode: mode ?? 'full', signal: c.req.raw.signal, workspaceRuntimeId }),
         'projection',
       ),
     )
   })
   app.post('/worktree-status', async (c) => {
-    const { cwd, repoRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.worktreeStatus, c)
+    const { cwd, workspaceRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.worktreeStatus, c)
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
-    assertGitCapability(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
+    assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => readRepoWorktreeStatus(cwd, { signal: c.req.raw.signal, repoRuntimeId }),
+        () => readRepoWorktreeStatus(cwd, { signal: c.req.raw.signal, workspaceRuntimeId }),
         'worktree-status',
       ),
     )
   })
   app.post('/workspace-overview', async (c) => {
-    const { cwd, repoRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.workspaceOverview, c)
+    const { cwd, workspaceRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.workspaceOverview, c)
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => readWorkspaceDirectoryOverview(cwd, { repoRuntimeId, signal: c.req.raw.signal }),
+        () => readWorkspaceDirectoryOverview(cwd, { workspaceRuntimeId, signal: c.req.raw.signal }),
         'workspace-overview',
       ),
     )
   })
   app.post('/operations', async (c) => {
-    const { cwd, repoRuntimeId, includeSettled } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.operations, c)
-    if (cwd && repoRuntimeId) {
+    const { cwd, workspaceRuntimeId, includeSettled } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.operations, c)
+    if (cwd && workspaceRuntimeId) {
       const userId = userIdFromContext(c)
-      assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
-      assertGitCapability(userId, cwd, repoRuntimeId)
+      assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
+      assertGitCapability(userId, cwd, workspaceRuntimeId)
     }
-    return c.json(await readRepoOperationsSnapshot(cwd, { includeSettled, repoRuntimeId, signal: c.req.raw.signal }))
+    return c.json(await readRepoOperationsSnapshot(cwd, { includeSettled, workspaceRuntimeId, signal: c.req.raw.signal }))
   })
   app.post('/fetch', async (c) => {
-    const { cwd, repoRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)
+    const { cwd, workspaceRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
-    assertGitCapability(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
+    assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runtimeReadJsonOrThrow(userId, () => fetchRepo(cwd, 'user', c.req.raw.signal, repoRuntimeId), 'fetch'),
+      await runtimeReadJsonOrThrow(userId, () => fetchRepo(cwd, 'user', c.req.raw.signal, workspaceRuntimeId), 'fetch'),
     )
   })
   app.post('/clone', async (c) => {
@@ -316,45 +276,45 @@ export function createRepoRoutes(options: {
     )
   })
   app.post('/pull', async (c) => {
-    const { cwd, repoRuntimeId, branch, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pull, c)
+    const { cwd, workspaceRuntimeId, branch, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pull, c)
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
-    assertGitCapability(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
+    assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal, { repoRuntimeId }),
+        () => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal, { workspaceRuntimeId }),
         'pull',
       ),
     )
   })
   app.post('/push', async (c) => {
-    const { cwd, repoRuntimeId, branch } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.push, c)
+    const { cwd, workspaceRuntimeId, branch } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.push, c)
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
-    assertGitCapability(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
+    assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => pushRepoBranch(cwd, branch, c.req.raw.signal, { repoRuntimeId }),
+        () => pushRepoBranch(cwd, branch, c.req.raw.signal, { workspaceRuntimeId }),
         'push',
       ),
     )
   })
   app.post('/create-worktree', async (c) => {
-    const { cwd, repoRuntimeId, worktreePath, mode, worktreeBootstrap } = await parseHttpBody(
+    const { cwd, workspaceRuntimeId, worktreePath, mode, worktreeBootstrap } = await parseHttpBody(
       REPO_PROCEDURE_SCHEMAS.createWorktree,
       c,
     )
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
-    assertGitCapability(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
+    assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
         () =>
           createRepoWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, {
-            repoRuntimeId,
+            workspaceRuntimeId,
             worktreeBootstrap,
           }),
         'create-worktree',
@@ -362,23 +322,23 @@ export function createRepoRoutes(options: {
     )
   })
   app.post('/delete-branch', async (c) => {
-    const { cwd, repoRuntimeId, branch, force, deleteUpstream } = await parseHttpBody(
+    const { cwd, workspaceRuntimeId, branch, force, deleteUpstream } = await parseHttpBody(
       REPO_PROCEDURE_SCHEMAS.deleteBranch,
       c,
     )
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
-    assertGitCapability(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
+    assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
         async () => {
           return await options.repoMutationApplication.deleteBranch(userId, {
             repoRoot: cwd,
-            repoRuntimeId,
+            workspaceRuntimeId,
             branchName: branch,
             deleteBranch: async () =>
-              await deleteRepoBranch(cwd, branch, { force, deleteUpstream }, c.req.raw.signal, { repoRuntimeId }),
+              await deleteRepoBranch(cwd, branch, { force, deleteUpstream }, c.req.raw.signal, { workspaceRuntimeId }),
           })
         },
         'delete-branch',
@@ -386,18 +346,18 @@ export function createRepoRoutes(options: {
     )
   })
   app.post('/remove-worktree', async (c) => {
-    const { cwd, repoRuntimeId, branch, worktreePath, deleteBranch, forceDeleteBranch, deleteUpstream } =
+    const { cwd, workspaceRuntimeId, branch, worktreePath, deleteBranch, forceDeleteBranch, deleteUpstream } =
       await parseHttpBody(REPO_PROCEDURE_SCHEMAS.removeWorktree, c)
     const userId = userIdFromContext(c)
     if (!userId) throw new Error('error.unauthorized')
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
-    assertGitCapability(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
+    assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await jsonOr(
         () =>
           options.worktreeRemovalApplication.removeWorktree(userId, {
             repoRoot: cwd,
-            repoRuntimeId,
+            workspaceRuntimeId,
             worktreePath,
             branchName: branch,
             deleteBranch,
@@ -413,7 +373,7 @@ export function createRepoRoutes(options: {
                 lifecycle,
                 physicalWorktreeCapability,
                 signal,
-                { repoRuntimeId },
+                { workspaceRuntimeId },
               ),
           }),
         READ_REPO_ERROR,
@@ -422,38 +382,38 @@ export function createRepoRoutes(options: {
     )
   })
   app.post('/open-url', async (c) => {
-    const { cwd, repoRuntimeId, target } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openUrl, c)
+    const { cwd, workspaceRuntimeId, target } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openUrl, c)
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
-    assertGitCapability(userId, cwd, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
+    assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => openRepoUrl(cwd, target, c.req.raw.signal, { repoRuntimeId }),
+        () => openRepoUrl(cwd, target, c.req.raw.signal, { workspaceRuntimeId }),
         'open-url',
       ),
     )
   })
   app.post('/open-terminal', async (c) => {
-    const { repoId, repoRuntimeId, worktreePath, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openTerminal, c)
+    const { repoId, workspaceRuntimeId, worktreePath, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openTerminal, c)
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, repoId, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, repoId, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => openRepoTerminal(repoId, worktreePath, app, c.req.raw.signal, { repoRuntimeId }),
+        () => openRepoTerminal(repoId, worktreePath, app, c.req.raw.signal, { workspaceRuntimeId }),
         'open-terminal',
       ),
     )
   })
   app.post('/open-editor', async (c) => {
-    const { repoId, repoRuntimeId, worktreePath, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openEditor, c)
+    const { repoId, workspaceRuntimeId, worktreePath, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openEditor, c)
     const userId = userIdFromContext(c)
-    assertCurrentRepoRuntimeForRead(userId, repoId, repoRuntimeId)
+    assertCurrentWorkspaceRuntimeForRead(userId, repoId, workspaceRuntimeId)
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => openRepoEditor(repoId, worktreePath, app, c.req.raw.signal, { repoRuntimeId }),
+        () => openRepoEditor(repoId, worktreePath, app, c.req.raw.signal, { workspaceRuntimeId }),
         'open-editor',
       ),
     )
@@ -475,96 +435,9 @@ export function createRepoRoutes(options: {
       ),
     )
   })
-  app.post('/runtime-open', async (c) => {
-    const userId = userIdFromContext(c)
-    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const input = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeOpen, c)
-    if ('repoInput' in input) {
-      const platform = serverLocatorPlatform()
-      const workspaceId = workspaceLocatorFromCommandInput(input.repoInput, platform)
-      if (!workspaceId) {
-        return c.json({
-          ok: false as const,
-          input: input.repoInput,
-          reason: 'error.workspace-locator-malformed',
-        })
-      }
-      const probe = await probeLocalWorkspace(workspaceId, platform, { signal: c.req.raw.signal })
-      if (probe.status !== 'ready') {
-        return c.json({ ok: false as const, input: input.repoInput, reason: probe.reason })
-      }
-      const repoRuntimeId = acquireRepoRuntime(userId, workspaceId, input.clientId)
-      const authoritativeProbe = await runSerializedInitialWorkspaceProbe({
-        userId,
-        repoRoot: workspaceId,
-        repoRuntimeId,
-        probe: async () => probe,
-        beforeCommit: async ({ before, after }) => {
-          if (!workspaceGitCleanupRequired(before, after)) return
-          await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
-            userId,
-            workspaceId,
-            workspaceRuntimeId: repoRuntimeId,
-            assertCurrent: () => assertCurrentRepoRuntimeForRead(userId, workspaceId, repoRuntimeId),
-          })
-        },
-      })
-      if (!authoritativeProbe || authoritativeProbe.status !== 'ready') {
-        return c.json({ ok: false as const, input: input.repoInput, reason: 'error.workspace-transport-unavailable' })
-      }
-      return c.json({
-        ok: true as const,
-        repo: { id: workspaceId, name: authoritativeProbe.name },
-        repoRuntimeId,
-        capabilities: authoritativeProbe.capabilities,
-        diagnostics: authoritativeProbe.diagnostics,
-      })
-    }
-    assertCanonicalWorkspaceId(input.repoRoot)
-    const repoRuntimeId = acquireRepoRuntime(userId, input.repoRoot, input.clientId)
-    return c.json({ ok: true as const, repoRuntimeId })
-  })
-  app.post('/runtime-list', async (c) => {
-    const userId = userIdFromContext(c)
-    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeList, c)
-    return c.json({ runtimes: listRepoRuntimes(userId) })
-  })
-  app.post('/runtime-reconcile', async (c) => {
-    const userId = userIdFromContext(c)
-    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { clientId, repoRoots } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeReconcile, c)
-    for (const repoRoot of repoRoots) assertCanonicalWorkspaceId(repoRoot)
-    const runtimes = replaceRepoRuntimeMembershipsForClient(userId, clientId, repoRoots)
-    return c.json({ runtimes })
-  })
-  app.post('/runtime-close', async (c) => {
-    const userId = userIdFromContext(c)
-    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { repoRoot, repoRuntimeId, clientId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeClose, c)
-    const result = releaseRepoRuntime(userId, repoRoot, repoRuntimeId, clientId)
-    return c.json({ ok: true as const, ...result })
-  })
   app.post('/abort', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.abort, c)
     return c.json(await jsonOr(async () => abortRepoOperation(cwd), false, 'abort'))
   })
   return app
-}
-
-function serverLocatorPlatform(): WorkspaceLocatorPlatform {
-  return process.platform === 'win32' ? 'win32' : 'posix'
-}
-
-function assertCanonicalWorkspaceId(value: string): void {
-  if (!parseWorkspaceLocator(value, serverLocatorPlatform())) {
-    throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-locator-malformed' })
-  }
-}
-
-function workspaceLocatorFromCommandInput(input: string, platform: WorkspaceLocatorPlatform): string | null {
-  if (parseWorkspaceLocator(input, platform)?.transport === 'file') return input
-  const implementation = platform === 'win32' ? path.win32 : path.posix
-  if (!implementation.isAbsolute(input)) return null
-  return formatWorkspaceLocator({ transport: 'file', platform, path: input }, platform)
 }

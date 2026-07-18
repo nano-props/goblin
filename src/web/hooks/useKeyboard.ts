@@ -213,7 +213,7 @@ export function useKeyboard({
           if (!repo || !workspaceWorktreesAvailable(repo.workspaceProbe)) return
           const branchAction = projectBranchActionOperation(
             repo.operations.branchAction,
-            getRepoOperationsQueryData(repo.id, repo.repoRuntimeId)?.operations,
+            getRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId)?.operations,
           )
           if (branchAction.phase === 'idle') {
             openCreateWorktreeRef.current()

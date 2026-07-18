@@ -123,8 +123,8 @@ export function useBranchActionDialogDisplay<P>(
 ): BranchActionDialogDisplay<P> {
   const entry = useLastNonNull(slot)
   const slotRepo = slot ? repos[slot.repoId] : null
-  const branchReadModel = useRepoBranchReadModel(slot?.repoId ?? '', slotRepo?.repoRuntimeId ?? '', !!slotRepo)
-  const operationsReadModel = useRepoOperationsReadModel(slot?.repoId ?? '', slotRepo?.repoRuntimeId ?? '', {
+  const branchReadModel = useRepoBranchReadModel(slot?.repoId ?? '', slotRepo?.workspaceRuntimeId ?? '', !!slotRepo)
+  const operationsReadModel = useRepoOperationsReadModel(slot?.repoId ?? '', slotRepo?.workspaceRuntimeId ?? '', {
     enabled: !!slotRepo,
   })
   const liveContext = slot ? resolveContext(repos, slot, branchReadModel, operationsReadModel.data?.operations) : null
@@ -160,7 +160,7 @@ function resolveContext<P>(
   if (!repoFromStore || !branchReadModel) return null
   const repo: BranchActionDialogRepo = {
     id: repoFromStore.id,
-    repoRuntimeId: repoFromStore.repoRuntimeId,
+    workspaceRuntimeId: repoFromStore.workspaceRuntimeId,
     branchModel: branchReadModel,
     branchAction: projectBranchActionOperation(repoFromStore.operations.branchAction, operations, entry.branchName),
     remote: {

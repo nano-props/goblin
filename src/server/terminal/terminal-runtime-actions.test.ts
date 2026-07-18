@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, test, vi } from 'vitest'
-import { acquireRepoRuntime, clearRepoRuntimesForUser } from '#/server/modules/repo-runtimes.ts'
+import { acquireWorkspaceRuntime, clearWorkspaceRuntimesForUser } from '#/server/modules/workspace-runtimes.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
@@ -15,7 +15,7 @@ const CLIENT_ID = 'client_terminal_actions'
 // don't have to mock the derivation helper.
 const USER_ID = 'user_terminal_actions'
 const REPO_ROOT = 'goblin+file:///repo'
-let REPO_RUNTIME_ID = ''
+let WORKSPACE_RUNTIME_ID = ''
 const WORKSPACE_ID = requiredWorkspaceLocator(REPO_ROOT)
 
 function requiredWorkspaceLocator(input: string) {
@@ -24,11 +24,11 @@ function requiredWorkspaceLocator(input: string) {
   return locator
 }
 
-function worktreeTarget(repoRuntimeId: string) {
+function worktreeTarget(workspaceRuntimeId: string) {
   return {
     kind: 'git-worktree' as const,
     workspaceId: WORKSPACE_ID,
-    workspaceRuntimeId: repoRuntimeId,
+    workspaceRuntimeId: workspaceRuntimeId,
     root: WORKSPACE_ID,
   }
 }
@@ -57,7 +57,7 @@ function makeActions(
             terminalRuntimeSessionId,
             terminalRuntimeGeneration: 1,
             terminalSessionId: 'term-111111111111111111111',
-            target: worktreeTarget(REPO_RUNTIME_ID),
+            target: worktreeTarget(WORKSPACE_RUNTIME_ID),
             presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/worktree' } },
             controller: null,
             processName: 'zsh',
@@ -86,9 +86,9 @@ function makeActions(
     writeSession: vi.fn(() => false),
     resizeSession: vi.fn(() => false),
     takeoverSession: vi.fn(),
-    terminalSessionsChangedEventForScope: vi.fn((_userId, repoRoot, repoRuntimeId) => ({
+    terminalSessionsChangedEventForScope: vi.fn((_userId, repoRoot, workspaceRuntimeId) => ({
       repoRoot,
-      repoRuntimeId,
+      workspaceRuntimeId,
       revision: 1,
     })),
     terminalSessionsSnapshotForUser: vi.fn(() => ({ revision: 0, sessions: [] })),
@@ -119,14 +119,14 @@ function makeActions(
   }
 }
 
-function syncCurrentRepoRuntime(): void {
-  REPO_RUNTIME_ID = acquireRepoRuntime(USER_ID, REPO_ROOT, CLIENT_ID)
+function syncCurrentWorkspaceRuntime(): void {
+  WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, CLIENT_ID)
 }
 
 describe('terminal-runtime-actions close broadcast', () => {
   test('does not emit workspace tab invalidation after a successful create', async () => {
-    clearRepoRuntimesForUser(USER_ID)
-    syncCurrentRepoRuntime()
+    clearWorkspaceRuntimesForUser(USER_ID)
+    syncCurrentWorkspaceRuntime()
     const { broadcasts, sessionService } = makeActions()
     sessionService.createAdmitted.mockResolvedValue({
       ok: true,
@@ -149,7 +149,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: USER_ID,
       repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     await expect(
       worktreeOperations.runOperation(
@@ -159,7 +159,7 @@ describe('terminal-runtime-actions close broadcast', () => {
             CLIENT_ID,
             USER_ID,
             {
-              target: worktreeTarget(REPO_RUNTIME_ID),
+              target: worktreeTarget(WORKSPACE_RUNTIME_ID),
               kind: 'additional',
             },
             { physicalWorktreeCapability, permit },
@@ -171,8 +171,8 @@ describe('terminal-runtime-actions close broadcast', () => {
   })
 
   test('does not emit workspace tab invalidation after a failed create', async () => {
-    clearRepoRuntimesForUser(USER_ID)
-    syncCurrentRepoRuntime()
+    clearWorkspaceRuntimesForUser(USER_ID)
+    syncCurrentWorkspaceRuntime()
     const { broadcasts, sessionService } = makeActions()
     sessionService.createAdmitted.mockResolvedValue({ ok: false, message: 'error.invalid-arguments' })
 
@@ -181,7 +181,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: USER_ID,
       repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     await expect(
       worktreeOperations.runOperation(
@@ -191,7 +191,7 @@ describe('terminal-runtime-actions close broadcast', () => {
             CLIENT_ID,
             USER_ID,
             {
-              target: worktreeTarget(REPO_RUNTIME_ID),
+              target: worktreeTarget(WORKSPACE_RUNTIME_ID),
               kind: 'additional',
             },
             { physicalWorktreeCapability, permit },
@@ -206,7 +206,7 @@ describe('terminal-runtime-actions close broadcast', () => {
   })
 
   test('does not emit workspace tab invalidation when admitted create validation fails', async () => {
-    clearRepoRuntimesForUser(USER_ID)
+    clearWorkspaceRuntimesForUser(USER_ID)
     const { broadcasts, sessionService } = makeActions()
     sessionService.createAdmitted.mockResolvedValue({ ok: false, message: 'error.invalid-arguments' })
 
@@ -215,7 +215,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: USER_ID,
       repoRoot: REPO_ROOT,
-      repoRuntimeId: 'repo-runtime-stale',
+      workspaceRuntimeId: 'repo-runtime-stale',
     })
     await expect(
       worktreeOperations.runOperation(
@@ -328,16 +328,16 @@ describe('terminal-runtime-actions close broadcast', () => {
 
 describe('terminal-runtime-actions prune', () => {
   test('rejects stale repo-runtime prune requests before touching session state', async () => {
-    clearRepoRuntimesForUser(USER_ID)
-    syncCurrentRepoRuntime()
+    clearWorkspaceRuntimesForUser(USER_ID)
+    syncCurrentWorkspaceRuntime()
     const { actions, broadcasts, sessionService } = makeActions({ closeSessionForUser: () => false })
 
     await expect(
       actions.prune(CLIENT_ID, USER_ID, {
         repoRoot: REPO_ROOT,
-        repoRuntimeId: 'repo-runtime-stale',
+        workspaceRuntimeId: 'repo-runtime-stale',
       }),
-    ).rejects.toThrow('error.repo-runtime-stale')
+    ).rejects.toThrow('error.workspace-runtime-stale')
 
     expect(sessionService.prune).not.toHaveBeenCalled()
     expect(broadcasts).not.toHaveBeenCalled()
@@ -346,14 +346,14 @@ describe('terminal-runtime-actions prune', () => {
 
 describe('terminal-runtime-actions catalog recovery', () => {
   test('returns a single screen-free catalog sample without global stability retries', async () => {
-    clearRepoRuntimesForUser(USER_ID)
-    syncCurrentRepoRuntime()
+    clearWorkspaceRuntimesForUser(USER_ID)
+    syncCurrentWorkspaceRuntime()
     const { actions, manager, sessionService } = makeActions()
     manager.terminalSessionsSnapshotForUser.mockReturnValueOnce({ revision: 2, sessions: [] })
     sessionService.listWorkspaceTabs.mockResolvedValueOnce({ revision: 9, entries: [] })
 
     await expect(
-      actions.recoverSessions(CLIENT_ID, USER_ID, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
+      actions.recoverSessions(CLIENT_ID, USER_ID, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
     ).resolves.toEqual({ revision: 2, sessions: [] })
 
     expect(manager.terminalSessionsSnapshotForUser).toHaveBeenCalledOnce()
@@ -361,14 +361,14 @@ describe('terminal-runtime-actions catalog recovery', () => {
   })
 
   test('does not use the workspace-tabs revision as terminal freshness', async () => {
-    clearRepoRuntimesForUser(USER_ID)
-    syncCurrentRepoRuntime()
+    clearWorkspaceRuntimesForUser(USER_ID)
+    syncCurrentWorkspaceRuntime()
     const { actions, manager, sessionService } = makeActions()
     manager.terminalSessionsSnapshotForUser.mockReturnValueOnce({ revision: 4, sessions: [] })
     sessionService.listWorkspaceTabs.mockResolvedValueOnce({ revision: 27, entries: [] })
 
     await expect(
-      actions.recoverSessions(CLIENT_ID, USER_ID, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
+      actions.recoverSessions(CLIENT_ID, USER_ID, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
     ).resolves.toEqual({ revision: 4, sessions: [] })
     expect(manager.terminalSessionsSnapshotForUser).toHaveBeenCalledOnce()
     expect(sessionService.listWorkspaceTabs).not.toHaveBeenCalled()

@@ -68,7 +68,7 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
  * Unlike a current-target presentation lease, this never reads route-controller
  * observation state. Callers that mutate server state first must invoke this
  * only after applying the canonical snapshot; the lease check then rejects a
- * reopened repo runtime or a branch whose worktree identity changed meanwhile.
+ * reopened workspace runtime or a branch whose worktree identity changed meanwhile.
  */
 export async function commitWorkspacePaneDestinationRoute(
   presentation: WorkspacePaneDestinationPresentation,

@@ -529,7 +529,7 @@ export const ja: Record<DictKey, string> = {
   'error.trash-unavailable': 'システムのごみ箱を利用できません',
   'error.failed-trash-file': 'ファイルをごみ箱に移動できませんでした',
   'error.invalid-arguments': '無効な引数',
-  'error.repo-runtime-stale': 'リポジトリランタイムが無効です',
+  'error.workspace-runtime-stale': 'ワークスペースランタイムが無効です',
   'error.workspace-target-stale': 'ワークスペースの対象が変更されました。もう一度お試しください。',
   'error.worktree-removal-in-progress': 'このワークツリーを削除しています',
   'error.not-controller': 'このターミナルは他のセッションが制御しています',

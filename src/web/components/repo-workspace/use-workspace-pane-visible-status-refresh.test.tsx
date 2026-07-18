@@ -12,7 +12,7 @@ vi.mock('#/web/stores/repos/repo-refresh-actions.ts', async (importOriginal) => 
 })
 
 const REPO_ID = 'goblin+file:///tmp/visible-status-refresh-repo'
-const REPO_RUNTIME_ID = 'repo-runtime-visible-status-refresh'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-visible-status-refresh'
 
 function Harness({
   branchName = 'main',
@@ -25,7 +25,7 @@ function Harness({
 }) {
   useWorkspacePaneVisibleStatusRefresh({
     repoId: REPO_ID,
-    repoRuntimeId: REPO_RUNTIME_ID,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     branchName,
     renderedTab,
     unavailable,
@@ -63,7 +63,7 @@ describe('useWorkspacePaneVisibleStatusRefresh', () => {
       expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledWith(
         expect.any(Object),
         REPO_ID,
-        REPO_RUNTIME_ID,
+        WORKSPACE_RUNTIME_ID,
         'main',
       )
     },
@@ -93,7 +93,7 @@ describe('useWorkspacePaneVisibleStatusRefresh', () => {
     expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledWith(
       expect.any(Object),
       REPO_ID,
-      REPO_RUNTIME_ID,
+      WORKSPACE_RUNTIME_ID,
       'feature/a',
     )
   })
@@ -112,7 +112,7 @@ describe('useWorkspacePaneVisibleStatusRefresh', () => {
     expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledWith(
       expect.any(Object),
       REPO_ID,
-      REPO_RUNTIME_ID,
+      WORKSPACE_RUNTIME_ID,
       'feature/a',
     )
   })

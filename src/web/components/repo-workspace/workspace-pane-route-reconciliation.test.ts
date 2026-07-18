@@ -12,7 +12,7 @@ import {
 } from '#/web/components/repo-workspace/workspace-pane-route-reconciliation.ts'
 
 const REPO_ID = 'goblin+file:///tmp/goblin-route-reconciliation-repo'
-const REPO_RUNTIME_ID = 'repo-runtime-test'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/tmp/goblin-route-reconciliation-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
@@ -57,7 +57,7 @@ describe('workspace pane route reconciliation', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -102,7 +102,7 @@ describe('workspace pane route reconciliation', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -149,7 +149,7 @@ describe('workspace pane route reconciliation', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'history',
@@ -168,7 +168,7 @@ describe('workspace pane route reconciliation', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'history',
@@ -187,7 +187,7 @@ describe('workspace pane route reconciliation', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'history',
@@ -212,7 +212,7 @@ describe('workspace pane route reconciliation', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'history',
@@ -231,7 +231,7 @@ describe('workspace pane route reconciliation', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
       worktreePath: null,
       preferredTab: 'changes',
@@ -252,7 +252,7 @@ describe('workspace pane route reconciliation', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
       worktreePath: null,
       preferredTab: null,
@@ -273,7 +273,7 @@ describe('workspace pane route reconciliation', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
       worktreePath: null,
       preferredTab: null,
@@ -294,7 +294,7 @@ describe('workspace pane route reconciliation', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
 
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branchName: 'feature/route',
       worktreePath: null,
       preferredTab: 'changes',
@@ -320,7 +320,7 @@ function terminalModel(input: {
   return createRepoWorkspaceTabModel({
     repoId: REPO_ID,
 
-    repoRuntimeId: REPO_RUNTIME_ID,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     branchName: 'feature/route',
     worktreePath: WORKTREE_PATH,
     preferredTab: 'terminal',

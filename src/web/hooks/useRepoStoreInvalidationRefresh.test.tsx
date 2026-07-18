@@ -12,7 +12,7 @@ const storeState = {
     'goblin+file:///tmp/repo': {
       id: 'goblin+file:///tmp/repo',
       availability: { phase: 'available' },
-      repoRuntimeId: 'repo-runtime-test-7',
+      workspaceRuntimeId: 'repo-runtime-test-7',
       dataLoads: {
         repoReadModel: { phase: 'idle', loadedAt: 0, stale: false, error: null },
         fetch: { phase: 'idle', loadedAt: 0, stale: false, error: null },
@@ -49,7 +49,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     storeState.repos['goblin+file:///tmp/repo'] = {
       id: 'goblin+file:///tmp/repo',
       availability: { phase: 'available' },
-      repoRuntimeId: 'repo-runtime-test-7',
+      workspaceRuntimeId: 'repo-runtime-test-7',
       dataLoads: {
         repoReadModel: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
         fetch: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },

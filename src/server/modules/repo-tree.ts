@@ -31,7 +31,7 @@ import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-
 export interface RepositoryTreeReadOptions extends RepoTreeSourceOptions {
   /** Optional worktree list from callers that already have one. */
   readonly precomputedWorktrees?: ReadonlyArray<WorktreeInfo>
-  readonly repoRuntimeId?: string
+  readonly workspaceRuntimeId?: string
   readonly signal?: AbortSignal
 }
 
@@ -76,7 +76,7 @@ export async function getRepositoryTree(
   if (isRemote) {
     remoteTarget = await resolveRemoteRepoTarget(
       cwd,
-      options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
+      options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
       options.signal,
     )
   }
@@ -114,8 +114,8 @@ export async function getRepositoryTree(
         worktreePath: resolvedWorktreePath,
         options,
         signal: options.signal,
-        ...(options.repoRuntimeId
-          ? { run: remoteRuntimeAwareGitRunner(cwd, options.repoRuntimeId, target) }
+        ...(options.workspaceRuntimeId
+          ? { run: remoteRuntimeAwareGitRunner(cwd, options.workspaceRuntimeId, target) }
           : {}),
         ...(worktrees ? { knownWorktrees: worktrees } : {}),
       })

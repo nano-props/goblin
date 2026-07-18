@@ -181,7 +181,7 @@ describe('settings-client', () => {
       repo: {
         entry: { kind: 'local' as const, id: 'goblin+file:///tmp/routed-repo' },
         repoRoot: 'goblin+file:///tmp/routed-repo',
-        repoRuntimeId: 'repo_runtime_test',
+        workspaceRuntimeId: 'repo_runtime_test',
         name: 'routed-repo',
         projection: {
           snapshot: { current: 'main', branches: [] },
@@ -208,7 +208,7 @@ describe('settings-client', () => {
     expect(JSON.parse(String(init.body))).toEqual({
       clientId: 'client_test000000000000',
       repoRoot: 'goblin+file:///tmp/routed-repo',
-      repoRuntimeId: 'repo_runtime_test',
+      workspaceRuntimeId: 'repo_runtime_test',
     })
   })
 

@@ -63,8 +63,8 @@ describe('RepoToolbarActions', () => {
 
   test('disables create worktree entry from server branch operation projection', () => {
     const repo = seedRepoShellForTest({ id: REPO_ID })
-    setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
-      operations: [serverOperation(repo.repoRuntimeId, { kind: 'create-worktree', phase: 'running' })],
+    setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
+      operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'create-worktree', phase: 'running' })],
       loadedAt: 123,
     })
 
@@ -79,13 +79,13 @@ describe('RepoToolbarActions', () => {
 })
 
 function serverOperation(
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   overrides: Pick<RepoServerOperationState, 'kind' | 'phase'>,
 ): RepoServerOperationState {
   return {
     id: `repo-op-${overrides.kind}-${overrides.phase}`,
     repoId: REPO_ID,
-    repoRuntimeId,
+    workspaceRuntimeId,
     kind: overrides.kind,
     phase: overrides.phase,
     source: 'user',

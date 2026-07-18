@@ -24,7 +24,7 @@ export interface BranchCopyPatchAction {
 
 export interface BranchActionRepo {
   id: RepoState['id']
-  repoRuntimeId: RepoState['repoRuntimeId']
+  workspaceRuntimeId: RepoState['workspaceRuntimeId']
   branchModel: Pick<RepoBranchReadModelData, 'currentBranch' | 'status' | 'worktreesByPath'>
   branchAction: RepoOperationState
   remote: Pick<

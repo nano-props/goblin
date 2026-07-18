@@ -100,7 +100,7 @@ export async function dispatchCloseWorkspacePaneTabAction(
   return await runWorkspacePaneAction(
     workspacePaneActionTargetFromCoordinates({
       repoId: coordinatorTarget.repoId,
-      repoRuntimeId: coordinatorTarget.repoRuntimeId,
+      workspaceRuntimeId: coordinatorTarget.workspaceRuntimeId,
       branchName: coordinatorTarget.branchName,
       worktreePath: coordinatorTarget.worktreePath,
     }),
@@ -138,7 +138,7 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
   const base = options.confirmedTerminal.base
   const coordinates = terminalExecutionCoordinates(base.target)
   const queueRepoId = options.repoId ?? coordinates.repoRoot
-  const queueRepoRuntimeId = coordinates.repoRuntimeId
+  const queueWorkspaceRuntimeId = coordinates.workspaceRuntimeId
   if (queueRepoId !== coordinates.repoRoot) return false
   const queueTarget = workspacePaneActionTargetFromFilesystemTarget(base.target)
   const presentationToken = beginPrimaryWindowPresentation()
@@ -276,7 +276,7 @@ function workspacePaneCloseTransition(
   if (!wasActive) return { wasActive: false, nextEntry: null, presentationLease: null }
   const openerIdentity = workspacePaneTabOpener(
     workspacePaneTabsTargetForModel(target),
-    target.repoRuntimeId,
+    target.workspaceRuntimeId,
     closingIdentity,
   )
   const nextEntry = nextWorkspacePaneTabEntryAfterClose(target.tabEntries, closingIdentity, openerIdentity)
@@ -300,7 +300,7 @@ function terminalBaseForPaneModel(target: RepoWorkspaceTabModel): TerminalSessio
   if (!target.worktreePath) return null
   return workspacePaneTerminalBaseFromCoordinates({
     workspaceId: target.repoId,
-    workspaceRuntimeId: target.repoRuntimeId,
+    workspaceRuntimeId: target.workspaceRuntimeId,
     branchName: target.branchName,
     rootPath: target.worktreePath,
   })
@@ -330,7 +330,7 @@ function openWorkspacePaneRuntimeCloseConfirm(
 }
 
 function completeWorkspacePaneTabClose(target: RepoWorkspaceTabModel, identity: string): void {
-  clearWorkspacePaneTabOpener(workspacePaneTabsTargetForModel(target), target.repoRuntimeId, identity)
+  clearWorkspacePaneTabOpener(workspacePaneTabsTargetForModel(target), target.workspaceRuntimeId, identity)
 }
 
 function workspacePaneTabsTargetForModel(target: RepoWorkspaceTabModel): WorkspacePaneTabsTarget {

@@ -45,18 +45,18 @@ export function WorkspaceRootNavigator({
       return {
         name: probe?.status === 'ready' ? probe.name : formatWorkspaceDisplayLocation(repoId),
         terminalAvailable: workspaceTerminalAvailable(probe),
-        repoRuntimeId: repo?.repoRuntimeId ?? null,
+        workspaceRuntimeId: repo?.workspaceRuntimeId ?? null,
         capabilities: probe?.status === 'ready' ? probe.capabilities : null,
       }
     }),
   )
   const root = parseCanonicalWorkspaceLocator(repoId)
   const filesystemTarget =
-    root && workspace.repoRuntimeId && workspace.capabilities
+    root && workspace.workspaceRuntimeId && workspace.capabilities
       ? {
           kind: 'workspace-root' as const,
           workspaceId: repoId,
-          workspaceRuntimeId: workspace.repoRuntimeId,
+          workspaceRuntimeId: workspace.workspaceRuntimeId,
           rootPath: root.path,
           capabilities: workspace.capabilities,
         }

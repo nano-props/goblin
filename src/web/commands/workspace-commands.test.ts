@@ -67,7 +67,7 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
         filesystemTarget: {
           kind: 'git-worktree',
           workspaceId: repo.id,
-          workspaceRuntimeId: repo.repoRuntimeId,
+          workspaceRuntimeId: repo.workspaceRuntimeId,
           rootPath: branch.worktree.path,
           head: { kind: 'branch', branchName: options.branchName },
           capabilities: repo.workspaceProbe.capabilities,
@@ -84,7 +84,7 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
     filesystemTarget: {
       kind: 'workspace-root',
       workspaceId: repo.id,
-      workspaceRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       rootPath: repo.id,
       capabilities: repo.workspaceProbe.capabilities,
     },
@@ -703,7 +703,7 @@ describe('workspace commands', () => {
       terminalEntry('term-222222222222222222222'),
     ])
     expect(
-      workspacePaneTabOpener(WORKTREE_PANE_TARGET, repoRuntimeIdForTest(), 'terminal:term-222222222222222222222'),
+      workspacePaneTabOpener(WORKTREE_PANE_TARGET, workspaceRuntimeIdForTest(), 'terminal:term-222222222222222222222'),
     ).toBe('terminal:term-111111111111111111111')
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
       REPO_ID,
@@ -794,7 +794,7 @@ describe('workspace commands', () => {
       terminalEntry('term-222222222222222222222'),
     ])
     expect(
-      workspacePaneTabOpener(WORKTREE_PANE_TARGET, repoRuntimeIdForTest(), 'terminal:term-222222222222222222222'),
+      workspacePaneTabOpener(WORKTREE_PANE_TARGET, workspaceRuntimeIdForTest(), 'terminal:term-222222222222222222222'),
     ).toBe('workspace-pane:status')
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
       REPO_ID,
@@ -846,7 +846,7 @@ describe('workspace commands', () => {
         navigation,
       }),
     ).toBe(true)
-    expect(workspacePaneTabOpener(WORKTREE_PANE_TARGET, repoRuntimeIdForTest(), 'workspace-pane:files')).toBe(
+    expect(workspacePaneTabOpener(WORKTREE_PANE_TARGET, workspaceRuntimeIdForTest(), 'workspace-pane:files')).toBe(
       'workspace-pane:status',
     )
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenLastCalledWith(REPO_ID, 'feature/worktree', 'files')
@@ -880,7 +880,7 @@ describe('workspace commands', () => {
     workspacePaneTabsTestBridge.addRuntimeTab({
       kind: 'git-worktree' as const,
       repoRoot: REPO_ID,
-      repoRuntimeId: repoRuntimeIdForTest(),
+      workspaceRuntimeId: workspaceRuntimeIdForTest(),
       worktreePath: WORKTREE_PATH,
       terminalSessionId: 'term-111111111111111111111',
     })
@@ -1141,7 +1141,7 @@ describe('workspace commands', () => {
       target: {
         kind: 'git-worktree' as const,
         workspaceId: canonicalWorkspaceLocator(REPO_ID)!,
-        workspaceRuntimeId: repoRuntimeIdForTest(),
+        workspaceRuntimeId: workspaceRuntimeIdForTest(),
         root: canonicalWorkspaceLocator('goblin+file:///tmp/goblin-workspace-command-worktree')!,
       },
       presentation: {
@@ -1203,7 +1203,7 @@ describe('workspace commands', () => {
     )
   })
 
-  test('new terminal tab command does not navigate when the server rejects a stale repo runtime', async () => {
+  test('new terminal tab command does not navigate when the server rejects a stale workspace runtime', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1215,7 +1215,7 @@ describe('workspace commands', () => {
     })
     const createTerminal = vi.fn(async () => {
       await Promise.resolve()
-      throw new Error('error.repo-runtime-stale')
+      throw new Error('error.workspace-runtime-stale')
     })
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
@@ -1798,7 +1798,7 @@ describe('workspace commands', () => {
     const target = {
       kind: 'workspace-root' as const,
       repoRoot: REPO_ID,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
     }
     setWorkspacePaneTabsForTargetQueryData({
       ...target,
@@ -1821,7 +1821,7 @@ describe('workspace commands', () => {
       readWorkspacePaneTabsForTarget({
         kind: 'workspace-root',
         repoRoot: REPO_ID,
-        repoRuntimeId: repo.repoRuntimeId,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
       }).map((tab) => tab.type),
     ).toEqual(['files'])
     expect(closeWindow).not.toHaveBeenCalled()
@@ -1834,7 +1834,7 @@ describe('workspace commands', () => {
     const target = {
       kind: 'workspace-root' as const,
       repoRoot: REPO_ID,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
     }
     setWorkspacePaneTabsForTargetQueryData({ ...target, tabs: [staticEntry('status'), staticEntry('files')] })
     useReposStore.getState().setWorkspacePaneTabForTarget(target, tabType)
@@ -2428,7 +2428,7 @@ describe('workspace commands', () => {
     navigation.showRepoBranchWorkspacePaneTab(REPO_ID, 'feature/worktree', 'changes')
     seedInitialObservedWorkspacePaneRouteForTest({
       repoId: REPO_ID,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
       route: { kind: 'static', tab: 'changes' },
@@ -2502,7 +2502,7 @@ describe('workspace commands', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/worktree': [] },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const closeTerminalByDescriptor = vi.fn(async () => true)
     const closeWindow = vi.fn()
     setTerminalSessionCommandBridge({
@@ -2539,7 +2539,7 @@ describe('workspace commands', () => {
     const closeWindow = vi.fn()
     seedInitialObservedWorkspacePaneRouteForTest({
       repoId: REPO_ID,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
       route: null,
@@ -2576,7 +2576,7 @@ describe('workspace commands', () => {
     })
     seedInitialObservedWorkspacePaneRouteForTest({
       repoId: REPO_ID,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
       route: null,
@@ -2636,7 +2636,7 @@ describe('workspace commands', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/worktree': [staticEntry('status')] },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const closeWindow = vi.fn()
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: true }),
@@ -2789,7 +2789,7 @@ describe('workspace commands', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/worktree': [staticEntry('status')] },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
       useReposStore.getState().setWorkspacePaneTab(repoId, branch, tab)
       return true
@@ -2925,22 +2925,22 @@ function tabsFor(branch: string): WorkspacePaneTabEntry[] {
         branch,
       )
     : null
-  return target ? readWorkspacePaneTabsForTarget({ ...target, repoRuntimeId: repo.repoRuntimeId }) : []
+  return target ? readWorkspacePaneTabsForTarget({ ...target, workspaceRuntimeId: repo.workspaceRuntimeId }) : []
 }
 
-function repoRuntimeIdForTest(repoId = REPO_ID): string {
+function workspaceRuntimeIdForTest(repoId = REPO_ID): string {
   const repo = useReposStore.getState().repos[repoId]
   if (!repo) throw new Error(`expected seeded repo ${repoId}`)
-  return repo.repoRuntimeId
+  return repo.workspaceRuntimeId
 }
 
 function expectedTerminalBase(): TerminalSessionBase {
-  const repoRuntimeId = repoRuntimeIdForTest()
+  const workspaceRuntimeId = workspaceRuntimeIdForTest()
   return {
     target: {
       kind: 'git-worktree' as const,
       workspaceId: canonicalWorkspaceLocator(REPO_ID)!,
-      workspaceRuntimeId: repoRuntimeId,
+      workspaceRuntimeId: workspaceRuntimeId,
       root: canonicalWorkspaceLocator('goblin+file:///tmp/goblin-workspace-command-worktree')!,
     },
     presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/worktree' } },
@@ -2951,7 +2951,7 @@ function filesystemTargetForTest() {
   return {
     kind: 'git-worktree' as const,
     workspaceId: REPO_ID,
-    workspaceRuntimeId: repoRuntimeIdForTest(),
+    workspaceRuntimeId: workspaceRuntimeIdForTest(),
     rootPath: WORKTREE_PATH,
     head: { kind: 'branch' as const, branchName: 'feature/worktree' },
     capabilities: {
@@ -3017,7 +3017,7 @@ function recordCreatedTerminalSelection(base: TerminalSessionBase, terminalSessi
   if (!branchName) return
   workspacePaneTabsTestBridge.addRuntimeTab({
     repoRoot: coordinates.repoRoot,
-    repoRuntimeId: coordinates.repoRuntimeId,
+    workspaceRuntimeId: coordinates.workspaceRuntimeId,
     branchName,
     worktreePath: terminalExecutionPath(base.target),
     terminalSessionId,
@@ -3034,7 +3034,7 @@ function removeTerminalFromWorkspacePaneTabsServer(base: TerminalSessionBase, te
   if (!branchName) throw new Error('expected Git worktree terminal fixture')
   workspacePaneTabsTestBridge.removeRuntimeTab({
     repoRoot: coordinates.repoRoot,
-    repoRuntimeId: coordinates.repoRuntimeId,
+    workspaceRuntimeId: coordinates.workspaceRuntimeId,
     branchName,
     worktreePath: terminalExecutionPath(base.target),
     terminalSessionId,
@@ -3060,7 +3060,7 @@ test('rebases the latest queued absolute selection after an earlier route commit
   })
   const target = {
     repoId: REPO_ID,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     branchName: 'feature/worktree',
     worktreePath: WORKTREE_PATH,
   }
@@ -3106,7 +3106,7 @@ test('resolves each queued relative move from the route current at execution tim
   })
   const target = {
     repoId: REPO_ID,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     branchName: 'feature/worktree',
     worktreePath: WORKTREE_PATH,
   }
@@ -3142,7 +3142,7 @@ test('resolves each queued relative move from the route current at execution tim
   expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'history')
 })
 
-test('rejects a queued relative move after its repo runtime epoch is replaced', async () => {
+test('rejects a queued relative move after its workspace runtime epoch is replaced', async () => {
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
     branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -3153,7 +3153,7 @@ test('rejects a queued relative move after its repo runtime epoch is replaced', 
   })
   const target = {
     repoId: REPO_ID,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     branchName: 'feature/worktree',
     worktreePath: WORKTREE_PATH,
   }
@@ -3174,7 +3174,7 @@ test('rejects a queued relative move after its repo runtime epoch is replaced', 
   useReposStore.setState((state) => ({
     repos: {
       ...state.repos,
-      [REPO_ID]: { ...state.repos[REPO_ID]!, repoRuntimeId: 'repo-runtime-replaced' },
+      [REPO_ID]: { ...state.repos[REPO_ID]!, workspaceRuntimeId: 'repo-runtime-replaced' },
     },
   }))
   blocker.resolve()
@@ -3184,7 +3184,7 @@ test('rejects a queued relative move after its repo runtime epoch is replaced', 
   expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
 })
 
-test('rejects a queued absolute selection after its repo runtime epoch is replaced', async () => {
+test('rejects a queued absolute selection after its workspace runtime epoch is replaced', async () => {
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
     branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -3195,7 +3195,7 @@ test('rejects a queued absolute selection after its repo runtime epoch is replac
   })
   const target = {
     repoId: REPO_ID,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     branchName: 'feature/worktree',
     worktreePath: WORKTREE_PATH,
   }
@@ -3216,7 +3216,7 @@ test('rejects a queued absolute selection after its repo runtime epoch is replac
   useReposStore.setState((state) => ({
     repos: {
       ...state.repos,
-      [REPO_ID]: { ...state.repos[REPO_ID]!, repoRuntimeId: 'repo-runtime-replaced' },
+      [REPO_ID]: { ...state.repos[REPO_ID]!, workspaceRuntimeId: 'repo-runtime-replaced' },
     },
   }))
   blocker.resolve()
@@ -3237,7 +3237,7 @@ test('rejects a queued relative move after the router leaves its workspace targe
   })
   const target = {
     repoId: REPO_ID,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     branchName: 'feature/worktree',
     worktreePath: WORKTREE_PATH,
   }
@@ -3277,7 +3277,7 @@ test('serializes open then move through exact route commits', async () => {
   })
   const target = {
     repoId: REPO_ID,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     branchName: 'feature/worktree',
     worktreePath: WORKTREE_PATH,
   }

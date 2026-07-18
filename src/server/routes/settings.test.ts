@@ -187,7 +187,7 @@ describe('settings routes', () => {
       repo: {
         entry: { kind: 'local' as const, id: 'goblin+file:///repo-active' },
         repoRoot: 'goblin+file:///repo-active',
-        repoRuntimeId: 'repo_runtime_test',
+        workspaceRuntimeId: 'repo_runtime_test',
         name: 'repo-active',
         projection: {
           snapshot: { current: 'main', branches: [] },
@@ -215,7 +215,7 @@ describe('settings routes', () => {
         body: JSON.stringify({
           clientId: 'client_test000000000000',
           repoRoot: 'goblin+file:///repo-active',
-          repoRuntimeId: 'repo_runtime_test',
+          workspaceRuntimeId: 'repo_runtime_test',
         }),
       }),
     )
@@ -225,7 +225,7 @@ describe('settings routes', () => {
       userId: 'user-test',
       clientId: 'client_test000000000000',
       repoRoot: 'goblin+file:///repo-active',
-      repoRuntimeId: 'repo_runtime_test',
+      workspaceRuntimeId: 'repo_runtime_test',
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       signal: expect.any(AbortSignal),

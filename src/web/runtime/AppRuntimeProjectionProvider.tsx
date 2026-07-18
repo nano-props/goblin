@@ -14,7 +14,7 @@ import {
   type RuntimeProjectionScope,
   type RuntimeProjectionScopeRegistry,
 } from '#/web/runtime/runtime-projection-scope.ts'
-import { reconcileOpenRepoRuntimeMemberships } from '#/web/stores/repos/repo-session-write-paths.ts'
+import { reconcileOpenWorkspaceRuntimeMemberships } from '#/web/stores/repos/repo-session-write-paths.ts'
 import { TerminalProjectionRecoveryCoordinator } from '#/web/runtime/terminal-projection-recovery.ts'
 
 interface AppRuntimeProjectionProviderProps {
@@ -25,8 +25,8 @@ interface AppRuntimeProjectionProviderProps {
 const WORKSPACE_TABS_REFRESH_LANE = 'workspace-tabs-refresh'
 
 export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRuntimeProjectionProviderProps) {
-  const currentRepoRuntimeId = useReposStore((s) =>
-    currentRepoId ? (s.repos[currentRepoId]?.repoRuntimeId ?? null) : null,
+  const currentWorkspaceRuntimeId = useReposStore((s) =>
+    currentRepoId ? (s.repos[currentRepoId]?.workspaceRuntimeId ?? null) : null,
   )
   const workspaceMembershipReady = useReposStore((s) => s.workspaceMembershipReady)
   const terminalProjection = useTerminalSessionProjection()
@@ -35,7 +35,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
     createRuntimeProjectionScopeRegistry(
       (target) =>
         useReposStore.getState().workspaceMembershipReady &&
-        repoRuntimeIdForRoot(target.repoRoot) === target.repoRuntimeId,
+        workspaceRuntimeIdForRoot(target.repoRoot) === target.workspaceRuntimeId,
     ),
   )
 
@@ -45,15 +45,15 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
       async () =>
         await workspacePaneTabsClient.list({
           workspaceId: scope.target.repoRoot,
-          workspaceRuntimeId: scope.target.repoRuntimeId,
+          workspaceRuntimeId: scope.target.workspaceRuntimeId,
         }),
       (snapshot) => {
-        writeCanonicalWorkspacePaneTabsSnapshot(scope.target.repoRoot, scope.target.repoRuntimeId, snapshot)
+        writeCanonicalWorkspacePaneTabsSnapshot(scope.target.repoRoot, scope.target.workspaceRuntimeId, snapshot)
       },
       (error) => {
         appRuntimeProjectionLog.debug('failed to refresh workspace pane tabs', {
           repoRoot: scope.target.repoRoot,
-          repoRuntimeId: scope.target.repoRuntimeId,
+          workspaceRuntimeId: scope.target.workspaceRuntimeId,
           error,
         })
       },
@@ -95,20 +95,20 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
         complete: () => {
           useTerminalProjectionHydrationStore
             .getState()
-            .markProjectionReady(scope.target.repoRoot, scope.target.repoRuntimeId)
+            .markProjectionReady(scope.target.repoRoot, scope.target.workspaceRuntimeId)
         },
         afterAccept: options.resynchronizeConnectedViews
-          ? () => terminalProjection.resynchronizeConnectedViews(scope.target.repoRoot, scope.target.repoRuntimeId)
+          ? () => terminalProjection.resynchronizeConnectedViews(scope.target.repoRoot, scope.target.workspaceRuntimeId)
           : undefined,
         reject: (error) => {
           appRuntimeProjectionLog.debug('failed to reconcile terminal sessions from server', { error })
           const hydration = useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(scope.target.repoRoot)
-          if (hydration?.repoRuntimeId !== scope.target.repoRuntimeId || hydration.phase !== 'pending') return
+          if (hydration?.workspaceRuntimeId !== scope.target.workspaceRuntimeId || hydration.phase !== 'pending') return
           useTerminalProjectionHydrationStore
             .getState()
             .markProjectionFailed(
               scope.target.repoRoot,
-              scope.target.repoRuntimeId,
+              scope.target.workspaceRuntimeId,
               projectionHydrationFailureMessage(error),
             )
         },
@@ -139,13 +139,13 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
   }, [scopeRegistry])
 
   useEffect(() => {
-    if (!workspaceMembershipReady || !currentRepoId || !currentRepoRuntimeId) return
-    const target = { repoRoot: currentRepoId, repoRuntimeId: currentRepoRuntimeId }
+    if (!workspaceMembershipReady || !currentRepoId || !currentWorkspaceRuntimeId) return
+    const target = { repoRoot: currentRepoId, workspaceRuntimeId: currentWorkspaceRuntimeId }
     const scope = scopeRegistry.scopeFor(target)
     scope.commit(() => {
       useTerminalProjectionHydrationStore
         .getState()
-        .beginProjectionHydration(scope.target.repoRoot, scope.target.repoRuntimeId)
+        .beginProjectionHydration(scope.target.repoRoot, scope.target.workspaceRuntimeId)
     })
     recoverTerminalSessionsFromServer(scope)
 
@@ -159,7 +159,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
     }
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [workspaceMembershipReady, currentRepoId, currentRepoRuntimeId, recoverTerminalSessionsFromServer, scopeRegistry])
+  }, [workspaceMembershipReady, currentRepoId, currentWorkspaceRuntimeId, recoverTerminalSessionsFromServer, scopeRegistry])
 
   useEffect(() => {
     if (!workspaceMembershipReady) {
@@ -170,9 +170,9 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
       terminalClient.onSessionsChanged((event) => {
         const scope = currentScopeForRepo(scopeRegistry, event.repoRoot)
         if (!scope) return
-        if (scope.target.repoRuntimeId !== event.repoRuntimeId) return
+        if (scope.target.workspaceRuntimeId !== event.workspaceRuntimeId) return
         const hydration = useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(event.repoRoot)
-        const ready = hydration?.repoRuntimeId === event.repoRuntimeId && hydration.phase === 'ready'
+        const ready = hydration?.workspaceRuntimeId === event.workspaceRuntimeId && hydration.phase === 'ready'
         const localRevision = terminalProjection.terminalSessionsCatalogCoverageRevision(scope.target) ?? -1
         if (ready && localRevision >= event.revision) return
         recoverTerminalSessionsFromServer(scope, { minimumRevision: event.revision })
@@ -182,18 +182,19 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
     const offRecovered = scopeRegistry.track(
       appRealtimeClient.onRecovered(() => {
         const generation = ++membershipRecoveryGeneration
-        void reconcileOpenRepoRuntimeMemberships(useReposStore.setState, useReposStore.getState)
+        void reconcileOpenWorkspaceRuntimeMemberships(useReposStore.setState, useReposStore.getState)
           .then((recovery) => {
             if (generation !== membershipRecoveryGeneration) return
             if (recovery.kind === 'superseded') return
             scopeRegistry.disposeScopes()
             for (const target of recovery.targets) {
-              if (repoRuntimeIdForRoot(target.repoRoot) !== target.repoRuntimeId) continue
-              const scope = scopeRegistry.scopeFor(target)
+              if (workspaceRuntimeIdForRoot(target.workspaceId) !== target.workspaceRuntimeId) continue
+              const projectionTarget = { repoRoot: target.workspaceId, workspaceRuntimeId: target.workspaceRuntimeId }
+              const scope = scopeRegistry.scopeFor(projectionTarget)
               scope.commit(() => {
                 useTerminalProjectionHydrationStore
                   .getState()
-                  .beginProjectionHydration(target.repoRoot, target.repoRuntimeId)
+                  .beginProjectionHydration(target.workspaceId, target.workspaceRuntimeId)
               })
               recoverTerminalSessionsFromServer(scope, { resynchronizeConnectedViews: true })
               refreshWorkspacePaneTabsForScope(scope)
@@ -201,7 +202,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
           })
           .catch((error) => {
             if (generation !== membershipRecoveryGeneration) return
-            appRuntimeProjectionLog.warn('failed to reconcile repo runtime memberships after realtime recovery', {
+            appRuntimeProjectionLog.warn('failed to reconcile workspace runtime memberships after realtime recovery', {
               error,
             })
           })
@@ -213,7 +214,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
         if (!scope) return
         if (
           message.change === 'revision' &&
-          message.workspaceRuntimeId === scope.target.repoRuntimeId &&
+          message.workspaceRuntimeId === scope.target.workspaceRuntimeId &&
           (workspacePaneTabsProjectionRevision(message.repoRoot, message.workspaceRuntimeId) ?? -1) >= message.revision
         ) {
           return
@@ -236,12 +237,12 @@ function currentScopeForRepo(
   registry: RuntimeProjectionScopeRegistry,
   repoRoot: string,
 ): RuntimeProjectionScope | null {
-  const repoRuntimeId = repoRuntimeIdForRoot(repoRoot)
-  return repoRuntimeId ? registry.scopeFor({ repoRoot, repoRuntimeId }) : null
+  const workspaceRuntimeId = workspaceRuntimeIdForRoot(repoRoot)
+  return workspaceRuntimeId ? registry.scopeFor({ repoRoot, workspaceRuntimeId }) : null
 }
 
-function repoRuntimeIdForRoot(repoRoot: string): string | null {
-  return useReposStore.getState().repos[repoRoot]?.repoRuntimeId ?? null
+function workspaceRuntimeIdForRoot(repoRoot: string): string | null {
+  return useReposStore.getState().repos[repoRoot]?.workspaceRuntimeId ?? null
 }
 
 function projectionHydrationFailureMessage(error: unknown): string {

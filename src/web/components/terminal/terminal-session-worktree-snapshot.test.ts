@@ -9,7 +9,7 @@ function makeDescriptor(terminalSessionId: string, index: number): TerminalDescr
     terminalSessionId: `/repo\0/repo\0${terminalSessionId}`,
     index,
     repoRoot: '/repo',
-    repoRuntimeId: 'repo-runtime-test',
+    workspaceRuntimeId: 'repo-runtime-test',
     branch: 'main',
     worktreePath: '/repo',
   })

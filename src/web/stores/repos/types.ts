@@ -3,7 +3,7 @@ import type { BranchSnapshotInfo, BrowserRemoteProvider, ExecResult, GitRemoteIn
 import type { RemoteRepoConnectionLifecycle, WorkspaceSessionEntry } from '#/shared/remote-repo.ts'
 import type {
   ClientWorkspaceState,
-  RepoWorkspaceTabsRestoreResult,
+  WorkspaceTabsRestoreResult,
   WorkspaceRuntimeRestoreSnapshot,
 } from '#/shared/api-types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
@@ -126,8 +126,8 @@ export interface RepoState {
   /** Absolute repo root — also the unique id. */
   id: string
   name: string
-  /** Current repo runtime authority for this repo; mirrors the runtime endpoint `repoRuntimeId`. */
-  repoRuntimeId: string
+  /** Current workspace runtime authority for this repo; mirrors the runtime endpoint `workspaceRuntimeId`. */
+  workspaceRuntimeId: string
   dataLoads: RepoDataLoadBundle
   operations: RepoOperationsState
   ui: RepoUiState
@@ -288,17 +288,17 @@ interface RuntimeCoherentRepoProjectionActions {
   setWorkspacePaneTab: (id: string, branch: string, tab: WorkspacePaneTabType | null) => void
   setWorkspacePaneTabForTarget: (target: WorkspacePaneTabsTarget, tab: WorkspacePaneTabType | null) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
-  setLastResult: (id: string, result: ExecResult, repoRuntimeId: string, options?: RepoResultEventOptions) => void
+  setLastResult: (id: string, result: ExecResult, workspaceRuntimeId: string, options?: RepoResultEventOptions) => void
   clearEvents: (id: string, eventIds: number[]) => void
   hydrateRestoredWorkspaceRuntime: (
     runtime: WorkspaceRuntimeRestoreSnapshot,
     options?: RepoWorkspaceHydrationOptions,
   ) => Promise<void>
-  promoteRestoredWorkspaceRepo: (result: RepoWorkspaceTabsRestoreResult) => boolean
+  promoteRestoredWorkspaceRepo: (result: WorkspaceTabsRestoreResult) => boolean
   /** Clear the fetchFailed flag — called by manual fetch success and
    *  by an explicit refresh, so a stale badge doesn't follow the user
    *  around forever. */
-  clearFetchFailed: (id: string, repoRuntimeId: string) => void
+  clearFetchFailed: (id: string, workspaceRuntimeId: string) => void
 }
 
 interface RepoMutationActions {

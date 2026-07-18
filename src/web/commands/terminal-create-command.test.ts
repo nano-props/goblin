@@ -5,13 +5,13 @@ import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/te
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const REPO_ID = 'goblin+file:///tmp/goblin-terminal-create-command-repo'
-const REPO_RUNTIME_ID = 'repo-runtime-terminal-create-command'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-terminal-create-command'
 const WORKTREE_PATH = '/tmp/goblin-terminal-create-command-worktree'
 const BASE: TerminalSessionBase = {
   target: {
     kind: 'git-worktree' as const,
     workspaceId: canonicalWorkspaceLocator(REPO_ID)!,
-    workspaceRuntimeId: REPO_RUNTIME_ID,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     root: canonicalWorkspaceLocator(`goblin+file://${WORKTREE_PATH}`)!,
   },
   presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },

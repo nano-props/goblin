@@ -156,7 +156,7 @@ function gitWorktreeFilesystemTarget(repo: RepoState, rootPath: string, branchNa
   return {
     kind: 'git-worktree' as const,
     workspaceId: repo.id,
-    workspaceRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     rootPath,
     head: { kind: 'branch' as const, branchName },
     capabilities: repo.workspaceProbe.capabilities,
@@ -172,7 +172,7 @@ describe('RepoWorkspace', () => {
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe('plain-workspace'),
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.repoRuntimeId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
 
     render(
       <QueryClientProvider client={primaryWindowQueryClient}>
@@ -267,8 +267,8 @@ describe('RepoWorkspace', () => {
       branches: [],
       currentBranchName: null,
     })
-    setRepoWorktreeStatusQueryData(repoId, repo.repoRuntimeId, {
-      repoRuntimeId: repo.repoRuntimeId,
+    setRepoWorktreeStatusQueryData(repoId, repo.workspaceRuntimeId, {
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       status: [{ path: worktreePath, isMain: false, entries: [] }],
       loadedAt: 1,
     })
@@ -276,7 +276,7 @@ describe('RepoWorkspace', () => {
     if (!target) throw new Error('expected canonical detached worktree fixture')
     setWorkspacePaneTabsForTargetQueryData({
       ...target,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       tabs: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
     })
     const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(repoId, worktreePath)
@@ -346,7 +346,7 @@ describe('RepoWorkspace', () => {
     })
     const repo = useReposStore.getState().repos[workspaceId]!
     useReposStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: workspaceId }, 'status')
-    primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.repoRuntimeId), {
+    primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
       topLevelFileCount: 7,
       topLevelDirectoryCount: 3,
       totalSizeBytes: 2048,
@@ -412,7 +412,7 @@ describe('RepoWorkspace', () => {
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'workspace-root',
       repoRoot: workspaceId,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
     })
     useReposStore
@@ -423,7 +423,7 @@ describe('RepoWorkspace', () => {
       setWorkspacePaneTabsForTargetQueryData({
         kind: 'workspace-root',
         repoRoot: workspaceId,
-        repoRuntimeId: repo.repoRuntimeId,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
         tabs: [workspacePaneStaticTabEntry('files')],
       })
       return true
@@ -508,7 +508,7 @@ describe('RepoWorkspace', () => {
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'workspace-root',
       repoRoot: workspaceId,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
 
       tabs: [],
     })
@@ -567,10 +567,10 @@ describe('RepoWorkspace', () => {
       branchSnapshots: [createBranchSnapshot('main')],
       currentBranchName: 'main',
     })
-    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId) })
+    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
     await expect(
       primaryWindowQueryClient.fetchQuery({
-        queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId),
+        queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
         queryFn: async () => {
           throw new Error('status failed')
         },
@@ -763,7 +763,7 @@ describe('RepoWorkspace', () => {
       ],
     })
     const statusQuery = primaryWindowQueryClient.getQueryCache().find({
-      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId),
+      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
       exact: true,
     })!
     statusQuery.setState({ ...statusQuery.state, status: 'error', error: new Error('status failed') })
@@ -801,7 +801,7 @@ describe('RepoWorkspace', () => {
         'feature/a': [workspacePaneStaticTabEntry('status')],
       },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     const statusEntry = {
       repoId: REPO_ID,
@@ -842,7 +842,7 @@ describe('RepoWorkspace', () => {
       if (!branchName) throw new Error('expected Git worktree terminal fixture')
       workspacePaneTabsTestBridge.addRuntimeTab({
         repoRoot: coordinates.repoRoot,
-        repoRuntimeId: coordinates.repoRuntimeId,
+        workspaceRuntimeId: coordinates.workspaceRuntimeId,
         branchName,
         worktreePath: terminalExecutionPath(base.target),
         terminalSessionId,
@@ -929,7 +929,7 @@ describe('RepoWorkspace', () => {
         ],
       },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     const readContext = terminalReadContextWithSession(terminalWorktreeKey, 'term-111111111111111111111')
     const route = routeNavigation()
@@ -994,7 +994,7 @@ describe('RepoWorkspace', () => {
         ],
       },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-111111111111111111111')
     const route = routeNavigation()
@@ -1100,7 +1100,7 @@ describe('RepoWorkspace', () => {
         ],
       },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     useReposStore.getState().recordWorkspaceNavigation({ repoId: REPO_ID, route: { kind: 'dashboard' } })
     const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     const route = routeNavigation()
@@ -1216,7 +1216,7 @@ describe('RepoWorkspace', () => {
         ],
       },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
     const route = routeNavigation()
 
@@ -1397,7 +1397,7 @@ describe('RepoWorkspace', () => {
           repoRoot: REPO_ID,
           worktreePath,
         },
-        repo.repoRuntimeId,
+        repo.workspaceRuntimeId,
         'workspace-pane:files',
         'workspace-pane:status',
       ),
@@ -1477,7 +1477,7 @@ describe('RepoWorkspace', () => {
       repoRoot: REPO_ID,
       worktreePath,
     }
-    expect(workspacePaneTabOpener(paneTarget, repo.repoRuntimeId, 'workspace-pane:files')).toBe('workspace-pane:status')
+    expect(workspacePaneTabOpener(paneTarget, repo.workspaceRuntimeId, 'workspace-pane:files')).toBe('workspace-pane:status')
     const closeTarget = workspacePaneTabTargetForBranch(REPO_ID, branchName, {
       workspacePaneRoute: { kind: 'static', tab: 'files' },
     })
@@ -1487,7 +1487,7 @@ describe('RepoWorkspace', () => {
         ? nextWorkspacePaneTabEntryAfterClose(
             closeTarget.tabEntries,
             'workspace-pane:files',
-            workspacePaneTabOpener(paneTarget, repo.repoRuntimeId, 'workspace-pane:files'),
+            workspacePaneTabOpener(paneTarget, repo.workspaceRuntimeId, 'workspace-pane:files'),
           )?.type
         : null,
     ).toBe('status')
@@ -1582,7 +1582,7 @@ describe('RepoWorkspace', () => {
     act(() => {
       setWorkspacePaneTabsForTargetQueryData({
         repoRoot: REPO_ID,
-        repoRuntimeId: repo.repoRuntimeId,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
         branchName,
         worktreePath,
         tabs: [workspacePaneStaticTabEntry('status')],
@@ -1807,7 +1807,7 @@ describe('RepoWorkspace', () => {
       },
     })
     const pullRequest = createPullRequest(42, { headRefName: 'feature/pr' })
-    setRepoProjectionQueryData(REPO_ID, repo.repoRuntimeId, 'feature/pr', 'full', {
+    setRepoProjectionQueryData(REPO_ID, repo.workspaceRuntimeId, 'feature/pr', 'full', {
       snapshot: { current: 'feature/pr', branches: [branch] },
       pullRequests: [{ branch: 'feature/pr', pullRequest }],
       operations: { operations: [], loadedAt: 123 },

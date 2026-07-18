@@ -19,7 +19,7 @@ beforeEach(() => {
   disposeAllRepoOperationSchedulers()
 })
 
-describe('repo runtime task scheduling', () => {
+describe('workspace runtime task scheduling', () => {
   test('runs queued tasks by priority within a lane', async () => {
     const starts: string[] = []
     let releaseFirst!: () => void

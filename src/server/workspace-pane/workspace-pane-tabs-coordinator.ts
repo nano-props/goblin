@@ -34,7 +34,7 @@ import {
 
 export class WorkspacePaneRuntimeStaleError extends Error {
   constructor() {
-    super('error.repo-runtime-stale')
+    super('error.workspace-runtime-stale')
     this.name = 'WorkspacePaneRuntimeStaleError'
   }
 }
@@ -127,7 +127,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
       physicalScope.worktreePath !== input.worktreePath ||
       physicalScope.userId !== input.userId ||
       physicalScope.repoRoot !== input.target.workspaceId ||
-      physicalScope.repoRuntimeId !== input.target.workspaceRuntimeId
+      physicalScope.workspaceRuntimeId !== input.target.workspaceRuntimeId
     ) {
       return { kind: 'runtime-stale' }
     }
@@ -419,7 +419,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
       userId: ref.userId,
       scope: scopeFromAggregate(ref),
       target: ref.target,
-      repoRuntimeId: ref.repoRuntimeId,
+      workspaceRuntimeId: ref.workspaceRuntimeId,
     }))
   }
 
@@ -628,11 +628,11 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
     worktreePath: string,
   ): Promise<PhysicalWorktreeExecutionCapability> {
     const separator = input.scope.lastIndexOf('\0')
-    const repoRuntimeId = separator >= 0 ? input.scope.slice(separator + 1) : ''
+    const workspaceRuntimeId = separator >= 0 ? input.scope.slice(separator + 1) : ''
     return await this.physicalWorktrees.capture({
       userId: input.userId,
       repoRoot: input.repoRoot,
-      repoRuntimeId,
+      workspaceRuntimeId,
       worktreePath,
     })
   }
@@ -811,7 +811,7 @@ function requiredProjectionForRuntimeTarget(
   }
 }
 
-function repoRuntimeIdFromScope(scope: string): string {
+function workspaceRuntimeIdFromScope(scope: string): string {
   const separator = scope.lastIndexOf('\0')
   if (separator < 0 || separator === scope.length - 1) throw new Error('invalid workspace pane runtime scope')
   return scope.slice(separator + 1)
@@ -824,11 +824,11 @@ function repoRootFromScope(scope: string): string {
 }
 
 function aggregateScope(userId: string, repoRoot: string, scope: string) {
-  return { userId, repoRoot, repoRuntimeId: repoRuntimeIdFromScope(scope) }
+  return { userId, repoRoot, workspaceRuntimeId: workspaceRuntimeIdFromScope(scope) }
 }
 
-function scopeFromAggregate(scope: { repoRoot: string; repoRuntimeId: string }): string {
-  return `${scope.repoRoot}\0${scope.repoRuntimeId}`
+function scopeFromAggregate(scope: { repoRoot: string; workspaceRuntimeId: string }): string {
+  return `${scope.repoRoot}\0${scope.workspaceRuntimeId}`
 }
 
 function assertUniqueRuntimeProviderTypes(providers: readonly WorkspacePaneRuntimeTabsProvider[]): void {

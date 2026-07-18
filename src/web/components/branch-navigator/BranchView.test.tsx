@@ -178,7 +178,7 @@ describe('BranchView', () => {
       currentBranch: 'main',
     })
     primaryWindowQueryClient.removeQueries({
-      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId),
+      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
     })
     const readStatus = vi.fn(async () => {
       throw new Error('status failed')
@@ -208,12 +208,12 @@ describe('BranchView', () => {
     const readStatus = vi
       .fn()
       .mockRejectedValueOnce(new Error('status failed'))
-      .mockResolvedValueOnce({ repoRuntimeId: repo.repoRuntimeId, status: [], loadedAt: 2 })
+      .mockResolvedValueOnce({ workspaceRuntimeId: repo.workspaceRuntimeId, status: [], loadedAt: 2 })
     installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
     renderBranchView()
 
     await primaryWindowQueryClient.invalidateQueries({
-      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.repoRuntimeId),
+      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
       exact: true,
       refetchType: 'active',
     })

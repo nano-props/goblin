@@ -21,8 +21,8 @@ export const terminalClient: ClientTerminal = {
   takeover(input) {
     return getTerminalClient().takeover(input)
   },
-  pruneTerminals(repoRoot, repoRuntimeId) {
-    return getTerminalClient().pruneTerminals(repoRoot, repoRuntimeId)
+  pruneTerminals(repoRoot, workspaceRuntimeId) {
+    return getTerminalClient().pruneTerminals(repoRoot, workspaceRuntimeId)
   },
   recoverSessions(input) {
     return getTerminalClient().recoverSessions(input)

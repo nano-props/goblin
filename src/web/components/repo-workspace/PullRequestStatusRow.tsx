@@ -179,13 +179,13 @@ function PullRequestValue({
 
 export function PullRequestStatusRow({
   repoId,
-  repoRuntimeId,
+  workspaceRuntimeId,
   branchName,
   pullRequest,
   tooltipSide = 'right',
 }: {
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   branchName: string
   pullRequest: PullRequestInfo | undefined
   tooltipSide?: TooltipSide
@@ -202,12 +202,12 @@ export function PullRequestStatusRow({
     () =>
       throttle(
         () => {
-          void openBranchExternalTarget(repoId, repoRuntimeId, { name: branchName, pullRequest }).catch(() => {})
+          void openBranchExternalTarget(repoId, workspaceRuntimeId, { name: branchName, pullRequest }).catch(() => {})
         },
         500,
         { edges: ['leading'] },
       ),
-    [repoId, repoRuntimeId, branchName, pullRequest],
+    [repoId, workspaceRuntimeId, branchName, pullRequest],
   )
   if (!pullRequest) return null
 

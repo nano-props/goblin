@@ -5,14 +5,14 @@ import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
 export function terminalSessionBaseForTest(input: {
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   branch: string | null
   worktreePath: string
 }): TerminalSessionBase {
   const workspaceId = requiredWorkspaceLocator(input.repoRoot)
   if (input.branch === null) {
     return {
-      target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: input.repoRuntimeId },
+      target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: input.workspaceRuntimeId },
       presentation: { kind: 'workspace-root' },
     }
   }
@@ -20,7 +20,7 @@ export function terminalSessionBaseForTest(input: {
     target: {
       kind: 'git-worktree',
       workspaceId,
-      workspaceRuntimeId: input.repoRuntimeId,
+      workspaceRuntimeId: input.workspaceRuntimeId,
       root: requiredWorkspaceLocator(input.worktreePath),
     },
     presentation: terminalGitWorktreePresentation(input.branch),
@@ -31,7 +31,7 @@ export function terminalDescriptorForTest(input: {
   terminalSessionId: string
   index: number
   repoRoot: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   branch: string | null
   worktreePath: string
 }): TerminalDescriptor {

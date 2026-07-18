@@ -72,10 +72,10 @@ export async function removeRepoFromWorkspace(repoRoot: string): Promise<void> {
 export async function restoreRepoTabsOnView(
   clientId: string,
   repoRoot: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   options?: { signal?: AbortSignal },
 ) {
-  return await restoreRepoWorkspaceTabs(clientId, repoRoot, repoRuntimeId, options)
+  return await restoreRepoWorkspaceTabs(clientId, repoRoot, workspaceRuntimeId, options)
 }
 
 export async function setFetchInterval(sec: number): Promise<number> {

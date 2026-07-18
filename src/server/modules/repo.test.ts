@@ -260,7 +260,7 @@ describe('resolveRemoteRepoTarget', () => {
     const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
     const { resolveRemoteRepoTarget } = await import('#/server/modules/repo-source.ts')
 
-    await resolveRemoteRepoTarget(repoId, { repoRuntimeId: 'runtime-test' }, signal)
+    await resolveRemoteRepoTarget(repoId, { workspaceRuntimeId: 'runtime-test' }, signal)
 
     expect(mocks.resolveRemoteTarget).toHaveBeenCalledWith({ alias: 'prod', remotePath: '/srv/repo' }, signal)
   })

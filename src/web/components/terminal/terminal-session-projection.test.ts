@@ -7,12 +7,12 @@ import {
 import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const REPO_ROOT = 'goblin+file:///repo'
-const REPO_RUNTIME_ID = 'repo-runtime-test'
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/repo'
 const RUNTIME_TARGET = runtimeWorkspacePaneTargetForTest({
   kind: 'git-worktree' as const,
   repoRoot: REPO_ROOT,
-  repoRuntimeId: REPO_RUNTIME_ID,
+  workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
   worktreePath: WORKTREE_PATH,
 })
 
@@ -20,7 +20,7 @@ describe('terminal session projection helpers', () => {
   test('projects server session summaries into client hydration input', () => {
     const projected = projectServerTerminalSession({
       repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       clientId: 'client_a',
       index: 2,
       serverSession: {
@@ -69,7 +69,7 @@ describe('terminal session projection helpers', () => {
   test('uses null when the server snapshot is missing', () => {
     const projected = projectServerTerminalSession({
       repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       clientId: 'client_b',
       index: 1,
       serverSession: {
@@ -95,10 +95,10 @@ describe('terminal session projection helpers', () => {
     expect(projected?.controlsTerminal).toBe(false)
   })
 
-  test('rejects server sessions from a different repo runtime', () => {
+  test('rejects server sessions from a different workspace runtime', () => {
     const projected = projectServerTerminalSession({
       repoRoot: REPO_ROOT,
-      repoRuntimeId: 'repo-runtime-current',
+      workspaceRuntimeId: 'repo-runtime-current',
       clientId: 'client_b',
       index: 1,
       serverSession: {
@@ -123,7 +123,7 @@ describe('terminal session projection helpers', () => {
   test('uses server session presentation metadata', () => {
     const projected = projectServerTerminalSession({
       repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       clientId: 'client_b',
       index: 1,
       serverSession: {
@@ -148,7 +148,7 @@ describe('terminal session projection helpers', () => {
   test('does not replace server presentation from a second client-side authority', () => {
     const projected = projectServerTerminalSession({
       repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       clientId: 'client_b',
       index: 1,
       serverSession: {
@@ -277,7 +277,7 @@ describe('terminal session projection helpers', () => {
 
     const recovered = projectServerTerminalSession({
       repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       clientId: 'client_a',
       index: 0,
       serverSession: projected.serverSession,

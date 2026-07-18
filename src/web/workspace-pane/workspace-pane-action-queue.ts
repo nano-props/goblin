@@ -2,13 +2,13 @@ import PQueue from 'p-queue'
 import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 export type WorkspacePaneActionTarget =
-  | { kind: 'workspace-root'; repoId: string; repoRuntimeId: string }
-  | { kind: 'git-branch'; repoId: string; repoRuntimeId: string; branchName: string }
-  | { kind: 'git-worktree'; repoId: string; repoRuntimeId: string; worktreePath: string }
+  | { kind: 'workspace-root'; repoId: string; workspaceRuntimeId: string }
+  | { kind: 'git-branch'; repoId: string; workspaceRuntimeId: string; branchName: string }
+  | { kind: 'git-worktree'; repoId: string; workspaceRuntimeId: string; worktreePath: string }
 
 export function workspacePaneActionTargetFromCoordinates(coordinates: {
   repoId: string
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   branchName: string | null
   worktreePath: string | null
 }): WorkspacePaneActionTarget {
@@ -16,16 +16,16 @@ export function workspacePaneActionTargetFromCoordinates(coordinates: {
     return {
       kind: 'git-worktree',
       repoId: coordinates.repoId,
-      repoRuntimeId: coordinates.repoRuntimeId,
+      workspaceRuntimeId: coordinates.workspaceRuntimeId,
       worktreePath: coordinates.worktreePath,
     }
   }
   return coordinates.branchName === null
-    ? { kind: 'workspace-root', repoId: coordinates.repoId, repoRuntimeId: coordinates.repoRuntimeId }
+    ? { kind: 'workspace-root', repoId: coordinates.repoId, workspaceRuntimeId: coordinates.workspaceRuntimeId }
     : {
         kind: 'git-branch',
         repoId: coordinates.repoId,
-        repoRuntimeId: coordinates.repoRuntimeId,
+        workspaceRuntimeId: coordinates.workspaceRuntimeId,
         branchName: coordinates.branchName,
       }
 }
@@ -34,14 +34,14 @@ export function workspacePaneActionTargetFromFilesystemTarget(
   target: WorkspacePaneFilesystemExecutionTarget,
 ): WorkspacePaneActionTarget {
   if (target.kind === 'workspace-root') {
-    return { kind: target.kind, repoId: target.workspaceId, repoRuntimeId: target.workspaceRuntimeId }
+    return { kind: target.kind, repoId: target.workspaceId, workspaceRuntimeId: target.workspaceRuntimeId }
   }
   const root = parseCanonicalWorkspaceLocator(target.root)
   if (!root) throw new Error('filesystem action target requires a canonical worktree root')
   return {
     kind: target.kind,
     repoId: target.workspaceId,
-    repoRuntimeId: target.workspaceRuntimeId,
+    workspaceRuntimeId: target.workspaceRuntimeId,
     worktreePath: root.path,
   }
 }
@@ -67,11 +67,11 @@ export async function runWorkspacePaneAction<T>(
 export function workspacePaneActionTargetKey(target: WorkspacePaneActionTarget): string {
   switch (target.kind) {
     case 'workspace-root':
-      return `${target.repoId}\0${target.repoRuntimeId}\0workspace-root`
+      return `${target.repoId}\0${target.workspaceRuntimeId}\0workspace-root`
     case 'git-branch':
-      return `${target.repoId}\0${target.repoRuntimeId}\0git-branch\0${target.branchName}`
+      return `${target.repoId}\0${target.workspaceRuntimeId}\0git-branch\0${target.branchName}`
     case 'git-worktree':
-      return `${target.repoId}\0${target.repoRuntimeId}\0git-worktree\0${target.worktreePath}`
+      return `${target.repoId}\0${target.workspaceRuntimeId}\0git-worktree\0${target.worktreePath}`
   }
 }
 

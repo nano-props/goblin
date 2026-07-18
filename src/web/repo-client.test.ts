@@ -71,7 +71,7 @@ function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
 }
 
 describe('repo-client', () => {
-  const repoRuntimeId = 'repo-runtime-test'
+  const workspaceRuntimeId = 'repo-runtime-test'
 
   beforeEach(() => {
     vi.resetModules()
@@ -107,7 +107,7 @@ describe('repo-client', () => {
       json: async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }),
     }))
     const { openRepoUrl } = await import('#/web/repo-client.ts')
-    await expect(openRepoUrl('/tmp/repo', repoRuntimeId, { type: 'branch', branch: 'feature/test' })).resolves.toEqual({
+    await expect(openRepoUrl('/tmp/repo', workspaceRuntimeId, { type: 'branch', branch: 'feature/test' })).resolves.toEqual({
       ok: true,
       message: '',
     })
@@ -121,7 +121,7 @@ describe('repo-client', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, target: { type: 'branch', branch: 'feature/test' } }),
+        body: JSON.stringify({ cwd: '/tmp/repo', workspaceRuntimeId, target: { type: 'branch', branch: 'feature/test' } }),
       }),
     )
   })
@@ -150,7 +150,7 @@ describe('repo-client', () => {
     }))
     const { openRepoUrl } = await import('#/web/repo-client.ts')
 
-    await expect(openRepoUrl('/tmp/repo', repoRuntimeId, { type: 'commit', hash: 'abcdef1' })).resolves.toEqual({
+    await expect(openRepoUrl('/tmp/repo', workspaceRuntimeId, { type: 'commit', hash: 'abcdef1' })).resolves.toEqual({
       ok: true,
       message: '',
     })
@@ -159,7 +159,7 @@ describe('repo-client', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, target: { type: 'commit', hash: 'abcdef1' } }),
+        body: JSON.stringify({ cwd: '/tmp/repo', workspaceRuntimeId, target: { type: 'commit', hash: 'abcdef1' } }),
       }),
     )
     expect(openExternalUrl).toHaveBeenCalledWith({
@@ -200,17 +200,17 @@ describe('repo-client', () => {
 
   test('reads worktree status through the runtime-scoped POST endpoint', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const response = { repoRuntimeId, status: [], loadedAt: 1_000 }
+    const response = { workspaceRuntimeId, status: [], loadedAt: 1_000 }
     const fetchMock = mockFetch(async () => ({ ok: true, json: async () => response }))
     const { getRepoWorktreeStatus } = await import('#/web/repo-client.ts')
 
-    await expect(getRepoWorktreeStatus('/tmp/repo', repoRuntimeId)).resolves.toEqual(response)
+    await expect(getRepoWorktreeStatus('/tmp/repo', workspaceRuntimeId)).resolves.toEqual(response)
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/repo/worktree-status',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId }),
+        body: JSON.stringify({ cwd: '/tmp/repo', workspaceRuntimeId }),
       }),
     )
   })
@@ -224,7 +224,7 @@ describe('repo-client', () => {
     }))
     const { getRepoWorktreeStatus } = await import('#/web/repo-client.ts')
 
-    await expect(getRepoWorktreeStatus('/tmp/repo', repoRuntimeId)).rejects.toMatchObject({
+    await expect(getRepoWorktreeStatus('/tmp/repo', workspaceRuntimeId)).rejects.toMatchObject({
       message: 'error.failed-read-repo',
       cause: expect.objectContaining({ message: 'Server request failed (BAD_REQUEST: error.failed-read-repo)' }),
     })
@@ -241,7 +241,7 @@ describe('repo-client', () => {
     })
 
     const { fetchRepo } = await import('#/web/repo-client.ts')
-    const request = fetchRepo('/tmp/repo', repoRuntimeId)
+    const request = fetchRepo('/tmp/repo', workspaceRuntimeId)
     const assertion = expect(request).rejects.toThrow('error.request-timeout')
 
     await vi.advanceTimersByTimeAsync(240_000)
@@ -337,7 +337,7 @@ describe('repo-client', () => {
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
         body: JSON.stringify({
           cwd: '/tmp/repo',
-          repoRuntimeId: 'repo-runtime-test',
+          workspaceRuntimeId: 'repo-runtime-test',
           branch: 'feature/work',
           count: 100,
           skip: 0,
@@ -412,7 +412,7 @@ describe('repo-client', () => {
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
         body: JSON.stringify({
           repoId: '/tmp/repo',
-          repoRuntimeId: 'repo-runtime-test',
+          workspaceRuntimeId: 'repo-runtime-test',
           worktreePath: '/tmp/repo',
           app: 'ghostty',
         }),
@@ -426,7 +426,7 @@ describe('repo-client', () => {
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
         body: JSON.stringify({
           repoId: '/tmp/repo',
-          repoRuntimeId: 'repo-runtime-test',
+          workspaceRuntimeId: 'repo-runtime-test',
           worktreePath: '/tmp/repo',
           app: 'vscode',
         }),
@@ -462,7 +462,7 @@ describe('repo-client', () => {
         method: 'POST',
         body: JSON.stringify({
           repoId: '/tmp/repo',
-          repoRuntimeId: 'repo-runtime-test',
+          workspaceRuntimeId: 'repo-runtime-test',
           worktreePath: '/tmp/repo',
           app: 'ghostty',
         }),
@@ -475,7 +475,7 @@ describe('repo-client', () => {
         method: 'POST',
         body: JSON.stringify({
           repoId: '/tmp/repo',
-          repoRuntimeId: 'repo-runtime-test',
+          workspaceRuntimeId: 'repo-runtime-test',
           worktreePath: '/tmp/repo',
           app: 'vscode',
         }),

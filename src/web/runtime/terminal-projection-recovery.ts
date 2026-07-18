@@ -19,7 +19,7 @@ interface TerminalProjectionRecoveryRequest {
 }
 
 interface PendingTerminalProjectionRecovery {
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   minimumRevision: number
   running: boolean
   refreshAfterCurrent: boolean
@@ -27,7 +27,7 @@ interface PendingTerminalProjectionRecovery {
 }
 
 interface TerminalProjectionFreshObligation {
-  repoRuntimeId: string
+  workspaceRuntimeId: string
   afterAccept: () => void
 }
 
@@ -38,16 +38,16 @@ export class TerminalProjectionRecoveryCoordinator {
 
   request(input: TerminalProjectionRecoveryRequest): void {
     if (!input.scope.isActive()) return
-    const { repoRoot, repoRuntimeId } = input.scope.target
+    const { repoRoot, workspaceRuntimeId } = input.scope.target
     const currentObligation = this.freshObligationByRepoRoot.get(repoRoot)
-    if (currentObligation?.repoRuntimeId !== repoRuntimeId) this.freshObligationByRepoRoot.delete(repoRoot)
+    if (currentObligation?.workspaceRuntimeId !== workspaceRuntimeId) this.freshObligationByRepoRoot.delete(repoRoot)
     if (input.afterAccept && !this.freshObligationByRepoRoot.has(repoRoot)) {
-      this.freshObligationByRepoRoot.set(repoRoot, { repoRuntimeId, afterAccept: input.afterAccept })
+      this.freshObligationByRepoRoot.set(repoRoot, { workspaceRuntimeId, afterAccept: input.afterAccept })
     }
     let pending = this.pendingByRepoRoot.get(repoRoot)
-    if (pending?.repoRuntimeId !== repoRuntimeId) {
+    if (pending?.workspaceRuntimeId !== workspaceRuntimeId) {
       pending = {
-        repoRuntimeId,
+        workspaceRuntimeId,
         minimumRevision: input.minimumRevision,
         running: false,
         refreshAfterCurrent: false,
@@ -130,7 +130,7 @@ export class TerminalProjectionRecoveryCoordinator {
         if (!pending.refreshAfterCurrent) {
           acceptedRequest.complete()
           const obligation = this.freshObligationByRepoRoot.get(acceptedRequest.scope.target.repoRoot)
-          if (obligation?.repoRuntimeId === pending.repoRuntimeId) {
+          if (obligation?.workspaceRuntimeId === pending.workspaceRuntimeId) {
             this.freshObligationByRepoRoot.delete(acceptedRequest.scope.target.repoRoot)
             obligation.afterAccept()
           }
@@ -153,7 +153,7 @@ export class TerminalProjectionRecoveryCoordinator {
     return (
       scope.isActive() &&
       this.pendingByRepoRoot.get(scope.target.repoRoot) === pending &&
-      pending.repoRuntimeId === scope.target.repoRuntimeId
+      pending.workspaceRuntimeId === scope.target.workspaceRuntimeId
     )
   }
 }

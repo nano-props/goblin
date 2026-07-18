@@ -182,16 +182,16 @@ describe('readRepoProjection', () => {
     })
     expect(mocks.listRepoWriteOperationsForRepo).toHaveBeenCalledWith('goblin+file:///tmp/repo', {
       signal,
-      repoRuntimeId: undefined,
+      workspaceRuntimeId: undefined,
     })
   })
 
-  test('scopes embedded operations to the requested repo runtime', async () => {
+  test('scopes embedded operations to the requested workspace runtime', async () => {
     mocks.listRepoWriteOperationsForRepo.mockResolvedValue([
       {
         id: 'op-current',
         repoId: 'goblin+file:///tmp/repo',
-        repoRuntimeId: 'repo-runtime-current',
+        workspaceRuntimeId: 'repo-runtime-current',
         kind: 'fetch',
         source: 'background',
         phase: 'running',
@@ -206,13 +206,13 @@ describe('readRepoProjection', () => {
 
     const result = await readRepoProjection('goblin+file:///tmp/repo', {
       signal,
-      repoRuntimeId: 'repo-runtime-current',
+      workspaceRuntimeId: 'repo-runtime-current',
     })
 
-    expect(result.operations.operations).toMatchObject([{ id: 'op-current', repoRuntimeId: 'repo-runtime-current' }])
+    expect(result.operations.operations).toMatchObject([{ id: 'op-current', workspaceRuntimeId: 'repo-runtime-current' }])
     expect(mocks.listRepoWriteOperationsForRepo).toHaveBeenCalledWith('goblin+file:///tmp/repo', {
       signal,
-      repoRuntimeId: 'repo-runtime-current',
+      workspaceRuntimeId: 'repo-runtime-current',
     })
   })
 
@@ -241,9 +241,9 @@ describe('readRepoProjection', () => {
     )
     const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
 
-    const result = await readRepoWorktreeStatus('goblin+file:///tmp/repo', { repoRuntimeId: 'repo-runtime-test' })
+    const result = await readRepoWorktreeStatus('goblin+file:///tmp/repo', { workspaceRuntimeId: 'repo-runtime-test' })
 
-    expect(result).toMatchObject({ repoRuntimeId: 'repo-runtime-test', status })
+    expect(result).toMatchObject({ workspaceRuntimeId: 'repo-runtime-test', status })
     expect(result.loadedAt).toEqual(expect.any(Number))
     expect(getStatus).toHaveBeenCalledWith(expect.any(AbortSignal))
   })
@@ -255,7 +255,7 @@ describe('readRepoProjection', () => {
 
     await expect(
       readRepoWorktreeStatus('goblin+file:///tmp/repo', {
-        repoRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId: 'repo-runtime-test',
         signal: controller.signal,
       }),
     ).rejects.toMatchObject({ name: 'AbortError' })
@@ -310,7 +310,7 @@ describe('repo projection section deadlines', () => {
     )
     const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
     const promise = readRepoWorktreeStatus('goblin+file:///tmp/repo', {
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       timeoutMs: 50,
     })
 
@@ -335,7 +335,7 @@ describe('repo projection section deadlines', () => {
     )
     const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
     const promise = readRepoWorktreeStatus('goblin+file:///tmp/repo', {
-      repoRuntimeId: 'repo-runtime-test',
+      workspaceRuntimeId: 'repo-runtime-test',
       timeoutMs: 50,
     })
 

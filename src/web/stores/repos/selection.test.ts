@@ -81,7 +81,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
       ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
       : null
   return workspacePaneStaticTabsFromEntries(
-    target ? readWorkspacePaneTabsForTarget({ ...target, repoRuntimeId: repo.repoRuntimeId }) : [],
+    target ? readWorkspacePaneTabsForTarget({ ...target, workspaceRuntimeId: repo.workspaceRuntimeId }) : [],
   )
 }
 

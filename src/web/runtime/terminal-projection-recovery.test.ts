@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { RuntimeProjectionScope } from '#/web/runtime/runtime-projection-scope.ts'
 import { TerminalProjectionRecoveryCoordinator } from '#/web/runtime/terminal-projection-recovery.ts'
 
-const TARGET = { repoRoot: 'goblin+file:///workspace', repoRuntimeId: 'repo-runtime-test' }
+const TARGET = { repoRoot: 'goblin+file:///workspace', workspaceRuntimeId: 'repo-runtime-test' }
 const complete = () => {}
 
 describe('TerminalProjectionRecoveryCoordinator', () => {

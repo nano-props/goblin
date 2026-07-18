@@ -87,10 +87,10 @@ describe('terminal session pruner', () => {
     expect(closeSession).not.toHaveBeenCalled()
   })
 
-  test('checks repo runtime freshness after reading local worktrees and before closing sessions', async () => {
+  test('checks workspace runtime freshness after reading local worktrees and before closing sessions', async () => {
     const closeSession = vi.fn()
     const assertCurrent = vi.fn(() => {
-      throw new Error('error.repo-runtime-stale')
+      throw new Error('error.workspace-runtime-stale')
     })
     const pruner = createTerminalSessionPruner({
       manager: {
@@ -108,7 +108,7 @@ describe('terminal session pruner', () => {
         scope: SCOPE,
         assertCurrent,
       }),
-    ).rejects.toThrow('error.repo-runtime-stale')
+    ).rejects.toThrow('error.workspace-runtime-stale')
     expect(getWorktrees).toHaveBeenCalledWith('/repo', { includeStatus: false })
     expect(assertCurrent).toHaveBeenCalledTimes(1)
     expect(closeSession).not.toHaveBeenCalled()

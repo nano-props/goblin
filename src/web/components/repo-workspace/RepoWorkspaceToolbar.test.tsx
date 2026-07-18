@@ -646,7 +646,7 @@ describe('RepoWorkspaceToolbar', () => {
       'term-111111111111111111111',
       terminalSessionBaseForTest({
       repoRoot: REPO_ID,
-      repoRuntimeId: repoRuntimeIdForTest(),
+      workspaceRuntimeId: workspaceRuntimeIdForTest(),
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
       }),
@@ -1146,7 +1146,7 @@ describe('RepoWorkspaceToolbar', () => {
       'term-111111111111111111111',
       terminalSessionBaseForTest({
       repoRoot: REPO_ID,
-      repoRuntimeId: repoRuntimeIdForTest(),
+      workspaceRuntimeId: workspaceRuntimeIdForTest(),
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
       }),
@@ -1181,7 +1181,7 @@ describe('RepoWorkspaceToolbar', () => {
       terminalCount: 0,
       navigation: navigationWith({}),
       loading: true,
-      repoRuntimeId: 'repo-runtime-new',
+      workspaceRuntimeId: 'repo-runtime-new',
     })
 
     const newButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
@@ -1280,7 +1280,7 @@ function renderToolbar(options: {
   createPending?: boolean
   trafficLightOffset?: boolean
   remote?: Partial<RepoState['remote']>
-  repoRuntimeId?: string
+  workspaceRuntimeId?: string
   /**
    * When true, do NOT mark the repo ready before mounting. The toolbar
    * reads `isInitialSyncInFlight` from the store and renders the
@@ -1315,7 +1315,7 @@ function renderToolbar(options: {
   )
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
-    repoRuntimeId: options.repoRuntimeId,
+    workspaceRuntimeId: options.workspaceRuntimeId,
     branchSnapshots: [branch],
     currentBranchName: branchName,
     preferredWorkspacePaneTab: options.preferredWorkspacePaneTab ?? 'status',
@@ -1346,7 +1346,7 @@ function renderToolbar(options: {
   // Mark the repo as already-synced so the toolbar renders the normal
   // "+ New" button. Loading-state tests pass `loading: true` to skip this.
   if (!options.loading) {
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
   }
   const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
   const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
@@ -1370,7 +1370,7 @@ function renderToolbar(options: {
         target: {
           kind: 'git-worktree' as const,
           workspaceId: canonicalWorkspaceLocator(REPO_ID)!,
-          workspaceRuntimeId: repo.repoRuntimeId,
+          workspaceRuntimeId: repo.workspaceRuntimeId,
           root: canonicalWorkspaceLocator(`goblin+file://${WORKTREE_PATH}`)!,
         },
         presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: branchName } },
@@ -1401,7 +1401,7 @@ function renderToolbar(options: {
     if (!branchName) throw new Error('expected Git worktree terminal fixture')
     workspacePaneTabsTestBridge.addRuntimeTab({
       repoRoot: coordinates.repoRoot,
-      repoRuntimeId: coordinates.repoRuntimeId,
+      workspaceRuntimeId: coordinates.workspaceRuntimeId,
       branchName,
       worktreePath: terminalExecutionPath(base.target),
       terminalSessionId,
@@ -1446,10 +1446,10 @@ function renderToolbar(options: {
     ...sessions.map((session) => terminalEntry(session.terminalSessionId)),
   ]
   if (workspacePaneTabs) {
-    const repoRuntimeId = useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
+    const workspaceRuntimeId = useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId
     const workspacePaneTabsQueryInput = {
       repoRoot: REPO_ID,
-      repoRuntimeId,
+      workspaceRuntimeId,
       branchName,
       worktreePath: options.worktree === false ? null : WORKTREE_PATH,
       tabs: workspacePaneTabs,
@@ -1488,14 +1488,14 @@ function renderToolbar(options: {
     const nextBranch = createBranchSnapshot(branchName, { worktree: { path: worktreePath } })
     const nextRepo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       branchSnapshots: [nextBranch],
       currentBranchName: branchName,
       preferredWorkspacePaneTab,
     })
     const nextTabsInput = {
       repoRoot: REPO_ID,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName,
       worktreePath,
       tabs: workspacePaneTabs,
@@ -1504,7 +1504,7 @@ function renderToolbar(options: {
     setWorkspacePaneTabsForTargetQueryData(nextTabsInput, queryClient)
     observeWorkspacePaneRouteForTest({
       repoId: REPO_ID,
-      repoRuntimeId: repo.repoRuntimeId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       branchName,
       worktreePath,
       route: workspacePaneRoute,
@@ -1613,13 +1613,13 @@ function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
         branchName,
       )
     : null
-  return target ? readWorkspacePaneTabsForTarget({ ...target, repoRuntimeId: repo.repoRuntimeId }) : []
+  return target ? readWorkspacePaneTabsForTarget({ ...target, workspaceRuntimeId: repo.workspaceRuntimeId }) : []
 }
 
-function repoRuntimeIdForTest(): string {
+function workspaceRuntimeIdForTest(): string {
   const repo = useReposStore.getState().repos[REPO_ID]
   if (!repo) throw new Error(`expected seeded repo ${REPO_ID}`)
-  return repo.repoRuntimeId
+  return repo.workspaceRuntimeId
 }
 
 function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabEntry {

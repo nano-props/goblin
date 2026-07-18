@@ -77,7 +77,7 @@ export function RepoDashboardPane({
         ? {
             id: state.id,
             name: state.name,
-            repoRuntimeId: state.repoRuntimeId,
+            workspaceRuntimeId: state.workspaceRuntimeId,
             projection: state.projection,
             remote: state.remote,
             workspaceProbe: state.workspaceProbe,
@@ -89,16 +89,16 @@ export function RepoDashboardPane({
   const gitQueriesEnabled = !!repo && workspaceGitAvailable(repo.workspaceProbe)
   const projectionReadModel = useRepoProjectionReadModel(
     repoId,
-    repo?.repoRuntimeId ?? '',
+    repo?.workspaceRuntimeId ?? '',
     null,
     'summary',
     gitQueriesEnabled,
   )
   const projection = projectionReadModel.data
-  const statusReadModel = useRepoWorktreeStatusReadModel(repoId, repo?.repoRuntimeId ?? '', gitQueriesEnabled)
+  const statusReadModel = useRepoWorktreeStatusReadModel(repoId, repo?.workspaceRuntimeId ?? '', gitQueriesEnabled)
   const overviewReadModel = useWorkspaceDirectoryOverview(
     repoId,
-    repo?.repoRuntimeId ?? '',
+    repo?.workspaceRuntimeId ?? '',
     !!repo && directoryWorkspace,
   )
   const branchModel = useMemo(
@@ -119,7 +119,7 @@ export function RepoDashboardPane({
   const statusStale = !!statusReadModel.data && statusReadModel.isError
   const retryStatus = () => {
     if (!repo) return
-    void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repo.id, repo.repoRuntimeId)
+    void refreshRepoWorktreeStatus({ get: useReposStore.getState }, repo.id, repo.workspaceRuntimeId)
   }
 
   return (

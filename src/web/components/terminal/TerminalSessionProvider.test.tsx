@@ -109,10 +109,10 @@ function selectedWorkspacePaneTab(repoId: string, branchName = 'feature/worktree
 }
 
 function repoTerminalBase() {
-  const repoRuntimeId = useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
+  const workspaceRuntimeId = useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId
   const target = runtimeWorkspacePaneTargetForTest({
     repoRoot: REPO_ID,
-    repoRuntimeId,
+    workspaceRuntimeId,
     branchName: 'feature/worktree',
     worktreePath: WORKTREE_PATH,
   })
@@ -341,7 +341,7 @@ function terminalExitEvent(terminalSessionId: string): TerminalExitEvent {
     terminalRuntimeGeneration: 1,
     terminalSessionId,
     repoRoot: REPO_ID,
-    repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
+    workspaceRuntimeId: useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId,
   }
 }
 
@@ -364,7 +364,7 @@ let sessionClosedHandler:
   | null = null
 type TestTerminalSessionSummary = TerminalSessionSummary
 const listSessionsMock = vi.fn<
-  (...args: Array<{ repoRoot: string; repoRuntimeId?: string }>) => Promise<TestTerminalSessionSummary[]>
+  (...args: Array<{ repoRoot: string; workspaceRuntimeId?: string }>) => Promise<TestTerminalSessionSummary[]>
 >(async () => [])
 const listWorkspaceTabsMock = vi.fn<(...args: Array<{ workspaceId: string }>) => Promise<WorkspacePaneTabsEntry[]>>(
   async () => [],
@@ -385,7 +385,7 @@ function terminalRuntimeTarget(workspaceRuntimeId: string) {
   return runtimeWorkspacePaneTargetForTest({
     kind: 'git-worktree' as const,
     repoRoot: REPO_ID,
-    repoRuntimeId: workspaceRuntimeId,
+    workspaceRuntimeId: workspaceRuntimeId,
     worktreePath: WORKTREE_PATH,
   })
 }
@@ -395,7 +395,7 @@ function currentTerminalSessionBase() {
   if (!repo) throw new Error('terminal test workspace is unavailable')
   return terminalSessionBaseForTest({
     repoRoot: REPO_ID,
-    repoRuntimeId: repo.repoRuntimeId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
     branch: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
   })
@@ -413,7 +413,7 @@ function tabsFor(repoRoot: string, branchName: string): WorkspacePaneTabEntry[] 
         branchName,
       )
     : null
-  return target ? readWorkspacePaneTabsForTarget({ ...target, repoRuntimeId: repo.repoRuntimeId }) : []
+  return target ? readWorkspacePaneTabsForTarget({ ...target, workspaceRuntimeId: repo.workspaceRuntimeId }) : []
 }
 
 function normalizeTestSessionId(terminalSessionId: string): string {
@@ -422,8 +422,8 @@ function normalizeTestSessionId(terminalSessionId: string): string {
 
 async function emitSessionsChanged(repoRoot = REPO_ID): Promise<void> {
   await act(async () => {
-    const repoRuntimeId = useReposStore.getState().repos[repoRoot]?.repoRuntimeId
-    if (repoRuntimeId) sessionsChangedHandler?.({ repoRoot, repoRuntimeId, revision: ++sessionsChangedRevision })
+    const workspaceRuntimeId = useReposStore.getState().repos[repoRoot]?.workspaceRuntimeId
+    if (workspaceRuntimeId) sessionsChangedHandler?.({ repoRoot, workspaceRuntimeId, revision: ++sessionsChangedRevision })
     await waitForScheduledServerSync()
   })
 }
@@ -475,7 +475,7 @@ beforeEach(() => {
   createTerminalMock.mockReset()
   createTerminalMock.mockImplementation(async (input) => {
     const repoRoot = input.target.workspaceId
-    const repoRuntimeId = input.target.workspaceRuntimeId
+    const workspaceRuntimeId = input.target.workspaceRuntimeId
     const worktreePath = terminalExecutionRootForTest(input.target)
     const presentation =
       input.target.kind === 'workspace-root'
@@ -483,7 +483,7 @@ beforeEach(() => {
         : ({ kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH_NAME } } as const)
     const currentSessions = await listSessionsMock({
       repoRoot,
-      repoRuntimeId,
+      workspaceRuntimeId,
     })
     const allocatedSessionId =
       input.kind === 'primary'
@@ -534,7 +534,7 @@ beforeEach(() => {
         terminalSessionId,
         target: runtimeWorkspacePaneTargetForTest({
           repoRoot,
-          repoRuntimeId,
+          workspaceRuntimeId,
           branchName: BRANCH_NAME,
           worktreePath,
         }),
@@ -1330,7 +1330,7 @@ describe('TerminalSessionProvider', () => {
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'git-worktree' as const,
       repoRoot: REPO_ID,
-      repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
+      workspaceRuntimeId: useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId,
       worktreePath: WORKTREE_PATH,
       tabs: [
         workspacePaneStaticTabEntry('status'),
@@ -1347,7 +1347,7 @@ describe('TerminalSessionProvider', () => {
           target: runtimeWorkspacePaneTargetForTest({
             kind: 'git-worktree' as const,
             repoRoot: REPO_ID,
-            repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
+            workspaceRuntimeId: useReposStore.getState().repos[REPO_ID]!.workspaceRuntimeId,
             worktreePath: WORKTREE_PATH,
           }),
           tabs: [workspacePaneStaticTabEntry('history')],

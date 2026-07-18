@@ -37,7 +37,7 @@ Representative examples:
 - `useThemeStore`
 - `useI18nStore`
 - recent repos
-- repo runtime projections, including branch, status, pull request, and operation state
+- workspace runtime projections, including branch, status, pull request, and operation state
 - terminal sessions and control
 
 Notes:
@@ -45,7 +45,7 @@ Notes:
 - `useReposStore` is not a shared cross-window store.
 - `RuntimeCoherentRepoProjectionState` names the runtime-coherent repo projection slice.
 - `useReposStore.repos` is a client-local projection of runtime-coherent repo truth.
-- React Query is the client read model for server-owned repo runtime projections. UI and command paths should read through query-backed helpers such as `useRepoBranchReadModel` or `readRepoBranchQueryProjection` instead of treating `useReposStore.repos[*]` fields as authoritative runtime truth.
+- React Query is the client read model for server-owned workspace runtime projections. UI and command paths should read through query-backed helpers such as `useRepoBranchReadModel` or `readRepoBranchQueryProjection` instead of treating `useReposStore.repos[*]` fields as authoritative runtime truth.
 - React Query is also the client projection for server-owned settings snapshots and workspace pane tab lists. Mutation helpers should update or invalidate those caches from server-returned canonical data, not from client intent payloads.
 - Store repo data may still exist as a projection for UI orchestration, action state, warm restore, and in-place server response application. New runtime reads should prefer the query-backed projection unless they are explicitly write-side projection code.
 - `ReposStore` actions are also grouped by local, restorable, runtime-coherent, and mutation responsibilities.
@@ -57,7 +57,7 @@ Notes:
 - Runtime-coherent repo actions should prefer orchestration entrypoints plus focused helper modules for projection/state transitions and sync pipelines.
 - Settings truth lives on the server; clients read it through query snapshots or specialized runtime projections.
 - Settings writes belong in `src/web/settings-actions.ts`. `src/web/settings-client.ts` is the transport boundary, not a UI mutation API. UI stores may keep local projections such as theme/i18n state, but their server write-through path should use settings actions so the settings query cache stays coherent.
-- Workspace pane facts have one owner each: the layout repository owns durable static layout, the repo projection owns target validity and branch metadata, the epoch overlay owns runtime placement/index/revision facts, the aggregate owns the canonical projection clock, and runtime providers own live membership. Every list or mutation returns their pure canonical `WorkspacePaneTabsSnapshot { revision, entries }` projection for the repo-runtime epoch. React Query accepts a snapshot only when its server revision is at least the cached revision. Canonical reorder is intentionally not optimistic; it waits for the server snapshot instead of mixing rollback tokens into the canonical cache.
+- Workspace pane facts have one owner each: the layout repository owns durable static layout, the repo projection owns target validity and branch metadata, the epoch overlay owns runtime placement/index/revision facts, the aggregate owns the canonical projection clock, and runtime providers own live membership. Every list or mutation returns their pure canonical `WorkspacePaneTabsSnapshot { revision, entries }` projection for the workspace-runtime epoch. React Query accepts a snapshot only when its server revision is at least the cached revision. Canonical reorder is intentionally not optimistic; it waits for the server snapshot instead of mixing rollback tokens into the canonical cache.
 - Runtime-coherent state may use server-published invalidation plus targeted refetch or realtime streaming. It must not use client polling as the mechanism that discovers server-owned changes.
 - For runtime correctness boundaries, prefer server-owned fast fail over client guards. A mutation that no longer matches the live runtime should be rejected by the server, not locally guessed away by the client.
 - Do not introduce client-only async tokens or focus guards to suppress late navigation after a write completes. Model the operation as a server/projection-owned pending state, reject competing user operations at their entry point, and then project the server result.
@@ -76,10 +76,10 @@ Notes:
   unversioned full-collection read model to a mutation response and use it to
   replace concurrent state. Full collections belong to revisioned query or
   recovery snapshots.
-- Server application commands, server snapshot revision, repo-runtime identity,
+- Server application commands, server snapshot revision, workspace-runtime identity,
   and client presentation coordination have different jobs. The server command
   orders resource changes, revision orders projection responses,
-  `repoRuntimeId` scopes projection/navigation, and client coordination handles
+  `workspaceRuntimeId` scopes projection/navigation, and client coordination handles
   only dedupe, cancellation, and route transitions. Do not replace any of these
   with client session-liveness or cache-generation guesses.
 

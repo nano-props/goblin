@@ -34,7 +34,7 @@ describe('workspace pane tab controller transactions', () => {
     resetReposStore()
     seedRepoWithReadModelForTest({
       id: 'goblin+file:///repo',
-      repoRuntimeId: 'repo-runtime-1',
+      workspaceRuntimeId: 'repo-runtime-1',
       branches: [createRepoBranch('feature/a', { worktree: { path: '/worktree-a' } })],
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'files',
@@ -159,7 +159,7 @@ describe('workspace pane tab controller transactions', () => {
       commitWorkspacePaneCommittedRuntimeTargetRoute(
         {
           repoId: 'goblin+file:///repo',
-          repoRuntimeId: 'repo-runtime-1',
+          workspaceRuntimeId: 'repo-runtime-1',
           branchName: 'feature/renamed',
           worktreePath: '/worktree-a',
           paneTarget: {
@@ -206,7 +206,7 @@ describe('workspace pane tab controller transactions', () => {
     useReposStore.setState((state) => ({
       repos: {
         ...state.repos,
-        'goblin+file:///repo': { ...state.repos['goblin+file:///repo']!, repoRuntimeId: 'repo-runtime-2' },
+        'goblin+file:///repo': { ...state.repos['goblin+file:///repo']!, workspaceRuntimeId: 'repo-runtime-2' },
       },
     }))
     commit.resolve(true)
@@ -263,7 +263,7 @@ describe('workspace pane tab controller transactions', () => {
 function workspacePaneTarget(): RepoWorkspaceTabModel {
   return {
     repoId: 'goblin+file:///repo',
-    repoRuntimeId: 'repo-runtime-1',
+    workspaceRuntimeId: 'repo-runtime-1',
     branchName: 'feature/a',
     worktreePath: '/worktree-a',
     paneTarget: { kind: 'git-worktree', repoRoot: 'goblin+file:///repo', worktreePath: '/worktree-a' },

@@ -9,7 +9,7 @@ import type {
   LangPref,
   LanInfo,
   RepoSettingsState,
-  RepoWorkspaceTabsRestoreResult,
+  WorkspaceTabsRestoreResult,
   RuntimeRecentWorkspacesState,
   WorkspaceRestoreResult,
   UserSettings,
@@ -175,12 +175,12 @@ export async function removeWorkspaceRepo(repoRoot: string): Promise<void> {
 export async function restoreRepoWorkspaceTabs(
   clientId: string,
   repoRoot: string,
-  repoRuntimeId: string,
+  workspaceRuntimeId: string,
   options?: { signal?: AbortSignal },
-): Promise<RepoWorkspaceTabsRestoreResult> {
+): Promise<WorkspaceTabsRestoreResult> {
   return await postServerJson(
     '/api/settings/workspace/restore-repo-tabs',
-    { clientId, repoRoot, repoRuntimeId },
+    { clientId, repoRoot, workspaceRuntimeId },
     { signal: options?.signal },
   )
 }

@@ -100,6 +100,6 @@ async function finishCreateTerminalTabCommand(
 function isTerminalCreateCanceled(error: unknown): boolean {
   return (
     error instanceof Error &&
-    (error.message === TERMINAL_CREATE_CANCELED_MESSAGE || error.message === 'error.repo-runtime-stale')
+    (error.message === TERMINAL_CREATE_CANCELED_MESSAGE || error.message === 'error.workspace-runtime-stale')
   )
 }

@@ -22,8 +22,8 @@ export function terminalSessionScope(repoRoot: string): string {
   return repoRoot
 }
 
-export function terminalSessionRuntimeScope(repoRoot: string, repoRuntimeId: string): string {
-  return `${terminalSessionScope(repoRoot)}\0${repoRuntimeId}`
+export function terminalSessionRuntimeScope(repoRoot: string, workspaceRuntimeId: string): string {
+  return `${terminalSessionScope(repoRoot)}\0${workspaceRuntimeId}`
 }
 
 export function terminalSessionScopeBelongsToRepo(scope: string, repoRoot: string): boolean {
