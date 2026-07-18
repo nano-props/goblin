@@ -4,6 +4,8 @@ import {
   isWorkspacePaneRuntimeTabEntry,
   workspacePaneRuntimeTabEntry,
   workspacePaneStaticTabEntry,
+  workspacePaneTabsWithRuntimeTab,
+  type WorkspacePaneRuntimeTabType,
   type WorkspacePaneStaticTabEntry,
   type WorkspacePaneTabEntry,
 } from '#/shared/workspace-pane.ts'
@@ -111,13 +113,17 @@ export interface WorkspacePaneLayoutOperation {
   snapshot(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot>
   projectEntriesForAdmission(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot['entries']>
   validateMembershipAndSnapshot(input: WorkspacePaneLayoutValidationInput): Promise<WorkspacePaneLayoutValidationResult>
-  commitRuntimeTarget(
+  commitRuntimeTabPlacement(
     input: WorkspacePaneEpochScope & {
       target: RuntimeWorkspacePaneTarget
       lease: PhysicalWorktreeAdmissionLease
-      tabs: readonly WorkspacePaneTabEntry[]
+      intent: {
+        runtimeType: WorkspacePaneRuntimeTabType
+        sessionId: string
+        insertAfterIdentity: string | null
+      }
       validTargets: readonly WorkspacePaneTargetProjection[]
-      providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
+      stagedProviderSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
     },
     admissionCallback: () => void,
   ): Promise<WorkspacePaneTabsSnapshot>
@@ -166,8 +172,8 @@ export class WorkspacePaneLayoutAggregate {
           snapshot: async (input) => await this.snapshot(input),
           projectEntriesForAdmission: async (input) => await this.projectEntriesForAdmission(input),
           validateMembershipAndSnapshot: async (input) => await this.validateMembershipAndSnapshot(input),
-          commitRuntimeTarget: async (input, admissionCallback) =>
-            await this.commitRuntimeTarget(input, admissionCallback),
+          commitRuntimeTabPlacement: async (input, admissionCallback) =>
+            await this.commitRuntimeTabPlacement(input, admissionCallback),
           closeEpoch: (scope) => this.closeEpoch(scope),
           commitProjectionTargets: (input) => this.commitProjectionTargets(input),
           indexedAdmissionLeases: (scope) => this.overlay.indexedAdmissionLeases(scope),
@@ -241,29 +247,46 @@ export class WorkspacePaneLayoutAggregate {
     this.clocks.delete(key)
   }
 
-  private async commitRuntimeTarget(
+  private async commitRuntimeTabPlacement(
     input: WorkspacePaneEpochScope & {
       target: RuntimeWorkspacePaneTarget
       lease: PhysicalWorktreeAdmissionLease
-      tabs: readonly WorkspacePaneTabEntry[]
+      intent: {
+        runtimeType: WorkspacePaneRuntimeTabType
+        sessionId: string
+        insertAfterIdentity: string | null
+      }
       validTargets: readonly WorkspacePaneTargetProjection[]
-      providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
+      stagedProviderSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
     },
     admissionCallback: () => void,
   ): Promise<WorkspacePaneTabsSnapshot> {
     const validTargets = targetMap(input.validTargets)
-    if (!validTargets.has(runtimeTargetKey(input.target))) throw new Error('error.workspace-tabs-target-invalid')
+    const target = validTargets.get(runtimeTargetKey(input.target))
+    if (!target) throw new Error('error.workspace-tabs-target-invalid')
     const layout = (await this.repository.load(input.repoRoot)).layout
     const stagedOverlay = this.overlay.fork()
     stagedOverlay.registerPhysicalTarget(input)
-    stagedOverlay.recordMixedOrder(input)
+    const currentTabs = canonicalTabsForTarget(
+      { ...input, ...target },
+      layout,
+      stagedOverlay,
+      input.stagedProviderSnapshots,
+    )
+    const tabs = workspacePaneTabsWithRuntimeTab(
+      currentTabs,
+      input.intent.runtimeType,
+      input.intent.sessionId,
+      { insertAfterIdentity: input.intent.insertAfterIdentity },
+    )
+    stagedOverlay.recordMixedOrder({ ...input, tabs })
     const stagedClocks = cloneCanonicalClocks(this.clocks)
     const entries = projectCanonicalEntries(
       input,
       layout,
       stagedOverlay,
       validTargets,
-      input.providerSnapshots,
+      input.stagedProviderSnapshots,
     )
     const snapshot = {
       revision: revisionForState(
@@ -272,7 +295,7 @@ export class WorkspacePaneLayoutAggregate {
         input,
         layout,
         input.validTargets,
-        input.providerSnapshots,
+        input.stagedProviderSnapshots,
         entries,
       ),
       entries,

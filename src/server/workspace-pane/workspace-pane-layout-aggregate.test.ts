@@ -56,6 +56,11 @@ function worktreeProjection(branch: string): WorkspacePaneLayoutValidationInput[
   return { target: runtimeWorktreeTarget, nativeWorktreePath: target.worktreePath, canonicalBranch: branch }
 }
 const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')
+const runtimeIntent = {
+  runtimeType: 'terminal' as const,
+  sessionId: 'term-livelivelivelivelive1',
+  insertAfterIdentity: null,
+}
 const providers = [
   {
     type: 'terminal' as const,
@@ -222,14 +227,14 @@ describe('workspace pane layout aggregate', () => {
 
     await aggregate.runExclusive(scope.repoRoot, async (operation) => {
       await expect(
-        operation.commitRuntimeTarget(
+        operation.commitRuntimeTabPlacement(
           {
             ...scope,
             target: runtimeWorktreeTarget,
             lease,
-            tabs: [terminal, workspacePaneStaticTabEntry('status')],
+            intent: runtimeIntent,
             validTargets,
-            providerSnapshots: providers,
+            stagedProviderSnapshots: providers,
           },
           () => {
           throw new Error('runtime admission failed')
@@ -251,14 +256,14 @@ describe('workspace pane layout aggregate', () => {
 
     await aggregate.runExclusive(scope.repoRoot, async (operation) => {
       let callbackObservedUncommittedState = false
-      const snapshot = await operation.commitRuntimeTarget(
+      const snapshot = await operation.commitRuntimeTabPlacement(
         {
           ...scope,
           target: runtimeWorktreeTarget,
           lease,
-          tabs: [terminal, workspacePaneStaticTabEntry('status')],
+          intent: runtimeIntent,
           validTargets,
-          providerSnapshots: providers,
+          stagedProviderSnapshots: providers,
         },
         () => {
           callbackObservedUncommittedState = operation.indexedAdmissionLeases(scope).length === 0
@@ -273,16 +278,103 @@ describe('workspace pane layout aggregate', () => {
     })
   })
 
+  test('reapplying the same runtime placement is idempotent and loads durable state once per intent', async () => {
+    const repository = memoryRepository()
+    repository.load = vi.fn(repository.load)
+    repository.compareAndSwap = vi.fn(repository.compareAndSwap)
+    const aggregate = aggregateFor(repository)
+    const validTargets = [worktreeProjection(target.branchName)]
+    const lease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
+    const commitAdmission = vi.fn()
+
+    const snapshots = []
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      snapshots.push(
+        await aggregate.runExclusive(scope.repoRoot, async (operation) =>
+          await operation.commitRuntimeTabPlacement(
+            {
+              ...scope,
+              target: runtimeWorktreeTarget,
+              lease,
+              intent: runtimeIntent,
+              validTargets,
+              stagedProviderSnapshots: providers,
+            },
+            commitAdmission,
+          ),
+        ),
+      )
+    }
+
+    expect(snapshots[1]).toEqual(snapshots[0])
+    expect(snapshots[1]?.entries[0]?.tabs.filter((tab) => tab.type === 'terminal')).toEqual([terminal])
+    expect(repository.load).toHaveBeenCalledTimes(2)
+    expect(repository.compareAndSwap).not.toHaveBeenCalled()
+    expect(commitAdmission).toHaveBeenCalledTimes(2)
+    expect(aggregate.physicalTargets(lease)).toEqual([{ ...scope, target: runtimeWorktreeTarget }])
+  })
+
+  test('preserves an anchored runtime placement when the same intent is reapplied', async () => {
+    const aggregate = aggregateFor(memoryRepository())
+    const validTargets = [worktreeProjection(target.branchName)]
+    const lease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
+    const firstTerminal = workspacePaneRuntimeTabEntry('terminal', 'term-firstfirstfirstfirst001')
+    const anchoredTerminal = workspacePaneRuntimeTabEntry('terminal', 'term-anchoranchoranchor001')
+    const stagedProviderSnapshots = [
+      {
+        type: 'terminal' as const,
+        revision: 1,
+        liveSessions: [firstTerminal, anchoredTerminal].map((entry) => ({
+          sessionId: entry.runtimeSessionId,
+          target: runtimeWorktreeTarget,
+          branch: target.branchName,
+          worktreePath: target.worktreePath,
+        })),
+      },
+    ]
+    const intent = {
+      runtimeType: 'terminal' as const,
+      sessionId: anchoredTerminal.runtimeSessionId,
+      insertAfterIdentity: workspacePaneTabEntryIdentity(workspacePaneStaticTabEntry('status')),
+    }
+
+    const snapshots = []
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      snapshots.push(
+        await aggregate.runExclusive(scope.repoRoot, async (operation) =>
+          await operation.commitRuntimeTabPlacement(
+            {
+              ...scope,
+              target: runtimeWorktreeTarget,
+              lease,
+              intent,
+              validTargets,
+              stagedProviderSnapshots,
+            },
+            () => undefined,
+          ),
+        ),
+      )
+    }
+
+    expect(snapshots[0].entries[0]?.tabs).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      anchoredTerminal,
+      firstTerminal,
+    ])
+    expect(snapshots[1]).toEqual(snapshots[0])
+    expect(snapshots[1].revision).toBe(snapshots[0].revision)
+    expect(snapshots[1].entries[0]?.tabs.filter((tab) => tab.type === 'terminal')).toHaveLength(2)
+  })
+
   test('preserves an existing epoch and its physical index when a replacement admission fails', async () => {
     const aggregate = aggregateFor(memoryRepository())
     const validTargets = [worktreeProjection(target.branchName)]
     const firstLease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
     const replacementLease = physicalWorktreeAdmissionLease(replacementCapability())
-    const firstTabs = [workspacePaneStaticTabEntry('status'), terminal]
-
     await aggregate.runExclusive(scope.repoRoot, async (operation) => {
-      await operation.commitRuntimeTarget(
-        { ...scope, target: runtimeWorktreeTarget, lease: firstLease, tabs: firstTabs, validTargets, providerSnapshots: providers },
+      await operation.commitRuntimeTabPlacement(
+        { ...scope, target: runtimeWorktreeTarget, lease: firstLease, intent: runtimeIntent, validTargets, stagedProviderSnapshots: providers },
         () => undefined,
       )
     })
@@ -290,14 +382,14 @@ describe('workspace pane layout aggregate', () => {
 
     await expect(
       aggregate.runExclusive(scope.repoRoot, async (operation) =>
-        await operation.commitRuntimeTarget(
+        await operation.commitRuntimeTabPlacement(
           {
             ...scope,
             target: runtimeWorktreeTarget,
             lease: replacementLease,
-            tabs: [terminal, workspacePaneStaticTabEntry('status')],
+            intent: runtimeIntent,
             validTargets,
-            providerSnapshots: providers,
+            stagedProviderSnapshots: providers,
           },
           () => {
             throw new Error('replacement admission failed')
@@ -320,8 +412,8 @@ describe('workspace pane layout aggregate', () => {
 
     for (const [epochScope, lease] of [[scope, firstLease], [siblingScope, firstLease]] as const) {
       await aggregate.runExclusive(scope.repoRoot, async (operation) => {
-        await operation.commitRuntimeTarget(
-          { ...epochScope, target: runtimeWorktreeTarget, lease, tabs: [terminal], validTargets, providerSnapshots: providers },
+        await operation.commitRuntimeTabPlacement(
+          { ...epochScope, target: runtimeWorktreeTarget, lease, intent: runtimeIntent, validTargets, stagedProviderSnapshots: providers },
           () => undefined,
         )
       })
@@ -329,8 +421,8 @@ describe('workspace pane layout aggregate', () => {
     const siblingBaseline = await readSnapshot(aggregate, siblingScope, validTargets, providers)
 
     await aggregate.runExclusive(scope.repoRoot, async (operation) => {
-      await operation.commitRuntimeTarget(
-        { ...scope, target: runtimeWorktreeTarget, lease: replacementLease, tabs: [terminal], validTargets, providerSnapshots: providers },
+      await operation.commitRuntimeTabPlacement(
+        { ...scope, target: runtimeWorktreeTarget, lease: replacementLease, intent: runtimeIntent, validTargets, stagedProviderSnapshots: providers },
         () => undefined,
       )
     })
@@ -341,24 +433,27 @@ describe('workspace pane layout aggregate', () => {
   })
 
   test('rejects staging a runtime target outside the authoritative target projection', async () => {
-    const aggregate = aggregateFor(memoryRepository())
+    const repository = memoryRepository()
+    repository.load = vi.fn(repository.load)
+    const aggregate = aggregateFor(repository)
     const lease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
 
     await expect(
       aggregate.runExclusive(scope.repoRoot, async (operation) =>
-        await operation.commitRuntimeTarget(
+        await operation.commitRuntimeTabPlacement(
           {
             ...scope,
             target: runtimeWorktreeTarget,
             lease,
-            tabs: [terminal],
+            intent: runtimeIntent,
             validTargets: [],
-            providerSnapshots: providers,
+            stagedProviderSnapshots: providers,
           },
           () => undefined,
         ),
       ),
     ).rejects.toThrow('error.workspace-tabs-target-invalid')
+    expect(repository.load).not.toHaveBeenCalled()
     expect(aggregate.activeEpochs(scope.repoRoot)).toEqual([])
   })
 

@@ -1,8 +1,6 @@
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
-  defaultWorkspacePaneTabEntries,
   isWorkspacePaneStaticTabType,
-  workspacePaneTabsWithRuntimeTab,
 } from '#/shared/workspace-pane.ts'
 import type {
   WorkspacePaneTabsEntry,
@@ -154,9 +152,6 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
       if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
       const scope = aggregateScope(input.userId, repoRoot, runtimeScope)
-      const current = await layout.snapshot({ scope, validTargets: capturedTargets, providerSnapshots })
-      if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
-      this.worktreeOperations.assertPermit(physicalCapability, input.permit)
       if (!(await this.targetProjection.validateTargets(input.userId, repoRoot, runtimeScope, capturedTargets))) {
         return { kind: 'target-stale' }
       }
@@ -165,16 +160,6 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
       } else if (!capturedTarget.canonicalBranch) {
         return { kind: 'runtime-stale' }
       }
-      const entry = current.entries.find(
-        (candidate) => runtimeTargetKey(candidate.target) === runtimeTargetKey(capturedTarget.target),
-      )
-      const tabs = workspacePaneTabsWithRuntimeTab(
-        entry?.tabs ??
-          defaultWorkspacePaneTabEntries(capturedTarget.target.kind === 'workspace-root' ? 'workspace-root' : 'git'),
-        input.runtimeType,
-        input.sessionId,
-        { insertAfterIdentity: input.insertAfterIdentity ?? null },
-      )
       const pendingProviderSnapshots = providerSnapshotsWithPendingSession(providerSnapshots, {
         type: input.runtimeType,
         sessionId: input.sessionId,
@@ -184,14 +169,18 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
       })
       if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
-      const snapshot = await layout.commitRuntimeTarget(
+      const snapshot = await layout.commitRuntimeTabPlacement(
         {
           ...scope,
           target: capturedTarget.target,
           lease: physicalWorktreeAdmissionLease(physicalCapability),
-          tabs,
+          intent: {
+            runtimeType: input.runtimeType,
+            sessionId: input.sessionId,
+            insertAfterIdentity: input.insertAfterIdentity ?? null,
+          },
           validTargets: capturedTargets,
-          providerSnapshots: pendingProviderSnapshots,
+          stagedProviderSnapshots: pendingProviderSnapshots,
         },
         () => {
           if (!input.isRuntimeCurrent()) throw new WorkspacePaneRuntimeStaleError()

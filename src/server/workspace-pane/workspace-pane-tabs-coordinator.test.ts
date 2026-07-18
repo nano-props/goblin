@@ -78,18 +78,25 @@ describe('workspace pane tabs coordinator queues', () => {
       repoRuntimeId: 'runtime-a',
     })
     const commitAdmission = vi.fn()
+    const repository = memoryRepository()
+    repository.load = vi.fn(repository.load)
+    repository.compareAndSwap = vi.fn(repository.compareAndSwap)
+    const validateTargets = vi.fn(async () => true)
     const coordinator = createWorkspacePaneTabsCoordinator({
-      layoutAggregate: aggregateFor(memoryRepository()),
+      layoutAggregate: aggregateFor(repository),
       runtimeProviders: [],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: testTargetProjection([
-        {
-          repoRoot: 'goblin+file:///repo',
-          branchName: 'feature/renamed',
-          worktreePath: '/repo/worktree',
-        },
-      ]),
+      targetProjection: {
+        ...testTargetProjection([
+          {
+            repoRoot: 'goblin+file:///repo',
+            branchName: 'feature/renamed',
+            worktreePath: '/repo/worktree',
+          },
+        ]),
+        validateTargets,
+      },
     })
 
     const admitted = await operations.runOperation(
@@ -114,6 +121,10 @@ describe('workspace pane tabs coordinator queues', () => {
 
     expect(admitted.admitted).toBe(true)
     expect(commitAdmission).toHaveBeenCalledWith('feature/renamed')
+    expect(commitAdmission).toHaveBeenCalledTimes(1)
+    expect(validateTargets).toHaveBeenCalledTimes(1)
+    expect(repository.load).toHaveBeenCalledTimes(1)
+    expect(repository.compareAndSwap).not.toHaveBeenCalled()
   })
 
   test('does not expose staged runtime state when terminal admission fails', async () => {
@@ -178,7 +189,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const originalLoad = repository.load
     repository.load = async (repoRoot) => {
       loads += 1
-      if (loads === 2) throw new Error('snapshot preparation failed')
+      if (loads === 1) throw new Error('snapshot preparation failed')
       return await originalLoad(repoRoot)
     }
     const operations = createPhysicalWorktreeOperationCoordinator()
@@ -267,7 +278,7 @@ describe('workspace pane tabs coordinator queues', () => {
       value: {
         kind: 'committed',
         snapshot: {
-          revision: 1,
+          revision: 0,
           entries: [
             {
               target: projection.target,
@@ -328,7 +339,7 @@ describe('workspace pane tabs coordinator queues', () => {
       value: {
         kind: 'committed',
         snapshot: {
-          revision: 1,
+          revision: 0,
           entries: [
             {
               target: projection.target,
@@ -548,7 +559,7 @@ describe('workspace pane tabs coordinator queues', () => {
       value: {
         kind: 'committed',
         snapshot: {
-          revision: 1,
+          revision: 0,
           entries: [
             {
               target: testRuntimeTargetProjection({
