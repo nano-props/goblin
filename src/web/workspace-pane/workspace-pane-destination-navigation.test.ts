@@ -222,7 +222,7 @@ function primaryNavigationActions() {
   const routeNavigation = {
     openHome: vi.fn(),
     openRepoDashboard: vi.fn(),
-    openRepoWorkspace: vi.fn(),
+    openWorkspaceRootPane: vi.fn(),
     openRepoBranch: vi.fn(() => true),
     openRepoBranchTab: vi.fn(() => true),
     openRepoBranchTerminal: vi.fn(() => true),

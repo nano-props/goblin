@@ -196,7 +196,7 @@ function AuthenticatedWorkspaceShell() {
               capabilities: commandCapabilities,
             },
           }
-        : routeContext?.kind === 'workspace' && commandRepo && commandCapabilities && commandWorkspace
+        : routeContext?.kind === 'workspace-root' && commandRepo && commandCapabilities && commandWorkspace
           ? {
               kind: 'workspace-root',
               workspacePaneRoute: null,
@@ -324,7 +324,7 @@ function WorkspaceSessionRestoreError({
 }
 
 type RepoRouteContext =
-  | { kind: 'empty' | 'workspace' | 'dashboard' | 'newWorktree'; repoSlug: string }
+  | { kind: 'empty' | 'workspace-root' | 'dashboard' | 'newWorktree'; repoSlug: string }
   | { kind: 'branch'; repoSlug: string; branchName: string; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
   | { kind: 'worktree'; repoSlug: string; worktreePath: string; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
 
@@ -360,7 +360,7 @@ export function repoRouteContextFromMatches(
 
   if (repoMatch.routeId.includes('/worktree/new')) return { kind: 'newWorktree', repoSlug }
   if (repoMatch.routeId.includes('/dashboard')) return { kind: 'dashboard', repoSlug }
-  if (repoMatch.routeId.includes('/workspace')) return { kind: 'workspace', repoSlug }
+  if (repoMatch.routeId.includes('/workspace')) return { kind: 'workspace-root', repoSlug }
   return { kind: 'empty', repoSlug }
 }
 

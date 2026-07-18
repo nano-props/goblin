@@ -40,8 +40,8 @@ describe('createPrimaryWindowNavigationActions', () => {
       routeNavigation: navigation,
     })
 
-    expect(actions.showRepoWorkspacePaneTab?.(REPO_ID, { kind: 'static', tab: 'files' })).toBe(true)
-    expect(navigation.openRepoWorkspace).toHaveBeenCalledWith(
+    expect(actions.showWorkspaceRootPaneTab?.(REPO_ID, { kind: 'static', tab: 'files' })).toBe(true)
+    expect(navigation.openWorkspaceRootPane).toHaveBeenCalledWith(
       REPO_ID,
       expect.objectContaining({ presentationToken: expect.any(Object), onCommit: expect.any(Function) }),
     )
@@ -67,7 +67,7 @@ describe('createPrimaryWindowNavigationActions', () => {
         .getState()
         .setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: REPO_ID }, 'files')
       const navigation = routeNavigation()
-      vi.mocked(navigation.openRepoWorkspace).mockImplementation((_repoId, options) => {
+      vi.mocked(navigation.openWorkspaceRootPane).mockImplementation((_repoId, options) => {
         if (accepted && commit) options?.onCommit?.()
         return accepted
       })
@@ -79,7 +79,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       })
 
       expect(
-        actions.showRepoWorkspacePaneTab?.(REPO_ID, {
+        actions.showWorkspaceRootPaneTab?.(REPO_ID, {
           kind: 'terminal',
           terminalSessionId: 'term-222222222222222222222',
         }),
@@ -139,7 +139,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(navigation.openRepoBranch).not.toHaveBeenCalled()
   })
 
-  test.each(['workspace', 'dashboard'] as const)(
+  test.each(['workspace-root', 'dashboard'] as const)(
     'activates a non-Git workspace at its last %s presentation',
     (kind) => {
       seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
@@ -155,12 +155,12 @@ describe('createPrimaryWindowNavigationActions', () => {
 
       actions.activateRepo(REPO_ID)
 
-      if (kind === 'workspace') {
-        expect(navigation.openRepoWorkspace).toHaveBeenCalledWith(REPO_ID, presentationOptions())
+      if (kind === 'workspace-root') {
+        expect(navigation.openWorkspaceRootPane).toHaveBeenCalledWith(REPO_ID, presentationOptions())
         expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
       } else {
         expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
-        expect(navigation.openRepoWorkspace).not.toHaveBeenCalled()
+        expect(navigation.openWorkspaceRootPane).not.toHaveBeenCalled()
       }
     },
   )
@@ -660,6 +660,26 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(navigation.openRepoDashboard).toHaveBeenCalledWith('goblin+file:///tmp/repo-b', presentationOptions())
   })
 
+  test('falls back to the dashboard when workspace-root history cannot be presented', () => {
+    const workspaceId = 'goblin+file:///tmp/workspace-b'
+    useReposStore.getState().recordWorkspaceNavigation({
+      repoId: workspaceId,
+      route: { kind: 'workspace-root' },
+    })
+    const navigation = routeNavigation()
+    vi.mocked(navigation.openWorkspaceRootPane).mockReturnValue(false)
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: 'goblin+file:///tmp/workspace-a',
+      order: ['goblin+file:///tmp/workspace-a', workspaceId],
+      closeRepo: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.activateRepo(workspaceId)
+
+    expect(navigation.openRepoDashboard).toHaveBeenCalledWith(workspaceId, presentationOptions())
+  })
+
   test('cycles to the target repo current workspace history entry', () => {
     const entry = branchHistoryEntry('goblin+file:///tmp/repo-b', 'feature/remembered', 'status')
     useReposStore.getState().recordWorkspaceNavigation(entry)
@@ -1134,7 +1154,7 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
     closeSettings: vi.fn(),
     openRepoRoot: vi.fn(),
     openRepoDashboard: vi.fn(),
-    openRepoWorkspace: vi.fn((_repoId, options) => {
+    openWorkspaceRootPane: vi.fn((_repoId, options) => {
       options?.onCommit?.()
       return true
     }),

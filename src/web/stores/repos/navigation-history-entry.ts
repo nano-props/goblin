@@ -9,7 +9,7 @@ export function workspaceNavigationHistoryEntryEqual(
   if (a.repoId !== b.repoId || a.route.kind !== b.route.kind) return false
   switch (a.route.kind) {
     case 'empty':
-    case 'workspace':
+    case 'workspace-root':
     case 'dashboard':
       return true
     case 'newWorktree':
@@ -40,7 +40,7 @@ export function workspaceNavigationHistoryEntryCanReplaceCurrent(
   if (a.repoId !== b.repoId || a.route.kind !== b.route.kind) return false
   switch (a.route.kind) {
     case 'empty':
-    case 'workspace':
+    case 'workspace-root':
     case 'dashboard':
     case 'newWorktree':
       return false

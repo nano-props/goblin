@@ -293,7 +293,9 @@ describe('RepoView workspace navigation', () => {
       },
     }))
 
-    const { container } = render(<RepoView repoId={REPO_ID} routeView={{ kind: 'workspace', repoId: REPO_ID }} />)
+    const { container } = render(
+      <RepoView repoId={REPO_ID} routeView={{ kind: 'workspace-root', repoId: REPO_ID }} />,
+    )
 
     expect(repoWorkspace(container)?.dataset.currentBranchName).toBe('')
     expect(repoWorkspace(container)?.dataset.workspacePaneRouteKind).toBe('workspace-root')

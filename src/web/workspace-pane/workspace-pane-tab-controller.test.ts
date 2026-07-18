@@ -85,7 +85,7 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('presents a workspace-scoped tab through the workspace route', async () => {
-    const showRepoWorkspacePaneTab = vi.fn((_repoId, presentation, options) => {
+    const showWorkspaceRootPaneTab = vi.fn((_repoId, presentation, options) => {
       useReposStore
         .getState()
         .setWorkspacePaneTabForTarget(
@@ -95,7 +95,7 @@ describe('workspace pane tab controller transactions', () => {
       options?.onCommit?.()
       return true
     })
-    const navigation = { commitWorkspacePaneRoute: vi.fn(() => false), showRepoWorkspacePaneTab }
+    const navigation = { commitWorkspacePaneRoute: vi.fn(() => false), showWorkspaceRootPaneTab }
 
     await expect(
       selectWorkspacePaneControllerTab(
@@ -111,7 +111,7 @@ describe('workspace pane tab controller transactions', () => {
     ).resolves.toBe(true)
 
     expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
-    expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(
+    expect(showWorkspaceRootPaneTab).toHaveBeenCalledWith(
       'goblin+file:///repo',
       { kind: 'static', tab: 'files' },
       expect.objectContaining({ presentationToken: expect.any(Object) }),

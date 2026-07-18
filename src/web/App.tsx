@@ -19,7 +19,7 @@ interface AppProps {
   routeRepoView?: RepoRouteView | null
   onRouteSettingsPageChange?: (page: SettingsPage | null) => void
   onOpenRepoRoot?: (repoId: string) => void
-  onOpenRepoWorkspace?: (repoId: string) => void
+  onOpenWorkspaceRoot?: (workspaceId: string) => void
   onOpenRepoDashboard?: (repoId: string) => void
   onOpenRepoBranch?: (repoId: string, branchName: string) => void
   onOpenRepoNewWorktree?: (repoId: string) => void
@@ -29,7 +29,7 @@ interface AppProps {
 
 export type RepoRouteView =
   | { kind: 'empty'; repoId: string }
-  | { kind: 'workspace'; repoId: string }
+  | { kind: 'workspace-root'; repoId: string }
   | {
       kind: 'worktree'
       repoId: string
@@ -60,7 +60,7 @@ export function App({
   routeRepoView = null,
   onRouteSettingsPageChange,
   onOpenRepoRoot,
-  onOpenRepoWorkspace,
+  onOpenWorkspaceRoot,
   onOpenRepoDashboard,
   onOpenRepoBranch,
   onOpenRepoNewWorktree,
@@ -94,7 +94,7 @@ export function App({
             routeView={routeRepoView}
             onOpenSettings={() => onRouteSettingsPageChange?.('general')}
             onOpenRepoRoot={onOpenRepoRoot}
-            onOpenRepoWorkspace={onOpenRepoWorkspace}
+            onOpenWorkspaceRoot={onOpenWorkspaceRoot}
             onOpenRepoDashboard={onOpenRepoDashboard}
             onOpenRepoBranch={onOpenRepoBranch}
             onOpenRepoNewWorktree={onOpenRepoNewWorktree}

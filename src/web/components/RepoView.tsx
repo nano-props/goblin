@@ -43,7 +43,7 @@ interface Props {
   routeView?: RepoRouteView | null
   onOpenSettings?: () => void
   onOpenRepoRoot?: (repoId: string) => void
-  onOpenRepoWorkspace?: (repoId: string) => void
+  onOpenWorkspaceRoot?: (workspaceId: string) => void
   onOpenRepoDashboard?: (repoId: string) => void
   onOpenRepoBranch?: (repoId: string, branchName: string) => void
   onOpenRepoNewWorktree?: (repoId: string) => void
@@ -56,7 +56,7 @@ export function RepoView({
   routeView = null,
   onOpenSettings,
   onOpenRepoRoot,
-  onOpenRepoWorkspace,
+  onOpenWorkspaceRoot,
   onOpenRepoDashboard,
   onOpenRepoBranch,
   onOpenRepoNewWorktree,
@@ -90,7 +90,7 @@ export function RepoView({
 
   const currentBranchName = routeView?.kind === 'branch' ? routeView.branchName : null
   const routeWorkspacePageActive =
-    routeView?.kind === 'workspace' ||
+    routeView?.kind === 'workspace-root' ||
     routeView?.kind === 'worktree' ||
     routeView?.kind === 'dashboard' ||
     routeView?.kind === 'newWorktree'
@@ -165,8 +165,8 @@ export function RepoView({
         newWorktreeSelected={newWorktreeSelected}
         currentBranchName={routeBranchName}
         gitAvailable={gitAvailable}
-        workspaceRootSelected={gitUnavailable && routeView?.kind === 'workspace'}
-        onSelectWorkspaceRoot={gitUnavailable ? () => onOpenRepoWorkspace?.(repo.id) : undefined}
+        workspaceRootSelected={gitUnavailable && routeView?.kind === 'workspace-root'}
+        onSelectWorkspaceRoot={gitUnavailable ? () => onOpenWorkspaceRoot?.(repo.id) : undefined}
       />
     </RepoWorkspacePane>
   )
@@ -276,7 +276,7 @@ export function RepoView({
               onBack={() => onOpenRepoRoot?.(repo.id)}
               onSelectBranch={(branchName) => onOpenRepoBranch?.(repo.id, branchName)}
             />
-          ) : routeView?.kind === 'workspace' ? (
+          ) : routeView?.kind === 'workspace-root' ? (
             <RepoWorkspace
               repoId={repoId}
               currentBranchName={null}

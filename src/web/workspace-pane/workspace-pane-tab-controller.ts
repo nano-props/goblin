@@ -51,7 +51,7 @@ export type WorkspacePaneTabControllerCommitNavigation = Pick<
   'commitWorkspacePaneRoute'
 > &
   Pick<PrimaryWindowNavigationActions, 'showRepoWorktreeTerminalSession'> &
-  Pick<PrimaryWindowNavigationActions, 'showRepoWorktreeWorkspacePaneTab' | 'showRepoWorkspacePaneTab'>
+  Pick<PrimaryWindowNavigationActions, 'showRepoWorktreeWorkspacePaneTab' | 'showWorkspaceRootPaneTab'>
 type WorkspacePaneTabControllerOptionalShowNavigation = Partial<WorkspacePaneTabControllerShowNavigation>
 
 export function workspacePaneControllerRouteForTab(tab: RepoWorkspaceTab): WorkspacePaneTabControllerRoute | undefined {
@@ -150,7 +150,7 @@ export async function selectWorkspacePaneControllerTab(
           ? { kind: 'static' as const, tab: tab.type }
           : null
     return presentation
-      ? (navigation.showRepoWorkspacePaneTab?.(target.repoId, presentation, { presentationToken }) ?? false)
+      ? (navigation.showWorkspaceRootPaneTab?.(target.repoId, presentation, { presentationToken }) ?? false)
       : false
   }
   if (target.paneTarget.kind === 'inactive') return false
@@ -173,7 +173,7 @@ export async function selectWorkspacePaneControllerTabEntry(
   if (!workspacePaneTabControllerTargetIsCurrent(target)) return false
   if (target.paneTarget.kind === 'workspace-root') {
     return (
-      navigation.showRepoWorkspacePaneTab?.(
+      navigation.showWorkspaceRootPaneTab?.(
         target.repoId,
         { kind: 'terminal', terminalSessionId: entry.runtimeSessionId },
         { presentationToken },

@@ -32,7 +32,7 @@ export interface PrimaryWindowRouteNavigation {
   openSettings: (page: SettingsPage, options?: PrimaryWindowRouteNavigationOptions) => void
   closeSettings: (options?: PrimaryWindowRouteNavigationOptions) => void
   openRepoRoot: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => void
-  openRepoWorkspace: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
+  openWorkspaceRootPane: (workspaceId: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
   openRepoDashboard: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => void
   openRepoBranch: (repoId: string, branchName: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
   openRepoBranchTab: (
@@ -187,8 +187,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           },
         })
       },
-      openRepoWorkspace(repoId, options) {
-        const repoSlug = repoSlugForId(repoId)
+      openWorkspaceRootPane(workspaceId, options) {
+        const repoSlug = repoSlugForId(workspaceId)
         if (!repoSlug || !router) return false
         const target = router.buildLocation({ to: '/repo/$repoSlug/workspace', params: { repoSlug } })
         return runOwnedPrimaryWindowNavigation({

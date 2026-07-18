@@ -64,8 +64,8 @@ export interface PrimaryWindowNavigationActions {
     tab: WorkspacePaneStaticTabType,
     options?: PrimaryWindowPresentationNavigationOptions,
   ) => boolean
-  showRepoWorkspacePaneTab?: (
-    repoId: string,
+  showWorkspaceRootPaneTab?: (
+    workspaceId: string,
     presentation: WorkspaceRootPanePresentation,
     options?: PrimaryWindowPresentationNavigationOptions,
   ) => boolean
@@ -184,9 +184,9 @@ export function createPrimaryWindowNavigationActions({
       const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
       return open(repoId, worktreePath, tab, { ...options, presentationToken: token })
     },
-    showRepoWorkspacePaneTab(repoId, presentation, options) {
+    showWorkspaceRootPaneTab(repoId, presentation, options) {
       const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
-      return routeNavigation.openRepoWorkspace(repoId, {
+      return routeNavigation.openWorkspaceRootPane(repoId, {
         ...options,
         presentationToken: token,
         onCommit: () => {
@@ -299,7 +299,7 @@ function restoreRepoPresentationOrOpenDashboard(
     entry &&
     entry.route.kind !== 'newWorktree' &&
     (!workspaceGitUnavailable(repo?.workspaceProbe) ||
-      entry.route.kind === 'workspace' ||
+      entry.route.kind === 'workspace-root' ||
       entry.route.kind === 'dashboard')
   if (entryCanResume) {
     const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, { presentationToken })

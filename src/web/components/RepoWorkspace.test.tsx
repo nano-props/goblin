@@ -439,7 +439,7 @@ describe('RepoWorkspace', () => {
       selectTerminal: terminalCommandContext.selectTerminal,
       closeTerminalByDescriptor,
     })
-    const showRepoWorkspacePaneTab = vi.fn<NonNullable<PrimaryWindowNavigationActions['showRepoWorkspacePaneTab']>>(
+    const showWorkspaceRootPaneTab = vi.fn<NonNullable<PrimaryWindowNavigationActions['showWorkspaceRootPaneTab']>>(
       (_repoId, presentation, options) => {
         if (presentation.kind === 'terminal') {
           useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, presentation.terminalSessionId)
@@ -454,7 +454,7 @@ describe('RepoWorkspace', () => {
     )
     const workspaceNavigation: PrimaryWindowNavigationActions = {
       ...navigation,
-      showRepoWorkspacePaneTab,
+      showWorkspaceRootPaneTab,
     }
 
     render(
@@ -473,7 +473,7 @@ describe('RepoWorkspace', () => {
     const terminalTab = screen.getByRole('tab', { name: terminalSessionId })
     act(() => terminalTab.click())
 
-    expect(showRepoWorkspacePaneTab).toHaveBeenCalled()
+    expect(showWorkspaceRootPaneTab).toHaveBeenCalled()
 
     await waitFor(() => expect(screen.getByRole('tabpanel', { name: 'tab.terminal' })).toBeTruthy())
     expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).toBe(
@@ -1906,7 +1906,7 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
     closeSettings: vi.fn(),
     openRepoRoot: vi.fn(),
     openRepoDashboard: vi.fn(),
-    openRepoWorkspace: vi.fn(),
+    openWorkspaceRootPane: vi.fn(),
     openRepoBranch: vi.fn((_repoId, _branchName, options) => {
       options?.onCommit?.()
       return true

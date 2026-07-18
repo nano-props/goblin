@@ -245,7 +245,7 @@ export function repoRouteViewFromChildRoute(
   }
   if (childRoute.newWorktree) return { kind: 'newWorktree', repoId }
   if (childRoute.dashboard) return { kind: 'dashboard', repoId }
-  if (childRoute.workspace) return { kind: 'workspace', repoId }
+  if (childRoute.workspace) return { kind: 'workspace-root', repoId }
   return { kind: 'empty', repoId }
 }
 
@@ -260,7 +260,7 @@ export function primaryWindowRouterCallbacks(routeActions: PrimaryWindowRouteNav
       if (page) routeActions.openSettings(page)
     },
     onOpenRepoRoot: (repoId: string) => routeActions.openRepoRoot(repoId),
-    onOpenRepoWorkspace: (repoId: string) => routeActions.openRepoWorkspace(repoId),
+    onOpenWorkspaceRoot: (workspaceId: string) => routeActions.openWorkspaceRootPane(workspaceId),
     onOpenRepoDashboard: (repoId: string) => routeActions.openRepoDashboard(repoId),
     onOpenRepoBranch: (repoId: string, branchName: string) =>
       openWorkspacePaneRoute(routeActions, repoId, branchName),

@@ -284,7 +284,7 @@ test('confirmed workspace terminal close selects Files without inventing a branc
     useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[formatTerminalWorktreeKey(REPO_ID, REPO_ID)],
   ).toBe(terminalSessionId)
   const navigation = navigationWith({
-    showRepoWorkspacePaneTab: vi.fn((_repoId, presentation, options) => {
+    showWorkspaceRootPaneTab: vi.fn((_repoId, presentation, options) => {
       if (presentation.kind === 'static') {
         useReposStore.getState().setWorkspacePaneTabForTarget(targetInput, presentation.tab)
       }
@@ -405,7 +405,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     showRepoBranchEmptyWorkspacePane: vi.fn(() => true),
     showRepoBranchWorkspacePaneTab: vi.fn(() => true),
     showRepoBranchTerminalSession: vi.fn(() => true),
-    showRepoWorkspacePaneTab: vi.fn((_repoId, _presentation, options) => {
+    showWorkspaceRootPaneTab: vi.fn((_repoId, _presentation, options) => {
       options?.onCommit?.()
       return true
     }),

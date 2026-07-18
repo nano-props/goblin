@@ -135,7 +135,7 @@ describe('repo route view derivation', () => {
         branchSlug: null,
         newWorktree: false,
       }),
-    ).toEqual({ kind: 'workspace', repoId: '/repo' })
+    ).toEqual({ kind: 'workspace-root', repoId: '/repo' })
     expect(repoRouteViewFromChildRoute('/repo', { dashboard: false, branchSlug: null, newWorktree: true })).toEqual({
       kind: 'newWorktree',
       repoId: '/repo',
@@ -237,7 +237,7 @@ describe('repo route capability admission', () => {
     navigateBrowser(`/repo/${repoSlugFromId(repoId)}/workspace`)
 
     await waitFor(() => expect(window.location.pathname).toBe(`/repo/${repoSlugFromId(repoId)}/workspace`))
-    await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('workspace'))
+    await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('workspace-root'))
     expect(appMocks.render).not.toHaveBeenCalledWith('dashboard')
   })
 })
@@ -284,7 +284,7 @@ describe('primary window route callback facades', () => {
       closeSettings: vi.fn(),
       openRepoRoot: vi.fn(),
       openRepoDashboard: vi.fn(),
-      openRepoWorkspace: vi.fn(),
+      openWorkspaceRootPane: vi.fn(),
       openRepoBranch: vi.fn(() => true),
       openRepoBranchTab: vi.fn(() => true),
       openRepoBranchTerminal: vi.fn(() => true),

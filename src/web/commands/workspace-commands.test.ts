@@ -3331,7 +3331,7 @@ function navigationWith(
       return true
     },
     showRepoBranchTerminalSession: () => true,
-    showRepoWorkspacePaneTab: (repoId, presentation, options) => {
+    showWorkspaceRootPaneTab: (repoId, presentation, options) => {
       useReposStore.getState().setWorkspacePaneTabForTarget(
         { kind: 'workspace-root', repoRoot: repoId },
         presentation.kind === 'terminal' ? 'terminal' : presentation.tab,
