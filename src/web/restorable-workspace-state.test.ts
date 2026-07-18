@@ -167,11 +167,11 @@ describe('restorable-workspace-state', () => {
         'goblin+file:///tmp/repo-a\0goblin+file:///tmp/active-worktree': 'term-active0000000000000',
         'goblin+file:///tmp/repo-b\0goblin+file:///tmp/stub-worktree': 'term-stub00000000000000',
       },
-        preferredWorkspacePaneTabByTargetByWorkspace: {
+      preferredWorkspacePaneTabByTargetByWorkspace: {
         [activeRepo.id]: { [activeTargetKey]: 'status' },
         [stubRepo.id]: { [stubTargetKey]: 'files' },
       },
-        filetreeViewStateByWorktreeByWorkspace: {
+      filetreeViewStateByWorktreeByWorkspace: {
         [stubRepo.id]: {
           '/tmp/stub-worktree': {
             selectedKeys: ['src/index.ts'],
@@ -276,8 +276,8 @@ describe('restorable-workspace-state', () => {
         selectedTerminalSessionIdByTerminalWorktree: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-111111111111111111111',
         },
-      preferredWorkspacePaneTabByTargetByWorkspace: {},
-      filetreeViewStateByWorktreeByWorkspace: {},
+        preferredWorkspacePaneTabByTargetByWorkspace: {},
+        filetreeViewStateByWorktreeByWorkspace: {},
       }),
     ).toEqual({
       restoredWorkspaceId: 'goblin+file:///tmp/repo',

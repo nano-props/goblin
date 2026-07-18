@@ -104,5 +104,4 @@ describe('terminal session worktree snapshot helper', () => {
     })
     expect(session.snapshotSpy).toHaveBeenCalledTimes(1)
   })
-
 })

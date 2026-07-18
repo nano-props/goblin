@@ -22,7 +22,10 @@ function remoteTargetEqual(a: RemoteWorkspaceTarget, b: RemoteWorkspaceTarget): 
   )
 }
 
-function lifecycleEqual(a: RemoteWorkspaceConnectionLifecycle | null, b: RemoteWorkspaceConnectionLifecycle | null): boolean {
+function lifecycleEqual(
+  a: RemoteWorkspaceConnectionLifecycle | null,
+  b: RemoteWorkspaceConnectionLifecycle | null,
+): boolean {
   if (a === b) return true
   if (!a || !b) return false
   if (a.kind !== b.kind) return false

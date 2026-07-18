@@ -67,7 +67,9 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
   const setOpenRemoteWorkspaceOpen = useCallback(
     (open: boolean) => {
       if (routeDriven) {
-        onRouteOverlayChange?.(open ? 'openRemoteWorkspace' : routeOverlay === 'openRemoteWorkspace' ? null : routeOverlay)
+        onRouteOverlayChange?.(
+          open ? 'openRemoteWorkspace' : routeOverlay === 'openRemoteWorkspace' ? null : routeOverlay,
+        )
         return
       }
       setOpen('openRemoteWorkspace', open)

@@ -21,20 +21,31 @@ export function acceptRemoteWorkspaceLifecycleProjection(
   const current = get().workspaces[entry.workspaceId]
   if (!current || current.workspaceRuntimeId !== entry.workspaceRuntimeId) return false
   if (current.admission.kind !== 'remote') return false
-  if (!remoteWorkspaceLifecycleProjectionIsFresh(current.admission.lifecycleAttemptId, current.admission.lifecycle?.kind, lifecycle)) {
+  if (
+    !remoteWorkspaceLifecycleProjectionIsFresh(
+      current.admission.lifecycleAttemptId,
+      current.admission.lifecycle?.kind,
+      lifecycle,
+    )
+  ) {
     return false
   }
 
   let accepted = false
   updateIfFresh(set, entry.workspaceId, entry.workspaceRuntimeId, (repo) => {
     if (repo.admission.kind !== 'remote') return
-    if (!remoteWorkspaceLifecycleProjectionIsFresh(repo.admission.lifecycleAttemptId, repo.admission.lifecycle?.kind, lifecycle))
+    if (
+      !remoteWorkspaceLifecycleProjectionIsFresh(
+        repo.admission.lifecycleAttemptId,
+        repo.admission.lifecycle?.kind,
+        lifecycle,
+      )
+    )
       return
     repo.admission.lifecycleAttemptId = lifecycle.attemptId
     if (lifecycle.kind === 'idle') {
       repo.admission.lifecycle = null
-    }
-    else if (lifecycle.kind === 'connecting') markRemoteLifecycleConnecting(repo)
+    } else if (lifecycle.kind === 'connecting') markRemoteLifecycleConnecting(repo)
     else if (lifecycle.kind === 'ready') {
       markRemoteLifecycleReady(repo, lifecycle.target)
       if (options.name) repo.name = options.name
@@ -46,7 +57,11 @@ export function acceptRemoteWorkspaceLifecycleProjection(
   return accepted
 }
 
-export function acceptRemoteWorkspaceLifecycleSnapshot(set: WorkspacesSet, get: WorkspacesGet, snapshot: WorkspaceRuntimesSnapshot): void {
+export function acceptRemoteWorkspaceLifecycleSnapshot(
+  set: WorkspacesSet,
+  get: WorkspacesGet,
+  snapshot: WorkspaceRuntimesSnapshot,
+): void {
   for (const entry of snapshot.runtimes) acceptRemoteWorkspaceLifecycleProjection(set, get, entry)
 }
 

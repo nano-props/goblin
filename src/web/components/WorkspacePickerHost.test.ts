@@ -8,7 +8,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 describe('workspacePickerItemsEqual', () => {
   test('treats Git capability changes as unequal', () => {
     const item: WorkspacePickerItem = {
-      id: 'goblin+file:///tmp/workspace',
+      id: workspaceIdForTest('goblin+file:///tmp/workspace'),
       name: 'workspace',
       gitCapability: 'unavailable',
       git: null,
@@ -21,7 +21,7 @@ describe('workspacePickerItemsEqual', () => {
   test('treats remote lifecycle target changes as unequal even when repo id stays the same', () => {
     const left: WorkspacePickerItem[] = [
       {
-        id: 'goblin+ssh://example/srv%2Frepo',
+        id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
         name: 'repo',
         gitCapability: 'available',
         git: { remoteDetails: [], lastSyncedAt: null },
@@ -41,7 +41,7 @@ describe('workspacePickerItemsEqual', () => {
     ]
     const right: WorkspacePickerItem[] = [
       {
-        id: 'goblin+ssh://example/srv%2Frepo',
+        id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
         name: 'repo',
         gitCapability: 'available',
         git: { remoteDetails: [], lastSyncedAt: null },
@@ -111,7 +111,7 @@ describe('workspacePickerItemsEqual', () => {
   test('treats last sync time changes as unequal', () => {
     const left: WorkspacePickerItem[] = [
       {
-        id: 'goblin+file:///tmp/repo',
+        id: workspaceIdForTest('goblin+file:///tmp/repo'),
         name: 'repo',
         gitCapability: 'available',
         git: { remoteDetails: [], lastSyncedAt: 1_000 },
@@ -120,7 +120,7 @@ describe('workspacePickerItemsEqual', () => {
     ]
     const right: WorkspacePickerItem[] = [
       {
-        id: 'goblin+file:///tmp/repo',
+        id: workspaceIdForTest('goblin+file:///tmp/repo'),
         name: 'repo',
         gitCapability: 'available',
         git: { remoteDetails: [], lastSyncedAt: 2_000 },
@@ -134,7 +134,7 @@ describe('workspacePickerItemsEqual', () => {
   test('treats terminal bell count changes as unequal', () => {
     const left: WorkspacePickerItem[] = [
       {
-        id: 'goblin+file:///tmp/repo',
+        id: workspaceIdForTest('goblin+file:///tmp/repo'),
         name: 'repo',
         gitCapability: 'available',
         git: { remoteDetails: [], lastSyncedAt: null },
@@ -144,7 +144,7 @@ describe('workspacePickerItemsEqual', () => {
     ]
     const right: WorkspacePickerItem[] = [
       {
-        id: 'goblin+file:///tmp/repo',
+        id: workspaceIdForTest('goblin+file:///tmp/repo'),
         name: 'repo',
         gitCapability: 'available',
         git: { remoteDetails: [], lastSyncedAt: null },

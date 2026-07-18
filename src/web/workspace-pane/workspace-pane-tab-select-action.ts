@@ -195,7 +195,10 @@ function resolveSelectableWorkspacePaneTarget(
   return workspacePaneTabTargetForPaneTarget(input.paneTarget, workspacePaneRoute, input.worktreeHead)
 }
 
-function paneTargetPresentationBranch(target: WorkspacePaneTabsTarget, worktreeHead: GitHead | undefined): string | null {
+function paneTargetPresentationBranch(
+  target: WorkspacePaneTabsTarget,
+  worktreeHead: GitHead | undefined,
+): string | null {
   if (target.kind === 'git-branch') return target.branchName
   return target.kind === 'git-worktree' && worktreeHead ? gitHeadBranch(worktreeHead) : null
 }

@@ -108,8 +108,6 @@ export function terminalRuntimeTabCloseContext(
   return context.byType.terminal as TerminalWorkspacePaneRuntimeTabCloseContext | undefined
 }
 
-export function terminalBaseForRuntimeTabCloseTarget(
-  target: WorkspacePaneRuntimeTabCloseTarget,
-): TerminalSessionBase {
+export function terminalBaseForRuntimeTabCloseTarget(target: WorkspacePaneRuntimeTabCloseTarget): TerminalSessionBase {
   return target
 }

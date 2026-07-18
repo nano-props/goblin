@@ -206,16 +206,20 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
 })
 
 function renderMutationHook(
-  input: { kind?: 'git-worktree' | 'workspace-root'; canonicalTabs?: WorkspacePaneTabEntry[]; onReorderRejected?: () => void } = {},
+  input: {
+    kind?: 'git-worktree' | 'workspace-root'
+    canonicalTabs?: WorkspacePaneTabEntry[]
+    onReorderRejected?: () => void
+  } = {},
 ) {
   const target =
     input.kind === 'workspace-root'
-      ? ({ kind: 'workspace-root' as const, repoRoot: REPO_ROOT })
-      : ({
+      ? { kind: 'workspace-root' as const, repoRoot: REPO_ROOT }
+      : {
           kind: 'git-worktree' as const,
           repoRoot: REPO_ROOT,
           worktreePath: WORKTREE_PATH,
-        })
+        }
   return renderInJsdom(
     <QueryClientProvider client={queryClient}>
       <HookHost

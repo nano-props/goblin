@@ -1,4 +1,4 @@
-import { isValidRepoLocator } from '#/shared/input-validation.ts'
+import { isValidWorkspaceLocatorInput } from '#/shared/input-validation.ts'
 import { restorableWorkspacePaneTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import type {
   WorkspacePaneTabsListInput,
@@ -51,7 +51,7 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       input: WorkspacePaneTabsListInput,
     ): Promise<WorkspacePaneTabsSnapshot> {
       if (!isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
-      if (!isValidRepoLocator(input?.workspaceId)) return emptyWorkspacePaneTabsSnapshot()
+      if (!isValidWorkspaceLocatorInput(input?.workspaceId)) return emptyWorkspacePaneTabsSnapshot()
       assertCurrentWorkspaceRuntime(userId, input.workspaceId, input.workspaceRuntimeId)
       return await sessionService.listWorkspaceTabs(userId, input.workspaceId, input.workspaceRuntimeId)
     },
@@ -66,7 +66,7 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
 
 function validInputTarget(input: WorkspacePaneTabsReplaceInput | WorkspacePaneTabsUpdateInput): boolean {
   return Boolean(
-    isValidRepoLocator(input?.workspaceId) &&
+    isValidWorkspaceLocatorInput(input?.workspaceId) &&
     input.target.workspaceId === input.workspaceId &&
     input.target.workspaceRuntimeId === input.workspaceRuntimeId &&
     restorableWorkspacePaneTargetFromRuntime(input.target),

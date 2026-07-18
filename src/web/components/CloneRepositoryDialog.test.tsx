@@ -2,10 +2,7 @@
 import { act } from '@testing-library/react'
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import {
-  CloneRepositoryDialog,
-  type CloneRepositoryRequest,
-} from '#/web/components/CloneRepositoryDialog.tsx'
+import { CloneRepositoryDialog, type CloneRepositoryRequest } from '#/web/components/CloneRepositoryDialog.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'

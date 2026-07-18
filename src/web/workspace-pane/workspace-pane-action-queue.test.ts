@@ -155,7 +155,9 @@ describe('workspace pane action queue', () => {
     const intentId = beginWorkspacePaneRouteIntent(TARGET, 'static:files')
 
     expect(workspacePaneRouteIntentPending(TARGET, 'static:files')).toBe(true)
-    expect(workspacePaneRouteIntentPending({ ...TARGET, workspaceRuntimeId: 'repo-runtime-2' }, 'static:files')).toBe(false)
+    expect(workspacePaneRouteIntentPending({ ...TARGET, workspaceRuntimeId: 'repo-runtime-2' }, 'static:files')).toBe(
+      false,
+    )
     expect(workspacePaneActionQueueStatsForTest().pendingRouteIntents).toBe(1)
 
     finishWorkspacePaneRouteIntent(intentId)

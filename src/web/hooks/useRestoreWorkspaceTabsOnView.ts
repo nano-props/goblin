@@ -1,39 +1,40 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { runRepoProjectionPromotion } from '#/web/repo-projection-promotion-command.ts'
+import { runWorkspaceProjectionPromotion } from '#/web/workspace-projection-promotion-command.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-export type RepoProjectionPromotionViewState =
+export type WorkspaceProjectionPromotionViewState =
   { phase: 'idle' } | { phase: 'promoting' } | { phase: 'failed'; message: string }
 
 interface LazyRestoreTarget {
-  repoRoot: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   projectionState: 'projected' | 'stub'
 }
 
 interface PromotionTargetIdentity {
-  repoRoot: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
 }
 
 interface TargetPromotionViewState {
   target: PromotionTargetIdentity
-  state: RepoProjectionPromotionViewState
+  state: WorkspaceProjectionPromotionViewState
 }
 
-const IDLE_PROMOTION_VIEW_STATE: RepoProjectionPromotionViewState = { phase: 'idle' }
+const IDLE_PROMOTION_VIEW_STATE: WorkspaceProjectionPromotionViewState = { phase: 'idle' }
 
-export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) {
+export function useRestoreWorkspaceTabsOnView({ workspaceId }: { workspaceId: string | null }) {
   const target = useWorkspacesStore(
     useShallow((state): LazyRestoreTarget | null => {
-      if (!repoId) return null
-      const repo = state.workspaces[repoId]
-      if (!repo) return null
+      if (!workspaceId) return null
+      const workspace = state.workspaces[workspaceId]
+      if (!workspace) return null
       return {
-        repoRoot: repo.id,
-        workspaceRuntimeId: repo.workspaceRuntimeId,
-        projectionState: repo.session.projectionState,
+        workspaceId: workspace.id,
+        workspaceRuntimeId: workspace.workspaceRuntimeId,
+        projectionState: workspace.session.projectionState,
       }
     }),
   )
@@ -42,11 +43,11 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
 
   useEffect(() => {
     if (target?.projectionState !== 'stub') return
-    const targetIdentity = { repoRoot: target.repoRoot, workspaceRuntimeId: target.workspaceRuntimeId }
+    const targetIdentity = { workspaceId: target.workspaceId, workspaceRuntimeId: target.workspaceRuntimeId }
     let current = true
     setTargetState({ target: targetIdentity, state: { phase: 'promoting' } })
-    void runRepoProjectionPromotion({
-      repoRoot: target.repoRoot,
+    void runWorkspaceProjectionPromotion({
+      workspaceId: target.workspaceId,
       workspaceRuntimeId: target.workspaceRuntimeId,
     }).then((result) => {
       if (!current) return
@@ -72,11 +73,11 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
 function promotionStateForCurrentTarget(
   targetState: TargetPromotionViewState | null,
   target: LazyRestoreTarget | null,
-): RepoProjectionPromotionViewState {
+): WorkspaceProjectionPromotionViewState {
   if (
     !targetState ||
     target?.projectionState !== 'stub' ||
-    targetState.target.repoRoot !== target.repoRoot ||
+    targetState.target.workspaceId !== target.workspaceId ||
     targetState.target.workspaceRuntimeId !== target.workspaceRuntimeId
   ) {
     return IDLE_PROMOTION_VIEW_STATE

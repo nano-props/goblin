@@ -46,7 +46,9 @@ export function runtimeMembershipIndexEqual(
   return true
 }
 
-function terminalRuntimeMembershipEntriesFromRepos(workspaces: WorkspacesStore['workspaces']): TerminalRuntimeMembershipEntry[] {
+function terminalRuntimeMembershipEntriesFromRepos(
+  workspaces: WorkspacesStore['workspaces'],
+): TerminalRuntimeMembershipEntry[] {
   return Object.values(workspaces).map((repo) => ({
     id: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,

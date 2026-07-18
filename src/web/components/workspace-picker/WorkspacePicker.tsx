@@ -7,9 +7,16 @@ import { ToolbarTabList, ToolbarTabStripBody } from '#/web/components/tab-strip/
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
 import { MenuRowButton } from '#/web/components/ui/menu-row-button.tsx'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
-import { CurrentWorkspaceSidebarButton, CurrentWorkspaceToolbarButton } from '#/web/components/workspace-picker/CurrentWorkspaceButton.tsx'
+import {
+  CurrentWorkspaceSidebarButton,
+  CurrentWorkspaceToolbarButton,
+} from '#/web/components/workspace-picker/CurrentWorkspaceButton.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
-import type { WorkspacePickerLabels, WorkspacePickerItem, WorkspacePickerSurface } from '#/web/components/workspace-picker/types.ts'
+import type {
+  WorkspacePickerLabels,
+  WorkspacePickerItem,
+  WorkspacePickerSurface,
+} from '#/web/components/workspace-picker/types.ts'
 import { isRemoteWorkspaceId, remoteWorkspaceConnectionTarget } from '#/shared/remote-workspace.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
@@ -115,8 +122,11 @@ function WorkspaceMenuContent({
             <div className="space-y-0.5 p-1" role="list">
               {workspaces.map((workspace) => {
                 const selected = workspace.id === currentWorkspaceId
-                const WorkspaceIcon =
-                  isRemoteWorkspaceId(workspace.id) ? Server : workspace.gitCapability === 'available' ? FolderGit2 : Folder
+                const WorkspaceIcon = isRemoteWorkspaceId(workspace.id)
+                  ? Server
+                  : workspace.gitCapability === 'available'
+                    ? FolderGit2
+                    : Folder
                 const remoteTarget = remoteWorkspaceConnectionTarget(workspace.lifecycle)
                 return (
                   <div key={workspace.id} className="group relative flex items-center" role="listitem">
@@ -266,7 +276,12 @@ export function WorkspacePicker({
           ) : (
             <PopoverTrigger asChild>
               <ToolbarTabStripBody className="flex-1">
-                <ToolbarTabList role="tablist" aria-orientation="horizontal" data-current-workspace-group className="flex-1">
+                <ToolbarTabList
+                  role="tablist"
+                  aria-orientation="horizontal"
+                  data-current-workspace-group
+                  className="flex-1"
+                >
                   <CurrentWorkspaceToolbarButton
                     workspace={currentWorkspace}
                     isCurrent={currentWorkspace.id === currentWorkspaceId}

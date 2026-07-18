@@ -213,15 +213,17 @@ function workspacePaneTabsInteractionBlocked(): boolean {
 function snapshot(revision: number, tabs: WorkspacePaneTabEntry[]): WorkspacePaneTabsSnapshot {
   return {
     revision,
-    entries: [{
-      target: runtimeWorkspacePaneTargetForTest({
-        kind: 'git-worktree' as const,
-        repoRoot: REPO_ROOT,
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        worktreePath: WORKTREE_PATH,
-      }),
-      tabs,
-    }],
+    entries: [
+      {
+        target: runtimeWorkspacePaneTargetForTest({
+          kind: 'git-worktree' as const,
+          repoRoot: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          worktreePath: WORKTREE_PATH,
+        }),
+        tabs,
+      },
+    ],
   }
 }
 

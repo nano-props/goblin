@@ -214,7 +214,9 @@ describe('server background sync scheduler', () => {
     resolveFetchA({ ok: true, message: 'ok' })
     // waitFor polls microtasks; using advanceTimersByTime would risk letting
     // the per-second cron catch B for us and mask a broken `finally` re-enqueue.
-    await vi.waitFor(() => expect(mocks.fetchRepo).toHaveBeenCalledWith('/repo-b', 'background', expect.any(AbortSignal)))
+    await vi.waitFor(() =>
+      expect(mocks.fetchRepo).toHaveBeenCalledWith('/repo-b', 'background', expect.any(AbortSignal)),
+    )
 
     const bCalls = mocks.fetchRepo.mock.calls.filter((c) => c[0] === '/repo-b' && c[1] === 'background')
     expect(bCalls.length).toBe(1)
@@ -242,7 +244,9 @@ describe('server background sync scheduler', () => {
     expect(mocks.fetchRepo.mock.calls.filter((call) => call[0] === '/repo-b')).toHaveLength(0)
 
     resolveFetchA({ ok: true, message: 'ok' })
-    await vi.waitFor(() => expect(mocks.fetchRepo).toHaveBeenCalledWith('/repo-b', 'background', expect.any(AbortSignal)))
+    await vi.waitFor(() =>
+      expect(mocks.fetchRepo).toHaveBeenCalledWith('/repo-b', 'background', expect.any(AbortSignal)),
+    )
     expect(getBackgroundSyncDiagnostics().idleDrainScheduled).toBe(false)
     expect(mocks.fetchRepo.mock.calls.filter((call) => call[0] === '/repo-b')).toHaveLength(1)
   })

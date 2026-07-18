@@ -139,7 +139,7 @@ describe('repo lifecycle', () => {
 
   test('ensureWorkspaceOpen rolls back a newly opened runtime when shared membership persistence fails', async () => {
     installGoblin({
-      'settings.addWorkspaceRepo': () => {
+      'settings.addWorkspaceEntry': () => {
         throw new Error('workspace write failed')
       },
     })
@@ -154,7 +154,7 @@ describe('repo lifecycle', () => {
 
   test('closeWorkspace keeps local state when shared membership persistence fails', async () => {
     installGoblin({
-      'settings.removeWorkspaceRepo': () => {
+      'settings.removeWorkspaceEntry': () => {
         throw new Error('workspace write failed')
       },
     })
@@ -172,46 +172,46 @@ describe('repo lifecycle', () => {
 
   test('serializes close after an in-flight open for the same repo', async () => {
     const releaseAdd = Promise.withResolvers<void>()
-    const workspaceRepos: string[] = []
-    const removeWorkspaceRepo = vi.fn(({ repoRoot }: { repoRoot: string }) => {
-      const index = workspaceRepos.indexOf(repoRoot)
-      if (index !== -1) workspaceRepos.splice(index, 1)
+    const workspaceEntries: string[] = []
+    const removeWorkspaceEntry = vi.fn(({ workspaceId }: { workspaceId: string }) => {
+      const index = workspaceEntries.indexOf(workspaceId)
+      if (index !== -1) workspaceEntries.splice(index, 1)
       return { openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} }
     })
     installGoblin({
-      'settings.addWorkspaceRepo': async ({ entry }: { entry: { id: string } }) => {
+      'settings.addWorkspaceEntry': async ({ entry }: { entry: { id: string } }) => {
         await releaseAdd.promise
-        workspaceRepos.push(entry.id)
+        workspaceEntries.push(entry.id)
         return { openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} }
       },
-      'settings.removeWorkspaceRepo': removeWorkspaceRepo,
+      'settings.removeWorkspaceEntry': removeWorkspaceEntry,
     })
 
     const opening = useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
     await vi.waitFor(() => expect(useWorkspacesStore.getState().workspaces[REPO_A]).toBeUndefined())
     const closing = useWorkspacesStore.getState().closeWorkspace(REPO_A)
-    expect(removeWorkspaceRepo).not.toHaveBeenCalled()
+    expect(removeWorkspaceEntry).not.toHaveBeenCalled()
     releaseAdd.resolve()
 
     await expect(opening).resolves.toMatchObject({ ok: true, workspaceId: REPO_A })
     await expect(closing).resolves.toEqual({ ok: true })
-    expect(workspaceRepos).toEqual([])
+    expect(workspaceEntries).toEqual([])
     expect(useWorkspacesStore.getState().workspaces[REPO_A]).toBeUndefined()
   })
 
   test('serializes reopen after an in-flight close for the same repo', async () => {
     const releaseRemove = Promise.withResolvers<void>()
     let blockRemove = false
-    const workspaceRepos: string[] = []
+    const workspaceEntries: string[] = []
     installGoblin({
-      'settings.addWorkspaceRepo': ({ entry }: { entry: { id: string } }) => {
-        if (!workspaceRepos.includes(entry.id)) workspaceRepos.push(entry.id)
+      'settings.addWorkspaceEntry': ({ entry }: { entry: { id: string } }) => {
+        if (!workspaceEntries.includes(entry.id)) workspaceEntries.push(entry.id)
         return { openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} }
       },
-      'settings.removeWorkspaceRepo': async ({ repoRoot }: { repoRoot: string }) => {
+      'settings.removeWorkspaceEntry': async ({ workspaceId }: { workspaceId: string }) => {
         if (blockRemove) await releaseRemove.promise
-        const index = workspaceRepos.indexOf(repoRoot)
-        if (index !== -1) workspaceRepos.splice(index, 1)
+        const index = workspaceEntries.indexOf(workspaceId)
+        if (index !== -1) workspaceEntries.splice(index, 1)
         return { openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} }
       },
     })
@@ -224,7 +224,7 @@ describe('repo lifecycle', () => {
 
     await expect(closing).resolves.toEqual({ ok: true })
     await expect(reopening).resolves.toMatchObject({ ok: true, workspaceId: REPO_A })
-    expect(workspaceRepos).toEqual([REPO_A])
+    expect(workspaceEntries).toEqual([REPO_A])
     expect(useWorkspacesStore.getState().workspaces[REPO_A]).toBeDefined()
   })
 
@@ -438,7 +438,7 @@ describe('repo lifecycle', () => {
       ok: true,
       workspaceId: target!.id,
     })
-    expect(calls.workspaceRepos).toEqual([remoteWorkspaceSessionEntry(target!)])
+    expect(calls.workspaceEntries).toEqual([remoteWorkspaceSessionEntry(target!)])
     expect(useWorkspacesStore.getState().workspaces[target!.id]).toBeDefined()
   })
 
@@ -460,7 +460,7 @@ describe('repo lifecycle', () => {
     const calls = installGoblin({ 'remote.lifecycle': () => lifecycle.promise })
 
     const opening = useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))
-    await vi.waitFor(() => expect(calls.workspaceRepos).toEqual([remoteWorkspaceSessionEntry(target!)]))
+    await vi.waitFor(() => expect(calls.workspaceEntries).toEqual([remoteWorkspaceSessionEntry(target!)]))
     await expect(useWorkspacesStore.getState().closeWorkspace(target!.id)).resolves.toEqual({ ok: true })
     lifecycle.resolve({
       kind: 'settled',
@@ -470,7 +470,7 @@ describe('repo lifecycle', () => {
     })
 
     await expect(opening).resolves.toEqual({ ok: false, message: 'error.failed-read-repo' })
-    expect(calls.workspaceRepos).toEqual([])
+    expect(calls.workspaceEntries).toEqual([])
     expect(useWorkspacesStore.getState().workspaces[target!.id]).toBeUndefined()
   })
 

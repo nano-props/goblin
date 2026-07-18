@@ -58,7 +58,10 @@ describe('OpenWorkspaceDialog', () => {
       <OpenWorkspaceDialog
         open
         onClose={vi.fn()}
-        onOpen={vi.fn(async () => ({ ok: true as const, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo') }))}
+        onOpen={vi.fn(async () => ({
+          ok: true as const,
+          workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
+        }))}
       />,
     )
 
@@ -70,7 +73,10 @@ describe('OpenWorkspaceDialog', () => {
       <OpenWorkspaceDialog
         open
         onClose={vi.fn()}
-        onOpen={vi.fn(async () => ({ ok: true as const, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo') }))}
+        onOpen={vi.fn(async () => ({
+          ok: true as const,
+          workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
+        }))}
       />,
     )
 
@@ -82,7 +88,10 @@ describe('OpenWorkspaceDialog', () => {
       <OpenWorkspaceDialog
         open
         onClose={vi.fn()}
-        onOpen={vi.fn(async () => ({ ok: true as const, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo') }))}
+        onOpen={vi.fn(async () => ({
+          ok: true as const,
+          workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
+        }))}
       />,
     )
 
@@ -144,7 +153,10 @@ describe('OpenWorkspaceDialog', () => {
     const onOpen = vi
       .fn<() => Promise<OpenWorkspaceResult>>()
       .mockRejectedValueOnce(new Error('boom'))
-      .mockResolvedValueOnce({ ok: true, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo') })
+      .mockResolvedValueOnce({
+        ok: true,
+        workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
+      })
 
     render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 

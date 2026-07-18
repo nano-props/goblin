@@ -3,7 +3,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import {
   restoredWorkspaceIdAfterWorkspaceHydration,
-  nextRestoredRepoIdAfterWorkspaceClose,
+  nextRestoredWorkspaceIdAfterWorkspaceClose,
   persistedOpenWorkspaceEntries,
 } from '#/web/open-workspace-state.ts'
 
@@ -77,39 +77,17 @@ describe('persistedOpenWorkspaceEntries', () => {
   })
 })
 
-describe('nextRestoredRepoIdAfterWorkspaceClose', () => {
+describe('nextRestoredWorkspaceIdAfterWorkspaceClose', () => {
   test('keeps the active selection when closing an inactive workspace', () => {
-    expect(
-      nextRestoredRepoIdAfterWorkspaceClose(
-        [REPO_A, REPO_B],
-        REPO_A,
-        REPO_B,
-      ),
-    ).toBe('goblin+file:///tmp/repo-a')
+    expect(nextRestoredWorkspaceIdAfterWorkspaceClose([REPO_A, REPO_B], REPO_A, REPO_B)).toBe('goblin+file:///tmp/repo-a')
   })
 
   test('slides to the right neighbor, then the left, then null', () => {
-    expect(
-      nextRestoredRepoIdAfterWorkspaceClose(
-        [REPO_A, REPO_B, REPO_C],
-        REPO_B,
-        REPO_B,
-      ),
-    ).toBe('goblin+file:///tmp/repo-c')
-    expect(
-      nextRestoredRepoIdAfterWorkspaceClose(
-        [REPO_A, REPO_B],
-        REPO_B,
-        REPO_B,
-      ),
-    ).toBe('goblin+file:///tmp/repo-a')
-    expect(
-      nextRestoredRepoIdAfterWorkspaceClose(
-        [REPO_A],
-        REPO_A,
-        REPO_A,
-      ),
-    ).toBeNull()
+    expect(nextRestoredWorkspaceIdAfterWorkspaceClose([REPO_A, REPO_B, REPO_C], REPO_B, REPO_B)).toBe(
+      'goblin+file:///tmp/repo-c',
+    )
+    expect(nextRestoredWorkspaceIdAfterWorkspaceClose([REPO_A, REPO_B], REPO_B, REPO_B)).toBe('goblin+file:///tmp/repo-a')
+    expect(nextRestoredWorkspaceIdAfterWorkspaceClose([REPO_A], REPO_A, REPO_A)).toBeNull()
   })
 })
 
@@ -137,13 +115,7 @@ describe('restoredWorkspaceIdAfterWorkspaceHydration', () => {
       ),
     ).toBe('goblin+file:///tmp/repo-b')
     expect(
-      restoredWorkspaceIdAfterWorkspaceHydration(
-        null,
-        { 'goblin+file:///tmp/repo-a': {} },
-        [REPO_A],
-        null,
-        null,
-      ),
+      restoredWorkspaceIdAfterWorkspaceHydration(null, { 'goblin+file:///tmp/repo-a': {} }, [REPO_A], null, null),
     ).toBe('goblin+file:///tmp/repo-a')
   })
 

@@ -3071,7 +3071,11 @@ function hydrateManagedSession(
   })
 }
 
-function hydratedSnapshot(session: TerminalSession): { snapshot: string | null; snapshotSeq: number; outputEra: number } {
+function hydratedSnapshot(session: TerminalSession): {
+  snapshot: string | null
+  snapshotSeq: number
+  outputEra: number
+} {
   return (
     session as unknown as { hydratedSnapshot: { snapshot: string | null; snapshotSeq: number; outputEra: number } }
   ).hydratedSnapshot

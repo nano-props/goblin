@@ -1,6 +1,10 @@
 import { markRepoAvailable } from '#/web/stores/workspaces/availability.ts'
 import { isRepoUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
-import { cancelDataLoad, finishDataLoadError, finishDataLoadSuccess } from '#/web/stores/workspaces/repo-data-load-state.ts'
+import {
+  cancelDataLoad,
+  finishDataLoadError,
+  finishDataLoadSuccess,
+} from '#/web/stores/workspaces/repo-data-load-state.ts'
 import { canStartRemoteFetch } from '#/web/stores/workspaces/sync-state.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { WorkspaceState, WorkspacesGet } from '#/web/stores/workspaces/types.ts'

@@ -16,7 +16,7 @@ import {
   workspaceExternalAppAvailable,
   type WorkspaceExternalAppItem,
 } from '#/web/external-workspace-apps.tsx'
-import { getRecentWorkspaceExternalAppId } from '#/shared/repo-settings.ts'
+import { getRecentWorkspaceExternalAppId } from '#/shared/workspace-settings.ts'
 import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
 import { setRecentWorkspaceExternalAppPreference } from '#/web/settings-actions.ts'
 import { cn } from '#/web/lib/cn.ts'
@@ -38,10 +38,10 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
   const isRemoteRepo = isRemoteWorkspaceId(repo.id)
   const finderAvailable = capabilities.canOpenFinder && hostPlatform === 'darwin'
   const { data: settingsSnapshot } = useSettingsSnapshotQuery()
-  const repoSettings = settingsSnapshot?.repoSettings
+  const workspaceSettings = settingsSnapshot?.workspaceSettings
   const serverRecentItemId = useMemo(
-    () => getRecentWorkspaceExternalAppId(repoSettings ?? [], repo.id, branch.worktree?.path),
-    [repoSettings, repo.id, branch.worktree?.path],
+    () => getRecentWorkspaceExternalAppId(workspaceSettings ?? [], repo.id, branch.worktree?.path),
+    [workspaceSettings, repo.id, branch.worktree?.path],
   )
   // Mirror the server-derived recent in local state so the split-button
   // primary icon swaps instantly on click, then re-syncs once the
@@ -87,7 +87,7 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
       if (shouldWriteRecent) {
         try {
           await setRecentWorkspaceExternalAppPreference({
-            repoId: repo.id,
+            workspaceId: repo.id,
             worktreePath: branch.worktree?.path ?? null,
             itemId: item.id,
           })

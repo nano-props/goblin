@@ -26,7 +26,9 @@ export async function trashRepositoryFile(
       cwd,
       options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
     )
-    const run = options.workspaceRuntimeId ? remoteRuntimeAwareGitRunner(cwd, options.workspaceRuntimeId, target) : undefined
+    const run = options.workspaceRuntimeId
+      ? remoteRuntimeAwareGitRunner(cwd, options.workspaceRuntimeId, target)
+      : undefined
     return await trashRemoteFile(target, executionPath, filePath, { signal, ...(run ? { run } : {}) })
   }
 

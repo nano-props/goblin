@@ -43,7 +43,13 @@ interface HarnessProps {
   readonly onSnapshot: (snapshot: HarnessSnapshot) => void
 }
 
-function Harness({ repoId, workspaceRuntimeId = WORKSPACE_RUNTIME_ID, worktreePath, expandedKeys, onSnapshot }: HarnessProps) {
+function Harness({
+  repoId,
+  workspaceRuntimeId = WORKSPACE_RUNTIME_ID,
+  worktreePath,
+  expandedKeys,
+  onSnapshot,
+}: HarnessProps) {
   const target = mockExecutionTarget(repoId, workspaceRuntimeId, worktreePath)
   const result = useLazyRepoTree({ target, expandedKeys })
   onSnapshot(result)
@@ -131,10 +137,15 @@ async function flush() {
 describe('useLazyRepoTree', () => {
   test('hydrates the initial aggregate from cached root data without an empty-tree flash', async () => {
     const snapshots: HarnessSnapshot[] = []
-    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', ''], {
-      nodes: [{ id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' }],
-      truncated: false,
-    })
+    queryClient.setQueryData<RepoTreeResult>(
+      ['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', ''],
+      {
+        nodes: [
+          { id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' },
+        ],
+        truncated: false,
+      },
+    )
     mocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
 
     await render({
@@ -151,27 +162,36 @@ describe('useLazyRepoTree', () => {
 
   test('hydrates cached restored children and ancestors into the initial aggregate', async () => {
     const snapshots: HarnessSnapshot[] = []
-    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', ''], {
-      nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
-      truncated: false,
-    })
-    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', 'src'], {
-      nodes: [{ id: 'src/web', path: 'src/web', name: 'web', parentId: 'src', kind: 'directory', status: 'clean' }],
-      truncated: false,
-    })
-    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', 'src/web'], {
-      nodes: [
-        {
-          id: 'src/web/FiletreeView.tsx',
-          path: 'src/web/FiletreeView.tsx',
-          name: 'FiletreeView.tsx',
-          parentId: 'src/web',
-          kind: 'file',
-          status: 'clean',
-        },
-      ],
-      truncated: false,
-    })
+    queryClient.setQueryData<RepoTreeResult>(
+      ['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', ''],
+      {
+        nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
+        truncated: false,
+      },
+    )
+    queryClient.setQueryData<RepoTreeResult>(
+      ['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', 'src'],
+      {
+        nodes: [{ id: 'src/web', path: 'src/web', name: 'web', parentId: 'src', kind: 'directory', status: 'clean' }],
+        truncated: false,
+      },
+    )
+    queryClient.setQueryData<RepoTreeResult>(
+      ['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', 'src/web'],
+      {
+        nodes: [
+          {
+            id: 'src/web/FiletreeView.tsx',
+            path: 'src/web/FiletreeView.tsx',
+            name: 'FiletreeView.tsx',
+            parentId: 'src/web',
+            kind: 'file',
+            status: 'clean',
+          },
+        ],
+        truncated: false,
+      },
+    )
     mocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
 
     await render({

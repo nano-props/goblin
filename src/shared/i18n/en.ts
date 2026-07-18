@@ -148,7 +148,8 @@ export const en = {
   'workspace-picker.open-remote-diagnostics-copy-ssh-command': 'Copy SSH command',
   'workspace-picker.open-remote-diagnostics-copy-details': 'Copy details',
   'workspace-picker.open-remote-connect-via-ssh': 'Connect via system SSH',
-  'workspace-picker.open-remote-config-only-hint': 'Goblin only opens SSH remotes from aliases defined in ~/.ssh/config.',
+  'workspace-picker.open-remote-config-only-hint':
+    'Goblin only opens SSH remotes from aliases defined in ~/.ssh/config.',
   'workspace-picker.open-remote-include-manual-hint':
     'An Include directive was detected, so the alias list may be incomplete. Enter an SSH alias manually; suggestions only come from the current file.',
   'workspace-picker.open-remote-config-required':

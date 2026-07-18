@@ -1,6 +1,7 @@
 // Actions are the write boundary that commits to the server transport and
 // projects server-returned values into React Query.
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { settingsLog } from '#/web/logger.ts'
 import type { GlobalShortcutState, I18nSnapshot, ThemeState, WorkspaceRestoreResult } from '#/shared/api-types.ts'
 import {
@@ -8,10 +9,10 @@ import {
   clearRecentWorkspaces,
   refreshExternalAppsSnapshot,
   refreshGitHubCliState,
-  restoreRepoWorkspaceTabs,
+  restoreWorkspaceTabs,
   restoreServerWorkspace,
-  addWorkspaceRepo,
-  removeWorkspaceRepo,
+  addWorkspaceEntry,
+  removeWorkspaceEntry,
   setGlobalShortcut as setSettingsGlobalShortcut,
   setGlobalShortcutDisabled as setSettingsGlobalShortcutDisabled,
   setI18nPref as setSettingsI18nPref,
@@ -30,15 +31,15 @@ import {
   externalAppsQueryKey,
   lanInfoQueryKey,
   updateGitHubCliCache,
-  updateRepoSettingsStateCache,
+  updateWorkspaceSettingsStateCache,
   updateRuntimeRecentWorkspacesStateCache,
   updateRuntimeSettingsSnapshotCache,
 } from '#/web/settings-query-cache.ts'
 
 // Settings actions commit to the embedded server first. React Query is the
 // window-local projection of that server result, never an independent source.
-export async function recordRecentWorkspace(repo: WorkspaceSessionEntry): Promise<void> {
-  const result = await addRecentWorkspace(repo)
+export async function recordRecentWorkspace(workspace: WorkspaceSessionEntry): Promise<void> {
+  const result = await addRecentWorkspace(workspace)
   updateRuntimeRecentWorkspacesStateCache(primaryWindowQueryClient, { recentWorkspaces: result.recentWorkspaces })
 }
 
@@ -49,33 +50,32 @@ export async function clearRecentWorkspaceHistory(): Promise<void> {
 
 export async function restoreWorkspaceAtBoot(
   clientId: string,
-  options?: { activeRepoRoot?: string | null; signal?: AbortSignal },
+  options?: { activeWorkspaceId?: WorkspaceId | null; signal?: AbortSignal },
 ): Promise<WorkspaceRestoreResult> {
   const restored = await restoreServerWorkspace(clientId, options)
   return restored
 }
 
-export async function addRepoToWorkspace(entry: WorkspaceSessionEntry): Promise<void> {
-  await addWorkspaceRepo(entry)
+export async function addWorkspaceToSession(entry: WorkspaceSessionEntry): Promise<void> {
+  await addWorkspaceEntry(entry)
 }
 
-export async function removeRepoFromWorkspace(repoRoot: string): Promise<void> {
-  await removeWorkspaceRepo(repoRoot)
+export async function removeWorkspaceFromSession(workspaceId: WorkspaceId): Promise<void> {
+  await removeWorkspaceEntry(workspaceId)
 }
 
 /**
- * Lazy per-repo restore: probes + projects + restores pane tabs for a single
- * repo on demand. Triggered by `useRestoreRepoTabsOnView` when the user
- * navigates to a repo that was hydrated as a stub at cold start. Returns the
- * server result so the caller can feed it to the repo store hydration sink.
+ * Lazily projects one workspace runtime and restores its pane tabs when a
+ * hydrated workspace stub is first viewed. The server result is committed to
+ * the workspace store through its projection hydration boundary.
  */
-export async function restoreRepoTabsOnView(
+export async function restoreWorkspaceTabsOnView(
   clientId: string,
-  repoRoot: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
   options?: { signal?: AbortSignal },
 ) {
-  return await restoreRepoWorkspaceTabs(clientId, repoRoot, workspaceRuntimeId, options)
+  return await restoreWorkspaceTabs(clientId, workspaceId, workspaceRuntimeId, options)
 }
 
 export async function setFetchInterval(sec: number): Promise<number> {
@@ -155,12 +155,12 @@ export async function refreshGitHubCliDetection(hosts?: string[]): Promise<void>
 }
 
 export async function setRecentWorkspaceExternalAppPreference(input: {
-  repoId: string
+  workspaceId: WorkspaceId
   worktreePath: string | null
   itemId: string
 }): Promise<void> {
   const state = await setRecentWorkspaceExternalApp(input)
-  updateRepoSettingsStateCache(primaryWindowQueryClient, state)
+  updateWorkspaceSettingsStateCache(primaryWindowQueryClient, state)
 }
 
 export async function setLanEnabled(enabled: boolean): Promise<void> {

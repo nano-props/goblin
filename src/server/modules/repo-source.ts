@@ -115,8 +115,7 @@ export interface RepoMutationResult extends ExecResult {
 }
 
 export type WorkspacePaneTargetIdentity =
-  | { kind: 'git-branch'; branchName: string }
-  | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
+  { kind: 'git-branch'; branchName: string } | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
 
 export interface RepoSource {
   id: string

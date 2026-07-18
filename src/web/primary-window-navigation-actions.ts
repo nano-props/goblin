@@ -26,17 +26,15 @@ export interface PrimaryWindowPresentationNavigationOptions {
   replace?: boolean
   presentationToken?: PrimaryWindowPresentationToken
   onCommit?: () => void
-  routePrecondition?:
-    { kind: 'exact-route'; route: WorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
+  routePrecondition?: { kind: 'exact-route'; route: WorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
 }
 
 export type WorkspaceRootPanePresentation =
-  | { kind: 'static'; tab: WorkspacePaneStaticTabType }
-  | { kind: 'terminal'; terminalSessionId: string }
+  { kind: 'static'; tab: WorkspacePaneStaticTabType } | { kind: 'terminal'; terminalSessionId: string }
 
 export interface PrimaryWindowNavigationActions {
   activateWorkspace: (workspaceId: string) => void
-  closeWorkspace: (workspaceId: string) => Promise<CloseWorkspaceResult>
+  closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   cycleWorkspace: (direction: 1 | -1) => void
   selectRepoBranch: (workspaceId: string, branch: string, options?: { replace?: boolean }) => boolean
   showRepoBranchEmptyWorkspacePane: (workspaceId: string, branch: string, options?: { replace?: boolean }) => boolean
@@ -75,10 +73,7 @@ export interface PrimaryWindowNavigationActions {
     route: WorkspacePaneRouteTarget,
     options?: PrimaryWindowPresentationNavigationOptions,
   ) => MaybePromise<boolean>
-  currentWorkspacePaneRoute: (
-    workspaceId: string,
-    branch: string,
-  ) => WorkspacePaneRouteTarget | undefined
+  currentWorkspacePaneRoute: (workspaceId: string, branch: string) => WorkspacePaneRouteTarget | undefined
   goBack: (workspaceId: string) => void
   goForward: (workspaceId: string) => void
   openSettings: (page: SettingsPage) => void
@@ -88,7 +83,7 @@ export interface PrimaryWindowNavigationActions {
 interface CreatePrimaryWindowNavigationActionsOptions {
   currentWorkspaceId: string | null
   workspaceOrder: WorkspaceId[]
-  closeWorkspace: (workspaceId: string) => Promise<CloseWorkspaceResult>
+  closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   peekWorkspaceNavigation: (
     workspaceId: WorkspaceId,
     direction: 'back' | 'forward',
@@ -116,7 +111,8 @@ export function createPrimaryWindowNavigationActions({
       })
     },
     async closeWorkspace(workspaceId) {
-      const nextWorkspaceId = workspaceId === currentWorkspaceId ? nextWorkspaceIdAfterClose(workspaceOrder, workspaceId) : null
+      const nextWorkspaceId =
+        workspaceId === currentWorkspaceId ? nextWorkspaceIdAfterClose(workspaceOrder, workspaceId) : null
       const presentationToken = workspaceId === currentWorkspaceId ? beginPrimaryWindowPresentation() : null
       const result = await closeWorkspace(workspaceId)
       if (!result.ok || workspaceId !== currentWorkspaceId) return result
@@ -153,7 +149,11 @@ export function createPrimaryWindowNavigationActions({
       const token = beginPrimaryWindowPresentation()
       const onCommit = () => rememberWorkspacePaneRouteSelection(workspaceId, branch, { kind: 'static' as const, tab })
       const accepted = options
-        ? routeNavigation.openRepoBranchTab(workspaceId, branch, tab, { ...options, presentationToken: token, onCommit })
+        ? routeNavigation.openRepoBranchTab(workspaceId, branch, tab, {
+            ...options,
+            presentationToken: token,
+            onCommit,
+          })
         : routeNavigation.openRepoBranchTab(workspaceId, branch, tab, {
             presentationToken: token,
             onCommit,
@@ -309,9 +309,7 @@ function restoreWorkspacePresentationOrOpenDashboard(
   const entryCanResume =
     entry &&
     entry.route.kind !== 'newWorktree' &&
-    (repo?.capability.kind === 'git' ||
-      entry.route.kind === 'workspace-root' ||
-      entry.route.kind === 'dashboard')
+    (repo?.capability.kind === 'git' || entry.route.kind === 'workspace-root' || entry.route.kind === 'dashboard')
   if (entryCanResume) {
     const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, { presentationToken })
     if (result.kind === 'accepted' || (result.kind === 'blocked' && options.onBlocked === 'stay')) return

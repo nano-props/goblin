@@ -8,10 +8,7 @@ import {
   useTerminalSessionContext,
   useTerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
-import type {
-  TerminalSessionContextValue,
-  TerminalSessionReadContextValue,
-} from '#/web/components/terminal/types.ts'
+import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 
 function ReadSnapshot() {
   const ctx = useTerminalSessionReadContext()
@@ -28,9 +25,7 @@ function CommandProbe() {
   return <span data-testid="has-create-terminal">{String(typeof ctx.createTerminal)}</span>
 }
 
-function makeCommandContext(
-  overrides: Partial<TerminalSessionContextValue> = {},
-): TerminalSessionContextValue {
+function makeCommandContext(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
   return {
     createTerminal: vi.fn(async () => 'term-111111111111111111111'),
     createTerminalWithAdmission: vi.fn(async () => ({

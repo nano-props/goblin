@@ -127,18 +127,14 @@ export async function selectWorkspacePaneControllerTab(
           target.paneTarget.worktreePath,
           tab.sessionId,
           { presentationToken },
-        ) ??
-        false
+        ) ?? false
       )
     }
     if (tab.kind !== 'static') return false
     return (
-      navigation.showRepoWorktreeWorkspacePaneTab?.(
-        target.workspaceId,
-        target.paneTarget.worktreePath,
-        tab.type,
-        { presentationToken },
-      ) ?? false
+      navigation.showRepoWorktreeWorkspacePaneTab?.(target.workspaceId, target.paneTarget.worktreePath, tab.type, {
+        presentationToken,
+      }) ?? false
     )
   }
   if (target.paneTarget.kind === 'workspace-root') {
@@ -318,12 +314,15 @@ async function commitWorkspacePaneValidatedTargetRoute(
     presentationToken,
     ...(useCurrentTargetPrecondition ? { routePrecondition: { kind: 'current-workspace-target' as const } } : {}),
     onCommit: () => {
-      supplementCommitted = commitSupplement({
-        repoId: target.workspaceId,
-        workspaceRuntimeId: target.workspaceRuntimeId,
-        branchName,
-        worktreePath: target.worktreePath,
-      }, route)
+      supplementCommitted = commitSupplement(
+        {
+          repoId: target.workspaceId,
+          workspaceRuntimeId: target.workspaceRuntimeId,
+          branchName,
+          worktreePath: target.worktreePath,
+        },
+        route,
+      )
     },
   })
   if (!committed || !supplementCommitted) return false
@@ -350,12 +349,15 @@ export async function commitWorkspacePaneExactTargetRoute(
     presentationToken,
     routePrecondition: sourceRoute === undefined ? undefined : { kind: 'exact-route', route: sourceRoute },
     onCommit: () => {
-      supplementCommitted = commitWorkspacePaneRouteSupplement({
-        repoId: target.workspaceId,
-        workspaceRuntimeId: target.workspaceRuntimeId,
-        branchName,
-        worktreePath: target.worktreePath,
-      }, route)
+      supplementCommitted = commitWorkspacePaneRouteSupplement(
+        {
+          repoId: target.workspaceId,
+          workspaceRuntimeId: target.workspaceRuntimeId,
+          branchName,
+          worktreePath: target.worktreePath,
+        },
+        route,
+      )
     },
   })
   if (!committed || !supplementCommitted) return false
@@ -364,7 +366,8 @@ export async function commitWorkspacePaneExactTargetRoute(
 
 export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneControllerTarget): boolean {
   if (target.paneTarget.kind === 'inactive' || target.paneTarget.repoRoot !== target.workspaceId) return false
-  if (useWorkspacesStore.getState().workspaces[target.workspaceId]?.workspaceRuntimeId !== target.workspaceRuntimeId) return false
+  if (useWorkspacesStore.getState().workspaces[target.workspaceId]?.workspaceRuntimeId !== target.workspaceRuntimeId)
+    return false
   if (target.paneTarget.kind === 'git-branch') {
     return (
       target.branchName === target.paneTarget.branchName &&
@@ -382,7 +385,7 @@ export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneC
     if (target.worktreePath !== targetWorktreePath) return false
     return target.branchName === null
       ? true
-        : workspacePaneTargetLeaseIsCurrent({
+      : workspacePaneTargetLeaseIsCurrent({
           repoId: target.workspaceId,
           workspaceRuntimeId: target.workspaceRuntimeId,
           branchName: target.branchName,

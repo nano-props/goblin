@@ -411,5 +411,4 @@ describe('repo write operation coordinator', () => {
       },
     ])
   })
-
 })

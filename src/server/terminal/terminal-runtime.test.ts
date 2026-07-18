@@ -168,8 +168,9 @@ vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', asyn
   return {
     ...original,
     createPhysicalWorktreeIdentityResolver: () => ({
-      capture: vi.fn(async (input: { userId: string; repoRoot: string; workspaceRuntimeId: string; worktreePath: string }) =>
-        resolver.issue(input),
+      capture: vi.fn(
+        async (input: { userId: string; repoRoot: string; workspaceRuntimeId: string; worktreePath: string }) =>
+          resolver.issue(input),
       ),
       dispose: vi.fn(),
     }),
@@ -272,25 +273,27 @@ function buildRuntime(
     ptySupervisor: createInProcessPtySupervisor(),
     workspacePaneLayoutRepository: testWorkspacePaneLayoutRepository,
     workspacePaneTargetProjection: {
-      captureTargets: options.captureTargets ?? (async (_userId, repoRoot, scope) => {
-        const workspaceId = canonicalWorkspaceLocator(repoRoot)
-        if (!workspaceId) throw new Error('invalid test workspace id')
-        const separator = scope.lastIndexOf('\0')
-        const workspaceRuntimeId = scope.slice(separator + 1)
-        const nativeWorktreePath = repoRoot.startsWith('goblin+ssh://') ? '/srv/repo' : '/repo-linked'
-        return [
-          {
-            target: {
-              kind: 'git-worktree',
-              workspaceId,
-              workspaceRuntimeId,
-              root: repoRoot.startsWith('goblin+ssh://') ? workspaceId : LINKED_REPO_ROOT,
+      captureTargets:
+        options.captureTargets ??
+        (async (_userId, repoRoot, scope) => {
+          const workspaceId = canonicalWorkspaceLocator(repoRoot)
+          if (!workspaceId) throw new Error('invalid test workspace id')
+          const separator = scope.lastIndexOf('\0')
+          const workspaceRuntimeId = scope.slice(separator + 1)
+          const nativeWorktreePath = repoRoot.startsWith('goblin+ssh://') ? '/srv/repo' : '/repo-linked'
+          return [
+            {
+              target: {
+                kind: 'git-worktree',
+                workspaceId,
+                workspaceRuntimeId,
+                root: repoRoot.startsWith('goblin+ssh://') ? workspaceId : LINKED_REPO_ROOT,
+              },
+              nativeWorktreePath,
+              canonicalBranch: 'feature',
             },
-            nativeWorktreePath,
-            canonicalBranch: 'feature',
-          },
-        ]
-      }),
+          ]
+        }),
     },
   })
   WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_a')
@@ -448,7 +451,9 @@ interface TerminalCreateFixtureInput extends Omit<TerminalCreateInput, 'target'>
   target?: TerminalCreateInput['target']
 }
 
-function terminalCreateTarget(input: Pick<TerminalCreateFixtureInput, 'repoRoot' | 'workspaceRuntimeId' | 'worktreePath'>) {
+function terminalCreateTarget(
+  input: Pick<TerminalCreateFixtureInput, 'repoRoot' | 'workspaceRuntimeId' | 'worktreePath'>,
+) {
   const workspaceId = requiredWorkspaceLocator(input.repoRoot)
   const root = input.repoRoot.startsWith('goblin+ssh://')
     ? workspaceId
@@ -458,16 +463,18 @@ function terminalCreateTarget(input: Pick<TerminalCreateFixtureInput, 'repoRoot'
 
 describe('server terminal runtime', () => {
   test('opens a Git terminal from one target-catalog capture', async () => {
-    const captureTargets = vi.fn(async (...args: Parameters<WorkspacePaneTargetProjectionProvider['captureTargets']>) => {
-      const scope = args[2]
-      return [
-        {
-          target: workspacePaneWorktreeTarget(scope.slice(scope.lastIndexOf('\0') + 1)),
-          nativeWorktreePath: '/repo-linked',
-          canonicalBranch: 'feature',
-        },
-      ]
-    })
+    const captureTargets = vi.fn(
+      async (...args: Parameters<WorkspacePaneTargetProjectionProvider['captureTargets']>) => {
+        const scope = args[2]
+        return [
+          {
+            target: workspacePaneWorktreeTarget(scope.slice(scope.lastIndexOf('\0') + 1)),
+            nativeWorktreePath: '/repo-linked',
+            canonicalBranch: 'feature',
+          },
+        ]
+      },
+    )
     const { host, shutdown } = buildRuntime({ captureTargets })
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
@@ -2169,7 +2176,10 @@ describe('server terminal runtime', () => {
     expect(userBSession.terminalSessionId).not.toBe(userASession.terminalSessionId)
     expect(userBSession.terminalRuntimeSessionId).not.toBe(userASession.terminalRuntimeSessionId)
     expect(
-      await host.listSessions('client_shared', USER_1, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
+      await host.listSessions('client_shared', USER_1, {
+        repoRoot: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      }),
     ).toEqual([
       expect.objectContaining({
         terminalRuntimeSessionId: userASession.terminalRuntimeSessionId,
@@ -2689,7 +2699,10 @@ describe('server terminal runtime', () => {
       const terminalRuntimeSessionId = await createTerminalSession(host, 'client_idle')
 
       expect(
-        await host.listSessions('client_idle', USER_1, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
+        await host.listSessions('client_idle', USER_1, {
+          repoRoot: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        }),
       ).toEqual([
         expect.objectContaining({
           terminalRuntimeSessionId,
@@ -2700,7 +2713,10 @@ describe('server terminal runtime', () => {
       vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
       expect(handle.isClientOnline('client_idle')).toBe(false)
       expect(
-        await host.listSessions('client_idle', USER_1, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
+        await host.listSessions('client_idle', USER_1, {
+          repoRoot: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        }),
       ).toEqual([
         expect.objectContaining({
           terminalRuntimeSessionId,
@@ -2712,7 +2728,10 @@ describe('server terminal runtime', () => {
       host.registerSocket('client_idle', USER_1, reconnectedSocket)
       expect(handle.isClientOnline('client_idle')).toBe(true)
       expect(
-        await host.listSessions('client_idle', USER_1, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
+        await host.listSessions('client_idle', USER_1, {
+          repoRoot: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        }),
       ).toEqual([
         expect.objectContaining({
           terminalRuntimeSessionId,
@@ -2751,7 +2770,10 @@ describe('server terminal runtime', () => {
       }
       await vi.runOnlyPendingTimersAsync()
       await expect(
-        host.listSessions('client_recovered', USER_1, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
+        host.listSessions('client_recovered', USER_1, {
+          repoRoot: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        }),
       ).resolves.toHaveLength(1)
     } finally {
       vi.useRealTimers()
@@ -2782,7 +2804,10 @@ describe('server terminal runtime', () => {
       expect(host.getDiagnostics().terminal.liveSessionCount).toBe(0)
       WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_half_open')
       await expect(
-        host.listSessions('client_half_open', USER_1, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
+        host.listSessions('client_half_open', USER_1, {
+          repoRoot: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        }),
       ).resolves.toEqual([])
     } finally {
       vi.useRealTimers()
@@ -2814,7 +2839,10 @@ describe('server terminal runtime', () => {
       expect(host.getDiagnostics().terminal.liveSessionCount).toBe(0)
       WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_late_drain')
       await expect(
-        host.listSessions('client_late_drain', USER_1, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
+        host.listSessions('client_late_drain', USER_1, {
+          repoRoot: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        }),
       ).resolves.toEqual([])
     } finally {
       vi.useRealTimers()

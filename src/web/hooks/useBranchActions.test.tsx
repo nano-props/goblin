@@ -83,7 +83,12 @@ describe('useBranchActions', () => {
       await actions?.openTerminal?.('ghostty')
     })
 
-    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(target!.id, repo.workspaceRuntimeId, '/srv/repo-feature', 'ghostty')
+    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(
+      target!.id,
+      repo.workspaceRuntimeId,
+      '/srv/repo-feature',
+      'ghostty',
+    )
   })
 
   test('copyPatch reads the server patch through a mutation and writes it to the clipboard', async () => {
@@ -148,7 +153,12 @@ describe('useBranchActions', () => {
       await actions?.openEditor?.('vscode')
     })
 
-    expect(mocks.openRepoEditor).toHaveBeenCalledWith(target!.id, repo.workspaceRuntimeId, '/srv/repo-feature', 'vscode')
+    expect(mocks.openRepoEditor).toHaveBeenCalledWith(
+      target!.id,
+      repo.workspaceRuntimeId,
+      '/srv/repo-feature',
+      'vscode',
+    )
   })
 
   test('openTerminal and openEditor forward explicit app choices for remote repos', async () => {
@@ -189,8 +199,18 @@ describe('useBranchActions', () => {
       await actions?.openEditor?.('vscode')
     })
 
-    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(target!.id, repo.workspaceRuntimeId, '/srv/repo-feature', 'ghostty')
-    expect(mocks.openRepoEditor).toHaveBeenCalledWith(target!.id, repo.workspaceRuntimeId, '/srv/repo-feature', 'vscode')
+    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(
+      target!.id,
+      repo.workspaceRuntimeId,
+      '/srv/repo-feature',
+      'ghostty',
+    )
+    expect(mocks.openRepoEditor).toHaveBeenCalledWith(
+      target!.id,
+      repo.workspaceRuntimeId,
+      '/srv/repo-feature',
+      'vscode',
+    )
   })
 
   test('openTerminal uses the embedded server route for non-remote repos', async () => {
@@ -210,7 +230,12 @@ describe('useBranchActions', () => {
       await actions?.openTerminal?.('ghostty')
     })
 
-    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(REPO_ID, repo.workspaceRuntimeId, '/tmp/local-feature', 'ghostty')
+    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(
+      REPO_ID,
+      repo.workspaceRuntimeId,
+      '/tmp/local-feature',
+      'ghostty',
+    )
   })
 
   test('openEditor forwards an explicit editor app for local repos', async () => {

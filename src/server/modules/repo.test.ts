@@ -55,11 +55,11 @@ const mocks = vi.hoisted(() => ({
   getRemoteRepoWriteGroupPath: vi.fn(),
   getRemoteWorktreeBootstrapPreview: vi.fn(),
   removeRemoteWorktree: vi.fn(),
-  getServerRepoSettings: vi.fn(),
-  pruneServerRepoSettingsForRemovedWorktree: vi.fn(),
+  getServerWorkspaceSettings: vi.fn(),
+  pruneServerWorkspaceSettingsForRemovedWorktree: vi.fn(),
   resolveRemoteTarget: vi.fn(),
-  trustServerRepoWorktreeBootstrapConfig: vi.fn(),
-  untrustServerRepoWorktreeBootstrapConfig: vi.fn(),
+  trustServerWorkspaceWorktreeBootstrapConfig: vi.fn(),
+  untrustServerWorkspaceWorktreeBootstrapConfig: vi.fn(),
 }))
 
 vi.mock('#/system/git/branches.ts', () => ({
@@ -125,15 +125,15 @@ vi.mock('#/system/git/worktree-bootstrap.ts', () => ({
 
 vi.mock('#/shared/input-validation.ts', () => ({
   isValidCwd: () => true,
-  isValidRepoLocator: () => true,
-  toSafeRepoLocator: (value: unknown) => (typeof value === 'string' ? value : null),
+  isValidWorkspaceLocatorInput: () => true,
+  toSafeWorkspaceLocator: (value: unknown) => (typeof value === 'string' ? value : null),
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
-  getServerRepoSettings: mocks.getServerRepoSettings,
-  pruneServerRepoSettingsForRemovedWorktree: mocks.pruneServerRepoSettingsForRemovedWorktree,
-  trustServerRepoWorktreeBootstrapConfig: mocks.trustServerRepoWorktreeBootstrapConfig,
-  untrustServerRepoWorktreeBootstrapConfig: mocks.untrustServerRepoWorktreeBootstrapConfig,
+  getServerWorkspaceSettings: mocks.getServerWorkspaceSettings,
+  pruneServerWorkspaceSettingsForRemovedWorktree: mocks.pruneServerWorkspaceSettingsForRemovedWorktree,
+  trustServerWorkspaceWorktreeBootstrapConfig: mocks.trustServerWorkspaceWorktreeBootstrapConfig,
+  untrustServerWorkspaceWorktreeBootstrapConfig: mocks.untrustServerWorkspaceWorktreeBootstrapConfig,
 }))
 
 vi.mock('#/system/ssh/config.ts', () => ({
@@ -221,8 +221,8 @@ beforeEach(async () => {
       excludeCount: 0,
     },
   })
-  mocks.getServerRepoSettings.mockResolvedValue([])
-  mocks.pruneServerRepoSettingsForRemovedWorktree.mockResolvedValue(false)
+  mocks.getServerWorkspaceSettings.mockResolvedValue([])
+  mocks.pruneServerWorkspaceSettingsForRemovedWorktree.mockResolvedValue(false)
   mocks.resolveRemoteTarget.mockResolvedValue({
     target: {
       id: normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' }),
@@ -234,8 +234,8 @@ beforeEach(async () => {
       displayName: 'prod:repo',
     },
   })
-  mocks.trustServerRepoWorktreeBootstrapConfig.mockResolvedValue([])
-  mocks.untrustServerRepoWorktreeBootstrapConfig.mockResolvedValue(true)
+  mocks.trustServerWorkspaceWorktreeBootstrapConfig.mockResolvedValue([])
+  mocks.untrustServerWorkspaceWorktreeBootstrapConfig.mockResolvedValue(true)
   mocks.deleteBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.deleteUpstreamBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.removeWorktree.mockResolvedValue({ ok: true, message: 'ok' })
@@ -990,16 +990,16 @@ describe('repo mutation invalidation publishing', () => {
       signal: undefined,
       expectedConfigHash: configHash,
     })
-    expect(mocks.getServerRepoSettings).toHaveBeenCalledTimes(1)
-    expect(mocks.trustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
-    expect(mocks.untrustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.getServerWorkspaceSettings).toHaveBeenCalledTimes(1)
+    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
   })
 
   test('createRepoWorktree clears existing bootstrap trust when the create request leaves trust unchecked', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    mocks.getServerRepoSettings.mockResolvedValueOnce([
+    mocks.getServerWorkspaceSettings.mockResolvedValueOnce([
       {
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         worktreeBootstrapTrust: {
           configHash,
           trustedAt: '2026-06-26T00:00:00.000Z',
@@ -1029,23 +1029,23 @@ describe('repo mutation invalidation publishing', () => {
       signal: undefined,
       expectedConfigHash: configHash,
     })
-    expect(mocks.trustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
-    expect(mocks.untrustServerRepoWorktreeBootstrapConfig).toHaveBeenCalledWith({ repoId: REPO_ID, configHash })
+    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({ workspaceId: REPO_ID, configHash })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
   })
 
   test('createRepoWorktree reports settings failure when clearing bootstrap trust fails after bootstrap succeeds', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    mocks.getServerRepoSettings.mockResolvedValueOnce([
+    mocks.getServerWorkspaceSettings.mockResolvedValueOnce([
       {
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         worktreeBootstrapTrust: {
           configHash,
           trustedAt: '2026-06-26T00:00:00.000Z',
         },
       },
     ])
-    mocks.untrustServerRepoWorktreeBootstrapConfig.mockRejectedValueOnce(new Error('settings write failed'))
+    mocks.untrustServerWorkspaceWorktreeBootstrapConfig.mockRejectedValueOnce(new Error('settings write failed'))
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await createRepoWorktree(
@@ -1065,7 +1065,7 @@ describe('repo mutation invalidation publishing', () => {
     )
 
     expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repositoryStateChanged: true })
-    expect(mocks.untrustServerRepoWorktreeBootstrapConfig).toHaveBeenCalledWith({ repoId: REPO_ID, configHash })
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({ workspaceId: REPO_ID, configHash })
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })
 
@@ -1095,10 +1095,10 @@ describe('repo mutation invalidation publishing', () => {
       signal: undefined,
       expectedConfigHash: configHash,
     })
-    expect(mocks.trustServerRepoWorktreeBootstrapConfig).toHaveBeenCalledWith({ repoId: REPO_ID, configHash })
+    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({ workspaceId: REPO_ID, configHash })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
     expect(mocks.bootstrapWorktreeAfterCreate.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.trustServerRepoWorktreeBootstrapConfig.mock.invocationCallOrder[0],
+      mocks.trustServerWorkspaceWorktreeBootstrapConfig.mock.invocationCallOrder[0],
     )
   })
 
@@ -1109,9 +1109,9 @@ describe('repo mutation invalidation publishing', () => {
     mocks.createWorktree
       .mockImplementationOnce(async () => await firstCreate.promise)
       .mockImplementationOnce(async () => await secondCreate.promise)
-    mocks.getServerRepoSettings.mockResolvedValueOnce([]).mockResolvedValueOnce([
+    mocks.getServerWorkspaceSettings.mockResolvedValueOnce([]).mockResolvedValueOnce([
       {
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         worktreeBootstrapTrust: {
           configHash,
           trustedAt: '2026-06-26T00:00:00.000Z',
@@ -1199,13 +1199,13 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(mocks.createWorktree.mock.calls[0]?.[1]).toMatchObject({ worktreePath: '/tmp/repo-worktree-a' })
     expect(mocks.createWorktree.mock.calls[1]?.[1]).toMatchObject({ worktreePath: '/tmp/repo-worktree-b' })
-    expect(mocks.trustServerRepoWorktreeBootstrapConfig).toHaveBeenCalledWith({ repoId: REPO_ID, configHash })
-    expect(mocks.untrustServerRepoWorktreeBootstrapConfig).toHaveBeenCalledWith({ repoId: REPO_ID, configHash })
-    expect(mocks.trustServerRepoWorktreeBootstrapConfig.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({ workspaceId: REPO_ID, configHash })
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({ workspaceId: REPO_ID, configHash })
+    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.createWorktree.mock.invocationCallOrder[1],
     )
     expect(mocks.createWorktree.mock.invocationCallOrder[1]).toBeLessThan(
-      mocks.untrustServerRepoWorktreeBootstrapConfig.mock.invocationCallOrder[0],
+      mocks.untrustServerWorkspaceWorktreeBootstrapConfig.mock.invocationCallOrder[0],
     )
   })
 
@@ -1376,7 +1376,7 @@ describe('repo mutation invalidation publishing', () => {
 
   test('createRepoWorktree reports settings failure after creating and bootstrapping the worktree', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    mocks.trustServerRepoWorktreeBootstrapConfig.mockRejectedValueOnce(new Error('settings write failed'))
+    mocks.trustServerWorkspaceWorktreeBootstrapConfig.mockRejectedValueOnce(new Error('settings write failed'))
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await createRepoWorktree(
@@ -1410,7 +1410,7 @@ describe('repo mutation invalidation publishing', () => {
       repoId: WORKTREE_REPO_ID,
       query: 'repo-snapshot',
     })
-    expect(mocks.untrustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
   })
 
   test.each([
@@ -1473,7 +1473,7 @@ describe('repo mutation invalidation publishing', () => {
   })
 
   test('createRepoWorktree publishes invalidation when bootstrap fails after git created the worktree', async () => {
-    mocks.getServerRepoSettings.mockResolvedValueOnce([
+    mocks.getServerWorkspaceSettings.mockResolvedValueOnce([
       {
         repoId: REPO_ID,
         worktreeBootstrapTrust: {
@@ -1521,7 +1521,7 @@ describe('repo mutation invalidation publishing', () => {
       repoId: WORKTREE_REPO_ID,
       query: 'repo-snapshot',
     })
-    expect(mocks.untrustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
   })
 
   test('createRepoWorktree publishes remote invalidation when bootstrap fails after remote worktree creation', async () => {
@@ -1598,8 +1598,8 @@ describe('repo mutation invalidation publishing', () => {
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
       repositoryStateChanged: true,
     })
-    expect(mocks.trustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
-    expect(mocks.untrustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })
 
@@ -1837,7 +1837,7 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(afterRemoveFailed).toHaveBeenCalledOnce()
     expect(afterWorktreeRemoved).not.toHaveBeenCalled()
-    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).not.toHaveBeenCalled()
+    expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).not.toHaveBeenCalled()
   })
 
   test('removeRepoWorktree prunes settings when application finalization fails after removal', async () => {
@@ -1868,8 +1868,8 @@ describe('repo mutation invalidation publishing', () => {
     )
 
     expect(result).toEqual({ ok: false, message: 'tabs finalize failed', repositoryStateChanged: true })
-    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
-      repoId: REPO_ID,
+    expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
       worktreePath: '/tmp/repo-worktree',
     })
   })
@@ -1939,8 +1939,8 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(result).toEqual({ ok: false, message: 'fatal: delete failed', repositoryStateChanged: true })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
-    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
-      repoId: REPO_ID,
+    expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
       worktreePath: '/tmp/repo-worktree',
     })
     expectRepoSnapshotInvalidations(
@@ -1994,8 +1994,8 @@ describe('repo mutation invalidation publishing', () => {
         query: 'repo-snapshot',
       },
     )
-    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
-      repoId: LINKED_REPO_ID,
+    expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      workspaceId: LINKED_REPO_ID,
       worktreePath: '/tmp/repo-linked',
     })
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
@@ -2014,7 +2014,7 @@ describe('repo mutation invalidation publishing', () => {
       },
     ]
     mocks.getWorktrees.mockResolvedValueOnce(worktrees).mockResolvedValueOnce(worktrees)
-    mocks.pruneServerRepoSettingsForRemovedWorktree.mockResolvedValueOnce(true)
+    mocks.pruneServerWorkspaceSettingsForRemovedWorktree.mockResolvedValueOnce(true)
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await removeRepoWorktree(
@@ -2028,8 +2028,8 @@ describe('repo mutation invalidation publishing', () => {
     )
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
-      repoId: REPO_ID,
+    expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
       worktreePath: '/tmp/repo-worktree',
     })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
@@ -2047,7 +2047,7 @@ describe('repo mutation invalidation publishing', () => {
         changeCount: 0,
       },
     ])
-    mocks.pruneServerRepoSettingsForRemovedWorktree.mockRejectedValueOnce(new Error('settings write failed'))
+    mocks.pruneServerWorkspaceSettingsForRemovedWorktree.mockRejectedValueOnce(new Error('settings write failed'))
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await removeRepoWorktree(

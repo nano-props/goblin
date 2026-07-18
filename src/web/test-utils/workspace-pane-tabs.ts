@@ -49,8 +49,7 @@ export function setWorkspacePaneTabsForTargetQueryData(
         ...current.entries.filter((entry) => {
           const target = workspacePaneTabsTargetFromRuntime(entry.target)
           return (
-            !target ||
-            workspacePaneTabsTargetIdentityKey(target) !== workspacePaneTabsTargetIdentityKey(resolvedTarget)
+            !target || workspacePaneTabsTargetIdentityKey(target) !== workspacePaneTabsTargetIdentityKey(resolvedTarget)
           )
         }),
         {
@@ -78,7 +77,11 @@ export function replaceWorkspacePaneTabsQueryData(
   )
 }
 
-function currentSnapshot(repoRoot: string, workspaceRuntimeId: string, queryClient: QueryClient): WorkspacePaneTabsSnapshot {
+function currentSnapshot(
+  repoRoot: string,
+  workspaceRuntimeId: string,
+  queryClient: QueryClient,
+): WorkspacePaneTabsSnapshot {
   return (
     queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(repoRoot, workspaceRuntimeId)) ?? {
       revision: 0,
@@ -108,9 +111,7 @@ export function runtimeWorkspacePaneTargetForTest(
     | { repoRoot: string; workspaceRuntimeId: string; branchName: string; worktreePath: string },
 ) {
   const paneTarget =
-    'kind' in input
-      ? input
-      : requiredGitWorkspacePaneTabsTarget(input.repoRoot, input.branchName, input.worktreePath)
+    'kind' in input ? input : requiredGitWorkspacePaneTabsTarget(input.repoRoot, input.branchName, input.worktreePath)
   const target = runtimeWorkspacePaneTarget(paneTarget, input.workspaceRuntimeId)
   if (!target) throw new Error('workspace pane test target requires a canonical target')
   return target

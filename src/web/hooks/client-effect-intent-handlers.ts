@@ -139,7 +139,7 @@ export async function handleWorkspaceClientIntent(
     overlayBlocked: deps.isOverlayOpen() || isShortcutBlockingLayerOpen(),
     workspaceShortcutSuppressed: deps.isWorkspaceShortcutSuppressed(),
     terminalFocused: isTerminalFocused(),
-    currentWorkspaceId: deps.currentWorkspaceId,
+    currentWorkspaceId: currentRepo?.id ?? null,
     currentWorkspaceRuntimeId: currentRepo?.workspaceRuntimeId ?? null,
     currentWorkspaceCapability: currentRepo?.capability ?? null,
     currentWorkspacePaneCommandTarget: deps.currentWorkspacePaneCommandTarget,

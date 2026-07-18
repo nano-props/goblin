@@ -215,7 +215,9 @@ describe('repo file viewer read layer', () => {
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.remoteCommandExists.mockResolvedValueOnce(true)
 
-    await expect(getRepositoryFileViewer(repoId, '/srv/repo-feature', undefined, { workspaceRuntimeId })).resolves.toEqual({
+    await expect(
+      getRepositoryFileViewer(repoId, '/srv/repo-feature', undefined, { workspaceRuntimeId }),
+    ).resolves.toEqual({
       viewer: 'bat',
       shell: 'posix',
       executionRoot: '/srv/repo-feature',

@@ -1,7 +1,7 @@
 // Application menu. Two purposes:
 //   1) Provide native macOS menu bar entries (File / View / Window / Help)
 //   2) Wire global keyboard shortcuts that should work regardless of
-//      which element has focus — e.g. ⌘O always opens a repo.
+//      which element has focus — e.g. ⌘O always opens a workspace.
 //
 // Client-driven actions (Open / Close Tab / Switch Tab / Refresh /
 // Toggle View) are dispatched as typed IPC events so the
@@ -176,17 +176,17 @@ function createRecentWorkspacesMenu(recentWorkspaces: WorkspaceSessionEntry[]): 
   if (recentWorkspaces.length === 0) return [{ label: t('menu.file.no-recent'), enabled: false }]
 
   const home = app.getPath('home')
-  const localRepoItems = recentWorkspaces
+  const localWorkspaceItems = recentWorkspaces
     .filter((entry) => entry.kind === 'local')
     .map((entry) => createRecentWorkspaceMenuItem(entry, home))
-  const remoteRepoItems = recentWorkspaces
+  const remoteWorkspaceItems = recentWorkspaces
     .filter((entry) => entry.kind === 'remote')
     .map((entry) => createRecentWorkspaceMenuItem(entry, home))
 
   return [
-    ...localRepoItems,
-    ...(localRepoItems.length > 0 && remoteRepoItems.length > 0 ? [separator()] : []),
-    ...remoteRepoItems,
+    ...localWorkspaceItems,
+    ...(localWorkspaceItems.length > 0 && remoteWorkspaceItems.length > 0 ? [separator()] : []),
+    ...remoteWorkspaceItems,
     separator(),
     { label: t('menu.file.clear-recent'), click: () => send({ type: 'clear-recent-workspaces-requested' }) },
   ]

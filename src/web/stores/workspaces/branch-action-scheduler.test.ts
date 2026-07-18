@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'vitest'
-import { evaluateBranchActionSchedule, isNetworkBranchActionKind } from '#/web/stores/workspaces/branch-action-scheduler.ts'
+import {
+  evaluateBranchActionSchedule,
+  isNetworkBranchActionKind,
+} from '#/web/stores/workspaces/branch-action-scheduler.ts'
 import type { RepoBranchActionKind } from '#/web/stores/workspaces/branch-action-types.ts'
 import type { RepoOperationPhase } from '#/web/stores/workspaces/operations.ts'
 const ACTIONS: RepoBranchActionKind[] = ['pull', 'push', 'createWorktree', 'deleteBranch', 'removeWorktree']

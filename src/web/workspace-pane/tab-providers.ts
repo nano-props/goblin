@@ -115,7 +115,6 @@ export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneTabTyp
   }
 
   abstract close(input: WorkspacePaneTabCloseInput): Promise<boolean>
-
 }
 
 export abstract class WorkspacePaneStaticTabProvider<
@@ -343,10 +342,12 @@ const STATIC_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<WorkspacePaneStaticTabT
 
 const RUNTIME_WORKSPACE_PANE_TAB_PROVIDERS = [terminalWorkspacePaneTabProvider] as const
 
-const RUNTIME_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<WorkspacePaneRuntimeTabType, WorkspacePaneRuntimeTabProvider> =
-  {
-    terminal: terminalWorkspacePaneTabProvider,
-  }
+const RUNTIME_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<
+  WorkspacePaneRuntimeTabType,
+  WorkspacePaneRuntimeTabProvider
+> = {
+  terminal: terminalWorkspacePaneTabProvider,
+}
 
 export const workspacePaneTabProviders = [
   ...STATIC_WORKSPACE_PANE_TAB_PROVIDERS,

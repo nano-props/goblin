@@ -129,7 +129,9 @@ export const useWorkspacesStore = create<WorkspacesStore>()(
       partialize: (state): PersistedWorkspacesStore => ({ repoSnapshotCache: state.repoSnapshotCache }),
       merge: (persisted, current) => ({
         ...current,
-        repoSnapshotCache: normalizeRepoSnapshotCache((persisted as RawPersistedWorkspacesStore | null)?.repoSnapshotCache),
+        repoSnapshotCache: normalizeRepoSnapshotCache(
+          (persisted as RawPersistedWorkspacesStore | null)?.repoSnapshotCache,
+        ),
       }),
     },
   ),

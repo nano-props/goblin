@@ -165,13 +165,13 @@ describe('app bootstrap hooks', () => {
   })
 
   test('passes the routed repo root to server workspace restore', async () => {
-    renderInJsdom(<Harness activeRepoRoot={workspaceIdForTest('goblin+file:///tmp/routed-repo')} />)
+    renderInJsdom(<Harness activeWorkspaceId={workspaceIdForTest('goblin+file:///tmp/routed-repo')} />)
 
     await vi.waitFor(() => {
       expect(mockedRestoreWorkspaceAtBoot).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          activeRepoRoot: 'goblin+file:///tmp/routed-repo',
+          activeWorkspaceId: 'goblin+file:///tmp/routed-repo',
           signal: expect.any(AbortSignal),
         }),
       )
@@ -310,9 +310,7 @@ describe('app bootstrap hooks', () => {
   test('blocks persistence when repo session hydration fails', async () => {
     const session = workspaceRestoreFixture(
       {
-        openWorkspaceEntries: [
-          { kind: 'local' as const, id: workspaceIdForTest('goblin+file:///tmp/missing-repo') },
-        ],
+        openWorkspaceEntries: [{ kind: 'local' as const, id: workspaceIdForTest('goblin+file:///tmp/missing-repo') }],
       },
       {
         restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/missing-repo'),
@@ -518,8 +516,8 @@ describe('app bootstrap hooks', () => {
   })
 })
 
-function Harness({ activeRepoRoot = null }: { activeRepoRoot?: WorkspaceId | null }) {
-  const bootstrap = useAuthenticatedAppBootstrap({ activeRepoRoot })
+function Harness({ activeWorkspaceId = null }: { activeWorkspaceId?: WorkspaceId | null }) {
+  const bootstrap = useAuthenticatedAppBootstrap({ activeWorkspaceId })
   return bootstrap.state.status === 'failed' ? (
     <button onClick={bootstrap.retry}>{bootstrap.state.message}</button>
   ) : (

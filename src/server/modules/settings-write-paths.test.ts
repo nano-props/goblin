@@ -72,10 +72,10 @@ describe('settings command handlers', () => {
     mocks.addServerRecentWorkspace.mockResolvedValue([repo])
     const { handleAddRecentWorkspace } = await import('#/server/modules/settings-write-paths.ts')
 
-    await expect(handleAddRecentWorkspace({ repo })).resolves.toEqual({
+    await expect(handleAddRecentWorkspace({ workspace: repo })).resolves.toEqual({
       ok: true,
       recentWorkspaces: [repo],
-      addedRepo: repo,
+      addedWorkspace: repo,
     })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
   })

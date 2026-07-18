@@ -3,14 +3,15 @@ import {
   addServerRecentWorkspace,
   clearServerRecentWorkspaces,
   setServerFetchIntervalSec,
-  setServerRepoWorkspaceExternalAppRecent,
+  setServerWorkspaceExternalAppRecent,
   updateUserSettings,
 } from '#/server/modules/settings-source.ts'
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
-import { toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
-import type { RepoSettingsState, UserSettingsUpdateResponse } from '#/shared/api-types.ts'
+import { toSafeWorkspaceSessionEntry } from '#/shared/input-validation.ts'
+import type { WorkspaceSettingsState, UserSettingsUpdateResponse } from '#/shared/api-types.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceSessionEntryId } from '#/shared/remote-workspace.ts'
 import { settingsInvalidationScopesForPrefsPatch } from '#/shared/server-invalidation.ts'
 
@@ -33,10 +34,10 @@ export interface SetGlobalShortcutRegisteredInput {
   registered: boolean
 }
 export interface AddRecentWorkspaceInput {
-  repo: WorkspaceSessionEntry
+  workspace: WorkspaceSessionEntry
 }
-export interface SetRepoWorkspaceExternalAppRecentInput {
-  repoId: string
+export interface SetWorkspaceExternalAppRecentInput {
+  workspaceId: WorkspaceId
   worktreePath: string | null
   itemId: string
 }
@@ -74,18 +75,20 @@ export function handleSetGlobalShortcutRegistered(
 
 export async function handleAddRecentWorkspace(
   input: AddRecentWorkspaceInput,
-): Promise<{ ok: true; recentWorkspaces: WorkspaceSessionEntry[]; addedRepo: WorkspaceSessionEntry | null }> {
+): Promise<{ ok: true; recentWorkspaces: WorkspaceSessionEntry[]; addedWorkspace: WorkspaceSessionEntry | null }> {
   // The route schema has already confirmed the shape; re-run
-  // `toSafeSessionRepoEntry` as a defence in depth check in case the
+  // `toSafeWorkspaceSessionEntry` as a defence in depth check in case the
   // shape ever loosens.
-  const requestedRepo = toSafeSessionRepoEntry(input.repo)
-  const recentWorkspaces = await addServerRecentWorkspace(input.repo)
-  const addedRepo =
-    requestedRepo && recentWorkspaces.length > 0 && workspaceSessionEntryId(recentWorkspaces[0]) === workspaceSessionEntryId(requestedRepo)
+  const requestedWorkspace = toSafeWorkspaceSessionEntry(input.workspace)
+  const recentWorkspaces = await addServerRecentWorkspace(input.workspace)
+  const addedWorkspace =
+    requestedWorkspace &&
+    recentWorkspaces.length > 0 &&
+    workspaceSessionEntryId(recentWorkspaces[0]) === workspaceSessionEntryId(requestedWorkspace)
       ? recentWorkspaces[0]
       : null
   publishSettingsInvalidation(['settings-snapshot'])
-  return { ok: true, recentWorkspaces, addedRepo }
+  return { ok: true, recentWorkspaces, addedWorkspace }
 }
 
 export async function handleClearRecentWorkspaces(): Promise<{ ok: true }> {
@@ -94,10 +97,10 @@ export async function handleClearRecentWorkspaces(): Promise<{ ok: true }> {
   return { ok: true }
 }
 
-export async function handleSetRepoWorkspaceExternalAppRecent(
-  input: SetRepoWorkspaceExternalAppRecentInput,
-): Promise<{ ok: true } & RepoSettingsState> {
-  const repoSettings = await setServerRepoWorkspaceExternalAppRecent(input)
+export async function handleSetWorkspaceExternalAppRecent(
+  input: SetWorkspaceExternalAppRecentInput,
+): Promise<{ ok: true } & WorkspaceSettingsState> {
+  const workspaceSettings = await setServerWorkspaceExternalAppRecent(input)
   publishSettingsInvalidation(['settings-snapshot'])
-  return { ok: true, repoSettings }
+  return { ok: true, workspaceSettings }
 }

@@ -1,8 +1,4 @@
-import type {
-  TerminalCreateInput,
-  TerminalCreateResult,
-  TerminalExecutionTarget,
-} from '#/shared/terminal-types.ts'
+import type { TerminalCreateInput, TerminalCreateResult, TerminalExecutionTarget } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'

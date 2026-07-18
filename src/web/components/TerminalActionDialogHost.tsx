@@ -13,11 +13,7 @@ interface Props {
   navigation: PrimaryWindowNavigationActions
 }
 
-export function TerminalActionDialogHost({
-  currentWorkspaceId,
-  currentWorkspacePaneRoute,
-  navigation,
-}: Props) {
+export function TerminalActionDialogHost({ currentWorkspaceId, currentWorkspacePaneRoute, navigation }: Props) {
   const t = useT()
   const closeConfirm = useTerminalActionDialogsStore((s) => s.closeConfirm)
   const closeCloseConfirm = useTerminalActionDialogsStore((s) => s.closeCloseConfirm)

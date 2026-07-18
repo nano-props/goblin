@@ -1278,7 +1278,6 @@ export class TerminalSession {
   private clearTerminalFocusIfOwned(): void {
     if (this.isTerminalFocusTarget(document.activeElement)) setTerminalFocused(false)
   }
-
 }
 
 function waitForTerminalLayout(): Promise<void> {

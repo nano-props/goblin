@@ -66,9 +66,7 @@ describe('WorkspacePaneTargetCatalog', () => {
   test('retains a detached worktree even when the repository has no branch refs', async () => {
     const catalog = new WorkspacePaneTargetCatalog({
       hasGitCapability: () => true,
-      readIdentities: async () => [
-        { kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'detached' } },
-      ],
+      readIdentities: async () => [{ kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'detached' } }],
     })
     await expect(
       catalog.captureTargets('user-a', 'goblin+file:///repo', 'goblin+file:///repo\0runtime-a'),
@@ -94,5 +92,4 @@ describe('WorkspacePaneTargetCatalog', () => {
       },
     ])
   })
-
 })

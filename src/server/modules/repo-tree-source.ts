@@ -140,7 +140,6 @@ async function readDirectoryEntriesLocal(
         isDirectory,
       }
     })
-
 }
 
 interface DirectoryEntryCandidate {

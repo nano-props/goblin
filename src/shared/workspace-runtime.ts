@@ -1,4 +1,8 @@
-import { parseCanonicalWorkspaceLocator, type ParsedWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+import {
+  parseCanonicalWorkspaceLocator,
+  type ParsedWorkspaceLocator,
+  type WorkspaceId,
+} from '#/shared/workspace-locator.ts'
 
 export type WorkspaceUnavailableReason =
   | 'error.workspace-locator-malformed'
@@ -117,11 +121,7 @@ export function workspaceTerminalAvailable(probe: WorkspaceProbeState | null | u
 }
 
 export function workspaceWorktreesAvailable(probe: WorkspaceProbeState | null | undefined): boolean {
-  return (
-    probe?.status === 'ready' &&
-    probe.capabilities.git.status === 'available' &&
-    probe.capabilities.git.worktrees
-  )
+  return probe?.status === 'ready' && probe.capabilities.git.status === 'available' && probe.capabilities.git.worktrees
 }
 
 export function bindWorkspacePaneTarget(

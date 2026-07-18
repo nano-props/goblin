@@ -27,7 +27,7 @@ import { recordWithoutKey } from '#/shared/record.ts'
 import { workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-interface InitialRepoRefresh {
+interface InitialWorkspaceRefresh {
   id: WorkspaceId
   workspaceRuntimeId: string
 }
@@ -65,7 +65,7 @@ function createRestorableWorkspaceLifecycleActions(
         ),
       )
       if (signal?.aborted) return
-      const initialRefreshes: InitialRepoRefresh[] = []
+      const initialRefreshes: InitialWorkspaceRefresh[] = []
       for (const tabs of runtime.workspacePaneTabs) {
         writeWorkspacePaneTabsSnapshotQueryData(tabs.workspaceId, tabs.workspaceRuntimeId, tabs.snapshot)
       }
@@ -81,7 +81,7 @@ function createRestorableWorkspaceLifecycleActions(
           const repo = workspaces[restoredRepo.workspaceId]
           // Stub leases (projection: null) skip the post-hydration projection
           // refresh — that's the entire point of the active-only restore. The
-          // lazy `useRestoreRepoTabsOnView` hook fires the first refresh when
+          // lazy `useRestoreWorkspaceTabsOnView` hook fires the first refresh when
           // the user navigates to a stub repo.
           if (repo && isProjectedRestoredWorkspaceRuntime(restoredRepo)) {
             initialRefreshes.push({ id: repo.id, workspaceRuntimeId: repo.workspaceRuntimeId })

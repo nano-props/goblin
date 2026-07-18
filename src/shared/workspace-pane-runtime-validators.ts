@@ -83,9 +83,7 @@ export function normalizeWorkspacePaneRuntimeCloseInput(value: unknown): Workspa
   const parsed = v.safeParse(WorkspacePaneRuntimeCloseInputSchema, value)
   if (!parsed.success) return null
   const target = canonicalRuntimeWorkspacePaneTarget(parsed.output.target.target)
-  return target && target.kind !== 'git-branch'
-    ? { ...parsed.output, target: { target } }
-    : null
+  return target && target.kind !== 'git-branch' ? { ...parsed.output, target: { target } } : null
 }
 
 export function normalizeWorkspacePaneRuntimeOpenResult(
@@ -99,17 +97,12 @@ export function normalizeWorkspacePaneRuntimeOpenResult(
   const paneTabsSnapshot = normalizeWorkspacePaneTabsSnapshot(parsed.output.paneTabsSnapshot)
   if (!runtime?.ok || !paneTabsSnapshot) return null
   const owners = paneTabsSnapshot.entries.filter((entry) =>
-    entry.tabs.some(
-      (tab) => isWorkspacePaneRuntimeTabEntry(tab) && tab.runtimeSessionId === runtime.terminalSessionId,
-    ),
+    entry.tabs.some((tab) => isWorkspacePaneRuntimeTabEntry(tab) && tab.runtimeSessionId === runtime.terminalSessionId),
   )
   if (owners.length !== 1) return null
   const owner = owners[0]
   if (!owner || owner.target.kind === 'git-branch' || owner.target.kind !== runtime.presentation.kind) return null
-  if (
-    expectedTarget &&
-    runtimeWorkspacePaneTargetKey(owner.target) !== runtimeWorkspacePaneTargetKey(expectedTarget)
-  )
+  if (expectedTarget && runtimeWorkspacePaneTargetKey(owner.target) !== runtimeWorkspacePaneTargetKey(expectedTarget))
     return null
   return { ...parsed.output, runtime, paneTabsSnapshot }
 }

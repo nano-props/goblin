@@ -163,10 +163,14 @@ describe('workspace pane tab providers', () => {
     expect(workspacePaneStaticTabProvider('status').buttonId('workspace-pane')).toBe('workspace-pane-status-tab')
     expect(workspacePaneStaticTabProvider('status').panelId('workspace-pane')).toBe('workspace-pane-status-panel')
     expect(workspacePaneStaticTabProvider('changes').tabEntry()).toEqual(workspacePaneStaticTabEntry('changes'))
-    expect(terminalWorkspacePaneTabProvider.identity('term-111111111111111111111')).toBe('terminal:term-111111111111111111111')
+    expect(terminalWorkspacePaneTabProvider.identity('term-111111111111111111111')).toBe(
+      'terminal:term-111111111111111111111',
+    )
     expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 0)).toBe('workspace-pane-workspace-pane-tab')
     expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 2)).toBe('workspace-pane-workspace-pane-tab-2')
-    expect(terminalWorkspacePaneTabProvider.tabEntry('term-111111111111111111111')).toEqual(workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'))
+    expect(terminalWorkspacePaneTabProvider.tabEntry('term-111111111111111111111')).toEqual(
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+    )
     expect(changesWorkspacePaneTabProvider.label({ t, branchName: 'main', statusCount: 3 })).toBe(
       'tab.changes-with-count:{"count":3}',
     )

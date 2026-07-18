@@ -77,11 +77,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
           if (localRevision !== null && localRevision > catalog.revision) {
             return { kind: 'superseded', localRevision }
           }
-          const reconciled = terminalProjection.reconcileServerSessionsSnapshot(
-            scope.target,
-            catalog,
-            clientId,
-          )
+          const reconciled = terminalProjection.reconcileServerSessionsSnapshot(scope.target, catalog, clientId)
           if (!reconciled) {
             if (!scope.isActive()) return { kind: 'inactive' }
             const currentRevision = terminalProjection.terminalSessionsCatalogCoverageRevision(scope.target)
@@ -159,7 +155,13 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
     }
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [workspaceMembershipReady, currentRepoId, currentWorkspaceRuntimeId, recoverTerminalSessionsFromServer, scopeRegistry])
+  }, [
+    workspaceMembershipReady,
+    currentRepoId,
+    currentWorkspaceRuntimeId,
+    recoverTerminalSessionsFromServer,
+    scopeRegistry,
+  ])
 
   useEffect(() => {
     if (!workspaceMembershipReady) {

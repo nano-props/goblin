@@ -197,7 +197,12 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       broadcastRepoSessionsChanged(event.userId, sessionsChangedEvent)
     } catch (error) {
       terminalRuntimeLogger.warn(
-        { userId: event.userId, workspaceId: event.workspaceId, workspaceRuntimeId: event.workspaceRuntimeId, err: error },
+        {
+          userId: event.userId,
+          workspaceId: event.workspaceId,
+          workspaceRuntimeId: event.workspaceRuntimeId,
+          err: error,
+        },
         'failed to publish invalidated workspace runtime sessions',
       )
     }

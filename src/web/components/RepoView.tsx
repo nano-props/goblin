@@ -11,7 +11,7 @@ import {
 } from '#/web/components/Skeleton.tsx'
 import { RepoWorkspacePane } from '#/web/components/Layout.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
-import { useRestoreRepoTabsOnView } from '#/web/hooks/useRestoreRepoTabsOnView.ts'
+import { useRestoreWorkspaceTabsOnView } from '#/web/hooks/useRestoreWorkspaceTabsOnView.ts'
 import { getRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import { UnavailableRepoView } from '#/web/components/UnavailableRepoView.tsx'
 import { RepoProjectionFailureView } from '#/web/components/RepoProjectionFailureView.tsx'
@@ -27,10 +27,10 @@ import { CreateWorktreePagePane } from '#/web/components/repo-pages/CreateWorktr
 import type { RepoRouteView } from '#/web/App.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
-import type { RepoProjectionPromotionViewState } from '#/web/hooks/useRestoreRepoTabsOnView.ts'
+import type { WorkspaceProjectionPromotionViewState } from '#/web/hooks/useRestoreWorkspaceTabsOnView.ts'
 
 interface RepoProjectionRestoreController {
-  state: RepoProjectionPromotionViewState
+  state: WorkspaceProjectionPromotionViewState
   retry: () => void
 }
 
@@ -278,7 +278,7 @@ export function RepoView({
           <RepoWorkspacePane>
             {routeView?.kind === 'dashboard' ? (
               <RepoDashboardPane
-                repoId={workspaceId}
+                repoId={repo.id}
                 compact={compact}
                 trafficLightOffset={workspaceTrafficLightOffset}
                 onBack={() => onOpenRepoRoot?.(repo.id)}
@@ -308,7 +308,7 @@ export function RepoView({
               />
             ) : routeView?.kind === 'newWorktree' ? (
               <CreateWorktreePagePane
-                repoId={workspaceId}
+                repoId={repo.id}
                 compact={compact}
                 trafficLightOffset={workspaceTrafficLightOffset}
                 onCancel={() => {
@@ -351,7 +351,7 @@ function GitWorkspaceEffects({
   children: (projectionRestore: RepoProjectionRestoreController) => ReactNode
 }) {
   useRepoToasts(workspaceId)
-  const projectionRestore = useRestoreRepoTabsOnView({ repoId: workspaceId })
+  const projectionRestore = useRestoreWorkspaceTabsOnView({ workspaceId })
   return children(projectionRestore)
 }
 

@@ -127,7 +127,8 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
       ownedTargetKeysAtSettle
         ? ownedTargetKeysAtSettle.has(key)
         : options.targets.some(
-            (target) => target.key === key && operationCurrent(options.get, options.id, workspaceRuntimeId, operationId, target),
+            (target) =>
+              target.key === key && operationCurrent(options.get, options.id, workspaceRuntimeId, operationId, target),
           ),
     setPhase: (phase) => {
       if (ctx.isCurrent()) markOperationState(options, workspaceRuntimeId, operationId, phase)
@@ -149,7 +150,8 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
       replaceQueuedKey:
         options.policy === 'latest-wins' ? `${options.lane}:${options.operationKey ?? primary.key}` : undefined,
       onQueued: () => markOperationState(options, workspaceRuntimeId, operationId, 'queued'),
-      onStart: (wasQueued: boolean) => markOperationState(options, workspaceRuntimeId, operationId, 'running', wasQueued),
+      onStart: (wasQueued: boolean) =>
+        markOperationState(options, workspaceRuntimeId, operationId, 'running', wasQueued),
     }
     const result = await scheduleRepoOperation<T>(
       options.id,

@@ -77,11 +77,7 @@ export function normalizeClientWorkspaceState(value: unknown): ClientWorkspaceSt
       ),
     ),
     filetreeViewStateByWorktreeByWorkspace: normalizeFiletreeState(
-      migratedClientWorkspaceField(
-        raw,
-        'filetreeViewStateByWorktreeByWorkspace',
-        'filetreeViewStateByWorktreeByRepo',
-      ),
+      migratedClientWorkspaceField(raw, 'filetreeViewStateByWorktreeByWorkspace', 'filetreeViewStateByWorktreeByRepo'),
     ),
   }
 }

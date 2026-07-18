@@ -232,7 +232,9 @@ function applyCreatedTerminalWorkspacePaneRuntimeTabs(
 
 function terminalCreateTargetRuntimeIsCurrent(base: TerminalSessionBase): boolean {
   const coordinates = terminalExecutionCoordinates(base.target)
-  return currentWorkspaceRuntimeId(useWorkspacesStore.getState(), coordinates.repoRoot) === coordinates.workspaceRuntimeId
+  return (
+    currentWorkspaceRuntimeId(useWorkspacesStore.getState(), coordinates.repoRoot) === coordinates.workspaceRuntimeId
+  )
 }
 
 function terminalRuntimeTabCreateAction(

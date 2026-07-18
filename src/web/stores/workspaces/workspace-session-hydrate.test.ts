@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { localWorkspaceSessionEntry, normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import {
+  localWorkspaceSessionEntry,
+  normalizeRemoteTarget,
+  remoteWorkspaceSessionEntry,
+} from '#/shared/remote-workspace.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'

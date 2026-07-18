@@ -21,11 +21,9 @@ describe('remote filesystem reads', () => {
       ok: true,
       message: 'README.md\0src/',
     })
-    expect(run).toHaveBeenCalledWith(
-      { type: 'directoryChildren', path: '/workspace', prefix: 'src' },
-      target,
-      { signal: undefined },
-    )
+    expect(run).toHaveBeenCalledWith({ type: 'directoryChildren', path: '/workspace', prefix: 'src' }, target, {
+      signal: undefined,
+    })
   })
 
   test('preserves a missing or unreadable directory failure', async () => {

@@ -1281,14 +1281,16 @@ export class TerminalSessionProjection {
     }
     if (!result.ok) return false
     this.applyClosedServerSessionEffect(base, result.runtime, requestedBinding)
-    void refreshWorkspacePaneTabsQueryData(terminalSessionCoordinates(base).repoRoot, workspaceRuntimeId).catch((err) => {
-      terminalSessionProviderLog.warn('terminal closed but workspace pane tabs refresh failed', {
-        terminalSessionId,
-        repoRoot: terminalSessionCoordinates(base).repoRoot,
-        workspaceRuntimeId,
-        err,
-      })
-    })
+    void refreshWorkspacePaneTabsQueryData(terminalSessionCoordinates(base).repoRoot, workspaceRuntimeId).catch(
+      (err) => {
+        terminalSessionProviderLog.warn('terminal closed but workspace pane tabs refresh failed', {
+          terminalSessionId,
+          repoRoot: terminalSessionCoordinates(base).repoRoot,
+          workspaceRuntimeId,
+          err,
+        })
+      },
+    )
     return true
   }
 
@@ -1458,10 +1460,7 @@ export class TerminalSessionProjection {
         const [reason, projectionDeltaRevision] = notification
         if (reason === 'projection-delta-revision') {
           if (projectionDeltaRevision === undefined) throw new Error('terminal projection delta revision missing')
-          this.applyTerminalSessionsDeltaRevision(
-            terminalSessionCoordinates(descriptor),
-            projectionDeltaRevision,
-          )
+          this.applyTerminalSessionsDeltaRevision(terminalSessionCoordinates(descriptor), projectionDeltaRevision)
           return
         }
         this.notifySession(descriptor.terminalSessionId)

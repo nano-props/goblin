@@ -8,6 +8,7 @@ import {
   isCurrentWorkspaceRuntimeMembership,
   releaseWorkspaceRuntimeMembershipLease,
 } from '#/server/modules/workspace-runtimes.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const mocks = vi.hoisted(() => ({
   getServerWorkspaceState: vi.fn(),
@@ -22,8 +23,8 @@ const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerWorkspaceState: mocks.getServerWorkspaceState,
-  compareAndReplaceServerWorkspaceRepos: vi.fn(),
-  confirmServerWorkspaceRepoEntry: vi.fn(async (entry) => ({
+  compareAndReplaceServerWorkspaceEntries: vi.fn(),
+  confirmServerWorkspaceEntry: vi.fn(async (entry) => ({
     matched: true,
     workspace: { openWorkspaceEntries: [entry], workspacePaneTabsByTargetByWorkspace: {} },
   })),
@@ -40,7 +41,7 @@ vi.mock('#/server/modules/remote-workspace-lifecycle-write-paths.ts', () => ({
 
 const USER_ID = 'user_restore_runtime'
 const CLIENT_ID = 'client_restore_runtime'
-const REPO_ROOT = 'goblin+file:///repo'
+const REPO_ROOT = workspaceIdForTest('goblin+file:///repo')
 
 describe('session restore runtime ownership', () => {
   beforeEach(() => {
@@ -58,13 +59,13 @@ describe('session restore runtime ownership', () => {
     expect(isCurrentWorkspaceRuntimeMembership(USER_ID, REPO_ROOT, lease.workspaceRuntimeId, CLIENT_ID)).toBe(true)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     await expect(
-      restoreRepoTabsForRepo({
+      restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
         userId: USER_ID,
         clientId: CLIENT_ID,
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         workspaceRuntimeId: lease.workspaceRuntimeId,
         workspacePaneTabsHost,
       }),

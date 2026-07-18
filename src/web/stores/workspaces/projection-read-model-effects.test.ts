@@ -20,7 +20,10 @@ beforeEach(() => {
 })
 
 describe('repo projection read-model effects', () => {
-  function acceptedProjection(branch: string | null = null, mode: 'summary' | 'full' = 'full'): WorkspaceRuntimeProjection {
+  function acceptedProjection(
+    branch: string | null = null,
+    mode: 'summary' | 'full' = 'full',
+  ): WorkspaceRuntimeProjection {
     const loadedAt = Date.now()
     return {
       snapshot: {
@@ -232,7 +235,10 @@ describe('repo projection read-model effects', () => {
       { scope: 'query-cache' },
     )
 
-    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces['goblin+file:///repo']).capability.git.dataLoads.repoReadModel).toMatchObject({
+    expect(
+      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces['goblin+file:///repo']).capability.git
+        .dataLoads.repoReadModel,
+    ).toMatchObject({
       phase: 'loading',
       loadedAt: null,
     })

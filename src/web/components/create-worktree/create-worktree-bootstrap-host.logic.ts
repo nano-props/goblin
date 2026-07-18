@@ -1,15 +1,17 @@
-import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
-import { isRepoWorktreeBootstrapConfigTrusted } from '#/shared/repo-settings.ts'
+import type { WorkspaceSettingsEntry } from '#/shared/workspace-settings.ts'
+import { isWorkspaceWorktreeBootstrapConfigTrusted } from '#/shared/workspace-settings.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export function resolveConfigTrusted(input: {
-  repoSettings: readonly RepoSettingsEntry[]
-  repoId: string
+  workspaceSettings: readonly WorkspaceSettingsEntry[]
+  workspaceId: WorkspaceId
   configHash: string | null | undefined
   configTrustChoice: boolean | null
 }): boolean {
   return (
-    input.configTrustChoice ?? isRepoWorktreeBootstrapConfigTrusted(input.repoSettings, input.repoId, input.configHash)
+    input.configTrustChoice ??
+    isWorkspaceWorktreeBootstrapConfigTrusted(input.workspaceSettings, input.workspaceId, input.configHash)
   )
 }
 
@@ -25,8 +27,8 @@ export function resolveNextConfigTrustChoice(input: {
 
 export function resolveWorktreeBootstrapDecision(input: {
   preview: WorktreeBootstrapPreview | null
-  repoSettings: readonly RepoSettingsEntry[]
-  repoId: string
+  workspaceSettings: readonly WorkspaceSettingsEntry[]
+  workspaceId: WorkspaceId
   configTrustChoice: boolean | null
 }): WorktreeBootstrapDecision {
   const configHash = input.preview?.hasOperations ? input.preview.configHash : null
@@ -35,8 +37,8 @@ export function resolveWorktreeBootstrapDecision(input: {
     kind: 'run',
     configHash,
     configTrusted: resolveConfigTrusted({
-      repoSettings: input.repoSettings,
-      repoId: input.repoId,
+      workspaceSettings: input.workspaceSettings,
+      workspaceId: input.workspaceId,
       configHash,
       configTrustChoice: input.configTrustChoice,
     }),

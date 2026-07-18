@@ -176,7 +176,11 @@ describe('useBranchActionDialogDisplay', () => {
     setRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId, false, {
       loadedAt: 123,
       operations: [
-        serverOperation({ workspaceRuntimeId: repo.workspaceRuntimeId, kind: 'delete-branch', branch: 'feature/query' }),
+        serverOperation({
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+          kind: 'delete-branch',
+          branch: 'feature/query',
+        }),
       ],
     })
     const entry: BranchActionDialogEntry<string> = {

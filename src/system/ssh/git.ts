@@ -84,8 +84,7 @@ export interface RemoteWorktreeMutationResult extends ExecResult {
 }
 
 export type RemoteWorkspacePaneTargetIdentity =
-  | { kind: 'git-branch'; branchName: string }
-  | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
+  { kind: 'git-branch'; branchName: string } | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
 
 interface SnapshotSections {
   current: string[]
@@ -125,17 +124,19 @@ export async function getRemoteWorkspacePaneTargetIdentities(
   const separator = `\n${REMOTE_PANE_WORKTREES_MARKER}\n`
   const index = result.stdout.lastIndexOf(separator)
   if (index < 0) throw new Error('error.failed-read-repo')
-  const branches = result.stdout.slice(0, index).split('\n').map((branch) => branch.trim()).filter(Boolean)
+  const branches = result.stdout
+    .slice(0, index)
+    .split('\n')
+    .map((branch) => branch.trim())
+    .filter(Boolean)
   const worktrees = parseUsableWorktrees(result.stdout.slice(index + separator.length))
   const checkedOutBranches = new Set(worktrees.flatMap((worktree) => (worktree.branch ? [worktree.branch] : [])))
   return [
-    ...worktrees.map(
-      (worktree): RemoteWorkspacePaneTargetIdentity => ({
-        kind: 'git-worktree',
-        worktreePath: worktree.path,
-        head: gitHead(worktree.branch ?? null),
-      }),
-    ),
+    ...worktrees.map((worktree): RemoteWorkspacePaneTargetIdentity => ({
+      kind: 'git-worktree',
+      worktreePath: worktree.path,
+      head: gitHead(worktree.branch ?? null),
+    })),
     ...branches
       .filter((branch) => !checkedOutBranches.has(branch))
       .map((branch): RemoteWorkspacePaneTargetIdentity => ({ kind: 'git-branch', branchName: branch })),

@@ -124,7 +124,7 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
-        currentWorkspaceId: 'goblin+file:///tmp/repo',
+        currentWorkspaceId: CURRENT_GIT_REPO.id,
 
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
@@ -142,7 +142,7 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
-        currentWorkspaceId: 'goblin+file:///tmp/repo',
+        currentWorkspaceId: CURRENT_GIT_REPO.id,
 
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
@@ -160,7 +160,7 @@ describe('client effect intent plans', () => {
         overlayBlocked: true,
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
-        currentWorkspaceId: 'goblin+file:///tmp/repo',
+        currentWorkspaceId: CURRENT_GIT_REPO.id,
 
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
@@ -196,7 +196,7 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
-        currentWorkspaceId: 'goblin+file:///tmp/repo',
+        currentWorkspaceId: CURRENT_GIT_REPO.id,
 
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
@@ -246,7 +246,7 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
-        currentWorkspaceId: 'goblin+file:///tmp/repo',
+        currentWorkspaceId: CURRENT_GIT_REPO.id,
 
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
@@ -268,7 +268,7 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
-        currentWorkspaceId: 'goblin+file:///tmp/repo',
+        currentWorkspaceId: CURRENT_GIT_REPO.id,
 
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
@@ -286,7 +286,7 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
-        currentWorkspaceId: 'goblin+file:///tmp/repo',
+        currentWorkspaceId: CURRENT_GIT_REPO.id,
 
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
@@ -304,7 +304,7 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: false,
         terminalFocused: true,
-        currentWorkspaceId: 'goblin+file:///tmp/repo',
+        currentWorkspaceId: CURRENT_GIT_REPO.id,
 
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
@@ -322,7 +322,7 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
-        currentWorkspaceId: 'goblin+file:///tmp/repo',
+        currentWorkspaceId: CURRENT_GIT_REPO.id,
 
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },
@@ -386,7 +386,7 @@ describe('client effect intent plans', () => {
         overlayBlocked: false,
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
-        currentWorkspaceId: 'goblin+file:///tmp/repo',
+        currentWorkspaceId: CURRENT_GIT_REPO.id,
 
         currentWorkspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
         currentWorkspaceCapability: { kind: 'git', probe: CURRENT_GIT_REPO.workspaceProbe },

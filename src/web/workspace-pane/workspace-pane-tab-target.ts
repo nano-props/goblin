@@ -80,7 +80,9 @@ export function resolveWorkspacePaneDestinationTargetLease(
 export function workspacePaneTargetLeaseIsCurrent(lease: WorkspacePaneTargetLease): boolean {
   const current = resolveWorkspacePaneDestinationTargetLease(lease.repoId, lease.branchName)
   return (
-    current !== null && current.workspaceRuntimeId === lease.workspaceRuntimeId && current.worktreePath === lease.worktreePath
+    current !== null &&
+    current.workspaceRuntimeId === lease.workspaceRuntimeId &&
+    current.worktreePath === lease.worktreePath
   )
 }
 
@@ -164,10 +166,7 @@ function resolveWorkspacePaneTabTarget(
       workspaceId,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       paneTarget: preferenceTarget,
-      worktreeHead:
-        preferenceTarget.kind === 'git-worktree' && branchName
-          ? { kind: 'branch', branchName }
-          : undefined,
+      worktreeHead: preferenceTarget.kind === 'git-worktree' && branchName ? { kind: 'branch', branchName } : undefined,
       preferredTab: preferredWorkspacePaneTabForRoute(repo.ui, preferenceTarget, options),
       allowPreferredTabFallback: options.workspacePaneRoute === undefined,
       tabEntries: tabEntriesProjection.tabs,

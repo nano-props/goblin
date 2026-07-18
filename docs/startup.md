@@ -30,7 +30,7 @@ The primary window boot path has two separate concerns: public shell hydration a
    - If the restore signal is aborted, this stage must return without flipping `workspaceMembershipReady`.
 
 5. Lazy repo promotion
-   - Owner: `useRestoreRepoTabsOnView` and server `restoreRepoTabsForRepo`.
+   - Owner: `useRestoreWorkspaceTabsOnView` and server `restoreWorkspaceTabs`.
    - When navigation reaches a stub, the server projects that repo and asks the pane aggregate for a canonical snapshot.
    - The client sends only the repo root and server-issued runtime identity. The server reads the canonical repo entry from current durable membership; client stub data is never command authority.
    - Promotion validates both the requesting client's runtime lease and durable membership, atomically filters invalid durable targets from the settings transaction's current layout, and then performs a pure projection. It never initializes or copies layout into epoch state.

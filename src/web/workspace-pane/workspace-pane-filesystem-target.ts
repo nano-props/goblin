@@ -26,9 +26,7 @@ export function workspacePaneFilesystemRuntimeTarget(
   return tabsTarget ? runtimeWorkspacePaneTarget(tabsTarget, target.workspaceRuntimeId) : null
 }
 
-export function workspacePaneFilesystemTerminalBase(
-  target: WorkspacePaneFilesystemTarget,
-): TerminalSessionBase | null {
+export function workspacePaneFilesystemTerminalBase(target: WorkspacePaneFilesystemTarget): TerminalSessionBase | null {
   if (!target.capabilities.terminal.available) return null
   const runtimeTarget = workspacePaneFilesystemRuntimeTarget(target)
   if (!runtimeTarget) return null

@@ -325,7 +325,10 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
         if (result.ok && ownsFetchDataLoad) get().clearFetchFailed(id, workspaceRuntimeId)
       }
       const handleError = (message: string, ctx: RepoOperationContext) => {
-        settleNetworkFetchDataLoadState(set, id, workspaceRuntimeId, ownsNetworkFetchDataLoad(ctx), { ok: false, message })
+        settleNetworkFetchDataLoadState(set, id, workspaceRuntimeId, ownsNetworkFetchDataLoad(ctx), {
+          ok: false,
+          message,
+        })
         if (message === 'cancelled') return
         get().setLastResult(id, { ok: false, message }, workspaceRuntimeId, { action: branchActionEventAction(action) })
       }

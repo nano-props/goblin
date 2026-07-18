@@ -42,12 +42,7 @@ function composeRequestSignal(
 export async function fetchServerJson<T>(path: string | URL, init?: ServerFetchOptions): Promise<T> {
   const server = requireClientServerConfig()
   const url = typeof path === 'string' ? new URL(path, resolveApiBaseUrl(server.url)).toString() : path.toString()
-  const {
-    headers: extraHeaders,
-    timeoutMs = DEFAULT_SERVER_REQUEST_TIMEOUT_MS,
-    signal,
-    ...rest
-  } = init ?? {}
+  const { headers: extraHeaders, timeoutMs = DEFAULT_SERVER_REQUEST_TIMEOUT_MS, signal, ...rest } = init ?? {}
   const headers: Record<string, string> = {}
   if (server.accessToken) {
     // Embedded client or dev mode: send the token as a header.

@@ -15,9 +15,7 @@ import {
   workspacePaneRouteHistoryResolution,
   type WorkspacePaneRouteReconciliation,
 } from '#/web/components/repo-workspace/workspace-pane-route-reconciliation.ts'
-import {
-  commitWorkspacePaneControllerRoute,
-} from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { commitWorkspacePaneControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import {
   workspacePaneActionTargetFromCoordinates,
   runWorkspacePaneAction,
@@ -71,9 +69,7 @@ export function useWorkspacePaneRouteController({
     () => false,
   )
   const effectiveReconciliation =
-    routeIntentPending && reconciliation.kind === 'replace-empty-pane'
-      ? ({ kind: 'pending' } as const)
-      : reconciliation
+    routeIntentPending && reconciliation.kind === 'replace-empty-pane' ? ({ kind: 'pending' } as const) : reconciliation
 
   useWorkspacePaneNavigationHistory({
     enabled,
@@ -143,7 +139,16 @@ function useReconcileWorkspacePaneRoute({
     return () => {
       cancelled = true
     }
-  }, [branchName, enabled, navigation, reconciliation, workspaceId, workspaceRuntimeId, routeIntentPending, worktreePath])
+  }, [
+    branchName,
+    enabled,
+    navigation,
+    reconciliation,
+    workspaceId,
+    workspaceRuntimeId,
+    routeIntentPending,
+    worktreePath,
+  ])
 }
 
 function useWorkspacePaneNavigationHistory({
@@ -182,9 +187,7 @@ function useWorkspacePaneNavigationHistory({
   })
 }
 
-function workspacePaneValidRouteTarget(
-  route: ParsedWorkspacePaneRouteTarget,
-): WorkspacePaneRouteTarget {
+function workspacePaneValidRouteTarget(route: ParsedWorkspacePaneRouteTarget): WorkspacePaneRouteTarget {
   if (route?.kind === 'invalid-static') return null
   return route
 }

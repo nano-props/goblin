@@ -29,7 +29,9 @@ interface CoreRepoProjectionAcceptanceSignature {
 
 const acceptedCoreRepoProjectionSignaturesByKey = new Map<string, CoreRepoProjectionAcceptanceSignature>()
 
-function acceptedProjectionKey(input: AcceptedRepoProjectionReadModel & { projection: WorkspaceRuntimeProjection }): string {
+function acceptedProjectionKey(
+  input: AcceptedRepoProjectionReadModel & { projection: WorkspaceRuntimeProjection },
+): string {
   return [
     input.repoRoot,
     input.workspaceRuntimeId,
@@ -44,7 +46,9 @@ function authoritativeProjection(projection: WorkspaceRuntimeProjection): boolea
   return projection.loadedAt > 0
 }
 
-function coreProjectionAcceptanceSignature(projection: WorkspaceRuntimeProjection): CoreRepoProjectionAcceptanceSignature {
+function coreProjectionAcceptanceSignature(
+  projection: WorkspaceRuntimeProjection,
+): CoreRepoProjectionAcceptanceSignature {
   return {
     readLoadedAt: projection.loadedAt,
     snapshot: projection.snapshot,

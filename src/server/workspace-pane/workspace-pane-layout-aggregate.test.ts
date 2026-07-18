@@ -241,14 +241,12 @@ describe('workspace pane layout aggregate', () => {
             stagedProviderSnapshots: providers,
           },
           () => {
-          throw new Error('runtime admission failed')
+            throw new Error('runtime admission failed')
           },
         ),
       ).rejects.toThrow('runtime admission failed')
       expect(operation.indexedAdmissionLeases(scope)).toEqual([])
-      await expect(
-        operation.snapshot({ scope, validTargets, providerSnapshots: providers }),
-      ).resolves.toEqual(baseline)
+      await expect(operation.snapshot({ scope, validTargets, providerSnapshots: providers })).resolves.toEqual(baseline)
     })
   })
 
@@ -276,9 +274,7 @@ describe('workspace pane layout aggregate', () => {
 
       expect(callbackObservedUncommittedState).toBe(true)
       expect(operation.indexedAdmissionLeases(scope)).toEqual([lease])
-      await expect(
-        operation.snapshot({ scope, validTargets, providerSnapshots: providers }),
-      ).resolves.toEqual(snapshot)
+      await expect(operation.snapshot({ scope, validTargets, providerSnapshots: providers })).resolves.toEqual(snapshot)
     })
   })
 
@@ -294,18 +290,20 @@ describe('workspace pane layout aggregate', () => {
     const snapshots = []
     for (let attempt = 0; attempt < 2; attempt += 1) {
       snapshots.push(
-        await aggregate.runExclusive(scope.repoRoot, async (operation) =>
-          await operation.commitRuntimeTabPlacement(
-            {
-              ...scope,
-              target: runtimeWorktreeTarget,
-              lease,
-              intent: runtimeIntent,
-              validTargets,
-              stagedProviderSnapshots: providers,
-            },
-            commitAdmission,
-          ),
+        await aggregate.runExclusive(
+          scope.repoRoot,
+          async (operation) =>
+            await operation.commitRuntimeTabPlacement(
+              {
+                ...scope,
+                target: runtimeWorktreeTarget,
+                lease,
+                intent: runtimeIntent,
+                validTargets,
+                stagedProviderSnapshots: providers,
+              },
+              commitAdmission,
+            ),
         ),
       )
     }
@@ -345,18 +343,20 @@ describe('workspace pane layout aggregate', () => {
     const snapshots = []
     for (let attempt = 0; attempt < 2; attempt += 1) {
       snapshots.push(
-        await aggregate.runExclusive(scope.repoRoot, async (operation) =>
-          await operation.commitRuntimeTabPlacement(
-            {
-              ...scope,
-              target: runtimeWorktreeTarget,
-              lease,
-              intent,
-              validTargets,
-              stagedProviderSnapshots,
-            },
-            () => undefined,
-          ),
+        await aggregate.runExclusive(
+          scope.repoRoot,
+          async (operation) =>
+            await operation.commitRuntimeTabPlacement(
+              {
+                ...scope,
+                target: runtimeWorktreeTarget,
+                lease,
+                intent,
+                validTargets,
+                stagedProviderSnapshots,
+              },
+              () => undefined,
+            ),
         ),
       )
     }
@@ -378,27 +378,36 @@ describe('workspace pane layout aggregate', () => {
     const replacementLease = physicalWorktreeAdmissionLease(replacementCapability())
     await aggregate.runExclusive(scope.repoRoot, async (operation) => {
       await operation.commitRuntimeTabPlacement(
-        { ...scope, target: runtimeWorktreeTarget, lease: firstLease, intent: runtimeIntent, validTargets, stagedProviderSnapshots: providers },
+        {
+          ...scope,
+          target: runtimeWorktreeTarget,
+          lease: firstLease,
+          intent: runtimeIntent,
+          validTargets,
+          stagedProviderSnapshots: providers,
+        },
         () => undefined,
       )
     })
     const baseline = await readSnapshot(aggregate, scope, validTargets, providers)
 
     await expect(
-      aggregate.runExclusive(scope.repoRoot, async (operation) =>
-        await operation.commitRuntimeTabPlacement(
-          {
-            ...scope,
-            target: runtimeWorktreeTarget,
-            lease: replacementLease,
-            intent: runtimeIntent,
-            validTargets,
-            stagedProviderSnapshots: providers,
-          },
-          () => {
-            throw new Error('replacement admission failed')
-          },
-        ),
+      aggregate.runExclusive(
+        scope.repoRoot,
+        async (operation) =>
+          await operation.commitRuntimeTabPlacement(
+            {
+              ...scope,
+              target: runtimeWorktreeTarget,
+              lease: replacementLease,
+              intent: runtimeIntent,
+              validTargets,
+              stagedProviderSnapshots: providers,
+            },
+            () => {
+              throw new Error('replacement admission failed')
+            },
+          ),
       ),
     ).rejects.toThrow('replacement admission failed')
 
@@ -414,10 +423,20 @@ describe('workspace pane layout aggregate', () => {
     const siblingScope = { ...scope, userId: 'user-b' }
     const validTargets = [worktreeProjection(target.branchName)]
 
-    for (const [epochScope, lease] of [[scope, firstLease], [siblingScope, firstLease]] as const) {
+    for (const [epochScope, lease] of [
+      [scope, firstLease],
+      [siblingScope, firstLease],
+    ] as const) {
       await aggregate.runExclusive(scope.repoRoot, async (operation) => {
         await operation.commitRuntimeTabPlacement(
-          { ...epochScope, target: runtimeWorktreeTarget, lease, intent: runtimeIntent, validTargets, stagedProviderSnapshots: providers },
+          {
+            ...epochScope,
+            target: runtimeWorktreeTarget,
+            lease,
+            intent: runtimeIntent,
+            validTargets,
+            stagedProviderSnapshots: providers,
+          },
           () => undefined,
         )
       })
@@ -426,7 +445,14 @@ describe('workspace pane layout aggregate', () => {
 
     await aggregate.runExclusive(scope.repoRoot, async (operation) => {
       await operation.commitRuntimeTabPlacement(
-        { ...scope, target: runtimeWorktreeTarget, lease: replacementLease, intent: runtimeIntent, validTargets, stagedProviderSnapshots: providers },
+        {
+          ...scope,
+          target: runtimeWorktreeTarget,
+          lease: replacementLease,
+          intent: runtimeIntent,
+          validTargets,
+          stagedProviderSnapshots: providers,
+        },
         () => undefined,
       )
     })
@@ -443,18 +469,20 @@ describe('workspace pane layout aggregate', () => {
     const lease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
 
     await expect(
-      aggregate.runExclusive(scope.repoRoot, async (operation) =>
-        await operation.commitRuntimeTabPlacement(
-          {
-            ...scope,
-            target: runtimeWorktreeTarget,
-            lease,
-            intent: runtimeIntent,
-            validTargets: [],
-            stagedProviderSnapshots: providers,
-          },
-          () => undefined,
-        ),
+      aggregate.runExclusive(
+        scope.repoRoot,
+        async (operation) =>
+          await operation.commitRuntimeTabPlacement(
+            {
+              ...scope,
+              target: runtimeWorktreeTarget,
+              lease,
+              intent: runtimeIntent,
+              validTargets: [],
+              stagedProviderSnapshots: providers,
+            },
+            () => undefined,
+          ),
       ),
     ).rejects.toThrow('error.workspace-tabs-target-invalid')
     expect(repository.load).not.toHaveBeenCalled()

@@ -1,9 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import {
-  canonicalWorkspaceLocator,
-  workspaceLocatorForPath,
-} from '#/shared/workspace-locator.ts'
+import { canonicalWorkspaceLocator, workspaceLocatorForPath } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
@@ -127,7 +124,7 @@ function terminalRuntimeTabTargetKey(
   const workspaceId = canonicalWorkspaceLocator(input.repoRoot)
   const worktreeId =
     input.worktreePath && workspaceId
-      ? canonicalWorkspaceLocator(input.worktreePath) ?? workspaceLocatorForPath(workspaceId, input.worktreePath)
+      ? (canonicalWorkspaceLocator(input.worktreePath) ?? workspaceLocatorForPath(workspaceId, input.worktreePath))
       : null
   return workspaceId && worktreeId ? formatTerminalWorktreeKey(workspaceId, worktreeId) : null
 }

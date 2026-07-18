@@ -131,7 +131,10 @@ describe('terminal session projection helpers', () => {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/restored' } },
+        presentation: {
+          kind: 'git-worktree' as const,
+          head: { kind: 'branch' as const, branchName: 'feature/restored' },
+        },
         controller: null,
         processName: 'bash',
         canonicalTitle: null,
@@ -142,7 +145,10 @@ describe('terminal session projection helpers', () => {
       },
     })
 
-    expect(projected?.descriptor.presentation).toEqual({ kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/restored' } })
+    expect(projected?.descriptor.presentation).toEqual({
+      kind: 'git-worktree' as const,
+      head: { kind: 'branch' as const, branchName: 'feature/restored' },
+    })
   })
 
   test('does not replace server presentation from a second client-side authority', () => {
@@ -167,7 +173,10 @@ describe('terminal session projection helpers', () => {
       },
     })
 
-    expect(projected?.descriptor.presentation).toEqual({ kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/stale' } })
+    expect(projected?.descriptor.presentation).toEqual({
+      kind: 'git-worktree' as const,
+      head: { kind: 'branch' as const, branchName: 'feature/stale' },
+    })
   })
 
   test('projects attach results into local controller state for the active attachment', () => {
@@ -205,7 +214,10 @@ describe('terminal session projection helpers', () => {
       {
         ok: true,
         action: 'created',
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/renamed' } },
+        presentation: {
+          kind: 'git-worktree' as const,
+          head: { kind: 'branch' as const, branchName: 'feature/renamed' },
+        },
         terminalSessionId: 'term-111111111111111111111',
         terminalProjectionEffect: { kind: 'delta', revision: 1 },
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',

@@ -178,11 +178,13 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
   const tabEntries =
     input.paneTarget.kind === 'git-worktree' && input.worktreeHead?.kind === 'detached'
       ? normalizedTabEntries.filter(
-          (entry) =>
-            isWorkspacePaneRuntimeTabEntry(entry) || entry.type === 'status' || entry.type === 'files',
+          (entry) => isWorkspacePaneRuntimeTabEntry(entry) || entry.type === 'status' || entry.type === 'files',
         )
       : normalizedTabEntries
-  const runtimeTabTargetKeyByType = workspacePaneRuntimeTabTargetKeyByType({ repoRoot: input.workspaceId, worktreePath })
+  const runtimeTabTargetKeyByType = workspacePaneRuntimeTabTargetKeyByType({
+    repoRoot: input.workspaceId,
+    worktreePath,
+  })
   const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ repoRoot: input.workspaceId, worktreePath })
   const hasWorktree = !!worktreePath
   const runtimeTabStateByType = runtimeTabStateByTypeFromInput(input)
@@ -259,7 +261,10 @@ function paneTargetFilesystemPath(target: RepoWorkspacePaneModelTarget): string 
   return parseCanonicalWorkspaceLocator(target.repoRoot)?.path ?? null
 }
 
-function paneTargetPresentationBranch(target: RepoWorkspacePaneModelTarget, worktreeHead: GitHead | undefined): string | null {
+function paneTargetPresentationBranch(
+  target: RepoWorkspacePaneModelTarget,
+  worktreeHead: GitHead | undefined,
+): string | null {
   if (target.kind === 'git-branch') return target.branchName
   return target.kind === 'git-worktree' && worktreeHead ? gitHeadBranch(worktreeHead) : null
 }
@@ -429,19 +434,13 @@ function selectedWorkspacePaneTabEntry(input: {
 }): WorkspacePaneTabEntry | null {
   const materializedTab = input.selection?.materializedTab
   if (materializedTab) {
-    return (
-      input.tabEntries.find(
-        (entry) => workspacePaneTabEntryIdentity(entry) === materializedTab.identity,
-      ) ?? null
-    )
+    return input.tabEntries.find((entry) => workspacePaneTabEntryIdentity(entry) === materializedTab.identity) ?? null
   }
   if (input.selection?.kind !== 'runtime-host') return null
   const runtimeType = input.selection.runtimeType
   const requestedSessionId = input.requestedSessionIdByRuntimeType?.[runtimeType]
   const selectedSessionId =
-    requestedSessionId !== undefined
-      ? requestedSessionId
-      : input.runtimeTabStateByType[runtimeType].selectedSessionId
+    requestedSessionId !== undefined ? requestedSessionId : input.runtimeTabStateByType[runtimeType].selectedSessionId
   if (!selectedSessionId) return null
   return (
     input.tabEntries.find(

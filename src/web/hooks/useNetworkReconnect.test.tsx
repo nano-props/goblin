@@ -4,7 +4,11 @@ import { act, cleanup } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
-import { isRemoteWorkspaceId, normalizeRemoteTarget, type RemoteWorkspaceConnectionLifecycle } from '#/shared/remote-workspace.ts'
+import {
+  isRemoteWorkspaceId,
+  normalizeRemoteTarget,
+  type RemoteWorkspaceConnectionLifecycle,
+} from '#/shared/remote-workspace.ts'
 import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import { goblinLog } from '#/web/logger.ts'

@@ -11,7 +11,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 /** Minimal shape this helper needs from a `WorkspaceState`. Defined
  *  locally so the persistence / session layer doesn't have to
  *  depend on the full store types. */
-interface OpenWorkspaceRepoLike {
+interface OpenWorkspaceLike {
   id: WorkspaceId
   session?: {
     entry: WorkspaceSessionEntry | null
@@ -21,28 +21,28 @@ interface OpenWorkspaceRepoLike {
 
 export function persistedOpenWorkspaceEntries(
   workspaceOrder: WorkspaceId[],
-  workspaces: Record<string, OpenWorkspaceRepoLike | undefined>,
+  workspaces: Record<string, OpenWorkspaceLike | undefined>,
 ): WorkspaceSessionEntry[] {
   return workspaceOrder.flatMap<WorkspaceSessionEntry>((id) => {
-    const repo = workspaces[id]
-    if (!repo) return []
-    if (repo.session?.entry) return [repo.session.entry]
-    if (!isRemoteWorkspaceId(repo.id)) return [{ kind: 'local', id: repo.id }]
+    const workspace = workspaces[id]
+    if (!workspace) return []
+    if (workspace.session?.entry) return [workspace.session.entry]
+    if (!isRemoteWorkspaceId(workspace.id)) return [{ kind: 'local', id: workspace.id }]
     // For remote workspaces, reconstruct the session entry from the
     // last-known target (lifecycle.target). A failed lifecycle
     // may or may not have a retained target; without one we
-    // can't reconstruct a session entry, so the repo is dropped
+    // can't reconstruct a session entry, so the workspace is dropped
     // from the recent-workspace list. This is the same
     // intentional trade-off: a placeholder with no target is just a
-    // connecting spinner, not a repo the user explicitly opened.
-    if (repo.admission.kind !== 'remote') return []
-    const target = remoteWorkspaceConnectionTarget(repo.admission.lifecycle)
+    // connecting spinner, not a workspace the user explicitly opened.
+    if (workspace.admission.kind !== 'remote') return []
+    const target = remoteWorkspaceConnectionTarget(workspace.admission.lifecycle)
     if (!target) return []
     return [remoteWorkspaceSessionEntry(remoteWorkspaceRefFromTarget(target))]
   })
 }
 
-export function nextRestoredRepoIdAfterWorkspaceClose(
+export function nextRestoredWorkspaceIdAfterWorkspaceClose(
   workspaceOrder: WorkspaceId[],
   restoredWorkspaceId: WorkspaceId | null,
   closedId: WorkspaceId,
@@ -54,16 +54,16 @@ export function nextRestoredRepoIdAfterWorkspaceClose(
 }
 
 export function restoredWorkspaceIdAfterWorkspaceHydration(
-  currentRestoredRepoId: WorkspaceId | null,
+  currentRestoredWorkspaceId: WorkspaceId | null,
   workspaces: Record<string, unknown>,
   workspaceOrder: WorkspaceId[],
-  preferredActiveRepoId: WorkspaceId | null,
-  managedRestoredRepoId: WorkspaceId | null,
+  preferredActiveWorkspaceId: WorkspaceId | null,
+  managedRestoredWorkspaceId: WorkspaceId | null,
 ): WorkspaceId | null {
-  if (currentRestoredRepoId && currentRestoredRepoId !== managedRestoredRepoId && workspaces[currentRestoredRepoId]) {
-    return currentRestoredRepoId
+  if (currentRestoredWorkspaceId && currentRestoredWorkspaceId !== managedRestoredWorkspaceId && workspaces[currentRestoredWorkspaceId]) {
+    return currentRestoredWorkspaceId
   }
-  if (preferredActiveRepoId && workspaces[preferredActiveRepoId]) return preferredActiveRepoId
-  if (preferredActiveRepoId) return null
+  if (preferredActiveWorkspaceId && workspaces[preferredActiveWorkspaceId]) return preferredActiveWorkspaceId
+  if (preferredActiveWorkspaceId) return null
   return workspaceOrder[0] ?? null
 }

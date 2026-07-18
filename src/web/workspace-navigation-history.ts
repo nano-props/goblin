@@ -72,7 +72,8 @@ export function useWorkspaceNavigationHistory({
 
   useEffect(() => {
     if (!entry) return
-    const currentHistoryEntry = useWorkspacesStore.getState().navigationHistoryByWorkspace[entry.workspaceId]?.current ?? null
+    const currentHistoryEntry =
+      useWorkspacesStore.getState().navigationHistoryByWorkspace[entry.workspaceId]?.current ?? null
     const browserHistoryTraversal = workspaceNavigationBrowserHistoryTraversal(routeHref)
     const replaceCurrentMatches =
       replaceCurrent &&
@@ -82,7 +83,8 @@ export function useWorkspaceNavigationHistory({
       if (!replaceCurrentMatches) {
         recordWorkspaceNavigation(replaceCurrentEntry, { browserHistoryTraversal })
       }
-      const restoredCurrent = useWorkspacesStore.getState().navigationHistoryByWorkspace[entry.workspaceId]?.current ?? null
+      const restoredCurrent =
+        useWorkspacesStore.getState().navigationHistoryByWorkspace[entry.workspaceId]?.current ?? null
       if (workspaceNavigationHistoryEntryEqual(restoredCurrent, replaceCurrentEntry)) {
         recordWorkspaceNavigation(entry, { replace: true })
       } else if (!workspaceNavigationHistoryEntryEqual(restoredCurrent, entry)) {

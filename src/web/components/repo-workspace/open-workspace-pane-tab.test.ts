@@ -152,9 +152,9 @@ describe('openWorkspacePaneTab', () => {
 
     expect(openTabsFor('feature/worktree')).toEqual(['status', 'files', 'history', 'changes'])
     expect(
-      useWorkspacesStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.[
-        'workspace-pane:changes'
-      ],
+      useWorkspacesStore.getState().tabOpenerIdentityByScope[
+        openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)
+      ]?.['workspace-pane:changes'],
     ).toBe('workspace-pane:files')
   })
 
@@ -381,9 +381,9 @@ describe('openWorkspacePaneTab', () => {
     ).resolves.toBe(true)
 
     expect(
-      useWorkspacesStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.[
-        'workspace-pane:changes'
-      ],
+      useWorkspacesStore.getState().tabOpenerIdentityByScope[
+        openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)
+      ]?.['workspace-pane:changes'],
     ).toBe('workspace-pane:files')
   })
 
@@ -419,9 +419,9 @@ describe('openWorkspacePaneTab', () => {
     })
 
     expect(
-      useWorkspacesStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.[
-        'workspace-pane:changes'
-      ],
+      useWorkspacesStore.getState().tabOpenerIdentityByScope[
+        openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)
+      ]?.['workspace-pane:changes'],
     ).toBe('workspace-pane:files')
   })
 

@@ -193,23 +193,25 @@ export type TerminalProjectionEffect = TerminalProjectionNoneEffect | TerminalPr
  * startup from being represented as a recovery replay.
  */
 export type TerminalAttachResult =
-  | ({ ok: true; terminalProjectionEffect: TerminalProjectionDeltaEffect } & TerminalRuntimeMetadata & TerminalStreamFrame)
-  | ({ ok: true; terminalProjectionEffect: TerminalProjectionNoneEffect } & TerminalRuntimeMetadata & TerminalSnapshotFrame)
+  | ({ ok: true; terminalProjectionEffect: TerminalProjectionDeltaEffect } & TerminalRuntimeMetadata &
+      TerminalStreamFrame)
+  | ({ ok: true; terminalProjectionEffect: TerminalProjectionNoneEffect } & TerminalRuntimeMetadata &
+      TerminalSnapshotFrame)
   | { ok: false; message: string }
 
 /** Restart always replaces an existing binding and commits a reset snapshot. */
 export type TerminalRestartResult =
-  | ({ ok: true; terminalProjectionEffect: TerminalProjectionDeltaEffect } & TerminalRuntimeMetadata & TerminalSnapshotFrame)
+  | ({ ok: true; terminalProjectionEffect: TerminalProjectionDeltaEffect } & TerminalRuntimeMetadata &
+      TerminalSnapshotFrame)
   | { ok: false; message: string }
 
 export type TerminalCreateAction = 'created' | 'restored' | 'reused'
 
 export type TerminalPresentation = { kind: 'workspace-root' } | { kind: 'git-worktree'; head: GitHead }
 
-export function terminalGitWorktreePresentation(branchName: string | null): Extract<
-  TerminalPresentation,
-  { kind: 'git-worktree' }
-> {
+export function terminalGitWorktreePresentation(
+  branchName: string | null,
+): Extract<TerminalPresentation, { kind: 'git-worktree' }> {
   return {
     kind: 'git-worktree',
     head: gitHead(branchName),

@@ -78,7 +78,9 @@ describe('workspace pane destination navigation', () => {
     useWorkspacesStore.setState((state) => {
       const repo = state.workspaces[REPO_ID]
       if (!repo) return state
-      return { workspaces: { ...state.workspaces, [REPO_ID]: { ...repo, workspaceRuntimeId: 'repo-runtime-reopened' } } }
+      return {
+        workspaces: { ...state.workspaces, [REPO_ID]: { ...repo, workspaceRuntimeId: 'repo-runtime-reopened' } },
+      }
     })
     const commitWorkspacePaneRoute = acceptedRouteCommit()
 
@@ -198,19 +200,21 @@ describe('workspace pane destination navigation', () => {
   test('a destination commit consumes its own route observation without self-superseding', async () => {
     seedDestinationRepo()
     const { actions, routeNavigation } = primaryNavigationActions()
-    vi.mocked(routeNavigation.commitWorkspacePaneRoute).mockImplementation(async (_repoId, _branchName, _route, options) => {
-      const token = options?.presentationToken
-      if (!token) return false
-      const href = '/repo/destination/tab/status'
-      const navigationId = registerPrimaryWindowNavigation(token, href, options.onCommit)
-      if (!navigationId) return false
-      observePrimaryWindowHistoryNavigation({
-        href,
-        state: primaryWindowNavigationState({}, navigationId),
-        action: { type: 'PUSH' },
-      })
-      return true
-    })
+    vi.mocked(routeNavigation.commitWorkspacePaneRoute).mockImplementation(
+      async (_repoId, _branchName, _route, options) => {
+        const token = options?.presentationToken
+        if (!token) return false
+        const href = '/repo/destination/tab/status'
+        const navigationId = registerPrimaryWindowNavigation(token, href, options.onCommit)
+        if (!navigationId) return false
+        observePrimaryWindowHistoryNavigation({
+          href,
+          state: primaryWindowNavigationState({}, navigationId),
+          action: { type: 'PUSH' },
+        })
+        return true
+      },
+    )
 
     await expect(
       commitWorkspacePaneDestinationRoute(beginPresentation('feature/destination'), DESTINATION_ROUTE, actions),
@@ -265,10 +269,7 @@ function deferredRouteCommit(completion: Promise<boolean>) {
   return vi.fn<WorkspacePaneDestinationNavigation['commitWorkspacePaneRoute']>(
     async (_repoId, _branchName, _route, options) => {
       const accepted = await completion
-      if (
-        accepted &&
-        (!options?.presentationToken || primaryWindowPresentationIsCurrent(options.presentationToken))
-      ) {
+      if (accepted && (!options?.presentationToken || primaryWindowPresentationIsCurrent(options.presentationToken))) {
         options?.onCommit?.()
       }
       return accepted

@@ -9,14 +9,15 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const LOCAL_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///other')
+const REMOTE_WORKSPACE_ID = workspaceIdForTest('goblin+ssh://host/repo')
 
 const mocks = vi.hoisted(() => ({
   acquireWorkspaceRuntimeLease: vi.fn(),
   releaseWorkspaceRuntimeMembershipLease: vi.fn(),
   isCurrentWorkspaceRuntimeMembership: vi.fn(),
   getServerWorkspaceState: vi.fn(),
-  compareAndReplaceServerWorkspaceRepos: vi.fn(),
-  confirmServerWorkspaceRepoEntry: vi.fn(),
+  compareAndReplaceServerWorkspaceEntries: vi.fn(),
+  confirmServerWorkspaceEntry: vi.fn(),
   probeRepo: vi.fn(),
   readRepoProjection: vi.fn(),
   runRemoteWorkspaceLifecycleWrite: vi.fn(),
@@ -43,8 +44,8 @@ vi.mock('#/server/modules/workspace-runtimes.ts', () => ({
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerWorkspaceState: mocks.getServerWorkspaceState,
-  compareAndReplaceServerWorkspaceRepos: mocks.compareAndReplaceServerWorkspaceRepos,
-  confirmServerWorkspaceRepoEntry: mocks.confirmServerWorkspaceRepoEntry,
+  compareAndReplaceServerWorkspaceEntries: mocks.compareAndReplaceServerWorkspaceEntries,
+  confirmServerWorkspaceEntry: mocks.confirmServerWorkspaceEntry,
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
@@ -79,7 +80,7 @@ function plainWorkspaceProbe() {
   }
 }
 
-describe('restoreRepoTabsForRepo', () => {
+describe('restoreWorkspaceTabs', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.acquireWorkspaceRuntimeLease.mockImplementation((_userId: string, workspaceId: string) => ({
@@ -90,7 +91,7 @@ describe('restoreRepoTabsForRepo', () => {
     mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(true)
     mocks.workspaceProbeStateForRuntime.mockReturnValue(gitProbe())
     mocks.probeWorkspace.mockResolvedValue(gitProbe())
-    mocks.probeRepo.mockImplementation(async (repoRoot: string) => ({ ok: true, root: repoRoot, name: 'repo' }))
+    mocks.probeRepo.mockImplementation(async (workspaceId: string) => ({ ok: true, root: workspaceId, name: 'repo' }))
     mocks.readRepoProjection.mockResolvedValue({
       snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: '/repo' } }] },
       status: [],
@@ -99,7 +100,7 @@ describe('restoreRepoTabsForRepo', () => {
       requested: { branch: null, pullRequestMode: 'full' },
       loadedAt: 1,
     })
-    mocks.confirmServerWorkspaceRepoEntry.mockImplementation(async () => ({
+    mocks.confirmServerWorkspaceEntry.mockImplementation(async () => ({
       matched: true,
       workspace: await mocks.getServerWorkspaceState.mock.results.at(-1)?.value,
     }))
@@ -108,7 +109,7 @@ describe('restoreRepoTabsForRepo', () => {
   test('probes + projects + restores tabs for a single repo', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: LOCAL_WORKSPACE_ID,
       branchName: 'main',
     })
     const workspace: ServerWorkspaceState = {
@@ -130,12 +131,12 @@ describe('restoreRepoTabsForRepo', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
-    const result = await restoreRepoTabsForRepo({
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: LOCAL_WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       workspacePaneTabsHost,
     })
@@ -162,7 +163,7 @@ describe('restoreRepoTabsForRepo', () => {
   test('repairs invalid deferred tab state before initializing the runtime scope', async () => {
     const staleTargetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: LOCAL_WORKSPACE_ID,
       branchName: 'deleted-branch',
     })
     const workspace: ServerWorkspaceState = {
@@ -184,12 +185,12 @@ describe('restoreRepoTabsForRepo', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
-    const result = await restoreRepoTabsForRepo({
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: LOCAL_WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       workspacePaneTabsHost,
     })
@@ -208,19 +209,19 @@ describe('restoreRepoTabsForRepo', () => {
   test('restores workspace tabs for a lazy local plain workspace without reading a Git projection', async () => {
     const workspace = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local' as const, id: LOCAL_WORKSPACE_ID }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.workspaceProbeStateForRuntime.mockReturnValue({ status: 'probing' })
     mocks.probeWorkspace.mockResolvedValue(plainWorkspaceProbe())
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
-    const result = await restoreRepoTabsForRepo({
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: LOCAL_WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       workspacePaneTabsHost,
     })
@@ -245,7 +246,7 @@ describe('restoreRepoTabsForRepo', () => {
   test('keeps Git layout deferred for a lazy workspace with an operational Git diagnostic', async () => {
     const workspace = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local' as const, id: LOCAL_WORKSPACE_ID }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.workspaceProbeStateForRuntime.mockReturnValue({
@@ -254,12 +255,12 @@ describe('restoreRepoTabsForRepo', () => {
     })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
-    await restoreRepoTabsForRepo({
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: LOCAL_WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       workspacePaneTabsHost,
     })
@@ -270,8 +271,8 @@ describe('restoreRepoTabsForRepo', () => {
   test('restores workspace tabs for a lazy remote plain workspace', async () => {
     const entry = {
       kind: 'remote' as const,
-      id: 'goblin+ssh://host/repo',
-      ref: { id: 'goblin+ssh://host/repo', alias: 'host', remotePath: '/repo', displayName: 'repo' },
+      id: REMOTE_WORKSPACE_ID,
+      ref: { id: REMOTE_WORKSPACE_ID, alias: 'host', remotePath: '/repo', displayName: 'repo' },
     }
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
@@ -285,12 +286,12 @@ describe('restoreRepoTabsForRepo', () => {
     mocks.workspaceProbeStateForRuntime.mockReturnValue(plainWorkspaceProbe())
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
-    const result = await restoreRepoTabsForRepo({
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      repoRoot: entry.id,
+      workspaceId: entry.id,
       workspaceRuntimeId: 'repo-runtime-test',
       workspacePaneTabsHost,
     })
@@ -314,13 +315,13 @@ describe('restoreRepoTabsForRepo', () => {
     mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(false)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     await expect(
-      restoreRepoTabsForRepo({
+      restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
         userId: 'user-test',
         clientId: 'client_test000000000000',
-        repoRoot: 'goblin+file:///repo',
+        workspaceId: LOCAL_WORKSPACE_ID,
         workspaceRuntimeId: 'stale-runtime',
         workspacePaneTabsHost,
       }),
@@ -336,13 +337,13 @@ describe('restoreRepoTabsForRepo', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     await expect(
-      restoreRepoTabsForRepo({
+      restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
         userId: 'user-test',
         clientId: 'client_test000000000000',
-        repoRoot: 'goblin+file:///repo',
+        workspaceId: LOCAL_WORKSPACE_ID,
         workspaceRuntimeId: 'repo-runtime-test',
         workspacePaneTabsHost,
       }),
@@ -353,22 +354,22 @@ describe('restoreRepoTabsForRepo', () => {
   test('rejects lazy restore when the repo is closed during projection', async () => {
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
     })
-    mocks.confirmServerWorkspaceRepoEntry.mockResolvedValue({
+    mocks.confirmServerWorkspaceEntry.mockResolvedValue({
       matched: false,
       latestWorkspace: defaultServerWorkspaceState(),
     })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
     workspacePaneTabsHost.restoreTabs.mockResolvedValue({ kind: 'membership-conflict' })
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     await expect(
-      restoreRepoTabsForRepo({
+      restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
         userId: 'user-test',
         clientId: 'client_test000000000000',
-        repoRoot: 'goblin+file:///repo',
+        workspaceId: LOCAL_WORKSPACE_ID,
         workspaceRuntimeId: 'repo-runtime-test',
         workspacePaneTabsHost,
       }),
@@ -377,23 +378,23 @@ describe('restoreRepoTabsForRepo', () => {
   })
 
   test('rejects lazy restore when aggregate validation observes removed membership', async () => {
-    const entry = { kind: 'local' as const, id: 'goblin+file:///repo' }
+    const entry = { kind: 'local' as const, id: LOCAL_WORKSPACE_ID }
     const workspace = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [entry] }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.confirmServerWorkspaceRepoEntry.mockResolvedValue({
+    mocks.confirmServerWorkspaceEntry.mockResolvedValue({
       matched: false,
       latestWorkspace: defaultServerWorkspaceState(),
     })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
     workspacePaneTabsHost.restoreTabs.mockResolvedValue({ kind: 'membership-conflict' })
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     await expect(
-      restoreRepoTabsForRepo({
+      restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
         userId: 'user-test',
         clientId: 'client_test000000000000',
-        repoRoot: 'goblin+file:///repo',
+        workspaceId: LOCAL_WORKSPACE_ID,
         workspaceRuntimeId: 'repo-runtime-test',
         workspacePaneTabsHost,
       }),
@@ -404,31 +405,31 @@ describe('restoreRepoTabsForRepo', () => {
   test('does not repair pane tabs after repo membership is removed', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: LOCAL_WORKSPACE_ID,
       branchName: 'deleted',
     })
     const workspace = {
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local' as const, id: LOCAL_WORKSPACE_ID }],
       workspacePaneTabsByTargetByWorkspace: {
         'goblin+file:///repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.confirmServerWorkspaceRepoEntry.mockResolvedValue({
+    mocks.confirmServerWorkspaceEntry.mockResolvedValue({
       matched: false,
       latestWorkspace: defaultServerWorkspaceState(),
     })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
     workspacePaneTabsHost.restoreTabs.mockResolvedValue({ kind: 'membership-conflict' })
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     await expect(
-      restoreRepoTabsForRepo({
+      restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
         userId: 'user-test',
         clientId: 'client_test000000000000',
-        repoRoot: 'goblin+file:///repo',
+        workspaceId: LOCAL_WORKSPACE_ID,
         workspaceRuntimeId: 'repo-runtime-test',
         workspacePaneTabsHost,
       }),
@@ -439,18 +440,18 @@ describe('restoreRepoTabsForRepo', () => {
   test('keeps the existing membership when lazy local projection fails', async () => {
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
     })
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     await expect(
-      restoreRepoTabsForRepo({
+      restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
         userId: 'user-test',
         clientId: 'client_test000000000000',
-        repoRoot: 'goblin+file:///repo',
+        workspaceId: LOCAL_WORKSPACE_ID,
         workspaceRuntimeId: 'repo-runtime-test',
         workspacePaneTabsHost,
       }),
@@ -462,8 +463,8 @@ describe('restoreRepoTabsForRepo', () => {
   test('keeps the existing membership when lazy remote ensure fails', async () => {
     const remoteEntry = {
       kind: 'remote' as const,
-      id: 'goblin+ssh://host/repo',
-      ref: { id: 'goblin+ssh://host/repo', alias: 'host', remotePath: '/repo', displayName: 'repo' },
+      id: REMOTE_WORKSPACE_ID,
+      ref: { id: REMOTE_WORKSPACE_ID, alias: 'host', remotePath: '/repo', displayName: 'repo' },
     }
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
@@ -476,13 +477,13 @@ describe('restoreRepoTabsForRepo', () => {
     })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     await expect(
-      restoreRepoTabsForRepo({
+      restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
         userId: 'user-test',
         clientId: 'client_test000000000000',
-        repoRoot: remoteEntry.id,
+        workspaceId: remoteEntry.id,
         workspaceRuntimeId: 'repo-runtime-test',
         workspacePaneTabsHost,
       }),
@@ -494,7 +495,7 @@ describe('restoreRepoTabsForRepo', () => {
   test('rejects a projection if the membership becomes stale while reading', async () => {
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
-      openWorkspaceEntries: [{ kind: 'local', id: 'goblin+file:///repo' }],
+      openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
     })
     mocks.isCurrentWorkspaceRuntimeMembership
       .mockReturnValueOnce(true)
@@ -503,13 +504,13 @@ describe('restoreRepoTabsForRepo', () => {
       .mockReturnValueOnce(false)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
     await expect(
-      restoreRepoTabsForRepo({
+      restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
         userId: 'user-test',
         clientId: 'client_test000000000000',
-        repoRoot: 'goblin+file:///repo',
+        workspaceId: LOCAL_WORKSPACE_ID,
         workspaceRuntimeId: 'repo-runtime-test',
         workspacePaneTabsHost,
       }),

@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react'
 import type { EditorAppAvailability, EditorApp, TerminalApp, TerminalAppAvailability } from '#/shared/api-types.ts'
-import type { WorkspaceExternalAppId } from '#/shared/repo-settings.ts'
+import type { WorkspaceExternalAppId } from '#/shared/workspace-settings.ts'
 import { AppleTerminalIcon, FinderIcon, GhosttyIcon, VSCodeIcon } from '#/web/components/ExternalAppIcon/index.tsx'
 
 export type WorkspaceExternalTerminalApp = Extract<TerminalApp, 'ghostty' | 'terminal'>

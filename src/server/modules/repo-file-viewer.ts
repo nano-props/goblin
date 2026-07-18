@@ -32,7 +32,9 @@ export async function getRepositoryFileViewer(
       cwd,
       options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
     )
-    const run = options.workspaceRuntimeId ? remoteRuntimeAwareGitRunner(cwd, options.workspaceRuntimeId, target) : undefined
+    const run = options.workspaceRuntimeId
+      ? remoteRuntimeAwareGitRunner(cwd, options.workspaceRuntimeId, target)
+      : undefined
     const worktree = workspacePath
       ? null
       : await resolveRemoteWorktree(target, executionPath, { signal, ...(run ? { run } : {}) })

@@ -25,8 +25,8 @@ const createWorktreePageMocks = vi.hoisted(() => ({
   cancel: vi.fn<() => void>(),
   created: vi.fn<(branchName: string) => void>(),
 }))
-const restoreRepoTabsMocks = vi.hoisted(() => ({
-  useRestoreRepoTabsOnView: vi.fn(),
+const restoreWorkspaceTabsMocks = vi.hoisted(() => ({
+  useRestoreWorkspaceTabsOnView: vi.fn(),
   useRepoToasts: vi.fn(),
 }))
 
@@ -36,11 +36,11 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
 }))
 
 vi.mock('#/web/hooks/useRepoToasts.tsx', () => ({
-  useRepoToasts: restoreRepoTabsMocks.useRepoToasts,
+  useRepoToasts: restoreWorkspaceTabsMocks.useRepoToasts,
 }))
 
-vi.mock('#/web/hooks/useRestoreRepoTabsOnView.ts', () => ({
-  useRestoreRepoTabsOnView: restoreRepoTabsMocks.useRestoreRepoTabsOnView,
+vi.mock('#/web/hooks/useRestoreWorkspaceTabsOnView.ts', () => ({
+  useRestoreWorkspaceTabsOnView: restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView,
 }))
 
 vi.mock('#/web/components/BranchNavigator.tsx', () => ({
@@ -270,9 +270,9 @@ beforeEach(() => {
     currentBranchName: null,
   })
   branchNavigatorMocks.activate.mockImplementation(() => {})
-  restoreRepoTabsMocks.useRestoreRepoTabsOnView.mockClear()
-  restoreRepoTabsMocks.useRepoToasts.mockClear()
-  restoreRepoTabsMocks.useRestoreRepoTabsOnView.mockReturnValue({ state: { phase: 'idle' }, retry: vi.fn() })
+  restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView.mockClear()
+  restoreWorkspaceTabsMocks.useRepoToasts.mockClear()
+  restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView.mockReturnValue({ state: { phase: 'idle' }, retry: vi.fn() })
 })
 
 afterEach(() => {
@@ -308,8 +308,8 @@ describe('RepoView workspace navigation', () => {
     expect(container.querySelector('[data-testid="create-worktree-row-action"]')).toBeNull()
     expect(container.querySelector('[data-testid="branch-filter-action"]')).toBeNull()
     expect(container.querySelector('[data-testid="repo-sync-action"]')).toBeNull()
-    expect(restoreRepoTabsMocks.useRestoreRepoTabsOnView).not.toHaveBeenCalled()
-    expect(restoreRepoTabsMocks.useRepoToasts).not.toHaveBeenCalled()
+    expect(restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView).not.toHaveBeenCalled()
+    expect(restoreWorkspaceTabsMocks.useRepoToasts).not.toHaveBeenCalled()
   })
 
   test('renders the directory Dashboard for a non-Git dashboard route without Git navigation', () => {
@@ -407,11 +407,11 @@ describe('RepoView workspace navigation', () => {
     expect(container.querySelector('[data-testid="repo-workspace-skeleton"]')).not.toBeNull()
     expect(branchNavigator(container)).toBeNull()
     expect(repoWorkspace(container)).toBeNull()
-    expect(restoreRepoTabsMocks.useRestoreRepoTabsOnView).toHaveBeenCalledWith({ repoId: REPO_ID })
+    expect(restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView).toHaveBeenCalledWith({ workspaceId: REPO_ID })
   })
 
   test('replaces the stub skeleton with a stable promotion failure view', () => {
-    restoreRepoTabsMocks.useRestoreRepoTabsOnView.mockReturnValue({
+    restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView.mockReturnValue({
       state: { phase: 'failed', message: 'server request failed' },
       retry: vi.fn(),
     })

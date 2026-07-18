@@ -11,7 +11,7 @@ import type {
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 
 export const DEFAULT_FETCH_INTERVAL_SEC = 120
-export const MAX_RECENT_REPOS = 10
+export const MAX_RECENT_WORKSPACES = 10
 export const DEFAULT_LANG_PREF: LangPref = 'auto'
 export const DEFAULT_THEME_PREF: ThemePref = 'auto'
 export const DEFAULT_TERMINAL_NOTIFICATIONS_ENABLED = false
@@ -54,7 +54,7 @@ export function defaultSettingsSnapshot(overrides: Partial<SettingsSnapshot> = {
     ...prefs,
     globalShortcutRegistered: overrides.globalShortcutRegistered ?? false,
     recentWorkspaces: overrides.recentWorkspaces ?? [],
-    repoSettings: overrides.repoSettings ?? [],
+    workspaceSettings: overrides.workspaceSettings ?? [],
   }
 }
 

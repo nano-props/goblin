@@ -107,8 +107,8 @@ export function Layout() {
 function AuthenticatedAppShell() {
   const routeMatches = useRouterState({ select: (s) => s.matches })
   const activeRepoSlug = repoRouteContextFromMatches(routeMatches)?.repoSlug ?? null
-  const activeRepoRoot = activeRepoSlug ? workspaceIdFromSlug(activeRepoSlug) : null
-  const bootstrap = useAuthenticatedAppBootstrap({ activeRepoRoot })
+  const activeWorkspaceId = activeRepoSlug ? workspaceIdFromSlug(activeRepoSlug) : null
+  const bootstrap = useAuthenticatedAppBootstrap({ activeWorkspaceId })
   const bootstrapState = bootstrap.state
   const location = useRouterState({ select: (s) => s.location })
   const shellMode = authenticatedAppShellMode(location.pathname, bootstrapState)

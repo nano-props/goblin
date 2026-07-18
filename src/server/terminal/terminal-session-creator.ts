@@ -59,7 +59,9 @@ class TerminalSessionCreator {
       { userId: input.userId, scope: sessionScope, worktreeId },
       async () => {
         if (signal.aborted) return { ok: false, message: 'error.workspace-runtime-stale' }
-        if (!this.options.isCurrentWorkspaceRuntime(input.userId, coordinates.repoRoot, coordinates.workspaceRuntimeId)) {
+        if (
+          !this.options.isCurrentWorkspaceRuntime(input.userId, coordinates.repoRoot, coordinates.workspaceRuntimeId)
+        ) {
           return { ok: false, message: 'error.workspace-runtime-stale' }
         }
         const createResult = await this.options.createCoordinator.withSessionIdAllocation(
@@ -78,7 +80,9 @@ class TerminalSessionCreator {
             ),
         )
         if (!createResult.ok) return { ok: false, message: createResult.message }
-        if (!this.options.isCurrentWorkspaceRuntime(input.userId, coordinates.repoRoot, coordinates.workspaceRuntimeId)) {
+        if (
+          !this.options.isCurrentWorkspaceRuntime(input.userId, coordinates.repoRoot, coordinates.workspaceRuntimeId)
+        ) {
           createResult.admission.abort()
           return { ok: false, message: 'error.workspace-runtime-stale' }
         }

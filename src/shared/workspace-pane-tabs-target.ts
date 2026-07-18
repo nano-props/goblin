@@ -26,9 +26,7 @@ export interface RootWorkspacePaneTabsTarget {
 }
 
 export type WorkspacePaneTabsTarget =
-  | RootWorkspacePaneTabsTarget
-  | GitBranchWorkspacePaneTabsTarget
-  | GitWorktreeWorkspacePaneTabsTarget
+  RootWorkspacePaneTabsTarget | GitBranchWorkspacePaneTabsTarget | GitWorktreeWorkspacePaneTabsTarget
 
 /** Returns a branch target's stable identity; this is never a worktree HEAD presentation. */
 export function workspacePaneTabsBranchIdentity(target: WorkspacePaneTabsTarget): string | null {
@@ -45,9 +43,7 @@ export function gitWorktreeWorkspacePaneTabsTarget(
 ): GitWorktreeWorkspacePaneTabsTarget | null {
   const workspaceId = canonicalWorkspaceLocator(repoRoot)
   const worktreeId = workspaceId ? workspaceLocatorForPath(workspaceId, worktreePath) : null
-  return workspaceId && worktreeId
-    ? { kind: 'git-worktree', repoRoot: workspaceId, worktreePath }
-    : null
+  return workspaceId && worktreeId ? { kind: 'git-worktree', repoRoot: workspaceId, worktreePath } : null
 }
 
 export function gitWorkspacePaneTabsTarget(
@@ -215,9 +211,7 @@ export function workspacePaneTabsTargetFromRuntime(target: RuntimeWorkspacePaneT
     return { kind: 'workspace-root', repoRoot: target.workspaceId }
   }
   if (target.kind === 'git-branch') {
-    return target.branch
-      ? { kind: 'git-branch', repoRoot: target.workspaceId, branchName: target.branch }
-      : null
+    return target.branch ? { kind: 'git-branch', repoRoot: target.workspaceId, branchName: target.branch } : null
   }
   const workspace = parseCanonicalWorkspaceLocator(target.workspaceId)
   const root = parseCanonicalWorkspaceLocator(target.root)

@@ -25,10 +25,11 @@ import { useT } from '#/web/stores/i18n.ts'
 import { projectBranchActionOperation, projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 type ConfigTrustChoice = { key: string; value: boolean } | null
 type BootstrapLoad = {
-  repoId: string
+  repoId: WorkspaceId
   workspaceRuntimeId: string
   previewResult: WorktreeBootstrapPreviewResult
   settingsSnapshot?: SettingsSnapshot
@@ -36,7 +37,7 @@ type BootstrapLoad = {
 }
 
 interface CreateWorktreePagePaneProps {
-  repoId: string
+  repoId: WorkspaceId
   compact?: boolean
   trafficLightOffset?: boolean
   onCancel: () => void
@@ -122,15 +123,15 @@ export function CreateWorktreePagePane({
   }
 
   const serverConfigTrusted = resolveConfigTrusted({
-    repoSettings: settingsSnapshot?.repoSettings ?? [],
-    repoId,
+    workspaceSettings: settingsSnapshot?.workspaceSettings ?? [],
+    workspaceId: repoId,
     configHash: bootstrapConfigHash,
     configTrustChoice: null,
   })
   const configTrusted = settingsSnapshot
     ? resolveConfigTrusted({
-        repoSettings: settingsSnapshot.repoSettings,
-        repoId,
+        workspaceSettings: settingsSnapshot.workspaceSettings,
+        workspaceId: repoId,
         configHash: bootstrapConfigHash,
         configTrustChoice: effectiveConfigTrustChoice,
       })
@@ -157,8 +158,8 @@ export function CreateWorktreePagePane({
   function currentWorktreeBootstrapDecision(): WorktreeBootstrapDecision {
     return resolveWorktreeBootstrapDecision({
       preview: bootstrapPreview,
-      repoSettings: settingsSnapshot?.repoSettings ?? [],
-      repoId,
+      workspaceSettings: settingsSnapshot?.workspaceSettings ?? [],
+      workspaceId: repoId,
       configTrustChoice: effectiveConfigTrustChoice,
     })
   }
@@ -249,11 +250,15 @@ function createWorktreeTargetBranch(input: CreateWorktreeRequest['input']): stri
   return exhaustive
 }
 
-function isBootstrapLoadForRepo(load: BootstrapLoad | null, repoId: string, workspaceRuntimeId: string): boolean {
+function isBootstrapLoadForRepo(load: BootstrapLoad | null, repoId: WorkspaceId, workspaceRuntimeId: string): boolean {
   return load?.repoId === repoId && load.workspaceRuntimeId === workspaceRuntimeId
 }
 
-async function loadBootstrap(repoId: string, workspaceRuntimeId: string, signal: AbortSignal): Promise<BootstrapLoad> {
+async function loadBootstrap(
+  repoId: WorkspaceId,
+  workspaceRuntimeId: string,
+  signal: AbortSignal,
+): Promise<BootstrapLoad> {
   const previewResult = await getRepoWorktreeBootstrapPreview(repoId, workspaceRuntimeId, signal).catch(
     (): WorktreeBootstrapPreviewResult => ({ ok: false, message: 'error.failed-read-repo' }),
   )

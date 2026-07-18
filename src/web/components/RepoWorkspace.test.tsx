@@ -346,7 +346,9 @@ describe('RepoWorkspace', () => {
       workspaceProbe: directoryWorkspaceProbe('plain-status-workspace'),
     })
     const repo = useWorkspacesStore.getState().workspaces[workspaceId]!
-    useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: workspaceId }, 'status')
+    useWorkspacesStore
+      .getState()
+      .setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: workspaceId }, 'status')
     primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
       topLevelFileCount: 7,
       topLevelDirectoryCount: 3,
@@ -445,10 +447,12 @@ describe('RepoWorkspace', () => {
         if (presentation.kind === 'terminal') {
           useWorkspacesStore.getState().setSelectedTerminal(terminalWorktreeKey, presentation.terminalSessionId)
         }
-        useWorkspacesStore.getState().setWorkspacePaneTabForTarget(
-          { kind: 'workspace-root', repoRoot: workspaceId },
-          presentation.kind === 'terminal' ? 'terminal' : presentation.tab,
-        )
+        useWorkspacesStore
+          .getState()
+          .setWorkspacePaneTabForTarget(
+            { kind: 'workspace-root', repoRoot: workspaceId },
+            presentation.kind === 'terminal' ? 'terminal' : presentation.tab,
+          )
         options?.onCommit?.()
         return true
       },
@@ -1432,10 +1436,9 @@ describe('RepoWorkspace', () => {
           showRepoBranchTerminalSession: () => false,
           commitWorkspacePaneRoute: () => false,
         }
-        routedNavigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(
-          routedNavigation,
-          { observeAcceptedRoute: () => {} },
-        )
+        routedNavigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(routedNavigation, {
+          observeAcceptedRoute: () => {},
+        })
         return routedNavigation
       }, [])
       const routeLabel = route?.kind === 'static' ? route.tab : route?.kind === 'terminal' ? 'terminal' : 'empty'
@@ -1478,7 +1481,9 @@ describe('RepoWorkspace', () => {
       repoRoot: REPO_ID,
       worktreePath,
     }
-    expect(workspacePaneTabOpener(paneTarget, repo.workspaceRuntimeId, 'workspace-pane:files')).toBe('workspace-pane:status')
+    expect(workspacePaneTabOpener(paneTarget, repo.workspaceRuntimeId, 'workspace-pane:files')).toBe(
+      'workspace-pane:status',
+    )
     const closeTarget = workspacePaneTabTargetForBranch(REPO_ID, branchName, {
       workspacePaneRoute: { kind: 'static', tab: 'files' },
     })

@@ -364,16 +364,8 @@ describe('WorktreeRemovalApplication', () => {
     ).resolves.toEqual({ ok: true, message: '' })
 
     expect(retireTarget).not.toHaveBeenCalled()
-    expect(broadcastSessionsChanged).toHaveBeenCalledWith(
-      'user-a',
-      'goblin+file:///repo',
-      'runtime-a',
-    )
-    expect(broadcastSessionsChanged).toHaveBeenCalledWith(
-      'user-a',
-      'goblin+file:///linked-repo',
-      'runtime-b',
-    )
+    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///repo', 'runtime-a')
+    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///linked-repo', 'runtime-b')
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///repo')
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///linked-repo')
   })

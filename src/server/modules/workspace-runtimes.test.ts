@@ -58,7 +58,11 @@ describe('workspace runtimes', () => {
         runtimeClosed: true,
       })
       expect(isCurrentWorkspaceRuntime(USER_ID, REPO_ROOT, second)).toBe(false)
-      expect(goodListener).toHaveBeenLastCalledWith({ userId: USER_ID, workspaceId: REPO_ROOT, workspaceRuntimeId: second })
+      expect(goodListener).toHaveBeenLastCalledWith({
+        userId: USER_ID,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: second,
+      })
     } finally {
       unsubscribeBad()
       unsubscribeGood()
@@ -79,12 +83,17 @@ describe('workspace runtimes', () => {
       diagnostics: [],
     }
 
-    expect(commitWorkspaceProbeState({ userId: USER_ID, workspaceId: REPO_ROOT, workspaceRuntimeId: runtimeId, probe })).toBe(
-      true,
-    )
+    expect(
+      commitWorkspaceProbeState({ userId: USER_ID, workspaceId: REPO_ROOT, workspaceRuntimeId: runtimeId, probe }),
+    ).toBe(true)
     expect(listWorkspaceRuntimes(USER_ID)[0]?.workspaceProbe).toEqual(probe)
     expect(
-      commitWorkspaceProbeState({ userId: USER_ID, workspaceId: REPO_ROOT, workspaceRuntimeId: 'workspace-runtime-stale', probe }),
+      commitWorkspaceProbeState({
+        userId: USER_ID,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: 'workspace-runtime-stale',
+        probe,
+      }),
     ).toBe(false)
 
     releaseWorkspaceRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')
@@ -138,7 +147,12 @@ describe('workspace runtimes', () => {
       },
       diagnostics: [],
     }
-    commitWorkspaceProbeState({ userId: USER_ID, workspaceId: REPO_ROOT, workspaceRuntimeId: runtimeId, probe: initial })
+    commitWorkspaceProbeState({
+      userId: USER_ID,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: runtimeId,
+      probe: initial,
+    })
     let finishFirst!: () => void
     const firstGate = new Promise<void>((resolve) => {
       finishFirst = resolve
@@ -191,7 +205,12 @@ describe('workspace runtimes', () => {
       },
       diagnostics: [],
     }
-    commitWorkspaceProbeState({ userId: USER_ID, workspaceId: REPO_ROOT, workspaceRuntimeId: runtimeId, probe: available })
+    commitWorkspaceProbeState({
+      userId: USER_ID,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: runtimeId,
+      probe: available,
+    })
     const unavailable = {
       ...available,
       capabilities: { ...available.capabilities, git: { status: 'unavailable' as const } },
@@ -223,7 +242,12 @@ describe('workspace runtimes', () => {
       },
       diagnostics: [],
     }
-    commitWorkspaceProbeState({ userId: USER_ID, workspaceId: REPO_ROOT, workspaceRuntimeId: runtimeId, probe: available })
+    commitWorkspaceProbeState({
+      userId: USER_ID,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: runtimeId,
+      probe: available,
+    })
     let releaseCleanup!: () => void
     let markCleanupStarted!: () => void
     const cleanupGate = new Promise<void>((resolve) => {
@@ -449,7 +473,10 @@ describe('workspace runtimes', () => {
     const reconciled = replaceWorkspaceRuntimeMembershipsForClient(USER_ID, 'client-a', [secondRoot])
 
     expect(reconciled).toContainEqual(
-      expect.objectContaining({ workspaceId: secondRoot, workspaceRuntimeId: expect.stringMatching(/^workspace-runtime-/) }),
+      expect.objectContaining({
+        workspaceId: secondRoot,
+        workspaceRuntimeId: expect.stringMatching(/^workspace-runtime-/),
+      }),
     )
     expect(isCurrentWorkspaceRuntime(USER_ID, REPO_ROOT, firstRuntimeId)).toBe(true)
     expect(releaseWorkspaceRuntime(USER_ID, REPO_ROOT, firstRuntimeId, 'client-a')).toEqual({

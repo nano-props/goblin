@@ -106,9 +106,7 @@ function RepoWorkspaceContentInner(props: RepoWorkspaceContentHarnessProps) {
   return <RepoWorkspaceContent {...contentProps} workspacePaneTabModel={workspacePaneTabModel} />
 }
 
-function useHarnessWorkspacePaneRoute(
-  props: RepoWorkspaceContentHarnessProps,
-): WorkspacePaneRoute | null | undefined {
+function useHarnessWorkspacePaneRoute(props: RepoWorkspaceContentHarnessProps): WorkspacePaneRoute | null | undefined {
   if (props.workspacePaneRouteMode === 'bare-branch') return undefined
   const branch = props.detail.branch
   const preferredTab = preferredWorkspacePaneTabForTarget(
@@ -116,10 +114,10 @@ function useHarnessWorkspacePaneRoute(
     branch
       ? branch.worktree?.path
         ? {
-          kind: 'git-worktree' as const,
-          repoRoot: props.repo.id,
-          worktreePath: branch.worktree.path,
-        }
+            kind: 'git-worktree' as const,
+            repoRoot: props.repo.id,
+            worktreePath: branch.worktree.path,
+          }
         : { kind: 'git-branch' as const, repoRoot: props.repo.id, branchName: branch.name }
       : null,
   )
@@ -143,9 +141,7 @@ function useHarnessWorkspacePaneRoute(
   return workspacePaneRouteForStaticPreferredTab(preferredTab)
 }
 
-function workspacePaneRouteForStaticPreferredTab(
-  tab: WorkspacePaneTabType | null,
-): WorkspacePaneRoute | null {
+function workspacePaneRouteForStaticPreferredTab(tab: WorkspacePaneTabType | null): WorkspacePaneRoute | null {
   return isWorkspacePaneStaticTabType(tab) ? { kind: 'static', tab } : null
 }
 
@@ -497,13 +493,17 @@ describe('RepoWorkspaceContent', () => {
       await Promise.resolve()
     })
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'files')
-    expect(workspacePaneTabOpener({
-      kind: 'git-worktree',
-      repoRoot: REPO_ID,
-      worktreePath,
-    }, repo.workspaceRuntimeId, 'workspace-pane:files')).toBe(
-      'workspace-pane:status',
-    )
+    expect(
+      workspacePaneTabOpener(
+        {
+          kind: 'git-worktree',
+          repoRoot: REPO_ID,
+          worktreePath,
+        },
+        repo.workspaceRuntimeId,
+        'workspace-pane:files',
+      ),
+    ).toBe('workspace-pane:status')
 
     showRepoBranchWorkspacePaneTab.mockClear()
     observeWorkspacePaneRouteForTest({
@@ -1271,13 +1271,17 @@ describe('RepoWorkspaceContent', () => {
     // Chrome-tab-style opener tracking: the terminal this opened should be
     // attributed to "files" (the only tab open, and active, when the file
     // was double-clicked), scoped to this workspace pane target.
-    expect(workspacePaneTabOpener({
-      kind: 'git-worktree',
-      repoRoot: REPO_ID,
-      worktreePath: '/tmp/filetree-open-worktree',
-    }, repo.workspaceRuntimeId, 'terminal:term-111111111111111111111')).toBe(
-      'workspace-pane:files',
-    )
+    expect(
+      workspacePaneTabOpener(
+        {
+          kind: 'git-worktree',
+          repoRoot: REPO_ID,
+          worktreePath: '/tmp/filetree-open-worktree',
+        },
+        repo.workspaceRuntimeId,
+        'terminal:term-111111111111111111111',
+      ),
+    ).toBe('workspace-pane:files')
   })
 
   test('opens a workspace-root file through the shared filesystem terminal flow', async () => {
@@ -1365,7 +1369,9 @@ describe('RepoWorkspaceContent', () => {
       { insertAfterIdentity: 'workspace-pane:files' },
     )
     expect(
-      useWorkspacesStore.getState().workspaces[workspaceId]?.ui.preferredWorkspacePaneTabByTarget[`${workspaceId}\0workspace-root`],
+      useWorkspacesStore.getState().workspaces[workspaceId]?.ui.preferredWorkspacePaneTabByTarget[
+        `${workspaceId}\0workspace-root`
+      ],
     ).toBe('terminal')
     expect(startupShellCommand).toBe(
       "bat --paging=never --style=plain '/Users/example/Workspace/sample-project/sample-document.md'\r",

@@ -15,9 +15,9 @@ const mocks = vi.hoisted(() => ({
   handleClearRecentWorkspaces: vi.fn(),
   handleUpdateUserSettings: vi.fn(),
   restoreServerWorkspace: vi.fn(),
-  restoreRepoTabsForRepo: vi.fn(),
-  addServerWorkspaceRepo: vi.fn(),
-  removeServerWorkspaceRepo: vi.fn(),
+  restoreWorkspaceTabs: vi.fn(),
+  addServerWorkspaceEntry: vi.fn(),
+  removeServerWorkspaceEntry: vi.fn(),
 }))
 
 vi.mock('#/server/modules/external-apps.ts', () => ({
@@ -34,8 +34,8 @@ vi.mock('#/server/modules/settings-snapshot.ts', () => ({
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getUserSettings: mocks.getUserSettings,
-  addServerWorkspaceRepo: mocks.addServerWorkspaceRepo,
-  removeServerWorkspaceRepo: mocks.removeServerWorkspaceRepo,
+  addServerWorkspaceEntry: mocks.addServerWorkspaceEntry,
+  removeServerWorkspaceEntry: mocks.removeServerWorkspaceEntry,
 }))
 
 vi.mock('#/server/modules/settings-write-paths.ts', () => ({
@@ -50,8 +50,8 @@ vi.mock('#/server/modules/session-restore.ts', () => ({
   restoreServerWorkspace: mocks.restoreServerWorkspace,
 }))
 
-vi.mock('#/server/modules/repo-workspace-tabs-restore.ts', () => ({
-  restoreRepoTabsForRepo: mocks.restoreRepoTabsForRepo,
+vi.mock('#/server/modules/workspace-tabs-restore.ts', () => ({
+  restoreWorkspaceTabs: mocks.restoreWorkspaceTabs,
 }))
 
 const workspacePaneTabsHostStub = {
@@ -134,7 +134,7 @@ describe('settings routes', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           clientId: 'client_test000000000000',
-          activeRepoRoot: 'goblin+file:///repo-active',
+          activeWorkspaceId: 'goblin+file:///repo-active',
         }),
       }),
     )
@@ -143,7 +143,7 @@ describe('settings routes', () => {
     expect(mocks.restoreServerWorkspace).toHaveBeenCalledWith({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      activeRepoRoot: 'goblin+file:///repo-active',
+      activeWorkspaceId: 'goblin+file:///repo-active',
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       signal: expect.any(AbortSignal),
@@ -155,8 +155,8 @@ describe('settings routes', () => {
       openWorkspaceEntries: [{ kind: 'local' as const, id: 'goblin+file:///repo-a' }],
       workspacePaneTabsByTargetByWorkspace: {},
     }
-    mocks.addServerWorkspaceRepo.mockResolvedValue(workspace)
-    mocks.removeServerWorkspaceRepo.mockResolvedValue({ ...workspace, openWorkspaceEntries: [] })
+    mocks.addServerWorkspaceEntry.mockResolvedValue(workspace)
+    mocks.removeServerWorkspaceEntry.mockResolvedValue({ ...workspace, openWorkspaceEntries: [] })
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
     const app = new Hono<{ Variables: { userId: string } }>()
     app.use('*', async (c, next) => {
@@ -165,21 +165,21 @@ describe('settings routes', () => {
     })
     app.route('/', createSettingsRoutes(settingsRouteOptions()))
 
-    const addResponse = await app.request('/workspace/repos/add', {
+    const addResponse = await app.request('/workspace/entries/add', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ entry: { kind: 'local', id: 'goblin+file:///repo-a' } }),
     })
-    const removeResponse = await app.request('/workspace/repos/remove', {
+    const removeResponse = await app.request('/workspace/entries/remove', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ repoRoot: 'goblin+file:///repo-a' }),
+      body: JSON.stringify({ workspaceId: 'goblin+file:///repo-a' }),
     })
 
     await expect(addResponse.json()).resolves.toEqual(workspace)
     await expect(removeResponse.json()).resolves.toEqual({ ...workspace, openWorkspaceEntries: [] })
-    expect(mocks.addServerWorkspaceRepo).toHaveBeenCalledWith({ kind: 'local', id: 'goblin+file:///repo-a' })
-    expect(mocks.removeServerWorkspaceRepo).toHaveBeenCalledWith('goblin+file:///repo-a')
+    expect(mocks.addServerWorkspaceEntry).toHaveBeenCalledWith({ kind: 'local', id: 'goblin+file:///repo-a' })
+    expect(mocks.removeServerWorkspaceEntry).toHaveBeenCalledWith('goblin+file:///repo-a')
   })
 
   test('delegates lazy repo tab restore to the server restore coordinator', async () => {
@@ -199,7 +199,7 @@ describe('settings routes', () => {
       },
       snapshot: null,
     }
-    mocks.restoreRepoTabsForRepo.mockResolvedValue(restored)
+    mocks.restoreWorkspaceTabs.mockResolvedValue(restored)
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
     const app = new Hono<{ Variables: { userId: string } }>()
     app.use('*', async (c, next) => {
@@ -209,22 +209,22 @@ describe('settings routes', () => {
     app.route('/', createSettingsRoutes(settingsRouteOptions()))
 
     const response = await app.request(
-      new Request('http://127.0.0.1:32100/workspace/restore-repo-tabs', {
+      new Request('http://127.0.0.1:32100/workspace/tabs/restore', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           clientId: 'client_test000000000000',
-          repoRoot: 'goblin+file:///repo-active',
+          workspaceId: 'goblin+file:///repo-active',
           workspaceRuntimeId: 'repo_runtime_test',
         }),
       }),
     )
 
     await expect(response.json()).resolves.toEqual(restored)
-    expect(mocks.restoreRepoTabsForRepo).toHaveBeenCalledWith({
+    expect(mocks.restoreWorkspaceTabs).toHaveBeenCalledWith({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      repoRoot: 'goblin+file:///repo-active',
+      workspaceId: 'goblin+file:///repo-active',
       workspaceRuntimeId: 'repo_runtime_test',
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
@@ -274,7 +274,7 @@ describe('settings routes', () => {
 
   test('delegates recent-workspace writes to the settings command handler layer', async () => {
     const repo = { kind: 'local', id: 'goblin+file:///tmp/repo-a' } as const
-    mocks.handleAddRecentWorkspace.mockResolvedValue({ ok: true, recentWorkspaces: [repo], addedRepo: repo })
+    mocks.handleAddRecentWorkspace.mockResolvedValue({ ok: true, recentWorkspaces: [repo], addedWorkspace: repo })
     mocks.handleClearRecentWorkspaces.mockResolvedValue({ ok: true })
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
     const app = createSettingsRoutes(settingsRouteOptions())
@@ -283,15 +283,15 @@ describe('settings routes', () => {
       new Request('http://127.0.0.1:32100/recent-workspaces/add', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repo }),
+        body: JSON.stringify({ workspace: repo }),
       }),
     )
     await expect(addResponse.json()).resolves.toEqual({
       ok: true,
       recentWorkspaces: [repo],
-      addedRepo: repo,
+      addedWorkspace: repo,
     })
-    expect(mocks.handleAddRecentWorkspace).toHaveBeenCalledWith({ repo })
+    expect(mocks.handleAddRecentWorkspace).toHaveBeenCalledWith({ workspace: repo })
 
     const clearResponse = await app.request(
       new Request('http://127.0.0.1:32100/recent-workspaces/clear', {

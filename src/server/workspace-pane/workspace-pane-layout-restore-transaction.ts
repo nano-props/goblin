@@ -6,7 +6,8 @@ export type WorkspacePaneLayoutRestoreTransactionOutcome =
   | { kind: 'membership-conflict'; snapshot: WorkspacePaneLayoutRepositorySnapshot }
 
 export interface WorkspacePaneLayoutRestoreTransaction {
-  validateMembershipAndLoad(
-    input: { repoRoot: string; expectedRepoEntry: WorkspaceSessionEntry },
-  ): Promise<WorkspacePaneLayoutRestoreTransactionOutcome>
+  validateMembershipAndLoad(input: {
+    repoRoot: string
+    expectedRepoEntry: WorkspaceSessionEntry
+  }): Promise<WorkspacePaneLayoutRestoreTransactionOutcome>
 }

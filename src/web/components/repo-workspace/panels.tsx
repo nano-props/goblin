@@ -175,11 +175,7 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
   )
 }
 
-export function FiletreeTab({
-  target,
-}: {
-  target: WorkspacePaneFilesystemTarget
-}) {
+export function FiletreeTab({ target }: { target: WorkspacePaneFilesystemTarget }) {
   const workspaceId = target.workspaceId
   const workspaceRuntimeId = target.workspaceRuntimeId
   const worktreePath = target.rootPath

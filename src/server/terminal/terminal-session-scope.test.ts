@@ -7,13 +7,11 @@ const workspaceId = canonicalWorkspaceLocator('goblin+file:///tmp/workspace')!
 describe('terminal session target worktree path', () => {
   test('derives a workspace-root execution path from its authoritative locator', () => {
     expect(
-      terminalSessionTargetWorktreePath(
-        {
-          kind: 'workspace-root',
-          workspaceId,
-          workspaceRuntimeId: 'repo-runtime-current',
-        },
-      ),
+      terminalSessionTargetWorktreePath({
+        kind: 'workspace-root',
+        workspaceId,
+        workspaceRuntimeId: 'repo-runtime-current',
+      }),
     ).toBe('/tmp/workspace')
   })
 

@@ -50,8 +50,7 @@ export type WorkspacePaneRoute =
 
 export type WorkspacePaneRouteTarget = WorkspacePaneRoute | null
 
-export type ParsedWorkspacePaneRoute =
-  WorkspacePaneRoute | { kind: 'invalid-static'; tabKey: string }
+export type ParsedWorkspacePaneRoute = WorkspacePaneRoute | { kind: 'invalid-static'; tabKey: string }
 
 export type ParsedWorkspacePaneRouteTarget = ParsedWorkspacePaneRoute | null
 

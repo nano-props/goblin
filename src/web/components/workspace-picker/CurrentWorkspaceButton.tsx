@@ -27,7 +27,8 @@ interface CurrentWorkspaceToolbarButtonProps extends CurrentWorkspaceButtonBaseP
   onActivate: (id: string) => void
 }
 
-type CurrentWorkspaceSidebarButtonProps = Omit<ComponentProps<'button'>, 'children' | 'type'> & CurrentWorkspaceButtonBaseProps
+type CurrentWorkspaceSidebarButtonProps = Omit<ComponentProps<'button'>, 'children' | 'type'> &
+  CurrentWorkspaceButtonBaseProps
 
 export function CurrentWorkspaceToolbarButton({
   workspace,
@@ -136,7 +137,11 @@ export function CurrentWorkspaceSidebarButton({
   )
 }
 
-function currentWorkspaceButtonState(workspace: WorkspacePickerItem, unavailableLabel: string, unreadBellLabel: string | null = null) {
+function currentWorkspaceButtonState(
+  workspace: WorkspacePickerItem,
+  unavailableLabel: string,
+  unreadBellLabel: string | null = null,
+) {
   const showConnecting = workspace.lifecycle?.kind === 'connecting'
   const showFailed = workspace.lifecycle?.kind === 'failed'
   const baseLabel = showFailed ? `${workspace.name} — ${unavailableLabel}` : workspace.name
@@ -165,8 +170,11 @@ function CurrentWorkspaceButtonLeading({
 }
 
 function CurrentWorkspaceButtonIcon({ workspace, size }: { workspace: WorkspacePickerItem; size: number }) {
-  const WorkspaceIcon =
-    isRemoteWorkspaceId(workspace.id) ? Server : workspace.gitCapability === 'available' ? FolderGit2 : Folder
+  const WorkspaceIcon = isRemoteWorkspaceId(workspace.id)
+    ? Server
+    : workspace.gitCapability === 'available'
+      ? FolderGit2
+      : Folder
   return <WorkspaceIcon size={size} className="text-foreground" aria-hidden />
 }
 

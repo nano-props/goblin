@@ -285,10 +285,10 @@ interface RestorableWorkspaceActions {
 }
 
 interface WorkspaceLifecycleActions {
-  /** Ensure a repo belongs to the open workspace set without implying
+  /** Ensure a workspace belongs to the open workspace set without implying
    *  anything about the current active selection. */
   ensureWorkspaceOpen: (path: string | WorkspaceSessionEntry) => Promise<OpenWorkspaceResult>
-  closeWorkspace: (id: string) => Promise<CloseWorkspaceResult>
+  closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   /**
    * Re-probe a remote repo's lifecycle. The single user-facing
    * entry point for "retry" (and the only path the

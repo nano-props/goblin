@@ -38,7 +38,10 @@ describe('resolveRenderableWorkspacePaneTab', () => {
   test('keeps a changes preference even when the worktree is clean', () => {
     expect(resolveRenderableWorkspacePaneTab('changes', ctx())).toBe('changes')
     expect(
-      resolveRenderableWorkspacePaneTab('changes', ctx({ runtimeTabAvailabilityByType: { terminal: terminalAvailability({ sessionCount: 7 }) } })),
+      resolveRenderableWorkspacePaneTab(
+        'changes',
+        ctx({ runtimeTabAvailabilityByType: { terminal: terminalAvailability({ sessionCount: 7 }) } }),
+      ),
     ).toBe('changes')
   })
 

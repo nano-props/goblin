@@ -1,7 +1,5 @@
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import {
-  isWorkspacePaneStaticTabType,
-} from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type {
   WorkspacePaneTabsEntry,
   WorkspacePaneTabsSnapshot,
@@ -73,9 +71,7 @@ export interface WorkspacePaneTabsCommandResult extends WorkspacePaneLayoutCommi
 }
 
 export type WorkspacePaneRuntimeTabCommitResult =
-  | { kind: 'committed'; snapshot: WorkspacePaneTabsSnapshot }
-  | { kind: 'runtime-stale' }
-  | { kind: 'target-stale' }
+  { kind: 'committed'; snapshot: WorkspacePaneTabsSnapshot } | { kind: 'runtime-stale' } | { kind: 'target-stale' }
 
 export interface WorkspaceRuntimeTabPlacementInput {
   userId: string

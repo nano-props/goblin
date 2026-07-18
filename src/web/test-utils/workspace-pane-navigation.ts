@@ -70,11 +70,7 @@ export function observedWorkspacePaneRouteCommitForTest(
   } = {},
 ): PrimaryWindowNavigationActions['commitWorkspacePaneRoute'] {
   const observeAcceptedRoute = options.observeAcceptedRoute ?? (() => {})
-  const observeCommittedRoute = (
-    repoId: string,
-    branchName: string,
-    route: ParsedWorkspacePaneRoute | null,
-  ): void => {
+  const observeCommittedRoute = (repoId: string, branchName: string, route: ParsedWorkspacePaneRoute | null): void => {
     const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute: route })
     if (!target?.branchName) return
     const observation = {
@@ -166,15 +162,10 @@ function workspacePaneObservationKey(observation: Omit<WorkspacePaneNavigationOb
     observation.workspaceRuntimeId,
     observation.branchName,
     observation.worktreePath ?? '',
-  ].join(
-    '\0',
-  )
+  ].join('\0')
 }
 
-function workspacePaneRoutesEqual(
-  a: ParsedWorkspacePaneRoute | null,
-  b: ParsedWorkspacePaneRoute | null,
-): boolean {
+function workspacePaneRoutesEqual(a: ParsedWorkspacePaneRoute | null, b: ParsedWorkspacePaneRoute | null): boolean {
   if (a === null || b === null) return a === b
   if (a.kind !== b.kind) return false
   if (a.kind === 'static') return b.kind === 'static' && a.tab === b.tab

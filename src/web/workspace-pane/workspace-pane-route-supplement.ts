@@ -28,7 +28,10 @@ export function commitWorkspacePaneRouteSupplement(
     route === null ? null : route.kind === 'static' ? route.tab : 'terminal',
   )
   if (route?.kind === 'terminal' && target.worktreePath) {
-    state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.repoId, target.worktreePath), route.terminalSessionId)
+    state.setSelectedTerminal(
+      formatTerminalWorktreeKeyForPath(target.repoId, target.worktreePath),
+      route.terminalSessionId,
+    )
   }
   return true
 }
@@ -44,7 +47,10 @@ export function commitWorkspacePaneCommittedRuntimeRouteSupplement(
     route === null ? null : route.kind === 'static' ? route.tab : 'terminal',
   )
   if (route?.kind === 'terminal' && target.worktreePath) {
-    state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.repoId, target.worktreePath), route.terminalSessionId)
+    state.setSelectedTerminal(
+      formatTerminalWorktreeKeyForPath(target.repoId, target.worktreePath),
+      route.terminalSessionId,
+    )
   }
   return true
 }

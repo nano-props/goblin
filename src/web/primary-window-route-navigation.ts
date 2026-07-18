@@ -18,16 +18,12 @@ export interface PrimaryWindowRouteNavigationOptions {
   replace?: boolean
   presentationToken?: PrimaryWindowPresentationToken
   onCommit?: () => void
-  routePrecondition?:
-    { kind: 'exact-route'; route: WorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
+  routePrecondition?: { kind: 'exact-route'; route: WorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
 }
 
 export interface PrimaryWindowRouteNavigation {
   repoSlugForId: (repoId: string) => string | null
-  currentWorkspacePaneRoute: (
-    repoId: string,
-    branchName: string,
-  ) => WorkspacePaneRouteTarget | undefined
+  currentWorkspacePaneRoute: (repoId: string, branchName: string) => WorkspacePaneRouteTarget | undefined
   openHome: (options?: PrimaryWindowRouteNavigationOptions) => void
   openSettings: (page: SettingsPage, options?: PrimaryWindowRouteNavigationOptions) => void
   closeSettings: (options?: PrimaryWindowRouteNavigationOptions) => void
@@ -47,11 +43,7 @@ export interface PrimaryWindowRouteNavigation {
     terminalSessionId: string,
     options?: PrimaryWindowRouteNavigationOptions,
   ) => boolean
-  openRepoWorktree: (
-    repoId: string,
-    worktreePath: string,
-    options?: PrimaryWindowRouteNavigationOptions,
-  ) => boolean
+  openRepoWorktree: (repoId: string, worktreePath: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
   openRepoWorktreeTerminal?: (
     repoId: string,
     worktreePath: string,

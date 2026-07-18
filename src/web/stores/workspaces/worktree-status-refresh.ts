@@ -8,7 +8,11 @@ interface RepoWorktreeStatusRefreshAccess {
   get: WorkspacesGet
 }
 
-function statusRefreshable(store: RepoWorktreeStatusRefreshAccess, repoRoot: string, workspaceRuntimeId: string): boolean {
+function statusRefreshable(
+  store: RepoWorktreeStatusRefreshAccess,
+  repoRoot: string,
+  workspaceRuntimeId: string,
+): boolean {
   const repo = store.get().workspaces[repoRoot]
   return !!repo && repo.workspaceRuntimeId === workspaceRuntimeId && !isRepoUnavailable(repo)
 }

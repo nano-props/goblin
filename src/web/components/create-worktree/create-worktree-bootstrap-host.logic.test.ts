@@ -5,8 +5,9 @@ import {
   resolveNextConfigTrustChoice,
   resolveWorktreeBootstrapDecision,
 } from '#/web/components/create-worktree/create-worktree-bootstrap-host.logic.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REPO_ID = 'goblin+file:///tmp/create-worktree-bootstrap-host-logic'
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 const CONFIG_HASH = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 
 describe('create worktree bootstrap host logic', () => {
@@ -14,8 +15,8 @@ describe('create worktree bootstrap host logic', () => {
     expect(
       resolveWorktreeBootstrapDecision({
         preview: preview(CONFIG_HASH),
-        repoSettings: [],
-        repoId: REPO_ID,
+        workspaceSettings: [],
+        workspaceId: WORKSPACE_ID,
         configTrustChoice: null,
       }),
     ).toEqual({ kind: 'run', configHash: CONFIG_HASH, configTrusted: false })
@@ -24,8 +25,8 @@ describe('create worktree bootstrap host logic', () => {
   test('uses server trust as the default decision for a matching config hash', () => {
     expect(
       resolveConfigTrusted({
-        repoSettings: trustedRepoSettings(),
-        repoId: REPO_ID,
+        workspaceSettings: trustedWorkspaceSettings(),
+        workspaceId: WORKSPACE_ID,
         configHash: CONFIG_HASH,
         configTrustChoice: null,
       }),
@@ -36,8 +37,8 @@ describe('create worktree bootstrap host logic', () => {
     expect(
       resolveWorktreeBootstrapDecision({
         preview: preview(CONFIG_HASH),
-        repoSettings: trustedRepoSettings(),
-        repoId: REPO_ID,
+        workspaceSettings: trustedWorkspaceSettings(),
+        workspaceId: WORKSPACE_ID,
         configTrustChoice: false,
       }),
     ).toEqual({ kind: 'run', configHash: CONFIG_HASH, configTrusted: false })
@@ -47,8 +48,8 @@ describe('create worktree bootstrap host logic', () => {
     expect(
       resolveWorktreeBootstrapDecision({
         preview: preview(null),
-        repoSettings: trustedRepoSettings(),
-        repoId: REPO_ID,
+        workspaceSettings: trustedWorkspaceSettings(),
+        workspaceId: WORKSPACE_ID,
         configTrustChoice: true,
       }),
     ).toEqual({ kind: 'skip' })
@@ -83,10 +84,10 @@ describe('create worktree bootstrap host logic', () => {
   })
 })
 
-function trustedRepoSettings() {
+function trustedWorkspaceSettings() {
   return [
     {
-      repoId: REPO_ID,
+      workspaceId: WORKSPACE_ID,
       worktreeBootstrapTrust: {
         configHash: CONFIG_HASH,
         trustedAt: '2026-06-26T00:00:00.000Z',

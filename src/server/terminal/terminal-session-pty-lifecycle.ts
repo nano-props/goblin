@@ -82,7 +82,10 @@ export interface TerminalPtyBindingEvents<TSession extends TerminalPtySessionSta
   emitOutput(session: TSession, event: Omit<TerminalOutputEvent, 'terminalSessionId'>): void
   emitBell(session: TSession, event: Omit<TerminalBellRealtimeEvent, 'terminalSessionId' | 'repoRoot'>): void
   emitTitle(session: TSession, event: Omit<TerminalTitleEvent, 'terminalSessionId' | 'repoRoot'>): void
-  emitExit(session: TSession, event: Omit<TerminalExitEvent, 'terminalSessionId' | 'repoRoot' | 'workspaceRuntimeId'>): void
+  emitExit(
+    session: TSession,
+    event: Omit<TerminalExitEvent, 'terminalSessionId' | 'repoRoot' | 'workspaceRuntimeId'>,
+  ): void
   confirmedExit(session: TSession, terminalRuntimeGeneration: number): void
 }
 

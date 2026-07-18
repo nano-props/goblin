@@ -97,7 +97,15 @@ async function terminalRuntimePrimaryAction({
       filesystemTarget,
       workspacePaneRoute,
       showRuntimeTab: (type, sessionId) =>
-        showTerminalRuntimeTab(type, sessionId, workspaceId, branchName, filesystemTarget, workspacePaneRoute, navigation),
+        showTerminalRuntimeTab(
+          type,
+          sessionId,
+          workspaceId,
+          branchName,
+          filesystemTarget,
+          workspacePaneRoute,
+          navigation,
+        ),
       showCreatedRuntimeTab: (type, sessionId, presentation, worktreePath) =>
         showCreatedTerminalRuntimeTab(
           type,
@@ -137,7 +145,15 @@ function newTerminalRuntimeTabActionContext({
     filesystemTarget,
     workspacePaneRoute,
     showRuntimeTab: (type, sessionId) =>
-      showTerminalRuntimeTab(type, sessionId, workspaceId, branchName, filesystemTarget, workspacePaneRoute, navigation),
+      showTerminalRuntimeTab(
+        type,
+        sessionId,
+        workspaceId,
+        branchName,
+        filesystemTarget,
+        workspacePaneRoute,
+        navigation,
+      ),
     showCreatedRuntimeTab: (type, sessionId, presentation, worktreePath) =>
       showCreatedTerminalRuntimeTab(
         type,

@@ -423,7 +423,8 @@ function normalizeTestSessionId(terminalSessionId: string): string {
 async function emitSessionsChanged(repoRoot = REPO_ID): Promise<void> {
   await act(async () => {
     const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[repoRoot]?.workspaceRuntimeId
-    if (workspaceRuntimeId) sessionsChangedHandler?.({ repoRoot, workspaceRuntimeId, revision: ++sessionsChangedRevision })
+    if (workspaceRuntimeId)
+      sessionsChangedHandler?.({ repoRoot, workspaceRuntimeId, revision: ++sessionsChangedRevision })
     await waitForScheduledServerSync()
   })
 }
@@ -1225,9 +1226,7 @@ describe('TerminalSessionProvider', () => {
           descriptor?.presentation.kind === 'git-worktree' && descriptor.presentation.head.kind === 'branch'
             ? descriptor.presentation.head.branchName
             : null,
-        ).toBe(
-          'feature/worktree',
-        )
+        ).toBe('feature/worktree')
       })
 
       await act(async () => {
@@ -1739,7 +1738,10 @@ describe('TerminalSessionProvider', () => {
     createTerminalMock.mockResolvedValueOnce({
       ok: true as const,
       action: 'created' as const,
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/worktree' } },
+      presentation: {
+        kind: 'git-worktree' as const,
+        head: { kind: 'branch' as const, branchName: 'feature/worktree' },
+      },
       terminalSessionId: 'term-111111111111111111111',
       terminalProjectionEffect: { kind: 'delta', revision: 2 },
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',

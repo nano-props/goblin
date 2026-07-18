@@ -11,14 +11,14 @@ import {
 import { gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
 
 type WorkspacePaneCatalogIdentity =
-  | { kind: 'git-branch'; branchName: string }
-  | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
+  { kind: 'git-branch'; branchName: string } | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
 
 interface WorkspacePaneTargetCatalogDependencies {
   hasGitCapability(userId: string, repoRoot: string, workspaceRuntimeId: string): boolean
-  readIdentities(repoRoot: string, options: { workspaceRuntimeId: string }): Promise<
-    readonly WorkspacePaneCatalogIdentity[]
-  >
+  readIdentities(
+    repoRoot: string,
+    options: { workspaceRuntimeId: string },
+  ): Promise<readonly WorkspacePaneCatalogIdentity[]>
 }
 
 const defaultDependencies: WorkspacePaneTargetCatalogDependencies = {
@@ -33,7 +33,11 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
     this.dependencies = dependencies
   }
 
-  async captureTargets(userId: string, repoRoot: string, scope: string): Promise<readonly WorkspacePaneTargetProjection[]> {
+  async captureTargets(
+    userId: string,
+    repoRoot: string,
+    scope: string,
+  ): Promise<readonly WorkspacePaneTargetProjection[]> {
     const workspaceRuntimeId = runtimeIdFromScope(scope)
     const workspaceId = canonicalWorkspaceLocator(repoRoot)
     if (!workspaceId) throw new Error('invalid workspace pane workspace id')

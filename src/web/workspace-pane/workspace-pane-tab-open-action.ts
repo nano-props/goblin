@@ -186,16 +186,18 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
     placement: { kind: 'append', openerIdentity },
     navigation,
   }
-  return await runWorkspacePaneAction(workspacePaneActionTargetFromCoordinates({
-    workspaceId: lease.repoId,
-    workspaceRuntimeId: lease.workspaceRuntimeId,
-    branchName: lease.branchName,
-    worktreePath: lease.worktreePath,
-  }), () =>
-    openWorkspacePaneStaticTabAction(input, {
-      kind: 'destination',
-      presentation,
+  return await runWorkspacePaneAction(
+    workspacePaneActionTargetFromCoordinates({
+      workspaceId: lease.repoId,
+      workspaceRuntimeId: lease.workspaceRuntimeId,
+      branchName: lease.branchName,
+      worktreePath: lease.worktreePath,
     }),
+    () =>
+      openWorkspacePaneStaticTabAction(input, {
+        kind: 'destination',
+        presentation,
+      }),
   )
 }
 
@@ -311,12 +313,7 @@ async function openWorkspacePaneStaticTabAction(
     return { kind: 'superseded' }
   }
   if (openerIdentity) {
-    recordWorkspacePaneTabOpener(
-      target,
-      input.workspaceRuntimeId,
-      workspacePaneStaticTabId(input.type),
-      openerIdentity,
-    )
+    recordWorkspacePaneTabOpener(target, input.workspaceRuntimeId, workspacePaneStaticTabId(input.type), openerIdentity)
   }
   if (provider.refreshOnOpen) requestVisibleStatusRefreshOnOpen(input)
   if (transaction.kind === 'current' && !primaryWindowPresentationIsCurrent(transaction.presentationToken)) {

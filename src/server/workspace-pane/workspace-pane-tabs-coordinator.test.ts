@@ -1317,8 +1317,7 @@ function aggregateFor(
 }
 
 type TestWorkspacePaneTarget =
-  | WorkspacePaneTabsTarget
-  | { repoRoot: string; branchName: string; worktreePath: string | null }
+  WorkspacePaneTabsTarget | { repoRoot: string; branchName: string; worktreePath: string | null }
 
 function testTargetProjection(targets: readonly TestWorkspacePaneTarget[]) {
   return {

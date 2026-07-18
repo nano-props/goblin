@@ -13,9 +13,7 @@ import {
 import { createTerminalWithAdmissionForTest } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import {
-  workspacePaneRuntimeTabCommandContext,
-} from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
+import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
 import { resolveWorkspacePaneTerminalExecutionTarget } from '#/web/workspace-pane/workspace-pane-terminal-execution-target.ts'
 import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
@@ -53,12 +51,7 @@ describe('workspace pane runtime tab command actions', () => {
       branches: [],
       currentBranchName: null,
     })
-    useWorkspacesStore
-      .getState()
-      .setWorkspacePaneTabForTarget(
-        { kind: 'workspace-root', repoRoot: repo.id },
-        'files',
-      )
+    useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: repo.id }, 'files')
 
     const workspaceId = canonicalWorkspaceLocator(repo.id)
     if (!workspaceId) throw new Error('expected canonical workspace fixture')
@@ -68,11 +61,9 @@ describe('workspace pane runtime tab command actions', () => {
       presentation: { kind: 'workspace-root' },
     })
     expect(
-      captureWorkspacePaneActiveTabIdentity(
-        { kind: 'workspace-root', repoRoot: repo.id },
-        repo.workspaceRuntimeId,
-        { workspacePaneRoute: undefined },
-      ),
+      captureWorkspacePaneActiveTabIdentity({ kind: 'workspace-root', repoRoot: repo.id }, repo.workspaceRuntimeId, {
+        workspacePaneRoute: undefined,
+      }),
     ).toBeNull()
     expect(
       recordWorkspacePaneTabOpener(
@@ -82,9 +73,13 @@ describe('workspace pane runtime tab command actions', () => {
         'workspace-pane:files',
       ),
     ).toBe('recorded')
-    expect(workspacePaneTabOpener({ kind: 'workspace-root', repoRoot: repo.id }, repo.workspaceRuntimeId, 'terminal:term-111111111111111111111')).toBe(
-      'workspace-pane:files',
-    )
+    expect(
+      workspacePaneTabOpener(
+        { kind: 'workspace-root', repoRoot: repo.id },
+        repo.workspaceRuntimeId,
+        'terminal:term-111111111111111111111',
+      ),
+    ).toBe('workspace-pane:files')
   })
 
   test('resolves a Git worktree execution target while pane tabs are still pending', () => {
@@ -101,11 +96,9 @@ describe('workspace pane runtime tab command actions', () => {
       terminalBase,
     )
     expect(
-      captureWorkspacePaneActiveTabIdentity(
-        terminalPaneTarget,
-        terminalCoordinates.workspaceRuntimeId,
-        { workspacePaneRoute: undefined },
-      ),
+      captureWorkspacePaneActiveTabIdentity(terminalPaneTarget, terminalCoordinates.workspaceRuntimeId, {
+        workspacePaneRoute: undefined,
+      }),
     ).toBeNull()
   })
 
@@ -120,7 +113,24 @@ describe('workspace pane runtime tab command actions', () => {
     })
     const showCreatedRuntimeTab = vi.fn(() => true)
     const context = workspacePaneRuntimeTabCommandContext({
-    filesystemTarget: terminalBase.target.kind === 'git-worktree' ? { kind: 'git-worktree', workspaceId: terminalBase.target.workspaceId, workspaceRuntimeId: terminalBase.target.workspaceRuntimeId, rootPath: terminalExecutionPath(terminalBase.target), head: terminalBase.presentation.kind === 'git-worktree' ? terminalBase.presentation.head : { kind: 'detached' }, capabilities: { files: { read: true, write: true }, terminal: { available: true }, git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } } } } : null,
+      filesystemTarget:
+        terminalBase.target.kind === 'git-worktree'
+          ? {
+              kind: 'git-worktree',
+              workspaceId: terminalBase.target.workspaceId,
+              workspaceRuntimeId: terminalBase.target.workspaceRuntimeId,
+              rootPath: terminalExecutionPath(terminalBase.target),
+              head:
+                terminalBase.presentation.kind === 'git-worktree'
+                  ? terminalBase.presentation.head
+                  : { kind: 'detached' },
+              capabilities: {
+                files: { read: true, write: true },
+                terminal: { available: true },
+                git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+              },
+            }
+          : null,
       workspaceId: terminalCoordinates.repoRoot,
       branchName: terminalPresentationBranch(terminalBase.presentation),
       workspacePaneRoute: null,

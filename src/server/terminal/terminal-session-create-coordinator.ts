@@ -52,9 +52,7 @@ class TerminalSessionCreateCoordinator {
     return await task({ terminalSessionId: await this.allocateSessionIdForCreate(input) })
   }
 
-  private async allocateSessionIdForCreate(
-    input: TerminalSessionCreateAllocationInput,
-  ): Promise<string> {
+  private async allocateSessionIdForCreate(input: TerminalSessionCreateAllocationInput): Promise<string> {
     if (input.kind === 'primary') {
       const existingSessionId = this.manager.primaryTerminalSessionIdForWorktree(
         input.userId,

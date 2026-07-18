@@ -9,6 +9,7 @@ import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 type ClientWorkspaceIntent = Extract<
   ClientEffectIntent,
@@ -62,7 +63,7 @@ export type WorkspaceIntentPlan =
   | { kind: 'create-worktree' }
   | { kind: 'new-terminal-tab'; workspaceId: string; target: WorkspacePaneCommandTarget }
   | { kind: 'close-workspace-pane-tab-or-window'; workspaceId: string; target: WorkspacePaneCommandTarget }
-  | { kind: 'close-workspace'; workspaceId: string }
+  | { kind: 'close-workspace'; workspaceId: WorkspaceId }
   | { kind: 'close-window' }
   | { kind: 'cycle-workspace'; direction: 1 | -1 }
   | { kind: 'refresh-repo'; repoId: string; workspaceRuntimeId: string }
@@ -85,7 +86,7 @@ interface WorkspaceIntentPlanContext {
   overlayBlocked: boolean
   workspaceShortcutSuppressed: boolean
   terminalFocused: boolean
-  currentWorkspaceId: string | null
+  currentWorkspaceId: WorkspaceId | null
   currentWorkspaceRuntimeId: string | null
   currentWorkspaceCapability: Pick<WorkspaceState['capability'], 'kind' | 'probe'> | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null

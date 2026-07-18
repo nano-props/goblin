@@ -40,13 +40,7 @@ export function usePrimaryWindowNavigation(): PrimaryWindowNavigationActions {
         commitWorkspaceNavigation,
         routeNavigation,
       }),
-    [
-      closeWorkspace,
-      peekWorkspaceNavigation,
-      commitWorkspaceNavigation,
-      workspaceOrder,
-      routeNavigation,
-    ],
+    [closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation, workspaceOrder, routeNavigation],
   )
 
   return fallbackNavigation

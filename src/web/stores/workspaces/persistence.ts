@@ -107,7 +107,11 @@ export function seedRepoProjectionQueryFromCacheEntry(
   })
 }
 
-export function persistRepoSnapshotCacheEntry(set: WorkspacesSet, repo: WorkspaceState | undefined, workspaceRuntimeId: string): void {
+export function persistRepoSnapshotCacheEntry(
+  set: WorkspacesSet,
+  repo: WorkspaceState | undefined,
+  workspaceRuntimeId: string,
+): void {
   if (!repo || !isGitWorkspace(repo)) return
   if (repo.workspaceRuntimeId !== workspaceRuntimeId) return
   const branchModel = readRepoBranchSnapshotQueryProjection(repo)

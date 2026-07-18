@@ -9,10 +9,7 @@ export function absoluteFilePathForTerminal(executionRoot: string, filePath: str
   return `${normalizedRoot}/${filePath}`
 }
 
-export function fileReadCommand(
-  reader: Pick<RepoFileViewerResult, 'viewer' | 'shell'>,
-  filePath: string,
-): string {
+export function fileReadCommand(reader: Pick<RepoFileViewerResult, 'viewer' | 'shell'>, filePath: string): string {
   const quotedPath = reader.shell === 'cmd' ? cmdQuotePath(filePath) : shellEscapePath(filePath)
   return `${fileReadViewerCommand(reader.viewer)} ${quotedPath}\r`
 }

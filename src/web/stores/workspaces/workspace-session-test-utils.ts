@@ -1,5 +1,12 @@
-import { normalizeRemoteWorkspaceId, type WorkspaceSessionEntry, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
-import { resolveServerRemoteWorkspaceConnection, type RemoteWorkspaceConnectionDeps } from '#/server/modules/remote-workspace.ts'
+import {
+  normalizeRemoteWorkspaceId,
+  type WorkspaceSessionEntry,
+  type RemoteWorkspaceTarget,
+} from '#/shared/remote-workspace.ts'
+import {
+  resolveServerRemoteWorkspaceConnection,
+  type RemoteWorkspaceConnectionDeps,
+} from '#/server/modules/remote-workspace.ts'
 import { createBranchSnapshot, installGoblinTestBridge, resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { flushMicrotasks } from '#/test-utils/index.ts'
@@ -15,7 +22,7 @@ export async function flushIpc(): Promise<void> {
 export function installGoblin(overrides: Record<string, (input: any) => unknown> = {}) {
   const calls = {
     recent: [] as WorkspaceSessionEntry[],
-    workspaceRepos: [] as WorkspaceSessionEntry[],
+    workspaceEntries: [] as WorkspaceSessionEntry[],
     projection: [] as string[],
     resolveTarget: [] as Array<{ alias: string; remotePath: string }>,
   }
@@ -48,19 +55,19 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
         },
       }
     },
-    'settings.addRecentWorkspace': ({ repo }: { repo: WorkspaceSessionEntry }) => {
-      calls.recent.push(repo)
+    'settings.addRecentWorkspace': ({ workspace }: { workspace: WorkspaceSessionEntry }) => {
+      calls.recent.push(workspace)
       return calls.recent
     },
-    'settings.addWorkspaceRepo': ({ entry }: { entry: WorkspaceSessionEntry }) => {
-      const existingIndex = calls.workspaceRepos.findIndex((candidate) => candidate.id === entry.id)
-      if (existingIndex === -1) calls.workspaceRepos.push(entry)
-      else calls.workspaceRepos[existingIndex] = entry
+    'settings.addWorkspaceEntry': ({ entry }: { entry: WorkspaceSessionEntry }) => {
+      const existingIndex = calls.workspaceEntries.findIndex((candidate) => candidate.id === entry.id)
+      if (existingIndex === -1) calls.workspaceEntries.push(entry)
+      else calls.workspaceEntries[existingIndex] = entry
       return undefined
     },
-    'settings.removeWorkspaceRepo': ({ repoRoot }: { repoRoot: string }) => {
-      const index = calls.workspaceRepos.findIndex((entry) => entry.id === repoRoot)
-      if (index !== -1) calls.workspaceRepos.splice(index, 1)
+    'settings.removeWorkspaceEntry': ({ workspaceId }: { workspaceId: string }) => {
+      const index = calls.workspaceEntries.findIndex((entry) => entry.id === workspaceId)
+      if (index !== -1) calls.workspaceEntries.splice(index, 1)
       return undefined
     },
     'settings.applyNativeHostProjection': async () => undefined,
@@ -92,7 +99,11 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
   if (!overrides['remote.lifecycle']) {
     handlers['remote.lifecycle'] = async ({ workspaceId }: { workspaceId: string; workspaceRuntimeId: string }) => {
       const canonicalWorkspaceId = workspaceIdForTest(workspaceId)
-      const result = await resolveServerRemoteWorkspaceConnection({ workspaceId: canonicalWorkspaceId }, undefined, deps)
+      const result = await resolveServerRemoteWorkspaceConnection(
+        { workspaceId: canonicalWorkspaceId },
+        undefined,
+        deps,
+      )
       return result.kind === 'ready'
         ? {
             kind: 'settled',

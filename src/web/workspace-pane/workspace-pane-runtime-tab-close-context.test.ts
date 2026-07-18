@@ -62,7 +62,6 @@ describe('workspace pane runtime tab close context', () => {
       ),
     ).toBe(false)
   })
-
 })
 
 function terminalCommandBridge({

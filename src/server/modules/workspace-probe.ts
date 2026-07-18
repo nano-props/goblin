@@ -2,7 +2,11 @@ import path from 'node:path'
 import { constants as fsConstants } from 'node:fs'
 import { access, realpath, stat } from 'node:fs/promises'
 import { git } from '#/system/git/git-exec.ts'
-import { formatWorkspaceLocator, parseWorkspaceLocator, type WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
+import {
+  formatWorkspaceLocator,
+  parseWorkspaceLocator,
+  type WorkspaceLocatorPlatform,
+} from '#/shared/workspace-locator.ts'
 import {
   capabilitiesFromGitProbe,
   type WorkspaceGitProbeResult,

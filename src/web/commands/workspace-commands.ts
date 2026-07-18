@@ -155,18 +155,36 @@ async function showWorkspacePaneTabCommand({
 export async function runTerminalPrimaryActionCommand(options: TerminalPrimaryActionCommandOptions): Promise<boolean> {
   const coordinates = workspacePaneCommandCoordinates(options.target)
   return coordinates.filesystemTarget
-    ? await dispatchTerminalRuntimePrimaryAction({ ...options, ...coordinates, filesystemTarget: coordinates.filesystemTarget })
+    ? await dispatchTerminalRuntimePrimaryAction({
+        ...options,
+        ...coordinates,
+        filesystemTarget: coordinates.filesystemTarget,
+      })
     : coordinates.branchName
-      ? await dispatchTerminalRuntimePrimaryAction({ ...options, ...coordinates, branchName: coordinates.branchName, filesystemTarget: null })
+      ? await dispatchTerminalRuntimePrimaryAction({
+          ...options,
+          ...coordinates,
+          branchName: coordinates.branchName,
+          filesystemTarget: null,
+        })
       : false
 }
 
 export async function runNewTerminalTabCommand(options: NewTerminalTabCommandOptions): Promise<boolean> {
   const coordinates = workspacePaneCommandCoordinates(options.target)
   return coordinates.filesystemTarget
-    ? await dispatchNewTerminalRuntimeTabAction({ ...options, ...coordinates, filesystemTarget: coordinates.filesystemTarget })
+    ? await dispatchNewTerminalRuntimeTabAction({
+        ...options,
+        ...coordinates,
+        filesystemTarget: coordinates.filesystemTarget,
+      })
     : coordinates.branchName
-      ? await dispatchNewTerminalRuntimeTabAction({ ...options, ...coordinates, branchName: coordinates.branchName, filesystemTarget: null })
+      ? await dispatchNewTerminalRuntimeTabAction({
+          ...options,
+          ...coordinates,
+          branchName: coordinates.branchName,
+          filesystemTarget: null,
+        })
       : false
 }
 
@@ -247,12 +265,11 @@ function resolveCloseWorkspaceSurfaceIntent(
   if (!workspaceId) return { kind: 'close-window' }
   if (!commandTarget) return { kind: 'close-window' }
   const branchName = workspacePaneCommandCoordinates(commandTarget).branchName
-  const branchResolution =
-    branchName
-      ? resolveWorkspacePaneTabTargetForBranch(workspaceId, branchName, {
-          workspacePaneRoute: commandTarget.workspacePaneRoute,
-        })
-      : null
+  const branchResolution = branchName
+    ? resolveWorkspacePaneTabTargetForBranch(workspaceId, branchName, {
+        workspacePaneRoute: commandTarget.workspacePaneRoute,
+      })
+    : null
   if (branchResolution?.kind === 'unavailable') return { kind: 'noop' }
   const target = branchResolution
     ? branchResolution.kind === 'ready'

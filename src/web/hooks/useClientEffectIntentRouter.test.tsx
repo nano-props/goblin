@@ -48,7 +48,7 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
 const appDataClientMocks = vi.hoisted(() => ({
   clearRecentWorkspaceHistory: vi.fn(async () => {}),
-  removeRepoFromWorkspace: vi.fn(async () => {}),
+  removeWorkspaceFromSession: vi.fn(async () => {}),
 }))
 
 vi.mock('#/web/settings-actions.ts', async () => {
@@ -56,7 +56,7 @@ vi.mock('#/web/settings-actions.ts', async () => {
   return {
     ...actual,
     clearRecentWorkspaceHistory: appDataClientMocks.clearRecentWorkspaceHistory,
-    removeRepoFromWorkspace: appDataClientMocks.removeRepoFromWorkspace,
+    removeWorkspaceFromSession: appDataClientMocks.removeWorkspaceFromSession,
   }
 })
 
@@ -85,7 +85,7 @@ beforeEach(() => {
   showRepoBranchWorkspacePaneTabSpy.mockClear()
   showRepoBranchTerminalSessionSpy.mockClear()
   appDataClientMocks.clearRecentWorkspaceHistory.mockClear()
-  appDataClientMocks.removeRepoFromWorkspace.mockClear()
+  appDataClientMocks.removeWorkspaceFromSession.mockClear()
   consumeExternalOpenPathsSpy.mockReset()
   consumeExternalOpenPathsSpy.mockResolvedValue([])
   overlayOpen = false
@@ -303,7 +303,7 @@ describe('useClientEffectIntentRouter', () => {
       branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
     })
     currentWorkspaceId = repo.id
-    appDataClientMocks.removeRepoFromWorkspace.mockRejectedValueOnce(new Error('workspace write failed'))
+    appDataClientMocks.removeWorkspaceFromSession.mockRejectedValueOnce(new Error('workspace write failed'))
     await renderHookHost()
 
     await act(async () => {
@@ -378,7 +378,10 @@ describe('useClientEffectIntentRouter', () => {
 
   test('open-recent-workspace opens without store activation and then delegates activation to navigation', async () => {
     useWorkspacesStore.setState({
-      ensureWorkspaceOpen: vi.fn(async () => ({ ok: true as const, workspaceId: workspaceIdForTest('goblin+file:///tmp/recent-workspace') })),
+      ensureWorkspaceOpen: vi.fn(async () => ({
+        ok: true as const,
+        workspaceId: workspaceIdForTest('goblin+file:///tmp/recent-workspace'),
+      })),
     })
 
     await renderHookHost()
@@ -549,8 +552,8 @@ describe('useClientEffectIntentRouter', () => {
         terminalSessionBaseForTest({
           repoRoot: repo.id,
           workspaceRuntimeId: repo.workspaceRuntimeId,
-        branch: 'main',
-        worktreePath: '/tmp/repo-worktree',
+          branch: 'main',
+          worktreePath: '/tmp/repo-worktree',
         }),
       )
     })
@@ -670,7 +673,8 @@ function terminalWorktreeSnapshot(
   terminalWorktreeKey: string,
   terminalSessionIds: readonly string[],
 ): TerminalWorktreeSnapshot {
-  const selectedKey = useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] ?? null
+  const selectedKey =
+    useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] ?? null
   const sessions = terminalSessionIds.map((terminalSessionId, index) => ({
     type: 'terminal' as const,
     terminalSessionId,
@@ -692,7 +696,8 @@ function terminalWorktreeSnapshot(
           target: {
             kind: 'git-worktree' as const,
             workspaceId: canonicalWorkspaceLocator('goblin+file:///tmp/repo')!,
-            workspaceRuntimeId: useWorkspacesStore.getState().workspaces['goblin+file:///tmp/repo']?.workspaceRuntimeId ?? '',
+            workspaceRuntimeId:
+              useWorkspacesStore.getState().workspaces['goblin+file:///tmp/repo']?.workspaceRuntimeId ?? '',
             root: canonicalWorkspaceLocator('goblin+file:///tmp/repo-worktree')!,
           },
           presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },

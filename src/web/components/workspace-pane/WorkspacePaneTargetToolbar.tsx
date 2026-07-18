@@ -17,9 +17,7 @@ import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
-import {
-  orderWorkspacePaneItemsByTabEntries,
-} from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import type { RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import {
   workspacePaneTabEntryForItem,
@@ -59,7 +57,11 @@ export function WorkspacePaneTargetToolbar({
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
   const branchName =
-    target.kind === 'workspace-root' ? null : target.kind === 'git-branch' ? target.branchName : gitHeadBranch(target.head)
+    target.kind === 'workspace-root'
+      ? null
+      : target.kind === 'git-branch'
+        ? target.branchName
+        : gitHeadBranch(target.head)
   const rootPath = target.kind === 'git-branch' ? null : target.rootPath
   const commandTarget: WorkspacePaneCommandTarget =
     target.kind === 'workspace-root'
@@ -103,11 +105,7 @@ export function WorkspacePaneTargetToolbar({
       if (target.kind !== 'git-worktree') return false
       if (presentation.kind !== 'git-worktree') return false
       if (runtimeTarget.kind !== 'git-worktree') return false
-      return showCreatedTerminalWorkspacePaneRuntimeTab(
-        { target: runtimeTarget, presentation },
-        sessionId,
-        navigation,
-      )
+      return showCreatedTerminalWorkspacePaneRuntimeTab({ target: runtimeTarget, presentation }, sessionId, navigation)
     },
     [navigation, persistenceTarget, target],
   )
@@ -218,7 +216,5 @@ export function WorkspacePaneTargetToolbar({
 function activePendingTabIdentity(model: RepoWorkspaceTabModel): string | null {
   const selection = model.selection
   if (selection?.kind !== 'runtime-host') return null
-  return (
-    model.tabs.find((tab) => tab.kind === 'pending' && tab.runtimeType === selection.runtimeType)?.identity ?? null
-  )
+  return model.tabs.find((tab) => tab.kind === 'pending' && tab.runtimeType === selection.runtimeType)?.identity ?? null
 }

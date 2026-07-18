@@ -29,8 +29,9 @@ describe('workspace pane terminal execution target resolver', () => {
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       root: WORKTREE_ID,
     }
-    expect(resolveWorkspacePaneTerminalExecutionTarget(target, { kind: 'git-worktree', head: { kind: 'detached' } }))
-      .toEqual({ target, presentation: { kind: 'git-worktree', head: { kind: 'detached' } } })
+    expect(
+      resolveWorkspacePaneTerminalExecutionTarget(target, { kind: 'git-worktree', head: { kind: 'detached' } }),
+    ).toEqual({ target, presentation: { kind: 'git-worktree', head: { kind: 'detached' } } })
     expect(
       resolveWorkspacePaneTerminalExecutionTarget(target, {
         kind: 'git-worktree',

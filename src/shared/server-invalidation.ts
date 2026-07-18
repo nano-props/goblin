@@ -14,9 +14,7 @@ export interface SettingsInvalidationEvent {
 }
 
 export type ServerInvalidationEvent =
-  | RepoQueryInvalidationEvent
-  | WorkspaceRuntimeInvalidationEvent
-  | SettingsInvalidationEvent
+  RepoQueryInvalidationEvent | WorkspaceRuntimeInvalidationEvent | SettingsInvalidationEvent
 
 export function isSettingsInvalidationScope(value: unknown): value is SettingsInvalidationScope {
   return value === 'settings-snapshot' || value === 'external-apps' || value === 'i18n' || value === 'theme'

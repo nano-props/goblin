@@ -34,7 +34,10 @@ import {
 import { clearWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { useTerminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
 import { workspacePaneTerminalBaseFromCoordinates } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import { requiredGitWorkspacePaneTabsTarget, type WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  requiredGitWorkspacePaneTabsTarget,
+  type WorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import {
   canConfirmWorkspacePaneRuntimeTabCloseWithContext,
   readWorkspacePaneRuntimeTabCloseContext,
@@ -339,10 +342,7 @@ function workspacePaneTabsTargetForModel(target: RepoWorkspaceTabModel): Workspa
 }
 
 function resolveCloseWorkspacePaneTarget(
-  input: Pick<
-    CloseWorkspacePaneTabActionOptions,
-    'workspaceId' | 'workspacePaneRoute' | 'paneTarget' | 'worktreeHead'
-  >,
+  input: Pick<CloseWorkspacePaneTabActionOptions, 'workspaceId' | 'workspacePaneRoute' | 'paneTarget' | 'worktreeHead'>,
 ): RepoWorkspaceTabModel | null {
   if (!input.workspaceId) return null
   return workspacePaneTabTargetForPaneTarget(input.paneTarget, input.workspacePaneRoute, input.worktreeHead)

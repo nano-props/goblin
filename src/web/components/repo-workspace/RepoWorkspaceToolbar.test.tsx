@@ -4,6 +4,7 @@ import { act } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { RepoWorkspaceToolbar } from '#/web/components/repo-workspace/RepoWorkspaceToolbar.tsx'
 import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/WorkspaceOpenExternallyMenu.tsx'
 import {
@@ -69,7 +70,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
-import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
+import type { WorkspaceSettingsEntry } from '#/shared/workspace-settings.ts'
 import {
   observeWorkspacePaneRouteForTest,
   observedWorkspacePaneRouteCommitForTest,
@@ -128,7 +129,7 @@ vi.mock('sonner', () => ({
   },
 }))
 
-const REPO_ID = 'goblin+file:///tmp/goblin-repo-workspace-toolbar-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
 const WORKTREE_PATH = '/tmp/goblin-repo-workspace-toolbar-worktree'
 compactUi = false
 
@@ -360,7 +361,7 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('uses the scoped recent external app as the split-button primary action', async () => {
-    const initialSnapshot = defaultSettingsSnapshot({ repoSettings: [] })
+    const initialSnapshot = defaultSettingsSnapshot({ workspaceSettings: [] })
     const fetchSpy = mockRecentAppPostFetch(initialSnapshot)
     const { container: c, queryClient } = renderToolbar({
       terminalCount: 0,
@@ -387,10 +388,10 @@ describe('RepoWorkspaceToolbar', () => {
     })
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      expect.stringContaining('/api/settings/repo-external-app-recent'),
+      expect.stringContaining('/api/settings/workspace-external-app-recent'),
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ repoId: REPO_ID, worktreePath: WORKTREE_PATH, itemId: 'finder' }),
+        body: JSON.stringify({ workspaceId: REPO_ID, worktreePath: WORKTREE_PATH, itemId: 'finder' }),
       }),
     )
     expect(repoClientMocks.openRepoInFinder).toHaveBeenCalledWith(REPO_ID, WORKTREE_PATH)
@@ -417,14 +418,14 @@ describe('RepoWorkspaceToolbar', () => {
     // endpoint; the second click is purely a local open.
     const postCalls = fetchSpy.mock.calls.filter(([input]) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
-      return url.endsWith('/api/settings/repo-external-app-recent')
+      return url.endsWith('/api/settings/workspace-external-app-recent')
     })
     expect(postCalls).toHaveLength(1)
     expect(repoClientMocks.openRepoInFinder).toHaveBeenCalledTimes(2)
   })
 
   test('shows an error toast when storing the recent external app fails', async () => {
-    const initialSnapshot = defaultSettingsSnapshot({ repoSettings: [] })
+    const initialSnapshot = defaultSettingsSnapshot({ workspaceSettings: [] })
     mockRecentAppPostFetch(initialSnapshot, { failPost: true })
     const { container: c } = renderToolbar({
       terminalCount: 0,
@@ -467,9 +468,9 @@ describe('RepoWorkspaceToolbar', () => {
 
     const { container, rerender } = renderInJsdom(
       <QueryClientProvider
-        client={seededQueryClientWithRepoSettings([
+        client={seededQueryClientWithWorkspaceSettings([
           {
-            repoId: REPO_ID,
+            workspaceId: REPO_ID,
             workspaceExternalAppRecent: {
               byWorktree: { [WORKTREE_PATH]: 'finder', [nextWorktreePath]: 'editor:vscode' },
             },
@@ -488,9 +489,9 @@ describe('RepoWorkspaceToolbar', () => {
 
     rerender(
       <QueryClientProvider
-        client={seededQueryClientWithRepoSettings([
+        client={seededQueryClientWithWorkspaceSettings([
           {
-            repoId: REPO_ID,
+            workspaceId: REPO_ID,
             workspaceExternalAppRecent: {
               byWorktree: { [WORKTREE_PATH]: 'finder', [nextWorktreePath]: 'editor:vscode' },
             },
@@ -649,10 +650,10 @@ describe('RepoWorkspaceToolbar', () => {
     expect(mocks.closeTerminalByDescriptor).toHaveBeenCalledWith(
       'term-111111111111111111111',
       terminalSessionBaseForTest({
-      repoRoot: REPO_ID,
-      workspaceRuntimeId: workspaceRuntimeIdForTest(),
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
+        repoRoot: REPO_ID,
+        workspaceRuntimeId: workspaceRuntimeIdForTest(),
+        branch: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
       }),
     )
   })
@@ -1149,10 +1150,10 @@ describe('RepoWorkspaceToolbar', () => {
     expect(mocks.closeTerminalByDescriptor).toHaveBeenCalledWith(
       'term-111111111111111111111',
       terminalSessionBaseForTest({
-      repoRoot: REPO_ID,
-      workspaceRuntimeId: workspaceRuntimeIdForTest(),
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
+        repoRoot: REPO_ID,
+        workspaceRuntimeId: workspaceRuntimeIdForTest(),
+        branch: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
       }),
     )
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes')
@@ -1292,11 +1293,11 @@ function renderToolbar(options: {
    */
   loading?: boolean
   /**
-   * Pre-seed the settings snapshot's `repoSettings` field so the
+   * Pre-seed the settings snapshot's `workspaceSettings` field so the
    * workspace external app menu reads from server-backed state
    * without an HTTP round trip. Defaults to an empty array.
    */
-  seedRepoSettings?: RepoSettingsEntry[]
+  seedWorkspaceSettings?: WorkspaceSettingsEntry[]
 }): {
   container: HTMLElement
   terminalTab: HTMLButtonElement
@@ -1463,7 +1464,7 @@ function renderToolbar(options: {
   }
   queryClient.setQueryData(
     settingsSnapshotQueryKey(),
-    defaultSettingsSnapshot({ repoSettings: options.seedRepoSettings ?? [] }),
+    defaultSettingsSnapshot({ workspaceSettings: options.seedWorkspaceSettings ?? [] }),
   )
   const navigation = navigationWith({
     ...options.navigation,
@@ -1647,7 +1648,7 @@ function mockRecentAppPostFetch(
   let currentSnapshot = initialSnapshot
   const fetchSpy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
-    if (url.endsWith('/api/settings/repo-external-app-recent')) {
+    if (url.endsWith('/api/settings/workspace-external-app-recent')) {
       if (options.failPost) {
         return new Response(JSON.stringify({ ok: false }), {
           status: 500,
@@ -1655,14 +1656,14 @@ function mockRecentAppPostFetch(
         })
       }
       const body = init?.body
-        ? (JSON.parse(init.body as string) as { itemId: string; worktreePath: string | null; repoId: string })
+        ? (JSON.parse(init.body as string) as { itemId: string; worktreePath: string | null; workspaceId: string })
         : null
       if (body) {
         currentSnapshot = {
           ...(currentSnapshot as Record<string, unknown>),
-          repoSettings: [
+          workspaceSettings: [
             {
-              repoId: body.repoId,
+              workspaceId: body.workspaceId,
               workspaceExternalAppRecent: { byWorktree: { [body.worktreePath ?? '']: body.itemId } },
             },
           ],
@@ -1687,12 +1688,12 @@ function mockRecentAppPostFetch(
 
 /**
  * Build a fresh `QueryClient` whose settings snapshot cache already
- * contains the given `repoSettings`. Used by the worktree-scope test
+ * contains the given `workspaceSettings`. Used by the worktree-scope test
  * which renders `WorkspaceOpenExternallyMenu` directly (it doesn't go
  * through `renderToolbar`).
  */
-function seededQueryClientWithRepoSettings(repoSettings: RepoSettingsEntry[]): QueryClient {
+function seededQueryClientWithWorkspaceSettings(workspaceSettings: WorkspaceSettingsEntry[]): QueryClient {
   const queryClient = new QueryClient()
-  queryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ repoSettings }))
+  queryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ workspaceSettings }))
   return queryClient
 }

@@ -19,11 +19,7 @@ vi.mock(import('#/web/stores/i18n.ts'), async (importOriginal) => {
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
-import {
-  createGitWorkspaceProbeForTest,
-  resetWorkspacesStore,
-  seedRepoShellForTest,
-} from '#/web/test-utils/bridge.ts'
+import { createGitWorkspaceProbeForTest, resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
 const toastMocks = vi.hoisted(() => ({

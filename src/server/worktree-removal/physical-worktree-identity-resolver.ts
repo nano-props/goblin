@@ -6,10 +6,7 @@ import { parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTargetWithConfigFingerprint } from '#/system/ssh/config.ts'
 import { resolveRemoteWorktree } from '#/system/ssh/git.ts'
-import {
-  runRemoteCommand,
-  type RemoteCommandRunner,
-} from '#/system/ssh/commands.ts'
+import { runRemoteCommand, type RemoteCommandRunner } from '#/system/ssh/commands.ts'
 import { resolveKnownWorktree } from '#/shared/worktree-guards.ts'
 import { isRemoteWorkspaceId, normalizeRemoteWorkspaceRef, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
@@ -107,7 +104,8 @@ export class PhysicalWorktreeIdentityResolver {
   }
 
   async capture(input: ResolvePhysicalWorktreeIdentityInput): Promise<PhysicalWorktreeExecutionCapability> {
-    if (!input.userId || !input.repoRoot || !input.workspaceRuntimeId) throw new Error('error.invalid-worktree-identity')
+    if (!input.userId || !input.repoRoot || !input.workspaceRuntimeId)
+      throw new Error('error.invalid-worktree-identity')
     const platform = process.platform === 'win32' ? 'win32' : 'posix'
     const workspace = parseWorkspaceLocator(input.repoRoot, platform)
     if (!workspace) throw new Error('error.workspace-locator-malformed')
@@ -133,7 +131,8 @@ export class PhysicalWorktreeIdentityResolver {
   }
 
   async captureWorkspace(input: ResolvePhysicalWorktreeIdentityInput): Promise<PhysicalWorktreeExecutionCapability> {
-    if (!input.userId || !input.repoRoot || !input.workspaceRuntimeId) throw new Error('error.invalid-worktree-identity')
+    if (!input.userId || !input.repoRoot || !input.workspaceRuntimeId)
+      throw new Error('error.invalid-worktree-identity')
     const platform = process.platform === 'win32' ? 'win32' : 'posix'
     const locator = parseWorkspaceLocator(input.repoRoot, platform)
     if (!locator) throw new Error('error.workspace-locator-malformed')
@@ -200,7 +199,10 @@ export class PhysicalWorktreeIdentityResolver {
       epoch.abortController.signal,
     )
     this.assertEpochActive(epoch)
-    const run = this.runtimeAwareRemoteRunner({ repoRoot: input.repoRoot, workspaceRuntimeId: input.workspaceRuntimeId })
+    const run = this.runtimeAwareRemoteRunner({
+      repoRoot: input.repoRoot,
+      workspaceRuntimeId: input.workspaceRuntimeId,
+    })
     const result = await run({ type: 'resolvePhysicalWorktreeIdentity', path: workspacePath }, resolved.target, {
       signal: epoch.abortController.signal,
     })

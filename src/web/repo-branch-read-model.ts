@@ -6,7 +6,10 @@ import {
   useRepoProjectionReadModel,
   useRepoWorktreeStatusReadModel,
 } from '#/web/repo-data-query.ts'
-import { stripBranchWorktreeMetadata, worktreeStatesFromBranchReadModel } from '#/web/stores/workspaces/worktree-state.ts'
+import {
+  stripBranchWorktreeMetadata,
+  worktreeStatesFromBranchReadModel,
+} from '#/web/stores/workspaces/worktree-state.ts'
 import type { RepoBranchState, WorkspaceState, RepoWorktreeState } from '#/web/stores/workspaces/types.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeStatus } from '#/web/types.ts'

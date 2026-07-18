@@ -5,7 +5,7 @@ import {
 } from '#/server/modules/repo-source.ts'
 import { getRepoOperationsSnapshot } from '#/server/modules/repo-operation-registry.ts'
 import { listRepoWriteOperationsForRepo } from '#/server/modules/repo-write-operation-coordinator.ts'
-import { isValidRepoLocator } from '#/shared/input-validation.ts'
+import { isValidWorkspaceLocatorInput } from '#/shared/input-validation.ts'
 import {
   DEFAULT_REPOSITORY_LOG_COUNT,
   type ExecResult,
@@ -125,7 +125,7 @@ export async function getRepoWorktreeBootstrapPreview(
   cwd: string,
   options: { signal?: AbortSignal; workspaceRuntimeId?: string } = {},
 ): Promise<WorktreeBootstrapPreviewResult> {
-  if (!isValidRepoLocator(cwd)) return { ok: false, message: 'error.invalid-arguments' }
+  if (!isValidWorkspaceLocatorInput(cwd)) return { ok: false, message: 'error.invalid-arguments' }
   return await runWithRepoSource(
     cwd,
     async (source) => await source.getWorktreeBootstrapPreview(options.signal),
@@ -277,7 +277,10 @@ export async function readRepoProjection(
   return {
     snapshot: result.snapshot,
     pullRequests: result.pullRequests,
-    operations: await readRepoOperationsSnapshot(cwd, { signal: options.signal, workspaceRuntimeId: options.workspaceRuntimeId }),
+    operations: await readRepoOperationsSnapshot(cwd, {
+      signal: options.signal,
+      workspaceRuntimeId: options.workspaceRuntimeId,
+    }),
     requested: {
       branch,
       pullRequestMode: mode,

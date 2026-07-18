@@ -396,14 +396,20 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
     operation.settle({ ok: false, message: err instanceof Error ? err.message : String(err) })
     throw err
   }
-  return await runResolvedRepoWriteOperation(boundaryKey, runtime, operation, async () => {
-    try {
-      return await task()
-    } catch (err) {
-      operation.settle({ ok: false, message: err instanceof Error ? err.message : String(err) })
-      throw err
-    }
-  }, signal)
+  return await runResolvedRepoWriteOperation(
+    boundaryKey,
+    runtime,
+    operation,
+    async () => {
+      try {
+        return await task()
+      } catch (err) {
+        operation.settle({ ok: false, message: err instanceof Error ? err.message : String(err) })
+        throw err
+      }
+    },
+    signal,
+  )
 }
 
 export async function abortRepoWriteNetworkOperation(
@@ -437,7 +443,11 @@ export async function listRepoWriteOperationsForRepo(
   return sortedOperations(
     runtimes.flatMap((runtime) =>
       [...runtime.operations.values()].filter((operation) => {
-        if (options.workspaceRuntimeId && operation.workspaceRuntimeId && operation.workspaceRuntimeId !== options.workspaceRuntimeId) {
+        if (
+          options.workspaceRuntimeId &&
+          operation.workspaceRuntimeId &&
+          operation.workspaceRuntimeId !== options.workspaceRuntimeId
+        ) {
           return false
         }
         if (!includeSettled && (operation.phase === 'done' || operation.phase === 'failed')) return false

@@ -45,11 +45,11 @@ export function toSafeSessionPath(value: unknown): string | null {
   return path.normalize(value)
 }
 
-export function isValidRepoLocator(value: unknown): value is string {
-  return toSafeRepoLocator(value) !== null
+export function isValidWorkspaceLocatorInput(value: unknown): value is string {
+  return toSafeWorkspaceLocator(value) !== null
 }
 
-export function toSafeRepoLocator(value: unknown): WorkspaceId | null {
+export function toSafeWorkspaceLocator(value: unknown): WorkspaceId | null {
   if (typeof value !== 'string' || value.length === 0 || value.length > MAX_IPC_PATH_LENGTH || value.includes('\0')) {
     return null
   }
@@ -58,9 +58,9 @@ export function toSafeRepoLocator(value: unknown): WorkspaceId | null {
   return parsed ? formatWorkspaceLocator(parsed, platform) : null
 }
 
-export function toSafeSessionRepoEntry(value: unknown): WorkspaceSessionEntry | null {
+export function toSafeWorkspaceSessionEntry(value: unknown): WorkspaceSessionEntry | null {
   const entry = normalizeWorkspaceSessionEntry(value)
-  const id = toSafeRepoLocator(entry?.id ?? value)
+  const id = toSafeWorkspaceLocator(entry?.id ?? value)
   if (!id) return null
   if (!isRemoteWorkspaceId(id)) return entry?.kind === 'local' ? { kind: 'local', id } : null
   const parsed = parseRemoteWorkspaceId(id)

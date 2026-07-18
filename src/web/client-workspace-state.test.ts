@@ -119,8 +119,8 @@ describe('client workspace persistence', () => {
         zenMode: 'yes',
         workspacePaneSize: Number.NaN,
         selectedTerminalSessionIdByTerminalWorktree: { broken: 12 },
-      preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///repo-a': { target: 'unknown' } },
-      filetreeViewStateByWorktreeByWorkspace: [],
+        preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///repo-a': { target: 'unknown' } },
+        filetreeViewStateByWorktreeByWorkspace: [],
       }),
     )
 

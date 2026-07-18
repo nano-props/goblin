@@ -21,7 +21,11 @@ export function workspacePaneActionTargetFromCoordinates(coordinates: {
     }
   }
   return coordinates.branchName === null
-    ? { kind: 'workspace-root', workspaceId: coordinates.workspaceId, workspaceRuntimeId: coordinates.workspaceRuntimeId }
+    ? {
+        kind: 'workspace-root',
+        workspaceId: coordinates.workspaceId,
+        workspaceRuntimeId: coordinates.workspaceRuntimeId,
+      }
     : {
         kind: 'git-branch',
         workspaceId: coordinates.workspaceId,

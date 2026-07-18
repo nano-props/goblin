@@ -45,8 +45,7 @@ function makeReadContext(overrides: Partial<TerminalWorktreeSnapshot> = {}): Ter
     ...overrides,
   }
   return {
-    terminalWorktreeSnapshot: (key) =>
-      key === WORKTREE_KEY ? snapshot : { ...snapshot, terminalWorktreeKey: key },
+    terminalWorktreeSnapshot: (key) => (key === WORKTREE_KEY ? snapshot : { ...snapshot, terminalWorktreeKey: key }),
     subscribeTerminalWorktree: () => () => {},
     workspaceBellCount: () => 0,
     subscribeWorkspaceBellCount: () => () => {},
@@ -92,9 +91,7 @@ describe('simplified worktree hooks read the right field', () => {
       const v = useTerminalWorktreeOutputActive(WORKTREE_KEY)
       return <span data-testid="v">{String(v)}</span>
     }
-    const { rerender, getByTestId } = renderInJsdom(
-      withRead(makeReadContext({ outputActiveCount: 2 }), <Probe />),
-    )
+    const { rerender, getByTestId } = renderInJsdom(withRead(makeReadContext({ outputActiveCount: 2 }), <Probe />))
     expect(getByTestId('v').textContent).toBe('true')
     rerender(withRead(makeReadContext({ outputActiveCount: 0 }), <Probe />))
     expect(getByTestId('v').textContent).toBe('false')
@@ -240,10 +237,7 @@ describe('useTerminalWorktreeField uses the latest selector closure', () => {
     function Probe({ multiplier }: { multiplier: number }) {
       // Closure captures `multiplier`; when the prop changes, the new
       // selector closure must take effect on the very next render.
-      const value = useTerminalWorktreeField(
-        WORKTREE_KEY,
-        (s) => s.count * multiplier,
-      )
+      const value = useTerminalWorktreeField(WORKTREE_KEY, (s) => s.count * multiplier)
       return <span data-testid="v">{value}</span>
     }
 

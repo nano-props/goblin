@@ -32,7 +32,9 @@ describe('shortcut definitions', () => {
     expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-close-workspace-tab-or-window'), {})).toBe(
       'CmdOrCtrl+W',
     )
-    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-close-workspace'), {})).toBe('CmdOrCtrl+Shift+W')
+    expect(resolveClientMenuCommandAccelerator(clientMenuCommandById('file-close-workspace'), {})).toBe(
+      'CmdOrCtrl+Shift+W',
+    )
   })
 
   test('defines the terminal primary action as the single terminal shortcut', () => {

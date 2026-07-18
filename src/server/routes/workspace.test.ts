@@ -92,7 +92,9 @@ describe('workspace routes', () => {
 
   test('lists and closes the shared epoch only after its last client releases', async () => {
     const app = createTestWorkspaceRoutes()
-    const first = (await (await post(app, '/runtime-open', { workspaceId: WORKSPACE_ID, clientId: CLIENT_ID })).json()) as {
+    const first = (await (
+      await post(app, '/runtime-open', { workspaceId: WORKSPACE_ID, clientId: CLIENT_ID })
+    ).json()) as {
       workspaceRuntimeId: string
     }
     const secondClientId = 'workspace-route-client-two'

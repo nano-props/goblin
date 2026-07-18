@@ -9,7 +9,11 @@ import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { getRemoteSshHosts, resolveRemoteWorkspaceTarget, testRemoteWorkspaceConnection } from '#/web/remote-workspace-client.ts'
+import {
+  getRemoteSshHosts,
+  resolveRemoteWorkspaceTarget,
+  testRemoteWorkspaceConnection,
+} from '#/web/remote-workspace-client.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { RemoteDiagnosticsPanel } from '#/web/components/RemoteDiagnosticsPanel.tsx'
@@ -136,7 +140,9 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
           return
         }
       }
-      const openResult = await useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(nextTarget))
+      const openResult = await useWorkspacesStore
+        .getState()
+        .ensureWorkspaceOpen(remoteWorkspaceSessionEntry(nextTarget))
       if (!openResult.ok) {
         setActionError(formatRemoteDialogError(t, openResult.message))
         setLoading(false)

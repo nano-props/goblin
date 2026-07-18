@@ -17,7 +17,7 @@ import {
 import { NativeHostProjectionSchema } from '#/shared/native-host-projection.ts'
 import { RepoTreePrefixSchema } from '#/shared/repo-tree-schema.ts'
 import { GIT_HASH_RE } from '#/shared/git-types.ts'
-import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/repo-settings.ts'
+import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/workspace-settings.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import { WorkspacePaneFilesystemExecutionTargetSchema } from '#/shared/workspace-pane-tabs-validators.ts'
@@ -245,28 +245,27 @@ export const GITHUB_CLI_REFRESH_SCHEMA = v.object({
 export const SETTINGS_PROCEDURE_SCHEMAS = {
   fetchInterval: v.object({ sec: v.number() }),
   globalShortcutState: v.object({ registered: v.boolean() }),
-  recentWorkspacesAdd: v.object({ repo: WorkspaceSessionEntrySchema }),
-  // Body for `POST /api/settings/repo-external-app-recent`. The
-  // server-side mutator still re-validates repoId, worktreePath and
+  recentWorkspacesAdd: v.object({ workspace: WorkspaceSessionEntrySchema }),
+  // Body for `POST /api/settings/workspace-external-app-recent`. The
+  // server-side mutator still re-validates workspaceId, worktreePath and
   // itemId, including path and NUL checks, before touching disk; this
   // schema only enforces the basic wire shape.
-  repoExternalAppRecentSet: v.object({
-    repoId: WorkspaceIdSchema,
+  workspaceExternalAppRecentSet: v.object({
+    workspaceId: WorkspaceIdSchema,
     worktreePath: v.nullable(v.pipe(v.string(), v.minLength(1))),
     itemId: v.pipe(v.string(), v.minLength(1), v.maxLength(64)),
   }),
   githubCli: GITHUB_CLI_REFRESH_SCHEMA,
   workspaceRestore: v.object({
     clientId: ClientIdSchema,
-    activeRepoRoot: v.optional(v.nullable(WorkspaceIdSchema)),
+    activeWorkspaceId: v.optional(v.nullable(WorkspaceIdSchema)),
   }),
-  workspaceRepoAdd: v.object({ entry: WorkspaceSessionEntrySchema }),
-  workspaceRepoRemove: v.object({ repoRoot: WorkspaceIdSchema }),
-  // Lazy per-repo restore endpoint — fires when the user navigates to a
-  // non-active repo that was hydrated as a stub at cold start.
-  restoreRepoTabs: v.object({
+  workspaceEntryAdd: v.object({ entry: WorkspaceSessionEntrySchema }),
+  workspaceEntryRemove: v.object({ workspaceId: WorkspaceIdSchema }),
+  // Lazily projects a non-active workspace that was hydrated as a stub.
+  restoreWorkspaceTabs: v.object({
     clientId: ClientIdSchema,
-    repoRoot: WorkspaceIdSchema,
+    workspaceId: WorkspaceIdSchema,
     workspaceRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
   }),
 } as const

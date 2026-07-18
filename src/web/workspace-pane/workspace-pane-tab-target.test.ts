@@ -42,16 +42,15 @@ describe('workspace pane tab target read model', () => {
 
       tabs: [workspacePaneStaticTabEntry('files')],
     })
-    useWorkspacesStore
-      .getState()
-      .setWorkspacePaneTabForTarget(
-        { kind: 'workspace-root', repoRoot: REPO_ID },
-        'files',
-      )
+    useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', repoRoot: REPO_ID }, 'files')
 
     const target = workspacePaneTabTargetForWorkspace(REPO_ID)
 
-    expect(target).toMatchObject({ branchName: null, worktreePath: '/tmp/workspace-pane-target-repo', renderedTab: 'files' })
+    expect(target).toMatchObject({
+      branchName: null,
+      worktreePath: '/tmp/workspace-pane-target-repo',
+      renderedTab: 'files',
+    })
   })
 
   test('marks target resolution unavailable when the repo branch read model is unavailable', () => {
@@ -221,13 +220,17 @@ describe('workspace pane tab target read model', () => {
       currentBranch: 'feature/new',
     })
 
-    expect(workspacePaneTabOpener({
-      kind: 'git-worktree',
-      repoRoot: REPO_ID,
-      worktreePath: WORKTREE_PATH,
-    }, repo.workspaceRuntimeId, 'workspace-pane:changes')).toBe(
-      'workspace-pane:status',
-    )
+    expect(
+      workspacePaneTabOpener(
+        {
+          kind: 'git-worktree',
+          repoRoot: REPO_ID,
+          worktreePath: WORKTREE_PATH,
+        },
+        repo.workspaceRuntimeId,
+        'workspace-pane:changes',
+      ),
+    ).toBe('workspace-pane:status')
   })
 
   test('keeps detached worktree openers isolated from workspace-root and branch targets', () => {
@@ -253,9 +256,9 @@ describe('workspace pane tab target read model', () => {
         'workspace-pane:files',
       ),
     ).toBe('recorded')
-    expect(
-      workspacePaneTabOpener(detachedTarget, repo.workspaceRuntimeId, 'terminal:term-111111111111111111111'),
-    ).toBe('workspace-pane:files')
+    expect(workspacePaneTabOpener(detachedTarget, repo.workspaceRuntimeId, 'terminal:term-111111111111111111111')).toBe(
+      'workspace-pane:files',
+    )
     expect(
       workspacePaneTabOpener(workspaceTarget, repo.workspaceRuntimeId, 'terminal:term-111111111111111111111'),
     ).toBeNull()

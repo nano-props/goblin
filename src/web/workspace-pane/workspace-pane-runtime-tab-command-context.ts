@@ -62,20 +62,16 @@ function assignTerminalRuntimeTabCommandContext(
   context.terminal = {
     base,
     bridge: readTerminalSessionCommandBridge(),
-    openerIdentity: base && paneTarget
-      ? captureWorkspacePaneActiveTabIdentity(paneTarget, base.target.workspaceRuntimeId, {
-          workspacePaneRoute: input.workspacePaneRoute,
-        })
-      : null,
+    openerIdentity:
+      base && paneTarget
+        ? captureWorkspacePaneActiveTabIdentity(paneTarget, base.target.workspaceRuntimeId, {
+            workspacePaneRoute: input.workspacePaneRoute,
+          })
+        : null,
     showTerminalSession: (terminalSessionId) => input.showRuntimeTab('terminal', terminalSessionId),
     showCreatedTerminalSession: (terminalSessionId, presentation) =>
       base
-        ? input.showCreatedRuntimeTab(
-            'terminal',
-            terminalSessionId,
-            presentation,
-            terminalExecutionPath(base.target),
-          )
+        ? input.showCreatedRuntimeTab('terminal', terminalSessionId, presentation, terminalExecutionPath(base.target))
         : false,
     t: input.terminalCreateTranslator,
   }

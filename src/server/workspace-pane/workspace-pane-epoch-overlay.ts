@@ -67,10 +67,7 @@ export class WorkspacePaneEpochOverlay {
       )
     }
     for (const [repoRoot, epochs] of source.epochsByRepoRoot) {
-      this.epochsByRepoRoot.set(
-        repoRoot,
-        new Map([...epochs].map(([key, scope]) => [key, { ...scope }])),
-      )
+      this.epochsByRepoRoot.set(repoRoot, new Map([...epochs].map(([key, scope]) => [key, { ...scope }])))
     }
   }
 

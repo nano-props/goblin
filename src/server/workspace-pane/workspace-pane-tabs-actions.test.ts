@@ -1,7 +1,11 @@
 // @vitest-environment node
 
 import { describe, expect, test, vi } from 'vitest'
-import { acquireWorkspaceRuntime, clearWorkspaceRuntimesForUser, isCurrentWorkspaceRuntime } from '#/server/modules/workspace-runtimes.ts'
+import {
+  acquireWorkspaceRuntime,
+  clearWorkspaceRuntimesForUser,
+  isCurrentWorkspaceRuntime,
+} from '#/server/modules/workspace-runtimes.ts'
 import { createWorkspacePaneTabsActions } from '#/server/workspace-pane/workspace-pane-tabs-actions.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'

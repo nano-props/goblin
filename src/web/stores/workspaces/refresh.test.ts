@@ -179,7 +179,10 @@ describe('remote fetch timestamps', () => {
       expect(resolveSnapshot).toEqual(expect.any(Function))
     })
 
-    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads.repoReadModel.phase).toBe('refreshing')
+    expect(
+      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads
+        .repoReadModel.phase,
+    ).toBe('refreshing')
 
     resolveSnapshot({ branches: [branch('feature/query')], current: 'feature/query' })
     await work
@@ -232,7 +235,10 @@ describe('remote fetch timestamps', () => {
 
     await runManualRepoSync(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
-    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads.fetch.loadedAt).toBeGreaterThanOrEqual(before)
+    expect(
+      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads.fetch
+        .loadedAt,
+    ).toBeGreaterThanOrEqual(before)
   })
 
   test('manual sync ignores stale fetch results after repo reopen', async () => {
@@ -282,7 +288,10 @@ describe('remote fetch timestamps', () => {
     resolveNetwork({ ok: true, message: 'ok' })
     await work
 
-    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads.fetch.phase).toBe('idle')
+    expect(
+      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads.fetch
+        .phase,
+    ).toBe('idle')
   })
 
   test('manual sync records failed fetch results and still refreshes local state', async () => {
@@ -297,7 +306,10 @@ describe('remote fetch timestamps', () => {
     await runManualRepoSync(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(requireGitWorkspaceForTest(repo).capability.git.events.at(-1)).toMatchObject({ kind: 'result', result: { ok: false, message: 'fatal: rejected' } })
+    expect(requireGitWorkspaceForTest(repo).capability.git.events.at(-1)).toMatchObject({
+      kind: 'result',
+      result: { ok: false, message: 'fatal: rejected' },
+    })
     expect(snapshotCount).toBe(1)
   })
 
@@ -333,7 +345,10 @@ describe('remote fetch timestamps', () => {
     await expect(runManualRepoSync(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })).resolves.toBeUndefined()
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(requireGitWorkspaceForTest(repo).capability.git.events.at(-1)).toMatchObject({ kind: 'result', result: { ok: false, message: 'network down' } })
+    expect(requireGitWorkspaceForTest(repo).capability.git.events.at(-1)).toMatchObject({
+      kind: 'result',
+      result: { ok: false, message: 'network down' },
+    })
     expect(requireGitWorkspaceForTest(repo).capability.git.dataLoads.fetch.phase).toBe('idle')
   })
 
@@ -512,18 +527,27 @@ describe('remote fetch timestamps', () => {
     })
     ipcHandlers['repo.pull'] = async () => ({ ok: false, message: 'fatal: rejected' })
 
-    await useWorkspacesStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' }, { workspaceRuntimeId })
+    await useWorkspacesStore
+      .getState()
+      .runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' }, { workspaceRuntimeId })
 
-    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.remote).toMatchObject({
+    expect(
+      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.remote,
+    ).toMatchObject({
       fetchFailed: true,
       fetchError: 'previous failure',
     })
-    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction).toMatchObject({
+    expect(
+      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations
+        .branchAction,
+    ).toMatchObject({
       phase: 'idle',
       error: 'fatal: rejected',
       target: null,
     })
-    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads.fetch).toMatchObject({
+    expect(
+      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads.fetch,
+    ).toMatchObject({
       phase: 'idle',
       error: 'fatal: rejected',
     })
@@ -593,9 +617,9 @@ describe('projection refresh request ordering', () => {
 
     await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
-    expect(primaryWindowQueryClient.getQueryData(repoProjectionQueryKey(REPO_ID, workspaceRuntimeId, null, 'full'))).toEqual(
-      projection,
-    )
+    expect(
+      primaryWindowQueryClient.getQueryData(repoProjectionQueryKey(REPO_ID, workspaceRuntimeId, null, 'full')),
+    ).toEqual(projection)
     expect(getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId)?.loadedAt).toBe(456)
   })
 
@@ -637,7 +661,9 @@ describe('projection refresh request ordering', () => {
     expect(projectionCalls).toBe(1)
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(repo?.availability).toEqual({ phase: 'available' })
-    expect(requireGitWorkspaceForTest(repo).capability.git.dataLoads.repoReadModel.error).toBe('error.workspace-git-unavailable')
+    expect(requireGitWorkspaceForTest(repo).capability.git.dataLoads.repoReadModel.error).toBe(
+      'error.workspace-git-unavailable',
+    )
   })
 
   test('projection and status refreshes settle independently when projection fails', async () => {
@@ -650,7 +676,10 @@ describe('projection refresh request ordering', () => {
     await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
-    expect(requireGitWorkspaceForTest(repo).capability.git.dataLoads.repoReadModel).toMatchObject({ phase: 'idle', error: 'projection failed' })
+    expect(requireGitWorkspaceForTest(repo).capability.git.dataLoads.repoReadModel).toMatchObject({
+      phase: 'idle',
+      error: 'projection failed',
+    })
     expect(getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId)?.loadedAt).toBe(456)
   })
 
@@ -665,8 +694,14 @@ describe('projection refresh request ordering', () => {
     await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
-    expect(requireGitWorkspaceForTest(repo).capability.git.dataLoads.repoReadModel).toMatchObject({ phase: 'idle', error: null, loadedAt: 123 })
-    expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.error).toEqual(
+    expect(requireGitWorkspaceForTest(repo).capability.git.dataLoads.repoReadModel).toMatchObject({
+      phase: 'idle',
+      error: null,
+      loadedAt: 123,
+    })
+    expect(
+      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.error,
+    ).toEqual(
       expect.objectContaining({
         message: 'error.failed-read-repo',
         cause: expect.objectContaining({ message: 'status failed' }),
@@ -712,14 +747,19 @@ describe('projection refresh request ordering', () => {
       } else {
         resolveProjection(repoProjection({ branches: [branch('main')], current: 'main' }))
         await vi.waitFor(() => {
-          expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads.repoReadModel.phase).toBe('idle')
+          expect(
+            requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads
+              .repoReadModel.phase,
+          ).toBe('idle')
         })
         rejectStatus(new Error('error.path-not-found'))
       }
       await refresh
 
       expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.availability).toEqual({ phase: 'available' })
-      expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.error).toEqual(
+      expect(
+        primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.error,
+      ).toEqual(
         expect.objectContaining({
           message: 'error.failed-read-repo',
           cause: expect.objectContaining({ message: 'error.path-not-found' }),
@@ -737,7 +777,9 @@ describe('projection refresh request ordering', () => {
     await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
 
     expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.availability).toEqual({ phase: 'available' })
-    expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.error).toEqual(
+    expect(
+      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.error,
+    ).toEqual(
       expect.objectContaining({
         message: 'error.failed-read-repo',
         cause: expect.objectContaining({ message: 'error.workspace-git-unavailable' }),
@@ -1226,7 +1268,9 @@ describe('projection refresh request ordering', () => {
     await vi.waitFor(() => {
       expect(resolveStatus).toEqual(expect.any(Function))
     })
-    expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))).toMatchObject({
+    expect(
+      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId)),
+    ).toMatchObject({
       fetchStatus: 'fetching',
       error: null,
     })
@@ -1235,7 +1279,9 @@ describe('projection refresh request ordering', () => {
 
     const loadedAt = getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId)?.loadedAt
     expect(loadedAt).toEqual(expect.any(Number))
-    expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))).toMatchObject({
+    expect(
+      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId)),
+    ).toMatchObject({
       fetchStatus: 'idle',
       error: null,
     })
@@ -1247,7 +1293,9 @@ describe('projection refresh request ordering', () => {
     await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
 
     expect(getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId)?.loadedAt).toBe(loadedAt)
-    expect(primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.error).toEqual(
+    expect(
+      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.error,
+    ).toEqual(
       expect.objectContaining({
         message: 'error.failed-read-repo',
         cause: expect.objectContaining({ message: 'status failed' }),
@@ -1273,7 +1321,10 @@ describe('projection refresh request ordering', () => {
 
     await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
-    expect(requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads.repoReadModel).toMatchObject({
+    expect(
+      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads
+        .repoReadModel,
+    ).toMatchObject({
       phase: 'idle',
       error: null,
     })
@@ -1307,7 +1358,10 @@ describe('projection refresh request ordering', () => {
     // The store never re-projects the preferred tab. Whether the terminal
     // tab is renderable is decided at read time by the workspace pane tab
     // model, which inspects the active branch's worktree + terminal session count.
-    const workspaceRuntimeId = seedRepo([branch('main', undefined, { worktree: { path: '/repo' } }), branch('feature/a')])
+    const workspaceRuntimeId = seedRepo([
+      branch('main', undefined, { worktree: { path: '/repo' } }),
+      branch('feature/a'),
+    ])
     updateRepoForTest((repo) => {
       repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
         repo.ui,

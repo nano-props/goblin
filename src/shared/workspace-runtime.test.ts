@@ -35,5 +35,4 @@ describe('workspace runtime domain', () => {
       branch: 'feature/example',
     })
   })
-
 })

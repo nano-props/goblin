@@ -1,9 +1,6 @@
 import type { WorkspacesStore } from '#/web/stores/workspaces/types.ts'
 
-interface RestorableWorkspaceLayoutStoreActions extends Pick<
-  WorkspacesStore,
-  'resetLayout' | 'toggleZenMode'
-> {}
+interface RestorableWorkspaceLayoutStoreActions extends Pick<WorkspacesStore, 'resetLayout' | 'toggleZenMode'> {}
 
 interface RestorableWorkspaceLayoutPreferenceStoreActions extends Pick<
   WorkspacesStore,
@@ -19,8 +16,10 @@ interface RuntimeCoherentWorkspaceProjectionStoreActions extends Pick<
   'ensureWorkspaceOpen' | 'closeWorkspace'
 > {}
 
-interface PrimaryWindowNavigationStoreActions
-  extends Pick<WorkspacesStore, 'closeWorkspace' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'> {}
+interface PrimaryWindowNavigationStoreActions extends Pick<
+  WorkspacesStore,
+  'closeWorkspace' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'
+> {}
 
 interface WorkspacePickerStoreActions extends Pick<WorkspacesStore, 'ensureWorkspaceOpen'> {}
 

@@ -39,9 +39,7 @@ describe('getBranchWorktreeIdentities', () => {
   test('keeps a detached local worktree without a branch ref', async () => {
     vi.mocked(git).mockResolvedValueOnce('')
     await expect(
-      getBranchWorktreeIdentities('/repo', [
-        { path: '/repo', isBare: false, isPrimary: true },
-      ]),
+      getBranchWorktreeIdentities('/repo', [{ path: '/repo', isBare: false, isPrimary: true }]),
     ).resolves.toEqual([{ kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'detached' } }])
   })
 })

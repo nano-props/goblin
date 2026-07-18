@@ -80,6 +80,7 @@ export function WorkspacePickerHost({
       })),
     [summaries, terminalBellCounts],
   )
+  const currentWorkspacePickerId = currentWorkspaceId
   const navigation = usePrimaryWindowNavigation()
   const { ensureWorkspaceOpen } = useWorkspacesStore(useShallow(workspacePickerStoreActionsFromStore))
 
@@ -92,15 +93,17 @@ export function WorkspacePickerHost({
     })
   }
 
-  async function handleClose(workspaceId: string) {
-    const result = await navigation.closeWorkspace(workspaceId)
+  async function handleClose(workspaceLocator: string) {
+    const workspace = useWorkspacesStore.getState().workspaces[workspaceLocator]
+    if (!workspace) return
+    const result = await navigation.closeWorkspace(workspace.id)
     if (!result.ok) toast.error(t(result.message))
   }
 
   return (
     <WorkspacePicker
       workspaces={summariesWithTerminalBells}
-      currentWorkspaceId={currentWorkspaceId}
+      currentWorkspaceId={currentWorkspacePickerId}
       labels={{
         workspaces: t('workspace-picker.workspaces'),
         closeWithName: (name) => t('workspace-picker.close-named', { name }),

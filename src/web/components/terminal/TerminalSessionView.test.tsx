@@ -85,7 +85,10 @@ function terminalBaseForTest(
 ): TerminalSessionBase {
   const workspaceId = requiredWorkspaceLocator(repoRoot)
   if (branch === null) {
-    return { target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: workspaceRuntimeId }, presentation: { kind: 'workspace-root' } }
+    return {
+      target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: workspaceRuntimeId },
+      presentation: { kind: 'workspace-root' },
+    }
   }
   return {
     target: {
@@ -147,7 +150,7 @@ async function renderTerminalSession() {
     terminalSessionId: 'term-111111111111111111111',
     terminalWorktreeKey: '/repo\0/worktree',
     index: 1,
-        ...terminalDescriptorTargetForTest(),
+    ...terminalDescriptorTargetForTest(),
   }
   const terminalWorktreeSnapshot = {
     terminalWorktreeKey: '/repo\0/worktree',
@@ -292,7 +295,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-        ...terminalDescriptorTargetForTest(),
+      ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = completeWorktreeSnapshot({
       terminalWorktreeKey: '/repo\0/worktree',
@@ -382,7 +385,7 @@ describe('TerminalSessionView', () => {
         expect.objectContaining({
           terminalSessionId: 'term-222222222222222222222',
           index: 2,
-        ...terminalDescriptorTargetForTest(),
+          ...terminalDescriptorTargetForTest(),
         }),
         expect.any(HTMLDivElement),
       )
@@ -400,7 +403,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-        ...terminalDescriptorTargetForTest(),
+      ...terminalDescriptorTargetForTest(),
     }
     let terminalWorktreeSnapshot = completeWorktreeSnapshot({
       terminalWorktreeKey: '/repo\0/worktree',
@@ -529,7 +532,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-        ...terminalDescriptorTargetForTest(),
+      ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -680,7 +683,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-        ...terminalDescriptorTargetForTest(),
+      ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -819,7 +822,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-        ...terminalDescriptorTargetForTest(),
+      ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -926,7 +929,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-        ...terminalDescriptorTargetForTest(),
+      ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -1041,7 +1044,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-        ...terminalDescriptorTargetForTest(),
+      ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -1154,7 +1157,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-        ...terminalDescriptorTargetForTest(),
+      ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -1272,7 +1275,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-        ...terminalDescriptorTargetForTest(),
+      ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -1409,7 +1412,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-        ...terminalDescriptorTargetForTest(),
+      ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -1518,7 +1521,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-        ...terminalDescriptorTargetForTest(),
+      ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -1643,7 +1646,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-        ...terminalDescriptorTargetForTest(),
+      ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -1924,7 +1927,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-        ...terminalDescriptorTargetForTest(),
+      ...terminalDescriptorTargetForTest(),
     }
     const terminalWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
@@ -2054,7 +2057,7 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
-        ...terminalDescriptorTargetForTest(),
+      ...terminalDescriptorTargetForTest(),
     }
     const descriptorB = terminalDescriptorForTest({
       terminalSessionId: 'term-222222222222222222222',

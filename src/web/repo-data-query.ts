@@ -426,7 +426,11 @@ function repoLogQueryOptions(
   })
 }
 
-function repoRemoteBranchesQueryOptions(repoRoot: string, workspaceRuntimeId: string, options: { enabled?: boolean } = {}) {
+function repoRemoteBranchesQueryOptions(
+  repoRoot: string,
+  workspaceRuntimeId: string,
+  options: { enabled?: boolean } = {},
+) {
   return queryOptions({
     queryKey: repoRemoteBranchesQueryKey(repoRoot, workspaceRuntimeId),
     queryFn: ({ signal }) => getRepoRemoteBranches(repoRoot, workspaceRuntimeId, signal),
@@ -578,7 +582,9 @@ export function getRepoProjectionQueryData(
   mode: PullRequestFetchMode | undefined,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): WorkspaceRuntimeProjection | undefined {
-  return queryClient.getQueryData<WorkspaceRuntimeProjection>(repoProjectionQueryKey(repoRoot, workspaceRuntimeId, branch, mode))
+  return queryClient.getQueryData<WorkspaceRuntimeProjection>(
+    repoProjectionQueryKey(repoRoot, workspaceRuntimeId, branch, mode),
+  )
 }
 
 export function getRepoWorktreeStatusQueryData(
@@ -624,7 +630,12 @@ export function seedRepoProjectionQueryData(
   // Cache/session restore seed data is a UI placeholder, not an authoritative
   // server read, so do not seed the active operations cache here.
   queryClient.setQueryData(
-    repoProjectionQueryKey(repoRoot, workspaceRuntimeId, projection.requested.branch, projection.requested.pullRequestMode),
+    repoProjectionQueryKey(
+      repoRoot,
+      workspaceRuntimeId,
+      projection.requested.branch,
+      projection.requested.pullRequestMode,
+    ),
     projection,
   )
 }
@@ -647,7 +658,9 @@ async function beginRepoProjectionReadModelRefresh(input: RepoProjectionRefreshR
   await invalidateExactRepoProjectionQuery(input.queryClient, input.queryKey)
 }
 
-async function fetchRepoProjectionReadModelOnce(input: RepoProjectionRefreshReadInput): Promise<WorkspaceRuntimeProjection> {
+async function fetchRepoProjectionReadModelOnce(
+  input: RepoProjectionRefreshReadInput,
+): Promise<WorkspaceRuntimeProjection> {
   const projectionQueryOptions = repoProjectionQueryOptions(
     input.repoRoot,
     input.workspaceRuntimeId,

@@ -46,9 +46,9 @@ describe('repo locators', () => {
         remotePath: '/srv/repo',
       }),
     ).toBe('~/Developer/repo')
-    expect(
-      formatWorkspaceDisplayLocation('goblin+file:///Users/example/Developer/repo', '/Users/example', null),
-    ).toBe('~/Developer/repo')
+    expect(formatWorkspaceDisplayLocation('goblin+file:///Users/example/Developer/repo', '/Users/example', null)).toBe(
+      '~/Developer/repo',
+    )
     expect(formatWorkspaceDisplayLocation('goblin+ssh://prod/srv/repo', '/Users/example')).toBe('prod:/srv/repo')
     expect(
       formatWorkspaceDisplayLocation('goblin+ssh://prod/srv/repo', '/Users/example', {
@@ -64,9 +64,9 @@ describe('repo locators', () => {
         remotePath: '/srv/other',
       }),
     ).toBe('prod:/srv/repo')
-    expect(
-      formatWorkspaceDisplayLocation('goblin+file:///C:/Users/example/My%20Repo', 'C:\\Users\\example'),
-    ).toBe('~\\My Repo')
+    expect(formatWorkspaceDisplayLocation('goblin+file:///C:/Users/example/My%20Repo', 'C:\\Users\\example')).toBe(
+      '~\\My Repo',
+    )
   })
 
   test('formats recent repo session entry locators', () => {

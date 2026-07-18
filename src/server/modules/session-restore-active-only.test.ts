@@ -20,8 +20,8 @@ const mocks = vi.hoisted(() => ({
   releaseWorkspaceRuntimeMembershipLease: vi.fn(),
   isCurrentWorkspaceRuntimeMembership: vi.fn(),
   getServerWorkspaceState: vi.fn(),
-  compareAndReplaceServerWorkspaceRepos: vi.fn(),
-  confirmServerWorkspaceRepoEntry: vi.fn(),
+  compareAndReplaceServerWorkspaceEntries: vi.fn(),
+  confirmServerWorkspaceEntry: vi.fn(),
   probeRepo: vi.fn(),
   readRepoProjection: vi.fn(),
   runRemoteWorkspaceLifecycleWrite: vi.fn(),
@@ -61,8 +61,8 @@ vi.mock('#/server/modules/workspace-runtimes.ts', () => ({
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerWorkspaceState: mocks.getServerWorkspaceState,
-  compareAndReplaceServerWorkspaceRepos: mocks.compareAndReplaceServerWorkspaceRepos,
-  confirmServerWorkspaceRepoEntry: mocks.confirmServerWorkspaceRepoEntry,
+  compareAndReplaceServerWorkspaceEntries: mocks.compareAndReplaceServerWorkspaceEntries,
+  confirmServerWorkspaceEntry: mocks.confirmServerWorkspaceEntry,
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
@@ -104,7 +104,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       requested: { branch: null, pullRequestMode: 'full' },
       loadedAt: 1,
     }))
-    mocks.compareAndReplaceServerWorkspaceRepos.mockImplementation(
+    mocks.compareAndReplaceServerWorkspaceEntries.mockImplementation(
       async (_expected: WorkspaceSessionEntry[], replacement: WorkspaceSessionEntry[]) => {
         const workspace = await mocks.getServerWorkspaceState.mock.results.at(-1)?.value
         return { matched: true, workspace: { ...workspace, openWorkspaceEntries: replacement } }
@@ -176,7 +176,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const initial = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA] }
     const latest = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA, repoB] }
     mocks.getServerWorkspaceState.mockResolvedValue(initial)
-    mocks.compareAndReplaceServerWorkspaceRepos
+    mocks.compareAndReplaceServerWorkspaceEntries
       .mockResolvedValueOnce({ matched: false, latestWorkspace: latest })
       .mockResolvedValueOnce({ matched: true, workspace: latest })
       .mockResolvedValueOnce({ matched: true, workspace: latest })
@@ -211,7 +211,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const initial = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA, repoB] }
     const latest = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoB] }
     mocks.getServerWorkspaceState.mockResolvedValue(initial)
-    mocks.compareAndReplaceServerWorkspaceRepos
+    mocks.compareAndReplaceServerWorkspaceEntries
       .mockResolvedValueOnce({ matched: false, latestWorkspace: latest })
       .mockResolvedValueOnce({ matched: true, workspace: latest })
       .mockResolvedValueOnce({ matched: true, workspace: latest })
@@ -241,7 +241,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const initial = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA] }
     const latest = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repoA, repoB] }
     mocks.getServerWorkspaceState.mockResolvedValue(initial)
-    mocks.compareAndReplaceServerWorkspaceRepos
+    mocks.compareAndReplaceServerWorkspaceEntries
       .mockResolvedValueOnce({ matched: true, workspace: initial })
       .mockResolvedValueOnce({ matched: false, latestWorkspace: latest })
       .mockResolvedValueOnce({ matched: true, workspace: latest })
@@ -264,7 +264,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const repo = { kind: 'local' as const, id: LOCAL_WORKSPACE_ID }
     const workspace = { ...defaultServerWorkspaceState(), openWorkspaceEntries: [repo] }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.compareAndReplaceServerWorkspaceRepos.mockResolvedValue({
+    mocks.compareAndReplaceServerWorkspaceEntries.mockResolvedValue({
       matched: false,
       latestWorkspace: workspace,
     })
@@ -284,7 +284,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledOnce()
   })
 
-  test('uses activeRepoRoot instead of restoredWorkspaceId to choose the eager restore repo', async () => {
+  test('uses activeWorkspaceId instead of restoredWorkspaceId to choose the eager restore repo', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [
@@ -309,7 +309,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      activeRepoRoot: 'goblin+file:///repo-b',
+      activeWorkspaceId: REPO_B_ID,
       workspacePaneTabsHost,
     })
 

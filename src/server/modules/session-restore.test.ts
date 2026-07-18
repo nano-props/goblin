@@ -16,8 +16,8 @@ const mocks = vi.hoisted(() => ({
   releaseWorkspaceRuntimeMembershipLease: vi.fn(),
   isCurrentWorkspaceRuntimeMembership: vi.fn(),
   getServerWorkspaceState: vi.fn(),
-  compareAndReplaceServerWorkspaceRepos: vi.fn(),
-  confirmServerWorkspaceRepoEntry: vi.fn(),
+  compareAndReplaceServerWorkspaceEntries: vi.fn(),
+  confirmServerWorkspaceEntry: vi.fn(),
   probeRepo: vi.fn(),
   readRepoProjection: vi.fn(),
   runRemoteWorkspaceLifecycleWrite: vi.fn(),
@@ -57,8 +57,8 @@ vi.mock('#/server/modules/workspace-runtimes.ts', () => ({
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerWorkspaceState: mocks.getServerWorkspaceState,
-  compareAndReplaceServerWorkspaceRepos: mocks.compareAndReplaceServerWorkspaceRepos,
-  confirmServerWorkspaceRepoEntry: mocks.confirmServerWorkspaceRepoEntry,
+  compareAndReplaceServerWorkspaceEntries: mocks.compareAndReplaceServerWorkspaceEntries,
+  confirmServerWorkspaceEntry: mocks.confirmServerWorkspaceEntry,
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
@@ -94,13 +94,13 @@ describe('restoreServerWorkspace', () => {
       requested: { branch: null, pullRequestMode: 'full' },
       loadedAt: 1,
     })
-    mocks.compareAndReplaceServerWorkspaceRepos.mockImplementation(
+    mocks.compareAndReplaceServerWorkspaceEntries.mockImplementation(
       async (_expected: WorkspaceSessionEntry[], replacement: WorkspaceSessionEntry[]) => {
         const workspace = await mocks.getServerWorkspaceState.mock.results.at(-1)?.value
         return { matched: true, workspace: { ...workspace, openWorkspaceEntries: replacement } }
       },
     )
-    mocks.confirmServerWorkspaceRepoEntry.mockImplementation(async (entry: WorkspaceSessionEntry) => ({
+    mocks.confirmServerWorkspaceEntry.mockImplementation(async (entry: WorkspaceSessionEntry) => ({
       matched: true,
       workspace: { openWorkspaceEntries: [entry], workspacePaneTabsByTargetByWorkspace: {} },
     }))
@@ -163,7 +163,11 @@ describe('restoreServerWorkspace', () => {
         },
       ],
       workspacePaneTabs: [
-        { workspaceId: 'goblin+file:///repo', workspaceRuntimeId: 'repo-runtime-test', snapshot: { revision: 1, entries: [] } },
+        {
+          workspaceId: 'goblin+file:///repo',
+          workspaceRuntimeId: 'repo-runtime-test',
+          snapshot: { revision: 1, entries: [] },
+        },
       ],
     })
   })
@@ -249,7 +253,11 @@ describe('restoreServerWorkspace', () => {
       targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
     })
     expect(result.runtime.workspacePaneTabs).toEqual([
-      { workspaceId: 'goblin+file:///repo', workspaceRuntimeId: 'repo-runtime-test', snapshot: { revision: 3, entries: [] } },
+      {
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-test',
+        snapshot: { revision: 3, entries: [] },
+      },
     ])
   })
 
@@ -580,7 +588,7 @@ describe('restoreServerWorkspace', () => {
       openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
     }
     mocks.getServerWorkspaceState.mockResolvedValueOnce(invalidWorkspace).mockResolvedValueOnce(currentWorkspace)
-    mocks.compareAndReplaceServerWorkspaceRepos
+    mocks.compareAndReplaceServerWorkspaceEntries
       .mockResolvedValueOnce({ matched: true, workspace: invalidWorkspace })
       .mockResolvedValueOnce({ matched: true, workspace: currentWorkspace })
     const workspacePaneTabsHost = {

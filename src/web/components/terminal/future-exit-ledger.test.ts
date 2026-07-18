@@ -50,10 +50,7 @@ describe('FutureExitLedger', () => {
     let now = 0
     const ledger = new FutureExitLedger({ ttlMs: 50, now: () => now })
     ledger.record(binding(1))
-    ledger.confirmAuthoritativeSnapshot(
-      JSON.stringify(['/repo-a', 'repo-runtime-a-1']),
-      [binding(1)],
-    )
+    ledger.confirmAuthoritativeSnapshot(JSON.stringify(['/repo-a', 'repo-runtime-a-1']), [binding(1)])
     now = 5_000
     expect(ledger.blocksActivation(binding(1))).toBe(true)
   })
@@ -73,10 +70,7 @@ describe('FutureExitLedger', () => {
   test('clears a durable tombstone after authoritative absence', () => {
     const ledger = new FutureExitLedger()
     ledger.record(binding(1), 'durable')
-    ledger.confirmAuthoritativeSnapshot(
-      JSON.stringify(['/repo-a', 'repo-runtime-a-1']),
-      [],
-    )
+    ledger.confirmAuthoritativeSnapshot(JSON.stringify(['/repo-a', 'repo-runtime-a-1']), [])
     expect(ledger.blocksActivation(binding(1))).toBe(false)
   })
 
@@ -100,10 +94,7 @@ describe('FutureExitLedger', () => {
   test('keeps a present exit as an exact activation tombstone', () => {
     const ledger = new FutureExitLedger()
     ledger.record(binding(1))
-    ledger.confirmAuthoritativeSnapshot(
-      JSON.stringify(['/repo-a', 'repo-runtime-a-1']),
-      [binding(1)],
-    )
+    ledger.confirmAuthoritativeSnapshot(JSON.stringify(['/repo-a', 'repo-runtime-a-1']), [binding(1)])
     expect(ledger.blocksActivation(binding(1))).toBe(true)
     expect(ledger.blocksActivation(binding(1))).toBe(true)
   })
@@ -130,10 +121,7 @@ describe('FutureExitLedger', () => {
     ledger.record(repoA)
     ledger.record(repoB)
 
-    ledger.confirmAuthoritativeSnapshot(
-      JSON.stringify(['/repo-a', 'repo-runtime-a-1']),
-      [],
-    )
+    ledger.confirmAuthoritativeSnapshot(JSON.stringify(['/repo-a', 'repo-runtime-a-1']), [])
     expect(ledger.blocksActivation(repoA)).toBe(false)
     expect(ledger.blocksActivation(repoB)).toBe(true)
   })

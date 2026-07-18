@@ -114,9 +114,9 @@ describe('repo workspace pane tab model', () => {
     expect(model.selectedEntry).toEqual(terminalEntry(terminalSessionId))
     expect(model.selectedIdentity).toBe(`terminal:${terminalSessionId}`)
     if (!model.selectedIdentity) throw new Error('expected selected terminal identity')
-    expect(
-      nextWorkspacePaneTabEntryAfterClose(model.tabEntries, model.selectedIdentity),
-    ).toEqual(workspacePaneStaticTabEntry('files'))
+    expect(nextWorkspacePaneTabEntryAfterClose(model.tabEntries, model.selectedIdentity)).toEqual(
+      workspacePaneStaticTabEntry('files'),
+    )
   })
 
   test('projects a mixed tab list across static and terminal tabs', () => {

@@ -17,10 +17,7 @@ export interface TerminalDirectoryReservation<TUser extends string | number> {
   readonly worktreeId: WorkspaceId
 }
 
-export class TerminalDirectory<
-  TUser extends string | number,
-  TEntry extends TerminalDirectoryEntry<TUser>,
-> {
+export class TerminalDirectory<TUser extends string | number, TEntry extends TerminalDirectoryEntry<TUser>> {
   private readonly entriesByRuntimeId = new Map<string, TEntry>()
   private readonly runtimeIdByUserSession = new Map<string, string>()
   private readonly reservationsByRuntimeId = new Map<string, TerminalDirectoryReservation<TUser>>()
@@ -58,7 +55,8 @@ export class TerminalDirectory<
         if (settled) throw new Error('terminal directory reservation already settled')
         if (this.reservationsByRuntimeId.get(identity.id) !== identity)
           throw new Error('terminal directory reservation ownership lost')
-        if (!reservationMatchesEntry(identity, entry)) throw new Error('terminal directory reservation identity mismatch')
+        if (!reservationMatchesEntry(identity, entry))
+          throw new Error('terminal directory reservation identity mismatch')
         this.publish(entry)
         settled = true
         this.reservationsByRuntimeId.delete(identity.id)

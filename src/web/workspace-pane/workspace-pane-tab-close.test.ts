@@ -94,7 +94,6 @@ test('closes a workspace-root static tab through the shared tab transaction', as
     kind: 'workspace-root' as const,
     repoRoot: REPO_ID,
     workspaceRuntimeId: repo.workspaceRuntimeId,
-
   }
   setWorkspacePaneTabsForTargetQueryData({
     ...target,
@@ -139,7 +138,7 @@ test('reports lifecycle success and clears the transition when close-back naviga
   const commitWorkspacePaneRoute = vi.fn(() => routeCommit.promise)
   const close = dispatchCloseWorkspacePaneTabAction({
     paneTarget: WORKTREE_PANE_TARGET,
-      worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
+    worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
     workspaceId: REPO_ID,
     workspacePaneRoute: { kind: 'static', tab: 'files' },
     navigation: navigationWith({ commitWorkspacePaneRoute }),
@@ -210,7 +209,7 @@ test('sends a detached worktree close to the server without requiring a branch',
 
   await expect(
     dispatchConfirmCloseTerminalWorkspacePaneTabAction({
-    paneTarget: WORKTREE_PANE_TARGET,
+      paneTarget: WORKTREE_PANE_TARGET,
       worktreeHead: { kind: 'detached' },
       workspaceId: REPO_ID,
       workspacePaneRoute: route,
@@ -235,7 +234,6 @@ test('confirmed workspace terminal close selects Files without inventing a branc
     kind: 'workspace-root' as const,
     repoRoot: REPO_ID,
     workspaceRuntimeId: repo.workspaceRuntimeId,
-
   }
   const runtimeTarget = runtimeWorkspacePaneTargetForTest(targetInput)
   setWorkspacePaneTabsForTargetQueryData({
@@ -279,9 +277,13 @@ test('confirmed workspace terminal close selects Files without inventing a branc
     closeTerminalByDescriptor,
   })
   const targetKey = workspacePaneTabsTargetIdentityKey(targetInput)
-  expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe('terminal')
+  expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
+    'terminal',
+  )
   expect(
-    useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[formatTerminalWorktreeKey(REPO_ID, REPO_ID)],
+    useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[
+      formatTerminalWorktreeKey(REPO_ID, REPO_ID)
+    ],
   ).toBe(terminalSessionId)
   const navigation = navigationWith({
     showWorkspaceRootPaneTab: vi.fn((_repoId, presentation, options) => {
@@ -312,7 +314,9 @@ test('confirmed workspace terminal close selects Files without inventing a branc
   ).resolves.toBe(true)
 
   expect(closeTerminalByDescriptor).toHaveBeenCalledOnce()
-  expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe('files')
+  expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
+    'files',
+  )
 })
 
 test('does not let a late close from an old runtime navigate or clear the replacement runtime opener', async () => {
@@ -345,7 +349,7 @@ test('does not let a late close from an old runtime navigate or clear the replac
   const navigation = navigationWith()
   const close = dispatchCloseWorkspacePaneTabAction({
     paneTarget: WORKTREE_PANE_TARGET,
-      worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
+    worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
     workspaceId: REPO_ID,
     workspacePaneRoute: { kind: 'static', tab: 'files' },
     navigation,

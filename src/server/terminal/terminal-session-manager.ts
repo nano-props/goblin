@@ -447,8 +447,9 @@ export class TerminalSessionManager<TUser extends string | number> {
     clientId: string,
     signal?: AbortSignal,
   ): Promise<TerminalRestartResult> {
-    return (await this.restartSessionWithProjectionOutcome(userId, terminalRuntimeSessionId, cols, rows, clientId, signal))
-      .result
+    return (
+      await this.restartSessionWithProjectionOutcome(userId, terminalRuntimeSessionId, cols, rows, clientId, signal)
+    ).result
   }
 
   async restartSessionWithProjectionOutcome(
@@ -473,7 +474,8 @@ export class TerminalSessionManager<TUser extends string | number> {
       return { result: { ok: false, message: authorityReasonToMessage(denyReason) }, projectionChanged: null }
     }
     restartTerminalClientControl(session, clientId, this.sessionPresence(session))
-    if (signal?.aborted) return { result: { ok: false, message: 'error.workspace-runtime-stale' }, projectionChanged: null }
+    if (signal?.aborted)
+      return { result: { ok: false, message: 'error.workspace-runtime-stale' }, projectionChanged: null }
     const spawn = await this.restartAndAttachSession(session, size.cols, size.rows, signal)
     if (!spawn.result.ok && session.ptyBinding.isCurrentSpawn(session, spawn.generation)) {
       if (markTerminalSessionError(session, spawn.result.message)) this.emitLifecycle(session)
@@ -1268,9 +1270,7 @@ function sameTerminalPresentation(a: TerminalPresentation | null, b: TerminalPre
   if (!a || a.kind !== b.kind) return false
   if (a.kind === 'workspace-root') return true
   if (b.kind !== 'git-worktree' || a.head.kind !== b.head.kind) return false
-  return (
-    a.head.kind === 'detached' || (b.head.kind === 'branch' && a.head.branchName === b.head.branchName)
-  )
+  return a.head.kind === 'detached' || (b.head.kind === 'branch' && a.head.branchName === b.head.branchName)
 }
 
 function assertTerminalPresentationMatchesTarget(

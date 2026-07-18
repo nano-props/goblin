@@ -16,10 +16,10 @@ export async function refreshWorkspace(
 }
 
 export async function openWorkspaceRuntime(workspaceId: string): Promise<string> {
-  const result = await postServerJson<
-    { workspaceId: string; clientId: string },
-    { workspaceRuntimeId: string }
-  >('/api/workspace/runtime-open', { workspaceId, clientId: readOrCreateWebTerminalClientId() })
+  const result = await postServerJson<{ workspaceId: string; clientId: string }, { workspaceRuntimeId: string }>(
+    '/api/workspace/runtime-open',
+    { workspaceId, clientId: readOrCreateWebTerminalClientId() },
+  )
   return result.workspaceRuntimeId
 }
 

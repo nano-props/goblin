@@ -42,7 +42,7 @@ describe('settings snapshot partitions', () => {
       prefs,
       globalShortcutRegistered: false,
       recentWorkspaces: [{ kind: 'local', id: workspaceIdForTest('goblin+file:///tmp/repo-b') }],
-      repoSettings: [],
+      workspaceSettings: [],
     })
 
     expect(runtimeSettingsSnapshotFromSettingsSnapshot(snapshot)).toMatchObject({

@@ -45,7 +45,7 @@ import { type NativeHostProjection } from '#/shared/native-host-projection.ts'
 import { RemoteAbsolutePathSchema } from '#/shared/remote-workspace-schema.ts'
 import type { CreateWorktreeIpcInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
-import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
+import type { WorkspaceSettingsEntry } from '#/shared/workspace-settings.ts'
 import type { WorkspaceCapabilities, WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 
 export type { SettingsPage } from '#/shared/settings-pages.ts'
@@ -66,7 +66,11 @@ export type {
   NativeSettingsProjectionState,
   NativeHostProjection,
 } from '#/shared/native-host-projection.ts'
-export type { RepoSettingsEntry, WorktreeBootstrapTrust, WorkspaceExternalAppRecent } from '#/shared/repo-settings.ts'
+export type {
+  WorkspaceSettingsEntry,
+  WorktreeBootstrapTrust,
+  WorkspaceExternalAppRecent,
+} from '#/shared/workspace-settings.ts'
 
 export interface LanInfo {
   host: string
@@ -83,21 +87,21 @@ export interface ThemeState {
 }
 
 export interface ServerWorkspaceState {
-  /** User-level repository membership, in picker order. */
+  /** User-level workspace membership, in picker order. */
   openWorkspaceEntries: WorkspaceSessionEntry[]
-  /** Per-repo, per-target workspace pane layout that survives a server restart. */
+  /** Per-workspace, per-target pane layout that survives a server restart. */
   workspacePaneTabsByTargetByWorkspace: Record<string, Record<string, WorkspacePaneStaticTabEntry[]>>
 }
 
 export interface ClientWorkspaceState {
-  /** Repo id restored when opening `/` — null when no repos were open. */
+  /** Workspace restored when opening `/`; null when none were open. */
   restoredWorkspaceId: WorkspaceId | null
   zenMode: boolean
   workspacePaneSize: number
   selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
-  /** Per-repo, per-target workspace pane tab preference that session restore can make renderable. */
+  /** Per-workspace, per-target pane tab preference that session restore can make renderable. */
   preferredWorkspacePaneTabByTargetByWorkspace: Record<string, Record<string, WorkspacePaneSessionTabType | null>>
-  /** Per-repo, per-worktree file tree view state. */
+  /** Per-workspace, per-filesystem-target file tree view state. */
   filetreeViewStateByWorktreeByWorkspace: Record<string, Record<string, FiletreeSessionViewState>>
 }
 
@@ -149,16 +153,16 @@ export interface ProjectedRestoredWorkspaceRuntime extends RestoredWorkspaceRunt
 
 export interface StubRestoredWorkspaceRuntime extends RestoredWorkspaceRuntimeBase {
   // Stub leases have a validated runtime identity but no projection. They are
-  // projected lazily when the user navigates to the repo.
+  // projected lazily when the user navigates to the workspace.
   projection: null
 }
 
 export type RestoredWorkspaceRuntime = ProjectedRestoredWorkspaceRuntime | StubRestoredWorkspaceRuntime
 
 export function isProjectedRestoredWorkspaceRuntime(
-  repo: RestoredWorkspaceRuntime,
-): repo is ProjectedRestoredWorkspaceRuntime {
-  return repo.projection !== null
+  workspace: RestoredWorkspaceRuntime,
+): workspace is ProjectedRestoredWorkspaceRuntime {
+  return workspace.projection !== null
 }
 
 export interface WorkspaceRuntimeRestoreSnapshot {
@@ -182,11 +186,12 @@ export interface WorkspaceTabsRestoreResult {
   snapshot: WorkspacePaneTabsSnapshot | null
 }
 
-export interface RepoSettingsState {
-  repoSettings: RepoSettingsEntry[]
+export interface WorkspaceSettingsState {
+  workspaceSettings: WorkspaceSettingsEntry[]
 }
 
-export interface SettingsSnapshot extends RuntimeSettingsSnapshot, RuntimeRecentWorkspacesState, RepoSettingsState {}
+export interface SettingsSnapshot
+  extends RuntimeSettingsSnapshot, RuntimeRecentWorkspacesState, WorkspaceSettingsState {}
 
 export interface GlobalShortcutState {
   accelerator: string
@@ -505,7 +510,7 @@ export interface AppIpcHandlers {
     setGlobalShortcutDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     applyNativeHostProjection: (input: NativeHostProjection) => Promise<void>
-    addRecentWorkspace: (input: { repo: WorkspaceSessionEntry }) => Promise<WorkspaceSessionEntry[]>
+    addRecentWorkspace: (input: { workspace: WorkspaceSessionEntry }) => Promise<WorkspaceSessionEntry[]>
     clearRecentWorkspaces: () => Promise<void>
   }
   externalApps: {

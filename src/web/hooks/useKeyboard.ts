@@ -284,13 +284,25 @@ export function useKeyboard({
         }
         case 'next-branch': {
           if (overlayOpen || !repo || repo.capability.kind !== 'git') break
-          if (moveBranchSelection({ repo, git: repo.capability.git, currentBranchName: currentBranchNameRef.current }, 1, navigation))
+          if (
+            moveBranchSelection(
+              { repo, git: repo.capability.git, currentBranchName: currentBranchNameRef.current },
+              1,
+              navigation,
+            )
+          )
             e.preventDefault()
           break
         }
         case 'prev-branch': {
           if (overlayOpen || !repo || repo.capability.kind !== 'git') break
-          if (moveBranchSelection({ repo, git: repo.capability.git, currentBranchName: currentBranchNameRef.current }, -1, navigation))
+          if (
+            moveBranchSelection(
+              { repo, git: repo.capability.git, currentBranchName: currentBranchNameRef.current },
+              -1,
+              navigation,
+            )
+          )
             e.preventDefault()
           break
         }

@@ -1,4 +1,4 @@
-import { isValidRepoLocator } from '#/shared/input-validation.ts'
+import { isValidWorkspaceLocatorInput } from '#/shared/input-validation.ts'
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
@@ -114,7 +114,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       input: TerminalPruneInput,
     ): Promise<{ pruned: number; remaining: number }> {
       if (!isValidTerminalClientId(clientId)) return { pruned: 0, remaining: 0 }
-      if (!isValidRepoLocator(input.repoRoot)) return { pruned: 0, remaining: 0 }
+      if (!isValidWorkspaceLocatorInput(input.repoRoot)) return { pruned: 0, remaining: 0 }
       assertCurrentWorkspaceRuntime(userId, input.repoRoot, input.workspaceRuntimeId)
       return await sessionService.prune(clientId, userId, input.repoRoot, input.workspaceRuntimeId)
     },
@@ -186,7 +186,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       userId: string,
       input: TerminalListSessionsInput,
     ): Promise<TerminalSessionsSnapshot> {
-      if (!isValidTerminalClientId(clientId) || !isValidRepoLocator(input.repoRoot)) {
+      if (!isValidTerminalClientId(clientId) || !isValidWorkspaceLocatorInput(input.repoRoot)) {
         return { revision: 0, sessions: [] }
       }
       assertCurrentWorkspaceRuntime(userId, input.repoRoot, input.workspaceRuntimeId)
@@ -200,7 +200,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       input: TerminalListSessionsInput,
     ): Promise<TerminalSessionSummary[]> {
       if (!isValidTerminalClientId(clientId)) return []
-      if (!isValidRepoLocator(input.repoRoot)) return []
+      if (!isValidWorkspaceLocatorInput(input.repoRoot)) return []
       assertCurrentWorkspaceRuntime(userId, input.repoRoot, input.workspaceRuntimeId)
       return await sessionService.listSessions(userId, input.repoRoot, input.workspaceRuntimeId)
     },

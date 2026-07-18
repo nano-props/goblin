@@ -76,7 +76,10 @@ afterEach(() => {
 
 describe('RepoCloneDialog', () => {
   test('ensures the cloned workspace is open before delegating activation to navigation', async () => {
-    const ensureWorkspaceOpen = vi.fn(async () => ({ ok: true as const, workspaceId: workspaceIdForTest('goblin+file:///tmp/cloned-repo') }))
+    const ensureWorkspaceOpen = vi.fn(async () => ({
+      ok: true as const,
+      workspaceId: workspaceIdForTest('goblin+file:///tmp/cloned-repo'),
+    }))
     useWorkspacesStore.setState({ ensureWorkspaceOpen })
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()

@@ -43,15 +43,12 @@ export function useTerminalWorktreeField<T>(
       terminalWorktreeKey ? ctx.subscribeTerminalWorktree(terminalWorktreeKey, listener) : () => {},
     [ctx, terminalWorktreeKey],
   )
-  const getSnapshot = useCallback(
-    (): T => {
-      const snap = terminalWorktreeKey
-        ? ctx.terminalWorktreeSnapshot(terminalWorktreeKey)
-        : EMPTY_TERMINAL_WORKTREE_SNAPSHOT
-      return selectorRef.current(snap)
-    },
-    [ctx, terminalWorktreeKey],
-  )
+  const getSnapshot = useCallback((): T => {
+    const snap = terminalWorktreeKey
+      ? ctx.terminalWorktreeSnapshot(terminalWorktreeKey)
+      : EMPTY_TERMINAL_WORKTREE_SNAPSHOT
+    return selectorRef.current(snap)
+  }, [ctx, terminalWorktreeKey])
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
@@ -72,13 +69,10 @@ export function useTerminalSessionField<T>(
       terminalSessionId ? ctx.subscribeSnapshot(terminalSessionId, listener) : () => {},
     [ctx, terminalSessionId],
   )
-  const getSnapshot = useCallback(
-    (): T => {
-      const snap = terminalSessionId ? ctx.snapshot(terminalSessionId) : EMPTY_TERMINAL_SNAPSHOT
-      return selectorRef.current(snap)
-    },
-    [ctx, terminalSessionId],
-  )
+  const getSnapshot = useCallback((): T => {
+    const snap = terminalSessionId ? ctx.snapshot(terminalSessionId) : EMPTY_TERMINAL_SNAPSHOT
+    return selectorRef.current(snap)
+  }, [ctx, terminalSessionId])
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
@@ -121,9 +115,7 @@ export function useTerminalWorktreeOutputActive(terminalWorktreeKey: string | nu
   return useTerminalWorktreeField(terminalWorktreeKey, (s) => s.outputActiveCount > 0)
 }
 
-export function useTerminalWorktreeSelectedDescriptor(
-  terminalWorktreeKey: string | null,
-): TerminalDescriptor | null {
+export function useTerminalWorktreeSelectedDescriptor(terminalWorktreeKey: string | null): TerminalDescriptor | null {
   return useTerminalWorktreeField(terminalWorktreeKey, (s) => s.selectedDescriptor)
 }
 
@@ -165,12 +157,16 @@ export function useTerminalSessionSummaries(terminalWorktreeKey: string | null):
 }
 
 export function useTerminalRepoProjectionPhase(repoRoot: string | null): TerminalProjectionHydrationPhase {
-  const workspaceRuntimeId = useWorkspacesStore((s) => (repoRoot ? s.workspaces[repoRoot]?.workspaceRuntimeId : undefined))
+  const workspaceRuntimeId = useWorkspacesStore((s) =>
+    repoRoot ? s.workspaces[repoRoot]?.workspaceRuntimeId : undefined,
+  )
   return useTerminalProjectionHydrationPhase(repoRoot, workspaceRuntimeId)
 }
 
 export function useTerminalRepoProjectionHydrationEntry(repoRoot: string | null): TerminalProjectionHydrationEntry {
-  const workspaceRuntimeId = useWorkspacesStore((s) => (repoRoot ? s.workspaces[repoRoot]?.workspaceRuntimeId : undefined))
+  const workspaceRuntimeId = useWorkspacesStore((s) =>
+    repoRoot ? s.workspaces[repoRoot]?.workspaceRuntimeId : undefined,
+  )
   return useTerminalProjectionHydrationEntry(repoRoot, workspaceRuntimeId)
 }
 

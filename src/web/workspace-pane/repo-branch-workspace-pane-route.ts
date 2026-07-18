@@ -14,9 +14,7 @@ import {
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import {
-  workspacePaneTabsTargetWorktreePath,
-} from '#/shared/workspace-pane-tabs-target.ts'
+import { workspacePaneTabsTargetWorktreePath } from '#/shared/workspace-pane-tabs-target.ts'
 
 export type WorkspacePaneRouteResolution =
   | { kind: 'missing' }
@@ -26,10 +24,7 @@ export type WorkspacePaneRouteResolution =
     }
   | { kind: 'route'; route: WorkspacePaneRoute | null }
 
-export function resolveWorkspacePaneRoute(
-  repoId: string,
-  branchName: string,
-): WorkspacePaneRouteResolution {
+export function resolveWorkspacePaneRoute(repoId: string, branchName: string): WorkspacePaneRouteResolution {
   const state = useWorkspacesStore.getState()
   const repo = state.workspaces[repoId]
   if (!repo || repo.capability.kind !== 'git') return { kind: 'missing' }

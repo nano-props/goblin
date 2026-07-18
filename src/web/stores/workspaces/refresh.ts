@@ -121,10 +121,7 @@ export async function runManualRepoSync(
       updateIfFresh(store.set, id, workspaceRuntimeId, (repo) => {
         acceptWorkspaceProbeState(repo, refreshed.probe)
       })
-      if (
-        refreshed.probe.status === 'ready' &&
-        refreshed.probe.capabilities.git.status === 'unavailable'
-      ) {
+      if (refreshed.probe.status === 'ready' && refreshed.probe.capabilities.git.status === 'unavailable') {
         return
       }
       await runManualSyncPipeline(id, workspaceRuntimeId)

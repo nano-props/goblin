@@ -152,9 +152,7 @@ describe('remote git helpers', () => {
 
   test('returns detached worktree identity for an unborn repository', async () => {
     const run = vi.fn(async () =>
-      okRemoteResult(
-        '\n__GOBLIN_REMOTE_PANE_WORKTREES__\nworktree /srv/repo\nHEAD f00ba4\ndetached\n',
-      ),
+      okRemoteResult('\n__GOBLIN_REMOTE_PANE_WORKTREES__\nworktree /srv/repo\nHEAD f00ba4\ndetached\n'),
     )
 
     await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run as any })).resolves.toEqual([

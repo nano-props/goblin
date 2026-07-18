@@ -153,7 +153,6 @@ describe('terminal create command', () => {
     expect(createTerminal).toHaveBeenCalledOnce()
     expect(commitCreatedTerminalTab).not.toHaveBeenCalled()
   })
-
 })
 
 function createAdmission(overrides: Partial<TerminalCreateAdmissionResult> = {}): TerminalCreateAdmissionResult {

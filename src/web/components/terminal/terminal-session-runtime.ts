@@ -18,11 +18,12 @@ export interface TerminalRuntimeBinding {
   terminalRuntimeGeneration: number
 }
 
-type TerminalRuntimeAttachFrame = Extract<TerminalAttachResult, { ok: true }> extends infer TResult
-  ? TResult extends { ok: true }
-    ? Omit<TResult, 'terminalProjectionEffect'>
+type TerminalRuntimeAttachFrame =
+  Extract<TerminalAttachResult, { ok: true }> extends infer TResult
+    ? TResult extends { ok: true }
+      ? Omit<TResult, 'terminalProjectionEffect'>
+      : never
     : never
-  : never
 
 export type TerminalRuntimeBindingClassification = 'active' | 'retiring' | 'future' | 'foreign'
 
@@ -474,9 +475,11 @@ export class TerminalSessionRuntime {
     const retiring = this.retiringRuntimeBinding()
     const addressable = this.addressableRuntimeBinding()
     return Array.from(
-      new Set([active, retiring, addressable].filter((binding): binding is TerminalRuntimeBinding => !!binding).map(
-        (binding) => binding.terminalRuntimeSessionId,
-      )),
+      new Set(
+        [active, retiring, addressable]
+          .filter((binding): binding is TerminalRuntimeBinding => !!binding)
+          .map((binding) => binding.terminalRuntimeSessionId),
+      ),
     )
   }
 

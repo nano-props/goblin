@@ -1,7 +1,10 @@
 import path from 'node:path'
 import { buildCanonicalSshConnectionSnapshot } from '#/system/ssh/commands.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
-import { physicalWorktreeIdentityKey, type PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
+import {
+  physicalWorktreeIdentityKey,
+  type PhysicalWorktreeIdentity,
+} from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { resolveRemoteTargetWithConfigFingerprint } from '#/system/ssh/config.ts'
 
 export interface PhysicalWorktreeExecutionInput {
@@ -83,7 +86,12 @@ export function physicalWorktreeExecutionScope(
   capability: PhysicalWorktreeExecutionCapability,
 ): PhysicalWorktreeExecutionScope {
   const state = capabilityState(capability)
-  return { userId: state.userId, repoRoot: state.repoRoot, workspaceRuntimeId: state.workspaceRuntimeId, worktreePath: state.worktreePath }
+  return {
+    userId: state.userId,
+    repoRoot: state.repoRoot,
+    workspaceRuntimeId: state.workspaceRuntimeId,
+    worktreePath: state.worktreePath,
+  }
 }
 
 export async function validatePhysicalWorktreeExecution(
@@ -127,7 +135,8 @@ export function assertPhysicalWorktreeExecutionCapability(
     state.repoRoot !== input.repoRoot ||
     state.workspaceRuntimeId !== input.workspaceRuntimeId ||
     state.worktreePath !== worktreePath
-  ) throw new Error('error.invalid-worktree-capability')
+  )
+    throw new Error('error.invalid-worktree-capability')
 }
 
 function capabilityState(capability: PhysicalWorktreeExecutionCapability): PhysicalWorktreeExecutionCapabilityState {

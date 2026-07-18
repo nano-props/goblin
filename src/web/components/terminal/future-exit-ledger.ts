@@ -67,10 +67,7 @@ export class FutureExitLedger {
     }
   }
 
-  confirmAuthoritativeSnapshot(
-    snapshotScopeKey: string,
-    presentBindings: readonly FutureExitBinding[],
-  ): void {
+  confirmAuthoritativeSnapshot(snapshotScopeKey: string, presentBindings: readonly FutureExitBinding[]): void {
     this.pruneExpired(this.now())
     const authoritativeBindingKeyByTerminalSessionId = new Map(
       presentBindings

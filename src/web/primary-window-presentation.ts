@@ -46,10 +46,7 @@ export function releasePrimaryWindowNavigation(navigationId: string): void {
   ownedPrimaryWindowNavigations.delete(navigationId)
 }
 
-export function primaryWindowNavigationState(
-  state: HistoryState,
-  navigationId: string,
-): HistoryState {
+export function primaryWindowNavigationState(state: HistoryState, navigationId: string): HistoryState {
   return { ...state, [PRIMARY_WINDOW_NAVIGATION_STATE_KEY]: navigationId }
 }
 

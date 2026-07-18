@@ -171,7 +171,11 @@ export function listRepoServerOperations(options: ListRepoServerOperationsOption
   return sortedOperations(
     [...operations.values()].filter((operation) => {
       if (options.repoId && operation.repoId !== options.repoId) return false
-      if (options.workspaceRuntimeId && operation.workspaceRuntimeId && operation.workspaceRuntimeId !== options.workspaceRuntimeId) {
+      if (
+        options.workspaceRuntimeId &&
+        operation.workspaceRuntimeId &&
+        operation.workspaceRuntimeId !== options.workspaceRuntimeId
+      ) {
         return false
       }
       if (!includeSettled && (operation.phase === 'done' || operation.phase === 'failed')) return false

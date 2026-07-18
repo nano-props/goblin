@@ -12,9 +12,7 @@ import {
 } from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 export type PhysicalWorktreeAdmissionTarget =
-  | PhysicalWorktreeAdmissionLease
-  | PhysicalWorktreeExecutionCapability
-  | PhysicalWorktreeIdentity
+  PhysicalWorktreeAdmissionLease | PhysicalWorktreeExecutionCapability | PhysicalWorktreeIdentity
 
 export interface PhysicalWorktreeOperationPermit {
   readonly operationId: number
@@ -99,8 +97,10 @@ export class PhysicalWorktreeOperationCoordinator {
     try {
       const selectedLeases = normalized.map((record) => {
         if (record.currentCapability) return physicalWorktreeAdmissionLease(record.currentCapability)
-        return record.indexedLeases.find((candidate) => !physicalWorktreeAdmissionLeaseSignal(candidate).aborted) ??
+        return (
+          record.indexedLeases.find((candidate) => !physicalWorktreeAdmissionLeaseSignal(candidate).aborted) ??
           record.indexedLeases[0]
+        )
       })
       const batchSignals = selectedLeases.map((lease) => {
         if (!lease) throw new Error('error.invalid-worktree-admission-record')
@@ -112,11 +112,15 @@ export class PhysicalWorktreeOperationCoordinator {
         const record = normalized[index]
         if (!record) return await task()
         const { key, currentCapability: capability } = record
-        return await this.runByKey(key, async () => {
-          batchSignal.throwIfAborted()
-          if (capability) await validatePhysicalWorktreeExecution(capability, batchSignal)
-          return await acquire(index + 1)
-        }, batchSignal)
+        return await this.runByKey(
+          key,
+          async () => {
+            batchSignal.throwIfAborted()
+            if (capability) await validatePhysicalWorktreeExecution(capability, batchSignal)
+            return await acquire(index + 1)
+          },
+          batchSignal,
+        )
       }
       batchSignal.throwIfAborted()
       return { admitted: true, value: await acquire(0) }
@@ -213,9 +217,9 @@ function physicalWorktreeOperationKey(target: PhysicalWorktreeAdmissionTarget): 
   return physicalWorktreeIdentityKey('identity' in target ? target.identity : target)
 }
 
-function normalizeAdmissionRecords(records: readonly PhysicalWorktreeAdmissionRecord[]): Array<
-  PhysicalWorktreeAdmissionRecord & { key: string }
-> {
+function normalizeAdmissionRecords(
+  records: readonly PhysicalWorktreeAdmissionRecord[],
+): Array<PhysicalWorktreeAdmissionRecord & { key: string }> {
   const byKey = new Map<string, PhysicalWorktreeAdmissionRecord & { key: string }>()
   for (const record of records) {
     const key = physicalWorktreeIdentityKey(record.identity)

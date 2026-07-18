@@ -209,7 +209,9 @@ describe('readRepoProjection', () => {
       workspaceRuntimeId: 'repo-runtime-current',
     })
 
-    expect(result.operations.operations).toMatchObject([{ id: 'op-current', workspaceRuntimeId: 'repo-runtime-current' }])
+    expect(result.operations.operations).toMatchObject([
+      { id: 'op-current', workspaceRuntimeId: 'repo-runtime-current' },
+    ])
     expect(mocks.listRepoWriteOperationsForRepo).toHaveBeenCalledWith('goblin+file:///tmp/repo', {
       signal,
       workspaceRuntimeId: 'repo-runtime-current',

@@ -36,18 +36,15 @@ export function useWorkspacePaneRuntimeTabCreateAction({
 }: UseWorkspacePaneRuntimeTabCreateActionInput): WorkspacePaneRuntimeTabCreateAction | null {
   const { createTerminalWithAdmission } = useTerminalSessionContext()
   const terminalBase = base
-  const captureOpenerIdentity = useCallback(
-    () => {
-      if (!terminalBase) return null
-      const paneTarget = workspacePaneTabsTargetFromRuntime(terminalBase.target)
-      return paneTarget
-        ? captureWorkspacePaneActiveTabIdentity(paneTarget, terminalBase.target.workspaceRuntimeId, {
-            workspacePaneRoute,
-          })
-        : null
-    },
-    [terminalBase, workspacePaneRoute],
-  )
+  const captureOpenerIdentity = useCallback(() => {
+    if (!terminalBase) return null
+    const paneTarget = workspacePaneTabsTargetFromRuntime(terminalBase.target)
+    return paneTarget
+      ? captureWorkspacePaneActiveTabIdentity(paneTarget, terminalBase.target.workspaceRuntimeId, {
+          workspacePaneRoute,
+        })
+      : null
+  }, [terminalBase, workspacePaneRoute])
 
   return useMemo(
     () =>
@@ -62,13 +59,6 @@ export function useWorkspacePaneRuntimeTabCreateAction({
           captureOpenerIdentity,
         },
       }),
-    [
-      captureOpenerIdentity,
-      createTerminalWithAdmission,
-      runtimeTabStateByType,
-      showCreatedRuntimeTab,
-      t,
-      terminalBase,
-    ],
+    [captureOpenerIdentity, createTerminalWithAdmission, runtimeTabStateByType, showCreatedRuntimeTab, t, terminalBase],
   )
 }

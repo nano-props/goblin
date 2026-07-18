@@ -11,7 +11,16 @@ type CommitHashLinkProps = Omit<ComponentProps<'button'>, 'type' | 'children' | 
   tone?: Tone
 }
 
-export function CommitHashLink({ repoId, workspaceRuntimeId, hash, shortHash, tone, title, className, ...props }: CommitHashLinkProps) {
+export function CommitHashLink({
+  repoId,
+  workspaceRuntimeId,
+  hash,
+  shortHash,
+  tone,
+  title,
+  className,
+  ...props
+}: CommitHashLinkProps) {
   const handleClick = useMemo(
     () =>
       throttle(

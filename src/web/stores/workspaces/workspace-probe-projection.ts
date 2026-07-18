@@ -17,6 +17,10 @@ export function acceptWorkspaceProbeProjection(
   return accepted
 }
 
-export function acceptWorkspaceProbeSnapshot(set: WorkspacesSet, get: WorkspacesGet, snapshot: WorkspaceRuntimesSnapshot): void {
+export function acceptWorkspaceProbeSnapshot(
+  set: WorkspacesSet,
+  get: WorkspacesGet,
+  snapshot: WorkspaceRuntimesSnapshot,
+): void {
   for (const entry of snapshot.runtimes) acceptWorkspaceProbeProjection(set, get, entry)
 }

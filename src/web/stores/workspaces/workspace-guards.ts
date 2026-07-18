@@ -13,11 +13,7 @@ import type {
   WorkspacesSet,
   WorkspacesStore,
 } from '#/web/stores/workspaces/types.ts'
-import {
-  workspaceGitAvailable,
-  workspaceGitUnavailable,
-  type WorkspaceProbeState,
-} from '#/shared/workspace-runtime.ts'
+import { workspaceGitAvailable, workspaceGitUnavailable, type WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 import { emptyGitWorkspaceProjection } from '#/web/stores/workspaces/workspace-state-factory.ts'
 
 /** The sole transition boundary for authoritative workspace capability state. */
@@ -100,7 +96,10 @@ export function deriveConnectivity(repo: WorkspaceState): RepoConnectivity {
  * any subset that carries the lifecycle (e.g. `BranchActionRepo`,
  * `RepoWorkspaceRepo`).
  */
-export function remoteRepoTarget(id: string, lifecycle: RemoteWorkspaceConnectionLifecycle | null): RemoteWorkspaceTarget | null {
+export function remoteRepoTarget(
+  id: string,
+  lifecycle: RemoteWorkspaceConnectionLifecycle | null,
+): RemoteWorkspaceTarget | null {
   if (!isRemoteWorkspaceId(id)) return null
   return remoteWorkspaceConnectionTarget(lifecycle)
 }

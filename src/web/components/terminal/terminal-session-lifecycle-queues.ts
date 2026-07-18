@@ -103,5 +103,4 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions, TResult = string> {
     this.createEntriesByWorktree.set(terminalWorktreeKey, next)
     return next
   }
-
 }

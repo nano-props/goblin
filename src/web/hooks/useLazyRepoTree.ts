@@ -131,8 +131,7 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
       try {
         const result = await queryClient.fetchQuery({
           queryKey: repoTreeChildrenQueryKey(repoId, workspaceRuntimeId, worktreePath, normalizedPrefix),
-          queryFn: ({ signal }) =>
-            getRepositoryTree(target, { prefix: normalizedPrefix || undefined, signal }),
+          queryFn: ({ signal }) => getRepositoryTree(target, { prefix: normalizedPrefix || undefined, signal }),
           retry: false,
         })
         dispatchTreeState({ type: 'childrenLoaded', prefix: normalizedPrefix, result })

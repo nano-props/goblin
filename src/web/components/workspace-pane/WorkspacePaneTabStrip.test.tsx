@@ -101,7 +101,9 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const tab = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:term-111111111111111111111"]')
+    const tab = document.body.querySelector(
+      '[data-workspace-pane-tab-tooltip-id="terminal:term-111111111111111111111"]',
+    )
     if (!(tab instanceof HTMLElement)) throw new Error('missing terminal tab')
     tab.getBoundingClientRect = () =>
       ({
@@ -412,7 +414,9 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const terminalTwo = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:term-222222222222222222222"]')
+    const terminalTwo = document.body.querySelector(
+      '[data-workspace-pane-tab-tooltip-id="terminal:term-222222222222222222222"]',
+    )
     const newButton = document.body.querySelector('button[aria-label="terminal.new"]')
     if (!(terminalTwo instanceof HTMLElement)) throw new Error('missing terminal tab')
     if (!(newButton instanceof HTMLButtonElement)) throw new Error('missing new terminal button')
@@ -1390,7 +1394,9 @@ describe('WorkspacePaneTabStrip', () => {
     )
 
     const tab = document.body.querySelector('[role="tab"][aria-label="terminal.opening"]')
-    const terminalView = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:term-111111111111111111111"]')
+    const terminalView = document.body.querySelector(
+      '[data-workspace-pane-tab-tooltip-id="terminal:term-111111111111111111111"]',
+    )
 
     expect(tab).not.toBeNull()
     expect(terminalView?.textContent).not.toContain('terminal')

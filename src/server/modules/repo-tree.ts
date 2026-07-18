@@ -83,13 +83,13 @@ export async function getRepositoryTree(
 
   const worktrees = workspaceScoped
     ? undefined
-    : options.precomputedWorktrees ??
+    : (options.precomputedWorktrees ??
       (isRemote
         ? undefined
         : await getWorktrees(locator.transport === 'file' ? locator.path : cwd, {
             includeStatus: false,
             signal: options.signal,
-          }))
+          })))
 
   // F2 (membership): validate that `worktreePath` is a known worktree
   // of this repo before we hand it to the source layer. The remote
@@ -110,15 +110,15 @@ export async function getRepositoryTree(
     const target = requiredRemoteTarget(remoteTarget)
     const readRemoteTree = workspaceScoped ? getWorkspaceTreeSourceRemote : getRepoTreeSourceRemote
     source = await readRemoteTree({
-        target,
-        worktreePath: resolvedWorktreePath,
-        options,
-        signal: options.signal,
-        ...(options.workspaceRuntimeId
-          ? { run: remoteRuntimeAwareGitRunner(cwd, options.workspaceRuntimeId, target) }
-          : {}),
-        ...(worktrees ? { knownWorktrees: worktrees } : {}),
-      })
+      target,
+      worktreePath: resolvedWorktreePath,
+      options,
+      signal: options.signal,
+      ...(options.workspaceRuntimeId
+        ? { run: remoteRuntimeAwareGitRunner(cwd, options.workspaceRuntimeId, target) }
+        : {}),
+      ...(worktrees ? { knownWorktrees: worktrees } : {}),
+    })
   } else {
     source = workspaceScoped
       ? await getWorkspaceTreeSourceLocal(resolvedWorktreePath, options, options.signal)

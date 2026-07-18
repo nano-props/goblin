@@ -61,7 +61,6 @@ describe('workspace pane tabs revisioned query cache', () => {
             kind: 'workspace-root',
             repoRoot: REPO_ROOT,
             workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-
           }),
           tabs,
         },
@@ -75,7 +74,6 @@ describe('workspace pane tabs revisioned query cache', () => {
           kind: 'workspace-root',
           repoRoot: REPO_ROOT,
           workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-
         },
         queryClient,
       ),
@@ -257,10 +255,7 @@ function readTabs(queryClient: QueryClient, branchName: string, worktreePath: st
           repoRoot: REPO_ROOT,
           worktreePath,
         }
-  return readWorkspacePaneTabsForTarget(
-    { ...target, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
-    queryClient,
-  )
+  return readWorkspacePaneTabsForTarget({ ...target, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }, queryClient)
 }
 
 function snapshot(revision: number, entries: WorkspacePaneTabsEntry[]): WorkspacePaneTabsSnapshot {

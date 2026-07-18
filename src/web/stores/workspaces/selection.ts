@@ -131,7 +131,10 @@ function createRestorableWorkspaceActions(set: WorkspacesSet): RestorableWorkspa
   }
 }
 
-function createRuntimeWorkspacePreferenceActions(set: WorkspacesSet, get: WorkspacesGet): RuntimeWorkspacePreferenceActions {
+function createRuntimeWorkspacePreferenceActions(
+  set: WorkspacesSet,
+  get: WorkspacesGet,
+): RuntimeWorkspacePreferenceActions {
   // Shared post-write effects for view preferences that affect warm restore or
   // visible branch data. Centralized so each preference write stays coherent.
   function afterWorkspacePreferenceChange(id: string, workspaceRuntimeId: string): void {
@@ -187,7 +190,10 @@ function createRuntimeWorkspacePreferenceActions(set: WorkspacesSet, get: Worksp
   }
 }
 
-function createWorkspaceNavigationHistoryActions(set: WorkspacesSet, get: WorkspacesGet): WorkspaceNavigationHistoryActions {
+function createWorkspaceNavigationHistoryActions(
+  set: WorkspacesSet,
+  get: WorkspacesGet,
+): WorkspaceNavigationHistoryActions {
   return {
     recordWorkspaceNavigation(entry, options) {
       set((s) => {
@@ -296,9 +302,7 @@ function commitWorkspaceNavigationTraversal(
   }
 }
 
-function navigationHistoryForRepo(
-  state: WorkspaceNavigationHistoryState | undefined,
-): WorkspaceNavigationHistoryState {
+function navigationHistoryForRepo(state: WorkspaceNavigationHistoryState | undefined): WorkspaceNavigationHistoryState {
   return state ?? { current: null, backStack: [], forwardStack: [] }
 }
 

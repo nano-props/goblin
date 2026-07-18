@@ -22,10 +22,10 @@ import {
   type RepoWriteOperationContext,
 } from '#/server/modules/repo-write-operation-coordinator.ts'
 import {
-  getServerRepoSettings,
-  pruneServerRepoSettingsForRemovedWorktree,
-  trustServerRepoWorktreeBootstrapConfig,
-  untrustServerRepoWorktreeBootstrapConfig,
+  getServerWorkspaceSettings,
+  pruneServerWorkspaceSettingsForRemovedWorktree,
+  trustServerWorkspaceWorktreeBootstrapConfig,
+  untrustServerWorkspaceWorktreeBootstrapConfig,
 } from '#/server/modules/settings-source.ts'
 import { cloneRepo as cloneGitRepo } from '#/system/git/clone.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
@@ -37,8 +37,12 @@ import { type ExecResult, type RepoUrlTarget } from '#/shared/git-types.ts'
 import type { NetworkOpKind, RepoServerOperationKind, RepoServerOperationTarget } from '#/shared/api-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import { checkGitAvailable } from '#/system/git/git-exec.ts'
-import { isValidCwd, isValidRepoLocator, toSafeRepoLocator } from '#/shared/input-validation.ts'
-import { isRepoWorktreeBootstrapConfigTrusted } from '#/shared/repo-settings.ts'
+import {
+  isValidCwd,
+  isValidWorkspaceLocatorInput,
+  toSafeWorkspaceLocator,
+} from '#/shared/input-validation.ts'
+import { isWorkspaceWorktreeBootstrapConfigTrusted } from '#/shared/workspace-settings.ts'
 import { resolveWorkspaceScopedPath } from '#/server/modules/workspace-path.ts'
 import { type CloneRepoResult } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -353,8 +357,8 @@ export async function createRepoWorktree(
   signal?: AbortSignal,
   options?: { workspaceRuntimeId?: string; worktreeBootstrap?: WorktreeBootstrapDecision },
 ): Promise<ExecResult> {
-  if (!isValidRepoLocator(cwd)) return { ok: false, message: 'error.invalid-arguments' }
-  const repoId = toSafeRepoLocator(cwd)
+  if (!isValidWorkspaceLocatorInput(cwd)) return { ok: false, message: 'error.invalid-arguments' }
+  const repoId = toSafeWorkspaceLocator(cwd)
   if (!repoId) return { ok: false, message: 'error.invalid-arguments' }
   const normalized = normalizeCreateWorktreeInput(input)
   if (!normalized) return { ok: false, message: 'error.invalid-arguments' }
@@ -395,16 +399,21 @@ async function syncWorktreeBootstrapTrustAfterSuccessfulRun(
 ): Promise<RepoMutationResult> {
   if (!result.ok || decision.kind !== 'run') return result
   try {
-    const repoSettings = await getServerRepoSettings()
-    const currentlyTrusted = isRepoWorktreeBootstrapConfigTrusted(repoSettings, repoId, decision.configHash)
+    const workspaceSettings = await getServerWorkspaceSettings()
+    const workspaceId = toSafeWorkspaceLocator(repoId)
+    const currentlyTrusted = workspaceId
+      ? isWorkspaceWorktreeBootstrapConfigTrusted(workspaceSettings, workspaceId, decision.configHash)
+      : false
     if (decision.configTrusted) {
       if (currentlyTrusted) return result
-      await trustServerRepoWorktreeBootstrapConfig({ repoId, configHash: decision.configHash })
+      if (!workspaceId) throw new Error('invalid workspace id after bootstrap mutation')
+      await trustServerWorkspaceWorktreeBootstrapConfig({ workspaceId, configHash: decision.configHash })
       publishSettingsInvalidation(['settings-snapshot'])
       return result
     }
     if (!currentlyTrusted) return result
-    if (await untrustServerRepoWorktreeBootstrapConfig({ repoId, configHash: decision.configHash })) {
+    if (!workspaceId) throw new Error('invalid workspace id after bootstrap mutation')
+    if (await untrustServerWorkspaceWorktreeBootstrapConfig({ workspaceId, configHash: decision.configHash })) {
       publishSettingsInvalidation(['settings-snapshot'])
     }
     return result
@@ -417,7 +426,7 @@ export async function getRepoRemoteBranches(
   cwd: string,
   options: { signal?: AbortSignal; workspaceRuntimeId?: string } = {},
 ): Promise<string[]> {
-  if (!isValidRepoLocator(cwd)) return []
+  if (!isValidWorkspaceLocatorInput(cwd)) return []
   return await runWithRepoSource(
     cwd,
     async (source) => await source.getRemoteBranches(options.signal),
@@ -522,8 +531,10 @@ async function removeRepoWorktreeWithBinding(
         const result = await publishSnapshotInvalidationAfterMutation(cwd, mutation)
         if (!mutation.ok && !mutation.repositoryStateChanged) return result
         try {
-          const changed = await pruneServerRepoSettingsForRemovedWorktree({
-            repoId: cwd,
+          const workspaceId = toSafeWorkspaceLocator(cwd)
+          if (!workspaceId) throw new Error('invalid workspace id after repo mutation')
+          const changed = await pruneServerWorkspaceSettingsForRemovedWorktree({
+            workspaceId,
             worktreePath: input.worktreePath,
           })
           if (changed) publishSettingsInvalidation(['settings-snapshot'])
@@ -595,6 +606,6 @@ export async function openRepoInFinder(workspaceId: WorkspaceId, worktreePath: s
 }
 
 export async function abortRepoOperation(cwd: string): Promise<boolean> {
-  if (!isValidRepoLocator(cwd)) return false
+  if (!isValidWorkspaceLocatorInput(cwd)) return false
   return await abortRepoWriteNetworkOperation(cwd)
 }

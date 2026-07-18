@@ -8,14 +8,14 @@ export interface WorktreeBootstrapTrust {
  * (the split-button primary in the workspace toolbar). The key is the
  * worktree's absolute path; an empty string represents the bare repo
  * (no worktree attached). Lives under
- * `RepoSettingsEntry.workspaceExternalAppRecent.byWorktree`.
+ * `WorkspaceSettingsEntry.workspaceExternalAppRecent.byWorktree`.
  */
 export interface WorkspaceExternalAppRecent {
   byWorktree: Record<string, string>
 }
 
-export interface RepoSettingsEntry {
-  repoId: string
+export interface WorkspaceSettingsEntry {
+  workspaceId: WorkspaceId
   worktreeBootstrapTrust?: WorktreeBootstrapTrust
   workspaceExternalAppRecent?: WorkspaceExternalAppRecent
 }
@@ -58,20 +58,20 @@ export function isWorktreeBootstrapConfigHash(value: unknown): value is string {
   return typeof value === 'string' && WORKTREE_BOOTSTRAP_CONFIG_HASH_RE.test(value)
 }
 
-export function repoSettingsEntryForRepo(
-  repoSettings: readonly RepoSettingsEntry[],
-  repoId: string,
-): RepoSettingsEntry | undefined {
-  return repoSettings.find((entry) => entry.repoId === repoId)
+export function workspaceSettingsEntry(
+  workspaceSettings: readonly WorkspaceSettingsEntry[],
+  workspaceId: WorkspaceId,
+): WorkspaceSettingsEntry | undefined {
+  return workspaceSettings.find((entry) => entry.workspaceId === workspaceId)
 }
 
-export function isRepoWorktreeBootstrapConfigTrusted(
-  repoSettings: readonly RepoSettingsEntry[],
-  repoId: string,
+export function isWorkspaceWorktreeBootstrapConfigTrusted(
+  workspaceSettings: readonly WorkspaceSettingsEntry[],
+  workspaceId: WorkspaceId,
   configHash: string | null | undefined,
 ): boolean {
   if (!configHash) return false
-  return repoSettingsEntryForRepo(repoSettings, repoId)?.worktreeBootstrapTrust?.configHash === configHash
+  return workspaceSettingsEntry(workspaceSettings, workspaceId)?.worktreeBootstrapTrust?.configHash === configHash
 }
 
 /**
@@ -86,15 +86,16 @@ export function workspaceExternalAppRecentKey(worktreePath: string | null | unde
 
 /**
  * Read the most recently chosen workspace-external-app id for a
- * (repo, worktree) scope. Returns null when no entry exists for the repo
+ * (workspace, worktree) scope. Returns null when no entry exists for the workspace
  * or for that worktree.
  */
 export function getRecentWorkspaceExternalAppId(
-  repoSettings: readonly RepoSettingsEntry[],
-  repoId: string,
+  workspaceSettings: readonly WorkspaceSettingsEntry[],
+  workspaceId: WorkspaceId,
   worktreePath: string | null | undefined,
 ): string | null {
-  const byWorktree = repoSettingsEntryForRepo(repoSettings, repoId)?.workspaceExternalAppRecent?.byWorktree
+  const byWorktree = workspaceSettingsEntry(workspaceSettings, workspaceId)?.workspaceExternalAppRecent?.byWorktree
   if (!byWorktree) return null
   return byWorktree[workspaceExternalAppRecentKey(worktreePath)] ?? null
 }
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'

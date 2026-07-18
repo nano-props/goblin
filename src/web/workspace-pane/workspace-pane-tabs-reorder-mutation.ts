@@ -36,8 +36,7 @@ export function useWorkspacePaneTabsReorderMutation(
 ): WorkspacePaneTabsReorderMutationResult {
   const queryClient = useQueryClient()
   const target = useMemo(() => {
-    const paneTarget =
-      input
+    const paneTarget = input
     return runtimeWorkspacePaneTarget(paneTarget, input.workspaceRuntimeId)
       ? { ...paneTarget, workspaceRuntimeId: input.workspaceRuntimeId }
       : null

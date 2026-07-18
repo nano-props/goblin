@@ -40,7 +40,9 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
   const directoryNameTrimmed = directoryName.trim()
   const derivedDirectoryName = directoryNameFromGitUrl(urlTrimmed)
   const directoryError =
-    directoryNameTrimmed && !isValidDirectoryName(directoryNameTrimmed) ? t('workspace-picker.clone-directory-invalid') : ''
+    directoryNameTrimmed && !isValidDirectoryName(directoryNameTrimmed)
+      ? t('workspace-picker.clone-directory-invalid')
+      : ''
   const effectivePath =
     parentPathTrimmed && directoryNameTrimmed && !directoryError
       ? tildify(joinPath(parentPathTrimmed, directoryNameTrimmed))

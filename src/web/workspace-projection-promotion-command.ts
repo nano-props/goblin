@@ -1,27 +1,32 @@
 import type { RestoredWorkspaceRuntime } from '#/shared/api-types.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
-import { restoreRepoTabsOnView } from '#/web/settings-actions.ts'
+import { restoreWorkspaceTabsOnView } from '#/web/settings-actions.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-export type RepoProjectionPromotionResult =
+export type WorkspaceProjectionPromotionResult =
   | { ok: true; workspace: RestoredWorkspaceRuntime; snapshot: WorkspacePaneTabsSnapshot | null }
   | { ok: false; message: string }
 
-export interface RepoProjectionPromotionTarget {
-  repoRoot: string
+export interface WorkspaceProjectionPromotionTarget {
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
 }
 
-const inFlightPromotions = new Map<string, Promise<RepoProjectionPromotionResult>>()
+const inFlightPromotions = new Map<string, Promise<WorkspaceProjectionPromotionResult>>()
 
-export function runRepoProjectionPromotion(
-  target: RepoProjectionPromotionTarget,
-): Promise<RepoProjectionPromotionResult> {
-  const key = `${target.repoRoot}\0${target.workspaceRuntimeId}`
+export function runWorkspaceProjectionPromotion(
+  target: WorkspaceProjectionPromotionTarget,
+): Promise<WorkspaceProjectionPromotionResult> {
+  const key = `${target.workspaceId}\0${target.workspaceRuntimeId}`
   const existing = inFlightPromotions.get(key)
   if (existing) return existing
 
-  const command = restoreRepoTabsOnView(readOrCreateWebTerminalClientId(), target.repoRoot, target.workspaceRuntimeId).then(
+  const command = restoreWorkspaceTabsOnView(
+    readOrCreateWebTerminalClientId(),
+    target.workspaceId,
+    target.workspaceRuntimeId,
+  ).then(
     (response) => ({ ok: true as const, workspace: response.workspace, snapshot: response.snapshot }),
     (err: unknown) => ({ ok: false as const, message: err instanceof Error ? err.message : String(err) }),
   )

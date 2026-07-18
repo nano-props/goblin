@@ -260,12 +260,7 @@ describe('TerminalSessionProjection', () => {
       projection.reconcileServerSessionsSnapshot(scope, { revision: 1, sessions: [sessionA] }, 'client_local')
 
       expect(
-        (projection as any).applyServerSessionEffect(
-          scope,
-          { kind: 'delta', revision: 3 },
-          sessionA,
-          'client_local',
-        ),
+        (projection as any).applyServerSessionEffect(scope, { kind: 'delta', revision: 3 }, sessionA, 'client_local'),
       ).toBe(true)
       expect(projection.terminalSessionsCatalogCoverageRevision(scope)).toBe(1)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
@@ -692,7 +687,11 @@ describe('TerminalSessionProjection', () => {
       ;(projection as any).ensureSession(makeDescriptor('term-111111111111111111111', 1))
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
 
-      projection.reconcileServerSessions({ repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }, [], 'client_local')
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        [],
+        'client_local',
+      )
 
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
     })
@@ -753,7 +752,11 @@ describe('TerminalSessionProjection', () => {
         projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),
       ).toEqual([terminalSessionId])
 
-      projection.reconcileServerSessions({ repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }, [], 'client_local')
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        [],
+        'client_local',
+      )
 
       expect(
         projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),

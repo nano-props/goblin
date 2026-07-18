@@ -1,8 +1,4 @@
-import type {
-  GitWorkspaceProjection,
-  WorkspaceAdmissionState,
-  WorkspaceState,
-} from '#/web/stores/workspaces/types.ts'
+import type { GitWorkspaceProjection, WorkspaceAdmissionState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 
 export function workspaceGitProjection(workspace: WorkspaceState | null | undefined): GitWorkspaceProjection | null {
   return workspace?.capability.kind === 'git' ? workspace.capability.git : null

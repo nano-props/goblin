@@ -65,7 +65,9 @@ export function createTerminalBellState(
       if (now - lastNotifiedAt < BELL_NOTIFICATION_THROTTLE_MS) return
       lastSystemNotificationAtByTerminalSessionId.set(descriptor.terminalSessionId, now)
       const repoName = lastPathSegment(terminalSessionCoordinates(descriptor).repoRoot)
-      const bodyParts = terminalPresentationBranch(descriptor.presentation) ? [terminalPresentationBranch(descriptor.presentation)] : []
+      const bodyParts = terminalPresentationBranch(descriptor.presentation)
+        ? [terminalPresentationBranch(descriptor.presentation)]
+        : []
       const canonicalTitle = typeof event.canonicalTitle === 'string' ? event.canonicalTitle.trim() : ''
       if (canonicalTitle) bodyParts.push(canonicalTitle)
       else if (event.processName) bodyParts.push(event.processName)

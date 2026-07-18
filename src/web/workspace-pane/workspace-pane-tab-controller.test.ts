@@ -120,9 +120,9 @@ describe('workspace pane tab controller transactions', () => {
       kind: 'workspace-root',
       repoRoot: 'goblin+file:///repo',
     })
-    expect(useWorkspacesStore.getState().workspaces['goblin+file:///repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
-      'files',
-    )
+    expect(
+      useWorkspacesStore.getState().workspaces['goblin+file:///repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey],
+    ).toBe('files')
   })
 
   test('does not create a replacement worktree presentation after the queued token is superseded', async () => {
@@ -184,9 +184,9 @@ describe('workspace pane tab controller transactions', () => {
       repoRoot: 'goblin+file:///repo',
       worktreePath: '/worktree-a',
     })
-    expect(useWorkspacesStore.getState().workspaces['goblin+file:///repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
-      'terminal',
-    )
+    expect(
+      useWorkspacesStore.getState().workspaces['goblin+file:///repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey],
+    ).toBe('terminal')
   })
 
   test('rejects exact target completion after its runtime is replaced', async () => {

@@ -1,9 +1,9 @@
 import path from 'node:path'
 import {
   MAX_IPC_PATH_LENGTH,
-  toSafeRepoLocator,
+  toSafeWorkspaceLocator,
   toSafeSessionPath,
-  toSafeSessionRepoEntry,
+  toSafeWorkspaceSessionEntry,
 } from '#/shared/input-validation.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
@@ -13,16 +13,20 @@ import {
   writeUserSettingsJson,
 } from '#/server/modules/settings-persistence.ts'
 import type { LangPref, ServerWorkspaceState, UserSettings, ThemePref } from '#/shared/api-types.ts'
-import { workspaceSessionEntryId, sameWorkspaceSessionEntry, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import {
+  workspaceSessionEntryId,
+  sameWorkspaceSessionEntry,
+  type WorkspaceSessionEntry,
+} from '#/shared/remote-workspace.ts'
 import { recordWithoutKey } from '#/shared/record.ts'
 import {
   isKnownWorkspaceExternalAppItemId,
   isWorktreeBootstrapConfigHash,
-  type RepoSettingsEntry,
+  type WorkspaceSettingsEntry,
   type WorkspaceExternalAppRecent,
   type WorktreeBootstrapTrust,
   workspaceExternalAppRecentKey,
-} from '#/shared/repo-settings.ts'
+} from '#/shared/workspace-settings.ts'
 import {
   isWorkspacePaneRuntimeTabEntry,
   type WorkspacePaneStaticTabEntry,
@@ -38,6 +42,7 @@ import {
   workspacePaneTabsTargetFromRestorable,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import {
   normalizeWorkspacePaneDurableLayout,
@@ -57,7 +62,7 @@ import {
   DEFAULT_FETCH_INTERVAL_SEC,
   DEFAULT_LANG_PREF,
   DEFAULT_THEME_PREF,
-  MAX_RECENT_REPOS,
+  MAX_RECENT_WORKSPACES,
   defaultUserSettings,
   defaultServerWorkspaceState,
 } from '#/shared/settings-defaults.ts'
@@ -75,7 +80,7 @@ interface UserSettingsData {
   lanEnabled: boolean
   workspace: ServerWorkspaceState
   recentWorkspaces: WorkspaceSessionEntry[]
-  repoSettings: RepoSettingsEntry[]
+  workspaceSettings: WorkspaceSettingsEntry[]
 }
 
 export type UserSettingsPatch = Partial<UserSettings>
@@ -131,7 +136,7 @@ function userSettingsFromData(data: UserSettingsData): UserSettings {
   }
 }
 
-function dedupeRepoEntries(entries: WorkspaceSessionEntry[]): WorkspaceSessionEntry[] {
+function dedupeWorkspaceEntries(entries: WorkspaceSessionEntry[]): WorkspaceSessionEntry[] {
   const seen = new Set<string>()
   const normalized: WorkspaceSessionEntry[] = []
   for (const entry of entries) {
@@ -147,17 +152,17 @@ function defaultWorkspace(): ServerWorkspaceState {
   return defaultServerWorkspaceState()
 }
 
-function normalizeWorkspacePaneTabsByTargetByRepo(
+function normalizeWorkspacePaneTabsByTargetByWorkspace(
   value: unknown,
 ): Record<string, Record<string, WorkspacePaneStaticTabEntry[]>> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const normalized: Record<string, Record<string, WorkspacePaneStaticTabEntry[]>> = {}
-  for (const [repoId, rawByTarget] of Object.entries(value)) {
-    const safeRepoId = toSafeRepoLocator(repoId)
-    if (!safeRepoId || !rawByTarget || typeof rawByTarget !== 'object' || Array.isArray(rawByTarget)) continue
+  for (const [workspaceId, rawByTarget] of Object.entries(value)) {
+    const safeWorkspaceId = toSafeWorkspaceLocator(workspaceId)
+    if (!safeWorkspaceId || !rawByTarget || typeof rawByTarget !== 'object' || Array.isArray(rawByTarget)) continue
     const byTarget: Record<string, WorkspacePaneStaticTabEntry[]> = {}
     for (const [targetKey, rawTabs] of Object.entries(rawByTarget)) {
-      const target = safeRestorableWorkspacePaneTarget(safeRepoId, targetKey)
+      const target = safeRestorableWorkspacePaneTarget(safeWorkspaceId, targetKey)
       if (!target || !Array.isArray(rawTabs)) continue
       const tabs: WorkspacePaneStaticTabEntry[] = []
       const seen = new Set<string>()
@@ -172,16 +177,16 @@ function normalizeWorkspacePaneTabsByTargetByRepo(
       }
       byTarget[targetKey] = tabs
     }
-    if (Object.keys(byTarget).length > 0) normalized[safeRepoId] = byTarget
+    if (Object.keys(byTarget).length > 0) normalized[safeWorkspaceId] = byTarget
   }
   return normalized
 }
 
-function safeRestorableWorkspacePaneTarget(repoId: string, targetKey: string): RestorableWorkspacePaneTarget | null {
+function safeRestorableWorkspacePaneTarget(workspaceId: string, targetKey: string): RestorableWorkspacePaneTarget | null {
   const parsed = parseRestorableWorkspacePaneTargetKey(targetKey)
   if (!parsed) return null
   if (parsed.kind === 'git-branch') return isSafeBranchName(parsed.branch) ? parsed : null
-  if (parsed.kind === 'git-worktree' && !workspacePaneTabsTargetFromRestorable(repoId, parsed)) return null
+  if (parsed.kind === 'git-worktree' && !workspacePaneTabsTargetFromRestorable(workspaceId, parsed)) return null
   return parsed
 }
 
@@ -189,21 +194,21 @@ function normalizeWorkspace(value: unknown): ServerWorkspaceState {
   if (!value || typeof value !== 'object') return defaultWorkspace()
   const partial = value as Partial<ServerWorkspaceState>
   return {
-    openWorkspaceEntries: normalizeRepoEntries(partial.openWorkspaceEntries),
-    workspacePaneTabsByTargetByWorkspace: normalizeWorkspacePaneTabsByTargetByRepo(
+    openWorkspaceEntries: normalizeWorkspaceEntries(partial.openWorkspaceEntries),
+    workspacePaneTabsByTargetByWorkspace: normalizeWorkspacePaneTabsByTargetByWorkspace(
       partial.workspacePaneTabsByTargetByWorkspace,
     ),
   }
 }
 
 function normalizeRecentWorkspaces(value: unknown): WorkspaceSessionEntry[] {
-  return normalizeRepoEntries(value).slice(0, MAX_RECENT_REPOS)
+  return normalizeWorkspaceEntries(value).slice(0, MAX_RECENT_WORKSPACES)
 }
 
-function normalizeRepoEntries(value: unknown): WorkspaceSessionEntry[] {
+function normalizeWorkspaceEntries(value: unknown): WorkspaceSessionEntry[] {
   if (!Array.isArray(value)) return []
-  return dedupeRepoEntries(
-    value.map(toSafeSessionRepoEntry).filter((entry): entry is WorkspaceSessionEntry => entry !== null),
+  return dedupeWorkspaceEntries(
+    value.map(toSafeWorkspaceSessionEntry).filter((entry): entry is WorkspaceSessionEntry => entry !== null),
   )
 }
 
@@ -235,17 +240,24 @@ function normalizeWorkspaceExternalAppRecent(value: unknown): WorkspaceExternalA
   return { byWorktree }
 }
 
-function normalizeRepoSettings(value: unknown): RepoSettingsEntry[] {
+interface RawWorkspaceSettingsEntry {
+  workspaceId?: unknown
+  repoId?: unknown
+  worktreeBootstrapTrust?: unknown
+  workspaceExternalAppRecent?: unknown
+}
+
+function normalizeWorkspaceSettings(value: unknown, identityField: 'workspaceId' | 'repoId'): WorkspaceSettingsEntry[] {
   if (!Array.isArray(value)) return []
   const seen = new Set<string>()
-  const normalized: RepoSettingsEntry[] = []
+  const normalized: WorkspaceSettingsEntry[] = []
   for (const item of value) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue
-    const raw = item as Partial<RepoSettingsEntry>
-    const repoId = toSafeRepoLocator(raw.repoId)
-    if (!repoId || seen.has(repoId)) continue
-    seen.add(repoId)
-    const entry: RepoSettingsEntry = { repoId }
+    const raw = item as RawWorkspaceSettingsEntry
+    const workspaceId = toSafeWorkspaceLocator(raw[identityField])
+    if (!workspaceId || seen.has(workspaceId)) continue
+    seen.add(workspaceId)
+    const entry: WorkspaceSettingsEntry = { workspaceId }
     const worktreeBootstrapTrust = normalizeWorktreeBootstrapTrust(raw.worktreeBootstrapTrust)
     if (worktreeBootstrapTrust) entry.worktreeBootstrapTrust = worktreeBootstrapTrust
     const workspaceExternalAppRecent = normalizeWorkspaceExternalAppRecent(raw.workspaceExternalAppRecent)
@@ -255,9 +267,9 @@ function normalizeRepoSettings(value: unknown): RepoSettingsEntry[] {
   return normalized
 }
 
-function cloneRepoSettings(repoSettings: readonly RepoSettingsEntry[]): RepoSettingsEntry[] {
-  return repoSettings.map((entry) => ({
-    repoId: entry.repoId,
+function cloneWorkspaceSettings(workspaceSettings: readonly WorkspaceSettingsEntry[]): WorkspaceSettingsEntry[] {
+  return workspaceSettings.map((entry) => ({
+    workspaceId: entry.workspaceId,
     ...(entry.worktreeBootstrapTrust
       ? {
           worktreeBootstrapTrust: {
@@ -279,7 +291,7 @@ function cloneWorkspace(workspace: ServerWorkspaceState): ServerWorkspaceState {
 async function readUserSettingsFile(): Promise<UserSettingsData | null> {
   const raw = await readUserSettingsJson()
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
-  const parsed = raw as Partial<UserSettingsData>
+  const parsed = raw as Partial<UserSettingsData> & { repoSettings?: unknown }
   return {
     lang: normalizeLangPref(parsed.lang),
     theme: normalizeThemePref(parsed.theme),
@@ -292,7 +304,10 @@ async function readUserSettingsFile(): Promise<UserSettingsData | null> {
     lanEnabled: normalizeLanEnabled(parsed.lanEnabled),
     workspace: normalizeWorkspace(parsed.workspace),
     recentWorkspaces: normalizeRecentWorkspaces(parsed.recentWorkspaces),
-    repoSettings: normalizeRepoSettings(parsed.repoSettings),
+    workspaceSettings:
+      parsed.workspaceSettings !== undefined
+        ? normalizeWorkspaceSettings(parsed.workspaceSettings, 'workspaceId')
+        : normalizeWorkspaceSettings(parsed.repoSettings, 'repoId'),
   }
 }
 
@@ -312,7 +327,7 @@ async function loadUserSettings(): Promise<UserSettingsData> {
         ...defaultUserSettings(),
         workspace: defaultWorkspace(),
         recentWorkspaces: [],
-        repoSettings: [],
+        workspaceSettings: [],
       }
       await writeUserSettingsFile(data)
     }
@@ -362,25 +377,25 @@ async function mutateUserSettings<T>(
 }
 
 /**
- * Apply a patch to the `RepoSettingsEntry` matching `repoId`, creating the
+ * Apply a patch to the `WorkspaceSettingsEntry` matching `workspaceId`, creating the
  * entry if it doesn't exist. The patch receives the current entry (or
  * `undefined`) and returns the new entry, or `null` to skip the update
  * entirely (used by callers that want to no-op on unchanged values).
  * Returns the updated list, or `null` when the patch is a no-op.
  */
-function updateRepoSettingsEntry(
-  repoSettings: readonly RepoSettingsEntry[],
-  repoId: string,
-  patch: (existing: RepoSettingsEntry | undefined) => RepoSettingsEntry | null,
-): RepoSettingsEntry[] | null {
-  const existingIndex = repoSettings.findIndex((entry) => entry.repoId === repoId)
-  const existing = existingIndex >= 0 ? repoSettings[existingIndex] : undefined
+function updateWorkspaceSettingsEntry(
+  workspaceSettings: readonly WorkspaceSettingsEntry[],
+  workspaceId: WorkspaceId,
+  patch: (existing: WorkspaceSettingsEntry | undefined) => WorkspaceSettingsEntry | null,
+): WorkspaceSettingsEntry[] | null {
+  const existingIndex = workspaceSettings.findIndex((entry) => entry.workspaceId === workspaceId)
+  const existing = existingIndex >= 0 ? workspaceSettings[existingIndex] : undefined
   const next = patch(existing)
   if (next === null) return null
   if (existingIndex >= 0) {
-    return repoSettings.map((entry, index) => (index === existingIndex ? next : entry))
+    return workspaceSettings.map((entry, index) => (index === existingIndex ? next : entry))
   }
-  return [...repoSettings, next]
+  return [...workspaceSettings, next]
 }
 
 export async function getServerFetchIntervalSec(): Promise<number> {
@@ -465,7 +480,7 @@ export async function getServerWorkspaceState(): Promise<ServerWorkspaceState> {
   return cloneWorkspace((await loadUserSettings()).workspace)
 }
 
-export async function addServerWorkspaceRepo(entry: WorkspaceSessionEntry): Promise<ServerWorkspaceState> {
+export async function addServerWorkspaceEntry(entry: WorkspaceSessionEntry): Promise<ServerWorkspaceState> {
   return await mutateUserSettings(async (data) => {
     const id = workspaceSessionEntryId(entry)
     const existingIndex = data.workspace.openWorkspaceEntries.findIndex(
@@ -479,10 +494,10 @@ export async function addServerWorkspaceRepo(entry: WorkspaceSessionEntry): Prom
   })
 }
 
-export async function removeServerWorkspaceRepo(repoRoot: string): Promise<ServerWorkspaceState> {
+export async function removeServerWorkspaceEntry(workspaceId: WorkspaceId): Promise<ServerWorkspaceState> {
   return await mutateUserSettings(async (data) => {
     const openWorkspaceEntries = data.workspace.openWorkspaceEntries.filter(
-      (entry) => workspaceSessionEntryId(entry) !== repoRoot,
+      (entry) => workspaceSessionEntryId(entry) !== workspaceId,
     )
     if (openWorkspaceEntries.length === data.workspace.openWorkspaceEntries.length) {
       return unchangedUserSettings(data, cloneWorkspace(data.workspace))
@@ -495,15 +510,15 @@ export async function removeServerWorkspaceRepo(repoRoot: string): Promise<Serve
 export type ServerWorkspaceMatchOutcome =
   { matched: true; workspace: ServerWorkspaceState } | { matched: false; latestWorkspace: ServerWorkspaceState }
 
-export async function compareAndReplaceServerWorkspaceRepos(
+export async function compareAndReplaceServerWorkspaceEntries(
   expected: WorkspaceSessionEntry[],
   replacement: WorkspaceSessionEntry[],
 ): Promise<ServerWorkspaceMatchOutcome> {
   return await mutateUserSettings<ServerWorkspaceMatchOutcome>(async (data) => {
-    if (!sameRepoEntries(data.workspace.openWorkspaceEntries, expected)) {
+    if (!sameWorkspaceEntries(data.workspace.openWorkspaceEntries, expected)) {
       return unchangedUserSettings(data, { matched: false, latestWorkspace: cloneWorkspace(data.workspace) })
     }
-    if (sameRepoEntries(expected, replacement)) {
+    if (sameWorkspaceEntries(expected, replacement)) {
       return unchangedUserSettings(data, { matched: true, workspace: cloneWorkspace(data.workspace) })
     }
     const workspace = { ...data.workspace, openWorkspaceEntries: replacement }
@@ -514,7 +529,7 @@ export async function compareAndReplaceServerWorkspaceRepos(
   })
 }
 
-export async function confirmServerWorkspaceRepoEntry(
+export async function confirmServerWorkspaceEntry(
   expected: WorkspaceSessionEntry,
 ): Promise<ServerWorkspaceMatchOutcome> {
   return await mutateUserSettings<ServerWorkspaceMatchOutcome>(async (data) => {
@@ -530,7 +545,7 @@ export async function confirmServerWorkspaceRepoEntry(
   })
 }
 
-function sameRepoEntries(a: WorkspaceSessionEntry[], b: WorkspaceSessionEntry[]): boolean {
+function sameWorkspaceEntries(a: WorkspaceSessionEntry[], b: WorkspaceSessionEntry[]): boolean {
   return a.length === b.length && a.every((entry, index) => sameWorkspaceSessionEntry(entry, b[index]))
 }
 
@@ -640,57 +655,57 @@ export async function getServerRecentWorkspaces(): Promise<WorkspaceSessionEntry
   return [...(await loadUserSettings()).recentWorkspaces]
 }
 
-export async function getServerRepoSettings(): Promise<RepoSettingsEntry[]> {
-  return cloneRepoSettings((await loadUserSettings()).repoSettings)
+export async function getServerWorkspaceSettings(): Promise<WorkspaceSettingsEntry[]> {
+  return cloneWorkspaceSettings((await loadUserSettings()).workspaceSettings)
 }
 
-export async function trustServerRepoWorktreeBootstrapConfig(input: {
-  repoId: string
+export async function trustServerWorkspaceWorktreeBootstrapConfig(input: {
+  workspaceId: WorkspaceId
   configHash: string
-}): Promise<RepoSettingsEntry[]> {
+}): Promise<WorkspaceSettingsEntry[]> {
   return await mutateUserSettings(async (data) => {
-    const repoId = toSafeRepoLocator(input.repoId)
-    if (!repoId || !isWorktreeBootstrapConfigHash(input.configHash)) {
-      return unchangedUserSettings(data, cloneRepoSettings(data.repoSettings))
+    if (!isWorktreeBootstrapConfigHash(input.configHash)) {
+      return unchangedUserSettings(data, cloneWorkspaceSettings(data.workspaceSettings))
     }
     const worktreeBootstrapTrust: WorktreeBootstrapTrust = {
       configHash: input.configHash,
       trustedAt: new Date().toISOString(),
     }
-    const repoSettings = updateRepoSettingsEntry(data.repoSettings, repoId, (existing) => ({
-      repoId,
+    const workspaceSettings = updateWorkspaceSettingsEntry(data.workspaceSettings, input.workspaceId, (existing) => ({
+      workspaceId: input.workspaceId,
       ...existing,
       worktreeBootstrapTrust,
     }))
-    const nextData = repoSettings ? { ...data, repoSettings } : data
+    const nextData = workspaceSettings ? { ...data, workspaceSettings } : data
     return {
       next: nextData,
-      result: cloneRepoSettings(nextData.repoSettings),
-      changed: repoSettings !== null,
+      result: cloneWorkspaceSettings(nextData.workspaceSettings),
+      changed: workspaceSettings !== null,
     }
   })
 }
 
-export async function untrustServerRepoWorktreeBootstrapConfig(input: {
-  repoId: string
+export async function untrustServerWorkspaceWorktreeBootstrapConfig(input: {
+  workspaceId: WorkspaceId
   configHash: string
 }): Promise<boolean> {
   return await mutateUserSettings(async (data) => {
-    const repoId = toSafeRepoLocator(input.repoId)
-    if (!repoId || !isWorktreeBootstrapConfigHash(input.configHash)) return unchangedUserSettings(data, false)
-    const existingIndex = data.repoSettings.findIndex((entry) => entry.repoId === repoId)
+    if (!isWorktreeBootstrapConfigHash(input.configHash)) return unchangedUserSettings(data, false)
+    const existingIndex = data.workspaceSettings.findIndex((entry) => entry.workspaceId === input.workspaceId)
     if (existingIndex < 0) return unchangedUserSettings(data, false)
-    const existing = data.repoSettings[existingIndex]
+    const existing = data.workspaceSettings[existingIndex]
     if (existing.worktreeBootstrapTrust?.configHash !== input.configHash) return unchangedUserSettings(data, false)
 
-    const nextEntry: RepoSettingsEntry = { ...existing }
+    const nextEntry: WorkspaceSettingsEntry = { ...existing }
     delete nextEntry.worktreeBootstrapTrust
     if (nextEntry.workspaceExternalAppRecent) {
-      const repoSettings = data.repoSettings.map((entry, index) => (index === existingIndex ? nextEntry : entry))
-      return { next: { ...data, repoSettings }, result: true }
+      const workspaceSettings = data.workspaceSettings.map((entry, index) =>
+        index === existingIndex ? nextEntry : entry,
+      )
+      return { next: { ...data, workspaceSettings }, result: true }
     } else {
-      const repoSettings = data.repoSettings.filter((_, index) => index !== existingIndex)
-      return { next: { ...data, repoSettings }, result: true }
+      const workspaceSettings = data.workspaceSettings.filter((_, index) => index !== existingIndex)
+      return { next: { ...data, workspaceSettings }, result: true }
     }
   })
 }
@@ -702,93 +717,87 @@ export async function untrustServerRepoWorktreeBootstrapConfig(input: {
  * — callers can fire on every selection without coordinating with the
  * server.
  */
-export async function setServerRepoWorkspaceExternalAppRecent(input: {
-  repoId: string
+export async function setServerWorkspaceExternalAppRecent(input: {
+  workspaceId: WorkspaceId
   worktreePath: string | null
   itemId: string
-}): Promise<RepoSettingsEntry[]> {
+}): Promise<WorkspaceSettingsEntry[]> {
   return await mutateUserSettings(async (data) => {
-    const repoId = toSafeRepoLocator(input.repoId)
     // Validate the worktree key: `null`/`undefined` collapses to "" (bare
     // repo); otherwise the path must be a normalized absolute path with
     // no NULs. `toSafeSessionPath` encodes the same validation used
     // elsewhere in the codebase, so the rules can't drift.
     const isBareRepoScope = input.worktreePath === null || input.worktreePath === undefined
     const safeWorktreePath = isBareRepoScope ? null : toSafeSessionPath(input.worktreePath)
-    if (
-      !repoId ||
-      (!isBareRepoScope && safeWorktreePath === null) ||
-      !isKnownWorkspaceExternalAppItemId(input.itemId)
-    ) {
-      return unchangedUserSettings(data, cloneRepoSettings(data.repoSettings))
+    if ((!isBareRepoScope && safeWorktreePath === null) || !isKnownWorkspaceExternalAppItemId(input.itemId)) {
+      return unchangedUserSettings(data, cloneWorkspaceSettings(data.workspaceSettings))
     }
     const worktreeKey = workspaceExternalAppRecentKey(safeWorktreePath)
     // No-op when the value hasn't changed — keeps a no-op click from
     // triggering a full user-settings.json rewrite.
-    const repoSettings = updateRepoSettingsEntry(data.repoSettings, repoId, (existing) => {
+    const workspaceSettings = updateWorkspaceSettingsEntry(data.workspaceSettings, input.workspaceId, (existing) => {
       const existingByWorktree = existing?.workspaceExternalAppRecent?.byWorktree ?? {}
       if (existingByWorktree[worktreeKey] === input.itemId) return null
       return {
-        repoId,
+        workspaceId: input.workspaceId,
         ...existing,
         workspaceExternalAppRecent: { byWorktree: { ...existingByWorktree, [worktreeKey]: input.itemId } },
       }
     })
-    const nextData = repoSettings ? { ...data, repoSettings } : data
+    const nextData = workspaceSettings ? { ...data, workspaceSettings } : data
     return {
       next: nextData,
-      result: cloneRepoSettings(nextData.repoSettings),
-      changed: repoSettings !== null,
+      result: cloneWorkspaceSettings(nextData.workspaceSettings),
+      changed: workspaceSettings !== null,
     }
   })
 }
 
 /**
- * Prune repo settings that are scoped to a worktree path after that worktree
- * has been removed. Repo-level settings, such as bootstrap trust, stay intact.
+ * Prune workspace settings that are scoped to a worktree path after that worktree
+ * has been removed. Workspace-level settings, such as bootstrap trust, stay intact.
  * Returns true when the settings file changed.
  */
-export async function pruneServerRepoSettingsForRemovedWorktree(input: {
-  repoId: string
+export async function pruneServerWorkspaceSettingsForRemovedWorktree(input: {
+  workspaceId: WorkspaceId
   worktreePath: string
 }): Promise<boolean> {
   return await mutateUserSettings(async (data) => {
-    const repoId = toSafeRepoLocator(input.repoId)
     const safeWorktreePath = toSafeSessionPath(input.worktreePath)
-    if (!repoId || safeWorktreePath === null) return unchangedUserSettings(data, false)
+    if (safeWorktreePath === null) return unchangedUserSettings(data, false)
     const worktreeKey = workspaceExternalAppRecentKey(safeWorktreePath)
-    const existingIndex = data.repoSettings.findIndex((entry) => entry.repoId === repoId)
+    const existingIndex = data.workspaceSettings.findIndex((entry) => entry.workspaceId === input.workspaceId)
     if (existingIndex < 0) return unchangedUserSettings(data, false)
-    const existing = data.repoSettings[existingIndex]
+    const existing = data.workspaceSettings[existingIndex]
     const existingByWorktree = existing.workspaceExternalAppRecent?.byWorktree
     if (!existingByWorktree || !(worktreeKey in existingByWorktree)) return unchangedUserSettings(data, false)
 
     const nextByWorktree = { ...existingByWorktree }
     delete nextByWorktree[worktreeKey]
-    const nextEntry: RepoSettingsEntry = { ...existing }
+    const nextEntry: WorkspaceSettingsEntry = { ...existing }
     if (Object.keys(nextByWorktree).length > 0) {
       nextEntry.workspaceExternalAppRecent = { byWorktree: nextByWorktree }
     } else {
       delete nextEntry.workspaceExternalAppRecent
     }
 
-    const repoSettings =
+    const workspaceSettings =
       nextEntry.worktreeBootstrapTrust || nextEntry.workspaceExternalAppRecent
-        ? data.repoSettings.map((entry, index) => (index === existingIndex ? nextEntry : entry))
-        : data.repoSettings.filter((_, index) => index !== existingIndex)
-    return { next: { ...data, repoSettings }, result: true }
+        ? data.workspaceSettings.map((entry, index) => (index === existingIndex ? nextEntry : entry))
+        : data.workspaceSettings.filter((_, index) => index !== existingIndex)
+    return { next: { ...data, workspaceSettings }, result: true }
   })
 }
 
-export async function addServerRecentWorkspace(repo: WorkspaceSessionEntry): Promise<WorkspaceSessionEntry[]> {
+export async function addServerRecentWorkspace(workspace: WorkspaceSessionEntry): Promise<WorkspaceSessionEntry[]> {
   return await mutateUserSettings(async (data) => {
-    const safeRepo = toSafeSessionRepoEntry(repo)
-    if (!safeRepo) return unchangedUserSettings(data, [...data.recentWorkspaces])
-    const safeId = workspaceSessionEntryId(safeRepo)
+    const safeWorkspace = toSafeWorkspaceSessionEntry(workspace)
+    if (!safeWorkspace) return unchangedUserSettings(data, [...data.recentWorkspaces])
+    const safeId = workspaceSessionEntryId(safeWorkspace)
     const recentWorkspaces = [
-      safeRepo,
+      safeWorkspace,
       ...data.recentWorkspaces.filter((entry) => workspaceSessionEntryId(entry) !== safeId),
-    ].slice(0, MAX_RECENT_REPOS)
+    ].slice(0, MAX_RECENT_WORKSPACES)
     return { next: { ...data, recentWorkspaces }, result: [...recentWorkspaces] }
   })
 }

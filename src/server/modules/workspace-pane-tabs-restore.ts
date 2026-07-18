@@ -102,6 +102,6 @@ function restorableWorktreeTarget(workspaceId: string, nativePath: string): Rest
   return root ? { kind: 'git-worktree', root } : null
 }
 
-export function workspaceRepoEntry(workspace: ServerWorkspaceState, repoRoot: string) {
+export function workspaceEntry(workspace: ServerWorkspaceState, repoRoot: string) {
   return workspace.openWorkspaceEntries.find((entry) => workspaceSessionEntryId(entry) === repoRoot) ?? null
 }

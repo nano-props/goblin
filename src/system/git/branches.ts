@@ -160,8 +160,7 @@ export async function getBranches(
 }
 
 export type BranchWorktreeIdentity =
-  | { kind: 'git-branch'; branchName: string }
-  | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
+  { kind: 'git-branch'; branchName: string } | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
 
 /** Strict, display-free branch membership read for admission/catalog paths. */
 export async function getBranchWorktreeIdentities(
@@ -180,13 +179,11 @@ export async function getBranchWorktreeIdentities(
   const usableWorktrees = worktrees.filter((worktree) => !worktree.isBare && !worktree.isPrunable)
   const checkedOutBranches = new Set(usableWorktrees.flatMap((worktree) => (worktree.branch ? [worktree.branch] : [])))
   return [
-    ...usableWorktrees.map(
-      (worktree): BranchWorktreeIdentity => ({
-        kind: 'git-worktree',
-        worktreePath: worktree.path,
-        head: gitHead(worktree.branch ?? null),
-      }),
-    ),
+    ...usableWorktrees.map((worktree): BranchWorktreeIdentity => ({
+      kind: 'git-worktree',
+      worktreePath: worktree.path,
+      head: gitHead(worktree.branch ?? null),
+    })),
     ...branches
       .filter((branch) => !checkedOutBranches.has(branch))
       .map((branch): BranchWorktreeIdentity => ({ kind: 'git-branch', branchName: branch })),

@@ -31,7 +31,9 @@ export async function resolveRemoteWorkspaceConnection(
   input: { workspaceId: WorkspaceId; workspaceRuntimeId: string; mode?: 'restart' | 'ensure' },
   signal?: AbortSignal,
 ): Promise<RemoteWorkspaceLifecycleCommandResult> {
-  return await postServerJson<typeof input, RemoteWorkspaceLifecycleCommandResult>('/api/remote/lifecycle', input, { signal })
+  return await postServerJson<typeof input, RemoteWorkspaceLifecycleCommandResult>('/api/remote/lifecycle', input, {
+    signal,
+  })
 }
 
 export async function getRemoteSshHosts(): Promise<SshConfigHostsResult> {

@@ -15,8 +15,9 @@ import type { CreateWorktreeRequest } from '#/web/components/create-worktree/cre
 import type { ExecResult } from '#/web/types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { DEFAULT_LOADING_DELAY_MS, DEFAULT_MIN_LOADING_VISIBLE_MS } from '#/web/hooks/useLoadingVisibility.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REPO_ID = 'goblin+file:///repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 
 const surfaceMocks = vi.hoisted(() => ({
@@ -84,7 +85,7 @@ beforeEach(() => {
     ok: false,
     message: 'error.failed-read-repo',
   }))
-  primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ repoSettings: [] }))
+  primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ workspaceSettings: [] }))
   seedRepoWithReadModelForTest({ id: REPO_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
 })
 

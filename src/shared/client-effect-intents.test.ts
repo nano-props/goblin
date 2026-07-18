@@ -47,7 +47,9 @@ describe('isClientEffectIntent', () => {
         entry: { kind: 'local', id: 'goblin+file:///tmp/repo' },
       }),
     ).toBe(true)
-    expect(isClientEffectIntent({ type: 'open-recent-workspace-requested', entry: { kind: 'local', id: '' } })).toBe(false)
+    expect(isClientEffectIntent({ type: 'open-recent-workspace-requested', entry: { kind: 'local', id: '' } })).toBe(
+      false,
+    )
     expect(
       isClientEffectIntent({ type: 'open-recent-workspace-requested', entry: { kind: 'remote', id: 'remote:repo' } }),
     ).toBe(false)

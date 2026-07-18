@@ -273,21 +273,12 @@ export class WorkspacePaneLayoutAggregate {
       stagedOverlay,
       input.stagedProviderSnapshots,
     )
-    const tabs = workspacePaneTabsWithRuntimeTab(
-      currentTabs,
-      input.intent.runtimeType,
-      input.intent.sessionId,
-      { insertAfterIdentity: input.intent.insertAfterIdentity },
-    )
+    const tabs = workspacePaneTabsWithRuntimeTab(currentTabs, input.intent.runtimeType, input.intent.sessionId, {
+      insertAfterIdentity: input.intent.insertAfterIdentity,
+    })
     stagedOverlay.recordMixedOrder({ ...input, tabs })
     const stagedClocks = cloneCanonicalClocks(this.clocks)
-    const entries = projectCanonicalEntries(
-      input,
-      layout,
-      stagedOverlay,
-      validTargets,
-      input.stagedProviderSnapshots,
-    )
+    const entries = projectCanonicalEntries(input, layout, stagedOverlay, validTargets, input.stagedProviderSnapshots)
     const snapshot = {
       revision: revisionForState(
         stagedClocks,
@@ -518,7 +509,10 @@ function providerTargets(
   const targets = new Map<string, WorkspacePaneTargetProjection>()
   for (const provider of providers) {
     for (const session of provider.liveSessions) {
-      if (session.target.workspaceId !== scope.repoRoot || session.target.workspaceRuntimeId !== scope.workspaceRuntimeId) {
+      if (
+        session.target.workspaceId !== scope.repoRoot ||
+        session.target.workspaceRuntimeId !== scope.workspaceRuntimeId
+      ) {
         throw new Error('error.workspace-tabs-target-invalid')
       }
       const key = runtimeTargetKey(session.target)
@@ -614,12 +608,7 @@ function mapsEqual(a: Map<string, number>, b: Map<string, number>): boolean {
 }
 
 function cloneCanonicalClocks(source: ReadonlyMap<string, CanonicalClockState>): Map<string, CanonicalClockState> {
-  return new Map(
-    [...source].map(([key, clock]) => [
-      key,
-      cloneCanonicalClock(clock),
-    ]),
-  )
+  return new Map([...source].map(([key, clock]) => [key, cloneCanonicalClock(clock)]))
 }
 
 function cloneCanonicalClock(clock: CanonicalClockState): CanonicalClockState {

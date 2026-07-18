@@ -91,7 +91,9 @@ export function workspacePaneTabsForTargetFromQueryData(
   const resolvedTarget = target.kind === 'inactive' ? null : target
   if (!resolvedTarget) return []
   const entry = workspacePaneTabsEntryForTarget(data.entries, resolvedTarget)
-  return [...(entry?.tabs ?? defaultWorkspacePaneTabs(resolvedTarget.kind === 'workspace-root' ? 'workspace-root' : 'git'))]
+  return [
+    ...(entry?.tabs ?? defaultWorkspacePaneTabs(resolvedTarget.kind === 'workspace-root' ? 'workspace-root' : 'git')),
+  ]
 }
 
 /**
@@ -138,7 +140,10 @@ export async function refreshWorkspacePaneTabsQueryData(
 }
 
 export function clearWorkspacePaneTabsProjectionState(repoRoot: string, workspaceRuntimeId: string): void {
-  primaryWindowQueryClient.removeQueries({ queryKey: workspacePaneTabsQueryKey(repoRoot, workspaceRuntimeId), exact: true })
+  primaryWindowQueryClient.removeQueries({
+    queryKey: workspacePaneTabsQueryKey(repoRoot, workspaceRuntimeId),
+    exact: true,
+  })
 }
 
 export function workspacePaneTabsByTargetFromQueryData(
@@ -168,9 +173,11 @@ export function workspacePaneTabsPersistenceSnapshot(): number {
 }
 
 export function workspacePaneTabsProjectionRevision(repoRoot: string, workspaceRuntimeId: string): number | null {
-  return primaryWindowQueryClient.getQueryData<WorkspacePaneTabsSnapshot>(
-    workspacePaneTabsQueryKey(repoRoot, workspaceRuntimeId),
-  )?.revision ?? null
+  return (
+    primaryWindowQueryClient.getQueryData<WorkspacePaneTabsSnapshot>(
+      workspacePaneTabsQueryKey(repoRoot, workspaceRuntimeId),
+    )?.revision ?? null
+  )
 }
 
 function notifyWorkspacePaneTabsPersistenceChanged(): void {

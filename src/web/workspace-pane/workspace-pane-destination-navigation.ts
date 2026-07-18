@@ -19,10 +19,7 @@ import {
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
-export type WorkspacePaneDestinationNavigation = Pick<
-  PrimaryWindowNavigationActions,
-  'commitWorkspacePaneRoute'
->
+export type WorkspacePaneDestinationNavigation = Pick<PrimaryWindowNavigationActions, 'commitWorkspacePaneRoute'>
 
 export interface WorkspacePaneDestinationPresentation {
   token: PrimaryWindowPresentationToken
@@ -58,13 +55,14 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
     return { kind: 'unsupported', reason: 'worktree-required' }
   }
   const presentation = beginWorkspacePaneDestinationPresentation(lease)
-  return await runWorkspacePaneAction(workspacePaneActionTargetFromCoordinates({
-    workspaceId: lease.repoId,
-    workspaceRuntimeId: lease.workspaceRuntimeId,
-    branchName: lease.branchName,
-    worktreePath: lease.worktreePath,
-  }), () =>
-    commitWorkspacePaneDestinationRoute(presentation, input.route, input.navigation, input.options),
+  return await runWorkspacePaneAction(
+    workspacePaneActionTargetFromCoordinates({
+      workspaceId: lease.repoId,
+      workspaceRuntimeId: lease.workspaceRuntimeId,
+      branchName: lease.branchName,
+      worktreePath: lease.worktreePath,
+    }),
+    () => commitWorkspacePaneDestinationRoute(presentation, input.route, input.navigation, input.options),
   )
 }
 

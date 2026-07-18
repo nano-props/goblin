@@ -106,7 +106,9 @@ describe('WorkspacePaneRuntimeApplication', () => {
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
-    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toMatchObject({
+    await expect(
+      application.open('client-test', 'user-test', { runtimeType: 'terminal', request }),
+    ).resolves.toMatchObject({
       ok: false,
       message: 'error.unavailable',
     })
@@ -146,7 +148,9 @@ describe('WorkspacePaneRuntimeApplication', () => {
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
-    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toMatchObject({
+    await expect(
+      application.open('client-test', 'user-test', { runtimeType: 'terminal', request }),
+    ).resolves.toMatchObject({
       ok: false,
       message: 'error.unavailable',
     })
@@ -868,7 +872,9 @@ function publishedTerminalResult(
   return {
     ok: true,
     terminalSessionId: runtime.terminalSessionId,
-    ...runtime.admission.commit({ presentation: { kind: 'git-worktree', head: { kind: 'branch' as const, branchName: request.branch } } }),
+    ...runtime.admission.commit({
+      presentation: { kind: 'git-worktree', head: { kind: 'branch' as const, branchName: request.branch } },
+    }),
   }
 }
 

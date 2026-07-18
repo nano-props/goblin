@@ -204,7 +204,10 @@ describe('terminal web host client', () => {
     const fetchMock = mockFetch()
     const { workspacePaneTabsClient } = await import('#/web/workspace-pane/workspace-pane-tabs-client.ts')
 
-    const listPromise = workspacePaneTabsClient.list({ workspaceId: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
+    const listPromise = workspacePaneTabsClient.list({
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    })
     const socket = wsMock.instances[0]
     socket?.emitOpen()
     await Promise.resolve()

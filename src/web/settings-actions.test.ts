@@ -5,25 +5,25 @@ import { defaultServerWorkspaceState, defaultSettingsSnapshot } from '#/shared/s
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { githubCliQueryKey, lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
-import type { GitHubCliState, RepoSettingsState, WorkspaceRestoreResult } from '#/shared/api-types.ts'
+import type { GitHubCliState, WorkspaceSettingsState, WorkspaceRestoreResult } from '#/shared/api-types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_A = workspaceIdForTest('goblin+file:///tmp/repo-a')
 
 type AddRecentWorkspaceResult = {
   recentWorkspaces: WorkspaceSessionEntry[]
-  addedRepo: WorkspaceSessionEntry | null
+  addedWorkspace: WorkspaceSessionEntry | null
 }
 
 type RestoreServerWorkspaceMock = (
   clientId: string,
-  options?: { activeRepoRoot?: string | null; signal?: AbortSignal },
+  options?: { activeWorkspaceId?: string | null; signal?: AbortSignal },
 ) => Promise<WorkspaceRestoreResult>
 
 const appDataClientMocks = vi.hoisted(() => ({
   addRecentWorkspace: vi.fn<() => Promise<AddRecentWorkspaceResult>>(async () => ({
     recentWorkspaces: [],
-    addedRepo: null,
+    addedWorkspace: null,
   })),
   clearRecentWorkspaces: vi.fn(async () => {}),
   getSettingsSnapshot: vi.fn(),
@@ -50,7 +50,7 @@ const appDataClientMocks = vi.hoisted(() => ({
     openWorkspaceEntries: [],
     runtime: { workspaces: [], workspacePaneTabs: [], restoredWorkspaceId: null },
   })),
-  restoreRepoWorkspaceTabs: vi.fn(async () => ({
+  restoreWorkspaceTabs: vi.fn(async () => ({
     workspace: {
       entry: { kind: 'local' as const, id: 'goblin+file:///tmp/repo-a' },
       workspaceId: 'goblin+file:///tmp/repo-a',
@@ -69,7 +69,7 @@ const appDataClientMocks = vi.hoisted(() => ({
   setGlobalShortcut: vi.fn(async (accelerator) => ({ accelerator, registered: true })),
   setGlobalShortcutDisabled: vi.fn(async (disabled) => disabled),
   setLanEnabled: vi.fn(async (enabled) => enabled),
-  setRecentWorkspaceExternalApp: vi.fn<() => Promise<RepoSettingsState>>(async () => ({ repoSettings: [] })),
+  setRecentWorkspaceExternalApp: vi.fn<() => Promise<WorkspaceSettingsState>>(async () => ({ workspaceSettings: [] })),
   setSettingsFetchInterval: vi.fn(async (sec) => sec),
   setShortcutsDisabled: vi.fn(async (disabled) => disabled),
   setTerminalNotificationsEnabled: vi.fn(async (enabled) => enabled),
@@ -81,7 +81,7 @@ vi.mock('#/web/settings-client.ts', () => ({
   getSettingsSnapshot: appDataClientMocks.getSettingsSnapshot,
   refreshExternalAppsSnapshot: appDataClientMocks.refreshExternalAppsSnapshot,
   refreshGitHubCliState: appDataClientMocks.refreshGitHubCliState,
-  restoreRepoWorkspaceTabs: appDataClientMocks.restoreRepoWorkspaceTabs,
+  restoreWorkspaceTabs: appDataClientMocks.restoreWorkspaceTabs,
   restoreServerWorkspace: appDataClientMocks.restoreServerWorkspace,
   setGlobalShortcut: appDataClientMocks.setGlobalShortcut,
   setGlobalShortcutDisabled: appDataClientMocks.setGlobalShortcutDisabled,
@@ -96,7 +96,7 @@ describe('settings actions', () => {
   beforeEach(() => {
     primaryWindowQueryClient.clear()
     appDataClientMocks.addRecentWorkspace.mockReset()
-    appDataClientMocks.addRecentWorkspace.mockResolvedValue({ recentWorkspaces: [], addedRepo: null })
+    appDataClientMocks.addRecentWorkspace.mockResolvedValue({ recentWorkspaces: [], addedWorkspace: null })
     appDataClientMocks.clearRecentWorkspaces.mockReset()
     appDataClientMocks.clearRecentWorkspaces.mockResolvedValue(undefined)
     appDataClientMocks.getSettingsSnapshot.mockReset()
@@ -127,8 +127,8 @@ describe('settings actions', () => {
       openWorkspaceEntries: [],
       runtime: { workspaces: [], workspacePaneTabs: [], restoredWorkspaceId: null },
     })
-    appDataClientMocks.restoreRepoWorkspaceTabs.mockReset()
-    appDataClientMocks.restoreRepoWorkspaceTabs.mockResolvedValue({
+    appDataClientMocks.restoreWorkspaceTabs.mockReset()
+    appDataClientMocks.restoreWorkspaceTabs.mockResolvedValue({
       workspace: {
         entry: { kind: 'local', id: 'goblin+file:///tmp/repo-a' },
         workspaceId: 'goblin+file:///tmp/repo-a',
@@ -151,7 +151,7 @@ describe('settings actions', () => {
     appDataClientMocks.setLanEnabled.mockReset()
     appDataClientMocks.setLanEnabled.mockImplementation(async (enabled) => enabled)
     appDataClientMocks.setRecentWorkspaceExternalApp.mockReset()
-    appDataClientMocks.setRecentWorkspaceExternalApp.mockResolvedValue({ repoSettings: [] })
+    appDataClientMocks.setRecentWorkspaceExternalApp.mockResolvedValue({ workspaceSettings: [] })
     appDataClientMocks.setSettingsFetchInterval.mockReset()
     appDataClientMocks.setSettingsFetchInterval.mockImplementation(async (sec) => sec)
     appDataClientMocks.setShortcutsDisabled.mockReset()
@@ -164,7 +164,7 @@ describe('settings actions', () => {
     primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     appDataClientMocks.addRecentWorkspace.mockResolvedValue({
       recentWorkspaces: [{ kind: 'local', id: WORKSPACE_A }],
-      addedRepo: { kind: 'local', id: WORKSPACE_A },
+      addedWorkspace: { kind: 'local', id: WORKSPACE_A },
     })
     const { recordRecentWorkspace } = await import('#/web/settings-actions.ts')
 
@@ -214,16 +214,20 @@ describe('settings actions', () => {
     expect(appDataClientMocks.restoreServerWorkspace).toHaveBeenCalledWith('client_test000000000000', undefined)
   })
 
-  test('restoreRepoTabsOnView delegates lazy repo tab restore to the settings client', async () => {
-    const { restoreRepoTabsOnView } = await import('#/web/settings-actions.ts')
+  test('restoreWorkspaceTabsOnView delegates lazy repo tab restore to the settings client', async () => {
+    const { restoreWorkspaceTabsOnView } = await import('#/web/settings-actions.ts')
     await expect(
-      restoreRepoTabsOnView('client_test000000000000', 'goblin+file:///tmp/repo-a', 'repo_runtime_test'),
+      restoreWorkspaceTabsOnView(
+        'client_test000000000000',
+        workspaceIdForTest('goblin+file:///tmp/repo-a'),
+        'repo_runtime_test',
+      ),
     ).resolves.toMatchObject({
       workspace: { workspaceId: 'goblin+file:///tmp/repo-a', workspaceRuntimeId: 'repo_runtime_test' },
       snapshot: null,
     })
 
-    expect(appDataClientMocks.restoreRepoWorkspaceTabs).toHaveBeenCalledWith(
+    expect(appDataClientMocks.restoreWorkspaceTabs).toHaveBeenCalledWith(
       'client_test000000000000',
       'goblin+file:///tmp/repo-a',
       'repo_runtime_test',
@@ -330,12 +334,15 @@ describe('settings actions', () => {
     })
   })
 
-  test('setRecentWorkspaceExternalAppPreference syncs server repo settings into the settings snapshot cache', async () => {
-    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ repoSettings: [] }))
+  test('setRecentWorkspaceExternalAppPreference syncs server workspace settings into the settings snapshot cache', async () => {
+    primaryWindowQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({ workspaceSettings: [] }),
+    )
     appDataClientMocks.setRecentWorkspaceExternalApp.mockResolvedValue({
-      repoSettings: [
+      workspaceSettings: [
         {
-          repoId: 'goblin+file:///tmp/repo-a',
+          workspaceId: WORKSPACE_A,
           workspaceExternalAppRecent: { byWorktree: { 'goblin+file:///tmp/repo-a': 'editor:vscode' } },
         },
       ],
@@ -343,15 +350,15 @@ describe('settings actions', () => {
     const { setRecentWorkspaceExternalAppPreference } = await import('#/web/settings-actions.ts')
 
     await setRecentWorkspaceExternalAppPreference({
-      repoId: 'goblin+file:///tmp/repo-a',
+      workspaceId: WORKSPACE_A,
       worktreePath: 'goblin+file:///tmp/repo-a',
       itemId: 'editor:vscode',
     })
 
     expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
-      repoSettings: [
+      workspaceSettings: [
         {
-          repoId: 'goblin+file:///tmp/repo-a',
+          workspaceId: WORKSPACE_A,
           workspaceExternalAppRecent: { byWorktree: { 'goblin+file:///tmp/repo-a': 'editor:vscode' } },
         },
       ],
