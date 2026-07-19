@@ -7,6 +7,7 @@ import {
   replaceWorkspaceRuntimeMembershipsForClient,
   runSerializedInitialWorkspaceProbe,
   runSerializedWorkspaceRefresh,
+  withWorkspaceRuntimeAdmission,
 } from '#/server/modules/workspace-runtimes.ts'
 import { readWorkspaceFilesystemTree } from '#/server/modules/workspace-filesystem-tree.ts'
 import { readWorkspaceFileViewer } from '#/server/modules/workspace-file-viewer.ts'
@@ -83,36 +84,35 @@ export function createWorkspaceRoutes(options: {
       if (probe.status !== 'ready') {
         return c.json({ ok: false as const, input: input.workspaceInput, reason: probe.reason })
       }
-      const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, input.clientId)
-      const authoritativeProbe = await runSerializedInitialWorkspaceProbe({
-        userId,
-        workspaceId,
-        workspaceRuntimeId,
-        probe: async () => probe,
-        beforeCommit: async ({ before, after }) => {
-          if (!workspaceGitCleanupRequired(before, after)) return
-          await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
+      return c.json(
+        await withWorkspaceRuntimeAdmission(userId, workspaceId, input.clientId, async (workspaceRuntimeId) => {
+          const authoritativeProbe = await runSerializedInitialWorkspaceProbe({
             userId,
             workspaceId,
             workspaceRuntimeId,
-            assertCurrent: () => requireCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId),
+            probe: async () => probe,
+            beforeCommit: async ({ before, after }) => {
+              if (!workspaceGitCleanupRequired(before, after)) return
+              await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
+                userId,
+                workspaceId,
+                workspaceRuntimeId,
+                assertCurrent: () => requireCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId),
+              })
+            },
           })
-        },
-      })
-      if (!authoritativeProbe || authoritativeProbe.status !== 'ready') {
-        return c.json({
-          ok: false as const,
-          input: input.workspaceInput,
-          reason: 'error.workspace-transport-unavailable',
+          if (!authoritativeProbe || authoritativeProbe.status !== 'ready') {
+            throw new IpcError({ code: 'INTERNAL_SERVER_ERROR', message: 'error.workspace-transport-unavailable' })
+          }
+          return {
+            ok: true as const,
+            workspace: { id: workspaceId, name: authoritativeProbe.name },
+            workspaceRuntimeId,
+            capabilities: authoritativeProbe.capabilities,
+            diagnostics: authoritativeProbe.diagnostics,
+          }
         })
-      }
-      return c.json({
-        ok: true as const,
-        workspace: { id: workspaceId, name: authoritativeProbe.name },
-        workspaceRuntimeId,
-        capabilities: authoritativeProbe.capabilities,
-        diagnostics: authoritativeProbe.diagnostics,
-      })
+      )
     }
     const workspaceRuntimeId = acquireWorkspaceRuntime(userId, input.workspaceId, input.clientId)
     return c.json({ ok: true as const, workspaceRuntimeId })

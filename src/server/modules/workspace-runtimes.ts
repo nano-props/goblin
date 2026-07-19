@@ -90,6 +90,7 @@ const workspaceRuntimesByUser = new Map<string, Map<WorkspaceId, WorkspaceRuntim
 const workspaceRuntimeClosedListeners = new Set<(event: WorkspaceRuntimeClosedEvent) => void>()
 const workspaceRuntimeMembershipAcquiredListeners = new Set<(event: WorkspaceRuntimeMembershipAcquiredEvent) => void>()
 const workspaceRuntimeMembershipReleasedListeners = new Set<(event: WorkspaceRuntimeMembershipReleasedEvent) => void>()
+const workspaceRuntimeAdmissionTails = new Map<string, Promise<void>>()
 const workspaceRuntimeLogger = serverLogger.child({ tag: 'workspace-runtime' })
 
 function workspaceRuntimeStateByUser(userId: string): Map<WorkspaceId, WorkspaceRuntimeState> {
@@ -123,6 +124,88 @@ function workspaceRuntimeState(userId: string, workspaceId: WorkspaceId): Worksp
 
 export function acquireWorkspaceRuntime(userId: string, workspaceId: WorkspaceId, clientId: string): string {
   return acquireWorkspaceRuntimeLease(userId, workspaceId, clientId).workspaceRuntimeId
+}
+
+/**
+ * Admit one client for work that must finish before the caller can own the
+ * membership. A failed admission restores that client's exact preceding
+ * generation without disturbing memberships acquired by other clients.
+ */
+export async function withWorkspaceRuntimeAdmission<T>(
+  userId: string,
+  workspaceId: WorkspaceId,
+  clientId: string,
+  admit: (workspaceRuntimeId: string) => Promise<T>,
+): Promise<T> {
+  const admissionKey = [userId, workspaceId, clientId].join('\0')
+  const predecessor = workspaceRuntimeAdmissionTails.get(admissionKey) ?? Promise.resolve()
+  let releaseTurn!: () => void
+  const turn = new Promise<void>((resolve) => {
+    releaseTurn = resolve
+  })
+  const tail = predecessor.then(async () => await turn)
+  workspaceRuntimeAdmissionTails.set(admissionKey, tail)
+  await predecessor
+  try {
+    return await runWorkspaceRuntimeAdmission(userId, workspaceId, clientId, admit)
+  } finally {
+    releaseTurn()
+    if (workspaceRuntimeAdmissionTails.get(admissionKey) === tail) workspaceRuntimeAdmissionTails.delete(admissionKey)
+  }
+}
+
+async function runWorkspaceRuntimeAdmission<T>(
+  userId: string,
+  workspaceId: WorkspaceId,
+  clientId: string,
+  admit: (workspaceRuntimeId: string) => Promise<T>,
+): Promise<T> {
+  const state = workspaceRuntimeState(userId, workspaceId)
+  const previousWorkspaceRuntimeId = state.currentWorkspaceRuntimeId
+  const previousGeneration = state.members.get(clientId)
+  const lease = acquireWorkspaceRuntimeMembership(userId, workspaceId, clientId)
+  try {
+    const result = await admit(lease.workspaceRuntimeId)
+    emitWorkspaceRuntimeMembershipAcquired({ userId, clientId })
+    return result
+  } catch (error) {
+    rollbackWorkspaceRuntimeAdmission({
+      userId,
+      clientId,
+      state,
+      lease,
+      previousWorkspaceRuntimeId,
+      previousGeneration,
+    })
+    throw error
+  }
+}
+
+function rollbackWorkspaceRuntimeAdmission(input: {
+  userId: string
+  clientId: string
+  state: WorkspaceRuntimeState
+  lease: WorkspaceRuntimeMembershipLeaseEntry
+  previousWorkspaceRuntimeId: string | null
+  previousGeneration: number | undefined
+}): void {
+  const { userId, clientId, state, lease, previousWorkspaceRuntimeId, previousGeneration } = input
+  if (
+    workspaceRuntimesByUser.get(userId)?.get(lease.workspaceId) !== state ||
+    state.currentWorkspaceRuntimeId !== lease.workspaceRuntimeId ||
+    state.members.get(clientId) !== lease.generation
+  ) {
+    return
+  }
+  if (previousWorkspaceRuntimeId === lease.workspaceRuntimeId && previousGeneration !== undefined) {
+    state.members.set(clientId, previousGeneration)
+    return
+  }
+  state.members.delete(clientId)
+  if (state.members.size > 0 || state.activeWorkspaceLifecycleOperations > 0) return
+  const workspaceRuntimeId = stopWorkspaceRuntimeEpoch(state)
+  if (!workspaceRuntimeId) return
+  emitWorkspaceRuntimeClosed({ userId, workspaceId: lease.workspaceId, workspaceRuntimeId })
 }
 
 export function acquireWorkspaceRuntimeLease(

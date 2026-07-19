@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createWorkspaceRoutes } from '#/server/routes/workspace.ts'
 import {
+  acquireWorkspaceRuntime,
+  captureWorkspaceRuntimeMembershipLease,
   clearWorkspaceRuntimesForUser,
   commitWorkspaceProbeState,
   listWorkspaceRuntimes,
@@ -99,6 +101,75 @@ describe('workspace routes', () => {
       capabilities: { git: { status: 'unavailable' } },
     })
     expect(commitGitCapabilityRemoval).toHaveBeenCalledOnce()
+    expect(captureWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID).entries).toEqual([
+      expect.objectContaining({ workspaceId: WORKSPACE_ID, generation: 1 }),
+    ])
+  })
+
+  test('rolls back a newly acquired membership when initial capability cleanup fails', async () => {
+    const cleanupError = new Error('durable layout write failed')
+    const app = createWorkspaceRoutes({
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'failed-before-commit' as const, error: cleanupError })),
+      },
+    })
+
+    const response = await post(app, '/runtime-open', {
+      workspaceInput: '/tmp/workspace-route',
+      clientId: CLIENT_ID,
+    })
+
+    expect(response.status).toBe(500)
+    expect(captureWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID).entries).toEqual([])
+    await expect((await post(app, '/runtime-list', {})).json()).resolves.toEqual({ runtimes: [] })
+  })
+
+  test('restores an existing membership generation when renewed admission cleanup fails', async () => {
+    const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, WORKSPACE_ID, CLIENT_ID)
+    const before = captureWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID).entries[0]
+    const cleanupError = new Error('durable layout write failed')
+    const app = createWorkspaceRoutes({
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'failed-before-commit' as const, error: cleanupError })),
+      },
+    })
+
+    const response = await post(app, '/runtime-open', {
+      workspaceInput: '/tmp/workspace-route',
+      clientId: CLIENT_ID,
+    })
+
+    expect(response.status).toBe(500)
+    expect(captureWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID).entries).toEqual([before])
+    await expect((await post(app, '/runtime-list', {})).json()).resolves.toMatchObject({
+      runtimes: [{ workspaceId: WORKSPACE_ID, workspaceRuntimeId }],
+    })
+  })
+
+  test('serializes failed renewals so a later rollback cannot restore another failed admission', async () => {
+    acquireWorkspaceRuntime(USER_ID, WORKSPACE_ID, CLIENT_ID)
+    const before = captureWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID).entries[0]
+    const cleanupStarted = Promise.withResolvers<void>()
+    const cleanupGate = Promise.withResolvers<void>()
+    const commitGitCapabilityRemoval = vi
+      .fn()
+      .mockImplementationOnce(async () => {
+        cleanupStarted.resolve()
+        await cleanupGate.promise
+        return { kind: 'failed-before-commit' as const, error: new Error('first cleanup failed') }
+      })
+      .mockResolvedValueOnce({ kind: 'failed-before-commit' as const, error: new Error('second cleanup failed') })
+    const app = createWorkspaceRoutes({ workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval } })
+
+    const first = post(app, '/runtime-open', { workspaceInput: '/tmp/workspace-route', clientId: CLIENT_ID })
+    await cleanupStarted.promise
+    const second = post(app, '/runtime-open', { workspaceInput: '/tmp/workspace-route', clientId: CLIENT_ID })
+    cleanupGate.resolve()
+
+    await expect(first).resolves.toMatchObject({ status: 500 })
+    await expect(second).resolves.toMatchObject({ status: 500 })
+    expect(commitGitCapabilityRemoval).toHaveBeenCalledTimes(2)
+    expect(captureWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID).entries).toEqual([before])
   })
 
   test('does not mint a runtime when command-input probing fails', async () => {
