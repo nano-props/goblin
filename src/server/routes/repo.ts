@@ -13,7 +13,6 @@ import {
   getRepoLog,
   getRepoPatch,
   getRepoWorktreeBootstrapPreview,
-  probeRepo,
 } from '#/server/modules/repo-read-paths.ts'
 import {
   cloneRepo,
@@ -97,10 +96,6 @@ export function createRepoRoutes(options: {
     }
   }
 
-  app.post('/probe', async (c) => {
-    const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.probe, c)
-    return c.json(await jsonOr(() => probeRepo(cwd), READ_REPO_ERROR, 'probe'))
-  })
   app.post('/log', async (c) => {
     const { cwd, workspaceRuntimeId, branch, count, skip } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.log, c)
     const userId = userIdFromContext(c)

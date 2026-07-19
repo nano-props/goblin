@@ -168,7 +168,6 @@ export const REPO_PROCEDURE_SCHEMAS = {
       v.transform((targets): GitBackgroundSyncTarget[] => targets),
     ),
   }),
-  probe: CwdInput,
   log: v.object({
     cwd: WorkspaceIdSchema,
     workspaceRuntimeId: WorkspaceRuntimeIdSchema,

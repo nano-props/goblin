@@ -422,9 +422,7 @@ describe('repo lifecycle', () => {
       remotePath: '/srv/repo',
     })
     expect(target).not.toBeNull()
-    const calls = installGoblin({
-      probe: (cwd: string) => ({ ok: true, root: cwd, name: 'repo' }),
-    })
+    const calls = installGoblin()
 
     const result = await useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))
     if (result.ok) await result.postOpenEffects
@@ -576,7 +574,6 @@ describe('repo lifecycle', () => {
     // to return oldTarget on the first call and newTarget on the second.
     let resolveCalls = 0
     installGoblin({
-      probe: (cwd: string) => ({ ok: true, root: cwd, name: 'repo' }),
       'remote.resolveTarget': () => {
         resolveCalls += 1
         return { target: resolveCalls === 1 ? oldTarget : newTarget }
@@ -594,7 +591,6 @@ describe('repo lifecycle', () => {
     // trigger a refresh — the previous build returned `changed: false`
     // for the in-place update, so this assertion would have failed.
     const calls = installGoblin({
-      probe: (cwd: string) => ({ ok: true, root: cwd, name: 'repo' }),
       'remote.resolveTarget': () => ({ target: newTarget }),
     })
     const second = await useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(newTarget!))

@@ -9,7 +9,6 @@ import type {
 } from '#/shared/api-types.ts'
 import type { ExecResult, LogEntry, PullRequestFetchMode, RepoUrlTarget } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
-import type { ProbeResult } from '#/shared/api-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
@@ -37,10 +36,6 @@ async function runRepoReadWithStableErrorKey<T>(read: () => Promise<T>, signal?:
     if (err instanceof Error && err.message === SERVER_REQUEST_TIMEOUT_ERROR) throw err
     throw new Error('error.failed-read-repo', { cause: err })
   }
-}
-
-export async function probeRepo(cwd: string, signal?: AbortSignal): Promise<ProbeResult> {
-  return await postServerJson('/api/repo/probe', { cwd }, { signal })
 }
 
 export async function cloneRepository(

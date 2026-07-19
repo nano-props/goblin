@@ -16,7 +16,7 @@
 //     `vi.stubGlobal('fetch', fetchMock)` boilerplate.
 //
 //   - `installGoblinTestBridge(handlers)` — pathname-keyed router that
-//     dispatches `fetch('/api/...')` calls to `handlers['repo.probe']`
+//     dispatches `fetch('/api/...')` calls to pathname-keyed handlers
 //     style keys. Lives in `#/web/test-utils/bridge.ts`. Prefer this when
 //     the test under test exercises many routes at once and the response
 //     shape is determined by the route.

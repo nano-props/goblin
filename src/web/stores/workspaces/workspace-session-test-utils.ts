@@ -11,6 +11,7 @@ import { createBranchSnapshot, installGoblinTestBridge, resetWorkspacesStore } f
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { flushMicrotasks } from '#/test-utils/index.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 export const REPO_A = workspaceIdForTest('goblin+file:///tmp/goblin-lifecycle-a')
 export const REPO_B = workspaceIdForTest('goblin+file:///tmp/goblin-lifecycle-b')
 export const branchSnapshot = createBranchSnapshot
@@ -27,9 +28,18 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
     resolveTarget: [] as Array<{ alias: string; remotePath: string }>,
   }
   const handlers: Record<string, (input: any) => unknown> = {
-    'repo.probe': ({ cwd }: { cwd: string }) => {
-      if (cwd === '/missing') return { ok: false, message: 'missing' }
-      return { ok: true, root: cwd, name: cwd.split('/').at(-1) ?? cwd }
+    'workspace.probe': ({ workspaceInput }: { workspaceInput: string }): WorkspaceSettledProbeState => {
+      if (workspaceInput === '/missing') return { status: 'unavailable', reason: 'error.workspace-path-not-found' }
+      return {
+        status: 'ready',
+        name: workspaceInput.split('/').at(-1) ?? workspaceInput,
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        },
+        diagnostics: [],
+      }
     },
     'repo.projection': ({ cwd }: { cwd: string }) => {
       calls.projection.push(cwd)
@@ -72,8 +82,9 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
     'settings.applyNativeHostProjection': async () => undefined,
   }
   for (const [key, handler] of Object.entries(overrides)) {
-    if (key === 'probe') handlers['repo.probe'] = ({ cwd }: { cwd: string }) => handler(cwd)
-    else if (key === 'projection') handlers['repo.projection'] = handler
+    if (key === 'workspaceProbe') {
+      handlers['workspace.probe'] = ({ workspaceInput }: { workspaceInput: string }) => handler(workspaceInput)
+    } else if (key === 'projection') handlers['repo.projection'] = handler
     else handlers[key] = handler
   }
   // Exercise the same server-side lifecycle boundary used in production:
@@ -88,10 +99,10 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       return { error: result.error ?? 'resolve-target-error' }
     },
     probeRemote: async (target, { signal: _signal }) => {
-      const parsed = handlers['repo.probe']?.({ cwd: target.remotePath }) as
-        { ok: true; root?: string; name?: string } | { ok: false; message: string } | undefined
+      const parsed = handlers['workspace.probe']?.({ workspaceInput: target.id }) as
+        WorkspaceSettledProbeState | undefined
       if (!parsed) return { ok: false, message: 'missing-probe' }
-      if (!parsed.ok) return { ok: false, message: parsed.message }
+      if (parsed.status === 'unavailable') return { ok: false, message: parsed.reason }
       return { ok: true }
     },
   }

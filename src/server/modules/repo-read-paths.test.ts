@@ -27,22 +27,13 @@ function asRepoSource(source: ReadSource): RepoSource {
 
 type ReadSource = Pick<
   RepoSource,
-  | 'id'
-  | 'kind'
-  | 'probe'
-  | 'getSnapshot'
-  | 'getStatus'
-  | 'getPullRequests'
-  | 'getLog'
-  | 'fetch'
-  | 'getWorktreeBootstrapPreview'
+  'id' | 'kind' | 'getSnapshot' | 'getStatus' | 'getPullRequests' | 'getLog' | 'fetch' | 'getWorktreeBootstrapPreview'
 >
 
 function makeSource(overrides: Partial<ReadSource> = {}): ReadSource {
   const base: ReadSource = {
     id: WORKSPACE_ID,
     kind: 'local',
-    probe: () => Promise.resolve({ ok: true }),
     getSnapshot: () => Promise.resolve<RepoSnapshot | null>(null),
     getStatus: () => Promise.resolve<WorktreeStatus[]>([]),
     getPullRequests: () => Promise.resolve<PullRequestEntry[] | null>(null),
@@ -95,9 +86,7 @@ describe('getRepoLog', () => {
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
     const signal = new AbortController().signal
 
-    await expect(
-      getRepoLog(WORKSPACE_ID, 'feature/work', { count: 30, skip: 0, signal }),
-    ).resolves.toEqual(entries)
+    await expect(getRepoLog(WORKSPACE_ID, 'feature/work', { count: 30, skip: 0, signal })).resolves.toEqual(entries)
     expect(getLog).toHaveBeenCalledWith('feature/work', { count: 30, skip: 0, signal })
   })
 

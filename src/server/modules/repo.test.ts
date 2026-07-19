@@ -7,9 +7,6 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo')
 const LINKED_REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-linked')
 const WORKTREE_REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-worktree')
-const MISSING_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/missing')
-const FILE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/file')
-const PRIVATE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/private')
 
 const successfulRemovalLifecycle = {
   beforeRemove: async () => ({ ok: true as const, message: '' }),
@@ -837,38 +834,6 @@ describe('cloneRepo cancellation', () => {
         message: 'cancelled',
         reason: 'caller-abort',
       },
-    })
-  })
-})
-
-describe('probeRepo path errors', () => {
-  test('reports missing paths specifically', async () => {
-    mocks.fsStat.mockRejectedValueOnce({ code: 'ENOENT' })
-
-    const { probeRepo } = await import('#/server/modules/repo-read-paths.ts')
-    await expect(probeRepo(MISSING_WORKSPACE_ID)).resolves.toEqual({
-      ok: false,
-      message: 'error.path-not-found',
-    })
-  })
-
-  test('reports non-directory paths specifically', async () => {
-    mocks.fsStat.mockResolvedValueOnce({ isDirectory: () => false })
-
-    const { probeRepo } = await import('#/server/modules/repo-read-paths.ts')
-    await expect(probeRepo(FILE_WORKSPACE_ID)).resolves.toEqual({
-      ok: false,
-      message: 'error.path-not-directory',
-    })
-  })
-
-  test('reports permission-denied paths specifically', async () => {
-    mocks.fsAccess.mockRejectedValueOnce({ code: 'EACCES' })
-
-    const { probeRepo } = await import('#/server/modules/repo-read-paths.ts')
-    await expect(probeRepo(PRIVATE_WORKSPACE_ID)).resolves.toEqual({
-      ok: false,
-      message: 'error.path-permission-denied',
     })
   })
 })

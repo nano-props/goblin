@@ -17,7 +17,6 @@ const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/repo')
 const CLIENT_ID = 'client-read-test'
 
 const mocks = vi.hoisted(() => ({
-  probeRepo: vi.fn(),
   probeLocalWorkspace: vi.fn(),
   probeWorkspace: vi.fn(),
   getRepoLog: vi.fn(),
@@ -55,7 +54,6 @@ vi.mock('#/server/modules/background-sync.ts', () => ({
   getBackgroundSyncDiagnostics: vi.fn(),
 }))
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
-  probeRepo: mocks.probeRepo,
   getRepoLog: mocks.getRepoLog,
   getRepoPatch: mocks.getRepoPatch,
   readRepoProjection: mocks.readRepoProjection,
@@ -180,40 +178,6 @@ async function expectRemoteRuntimeFailed(
 }
 
 describe('repo routes — POST body validation (read endpoints)', () => {
-  test('returns 400 when the body is missing required fields', async () => {
-    const app = createTestRepoRoutes()
-    const response = await app.request(
-      new Request('http://localhost/probe', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({}),
-      }),
-    )
-    expect(response.status).toBe(400)
-    const json = (await response.json()) as { ok: boolean; code: string; message: string }
-    expect(json).toMatchObject({ ok: false, code: 'BAD_REQUEST' })
-    expect(json.message).toContain('cwd')
-    expect(mocks.probeRepo).not.toHaveBeenCalled()
-  })
-
-  test('returns 400 when the body is empty (no content-length)', async () => {
-    // `parseHttpBody` treats an empty body as `undefined` and lets the
-    // schema decide — a required-field schema must still 400 even
-    // without a JSON envelope.
-    const app = createTestRepoRoutes()
-    const response = await app.request(
-      new Request('http://localhost/probe', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: '',
-      }),
-    )
-    expect(response.status).toBe(400)
-    const json = (await response.json()) as { code: string }
-    expect(json.code).toBe('BAD_REQUEST')
-    expect(mocks.probeRepo).not.toHaveBeenCalled()
-  })
-
   test('returns 400 for invalid picklist values in the body (e.g. projection mode)', async () => {
     const app = createTestRepoRoutes()
     const response = await app.request(
@@ -227,21 +191,6 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     const json = (await response.json()) as { ok: boolean; code: string }
     expect(json.code).toBe('BAD_REQUEST')
     expect(mocks.readRepoProjection).not.toHaveBeenCalled()
-  })
-
-  test('passes a valid body through to the module layer', async () => {
-    mocks.probeRepo.mockResolvedValue({ ok: true, root: '/tmp/repo', name: 'repo' })
-    const app = createTestRepoRoutes()
-    const response = await app.request(
-      new Request('http://localhost/probe', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID }),
-      }),
-    )
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ ok: true, root: '/tmp/repo', name: 'repo' })
-    expect(mocks.probeRepo).toHaveBeenCalledWith(WORKSPACE_ID)
   })
 
   test('rejects Git reads after the server commits Git unavailable', async () => {

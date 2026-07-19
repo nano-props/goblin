@@ -2,7 +2,6 @@ import path from 'node:path'
 import { constants as fsConstants, promises as fs } from 'node:fs'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { GitHead } from '#/shared/git-head.ts'
-import { checkGitAvailable } from '#/system/git/git-exec.ts'
 import {
   deleteBranch,
   deleteUpstreamBranch,
@@ -12,8 +11,6 @@ import {
   getRepoCommonDir,
   getHeadHash,
   getLog as getBranchLog,
-  getRepoName,
-  getRepoRoot,
   getUpstream,
   isAncestor,
   isGitRepo,
@@ -48,8 +45,6 @@ import { isValidCwd } from '#/shared/input-validation.ts'
 import { validateBranchDeletionPolicy, validateRemovableWorktreeState } from '#/shared/repo-action-policy.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { resolveRemoteTarget as resolveSshRemoteTarget } from '#/system/ssh/config.ts'
-import { testRemoteWorkspace } from '#/system/ssh/diagnostics.ts'
-import { SSH_BOOT_PROBE_TIMEOUT_MS } from '#/system/ssh/commands.ts'
 import {
   bootstrapRemoteWorktreeAfterCreate,
   createRemoteWorktree,
@@ -76,7 +71,6 @@ import { parseGitHubRemoteUrl, type GitHubRepoRef } from '#/system/github/graphq
 import {
   isRemoteWorkspaceId,
   parseRemoteWorkspaceId,
-  type ProbeResult,
   type PullRequestEntry,
   type RemoteWorkspaceTarget,
   type RepoSnapshot,
@@ -123,7 +117,6 @@ export type WorkspacePaneTargetIdentity =
 export interface RepoSource {
   id: string
   kind: 'local' | 'remote'
-  probe(): Promise<ProbeResult>
   getSnapshot(signal?: AbortSignal): Promise<RepoSnapshot | null>
   getWorkspacePaneTargetIdentities(signal?: AbortSignal): Promise<WorkspacePaneTargetIdentity[]>
   getStatus(signal?: AbortSignal): Promise<WorktreeStatus[]>
@@ -401,19 +394,6 @@ function createLocalRepoSource(
   return {
     id: repoId,
     kind: 'local',
-    async probe() {
-      if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-path' }
-      const gitAvailable = await checkGitAvailable()
-      if (!gitAvailable.ok) return gitAvailable
-      const readable = await probeReadableDirectory(repoId)
-      if (!readable.ok) return readable
-      const ok = await isGitRepo(repoId)
-      if (!ok) return { ok: false, message: 'error.workspace-git-unavailable' }
-      const root = await getRepoRoot(repoId)
-      if (!root) return { ok: false, message: 'error.failed-read-repo' }
-      const name = await getRepoName(repoId)
-      return { ok: true, root, name }
-    },
     async getSnapshot(signal) {
       if (!isValidCwd(repoId)) return null
       const available = await probeGitRepo(repoId)
@@ -627,11 +607,6 @@ async function createRemoteRepoSource(
   return {
     id: repoId,
     kind: 'remote',
-    async probe() {
-      const result = await testRemoteWorkspace(target, { timeoutMs: SSH_BOOT_PROBE_TIMEOUT_MS })
-      if (!result.ok) return { ok: false, message: result.message || 'error.failed-read-repo' }
-      return { ok: true, root: target.id, name: target.displayName }
-    },
     async getSnapshot(signal) {
       const remoteSnapshot = await getRemoteSnapshot(target, { signal, run })
       if (signal?.aborted || !remoteSnapshot) return null

@@ -1,5 +1,4 @@
 export const EMBEDDED_SERVER_IPC_ROUTES = {
-  'repo.probe': { route: '/api/repo/probe', method: 'POST' },
   'repo.clone': { route: '/api/repo/clone', method: 'POST' },
   'repo.projection': { route: '/api/repo/projection', method: 'POST' },
   'repo.worktreeStatus': { route: '/api/repo/worktree-status', method: 'POST' },

@@ -9,14 +9,12 @@ import {
 } from '#/web/stores/workspaces/persistence.ts'
 import { disposeRepoOperationScheduler } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
-import { probeRepo } from '#/web/repo-client.ts'
 import {
   closeWorkspaceRuntime,
   openWorkspaceRuntime,
   openWorkspaceRuntimeForInput,
   reconcileWorkspaceRuntimeMemberships,
 } from '#/web/workspace-client.ts'
-import { resolveRemoteWorkspaceTarget } from '#/web/remote-workspace-client.ts'
 import { addWorkspaceToSession, recordRecentWorkspace, removeWorkspaceFromSession } from '#/web/settings-actions.ts'
 import {
   invalidateWorkspaceRuntimes,
@@ -26,7 +24,6 @@ import {
 } from '#/web/workspace-runtime-query.ts'
 import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacesLog } from '#/web/logger.ts'
-import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -72,13 +69,6 @@ interface ResolvedWorkspace {
   }
 }
 
-interface ProbeResult {
-  input: string
-  reason: string | null
-  workspace: ResolvedWorkspace | null
-  target?: RemoteWorkspaceTarget
-}
-
 export interface RuntimeOpenResolvedWorkspace {
   input: string
   reason: string | null
@@ -107,50 +97,6 @@ function workspaceAdmissionFromInput(input: string | WorkspaceSessionEntry): Wor
   return ref
     ? { kind: 'workspace-entry', entry: { kind: 'remote', id: ref.id, ref } }
     : { kind: 'command-input', input }
-}
-
-export async function resolveWorkspacePath(
-  input: string | WorkspaceSessionEntry,
-  onError?: (err: unknown) => void,
-  fallbackError = 'error.failed-read-repo',
-): Promise<ProbeResult> {
-  const admission = workspaceAdmissionFromInput(input)
-  const value = admission.kind === 'workspace-entry' ? admission.entry : admission.input
-  try {
-    let target: RemoteWorkspaceTarget | undefined
-    if (typeof value !== 'string' && value.kind === 'remote') target = await resolveRemoteWorkspaceTarget(value.ref)
-    const workspaceInput = typeof value === 'string' ? value : value.id
-    const probe = await probeRepo(workspaceInput)
-    if (!probe?.ok || !probe.root) {
-      return {
-        input: workspaceInput,
-        reason: probe?.message ?? 'error.repo-git-unavailable',
-        workspace: null,
-        target,
-      }
-    }
-    const workspaceId = canonicalWorkspaceLocator(probe.root)
-    if (!workspaceId) throw new Error('Workspace probe returned a non-canonical workspace ID')
-    return {
-      input: workspaceInput,
-      reason: null,
-      workspace: {
-        id: workspaceId,
-        name:
-          probe.name ??
-          (typeof value !== 'string' && value.kind === 'remote' ? value.ref.displayName : lastPathSegment(probe.root)),
-        ...(target ? { target } : {}),
-      },
-      target,
-    }
-  } catch (err) {
-    onError?.(err)
-    return {
-      input: typeof value === 'string' ? value : value.id,
-      reason: err instanceof Error ? err.message : fallbackError,
-      workspace: null,
-    }
-  }
 }
 
 export async function openLocalWorkspaceRuntimeForInput(
@@ -467,8 +413,7 @@ function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string): Partia
   delete navigationHistoryByWorkspace[id]
   for (const terminalWorktreeKey of Object.keys(selectedTerminalSessionIdByTerminalWorktree)) {
     const target = parseTerminalWorktreeKey(terminalWorktreeKey)
-    if (target?.workspaceId === id)
-      delete selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
+    if (target?.workspaceId === id) delete selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
   }
   for (const scopeKey of Object.keys(tabOpenerIdentityByScope)) {
     if (scopeKey.startsWith(`${id}\0`)) delete tabOpenerIdentityByScope[scopeKey]
@@ -626,7 +571,9 @@ function sessionEntryForResolvedWorkspace(resolvedWorkspace: ResolvedWorkspace):
   )
 }
 
-function sessionProjectionStateForResolvedWorkspace(resolvedWorkspace: ResolvedWorkspace): WorkspaceSessionProjectionState {
+function sessionProjectionStateForResolvedWorkspace(
+  resolvedWorkspace: ResolvedWorkspace,
+): WorkspaceSessionProjectionState {
   return resolvedWorkspace.session?.projectionState ?? 'projected'
 }
 
@@ -700,10 +647,7 @@ export function addResolvedWorkspace(
       if (resolvedWorkspace.workspaceProbe) {
         acceptWorkspaceProbeState(workspace, resolvedWorkspace.workspaceProbe)
       }
-      const restored = restoreRepoProjectionFromCacheEntry(
-        workspace,
-        s.repoSnapshotCache[resolvedWorkspace.id],
-      )
+      const restored = restoreRepoProjectionFromCacheEntry(workspace, s.repoSnapshotCache[resolvedWorkspace.id])
       if (resolvedWorkspace.target) markRemoteLifecycleReady(restored, resolvedWorkspace.target)
       return restored
     },
@@ -921,10 +865,7 @@ export function createWorkspaceLifecycleActions(
         return await openRemoteWorkspace(set, get, admission.entry)
       }
       const workspaceInput = admission.kind === 'workspace-entry' ? admission.entry.id : admission.input
-      return await runWorkspaceCommand(
-        workspaceInput,
-        async () => await openLocalWorkspace(set, get, workspaceInput),
-      )
+      return await runWorkspaceCommand(workspaceInput, async () => await openLocalWorkspace(set, get, workspaceInput))
     },
 
     async closeWorkspace(workspaceId: WorkspaceId): Promise<CloseWorkspaceResult> {
@@ -970,7 +911,10 @@ async function openLocalWorkspace(
     set((state) => {
       const { workspaces, workspaceOrder, changed } = addResolvedWorkspace(state, workspace, workspaceRuntimeId)
       if (changed)
-        initialRefreshRef.current = { id: workspace.id, workspaceRuntimeId: workspaces[workspace.id]!.workspaceRuntimeId }
+        initialRefreshRef.current = {
+          id: workspace.id,
+          workspaceRuntimeId: workspaces[workspace.id]!.workspaceRuntimeId,
+        }
       return changed ? { workspaces, workspaceOrder } : state
     })
     return opened

@@ -291,13 +291,6 @@ export interface WorkspaceFileViewerResult {
   readonly executionRoot: string
 }
 
-export interface ProbeResult {
-  ok: boolean
-  root?: string
-  name?: string
-  message?: string
-}
-
 export type WorkspaceRuntimeOpenResult =
   | {
       ok: true
@@ -439,7 +432,6 @@ export interface AppIpcHandlers {
     openInFinder: (input: { target: WorkspacePaneFilesystemExecutionTarget }) => Promise<ExecResult>
   }
   repo: {
-    probe: (input: { cwd: WorkspaceId }) => Promise<ProbeResult>
     clone: (input: { url: string; parentPath: string; directoryName: string }) => Promise<CloneRepoResult>
     projection: (input: {
       cwd: WorkspaceId
@@ -484,7 +476,11 @@ export interface AppIpcHandlers {
     push: (input: { cwd: WorkspaceId; workspaceRuntimeId: string; branch: string }) => Promise<ExecResult>
     fetch: (input: { cwd: WorkspaceId; workspaceRuntimeId: string }) => Promise<ExecResult>
     openUrl: (input: { cwd: WorkspaceId; workspaceRuntimeId: string; target: RepoUrlTarget }) => Promise<ExecResult>
-    backgroundSyncRepos: (input: { clientId: string; revision: number; targets: GitBackgroundSyncTarget[] }) => Promise<{
+    backgroundSyncRepos: (input: {
+      clientId: string
+      revision: number
+      targets: GitBackgroundSyncTarget[]
+    }) => Promise<{
       ok: true
       repoIds: WorkspaceId[]
       intervalSec: number

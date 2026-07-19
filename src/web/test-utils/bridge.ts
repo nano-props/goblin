@@ -6,8 +6,8 @@
 //
 // Design choices:
 //   - `handlers` is a `Record<string, IpcTestHandler>` keyed by IPC
-//     pathname (`'repo.probe'`, `'repo.projection'`, etc.) and server
-//     route (`'/api/repo/probe'`, etc.). `installGoblinTestBridge`
+//     pathname (`'workspace.probe'`, `'repo.projection'`, etc.) and server
+//     route. `installGoblinTestBridge`
 //     wires each pathname to the matching fetch URL.
 //   - The bridge mock composes the same `goblinNative` shape the real
 //     client bridge exposes, including `host`, `terminal`, `invokeIpc`,
@@ -56,7 +56,7 @@ import {
 import { workspacePaneTabEntryIdentity, workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
-import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 import type {
   TerminalAttachResult,
   TerminalRestartResult,
@@ -1050,20 +1050,15 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         const clientId = typeof payload === 'object' && payload && 'clientId' in payload ? payload.clientId : null
         if (typeof clientId !== 'string' || clientId.length === 0) throw new Error('runtime-open requires clientId')
         if (typeof workspaceInput === 'string' && workspaceInput.length > 0) {
-          const probe = (await call('repo.probe', { cwd: workspaceInput })) as {
-            ok: boolean
-            root?: string
-            name?: string
-            message?: string
-          }
-          if (!probe.ok || !probe.root) {
+          const probe = (await call('workspace.probe', { workspaceInput })) as WorkspaceSettledProbeState
+          if (probe.status === 'unavailable') {
             return {
               ok: false as const,
               input: workspaceInput,
-              reason: probe.message ?? 'error.workspace-git-unavailable',
+              reason: probe.reason,
             }
           }
-          const state = workspaceRuntimeState.get(probe.root) ?? {
+          const state = workspaceRuntimeState.get(workspaceInput) ?? {
             currentWorkspaceRuntimeId: null,
             members: new Set<string>(),
           }
@@ -1071,25 +1066,17 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           state.members.add(clientId)
           state.workspaceProbe = {
             status: 'ready',
-            name: probe.name ?? probe.root.split('/').at(-1) ?? probe.root,
-            capabilities: {
-              files: { read: true, write: true },
-              terminal: { available: true },
-              git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
-            },
-            diagnostics: [],
+            name: probe.name,
+            capabilities: probe.capabilities,
+            diagnostics: probe.diagnostics,
           }
-          workspaceRuntimeState.set(probe.root, state)
+          workspaceRuntimeState.set(workspaceInput, state)
           return {
             ok: true as const,
-            workspace: { id: probe.root, name: probe.name ?? probe.root.split('/').at(-1) ?? probe.root },
+            workspace: { id: workspaceInput, name: probe.name },
             workspaceRuntimeId: state.currentWorkspaceRuntimeId,
-            capabilities: {
-              files: { read: true as const, write: true },
-              terminal: { available: true },
-              git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
-            },
-            diagnostics: [],
+            capabilities: probe.capabilities,
+            diagnostics: probe.diagnostics,
           }
         }
         if (typeof workspaceId !== 'string' || workspaceId.length === 0) {
@@ -1224,7 +1211,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         }
         if (url.pathname === '/api/remote/path-suggestions') return call('remote.listPathSuggestions', body)
         if (url.pathname === '/api/remote/test-workspace') return call('remote.testWorkspace', body)
-        if (url.pathname === '/api/repo/probe') return call('repo.probe', body)
         if (url.pathname === '/api/repo/log') return call('repo.log', body)
         if (url.pathname === '/api/repo/remote-branches') return call('repo.remoteBranches', body)
         if (url.pathname === '/api/repo/projection') return readRepoProjection(body)

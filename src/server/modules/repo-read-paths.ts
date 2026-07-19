@@ -14,7 +14,6 @@ import {
   type WorktreeStatus,
 } from '#/shared/git-types.ts'
 import type {
-  ProbeResult,
   PullRequestEntry,
   RepoOperationsSnapshot,
   WorkspaceRuntimeProjection,
@@ -24,10 +23,6 @@ import type {
 } from '#/shared/api-types.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-
-export async function probeRepo(cwd: WorkspaceId): Promise<ProbeResult> {
-  return await runWithRepoSource(cwd, async (source) => await source.probe())
-}
 
 export async function getRepoSnapshot(
   cwd: WorkspaceId,
