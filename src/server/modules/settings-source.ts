@@ -242,19 +242,18 @@ function normalizeWorkspaceExternalAppRecent(value: unknown): WorkspaceExternalA
 
 interface RawWorkspaceSettingsEntry {
   workspaceId?: unknown
-  repoId?: unknown
   worktreeBootstrapTrust?: unknown
   workspaceExternalAppRecent?: unknown
 }
 
-function normalizeWorkspaceSettings(value: unknown, identityField: 'workspaceId' | 'repoId'): WorkspaceSettingsEntry[] {
+function normalizeWorkspaceSettings(value: unknown): WorkspaceSettingsEntry[] {
   if (!Array.isArray(value)) return []
   const seen = new Set<string>()
   const normalized: WorkspaceSettingsEntry[] = []
   for (const item of value) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue
     const raw = item as RawWorkspaceSettingsEntry
-    const workspaceId = toSafeWorkspaceLocator(raw[identityField])
+    const workspaceId = toSafeWorkspaceLocator(raw.workspaceId)
     if (!workspaceId || seen.has(workspaceId)) continue
     seen.add(workspaceId)
     const entry: WorkspaceSettingsEntry = { workspaceId }
@@ -291,7 +290,7 @@ function cloneWorkspace(workspace: ServerWorkspaceState): ServerWorkspaceState {
 async function readUserSettingsFile(): Promise<UserSettingsData | null> {
   const raw = await readUserSettingsJson()
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
-  const parsed = raw as Partial<UserSettingsData> & { repoSettings?: unknown }
+  const parsed = raw as Partial<UserSettingsData>
   return {
     lang: normalizeLangPref(parsed.lang),
     theme: normalizeThemePref(parsed.theme),
@@ -304,10 +303,7 @@ async function readUserSettingsFile(): Promise<UserSettingsData | null> {
     lanEnabled: normalizeLanEnabled(parsed.lanEnabled),
     workspace: normalizeWorkspace(parsed.workspace),
     recentWorkspaces: normalizeRecentWorkspaces(parsed.recentWorkspaces),
-    workspaceSettings:
-      parsed.workspaceSettings !== undefined
-        ? normalizeWorkspaceSettings(parsed.workspaceSettings, 'workspaceId')
-        : normalizeWorkspaceSettings(parsed.repoSettings, 'repoId'),
+    workspaceSettings: normalizeWorkspaceSettings(parsed.workspaceSettings),
   }
 }
 

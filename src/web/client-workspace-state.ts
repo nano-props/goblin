@@ -55,39 +55,19 @@ export async function writeClientWorkspaceState(state: ClientWorkspaceState): Pr
 export function normalizeClientWorkspaceState(value: unknown): ClientWorkspaceState {
   const defaults = defaultClientWorkspaceState()
   if (!value || typeof value !== 'object' || Array.isArray(value)) return defaults
-  const raw = value as Partial<ClientWorkspaceState> & {
-    restoredRepoId?: unknown
-    preferredWorkspacePaneTabByTargetByRepo?: unknown
-    filetreeViewStateByWorktreeByRepo?: unknown
-  }
+  const raw = value as Partial<ClientWorkspaceState>
   const layout = normalizeWorkspaceSessionLayoutState(raw)
   return {
-    restoredWorkspaceId: toSafeCanonicalRepoLocator(
-      migratedClientWorkspaceField(raw, 'restoredWorkspaceId', 'restoredRepoId'),
-    ),
+    restoredWorkspaceId: toSafeCanonicalRepoLocator(raw.restoredWorkspaceId),
     ...layout,
     selectedTerminalSessionIdByTerminalWorktree: normalizeSelectedTerminals(
       raw.selectedTerminalSessionIdByTerminalWorktree,
     ),
     preferredWorkspacePaneTabByTargetByWorkspace: normalizePreferredTabs(
-      migratedClientWorkspaceField(
-        raw,
-        'preferredWorkspacePaneTabByTargetByWorkspace',
-        'preferredWorkspacePaneTabByTargetByRepo',
-      ),
+      raw.preferredWorkspacePaneTabByTargetByWorkspace,
     ),
-    filetreeViewStateByWorktreeByWorkspace: normalizeFiletreeState(
-      migratedClientWorkspaceField(raw, 'filetreeViewStateByWorktreeByWorkspace', 'filetreeViewStateByWorktreeByRepo'),
-    ),
+    filetreeViewStateByWorktreeByWorkspace: normalizeFiletreeState(raw.filetreeViewStateByWorktreeByWorkspace),
   }
-}
-
-function migratedClientWorkspaceField(
-  raw: Record<string, unknown>,
-  currentField: string,
-  legacyField: string,
-): unknown {
-  return Object.prototype.hasOwnProperty.call(raw, currentField) ? raw[currentField] : raw[legacyField]
 }
 
 function normalizeSelectedTerminals(value: unknown): Record<string, string> {

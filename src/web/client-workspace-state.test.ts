@@ -21,54 +21,6 @@ describe('client workspace persistence', () => {
     expect(normalizeClientWorkspaceState({ restoredWorkspaceId: 'relative/repo' }).restoredWorkspaceId).toBeNull()
   })
 
-  test('migrates legacy durable field names at the decode boundary', () => {
-    const state = normalizeClientWorkspaceState({
-      restoredRepoId: 'goblin+file:///legacy',
-      preferredWorkspacePaneTabByTargetByRepo: {
-        'goblin+file:///legacy': { 'goblin+file:///legacy\0workspace-root': 'files' },
-      },
-      filetreeViewStateByWorktreeByRepo: {
-        'goblin+file:///legacy': {
-          'goblin+file:///legacy': { selectedKeys: ['README.md'], expandedKeys: [], topVisibleRowIndex: 0 },
-        },
-      },
-    })
-
-    expect(state.restoredWorkspaceId).toBe('goblin+file:///legacy')
-    expect(state.preferredWorkspacePaneTabByTargetByWorkspace).toEqual({
-      'goblin+file:///legacy': { 'goblin+file:///legacy\0workspace-root': 'files' },
-    })
-    expect(state.filetreeViewStateByWorktreeByWorkspace).toEqual({
-      'goblin+file:///legacy': {
-        'goblin+file:///legacy': { selectedKeys: ['README.md'], expandedKeys: [], topVisibleRowIndex: 0 },
-      },
-    })
-    expect(state).not.toHaveProperty('restoredRepoId')
-    expect(state).not.toHaveProperty('preferredWorkspacePaneTabByTargetByRepo')
-    expect(state).not.toHaveProperty('filetreeViewStateByWorktreeByRepo')
-  })
-
-  test('treats present current fields as authoritative over legacy fields', () => {
-    const state = normalizeClientWorkspaceState({
-      restoredWorkspaceId: null,
-      restoredRepoId: 'goblin+file:///legacy',
-      preferredWorkspacePaneTabByTargetByWorkspace: {},
-      preferredWorkspacePaneTabByTargetByRepo: {
-        'goblin+file:///legacy': { 'goblin+file:///legacy\0workspace-root': 'files' },
-      },
-      filetreeViewStateByWorktreeByWorkspace: {},
-      filetreeViewStateByWorktreeByRepo: {
-        'goblin+file:///legacy': {
-          'goblin+file:///legacy': { selectedKeys: ['README.md'], expandedKeys: [], topVisibleRowIndex: 0 },
-        },
-      },
-    })
-
-    expect(state.restoredWorkspaceId).toBeNull()
-    expect(state.preferredWorkspacePaneTabByTargetByWorkspace).toEqual({})
-    expect(state.filetreeViewStateByWorktreeByWorkspace).toEqual({})
-  })
-
   test('fails fast when native workspace state cannot be read', async () => {
     const readError = new Error('native workspace unavailable')
     vi.spyOn(nativeBridge, 'readNativeBridge').mockReturnValue({} as Window['goblinNative'])

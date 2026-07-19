@@ -723,46 +723,6 @@ test('normalizer drops malformed workspace external app recent entries on load',
   ])
 })
 
-test('migrates legacy repo settings at the persistence boundary and writes only workspace settings', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
-  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
-  process.env.GOBLIN_SERVER_DATA_DIR = tmp
-  const settingsFile = path.join(tmp, 'user-settings.json')
-  const configHash = `sha256:${'a'.repeat(64)}`
-  await writeFile(
-    settingsFile,
-    JSON.stringify({
-      repoSettings: [{ repoId: REPO_A, worktreeBootstrapTrust: { configHash, trustedAt: '2026-01-01T00:00:00.000Z' } }],
-    }),
-    'utf-8',
-  )
-
-  const mod = await import('#/server/modules/settings-source.ts')
-  expect(await mod.getServerWorkspaceSettings()).toEqual([
-    {
-      workspaceId: REPO_A,
-      worktreeBootstrapTrust: { configHash, trustedAt: '2026-01-01T00:00:00.000Z' },
-    },
-  ])
-
-  await mod.setServerWorkspaceExternalAppRecent({
-    workspaceId: REPO_A,
-    worktreePath: '/workspace/worktree',
-    itemId: 'editor:vscode',
-  })
-
-  const persisted = JSON.parse(await readFile(settingsFile, 'utf-8')) as Record<string, unknown>
-  expect(persisted).not.toHaveProperty('repoSettings')
-  expect(persisted).toMatchObject({
-    workspaceSettings: [
-      {
-        workspaceId: REPO_A,
-        worktreeBootstrapTrust: { configHash },
-        workspaceExternalAppRecent: { byWorktree: { '/workspace/worktree': 'editor:vscode' } },
-      },
-    ],
-  })
-})
 
 test('setServerWorkspaceExternalAppRecent silently drops unknown item ids without overwriting valid entries', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
