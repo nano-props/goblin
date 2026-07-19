@@ -45,7 +45,7 @@ export function createTerminalSessionCreateProvider(deps: {
       const coordinates = terminalExecutionCoordinates(input.target)
       assertPhysicalWorktreeExecutionCapability(admission.physicalWorktreeCapability, {
         userId,
-        repoRoot: coordinates.repoRoot,
+        repoRoot: coordinates.workspaceId,
         workspaceRuntimeId: coordinates.workspaceRuntimeId,
         worktreePath: terminalExecutionPath(input.target),
       })

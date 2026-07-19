@@ -13,19 +13,19 @@ const WORKTREE_SEGMENT = 2
 
 export type TerminalWorktreeKey = string
 
-export function formatTerminalWorktreeKey(repoRoot: string, worktreeRoot: string): TerminalWorktreeKey {
+export function formatTerminalWorktreeKey(workspaceId: string, worktreeRoot: string): TerminalWorktreeKey {
   if (
-    canonicalWorkspaceLocator(repoRoot) !== repoRoot ||
+    canonicalWorkspaceLocator(workspaceId) !== workspaceId ||
     canonicalWorkspaceLocator(worktreeRoot) !== worktreeRoot ||
-    !workspaceLocatorsShareTransport(repoRoot, worktreeRoot)
+    !workspaceLocatorsShareTransport(workspaceId, worktreeRoot)
   ) {
     throw new Error('terminal worktree key requires compatible canonical workspace roots')
   }
-  return `${repoRoot}\0${worktreeRoot}`
+  return `${workspaceId}\0${worktreeRoot}`
 }
 
-export function formatTerminalWorktreeKeyForPath(repoRoot: string, worktreePath: string): TerminalWorktreeKey {
-  const workspaceId = canonicalWorkspaceLocator(repoRoot)
+export function formatTerminalWorktreeKeyForPath(workspaceIdInput: string, worktreePath: string): TerminalWorktreeKey {
+  const workspaceId = canonicalWorkspaceLocator(workspaceIdInput)
   const worktreeId =
     canonicalWorkspaceLocator(worktreePath) ?? (workspaceId ? workspaceLocatorForPath(workspaceId, worktreePath) : null)
   if (!workspaceId || !worktreeId || !workspaceLocatorsShareTransport(workspaceId, worktreeId)) {
@@ -35,21 +35,21 @@ export function formatTerminalWorktreeKeyForPath(repoRoot: string, worktreePath:
 }
 
 export interface ParsedTerminalWorktreeKey {
-  repoRoot: string
+  workspaceId: string
   worktreeId: string
 }
 
 export function parseTerminalWorktreeKey(key: string): ParsedTerminalWorktreeKey | null {
   const parts = key.split('\0')
   if (parts.length !== WORKTREE_SEGMENT) return null
-  const [repoRoot, worktreeId] = parts
-  if (!repoRoot || !worktreeId) return null
+  const [workspaceId, worktreeId] = parts
+  if (!workspaceId || !worktreeId) return null
   if (
-    canonicalWorkspaceLocator(repoRoot) !== repoRoot ||
+    canonicalWorkspaceLocator(workspaceId) !== workspaceId ||
     canonicalWorkspaceLocator(worktreeId) !== worktreeId ||
-    !workspaceLocatorsShareTransport(repoRoot, worktreeId)
+    !workspaceLocatorsShareTransport(workspaceId, worktreeId)
   ) {
     return null
   }
-  return { repoRoot, worktreeId }
+  return { workspaceId, worktreeId }
 }

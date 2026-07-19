@@ -99,7 +99,7 @@ export function createTerminalBellIntentPlan(
 ): TerminalBellIntentPlan {
   if (!repo) return { kind: 'noop' }
   const parsedKey = event.terminalWorktreeKey ? parseTerminalWorktreeKey(event.terminalWorktreeKey) : null
-  if (parsedKey && parsedKey.repoRoot === repo.id && event.terminalSessionId) {
+  if (parsedKey && parsedKey.workspaceId === repo.id && event.terminalSessionId) {
     if (!branchReadModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
     const worktreePath = parseCanonicalWorkspaceLocator(parsedKey.worktreeId)?.path
     const branch = worktreePath

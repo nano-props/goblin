@@ -2,7 +2,7 @@ export interface FutureExitBinding {
   terminalSessionId: string
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: number
-  repoRoot: string
+  workspaceId: string
   workspaceRuntimeId: string
 }
 
@@ -145,6 +145,6 @@ function bindingKey(binding: FutureExitBinding): string {
   return `${scopeKey(binding)}:${binding.terminalSessionId}:${binding.terminalRuntimeSessionId}:${binding.terminalRuntimeGeneration}`
 }
 
-function scopeKey(binding: Pick<FutureExitBinding, 'repoRoot' | 'workspaceRuntimeId'>): string {
-  return JSON.stringify([binding.repoRoot, binding.workspaceRuntimeId])
+function scopeKey(binding: Pick<FutureExitBinding, 'workspaceId' | 'workspaceRuntimeId'>): string {
+  return JSON.stringify([binding.workspaceId, binding.workspaceRuntimeId])
 }

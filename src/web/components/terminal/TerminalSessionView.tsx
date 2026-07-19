@@ -73,8 +73,8 @@ export function TerminalSessionView({
     restart,
     focusTerminal,
   } = context
-  const { repoRoot, worktreeId } = terminalSessionCoordinates(base)
-  const terminalWorktreeKey = formatTerminalWorktreeKey(repoRoot, worktreeId)
+  const { workspaceId, worktreeId } = terminalSessionCoordinates(base)
+  const terminalWorktreeKey = formatTerminalWorktreeKey(workspaceId, worktreeId)
   useLayoutEffect(() => {
     const host = hostRef.current
     if (!host) return

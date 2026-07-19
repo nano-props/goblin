@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalCreateResult } from '#/shared/terminal-types.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -169,7 +170,13 @@ import {
   setTerminalSessionProjectionForTests,
 } from '#/web/components/terminal/TerminalSessionProjection.ts'
 
-const REPO_ROOT = 'goblin+file:///repo'
+function workspaceIdFixture(input: string) {
+  const workspaceId = canonicalWorkspaceLocator(input)
+  if (!workspaceId) throw new Error('invalid workspace locator fixture')
+  return workspaceId
+}
+
+const REPO_ROOT = workspaceIdFixture('goblin+file:///repo')
 const WORKTREE_PATH = '/repo'
 const BRANCH = 'main'
 const WORKTREE_KEY = `${REPO_ROOT}\0${REPO_ROOT}`
@@ -328,7 +335,7 @@ describe('TerminalSessionProjection create flow', () => {
 
   test('advances catalog coverage with a continuous create delta', async () => {
     projection.reconcileServerSessionsSnapshot(
-      { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       { revision: 10, sessions: [] },
       'client_local',
     )
@@ -338,7 +345,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect(
       projection.reconcileServerSessionsSnapshot(
-        { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
         { revision: 10, sessions: [] },
         'client_local',
       ),
@@ -347,7 +354,7 @@ describe('TerminalSessionProjection create flow', () => {
   })
 
   test('materializes an unseen unchanged reuse without advancing catalog coverage', async () => {
-    const scope = { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
+    const scope = { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
     projection.reconcileServerSessionsSnapshot(scope, { revision: 2, sessions: [] }, 'client_local')
     mocks.createMock.mockResolvedValueOnce(
       makeCreateResult({
@@ -776,7 +783,7 @@ describe('TerminalSessionProjection create flow', () => {
         terminalRuntimeSessionId: `pty_session_${index}_aaaaaaaaa`,
         terminalRuntimeGeneration: 1,
         terminalSessionId: `term-${String(index).padStart(21, '0')}`,
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         processName: 'zsh',
         canonicalTitle: null,
       })
@@ -800,7 +807,7 @@ describe('TerminalSessionProjection create flow', () => {
       terminalRuntimeSessionId: 'pty_session_unknown_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-unknownunknownunknown',
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       processName: 'zsh',
       canonicalTitle: null,
     })
@@ -837,7 +844,7 @@ describe('TerminalSessionProjection create flow', () => {
       terminalRuntimeSessionId: 'pty_session_current_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-unknownunknownunknown',
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       processName: 'zsh',
       canonicalTitle: null,
     })

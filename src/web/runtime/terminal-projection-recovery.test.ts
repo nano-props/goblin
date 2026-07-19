@@ -1,8 +1,11 @@
 import { describe, expect, test, vi } from 'vitest'
 import { RuntimeProjectionScope } from '#/web/runtime/runtime-projection-scope.ts'
 import { TerminalProjectionRecoveryCoordinator } from '#/web/runtime/terminal-projection-recovery.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-const TARGET = { repoRoot: 'goblin+file:///workspace', workspaceRuntimeId: 'repo-runtime-test' }
+const WORKSPACE_ID = canonicalWorkspaceLocator('goblin+file:///workspace')
+if (!WORKSPACE_ID) throw new Error('invalid workspace locator fixture')
+const TARGET = { workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-test' }
 const complete = () => {}
 
 describe('TerminalProjectionRecoveryCoordinator', () => {

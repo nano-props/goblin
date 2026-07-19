@@ -1,5 +1,7 @@
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+
 export interface RuntimeProjectionTarget {
-  repoRoot: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
 }
 
@@ -154,7 +156,7 @@ export class RuntimeProjectionScope {
 
 export class RuntimeProjectionScopeRegistry {
   private readonly isTargetCurrent: (target: RuntimeProjectionTarget) => boolean
-  private readonly scopesByRepoRoot = new Map<string, RuntimeProjectionScope>()
+  private readonly scopesByWorkspaceId = new Map<string, RuntimeProjectionScope>()
   private readonly disposers = new Set<RuntimeProjectionDisposer>()
   private active = true
 
@@ -164,11 +166,11 @@ export class RuntimeProjectionScopeRegistry {
 
   scopeFor(target: RuntimeProjectionTarget): RuntimeProjectionScope {
     if (!this.active) throw new Error('runtime projection scope registry disposed')
-    const current = this.scopesByRepoRoot.get(target.repoRoot)
+    const current = this.scopesByWorkspaceId.get(target.workspaceId)
     if (current?.target.workspaceRuntimeId === target.workspaceRuntimeId && current.isActive()) return current
     current?.dispose()
     const scope = new RuntimeProjectionScope(target, this.isTargetCurrent)
-    this.scopesByRepoRoot.set(target.repoRoot, scope)
+    this.scopesByWorkspaceId.set(target.workspaceId, scope)
     return scope
   }
 
@@ -191,8 +193,8 @@ export class RuntimeProjectionScopeRegistry {
   }
 
   disposeScopes(): void {
-    for (const scope of this.scopesByRepoRoot.values()) scope.dispose()
-    this.scopesByRepoRoot.clear()
+    for (const scope of this.scopesByWorkspaceId.values()) scope.dispose()
+    this.scopesByWorkspaceId.clear()
   }
 
   dispose(): void {

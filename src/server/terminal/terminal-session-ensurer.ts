@@ -98,7 +98,7 @@ class TerminalSessionEnsurer {
     input: TerminalSessionEnsureInput,
     context: TerminalSessionEnsureContext,
   ): Promise<TerminalSessionEnsureResult> {
-    if (isRemoteWorkspaceId(terminalExecutionCoordinates(input.target).repoRoot)) {
+    if (isRemoteWorkspaceId(terminalExecutionCoordinates(input.target).workspaceId)) {
       return await this.ensureRemote(userId, input, context)
     }
     return await this.ensureLocal(userId, input, context)
@@ -146,7 +146,7 @@ class TerminalSessionEnsurer {
     const execution = physicalWorktreeExecutionBinding(context.physicalWorktreeCapability)
     if (execution.kind !== 'local') return { ok: false, message: 'error.invalid-worktree-capability' }
     const coordinates = terminalExecutionCoordinates(input.target)
-    const repoRoot = coordinates.repoRoot
+    const repoRoot = coordinates.workspaceId
     const worktreePath = execution.canonicalWorktreePath
     const env = this.options.gCommand
       ? (buildGoblinTerminalCommandEnvironment({

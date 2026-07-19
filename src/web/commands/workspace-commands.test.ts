@@ -3013,11 +3013,11 @@ function recordCreatedTerminalSelection(base: TerminalSessionBase, terminalSessi
   const coordinates = terminalSessionCoordinates(base)
   useWorkspacesStore
     .getState()
-    .setSelectedTerminal(formatTerminalWorktreeKey(coordinates.repoRoot, coordinates.worktreeId), terminalSessionId)
+    .setSelectedTerminal(formatTerminalWorktreeKey(coordinates.workspaceId, coordinates.worktreeId), terminalSessionId)
   const branchName = terminalPresentationBranch(base.presentation)
   if (!branchName) return
   workspacePaneTabsTestBridge.addRuntimeTab({
-    workspaceId: coordinates.repoRoot,
+    workspaceId: coordinates.workspaceId,
     workspaceRuntimeId: coordinates.workspaceRuntimeId,
     branchName,
     worktreePath: terminalExecutionPath(base.target),
@@ -3034,7 +3034,7 @@ function removeTerminalFromWorkspacePaneTabsServer(base: TerminalSessionBase, te
   const branchName = terminalPresentationBranch(base.presentation)
   if (!branchName) throw new Error('expected Git worktree terminal fixture')
   workspacePaneTabsTestBridge.removeRuntimeTab({
-    workspaceId: coordinates.repoRoot,
+    workspaceId: coordinates.workspaceId,
     workspaceRuntimeId: coordinates.workspaceRuntimeId,
     branchName,
     worktreePath: terminalExecutionPath(base.target),

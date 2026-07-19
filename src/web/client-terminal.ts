@@ -34,7 +34,7 @@ export function createServerTerminalClient(options: {
       terminalRuntimeSessionId: string
       terminalRuntimeGeneration: number
       terminalSessionId: string
-      repoRoot: string
+      workspaceId: TerminalExitEvent['workspaceId']
     }) => void
   >()
 
@@ -56,8 +56,8 @@ export function createServerTerminalClient(options: {
     takeover(input) {
       return options.realtime.request('takeover', input)
     },
-    pruneTerminals(repoRoot, workspaceRuntimeId) {
-      return options.realtime.request('prune', { repoRoot, workspaceRuntimeId })
+    pruneTerminals(workspaceId, workspaceRuntimeId) {
+      return options.realtime.request('prune', { workspaceId, workspaceRuntimeId })
     },
     recoverSessions(input) {
       return options.realtime.request('recover-sessions', input).then((value) => {
@@ -190,7 +190,7 @@ export function createServerTerminalClient(options: {
             terminalRuntimeSessionId: message.terminalRuntimeSessionId,
             terminalRuntimeGeneration: message.terminalRuntimeGeneration,
             terminalSessionId: message.terminalSessionId,
-            repoRoot: message.repoRoot,
+            workspaceId: message.workspaceId,
           })
         return
       case 'identity': {

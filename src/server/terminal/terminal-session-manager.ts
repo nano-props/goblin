@@ -49,7 +49,7 @@ import { TerminalDirectory } from '#/server/terminal/terminal-directory.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { TerminalSessionAdmission } from '#/server/terminal/terminal-session-ensurer.ts'
 import { serverLogger } from '#/server/logger.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 const INVALIDATED_SESSION_RETIREMENT_RETRY_BASE_MS = 100
@@ -183,7 +183,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     const userId = input.userId
     if (!this.isValidUserId(userId)) return { ok: false, message: 'error.invalid-arguments' }
     const coordinates = terminalExecutionCoordinates(input.target)
-    const scope = terminalSessionRuntimeScope(coordinates.repoRoot, coordinates.workspaceRuntimeId)
+    const scope = terminalSessionRuntimeScope(coordinates.workspaceId, coordinates.workspaceRuntimeId)
     const existing = this.directory.getByDurableId(userId, input.terminalSessionId)
     if (existing) {
       if (!sameTerminalScope(existing, input)) {
@@ -742,7 +742,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       const coordinates = terminalExecutionCoordinates(session.target)
       affected.set(key, {
         userId: session.userId,
-        repoRoot: coordinates.repoRoot,
+        repoRoot: coordinates.workspaceId,
         workspaceRuntimeId: coordinates.workspaceRuntimeId,
         scope: session.scope,
       })
@@ -845,13 +845,15 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   terminalSessionsChangedEventForScope(
     userId: TUser,
-    repoRoot: string,
+    workspaceIdInput: string,
     workspaceRuntimeId: string,
   ): TerminalSessionsChangedEvent {
+    const workspaceId = canonicalWorkspaceLocator(workspaceIdInput)
+    if (!workspaceId) throw new Error('error.workspace-locator-malformed')
     return {
-      repoRoot,
+      workspaceId,
       workspaceRuntimeId,
-      revision: this.projectionRevision(userId, terminalSessionRuntimeScope(repoRoot, workspaceRuntimeId)),
+      revision: this.projectionRevision(userId, terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)),
     }
   }
 
@@ -1020,11 +1022,11 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   private terminalSessionPublicScope(session: TerminalSessionView<TUser>): {
     terminalSessionId: string
-    repoRoot: string
+    workspaceId: WorkspaceId
   } {
     return {
       terminalSessionId: session.terminalSessionId,
-      repoRoot: terminalExecutionCoordinates(session.target).repoRoot,
+      workspaceId: terminalExecutionCoordinates(session.target).workspaceId,
     }
   }
 
@@ -1183,7 +1185,7 @@ export class TerminalSessionManager<TUser extends string | number> {
         this.sink.onExit(session.userId, {
           ...event,
           ...this.terminalSessionIdentity(session),
-          repoRoot: terminalExecutionCoordinates(session.target).repoRoot,
+          workspaceId: terminalExecutionCoordinates(session.target).workspaceId,
           workspaceRuntimeId: terminalExecutionCoordinates(session.target).workspaceRuntimeId,
         }),
       confirmedExit: (session, terminalRuntimeGeneration) => {
@@ -1219,7 +1221,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   private sessionsChangedEvent(session: TerminalSessionView<TUser>): TerminalSessionsChangedEvent {
     const coordinates = terminalExecutionCoordinates(session.target)
     return {
-      repoRoot: coordinates.repoRoot,
+      workspaceId: coordinates.workspaceId,
       workspaceRuntimeId: coordinates.workspaceRuntimeId,
       revision: this.projectionRevision(session.userId, session.scope),
     }
@@ -1294,7 +1296,7 @@ function sameTerminalScope<TUser extends string | number>(
   if (
     session.scope !==
       terminalSessionRuntimeScope(
-        terminalExecutionCoordinates(input.target).repoRoot,
+        terminalExecutionCoordinates(input.target).workspaceId,
         terminalExecutionCoordinates(input.target).workspaceRuntimeId,
       ) ||
     session.target.kind !== input.target.kind
@@ -1304,7 +1306,7 @@ function sameTerminalScope<TUser extends string | number>(
   const current = terminalExecutionCoordinates(session.target)
   const requested = terminalExecutionCoordinates(input.target)
   return (
-    current.repoRoot === requested.repoRoot &&
+    current.workspaceId === requested.workspaceId &&
     current.workspaceRuntimeId === requested.workspaceRuntimeId &&
     current.worktreeId === requested.worktreeId
   )

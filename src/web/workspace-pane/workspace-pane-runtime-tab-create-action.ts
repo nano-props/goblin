@@ -151,7 +151,7 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
   ) {
     return (
       navigation.showRepoWorktreeTerminalSession?.(
-        coordinates.repoRoot,
+        coordinates.workspaceId,
         terminalExecutionPath(resolvedBase.target),
         terminalSessionId,
       ) ?? false
@@ -159,7 +159,7 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
   }
   return commitWorkspacePaneCurrentTargetRoute(
     {
-      workspaceId: coordinates.repoRoot,
+      workspaceId: coordinates.workspaceId,
       workspaceRuntimeId: coordinates.workspaceRuntimeId,
       branchName: workspaceRoot ? null : terminalPresentationBranch(resolvedBase.presentation),
       worktreePath: workspaceRoot ? null : terminalExecutionPath(resolvedBase.target),
@@ -233,7 +233,7 @@ function applyCreatedTerminalWorkspacePaneRuntimeTabs(
 function terminalCreateTargetRuntimeIsCurrent(base: TerminalSessionBase): boolean {
   const coordinates = terminalExecutionCoordinates(base.target)
   return (
-    currentWorkspaceRuntimeId(useWorkspacesStore.getState(), coordinates.repoRoot) === coordinates.workspaceRuntimeId
+    currentWorkspaceRuntimeId(useWorkspacesStore.getState(), coordinates.workspaceId) === coordinates.workspaceRuntimeId
   )
 }
 

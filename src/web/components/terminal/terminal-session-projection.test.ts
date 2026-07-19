@@ -19,7 +19,7 @@ const RUNTIME_TARGET = runtimeWorkspacePaneTargetForTest({
 describe('terminal session projection helpers', () => {
   test('projects server session summaries into client hydration input', () => {
     const projected = projectServerTerminalSession({
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       clientId: 'client_a',
       index: 2,
@@ -68,7 +68,7 @@ describe('terminal session projection helpers', () => {
 
   test('uses null when the server snapshot is missing', () => {
     const projected = projectServerTerminalSession({
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       clientId: 'client_b',
       index: 1,
@@ -97,7 +97,7 @@ describe('terminal session projection helpers', () => {
 
   test('rejects server sessions from a different workspace runtime', () => {
     const projected = projectServerTerminalSession({
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId: 'repo-runtime-current',
       clientId: 'client_b',
       index: 1,
@@ -122,7 +122,7 @@ describe('terminal session projection helpers', () => {
 
   test('uses server session presentation metadata', () => {
     const projected = projectServerTerminalSession({
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       clientId: 'client_b',
       index: 1,
@@ -153,7 +153,7 @@ describe('terminal session projection helpers', () => {
 
   test('does not replace server presentation from a second client-side authority', () => {
     const projected = projectServerTerminalSession({
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       clientId: 'client_b',
       index: 1,
@@ -288,7 +288,7 @@ describe('terminal session projection helpers', () => {
     )
 
     const recovered = projectServerTerminalSession({
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       clientId: 'client_a',
       index: 0,

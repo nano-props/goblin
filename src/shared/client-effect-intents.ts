@@ -24,7 +24,7 @@ export type ClientEffectIntent =
   | { type: 'lang-pref-set-requested'; pref: LangPref }
   | { type: 'clear-recent-workspaces-requested' }
   | { type: 'open-recent-workspace-requested'; entry: WorkspaceSessionEntry }
-  | { type: 'terminal-bell-click'; repoRoot: string; terminalSessionId?: string; terminalWorktreeKey?: string }
+  | { type: 'terminal-bell-click'; workspaceId: string; terminalSessionId?: string; terminalWorktreeKey?: string }
   | { type: 'external-open-enqueued' }
 
 export type ClientEffectIntentType = ClientEffectIntent['type']
@@ -62,7 +62,7 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
       return isWorkspaceSessionEntry(event.entry)
     case 'terminal-bell-click':
       return (
-        typeof event.repoRoot === 'string' &&
+        typeof event.workspaceId === 'string' &&
         // Reject the old generic key payload; bell routing needs explicit terminal identifiers.
         !Object.prototype.hasOwnProperty.call(event, 'key') &&
         (event.terminalSessionId === undefined || typeof event.terminalSessionId === 'string') &&

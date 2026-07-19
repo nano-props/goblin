@@ -11,7 +11,7 @@ describe('terminal worktree key', () => {
 
     expect(key).toBe('goblin+file:///repo\0goblin+file:///repo/worktree')
     expect(parseTerminalWorktreeKey(key)).toEqual({
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: 'goblin+file:///repo',
       worktreeId: 'goblin+file:///repo/worktree',
     })
   })

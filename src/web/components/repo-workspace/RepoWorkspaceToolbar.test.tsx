@@ -1405,7 +1405,7 @@ function renderToolbar(options: {
     const branchName = terminalPresentationBranch(base.presentation)
     if (!branchName) throw new Error('expected Git worktree terminal fixture')
     workspacePaneTabsTestBridge.addRuntimeTab({
-      workspaceId: coordinates.repoRoot,
+      workspaceId: coordinates.workspaceId,
       workspaceRuntimeId: coordinates.workspaceRuntimeId,
       branchName,
       worktreePath: terminalExecutionPath(base.target),

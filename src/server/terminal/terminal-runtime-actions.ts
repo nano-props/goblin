@@ -1,4 +1,5 @@
 import { isValidWorkspaceLocatorInput } from '#/shared/input-validation.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
@@ -29,10 +30,10 @@ interface TerminalSessionServiceLike {
   prune(
     clientId: string,
     userId: string,
-    repoRoot: string,
+    workspaceId: WorkspaceId,
     workspaceRuntimeId: string,
   ): Promise<{ pruned: number; remaining: number }>
-  listSessions(userId: string, repoRoot: string, workspaceRuntimeId: string): Promise<TerminalSessionSummary[]>
+  listSessions(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): Promise<TerminalSessionSummary[]>
 }
 
 interface TerminalRuntimeActionDependencies {
@@ -114,9 +115,9 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       input: TerminalPruneInput,
     ): Promise<{ pruned: number; remaining: number }> {
       if (!isValidTerminalClientId(clientId)) return { pruned: 0, remaining: 0 }
-      if (!isValidWorkspaceLocatorInput(input.repoRoot)) return { pruned: 0, remaining: 0 }
-      assertCurrentWorkspaceRuntime(userId, input.repoRoot, input.workspaceRuntimeId)
-      return await sessionService.prune(clientId, userId, input.repoRoot, input.workspaceRuntimeId)
+      if (!isValidWorkspaceLocatorInput(input.workspaceId)) return { pruned: 0, remaining: 0 }
+      assertCurrentWorkspaceRuntime(userId, input.workspaceId, input.workspaceRuntimeId)
+      return await sessionService.prune(clientId, userId, input.workspaceId, input.workspaceRuntimeId)
     },
 
     async write(clientId: string, userId: string, input: TerminalWriteInput): Promise<TerminalWriteResult> {
@@ -163,7 +164,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
           terminalRuntimeSessionId: input.terminalRuntimeSessionId,
           terminalRuntimeGeneration: session.terminalRuntimeGeneration,
           terminalSessionId: session.terminalSessionId,
-          repoRoot: terminalSessionCoordinates(session).repoRoot,
+          workspaceId: terminalSessionCoordinates(session).workspaceId,
         })
       }
       return closed
@@ -186,11 +187,11 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       userId: string,
       input: TerminalListSessionsInput,
     ): Promise<TerminalSessionsSnapshot> {
-      if (!isValidTerminalClientId(clientId) || !isValidWorkspaceLocatorInput(input.repoRoot)) {
+      if (!isValidTerminalClientId(clientId) || !isValidWorkspaceLocatorInput(input.workspaceId)) {
         return { revision: 0, sessions: [] }
       }
-      assertCurrentWorkspaceRuntime(userId, input.repoRoot, input.workspaceRuntimeId)
-      const scope = terminalSessionRuntimeScope(input.repoRoot, input.workspaceRuntimeId)
+      assertCurrentWorkspaceRuntime(userId, input.workspaceId, input.workspaceRuntimeId)
+      const scope = terminalSessionRuntimeScope(input.workspaceId, input.workspaceRuntimeId)
       return manager.terminalSessionsSnapshotForUser(userId, scope)
     },
 
@@ -200,14 +201,14 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       input: TerminalListSessionsInput,
     ): Promise<TerminalSessionSummary[]> {
       if (!isValidTerminalClientId(clientId)) return []
-      if (!isValidWorkspaceLocatorInput(input.repoRoot)) return []
-      assertCurrentWorkspaceRuntime(userId, input.repoRoot, input.workspaceRuntimeId)
-      return await sessionService.listSessions(userId, input.repoRoot, input.workspaceRuntimeId)
+      if (!isValidWorkspaceLocatorInput(input.workspaceId)) return []
+      assertCurrentWorkspaceRuntime(userId, input.workspaceId, input.workspaceRuntimeId)
+      return await sessionService.listSessions(userId, input.workspaceId, input.workspaceRuntimeId)
     },
   }
 
-  function assertCurrentWorkspaceRuntime(userId: string, repoRoot: string, workspaceRuntimeId: string): void {
-    if (!isCurrentWorkspaceRuntimeOpen(userId, repoRoot, workspaceRuntimeId)) {
+  function assertCurrentWorkspaceRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
+    if (!isCurrentWorkspaceRuntimeOpen(userId, workspaceId, workspaceRuntimeId)) {
       throw new Error('error.workspace-runtime-stale')
     }
   }

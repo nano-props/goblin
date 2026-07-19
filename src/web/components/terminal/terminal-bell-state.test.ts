@@ -74,7 +74,7 @@ describe('terminal bell state', () => {
       body: 'feature/test\nzsh',
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: terminalDescriptorWorktreeKey(descriptor),
-      repoRoot: terminalSessionCoordinates(descriptor).repoRoot,
+      workspaceId: terminalSessionCoordinates(descriptor).workspaceId,
     })
 
     hasFocus.mockRestore()
@@ -101,7 +101,7 @@ describe('terminal bell state', () => {
       body: 'feature/test\n~/Developer/goblin — npm run dev',
       terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: terminalDescriptorWorktreeKey(descriptor),
-      repoRoot: terminalSessionCoordinates(descriptor).repoRoot,
+      workspaceId: terminalSessionCoordinates(descriptor).workspaceId,
     })
 
     hasFocus.mockRestore()

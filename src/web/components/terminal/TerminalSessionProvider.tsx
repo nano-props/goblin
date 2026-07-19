@@ -71,8 +71,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     // keeps its projection visible until that close command settles.
     const offSessionClosed = terminalClient.onSessionClosed((event) => {
       projection.handleSessionClosed(event)
-      const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[event.repoRoot]?.workspaceRuntimeId
-      if (typeof workspaceRuntimeId === 'string') refreshWorkspacePaneTabs(event.repoRoot, workspaceRuntimeId)
+      const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[event.workspaceId]?.workspaceRuntimeId
+      if (typeof workspaceRuntimeId === 'string') refreshWorkspacePaneTabs(event.workspaceId, workspaceRuntimeId)
     })
 
     const disposeCommandBridge = setTerminalSessionCommandBridge({

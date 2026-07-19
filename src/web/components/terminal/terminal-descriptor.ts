@@ -22,5 +22,5 @@ export function terminalDescriptor(
 
 export function terminalDescriptorWorktreeKey(descriptor: TerminalDescriptor): string {
   const coordinates = terminalExecutionCoordinates(descriptor.target)
-  return formatTerminalWorktreeKey(coordinates.repoRoot, coordinates.worktreeId)
+  return formatTerminalWorktreeKey(coordinates.workspaceId, coordinates.worktreeId)
 }

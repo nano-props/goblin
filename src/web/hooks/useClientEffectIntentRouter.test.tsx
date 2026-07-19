@@ -474,7 +474,7 @@ describe('useClientEffectIntentRouter', () => {
       if (!branchName) throw new Error('expected Git worktree terminal fixture')
       visibleSessionIds = [...visibleSessionIds, terminalSessionId]
       workspacePaneTabsTestBridge.addRuntimeTab({
-        workspaceId: coordinates.repoRoot,
+        workspaceId: coordinates.workspaceId,
         workspaceRuntimeId: coordinates.workspaceRuntimeId,
         branchName,
         worktreePath: terminalExecutionPath(base.target),

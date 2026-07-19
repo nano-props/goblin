@@ -3,6 +3,7 @@ import {
   type TerminalCreateInput,
   type TerminalCreateResult,
 } from '#/shared/terminal-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type {
   TerminalSessionEnsureInput,
@@ -33,7 +34,7 @@ interface TerminalSessionCreatorOptions {
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     signal: AbortSignal,
   ): Promise<TerminalSessionEnsureResult>
-  isCurrentWorkspaceRuntime(userId: string, repoRoot: string, workspaceRuntimeId: string): boolean
+  isCurrentWorkspaceRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean
 }
 
 class TerminalSessionCreator {
@@ -53,14 +54,14 @@ class TerminalSessionCreator {
   }): Promise<ServerTerminalCreateResult> {
     const signal = input.signal
     const coordinates = terminalExecutionCoordinates(input.request.target)
-    const sessionScope = terminalSessionRuntimeScope(coordinates.repoRoot, coordinates.workspaceRuntimeId)
+    const sessionScope = terminalSessionRuntimeScope(coordinates.workspaceId, coordinates.workspaceRuntimeId)
     const worktreeId = coordinates.worktreeId
     return await this.options.createCoordinator.runInWorktreeQueue(
       { userId: input.userId, scope: sessionScope, worktreeId },
       async () => {
         if (signal.aborted) return { ok: false, message: 'error.workspace-runtime-stale' }
         if (
-          !this.options.isCurrentWorkspaceRuntime(input.userId, coordinates.repoRoot, coordinates.workspaceRuntimeId)
+          !this.options.isCurrentWorkspaceRuntime(input.userId, coordinates.workspaceId, coordinates.workspaceRuntimeId)
         ) {
           return { ok: false, message: 'error.workspace-runtime-stale' }
         }
@@ -81,7 +82,7 @@ class TerminalSessionCreator {
         )
         if (!createResult.ok) return { ok: false, message: createResult.message }
         if (
-          !this.options.isCurrentWorkspaceRuntime(input.userId, coordinates.repoRoot, coordinates.workspaceRuntimeId)
+          !this.options.isCurrentWorkspaceRuntime(input.userId, coordinates.workspaceId, coordinates.workspaceRuntimeId)
         ) {
           createResult.admission.abort()
           return { ok: false, message: 'error.workspace-runtime-stale' }

@@ -68,7 +68,7 @@ export function handleTerminalBellClickIntent(
   event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
   deps: TerminalBellIntentDeps,
 ): void {
-  const repo = useWorkspacesStore.getState().workspaces[event.repoRoot]
+  const repo = useWorkspacesStore.getState().workspaces[event.workspaceId]
   const branchModel = repo && event.terminalWorktreeKey ? readRepoBranchQueryProjection(repo) : null
   const plan = createTerminalBellIntentPlan(repo, branchModel, event)
   if (plan.kind === 'noop' || plan.kind === 'unavailable') return

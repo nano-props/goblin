@@ -1420,8 +1420,8 @@ describe('projection refresh request ordering', () => {
 
   test('repo read-model projection refresh prunes terminal sessions to current worktree paths', async () => {
     const workspaceRuntimeId = seedRepo([branch('stale', undefined, { worktree: { path: '/tmp/stale-worktree' } })])
-    const calls: Array<{ workspaceId: string }> = []
-    ipcHandlers['terminal.prune'] = async (input: { workspaceId: string }) => {
+    const calls: Array<{ repoRoot: string; workspaceRuntimeId: string }> = []
+    ipcHandlers['terminal.prune'] = async (input: { repoRoot: string; workspaceRuntimeId: string }) => {
       calls.push(input)
       return { pruned: 1, remaining: 1 }
     }
@@ -1439,7 +1439,7 @@ describe('projection refresh request ordering', () => {
 
     expect(calls).toEqual([
       expect.objectContaining({
-        workspaceId: REPO_ID,
+        repoRoot: REPO_ID,
       }),
     ])
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!

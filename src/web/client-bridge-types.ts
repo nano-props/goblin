@@ -24,6 +24,7 @@ import type {
   TerminalSessionsSnapshot,
   TerminalSessionsChangedEvent,
 } from '#/shared/terminal-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type {
   WorkspacePaneTabsChangedRealtimeMessage,
   WorkspacePaneTabsListInput,
@@ -45,7 +46,7 @@ export interface ClientTerminal {
   write: (input: TerminalWriteInput) => Promise<TerminalWriteResult>
   resize: (input: TerminalResizeInput) => Promise<TerminalMutationResult>
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
-  pruneTerminals: (repoRoot: string, workspaceRuntimeId: string) => Promise<{ pruned: number; remaining: number }>
+  pruneTerminals: (workspaceId: WorkspaceId, workspaceRuntimeId: string) => Promise<{ pruned: number; remaining: number }>
   recoverSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionsSnapshot>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
   sendTestNotification: (input: TerminalTestNotificationInput) => Promise<boolean>
@@ -71,7 +72,7 @@ export interface ClientTerminal {
       terminalRuntimeSessionId: string
       terminalRuntimeGeneration: number
       terminalSessionId: string
-      repoRoot: string
+      workspaceId: WorkspaceId
     }) => void,
   ) => () => void
 }

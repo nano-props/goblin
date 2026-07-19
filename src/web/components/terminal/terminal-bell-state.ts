@@ -64,7 +64,7 @@ export function createTerminalBellState(
       // The in-app unread state above is published immediately.
       if (now - lastNotifiedAt < BELL_NOTIFICATION_THROTTLE_MS) return
       lastSystemNotificationAtByTerminalSessionId.set(descriptor.terminalSessionId, now)
-      const repoName = lastPathSegment(terminalSessionCoordinates(descriptor).repoRoot)
+      const repoName = lastPathSegment(terminalSessionCoordinates(descriptor).workspaceId)
       const bodyParts = terminalPresentationBranch(descriptor.presentation)
         ? [terminalPresentationBranch(descriptor.presentation)]
         : []
@@ -77,7 +77,7 @@ export function createTerminalBellState(
           body: bodyParts.join('\n'),
           terminalSessionId: descriptor.terminalSessionId,
           terminalWorktreeKey: terminalDescriptorWorktreeKey(descriptor),
-          repoRoot: terminalSessionCoordinates(descriptor).repoRoot,
+          workspaceId: terminalSessionCoordinates(descriptor).workspaceId,
         })
         .catch(() => {})
     },

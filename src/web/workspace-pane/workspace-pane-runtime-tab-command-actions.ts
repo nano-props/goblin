@@ -255,7 +255,7 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
   if (!terminal.bridge) return false
   const { base, bridge } = terminal
   const coordinates = terminalExecutionCoordinates(base.target)
-  const terminalWorktreeKey = formatTerminalWorktreeKey(coordinates.repoRoot, coordinates.worktreeId)
+  const terminalWorktreeKey = formatTerminalWorktreeKey(coordinates.workspaceId, coordinates.worktreeId)
   const worktree = bridge.terminalWorktreeSnapshot(terminalWorktreeKey)
   if (worktree.createPending) return true
   if (worktree.count > 0) {
@@ -298,7 +298,7 @@ function terminalCoordinatorTarget(base: TerminalSessionBase): WorkspacePaneActi
   const coordinates = terminalExecutionCoordinates(base.target)
   const workspaceRoot = base.target.kind === 'workspace-root'
   return workspacePaneActionTargetFromCoordinates({
-    workspaceId: coordinates.repoRoot,
+    workspaceId: coordinates.workspaceId,
     workspaceRuntimeId: coordinates.workspaceRuntimeId,
     branchName: workspaceRoot ? null : terminalPresentationBranch(base.presentation),
     worktreePath: workspaceRoot ? null : terminalExecutionPath(base.target),

@@ -60,21 +60,21 @@ export function projectCreateResultForClient(
 }
 
 export function projectServerTerminalSession(input: {
-  repoRoot: string
+  workspaceId: string
   workspaceRuntimeId: string
   serverSession: ServerTerminalSessionSummary
   clientId: string
   index: number
 }): ProjectedServerTerminalSession | null {
   const coordinates = terminalExecutionCoordinates(input.serverSession.target)
-  if (coordinates.repoRoot !== input.repoRoot) return null
+  if (coordinates.workspaceId !== input.workspaceId) return null
   if (coordinates.workspaceRuntimeId !== input.workspaceRuntimeId) return null
   const descriptor = terminalDescriptor(
     terminalSessionBase(input.serverSession.target, input.serverSession.presentation),
     input.serverSession.terminalSessionId,
     input.index,
   )
-  const terminalWorktree = formatTerminalWorktreeKey(coordinates.repoRoot, coordinates.worktreeId)
+  const terminalWorktree = formatTerminalWorktreeKey(coordinates.workspaceId, coordinates.worktreeId)
   const controller = resolveTerminalController(input.serverSession.controller, input.clientId)
   return {
     descriptor,

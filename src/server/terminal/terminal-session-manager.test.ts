@@ -635,7 +635,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     })
     expect(onSessionsProjectionChanged).toHaveBeenCalledTimes(2)
     expect(onSessionsProjectionChanged).toHaveBeenLastCalledWith(USER_ID, {
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       revision: 2,
     })
@@ -757,7 +757,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     ])
     expect(onSessionsProjectionChanged).toHaveBeenCalledTimes(2)
     expect(onSessionsProjectionChanged).toHaveBeenLastCalledWith(USER_ID, {
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       revision: 2,
     })
@@ -1000,7 +1000,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     })
     const onSessionClosed = vi.fn()
     const manager = createManager(supervisor, { onSessionClosed })
-    const scope = terminalSessionRuntimeScope('goblin+file:///repo', 'repo-runtime-test')
+    const scope = terminalSessionRuntimeScope(WORKSPACE_ID, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
       target: WORKTREE_TARGET,
@@ -1035,7 +1035,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     supervisor.killAndWait = killAndWait
     const onSessionClosed = vi.fn()
     const manager = createManager(supervisor, { onSessionClosed })
-    const repoRoot = 'goblin+file:///repo'
+    const repoRoot = WORKSPACE_ID
     const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
@@ -1081,7 +1081,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const supervisor = createDeferredPtySupervisor()
     supervisor.killAndWait = vi.fn(async () => {})
     const manager = createManager(supervisor)
-    const linkedRepoRoot = 'goblin+file:///repo-linked'
+    const linkedRepoRoot = requiredWorkspaceLocator('goblin+file:///repo-linked')
     const physicalWorktreePath = '/repo-linked/worktree'
     const scope = terminalSessionRuntimeScope(linkedRepoRoot, 'repo-runtime-linked')
     const pending = ensureSession(manager, {
@@ -1114,7 +1114,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     })
     supervisor.killAndWait = vi.fn(async () => await killAcknowledged)
     const manager = createManager(supervisor)
-    const repoRoot = 'goblin+file:///repo'
+    const repoRoot = WORKSPACE_ID
     const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
     const pendingCreate = ensureSession(manager, {
       userId: USER_ID,
@@ -1152,7 +1152,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     })
     supervisor.killAndWait = killAndWait
     const manager = createManager(supervisor)
-    const repoRoot = 'goblin+file:///repo'
+    const repoRoot = WORKSPACE_ID
     const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
@@ -1194,7 +1194,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const killAndWait = vi.fn(async () => await killAcknowledged.promise)
     supervisor.killAndWait = killAndWait
     const manager = createManager(supervisor)
-    const repoRoot = 'goblin+file:///repo'
+    const repoRoot = WORKSPACE_ID
     const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
     const controller = new AbortController()
     const pendingCreate = ensureSession(manager, {
@@ -1236,7 +1236,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     killAndWait.mockRejectedValueOnce(new Error('PTY close timed out'))
     supervisor.killAndWait = killAndWait
     const manager = createManager(supervisor)
-    const repoRoot = 'goblin+file:///repo'
+    const repoRoot = WORKSPACE_ID
     const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
     const controller = new AbortController()
     const pendingCreate = ensureSession(manager, {
@@ -1285,7 +1285,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const termination = Promise.withResolvers<void>()
     supervisor.killAndWait = vi.fn(async () => await termination.promise)
     const manager = createManager(supervisor)
-    const scope = terminalSessionRuntimeScope('goblin+file:///repo', 'repo-runtime-test')
+    const scope = terminalSessionRuntimeScope(WORKSPACE_ID, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
       target: WORKTREE_TARGET,
@@ -1322,7 +1322,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     })
     supervisor.killAndWait = killAndWait
     const manager = createManager(supervisor)
-    const scope = terminalSessionRuntimeScope('goblin+file:///repo', 'repo-runtime-test')
+    const scope = terminalSessionRuntimeScope(WORKSPACE_ID, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
       target: WORKTREE_TARGET,
@@ -1362,7 +1362,7 @@ describe('TerminalSessionManager membership catalog', () => {
     const supervisor = createDeferredPtySupervisor()
     supervisor.processName = vi.fn(() => 'terminal')
     const manager = createManager(supervisor)
-    const scope = terminalSessionRuntimeScope('goblin+file:///repo', 'repo-runtime-test')
+    const scope = terminalSessionRuntimeScope(WORKSPACE_ID, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
       target: WORKTREE_TARGET,
@@ -1391,7 +1391,7 @@ describe('TerminalSessionManager membership catalog', () => {
   test('does not advance the projection revision for incremental runtime details', async () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = createManager(supervisor)
-    const scope = terminalSessionRuntimeScope('goblin+file:///repo', 'repo-runtime-test')
+    const scope = terminalSessionRuntimeScope(WORKSPACE_ID, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
       target: WORKTREE_TARGET,

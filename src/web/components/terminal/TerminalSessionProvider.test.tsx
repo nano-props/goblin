@@ -8,7 +8,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { WorkspacePaneTabsChangedRealtimeMessage } from '#/shared/workspace-pane-tabs.ts'
 import type { TerminalExecutionTarget } from '#/shared/terminal-types.ts'
-import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { canonicalWorkspaceLocator, parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
 import { setTerminalSessionProjectionForTests } from '#/web/components/terminal/TerminalSessionProjection.ts'
@@ -331,7 +331,13 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
   return { TerminalSession }
 })
 
-const REPO_ID = 'goblin+file:///tmp/goblin-terminal-provider-repo'
+function workspaceIdFixture(input: string) {
+  const workspaceId = canonicalWorkspaceLocator(input)
+  if (!workspaceId) throw new Error('invalid workspace locator fixture')
+  return workspaceId
+}
+
+const REPO_ID = workspaceIdFixture('goblin+file:///tmp/goblin-terminal-provider-repo')
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/goblin-terminal-provider-worktree'
 
@@ -340,7 +346,7 @@ function terminalExitEvent(terminalSessionId: string): TerminalExitEvent {
     terminalRuntimeSessionId: terminalSessionId,
     terminalRuntimeGeneration: 1,
     terminalSessionId,
-    repoRoot: REPO_ID,
+    workspaceId: REPO_ID,
     workspaceRuntimeId: useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
   }
 }
@@ -359,12 +365,12 @@ let sessionClosedHandler:
       terminalRuntimeSessionId: string
       terminalRuntimeGeneration: number
       terminalSessionId: string
-      repoRoot: string
+      workspaceId: typeof REPO_ID
     }) => void)
   | null = null
 type TestTerminalSessionSummary = TerminalSessionSummary
 const listSessionsMock = vi.fn<
-  (...args: Array<{ repoRoot: string; workspaceRuntimeId?: string }>) => Promise<TestTerminalSessionSummary[]>
+  (...args: Array<{ workspaceId: typeof REPO_ID; workspaceRuntimeId?: string }>) => Promise<TestTerminalSessionSummary[]>
 >(async () => [])
 const listWorkspaceTabsMock = vi.fn<(...args: Array<{ workspaceId: string }>) => Promise<WorkspacePaneTabsEntry[]>>(
   async () => [],
@@ -424,7 +430,7 @@ async function emitSessionsChanged(workspaceId = REPO_ID): Promise<void> {
   await act(async () => {
     const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[workspaceId]?.workspaceRuntimeId
     if (workspaceRuntimeId)
-      sessionsChangedHandler?.({ repoRoot: workspaceId, workspaceRuntimeId, revision: ++sessionsChangedRevision })
+      sessionsChangedHandler?.({ workspaceId, workspaceRuntimeId, revision: ++sessionsChangedRevision })
     await waitForScheduledServerSync()
   })
 }
@@ -483,7 +489,7 @@ beforeEach(() => {
         ? ({ kind: 'workspace-root' } as const)
         : ({ kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH_NAME } } as const)
     const currentSessions = await listSessionsMock({
-      repoRoot: workspaceId,
+      workspaceId,
       workspaceRuntimeId,
     })
     const allocatedSessionId =
@@ -640,7 +646,7 @@ beforeEach(() => {
         notifyBell: vi.fn(async () => true),
         setBadge: vi.fn(async () => {}),
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-        recoverSessions: async (input: { repoRoot: string }) => ({
+        recoverSessions: async (input: { workspaceId: typeof REPO_ID }) => ({
           revision: Math.max(1, sessionsChangedRevision),
           sessions: completeServerSessions(await listSessionsMock(input)),
         }),
@@ -796,7 +802,7 @@ beforeEach(() => {
             terminalRuntimeSessionId: string
             terminalRuntimeGeneration: number
             terminalSessionId: string
-            repoRoot: string
+            workspaceId: typeof REPO_ID
           }) => void,
         ) => {
           sessionClosedHandler = cb
@@ -936,7 +942,7 @@ describe('TerminalSessionProvider', () => {
           terminalRuntimeSessionId: 'term-111111111111111111111',
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           processName: 'zsh',
           canonicalTitle: '~/Developer/goblin — npm run dev',
         })
@@ -1006,7 +1012,7 @@ describe('TerminalSessionProvider', () => {
           terminalRuntimeSessionId: 'term-111111111111111111111',
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           processName: 'zsh',
           canonicalTitle: null,
         })
@@ -1054,7 +1060,7 @@ describe('TerminalSessionProvider', () => {
           terminalRuntimeSessionId: 'term-111111111111111111111',
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           processName: 'zsh',
           canonicalTitle: 'build running',
         })
@@ -1116,7 +1122,7 @@ describe('TerminalSessionProvider', () => {
           terminalRuntimeSessionId: 'term-111111111111111111111',
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           canonicalTitle: '~/Developer/goblin — npm run dev',
         })
         identityHandler?.({
@@ -1235,7 +1241,7 @@ describe('TerminalSessionProvider', () => {
           terminalRuntimeSessionId: 'term-111111111111111111111',
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           processName: 'zsh',
           canonicalTitle: '~/Developer/goblin — npm run dev',
         })
@@ -1358,7 +1364,7 @@ describe('TerminalSessionProvider', () => {
           terminalRuntimeSessionId: 'server_session_1',
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
         })
       })
 

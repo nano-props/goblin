@@ -26,21 +26,21 @@ class TerminalSessionPruner {
 
   async prune(input: {
     userId: string
-    repoRoot: string
+    workspaceId: string
     scope: string
     assertCurrent: () => void
   }): Promise<{ pruned: number; remaining: number }> {
     const allSessions = await this.manager.listSessionsForUser(input.userId, input.scope)
-    if (isRemoteWorkspaceId(input.repoRoot)) return { pruned: 0, remaining: allSessions.length }
+    if (isRemoteWorkspaceId(input.workspaceId)) return { pruned: 0, remaining: allSessions.length }
 
-    const workspacePath = localWorkspaceNativePath(input.repoRoot)
+    const workspacePath = localWorkspaceNativePath(input.workspaceId)
     if (!workspacePath) throw new Error('error.workspace-locator-malformed')
     const worktrees = await getWorktrees(workspacePath, { includeStatus: false })
     input.assertCurrent()
     const liveWorktreePaths = new Set(worktrees.map((worktree) => path.resolve(worktree.path)))
     let pruned = 0
     for (const session of allSessions) {
-      if (terminalSessionCoordinates(session).repoRoot !== input.repoRoot) continue
+      if (terminalSessionCoordinates(session).workspaceId !== input.workspaceId) continue
       if (liveWorktreePaths.has(path.resolve(terminalExecutionPath(session.target)))) continue
       if (await this.manager.requestSessionRetirement(session.terminalRuntimeSessionId)) pruned += 1
     }

@@ -14,6 +14,7 @@ import type {
   TerminalSessionSummary as ServerTerminalSessionSummary,
   TerminalSessionsSnapshot,
   TerminalTitleEvent,
+  WorkspaceRuntimeScope,
 } from '#/shared/terminal-types.ts'
 import {
   projectCreateResultForClient,
@@ -107,7 +108,7 @@ interface ResolvedTerminalCreateOptions {
  * survive StrictMode; the singleton removes that dance entirely.
  */
 interface TerminalRuntimeBindingIdentity {
-  repoRoot: string
+  workspaceId: string
   workspaceRuntimeId: string
   worktreeId: string
   terminalSessionId: string
@@ -122,7 +123,7 @@ interface TerminalCloseOperation {
 
 function terminalRuntimeBindingKey(binding: TerminalRuntimeBindingIdentity): string {
   return JSON.stringify([
-    binding.repoRoot,
+    binding.workspaceId,
     binding.workspaceRuntimeId,
     binding.worktreeId,
     binding.terminalSessionId,
@@ -139,18 +140,18 @@ function terminalRealtimeEventBindingKey(event: {
   return JSON.stringify([event.terminalSessionId, event.terminalRuntimeSessionId, event.terminalRuntimeGeneration])
 }
 
-function terminalRuntimeMembershipKey(repoRoot: string, workspaceRuntimeId: string): string {
-  return JSON.stringify([repoRoot, workspaceRuntimeId])
+function terminalRuntimeMembershipKey(workspaceId: string, workspaceRuntimeId: string): string {
+  return JSON.stringify([workspaceId, workspaceRuntimeId])
 }
 
 function retiredTerminalRuntimeMembershipKeys(
   previous: TerminalRuntimeMembershipIndex,
   next: TerminalRuntimeMembershipIndex,
 ): string[] {
-  return Object.entries(previous).flatMap(([repoRoot, repo]) =>
-    next[repoRoot]?.workspaceRuntimeId === repo.workspaceRuntimeId
+  return Object.entries(previous).flatMap(([workspaceId, repo]) =>
+    next[workspaceId]?.workspaceRuntimeId === repo.workspaceRuntimeId
       ? []
-      : [terminalRuntimeMembershipKey(repoRoot, repo.workspaceRuntimeId)],
+      : [terminalRuntimeMembershipKey(workspaceId, repo.workspaceRuntimeId)],
   )
 }
 
@@ -164,7 +165,7 @@ export class TerminalSessionProjection {
     string,
     { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number }
   >()
-  private readonly terminalSessionsCatalogCoverageByRepoRoot = new Map<
+  private readonly terminalSessionsCatalogCoverageByWorkspaceId = new Map<
     string,
     { workspaceRuntimeId: string; revision: number }
   >()
@@ -263,7 +264,7 @@ export class TerminalSessionProjection {
     this.sessions.clear()
     this.terminalSessionIdByTerminalRuntimeSessionId.clear()
     this.terminalRuntimeBindingByTerminalSessionId.clear()
-    this.terminalSessionsCatalogCoverageByRepoRoot.clear()
+    this.terminalSessionsCatalogCoverageByWorkspaceId.clear()
     this.selectedTerminalSessionIdByTerminalWorktree.clear()
     this.preferredSelectedTerminalSessionIdByTerminalWorktree.clear()
     this.hostByWorktree.clear()
@@ -378,7 +379,7 @@ export class TerminalSessionProjection {
       return
     }
     if (
-      terminalSessionCoordinates(classified.session.descriptor).repoRoot !== event.repoRoot ||
+      terminalSessionCoordinates(classified.session.descriptor).workspaceId !== event.workspaceId ||
       terminalSessionCoordinates(classified.session.descriptor).workspaceRuntimeId !== event.workspaceRuntimeId
     ) {
       return
@@ -450,28 +451,28 @@ export class TerminalSessionProjection {
   }
 
   reconcileServerSessions(
-    scope: { repoRoot: string; workspaceRuntimeId: string },
+    scope: WorkspaceRuntimeScope,
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
   ): boolean {
-    if (this.runtimeMembershipIndex[scope.repoRoot]?.workspaceRuntimeId !== scope.workspaceRuntimeId) return false
+    if (this.runtimeMembershipIndex[scope.workspaceId]?.workspaceRuntimeId !== scope.workspaceRuntimeId) return false
 
     const { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees } =
       this.materializeServerSessions(scope, serverSessions, clientId)
 
     const authoritativeServerSessions = serverSessions.filter((session) => {
       const coordinates = terminalSessionCoordinates(session)
-      return coordinates.repoRoot === scope.repoRoot && coordinates.workspaceRuntimeId === scope.workspaceRuntimeId
+      return coordinates.workspaceId === scope.workspaceId && coordinates.workspaceRuntimeId === scope.workspaceRuntimeId
     })
     const serverTerminalSessionIds = new Set(authoritativeServerSessions.map((session) => session.terminalSessionId))
     this.evictOrphanedLocalSessions(scope, serverTerminalSessionIds)
     this.futureExitOrphans.confirmAuthoritativeSnapshot(
-      terminalRuntimeMembershipKey(scope.repoRoot, scope.workspaceRuntimeId),
+      terminalRuntimeMembershipKey(scope.workspaceId, scope.workspaceRuntimeId),
       authoritativeServerSessions.map((session) => ({
         terminalSessionId: session.terminalSessionId,
         terminalRuntimeSessionId: session.terminalRuntimeSessionId,
         terminalRuntimeGeneration: session.terminalRuntimeGeneration,
-        repoRoot: scope.repoRoot,
+        workspaceId: scope.workspaceId,
         workspaceRuntimeId: scope.workspaceRuntimeId,
       })),
     )
@@ -484,35 +485,35 @@ export class TerminalSessionProjection {
   }
 
   reconcileServerSessionsSnapshot(
-    scope: { repoRoot: string; workspaceRuntimeId: string },
+    scope: WorkspaceRuntimeScope,
     snapshot: TerminalSessionsSnapshot,
     clientId: string,
   ): boolean {
-    const current = this.terminalSessionsCatalogCoverageByRepoRoot.get(scope.repoRoot)
+    const current = this.terminalSessionsCatalogCoverageByWorkspaceId.get(scope.workspaceId)
     if (current?.workspaceRuntimeId === scope.workspaceRuntimeId && snapshot.revision < current.revision) return false
     if (!this.reconcileServerSessions(scope, snapshot.sessions, clientId)) return false
-    this.terminalSessionsCatalogCoverageByRepoRoot.set(scope.repoRoot, {
+    this.terminalSessionsCatalogCoverageByWorkspaceId.set(scope.workspaceId, {
       workspaceRuntimeId: scope.workspaceRuntimeId,
       revision: snapshot.revision,
     })
     return true
   }
 
-  terminalSessionsCatalogCoverageRevision(scope: { repoRoot: string; workspaceRuntimeId: string }): number | null {
-    const current = this.terminalSessionsCatalogCoverageByRepoRoot.get(scope.repoRoot)
+  terminalSessionsCatalogCoverageRevision(scope: WorkspaceRuntimeScope): number | null {
+    const current = this.terminalSessionsCatalogCoverageByWorkspaceId.get(scope.workspaceId)
     return current?.workspaceRuntimeId === scope.workspaceRuntimeId ? current.revision : null
   }
 
   applyTerminalSessionsDeltaRevision(
-    scope: { repoRoot: string; workspaceRuntimeId: string },
+    scope: WorkspaceRuntimeScope,
     revision: number,
   ): boolean {
-    if (this.runtimeMembershipIndex[scope.repoRoot]?.workspaceRuntimeId !== scope.workspaceRuntimeId) return false
-    const current = this.terminalSessionsCatalogCoverageByRepoRoot.get(scope.repoRoot)
+    if (this.runtimeMembershipIndex[scope.workspaceId]?.workspaceRuntimeId !== scope.workspaceRuntimeId) return false
+    const current = this.terminalSessionsCatalogCoverageByWorkspaceId.get(scope.workspaceId)
     const coverageRevision = current?.workspaceRuntimeId === scope.workspaceRuntimeId ? current.revision : 0
     if (revision <= coverageRevision) return true
     if (revision !== coverageRevision + 1) return true
-    this.terminalSessionsCatalogCoverageByRepoRoot.set(scope.repoRoot, {
+    this.terminalSessionsCatalogCoverageByWorkspaceId.set(scope.workspaceId, {
       workspaceRuntimeId: scope.workspaceRuntimeId,
       revision,
     })
@@ -520,13 +521,13 @@ export class TerminalSessionProjection {
   }
 
   private applyServerSessionEffect(
-    scope: { repoRoot: string; workspaceRuntimeId: string },
+    scope: WorkspaceRuntimeScope,
     effect: TerminalProjectionEffect,
     serverSession: ServerTerminalSessionSummary,
     clientId: string,
   ): boolean {
-    if (this.runtimeMembershipIndex[scope.repoRoot]?.workspaceRuntimeId !== scope.workspaceRuntimeId) return false
-    const current = this.terminalSessionsCatalogCoverageByRepoRoot.get(scope.repoRoot)
+    if (this.runtimeMembershipIndex[scope.workspaceId]?.workspaceRuntimeId !== scope.workspaceRuntimeId) return false
+    const current = this.terminalSessionsCatalogCoverageByWorkspaceId.get(scope.workspaceId)
     const coverageRevision = current?.workspaceRuntimeId === scope.workspaceRuntimeId ? current.revision : 0
     if (effect.kind === 'delta' && effect.revision <= coverageRevision) return false
     const { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees } =
@@ -537,7 +538,7 @@ export class TerminalSessionProjection {
     this.resolveSelectedTerminalSessionIdsForTouchedWorktrees(touchedWorktrees, controllerTerminalSessionIdByWorktree)
     for (const terminalWorktreeKey of tabsChangedWorktrees) this.notifyWorktree(terminalWorktreeKey)
     if (effect.kind === 'delta' && effect.revision === coverageRevision + 1) {
-      this.terminalSessionsCatalogCoverageByRepoRoot.set(scope.repoRoot, {
+      this.terminalSessionsCatalogCoverageByWorkspaceId.set(scope.workspaceId, {
         workspaceRuntimeId: scope.workspaceRuntimeId,
         revision: effect.revision,
       })
@@ -550,7 +551,7 @@ export class TerminalSessionProjection {
   // which worktrees saw any change. Side effects: ensureSession,
   // session.hydrate, terminalSessionIdsByTerminalWorktree, syncTerminalRuntimeSessionIdIndex.
   private materializeServerSessions(
-    scope: { repoRoot: string; workspaceRuntimeId: string },
+    scope: WorkspaceRuntimeScope,
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
     options: {
@@ -569,7 +570,7 @@ export class TerminalSessionProjection {
 
     for (const serverSession of serverSessions) {
       const coordinates = terminalSessionCoordinates(serverSession)
-      const terminalWorktreeKey = formatTerminalWorktreeKey(coordinates.repoRoot, coordinates.worktreeId)
+      const terminalWorktreeKey = formatTerminalWorktreeKey(coordinates.workspaceId, coordinates.worktreeId)
       const existingSessionIds = options.mergeIntoExisting
         ? (this.terminalSessionIdsByTerminalWorktree.get(terminalWorktreeKey) ?? [])
         : []
@@ -579,7 +580,7 @@ export class TerminalSessionProjection {
           ? existingIndex + 1
           : (nextIndexByWorktree.get(terminalWorktreeKey) ?? existingSessionIds.length) + 1
       const projected = projectServerTerminalSession({
-        repoRoot: scope.repoRoot,
+        workspaceId: scope.workspaceId,
         workspaceRuntimeId: scope.workspaceRuntimeId,
         serverSession,
         clientId,
@@ -618,13 +619,13 @@ export class TerminalSessionProjection {
   // Phase 2: the accepted catalog is the complete membership authority for
   // this workspace runtime. Pending creates live in lifecycle queues, not sessions.
   private evictOrphanedLocalSessions(
-    scope: { repoRoot: string; workspaceRuntimeId: string },
+    scope: WorkspaceRuntimeScope,
     serverTerminalSessionIds: Set<string>,
   ): number {
     const orphanedTerminalSessionIds = Array.from(this.sessions.values())
       .filter(
         (session) =>
-          terminalSessionCoordinates(session.descriptor).repoRoot === scope.repoRoot &&
+          terminalSessionCoordinates(session.descriptor).workspaceId === scope.workspaceId &&
           terminalSessionCoordinates(session.descriptor).workspaceRuntimeId === scope.workspaceRuntimeId &&
           !serverTerminalSessionIds.has(session.descriptor.terminalSessionId),
       )
@@ -663,7 +664,7 @@ export class TerminalSessionProjection {
 
   createTerminal = (base: TerminalSessionBase, options: TerminalCreateOptions = {}): Promise<string> => {
     const terminalWorktreeKey = formatTerminalWorktreeKey(
-      terminalSessionCoordinates(base).repoRoot,
+      terminalSessionCoordinates(base).workspaceId,
       terminalSessionCoordinates(base).worktreeId,
     )
     const admission = this.enqueueCreateRequest(base, terminalWorktreeKey, {
@@ -685,7 +686,7 @@ export class TerminalSessionProjection {
     placement: WorkspacePaneRuntimeTabPlacement = {},
   ): Promise<TerminalCreateAdmissionResult> => {
     const terminalWorktreeKey = formatTerminalWorktreeKey(
-      terminalSessionCoordinates(base).repoRoot,
+      terminalSessionCoordinates(base).workspaceId,
       terminalSessionCoordinates(base).worktreeId,
     )
     const admission = this.enqueueCreateRequest(base, terminalWorktreeKey, {
@@ -755,7 +756,7 @@ export class TerminalSessionProjection {
     })
     if (!openResult.ok) throw new Error(openResult.message)
     writeCanonicalWorkspacePaneTabsSnapshot(
-      terminalSessionCoordinates(base).repoRoot,
+      terminalSessionCoordinates(base).workspaceId,
       terminalSessionCoordinates(base).workspaceRuntimeId,
       openResult.paneTabsSnapshot,
     )
@@ -767,7 +768,7 @@ export class TerminalSessionProjection {
       if (this.lifecycleQueues.getCreate(terminalWorktreeKey) === pending) {
         runtimeProjectionApplied = this.applyServerSessionEffect(
           {
-            repoRoot: terminalSessionCoordinates(base).repoRoot,
+            workspaceId: terminalSessionCoordinates(base).workspaceId,
             workspaceRuntimeId: terminalSessionCoordinates(base).workspaceRuntimeId,
           },
           result.terminalProjectionEffect,
@@ -927,7 +928,7 @@ export class TerminalSessionProjection {
     for (const session of this.sessions.values()) {
       const terminalSessionId = session.descriptor.terminalSessionId
       if (
-        terminalSessionCoordinates(session.descriptor).repoRoot === workspaceId &&
+        terminalSessionCoordinates(session.descriptor).workspaceId === workspaceId &&
         this.bellState.hasBell(terminalSessionId)
       )
         count++
@@ -984,10 +985,10 @@ export class TerminalSessionProjection {
     this.sessions.get(terminalSessionId)?.restart()
   }
 
-  resynchronizeConnectedViews = (repoRoot: string, workspaceRuntimeId: string): void => {
+  resynchronizeConnectedViews = (workspaceId: string, workspaceRuntimeId: string): void => {
     for (const session of this.sessions.values()) {
       if (
-        terminalSessionCoordinates(session.descriptor).repoRoot !== repoRoot ||
+        terminalSessionCoordinates(session.descriptor).workspaceId !== workspaceId ||
         terminalSessionCoordinates(session.descriptor).workspaceRuntimeId !== workspaceRuntimeId
       )
         continue
@@ -1057,7 +1058,7 @@ export class TerminalSessionProjection {
         }
       }
     }
-    const workspaceId = parseTerminalWorktreeKey(terminalWorktreeKey)?.repoRoot
+    const workspaceId = parseTerminalWorktreeKey(terminalWorktreeKey)?.workspaceId
     if (workspaceId) this.notifyWorkspaceBellCountIfChanged(workspaceId)
   }
 
@@ -1160,7 +1161,7 @@ export class TerminalSessionProjection {
     if (pendingBinding) {
       const pendingEventBinding = {
         terminalSessionId: session.descriptor.terminalSessionId,
-        repoRoot: terminalSessionCoordinates(session.descriptor).repoRoot,
+        workspaceId: terminalSessionCoordinates(session.descriptor).workspaceId,
         workspaceRuntimeId: terminalSessionCoordinates(session.descriptor).workspaceRuntimeId,
         ...pendingBinding,
       }
@@ -1180,7 +1181,7 @@ export class TerminalSessionProjection {
     if (!binding) return true
     const eventBinding = {
       terminalSessionId: session.descriptor.terminalSessionId,
-      repoRoot: terminalSessionCoordinates(session.descriptor).repoRoot,
+      workspaceId: terminalSessionCoordinates(session.descriptor).workspaceId,
       workspaceRuntimeId: terminalSessionCoordinates(session.descriptor).workspaceRuntimeId,
       ...binding,
     }
@@ -1281,11 +1282,11 @@ export class TerminalSessionProjection {
     }
     if (!result.ok) return false
     this.applyClosedServerSessionEffect(base, result.runtime, requestedBinding)
-    void refreshWorkspacePaneTabsQueryData(terminalSessionCoordinates(base).repoRoot, workspaceRuntimeId).catch(
+    void refreshWorkspacePaneTabsQueryData(terminalSessionCoordinates(base).workspaceId, workspaceRuntimeId).catch(
       (err) => {
         terminalSessionProviderLog.warn('terminal closed but workspace pane tabs refresh failed', {
           terminalSessionId,
-          repoRoot: terminalSessionCoordinates(base).repoRoot,
+          workspaceId: terminalSessionCoordinates(base).workspaceId,
           workspaceRuntimeId,
           err,
         })
@@ -1302,7 +1303,7 @@ export class TerminalSessionProjection {
     const session = this.sessions.get(effect.terminalSessionId)
     if (!session) return
     const effectBinding: TerminalRuntimeBindingIdentity = {
-      repoRoot: terminalSessionCoordinates(base).repoRoot,
+      workspaceId: terminalSessionCoordinates(base).workspaceId,
       workspaceRuntimeId: terminalSessionCoordinates(base).workspaceRuntimeId,
       worktreeId: terminalSessionCoordinates(base).worktreeId,
       terminalSessionId: effect.terminalSessionId,
@@ -1344,13 +1345,13 @@ export class TerminalSessionProjection {
     const workspaceRuntimeId = terminalSessionCoordinates(base).workspaceRuntimeId
     const addressableBinding =
       session &&
-      terminalSessionCoordinates(session.descriptor).repoRoot === terminalSessionCoordinates(base).repoRoot &&
+      terminalSessionCoordinates(session.descriptor).workspaceId === terminalSessionCoordinates(base).workspaceId &&
       terminalSessionCoordinates(session.descriptor).workspaceRuntimeId === workspaceRuntimeId &&
       terminalSessionCoordinates(session.descriptor).worktreeId === terminalSessionCoordinates(base).worktreeId
         ? session.addressableRuntimeBinding()
         : null
     return {
-      repoRoot: terminalSessionCoordinates(base).repoRoot,
+      workspaceId: terminalSessionCoordinates(base).workspaceId,
       workspaceRuntimeId,
       worktreeId: terminalSessionCoordinates(base).worktreeId,
       terminalSessionId,
@@ -1367,7 +1368,7 @@ export class TerminalSessionProjection {
     const workspaceRuntimeId = terminalSessionCoordinates(session.descriptor).workspaceRuntimeId
     if (!workspaceRuntimeId) return null
     return {
-      repoRoot: terminalSessionCoordinates(session.descriptor).repoRoot,
+      workspaceId: terminalSessionCoordinates(session.descriptor).workspaceId,
       workspaceRuntimeId,
       worktreeId: terminalSessionCoordinates(session.descriptor).worktreeId,
       terminalSessionId: session.descriptor.terminalSessionId,
@@ -1378,7 +1379,7 @@ export class TerminalSessionProjection {
 
   private sessionMatchesRuntimeBinding(session: TerminalSession, binding: TerminalRuntimeBindingIdentity): boolean {
     return (
-      terminalSessionCoordinates(session.descriptor).repoRoot === binding.repoRoot &&
+      terminalSessionCoordinates(session.descriptor).workspaceId === binding.workspaceId &&
       terminalSessionCoordinates(session.descriptor).workspaceRuntimeId === binding.workspaceRuntimeId &&
       terminalSessionCoordinates(session.descriptor).worktreeId === binding.worktreeId &&
       session.descriptor.terminalSessionId === binding.terminalSessionId &&
@@ -1392,7 +1393,7 @@ export class TerminalSessionProjection {
     for (const operation of this.closeOperationByRuntimeBindingKey.values()) {
       const binding = operation.binding
       if (
-        binding.repoRoot !== terminalSessionCoordinates(session.descriptor).repoRoot ||
+        binding.workspaceId !== terminalSessionCoordinates(session.descriptor).workspaceId ||
         binding.workspaceRuntimeId !== terminalSessionCoordinates(session.descriptor).workspaceRuntimeId ||
         binding.worktreeId !== terminalSessionCoordinates(session.descriptor).worktreeId ||
         binding.terminalSessionId !== session.descriptor.terminalSessionId
@@ -1420,7 +1421,7 @@ export class TerminalSessionProjection {
     if (candidateSession && this.hasPendingCloseForSession(candidateSession)) return
     const session = this.sessions.get(terminalSessionId)
     const terminalWorktreeKey = formatTerminalWorktreeKey(
-      terminalSessionCoordinates(base).repoRoot,
+      terminalSessionCoordinates(base).workspaceId,
       terminalSessionCoordinates(base).worktreeId,
     )
     if (!session || terminalDescriptorWorktreeKey(session.descriptor) !== terminalWorktreeKey) return
@@ -1435,7 +1436,7 @@ export class TerminalSessionProjection {
   }
 
   private sessionBelongsToCurrentRuntimeMembership(session: TerminalSession): boolean {
-    const current = this.runtimeMembershipIndex[terminalSessionCoordinates(session.descriptor).repoRoot]
+    const current = this.runtimeMembershipIndex[terminalSessionCoordinates(session.descriptor).workspaceId]
     if (!current) return false
     return current.workspaceRuntimeId === terminalSessionCoordinates(session.descriptor).workspaceRuntimeId
   }

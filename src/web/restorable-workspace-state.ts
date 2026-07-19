@@ -268,9 +268,9 @@ function selectedTerminalSessionsForClientWorkspace(
   for (const [terminalWorktreeKey, terminalSessionId] of Object.entries(selectedTerminalSessionIdByTerminalWorktree)) {
     const parsed = parseTerminalWorktreeKey(terminalWorktreeKey)
     if (!parsed || !terminalSessionId) continue
-    const repo = workspaces[parsed.repoRoot]
+    const repo = workspaces[parsed.workspaceId]
     if (!repo) continue
-    if (parsed.worktreeId === parsed.repoRoot) {
+    if (parsed.worktreeId === parsed.workspaceId) {
       persisted[terminalWorktreeKey] = terminalSessionId
       continue
     }

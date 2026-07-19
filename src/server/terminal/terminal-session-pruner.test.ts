@@ -50,7 +50,7 @@ describe('terminal session pruner', () => {
     await expect(
       pruner.prune({
         userId: USER_ID,
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         scope: SCOPE,
         assertCurrent: vi.fn(),
       }),
@@ -77,7 +77,7 @@ describe('terminal session pruner', () => {
     await expect(
       pruner.prune({
         userId: USER_ID,
-        repoRoot: REMOTE_REPO_ROOT,
+        workspaceId: REMOTE_REPO_ROOT,
         scope: SCOPE,
         assertCurrent,
       }),
@@ -104,7 +104,7 @@ describe('terminal session pruner', () => {
     await expect(
       pruner.prune({
         userId: USER_ID,
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         scope: SCOPE,
         assertCurrent,
       }),

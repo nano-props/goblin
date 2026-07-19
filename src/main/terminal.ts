@@ -77,7 +77,7 @@ async function notifyTerminalBell(webContents: WebContents, input: TerminalNotif
     return await showNotificationWithResult(
       input.title,
       input.body,
-      input.repoRoot,
+      input.workspaceId,
       input.terminalSessionId,
       input.terminalWorktreeKey,
     )
@@ -103,7 +103,7 @@ async function notifyTerminalBell(webContents: WebContents, input: TerminalNotif
 function showNotificationWithResult(
   title: string,
   body: string,
-  repoRoot: string | null,
+  workspaceId: string | null,
   terminalSessionId?: string,
   terminalWorktreeKey?: string,
 ): Promise<boolean> {
@@ -121,10 +121,10 @@ function showNotificationWithResult(
     notif.once('failed', () => settle(false))
     notif.once('click', () => {
       // Bring the window to the foreground, then tell the client to switch
-      // to the repo and open the terminal view (only when repoRoot is known).
+      // to the workspace and open the terminal view (only when workspaceId is known).
       void activatePrimaryWindow().catch(() => {})
-      if (repoRoot)
-        broadcastClientEffectIntent({ type: 'terminal-bell-click', repoRoot, terminalSessionId, terminalWorktreeKey })
+      if (workspaceId)
+        broadcastClientEffectIntent({ type: 'terminal-bell-click', workspaceId, terminalSessionId, terminalWorktreeKey })
     })
     notif.show()
   })

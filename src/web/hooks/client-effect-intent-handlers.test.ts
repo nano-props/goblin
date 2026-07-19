@@ -55,7 +55,7 @@ describe('client effect intent handlers', () => {
     handleTerminalBellClickIntent(
       {
         type: 'terminal-bell-click',
-        repoRoot: REPO_ID,
+        workspaceId: REPO_ID,
         terminalSessionId: 'term-queryqueryqueryquery1',
         terminalWorktreeKey: formatTerminalWorktreeKeyForPath(REPO_ID, '/tmp/bell-worktree'),
       },

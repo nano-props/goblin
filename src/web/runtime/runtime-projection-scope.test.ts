@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { createRuntimeProjectionScopeRegistry, RuntimeProjectionScope } from '#/web/runtime/runtime-projection-scope.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-const TARGET = { repoRoot: '/repo', workspaceRuntimeId: 'repo-runtime-1' }
+const WORKSPACE_ID = canonicalWorkspaceLocator('goblin+file:///workspace')
+const SECOND_WORKSPACE_ID = canonicalWorkspaceLocator('goblin+file:///workspace-2')
+if (!WORKSPACE_ID || !SECOND_WORKSPACE_ID) throw new Error('invalid workspace locator fixture')
+const TARGET = { workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-1' }
 
 describe('RuntimeProjectionScope', () => {
   afterEach(() => {
@@ -96,7 +100,7 @@ describe('RuntimeProjectionScopeRegistry', () => {
     oldScope.runLatest('failure', async () => await lateFailure.promise, publish, reject)
 
     currentRuntimeId = 'repo-runtime-2'
-    const replacement = registry.scopeFor({ repoRoot: TARGET.repoRoot, workspaceRuntimeId: currentRuntimeId })
+    const replacement = registry.scopeFor({ workspaceId: TARGET.workspaceId, workspaceRuntimeId: currentRuntimeId })
     lateSuccess.resolve('stale')
     lateFailure.reject(new Error('stale failure'))
     await Promise.resolve()
@@ -113,7 +117,7 @@ describe('RuntimeProjectionScopeRegistry', () => {
     const unsubscribe = vi.fn()
     const registry = createRuntimeProjectionScopeRegistry(() => true)
     const first = registry.scopeFor(TARGET)
-    const second = registry.scopeFor({ repoRoot: '/repo-2', workspaceRuntimeId: 'repo-runtime-2' })
+    const second = registry.scopeFor({ workspaceId: SECOND_WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-2' })
     registry.track(unsubscribe)
 
     registry.dispose()

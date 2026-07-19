@@ -483,14 +483,40 @@ export function normalizeTerminalCreateResult(value: unknown): TerminalCreateRes
 
 export function normalizeTerminalRealtimeMessage(value: unknown): TerminalRealtimeMessage | null {
   const parsed = v.safeParse(TerminalRealtimeMessageSchema, value)
-  return parsed.success ? parsed.output : null
+  if (!parsed.success) return null
+  const message = parsed.output
+  switch (message.type) {
+    case 'bell': {
+      const { repoRoot, ...event } = message.event
+      return { ...message, event: { ...event, workspaceId: repoRoot } }
+    }
+    case 'title': {
+      const { repoRoot, ...event } = message.event
+      return { ...message, event: { ...event, workspaceId: repoRoot } }
+    }
+    case 'exit': {
+      const { repoRoot, ...event } = message.event
+      return { ...message, event: { ...event, workspaceId: repoRoot } }
+    }
+    case 'sessions-changed': {
+      const { repoRoot, ...event } = message
+      return { ...event, workspaceId: repoRoot }
+    }
+    case 'session-closed': {
+      const { repoRoot, ...event } = message
+      return { ...event, workspaceId: repoRoot }
+    }
+    default:
+      return message
+  }
 }
 
 export function normalizeTerminalSocketServerMessage(value: unknown): TerminalSocketServerMessage | null {
   const parsed = v.safeParse(TerminalSocketServerMessageSchema, value)
   if (!parsed.success) return null
   const message = parsed.output
-  if (message.type !== 'response' || !message.ok) return message as TerminalSocketServerMessage
+  if (message.type !== 'response') return normalizeTerminalRealtimeMessage(message)
+  if (!message.ok) return message
   const payload = normalizeTerminalSocketResponsePayload(message.action, message.payload)
   if (payload === null) {
     return {
@@ -533,5 +559,9 @@ function normalizeWithSchema<TSchema extends v.BaseSchema<unknown, unknown, v.Ba
 
 export function normalizeTerminalClientMessage(value: unknown): TerminalClientMessage | null {
   const parsed = v.safeParse(TerminalClientMessageSchema, value)
-  return parsed.success ? parsed.output : null
+  if (!parsed.success) return null
+  const message = parsed.output
+  if (message.action !== 'recover-sessions' && message.action !== 'prune') return message
+  const { repoRoot, ...input } = message.input
+  return { ...message, input: { ...input, workspaceId: repoRoot } }
 }

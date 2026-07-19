@@ -46,7 +46,7 @@ describe('workspace pane runtime tab command actions', () => {
 
   test('resolves the ordinary workspace root while pane tabs are still pending', () => {
     const repo = seedRepoWithReadModelForTest({
-      id: terminalCoordinates.repoRoot,
+      id: terminalCoordinates.workspaceId,
       workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
       branches: [],
       currentBranchName: null,
@@ -86,7 +86,7 @@ describe('workspace pane runtime tab command actions', () => {
     const branchName = terminalPresentationBranch(terminalBase.presentation)
     if (!branchName) throw new Error('expected Git worktree terminal fixture')
     seedRepoWithReadModelForTest({
-      id: terminalCoordinates.repoRoot,
+      id: terminalCoordinates.workspaceId,
       workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
       branches: [createRepoBranch(branchName, { worktree: { path: terminalExecutionPath(terminalBase.target) } })],
       currentBranchName: branchName,
@@ -106,7 +106,7 @@ describe('workspace pane runtime tab command actions', () => {
     const branchName = terminalPresentationBranch(terminalBase.presentation)
     if (!branchName) throw new Error('expected Git worktree terminal fixture')
     seedRepoWithReadModelForTest({
-      id: terminalCoordinates.repoRoot,
+      id: terminalCoordinates.workspaceId,
       workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
       branches: [createRepoBranch(branchName, { worktree: { path: terminalExecutionPath(terminalBase.target) } })],
       currentBranchName: branchName,
@@ -131,7 +131,7 @@ describe('workspace pane runtime tab command actions', () => {
               },
             }
           : null,
-      workspaceId: terminalCoordinates.repoRoot,
+      workspaceId: terminalCoordinates.workspaceId,
       branchName: terminalPresentationBranch(terminalBase.presentation),
       workspacePaneRoute: null,
       showRuntimeTab: vi.fn(() => true),
@@ -199,7 +199,7 @@ describe('workspace pane runtime tab command actions', () => {
     const coordinatorBlocker = runWorkspacePaneAction(
       {
         kind: 'git-worktree' as const,
-        workspaceId: terminalCoordinates.repoRoot,
+        workspaceId: terminalCoordinates.workspaceId,
         workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
         worktreePath: terminalExecutionPath(terminalBase.target),
       },

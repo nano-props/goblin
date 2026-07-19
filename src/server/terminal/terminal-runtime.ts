@@ -11,6 +11,7 @@
 
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionCoordinates, type TerminalSessionsChangedEvent } from '#/shared/terminal-types.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { serverLogger } from '#/server/logger.ts'
 import {
   createTerminalSessionService,
@@ -135,7 +136,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         broker.broadcastToUser(userId, { type: 'lifecycle', event })
       },
       onSessionsProjectionChanged(userId, event) {
-        broadcastRepoSessionsChanged(userId, event)
+        broadcastTerminalSessionsChanged(userId, event)
       },
     },
     (userId, clientId) => broker.isClientOnline(userId, clientId),
@@ -160,8 +161,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     manager,
     workspaceTabsCoordinator,
     isCurrentWorkspaceRuntime: isCurrentWorkspaceRuntime,
-    broadcastWorkspaceTabsChanged(userId, repoRoot) {
-      broadcastRepoWorkspaceTabsChanged(userId, repoRoot)
+    broadcastWorkspaceTabsChanged(userId, workspaceId) {
+      publishWorkspaceTabsChanged(userId, workspaceId)
     },
     gCommand: options.gCommand,
   })
@@ -169,7 +170,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     string,
     {
       userId: string
-      repoRoot: string
+      workspaceId: string
       workspaceRuntimeId: string
       scope: string
       attempts: number
@@ -188,13 +189,13 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     manager.releaseProjectionRevisionForScope(event.userId, scope)
     scheduleInvalidatedScopeRetirement({
       userId: event.userId,
-      repoRoot: event.workspaceId,
+      workspaceId: event.workspaceId,
       workspaceRuntimeId: event.workspaceRuntimeId,
       scope,
     })
     invalidation.publishEffects()
     try {
-      broadcastRepoSessionsChanged(event.userId, sessionsChangedEvent)
+      broadcastTerminalSessionsChanged(event.userId, sessionsChangedEvent)
     } catch (error) {
       terminalRuntimeLogger.warn(
         {
@@ -210,7 +211,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 
   function scheduleInvalidatedScopeRetirement(input: {
     userId: string
-    repoRoot: string
+    workspaceId: string
     workspaceRuntimeId: string
     scope: string
   }): void {
@@ -226,7 +227,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     key: string,
     retirement: {
       userId: string
-      repoRoot: string
+      workspaceId: string
       workspaceRuntimeId: string
       scope: string
       attempts: number
@@ -246,12 +247,12 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       if (invalidatedScopeRetirements.get(key) !== retirement) return
       invalidatedScopeRetirements.delete(key)
       try {
-        broadcastRepoWorkspaceTabsChanged(retirement.userId, retirement.repoRoot)
+        publishWorkspaceTabsChanged(retirement.userId, retirement.workspaceId)
       } catch (error) {
         terminalRuntimeLogger.warn(
           {
             userId: retirement.userId,
-            repoRoot: retirement.repoRoot,
+            workspaceId: retirement.workspaceId,
             workspaceRuntimeId: retirement.workspaceRuntimeId,
             err: error,
           },
@@ -263,7 +264,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       terminalRuntimeLogger.warn(
         {
           userId: retirement.userId,
-          repoRoot: retirement.repoRoot,
+          workspaceId: retirement.workspaceId,
           workspaceRuntimeId: retirement.workspaceRuntimeId,
           attempt: retirement.attempts,
           err: error,
@@ -305,7 +306,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     terminal: { ...terminalCreateProvider, close: actions.close },
     terminalWorktree: manager,
     isCurrentWorkspaceRuntime,
-    broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsRevision,
+    broadcastWorkspaceTabsChanged: publishWorkspaceTabsRevision,
   })
   const worktreeRemovalApplication = createWorktreeRemovalApplication({
     worktreeOperations,
@@ -313,13 +314,13 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     terminalWorktree: manager,
     workspaceTabs: workspaceTabsCoordinator,
     isCurrentWorkspaceRuntime,
-    broadcastSessionsChanged(userId, repoRoot, workspaceRuntimeId) {
-      broadcastRepoSessionsChanged(
+    broadcastSessionsChanged(userId, workspaceId, workspaceRuntimeId) {
+      broadcastTerminalSessionsChanged(
         userId,
-        manager.terminalSessionsChangedEventForScope(userId, repoRoot, workspaceRuntimeId),
+        manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
       )
     },
-    broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
+    broadcastWorkspaceTabsChanged: publishWorkspaceTabsChanged,
   })
   const workspacePaneRuntimeHost: ServerWorkspacePaneRuntimeHost = {
     async openRuntime(clientId, userId, input) {
@@ -433,7 +434,9 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 
   const workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost = {
     async commitGitCapabilityRemoval({ userId, workspaceId, workspaceRuntimeId, assertCurrent }) {
-      const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
+      const canonicalWorkspaceId = canonicalWorkspaceLocator(workspaceId)
+      if (!canonicalWorkspaceId) return { kind: 'failed-before-commit', error: new Error('invalid workspace id') }
+      const scope = terminalSessionRuntimeScope(canonicalWorkspaceId, workspaceRuntimeId)
       let durableLayoutChanged: boolean
       try {
         assertCurrent()
@@ -447,7 +450,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       // queued effect cannot run until this synchronous commit returns.
       scheduleInvalidatedScopeRetirement({
         userId,
-        repoRoot: workspaceId,
+        workspaceId: canonicalWorkspaceId,
         workspaceRuntimeId: workspaceRuntimeId,
         scope,
       })
@@ -455,7 +458,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       terminalInvalidation.publishEffects()
       if (durableLayoutChanged || terminalInvalidation.removedCount > 0) {
         try {
-          broadcastRepoSessionsChanged(
+          broadcastTerminalSessionsChanged(
             userId,
             manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
           )
@@ -482,21 +485,21 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
   }
 
-  function broadcastRepoSessionsChanged(userId: string, event: TerminalSessionsChangedEvent): void {
+  function broadcastTerminalSessionsChanged(userId: string, event: TerminalSessionsChangedEvent): void {
     broker.broadcastToUser(userId, { type: 'sessions-changed', ...event })
   }
 
-  function broadcastRepoWorkspaceTabsChanged(userId: string, repoRoot: string): void {
-    broadcastWorkspacePaneTabsChanged(broker, userId, repoRoot)
+  function publishWorkspaceTabsChanged(userId: string, workspaceId: string): void {
+    broadcastWorkspacePaneTabsChanged(broker, userId, workspaceId)
   }
 
-  function broadcastRepoWorkspaceTabsRevision(
+  function publishWorkspaceTabsRevision(
     userId: string,
-    repoRoot: string,
+    workspaceId: string,
     workspaceRuntimeId: string,
     revision: number,
   ): void {
-    broadcastWorkspacePaneTabsRevision(broker, userId, repoRoot, workspaceRuntimeId, revision)
+    broadcastWorkspacePaneTabsRevision(broker, userId, workspaceId, workspaceRuntimeId, revision)
   }
 
   function handleSessionClosed(
@@ -505,20 +508,19 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     reason: TerminalSessionCloseReason,
   ): void {
     if (reason !== 'session') return
-    const { repoRoot } = terminalSessionCoordinates(session)
     const coordinates = terminalSessionCoordinates(session)
-    broadcastRepoSessionsChanged(
+    broadcastTerminalSessionsChanged(
       userId,
-      manager.terminalSessionsChangedEventForScope(userId, coordinates.repoRoot, coordinates.workspaceRuntimeId),
+      manager.terminalSessionsChangedEventForScope(userId, coordinates.workspaceId, coordinates.workspaceRuntimeId),
     )
     void sessionService
       .reconcileTerminalTabsForSession(userId, session)
       .then(() => {
-        broadcastRepoWorkspaceTabsChanged(userId, repoRoot)
+        publishWorkspaceTabsChanged(userId, coordinates.workspaceId)
       })
       .catch((err) => {
         terminalRuntimeLogger.warn(
-          { userId, terminalRuntimeSessionId: session.terminalRuntimeSessionId, repoRoot, err },
+          { userId, terminalRuntimeSessionId: session.terminalRuntimeSessionId, workspaceId: coordinates.workspaceId, err },
           'failed to reconcile workspace tabs after terminal session close',
         )
       })

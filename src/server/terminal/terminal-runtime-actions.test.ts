@@ -86,8 +86,8 @@ function makeActions(
     writeSession: vi.fn(() => false),
     resizeSession: vi.fn(() => false),
     takeoverSession: vi.fn(),
-    terminalSessionsChangedEventForScope: vi.fn((_userId, repoRoot, workspaceRuntimeId) => ({
-      repoRoot,
+    terminalSessionsChangedEventForScope: vi.fn((_userId, workspaceId, workspaceRuntimeId) => ({
+      workspaceId,
       workspaceRuntimeId,
       revision: 1,
     })),
@@ -260,13 +260,13 @@ describe('terminal-runtime-actions close broadcast', () => {
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
-      repoRoot: REPO_ROOT,
+      workspaceId: WORKSPACE_ID,
     })
   })
 
   test('emits NEITHER broadcast when the close returns false (session not owned)', async () => {
     // A non-user close must not leak a phantom session-closed to
-    // sibling windows. The guard is `if (closed && repoRoot)`.
+    // sibling windows. The guard is `if (closed && workspaceId)`.
     const { actions, broadcasts } = makeActions({
       closeSessionForUser: () => false,
       getSlotScope: () => REPO_ROOT,
@@ -281,7 +281,7 @@ describe('terminal-runtime-actions close broadcast', () => {
   test('emits NEITHER broadcast when the session has no scope (lookup miss)', async () => {
     // Defensive: if the scope lookup misses (e.g. the session
     // was already removed server-side by a parallel path), the close
-    // path must not synthesize a session-closed with a fake repoRoot.
+    // path must not synthesize a session-closed with a fake workspaceId.
     const { actions, broadcasts } = makeActions({
       closeSessionForUser: () => true,
       getSlotScope: () => undefined,
@@ -334,7 +334,7 @@ describe('terminal-runtime-actions prune', () => {
 
     await expect(
       actions.prune(CLIENT_ID, USER_ID, {
-        repoRoot: REPO_ROOT,
+        workspaceId: WORKSPACE_ID,
         workspaceRuntimeId: 'repo-runtime-stale',
       }),
     ).rejects.toThrow('error.workspace-runtime-stale')
@@ -353,7 +353,10 @@ describe('terminal-runtime-actions catalog recovery', () => {
     sessionService.listWorkspaceTabs.mockResolvedValueOnce({ revision: 9, entries: [] })
 
     await expect(
-      actions.recoverSessions(CLIENT_ID, USER_ID, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
+      actions.recoverSessions(CLIENT_ID, USER_ID, {
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      }),
     ).resolves.toEqual({ revision: 2, sessions: [] })
 
     expect(manager.terminalSessionsSnapshotForUser).toHaveBeenCalledOnce()
@@ -368,7 +371,10 @@ describe('terminal-runtime-actions catalog recovery', () => {
     sessionService.listWorkspaceTabs.mockResolvedValueOnce({ revision: 27, entries: [] })
 
     await expect(
-      actions.recoverSessions(CLIENT_ID, USER_ID, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
+      actions.recoverSessions(CLIENT_ID, USER_ID, {
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      }),
     ).resolves.toEqual({ revision: 4, sessions: [] })
     expect(manager.terminalSessionsSnapshotForUser).toHaveBeenCalledOnce()
     expect(sessionService.listWorkspaceTabs).not.toHaveBeenCalled()

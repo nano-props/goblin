@@ -74,10 +74,10 @@ function workspacePaneWorktreeTarget(workspaceRuntimeId: string) {
   }
 }
 
-function commitTerminalReadyProbe(userId: string, repoRoot: string, workspaceRuntimeId: string): void {
+function commitTerminalReadyProbe(userId: string, workspaceId: string, workspaceRuntimeId: string): void {
   const committed = commitWorkspaceProbeState({
     userId,
-    workspaceId: repoRoot,
+    workspaceId,
     workspaceRuntimeId,
     probe: {
       status: 'ready',
@@ -531,7 +531,7 @@ describe('server terminal runtime', () => {
     const terminalRuntimeSessionId = result.terminalRuntimeSessionId
 
     await expect(
-      host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
+      host.listSessions('client_a', USER_1, { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
     ).resolves.toEqual([
       expect.objectContaining({
         terminalRuntimeSessionId,
@@ -564,7 +564,7 @@ describe('server terminal runtime', () => {
 
     expect(result.ok).toBe(true)
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toEqual([
-      { type: 'sessions-changed', repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID, revision: 1 },
+      { type: 'sessions-changed', workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID, revision: 1 },
     ])
     expect(
       sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
@@ -585,8 +585,8 @@ describe('server terminal runtime', () => {
       terminalProjectionEffect: { kind: 'delta', revision: 2 },
     })
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toEqual([
-      { type: 'sessions-changed', repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID, revision: 1 },
-      { type: 'sessions-changed', repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID, revision: 2 },
+      { type: 'sessions-changed', workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID, revision: 1 },
+      { type: 'sessions-changed', workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID, revision: 2 },
     ])
 
     host.unregisterSocket('client_a', USER_1, socket)
@@ -637,7 +637,7 @@ describe('server terminal runtime', () => {
     })
 
     const sessions = await host.listSessions('client_a', USER_1, {
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     expect(sessions).toEqual([
@@ -729,7 +729,7 @@ describe('server terminal runtime', () => {
     expect(mockPtys[0]?.resize).toHaveBeenLastCalledWith(101, 31)
 
     const sessions = await host.listSessions('client_a', USER_1, {
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     expect(sessions).toEqual([
@@ -837,7 +837,7 @@ describe('server terminal runtime', () => {
       event: {
         terminalRuntimeSessionId,
         terminalSessionId: expect.any(String),
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         processName: 'zsh',
         canonicalTitle: 'build running',
       },
@@ -851,7 +851,7 @@ describe('server terminal runtime', () => {
       event: {
         terminalRuntimeSessionId,
         terminalSessionId: expect.any(String),
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         canonicalTitle: 'devin: hello',
       },
     })
@@ -894,7 +894,7 @@ describe('server terminal runtime', () => {
       event: {
         terminalRuntimeSessionId,
         terminalSessionId: expect.any(String),
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         canonicalTitle: 'devin running',
       },
     })
@@ -908,7 +908,7 @@ describe('server terminal runtime', () => {
       event: {
         terminalRuntimeSessionId,
         terminalSessionId: expect.any(String),
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       },
     })
@@ -1032,7 +1032,7 @@ describe('server terminal runtime', () => {
     vi.mocked(getWorktrees).mockResolvedValueOnce([])
 
     await expect(
-      host.prune('client_a', USER_1, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
+      host.prune('client_a', USER_1, { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
     ).resolves.toEqual({ pruned: 1, remaining: 0 })
 
     await vi.waitFor(() => {
@@ -1229,7 +1229,7 @@ describe('server terminal runtime', () => {
     expect(result).not.toHaveProperty('sessions')
     await expect(
       host.listSessions('client_a', USER_1, {
-        repoRoot: 'goblin+ssh://prod/srv/repo',
+        workspaceId: requiredWorkspaceLocator('goblin+ssh://prod/srv/repo'),
         workspaceRuntimeId: SSH_WORKSPACE_RUNTIME_ID,
       }),
     ).resolves.toEqual([
@@ -1237,7 +1237,7 @@ describe('server terminal runtime', () => {
         terminalSessionId: result.terminalSessionId,
         target: expect.objectContaining({
           kind: 'git-worktree',
-          workspaceId: 'goblin+ssh://prod/srv/repo',
+          workspaceId: requiredWorkspaceLocator('goblin+ssh://prod/srv/repo'),
           root: 'goblin+ssh://prod/srv/repo',
         }),
       }),
@@ -1331,7 +1331,7 @@ describe('server terminal runtime', () => {
     commitTerminalReadyProbe(USER_1, REPO_ROOT, nextWorkspaceRuntimeId)
 
     await expect(
-      host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, workspaceRuntimeId: nextWorkspaceRuntimeId }),
+      host.listSessions('client_a', USER_1, { workspaceId: REPO_ROOT, workspaceRuntimeId: nextWorkspaceRuntimeId }),
     ).resolves.toEqual([])
     await expect(
       requestWorkspacePaneTabs(
@@ -1403,7 +1403,7 @@ describe('server terminal runtime', () => {
     ).resolves.toEqual({ kind: 'committed' })
 
     await expect(
-      host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
+      host.listSessions('client_a', USER_1, { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
     ).resolves.toEqual([])
     expect(testWorkspacePaneLayout).toEqual({ entries: [] })
     shutdown()
@@ -1441,7 +1441,7 @@ describe('server terminal runtime', () => {
     expect(result).toEqual({ kind: 'failed-before-commit', error: testWorkspacePaneLayoutWriteError })
 
     await expect(
-      host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
+      host.listSessions('client_a', USER_1, { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
     ).resolves.toHaveLength(1)
     expect(testWorkspacePaneLayout.entries).toHaveLength(1)
     shutdown()
@@ -1508,7 +1508,7 @@ describe('server terminal runtime', () => {
     })
 
     await expect(
-      host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
+      host.listSessions('client_a', USER_1, { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
     ).resolves.toEqual([])
     expect(testWorkspacePaneLayout).toEqual({ entries: [] })
     shutdown()
@@ -1617,7 +1617,7 @@ describe('server terminal runtime', () => {
     ).resolves.toMatchObject({ ok: true, frame: 'stream', canonicalCols: 102, canonicalRows: 33 })
 
     const sessions = await host.listSessions('client_electron', USER_1, {
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     expect(sessions).toEqual([
@@ -1665,7 +1665,7 @@ describe('server terminal runtime', () => {
     // Process creation failure is lifecycle state on the logical session;
     // the durable tab remains addressable so an explicit retry can recover.
     const sessionsAfterFailure = await host.listSessions('client_a', USER_1, {
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     expect(sessionsAfterFailure).toEqual([
@@ -1676,8 +1676,8 @@ describe('server terminal runtime', () => {
       }),
     ])
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toEqual([
-      { type: 'sessions-changed', repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID, revision: 1 },
-      { type: 'sessions-changed', repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID, revision: 2 },
+      { type: 'sessions-changed', workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID, revision: 1 },
+      { type: 'sessions-changed', workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID, revision: 2 },
     ])
 
     // A never-spawned session has no exit event — lock in that
@@ -1738,7 +1738,7 @@ describe('server terminal runtime', () => {
     expect(restarted.message).toBe('pty restart failed')
 
     const sessionsAfterFailure = await host.listSessions('client_a', USER_1, {
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     expect(sessionsAfterFailure).toEqual([
@@ -1970,7 +1970,7 @@ describe('server terminal runtime', () => {
       },
     })
     await expect(
-      host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
+      host.listSessions('client_a', USER_1, { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }),
     ).resolves.toEqual([])
 
     host.unregisterSocket('client_a', USER_1, socket)
@@ -2096,7 +2096,7 @@ describe('server terminal runtime', () => {
     expect(result.ok).toBe(true)
 
     const sessions = await host.listSessions('client_2', USER_1, {
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     expect(sessions).toHaveLength(1)
@@ -2105,7 +2105,7 @@ describe('server terminal runtime', () => {
     expect(
       socketB.send.mock.calls.some(([payload]) => {
         const parsed = JSON.parse(String(payload))
-        return parsed.type === 'sessions-changed' && parsed.repoRoot === REPO_ROOT
+        return parsed.type === 'sessions-changed' && parsed.workspaceId === REPO_ROOT
       }),
     ).toBe(true)
 
@@ -2141,7 +2141,7 @@ describe('server terminal runtime', () => {
 
     expect(
       await host.listSessions('client_shared', USER_2, {
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         workspaceRuntimeId: USER_2_WORKSPACE_RUNTIME_ID,
       }),
     ).toEqual([])
@@ -2151,7 +2151,7 @@ describe('server terminal runtime', () => {
     expect(
       userBSocket.send.mock.calls.some(([payload]) => {
         const parsed = JSON.parse(String(payload))
-        return parsed.type === 'sessions-changed' && parsed.repoRoot === REPO_ROOT
+        return parsed.type === 'sessions-changed' && parsed.workspaceId === REPO_ROOT
       }),
     ).toBe(false)
 
@@ -2177,7 +2177,7 @@ describe('server terminal runtime', () => {
     expect(userBSession.terminalRuntimeSessionId).not.toBe(userASession.terminalRuntimeSessionId)
     expect(
       await host.listSessions('client_shared', USER_1, {
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       }),
     ).toEqual([
@@ -2189,7 +2189,7 @@ describe('server terminal runtime', () => {
     ])
     expect(
       await host.listSessions('client_shared', USER_2, {
-        repoRoot: REPO_ROOT,
+        workspaceId: REPO_ROOT,
         workspaceRuntimeId: USER_2_WORKSPACE_RUNTIME_ID,
       }),
     ).toEqual([
@@ -2398,7 +2398,7 @@ describe('server terminal runtime', () => {
     // listSessions confirms the global view: B is the controller,
     // canonical geometry follows B (the most recent writer).
     const sessions = await host.listSessions('client_a', USER_1, {
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     expect(sessions).toEqual([
@@ -2457,7 +2457,7 @@ describe('server terminal runtime', () => {
     await Promise.resolve()
 
     const sessionsAfterExpiry = await host.listSessions('client_a', USER_1, {
-      repoRoot: REPO_ROOT,
+      workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     expect(sessionsAfterExpiry).toEqual([
@@ -2700,7 +2700,7 @@ describe('server terminal runtime', () => {
 
       expect(
         await host.listSessions('client_idle', USER_1, {
-          repoRoot: REPO_ROOT,
+          workspaceId: REPO_ROOT,
           workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         }),
       ).toEqual([
@@ -2714,7 +2714,7 @@ describe('server terminal runtime', () => {
       expect(handle.isClientOnline('client_idle')).toBe(false)
       expect(
         await host.listSessions('client_idle', USER_1, {
-          repoRoot: REPO_ROOT,
+          workspaceId: REPO_ROOT,
           workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         }),
       ).toEqual([
@@ -2729,7 +2729,7 @@ describe('server terminal runtime', () => {
       expect(handle.isClientOnline('client_idle')).toBe(true)
       expect(
         await host.listSessions('client_idle', USER_1, {
-          repoRoot: REPO_ROOT,
+          workspaceId: REPO_ROOT,
           workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         }),
       ).toEqual([
@@ -2771,7 +2771,7 @@ describe('server terminal runtime', () => {
       await vi.runOnlyPendingTimersAsync()
       await expect(
         host.listSessions('client_recovered', USER_1, {
-          repoRoot: REPO_ROOT,
+          workspaceId: REPO_ROOT,
           workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         }),
       ).resolves.toHaveLength(1)
@@ -2805,7 +2805,7 @@ describe('server terminal runtime', () => {
       WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_half_open')
       await expect(
         host.listSessions('client_half_open', USER_1, {
-          repoRoot: REPO_ROOT,
+          workspaceId: REPO_ROOT,
           workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         }),
       ).resolves.toEqual([])
@@ -2840,7 +2840,7 @@ describe('server terminal runtime', () => {
       WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_late_drain')
       await expect(
         host.listSessions('client_late_drain', USER_1, {
-          repoRoot: REPO_ROOT,
+          workspaceId: REPO_ROOT,
           workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         }),
       ).resolves.toEqual([])

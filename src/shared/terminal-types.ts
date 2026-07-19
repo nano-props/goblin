@@ -42,15 +42,20 @@ export type TerminalSessionBase =
     }
 
 export interface TerminalExecutionCoordinates {
-  repoRoot: WorkspaceId
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   worktreeId: WorkspaceId
+}
+
+export interface WorkspaceRuntimeScope {
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
 }
 
 /** Canonical execution coordinates. Callers must not cache a second copy beside the target. */
 export function terminalExecutionCoordinates(target: TerminalExecutionTarget): TerminalExecutionCoordinates {
   return {
-    repoRoot: target.workspaceId,
+    workspaceId: target.workspaceId,
     workspaceRuntimeId: target.workspaceRuntimeId,
     worktreeId: target.kind === 'workspace-root' ? target.workspaceId : target.root,
   }
@@ -69,10 +74,7 @@ export function terminalPresentationBranch(presentation: TerminalPresentation): 
   return presentation.kind === 'git-worktree' ? gitHeadBranch(presentation.head) : null
 }
 
-export interface WorkspaceRuntimeInput {
-  repoRoot: string
-  workspaceRuntimeId: string
-}
+export type WorkspaceRuntimeInput = WorkspaceRuntimeScope
 
 export interface TerminalAttachInput {
   /**
@@ -254,7 +256,7 @@ export interface TerminalNotifyBellInput {
   body: string
   terminalSessionId?: string
   terminalWorktreeKey?: string
-  repoRoot: string
+  workspaceId: WorkspaceId
 }
 
 export interface TerminalTestNotificationInput {
@@ -262,15 +264,9 @@ export interface TerminalTestNotificationInput {
   body: string
 }
 
-export interface TerminalListSessionsInput {
-  repoRoot: string
-  workspaceRuntimeId: string
-}
+export type TerminalListSessionsInput = WorkspaceRuntimeScope
 
-export interface TerminalPruneInput {
-  repoRoot: string
-  workspaceRuntimeId: string
-}
+export type TerminalPruneInput = WorkspaceRuntimeScope
 
 interface TerminalSessionSummaryFields {
   terminalRuntimeSessionId: string
@@ -304,7 +300,7 @@ export interface TerminalSessionsSnapshot {
 }
 
 export interface TerminalSessionsChangedEvent {
-  repoRoot: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   revision: number
 }
@@ -347,7 +343,7 @@ export interface TerminalBellRealtimeEvent {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
-  repoRoot: string
+  workspaceId: WorkspaceId
   processName: string
   canonicalTitle: string | null
 }
@@ -356,7 +352,7 @@ export interface TerminalTitleEvent {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
-  repoRoot: string
+  workspaceId: WorkspaceId
   canonicalTitle: string | null
 }
 
@@ -364,7 +360,7 @@ export interface TerminalExitEvent {
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
-  repoRoot: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
 }
 

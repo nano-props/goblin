@@ -58,7 +58,7 @@ let workspaceTabsChangedHandler: ((message: WorkspacePaneTabsChangedRealtimeMess
 let recoveredHandler: ((clientId: string) => void) | null = null
 const kickReconnectMock = vi.fn(() => {})
 const recoverSessionsMock =
-  vi.fn<(...args: Array<{ repoRoot: string; workspaceRuntimeId: string }>) => Promise<TerminalSessionsSnapshot>>()
+  vi.fn<(...args: Array<{ workspaceId: typeof REPO_ID; workspaceRuntimeId: string }>) => Promise<TerminalSessionsSnapshot>>()
 const listWorkspaceTabsMock = vi.fn<(...args: Array<{ workspaceId: string }>) => Promise<WorkspacePaneTabsEntry[]>>()
 
 describe('AppRuntimeProjectionProvider', () => {
@@ -305,7 +305,7 @@ describe('AppRuntimeProjectionProvider', () => {
       recoverSessionsMock.mockResolvedValue({ revision: 1, sessions: [] })
 
       await act(async () => {
-        sessionsChangedHandler?.({ repoRoot: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 1 })
+        sessionsChangedHandler?.({ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 1 })
         workspaceTabsChangedHandler?.({
           type: 'workspace-pane-tabs.changed',
           change: 'invalidation',
@@ -333,8 +333,8 @@ describe('AppRuntimeProjectionProvider', () => {
       recoverSessionsMock.mockClear()
 
       await act(async () => {
-        sessionsChangedHandler?.({ repoRoot: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 3 })
-        sessionsChangedHandler?.({ repoRoot: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 4 })
+        sessionsChangedHandler?.({ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 3 })
+        sessionsChangedHandler?.({ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 4 })
         await waitForScheduledServerSync()
       })
 
@@ -357,7 +357,7 @@ describe('AppRuntimeProjectionProvider', () => {
       recoverSessionsMock.mockResolvedValueOnce({ revision: 3, sessions: [] })
 
       await act(async () => {
-        sessionsChangedHandler?.({ repoRoot: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 3 })
+        sessionsChangedHandler?.({ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 3 })
       })
 
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
@@ -411,7 +411,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await act(async () => {
         sessionsChangedHandler?.({
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           workspaceRuntimeId: `${repo.workspaceRuntimeId}-old`,
           revision: 9,
         })
@@ -433,7 +433,7 @@ describe('AppRuntimeProjectionProvider', () => {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
 
       await act(async () => {
-        sessionsChangedHandler?.({ repoRoot: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 4 })
+        sessionsChangedHandler?.({ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 4 })
         await waitForScheduledServerSync()
         recovery.resolve({ revision: 4, sessions: [] })
       })
@@ -525,7 +525,7 @@ describe('AppRuntimeProjectionProvider', () => {
       await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledOnce())
       await act(async () => {
         sessionsChangedHandler?.({
-          repoRoot: REPO_ID,
+          workspaceId: REPO_ID,
           workspaceRuntimeId: useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
           revision: 2,
         })
@@ -582,7 +582,7 @@ describe('AppRuntimeProjectionProvider', () => {
       expect(projectionMocks.resynchronizeConnectedViews).not.toHaveBeenCalled()
 
       await act(async () => {
-        sessionsChangedHandler?.({ repoRoot: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 2 })
+        sessionsChangedHandler?.({ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 2 })
       })
 
       await vi.waitFor(() =>

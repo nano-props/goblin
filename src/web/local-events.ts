@@ -1,7 +1,7 @@
 export interface ClientLocalEventMap {
   'terminal-bell-click': {
     type: 'terminal-bell-click'
-    repoRoot: string
+    workspaceId: string
     terminalSessionId?: string
     terminalWorktreeKey?: string
   }

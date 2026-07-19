@@ -20,6 +20,7 @@ import type {
   TerminalWriteInput,
   TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type TerminalRealtimeMessage =
   | { type: 'output'; event: TerminalOutputEvent }
@@ -38,15 +39,14 @@ export type TerminalRealtimeMessage =
   // successful `close` request, alongside the existing
   // `sessions-changed` global broadcast. Multi-window clients use
   // this to drop the local session immediately, without waiting for
-  // a full list-rescan. The `repoRoot` is included so the client
-  // can route the event to the right worktree without a manager
-  // lookup.
+  // a full list-rescan. The workspace identity lets the client route
+  // the event without a manager lookup.
   | {
       type: 'session-closed'
       terminalRuntimeSessionId: string
       terminalRuntimeGeneration: number
       terminalSessionId: string
-      repoRoot: string
+      workspaceId: WorkspaceId
     }
 
 export interface TerminalSocketRequestInputs {
@@ -102,3 +102,21 @@ export type TerminalSocketResponseMessage =
 
 export type TerminalSocketServerMessage = TerminalRealtimeMessage | TerminalSocketResponseMessage
 export type TerminalClientMessage = TerminalSocketRequestMessage
+
+export function terminalRealtimeWireValue(message: TerminalRealtimeMessage): object {
+  switch (message.type) {
+    case 'bell':
+    case 'title':
+    case 'exit': {
+      const { workspaceId, ...event } = message.event
+      return { ...message, event: { ...event, repoRoot: workspaceId } }
+    }
+    case 'sessions-changed':
+    case 'session-closed': {
+      const { workspaceId, ...event } = message
+      return { ...event, repoRoot: workspaceId }
+    }
+    default:
+      return message
+  }
+}

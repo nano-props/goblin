@@ -24,7 +24,7 @@ interface WorktreeRemovalApplicationDependencies {
     'physicalWorktreeTargets' | 'reconcilePhysicalWorktreeAfterRemovalFailure' | 'clearPhysicalWorktreeIndex'
   >
   isCurrentWorkspaceRuntime(userId: string, repoRoot: string, workspaceRuntimeId: string): boolean
-  broadcastSessionsChanged(userId: string, repoRoot: string, workspaceRuntimeId: string): void
+  broadcastSessionsChanged(userId: string, workspaceId: string, workspaceRuntimeId: string): void
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
 }
 

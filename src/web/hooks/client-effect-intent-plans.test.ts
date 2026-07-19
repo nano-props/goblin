@@ -52,7 +52,7 @@ describe('client effect intent plans', () => {
 
     const plan = createTerminalBellIntentPlan(repo, readRepoBranchQueryProjection(repo), {
       type: 'terminal-bell-click',
-      repoRoot: repo.id,
+      workspaceId: repo.id,
       terminalSessionId: 'term-222222222222222222222',
       terminalWorktreeKey: formatTerminalWorktreeKeyForPath('goblin+file:///tmp/repo', '/tmp/repo-feature'),
     })
@@ -69,7 +69,7 @@ describe('client effect intent plans', () => {
   test('marks worktree terminal bell intent unavailable when the branch read model is missing', () => {
     const plan = createTerminalBellIntentPlan({ id: workspaceIdForTest('goblin+file:///tmp/repo') }, null, {
       type: 'terminal-bell-click',
-      repoRoot: 'goblin+file:///tmp/repo',
+      workspaceId: 'goblin+file:///tmp/repo',
       terminalSessionId: 'term-222222222222222222222',
       terminalWorktreeKey: formatTerminalWorktreeKeyForPath('goblin+file:///tmp/repo', '/tmp/repo-feature'),
     })
@@ -91,7 +91,7 @@ describe('client effect intent plans', () => {
       },
       {
         type: 'terminal-bell-click',
-        repoRoot: 'goblin+file:///workspace/repo',
+        workspaceId: 'goblin+file:///workspace/repo',
         terminalSessionId: 'term-333333333333333333333',
         terminalWorktreeKey: formatTerminalWorktreeKeyForPath('goblin+file:///workspace/repo', worktreePath),
       },

@@ -2497,7 +2497,7 @@ describe('TerminalSession', () => {
         terminalRuntimeSessionId: 'pty_session_otheraaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-999999999999999999999',
-        repoRoot: '/repo',
+        workspaceId: requiredWorkspaceLocator('/repo'),
         workspaceRuntimeId: 'repo-runtime-1',
       }),
     ).toBe(false)
@@ -2506,7 +2506,7 @@ describe('TerminalSession', () => {
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
-        repoRoot: '/repo',
+        workspaceId: requiredWorkspaceLocator('/repo'),
         workspaceRuntimeId: 'repo-runtime-1',
       }),
     ).toBe(true)

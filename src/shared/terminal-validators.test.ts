@@ -1009,7 +1009,7 @@ describe('shared terminal validators', () => {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: 'goblin+file:///repo',
     })
     expect(
       normalizeTerminalSocketServerMessage({
@@ -1118,7 +1118,16 @@ describe('terminal runtime generation validation', () => {
         workspaceRuntimeId: 'repo-runtime-validation',
       },
     }
-    expect(normalizeTerminalRealtimeMessage(message)).toEqual(message)
+    expect(normalizeTerminalRealtimeMessage(message)).toEqual({
+      type: 'exit',
+      event: {
+        terminalRuntimeSessionId: 'pty_generation_validation',
+        terminalSessionId: 'term-generation-validation',
+        terminalRuntimeGeneration: 0,
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-validation',
+      },
+    })
     expect(
       normalizeTerminalRealtimeMessage({ ...message, event: { ...message.event, repoRoot: undefined } }),
     ).toBeNull()

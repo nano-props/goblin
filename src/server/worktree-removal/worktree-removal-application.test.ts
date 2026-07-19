@@ -142,13 +142,18 @@ describe('WorktreeRemovalApplication', () => {
 
     expect(retireTarget).not.toHaveBeenCalled()
     expect(reconcilePhysicalWorktreeAfterRemovalFailure).toHaveBeenCalledWith({
-      repoRoot: target.repoRoot,
+      workspaceId: target.repoRoot,
       worktreePath: target.worktreePath,
       physicalWorktreeCapability: expect.objectContaining({
         identity: testPhysicalWorktreeIdentity(target.worktreePath),
       }),
       permit: expect.objectContaining({ operationId: expect.any(Number) }),
-      scopes: affectedScopes,
+      scopes: affectedScopes.map(({ userId, scope, worktreePath }) => ({
+        userId,
+        scope,
+        workspaceId: target.repoRoot,
+        worktreePath,
+      })),
     })
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', target.repoRoot)
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-b', target.repoRoot)

@@ -4,14 +4,18 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { onClientLocalEventType, resetClientLocalEventsForTests } from '#/web/local-events.ts'
 import { createTerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 let wsMock: WebSocketMockHandle
+
+const WORKSPACE_ID = canonicalWorkspaceLocator('goblin+file:///workspace')
+if (!WORKSPACE_ID) throw new Error('invalid workspace locator fixture')
 
 const bellInput = {
   title: 'repo',
   body: 'feature/test\nzsh',
   terminalSessionId: 'term-111111111111111111111',
-  repoRoot: '/tmp/repo',
+  workspaceId: WORKSPACE_ID,
 }
 
 const testNotificationInput = {
@@ -72,8 +76,9 @@ describe('terminal notification provider', () => {
     expect(wsMock.notificationInstances).toHaveLength(1)
     expect(bellClick).toHaveBeenCalledWith({
       type: 'terminal-bell-click',
-      repoRoot: '/tmp/repo',
+      workspaceId: WORKSPACE_ID,
       terminalSessionId: 'term-111111111111111111111',
+      terminalWorktreeKey: undefined,
     })
     dispose()
   })

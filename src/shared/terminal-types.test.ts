@@ -19,7 +19,7 @@ describe('terminal execution target projections', () => {
     }
 
     expect(terminalExecutionCoordinates(target)).toEqual({
-      repoRoot: workspace,
+      workspaceId: workspace,
       workspaceRuntimeId: 'workspace-runtime-test',
       worktreeId: worktree,
     })
