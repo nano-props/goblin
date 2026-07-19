@@ -28,6 +28,7 @@ import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/work
 import { workspacesLog } from '#/web/logger.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import { acceptRemoteWorkspaceLifecycleSnapshot } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
@@ -465,7 +466,8 @@ function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string): Partia
   delete workspaces[id]
   delete navigationHistoryByWorkspace[id]
   for (const terminalWorktreeKey of Object.keys(selectedTerminalSessionIdByTerminalWorktree)) {
-    if (terminalWorktreeKey.startsWith(`${id}\0`))
+    const target = parseTerminalWorktreeKey(terminalWorktreeKey)
+    if (target?.workspaceId === id)
       delete selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
   }
   for (const scopeKey of Object.keys(tabOpenerIdentityByScope)) {
@@ -490,7 +492,10 @@ function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string): Partia
         ),
         selectedTerminalSessionIdByTerminalWorktree: Object.fromEntries(
           Object.entries(s.restoredClientWorkspaceBaseline.selectedTerminalSessionIdByTerminalWorktree).filter(
-            ([key]) => !key.startsWith(`${id}\0`),
+            ([key]) => {
+              const target = parseTerminalWorktreeKey(key)
+              return target?.workspaceId !== id
+            },
           ),
         ),
       }

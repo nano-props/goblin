@@ -14,6 +14,7 @@ import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-gua
 import { markRemoteLifecycleReady } from '#/web/stores/workspaces/availability.ts'
 import { addResolvedWorkspace, addUnavailableWorkspace } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import {
   branchSnapshot,
   flushIpc,
@@ -651,6 +652,31 @@ describe('repo lifecycle', () => {
         'workspace-pane:changes'
       ],
     ).toBe('workspace-pane:status')
+  })
+
+  test('closeWorkspace clears only terminal selections canonically owned by that Workspace', async () => {
+    const workspaceA = seedRepoWithReadModelForTest({ id: REPO_A, branches: [] })
+    const workspaceB = seedRepoWithReadModelForTest({ id: REPO_B, branches: [] })
+    const keyA = formatTerminalWorktreeKey(REPO_A, REPO_A)
+    const keyB = formatTerminalWorktreeKey(REPO_B, REPO_B)
+    const malformedPrefixKey = `${REPO_A}\0not-a-workspace-locator`
+    useWorkspacesStore.setState({
+      workspaces: { [REPO_A]: workspaceA, [REPO_B]: workspaceB },
+      workspaceOrder: [REPO_A, REPO_B],
+      restoredWorkspaceId: REPO_A,
+      selectedTerminalSessionIdByTerminalWorktree: {
+        [keyA]: 'terminal-session-a',
+        [keyB]: 'terminal-session-b',
+        [malformedPrefixKey]: 'terminal-session-malformed',
+      },
+    })
+
+    await useWorkspacesStore.getState().closeWorkspace(REPO_A)
+
+    expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree).toEqual({
+      [keyB]: 'terminal-session-b',
+      [malformedPrefixKey]: 'terminal-session-malformed',
+    })
   })
 
   test('closeWorkspace clears workspace navigation history scoped to that repo', async () => {

@@ -19,16 +19,16 @@ import {
   workspacePaneTabsQueryKey,
   type WorkspacePaneTabsQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { readRepoBranchSnapshotQueryProjection, type RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import {
   defaultWorkspacePaneTabs,
   workspacePaneStaticTabsFromEntries,
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
-interface ClientWorkspaceRepoProjection {
+interface ClientWorkspaceRestorationProjection {
   id: WorkspaceId
   ui: Pick<WorkspacesStore['workspaces'][string]['ui'], 'preferredWorkspacePaneTabByTarget'>
-  branches: RepoBranchSnapshotData['branches']
+  gitTargets?: ClientWorkspaceGitTargets
 }
 
 interface ClientWorkspaceBranchProjection {
@@ -36,14 +36,18 @@ interface ClientWorkspaceBranchProjection {
   worktree?: { path?: string } | undefined
 }
 
-interface ClientWorkspaceRepoTargetProjection {
+interface ClientWorkspaceGitTargets {
   branches: readonly ClientWorkspaceBranchProjection[]
+}
+
+interface ClientWorkspaceTargetProjection {
+  gitTargets?: ClientWorkspaceGitTargets
   ui?: {
     preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneTabType | null>
   }
 }
 
-type ClientWorkspaceRepoProjectionMap = Record<string, ClientWorkspaceRepoProjection | undefined>
+type ClientWorkspaceRestorationProjectionMap = Record<string, ClientWorkspaceRestorationProjection | undefined>
 
 export function clientWorkspaceStateFromRestorableWorkspaceState(input: {
   workspaces: WorkspacesStore['workspaces']
@@ -53,10 +57,13 @@ export function clientWorkspaceStateFromRestorableWorkspaceState(input: {
 }): ClientWorkspaceState {
   const { workspaces, restorableWorkspaceState } = input
   // Workspace membership is shell state: it must remain restorable even
-  // while repo data queries are unavailable. Target-scoped state below
+  // while capability data queries are unavailable. Target-scoped state below
   // is different; it references branch/worktree identities and is only
   // persisted for workspaces whose branch read model can validate those targets.
-  const projectedRepos = clientWorkspaceRepoProjections(workspaces, restorableWorkspaceState.workspaceOrder)
+  const restorationProjections = clientWorkspaceRestorationProjections(
+    workspaces,
+    restorableWorkspaceState.workspaceOrder,
+  )
   const workspacePaneTabsByTargetByWorkspace = workspacePaneTabsByTargetByWorkspaceFromQueryCache(
     workspaces,
     restorableWorkspaceState.workspaceOrder,
@@ -67,16 +74,16 @@ export function clientWorkspaceStateFromRestorableWorkspaceState(input: {
     workspacePaneSize: restorableWorkspaceState.workspacePaneSize,
     selectedTerminalSessionIdByTerminalWorktree: selectedTerminalSessionsForClientWorkspace(
       restorableWorkspaceState.selectedTerminalSessionIdByTerminalWorktree,
-      projectedRepos,
+      restorationProjections,
     ),
     preferredWorkspacePaneTabByTargetByWorkspace: preferredWorkspacePaneTabsForClientWorkspace(
-      projectedRepos,
+      restorationProjections,
       restorableWorkspaceState.workspaceOrder,
       workspacePaneTabsByTargetByWorkspace,
     ),
     filetreeViewStateByWorktreeByWorkspace: persistedFiletreeViewStateByWorktreeByWorkspaceForSession(
       input.filetreeInteractionByScope ?? {},
-      projectedRepos,
+      restorationProjections,
       restorableWorkspaceState.workspaceOrder,
     ),
   }
@@ -88,46 +95,46 @@ export function clientWorkspaceStateFromRestorableWorkspaceState(input: {
   )
 }
 
-function clientWorkspaceRepoProjections(
+function clientWorkspaceRestorationProjections(
   workspaces: WorkspacesStore['workspaces'],
   workspaceOrder: readonly WorkspaceId[],
-): ClientWorkspaceRepoProjectionMap {
-  const projectedRepos: ClientWorkspaceRepoProjectionMap = {}
+): ClientWorkspaceRestorationProjectionMap {
+  const projections: ClientWorkspaceRestorationProjectionMap = {}
   for (const id of workspaceOrder) {
-    const repo = workspaces[id]
-    if (!repo) continue
-    if (repo.session.projectionState === 'stub') continue
-    const branchModel = repo.capability.kind === 'git' ? readRepoBranchSnapshotQueryProjection(repo) : null
-    const readyWithoutGit = repo.capability.kind === 'filesystem'
+    const workspace = workspaces[id]
+    if (!workspace) continue
+    if (workspace.session.projectionState === 'stub') continue
+    const branchModel = workspace.capability.kind === 'git' ? readRepoBranchSnapshotQueryProjection(workspace) : null
+    const readyWithoutGit = workspace.capability.kind === 'filesystem'
     if (!branchModel && !readyWithoutGit) continue
-    projectedRepos[id] = {
-      id: repo.id,
+    projections[id] = {
+      id: workspace.id,
       ui: {
-        preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
+        preferredWorkspacePaneTabByTarget: workspace.ui.preferredWorkspacePaneTabByTarget,
       },
-      branches: branchModel?.branches ?? [],
+      ...(branchModel ? { gitTargets: { branches: branchModel.branches } } : {}),
     }
   }
-  return projectedRepos
+  return projections
 }
 
 function workspacePaneTabsByTargetByWorkspaceFromQueryCache(
   workspaces: Record<string, Pick<WorkspacesStore['workspaces'][string], 'workspaceRuntimeId' | 'session'> | undefined>,
   workspaceOrder: readonly WorkspaceId[],
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
-  const byRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
+  const byWorkspace: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
   for (const id of workspaceOrder) {
-    const repo = workspaces[id]
-    if (!repo) continue
-    if (repo.session.projectionState === 'stub') continue
+    const workspace = workspaces[id]
+    if (!workspace) continue
+    if (workspace.session.projectionState === 'stub') continue
     const data = primaryWindowQueryClient.getQueryData<WorkspacePaneTabsQueryData>(
-      workspacePaneTabsQueryKey(id, repo.workspaceRuntimeId),
+      workspacePaneTabsQueryKey(id, workspace.workspaceRuntimeId),
     )
     if (!data) continue
     const byTarget = workspacePaneTabsByTargetFromQueryData(data)
-    if (Object.keys(byTarget).length > 0) byRepo[id] = byTarget
+    if (Object.keys(byTarget).length > 0) byWorkspace[id] = byTarget
   }
-  return byRepo
+  return byWorkspace
 }
 
 function clientWorkspaceWithStubBaseline(
@@ -137,39 +144,39 @@ function clientWorkspaceWithStubBaseline(
   workspaceOrder: readonly WorkspaceId[],
 ): ClientWorkspaceState {
   if (!baseline) return clientWorkspace
-  const stubRepoIds = new Set(workspaceOrder.filter((id) => workspaces[id]?.session.projectionState === 'stub'))
-  if (stubRepoIds.size === 0) return clientWorkspace
+  const stubWorkspaceIds = new Set(workspaceOrder.filter((id) => workspaces[id]?.session.projectionState === 'stub'))
+  if (stubWorkspaceIds.size === 0) return clientWorkspace
   return {
     ...clientWorkspace,
     selectedTerminalSessionIdByTerminalWorktree: mergeBaselineSelectedTerminals(
       clientWorkspace.selectedTerminalSessionIdByTerminalWorktree,
       baseline.selectedTerminalSessionIdByTerminalWorktree,
-      stubRepoIds,
+      stubWorkspaceIds,
     ),
-    preferredWorkspacePaneTabByTargetByWorkspace: mergeBaselineRepoMap(
+    preferredWorkspacePaneTabByTargetByWorkspace: mergeBaselineWorkspaceMap(
       clientWorkspace.preferredWorkspacePaneTabByTargetByWorkspace,
       baseline.preferredWorkspacePaneTabByTargetByWorkspace,
-      stubRepoIds,
+      stubWorkspaceIds,
     ),
-    filetreeViewStateByWorktreeByWorkspace: mergeBaselineRepoMap(
+    filetreeViewStateByWorktreeByWorkspace: mergeBaselineWorkspaceMap(
       clientWorkspace.filetreeViewStateByWorktreeByWorkspace,
       baseline.filetreeViewStateByWorktreeByWorkspace,
-      stubRepoIds,
+      stubWorkspaceIds,
     ),
   }
 }
 
-function mergeBaselineRepoMap<T>(
+function mergeBaselineWorkspaceMap<T>(
   current: Record<string, T>,
   baseline: Record<string, T>,
-  stubRepoIds: ReadonlySet<string>,
+  stubWorkspaceIds: ReadonlySet<string>,
 ): Record<string, T> {
   let merged = current
-  for (const repoId of stubRepoIds) {
-    const value = baseline[repoId]
+  for (const workspaceId of stubWorkspaceIds) {
+    const value = baseline[workspaceId]
     if (value === undefined) continue
     if (merged === current) merged = { ...current }
-    merged[repoId] = value
+    merged[workspaceId] = value
   }
   return merged
 }
@@ -177,39 +184,33 @@ function mergeBaselineRepoMap<T>(
 function mergeBaselineSelectedTerminals(
   current: Record<string, string>,
   baseline: Record<string, string>,
-  stubRepoIds: ReadonlySet<string>,
+  stubWorkspaceIds: ReadonlySet<string>,
 ): Record<string, string> {
   let merged = current
   for (const [terminalWorktreeKey, terminalSessionId] of Object.entries(baseline)) {
-    const repoId = repoIdFromTerminalWorktreeKey(terminalWorktreeKey)
-    if (!repoId || !stubRepoIds.has(repoId)) continue
+    const workspaceId = parseTerminalWorktreeKey(terminalWorktreeKey)?.workspaceId
+    if (!workspaceId || !stubWorkspaceIds.has(workspaceId)) continue
     if (merged === current) merged = { ...current }
     merged[terminalWorktreeKey] = terminalSessionId
   }
   return merged
 }
 
-function repoIdFromTerminalWorktreeKey(key: string): string | null {
-  const index = key.indexOf('\0')
-  if (index <= 0) return null
-  return key.slice(0, index)
-}
-
 function preferredWorkspacePaneTabsForClientWorkspace(
   workspaces: Record<
     string,
-    (ClientWorkspaceRepoTargetProjection & Required<Pick<ClientWorkspaceRepoTargetProjection, 'ui'>>) | undefined
+    (ClientWorkspaceTargetProjection & Required<Pick<ClientWorkspaceTargetProjection, 'ui'>>) | undefined
   >,
   workspaceOrder: readonly WorkspaceId[],
   workspacePaneTabsByTargetByWorkspace: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
 ): Record<string, Record<string, WorkspacePaneSessionTabType | null>> {
-  const byRepo: Record<string, Record<string, WorkspacePaneSessionTabType | null>> = {}
+  const byWorkspace: Record<string, Record<string, WorkspacePaneSessionTabType | null>> = {}
   for (const id of workspaceOrder) {
-    const repo = workspaces[id]
-    if (!repo) continue
+    const workspace = workspaces[id]
+    if (!workspace) continue
     const byTarget: Record<string, WorkspacePaneSessionTabType | null> = {}
-    for (const [targetKey, tab] of Object.entries(repo.ui.preferredWorkspacePaneTabByTarget)) {
-      const target = workspacePaneTabsTargetKeyBelongsToRepo(targetKey, id, repo)
+    for (const [targetKey, tab] of Object.entries(workspace.ui.preferredWorkspacePaneTabByTarget)) {
+      const target = workspacePaneTabsTargetKeyBelongsToWorkspace(targetKey, id, workspace)
       if (!target) continue
       if (tab !== null && !isWorkspacePaneSessionTabType(tab)) continue
       if (tab !== null && target.kind === 'branch' && workspacePaneTabRequiresWorktree(tab)) continue
@@ -224,59 +225,61 @@ function preferredWorkspacePaneTabsForClientWorkspace(
         continue
       byTarget[targetKey] = tab
     }
-    if (Object.keys(byTarget).length > 0) byRepo[id] = byTarget
+    if (Object.keys(byTarget).length > 0) byWorkspace[id] = byTarget
   }
-  return byRepo
+  return byWorkspace
 }
 
 export function restoredPreferredWorkspacePaneTabByTarget(
   workspaceId: WorkspaceId,
-  repo: ClientWorkspaceRepoTargetProjection,
+  workspace: ClientWorkspaceTargetProjection,
   preferredByTarget: Record<string, WorkspacePaneSessionTabType | null> | undefined,
   workspacePaneTabsByTarget: Record<string, WorkspacePaneTabEntry[]>,
 ): Record<string, WorkspacePaneSessionTabType | null> {
   if (!preferredByTarget) return {}
   return (
     preferredWorkspacePaneTabsForClientWorkspace(
-      { [workspaceId]: { ...repo, ui: { preferredWorkspacePaneTabByTarget: preferredByTarget } } },
+      { [workspaceId]: { ...workspace, ui: { preferredWorkspacePaneTabByTarget: preferredByTarget } } },
       [workspaceId],
       { [workspaceId]: workspacePaneTabsByTarget },
     )[workspaceId] ?? {}
   )
 }
 
-function workspacePaneTabsTargetKeyBelongsToRepo(
+function workspacePaneTabsTargetKeyBelongsToWorkspace(
   targetKey: string,
   workspaceId: WorkspaceId,
-  repo: ClientWorkspaceRepoTargetProjection,
+  workspace: ClientWorkspaceTargetProjection,
 ) {
   const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
   if (!target || target.workspaceId !== workspaceId) return null
   if (target.kind === 'workspace-root') return target
   if (target.kind === 'branch') {
-    return repo.branches.some((branch) => branch.name === target.branchName) ? target : null
+    return workspace.gitTargets?.branches.some((branch) => branch.name === target.branchName) ? target : null
   }
   const worktreePath = parseCanonicalWorkspaceLocator(target.worktreeId)?.path
-  return worktreePath && repo.branches.some((branch) => branch.worktree?.path === worktreePath) ? target : null
+  return worktreePath && workspace.gitTargets?.branches.some((branch) => branch.worktree?.path === worktreePath)
+    ? target
+    : null
 }
 
 function selectedTerminalSessionsForClientWorkspace(
   selectedTerminalSessionIdByTerminalWorktree: Record<string, string>,
-  workspaces: Record<string, ClientWorkspaceRepoTargetProjection | undefined>,
+  workspaces: Record<string, ClientWorkspaceTargetProjection | undefined>,
 ): Record<string, string> {
   const persisted: Record<string, string> = {}
   for (const [terminalWorktreeKey, terminalSessionId] of Object.entries(selectedTerminalSessionIdByTerminalWorktree)) {
     const parsed = parseTerminalWorktreeKey(terminalWorktreeKey)
     if (!parsed || !terminalSessionId) continue
-    const repo = workspaces[parsed.workspaceId]
-    if (!repo) continue
+    const workspace = workspaces[parsed.workspaceId]
+    if (!workspace) continue
     if (parsed.worktreeId === parsed.workspaceId) {
       persisted[terminalWorktreeKey] = terminalSessionId
       continue
     }
     const worktreePath = parseCanonicalWorkspaceLocator(parsed.worktreeId)?.path
     if (!worktreePath) continue
-    if (!repo.branches.some((branch) => branch.worktree?.path === worktreePath)) continue
+    if (!workspace.gitTargets?.branches.some((branch) => branch.worktree?.path === worktreePath)) continue
     persisted[terminalWorktreeKey] = terminalSessionId
   }
   return persisted

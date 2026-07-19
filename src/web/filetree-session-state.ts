@@ -13,13 +13,15 @@ import {
   type WorkspaceId,
 } from '#/shared/workspace-locator.ts'
 
-interface WorkspaceFilesystemRootsProjection {
-  branches: ReadonlyArray<{ worktree?: { path?: string } | undefined }>
+interface ClientWorkspaceFilesystemTargetsProjection {
+  gitTargets?: {
+    branches: ReadonlyArray<{ worktree?: { path?: string } | undefined }>
+  }
 }
 
 export function persistedFiletreeViewStateByWorktreeByWorkspaceForSession(
   interactionByScope: Readonly<Record<string, FiletreeInteractionSnapshot>>,
-  workspaces: Record<string, WorkspaceFilesystemRootsProjection | undefined>,
+  workspaces: Record<string, ClientWorkspaceFilesystemTargetsProjection | undefined>,
   workspaceOrder: readonly string[],
 ): ClientWorkspaceState['filetreeViewStateByWorktreeByWorkspace'] {
   const openWorkspaceIds = new Set(workspaceOrder)
@@ -82,12 +84,12 @@ function hasRestorableFiletreeViewState(viewState: FiletreeSessionViewState): bo
 
 function knownFilesystemRootPaths(
   workspaceId: WorkspaceId,
-  workspace: WorkspaceFilesystemRootsProjection,
+  workspace: ClientWorkspaceFilesystemTargetsProjection,
 ): ReadonlySet<string> {
   const workspaceRoot = parseCanonicalWorkspaceLocator(workspaceId)?.path
   return new Set([
     ...(workspaceRoot ? [workspaceRoot] : []),
-    ...workspace.branches.map((branch) => branch.worktree?.path).filter(isNonEmptyString),
+    ...(workspace.gitTargets?.branches ?? []).map((branch) => branch.worktree?.path).filter(isNonEmptyString),
   ])
 }
 

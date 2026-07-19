@@ -57,13 +57,13 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('persists workspace shell when an open repo has no branch read model', () => {
-    const repo = emptyWorkspace(
+  test('persists a plain Workspace root without synthetic Git targets', () => {
+    const workspace = emptyWorkspace(
       'goblin+file:///tmp/repo-without-query-model',
       'repo-without-query-model',
       'repo-runtime-without-query',
     )
-    acceptWorkspaceProbeState(repo, {
+    acceptWorkspaceProbeState(workspace, {
       status: 'ready',
       name: 'repo-without-query-model',
       capabilities: {
@@ -73,19 +73,19 @@ describe('restorable-workspace-state', () => {
       },
       diagnostics: [],
     })
-    const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, repo.id)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(workspace.id, workspace.id)
     const workspaceRootTargetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'workspace-root',
-      workspaceId: repo.id,
+      workspaceId: workspace.id,
     })
-    repo.ui.preferredWorkspacePaneTabByTarget[workspaceRootTargetKey] = 'files'
+    workspace.ui.preferredWorkspacePaneTabByTarget[workspaceRootTargetKey] = 'files'
 
     expect(
       clientWorkspaceStateFromRestorableWorkspaceState({
-        workspaces: { [repo.id]: repo },
+        workspaces: { [workspace.id]: workspace },
         restorableWorkspaceState: {
-          workspaceOrder: [repo.id],
-          restoredWorkspaceId: repo.id,
+          workspaceOrder: [workspace.id],
+          restoredWorkspaceId: workspace.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {
@@ -94,20 +94,20 @@ describe('restorable-workspace-state', () => {
         },
       }),
     ).toEqual({
-      restoredWorkspaceId: repo.id,
+      restoredWorkspaceId: workspace.id,
       zenMode: false,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {
         [terminalWorktreeKey]: 'term-workspaceroot0000001',
       },
       preferredWorkspacePaneTabByTargetByWorkspace: {
-        [repo.id]: { [workspaceRootTargetKey]: 'files' },
+        [workspace.id]: { [workspaceRootTargetKey]: 'files' },
       },
       filetreeViewStateByWorktreeByWorkspace: {},
     })
   })
 
-  test('preserves target-scoped baseline state for restore stub repos', () => {
+  test('preserves target-scoped baseline state for restore stub Workspaces', () => {
     const activeTargetKey = worktreeTargetKey('goblin+file:///tmp/repo-a', 'feature/active', '/tmp/active-worktree')
     const stubTargetKey = worktreeTargetKey('goblin+file:///tmp/repo-b', 'feature/stub', '/tmp/stub-worktree')
     const activeRepo = seedRepoWithReadModelForTest({
@@ -150,7 +150,7 @@ describe('restorable-workspace-state', () => {
           },
           filetreeViewStateByWorktreeByWorkspace: {
             [stubRepo.id]: {
-              '/tmp/stub-worktree': {
+              'goblin+file:///tmp/stub-worktree': {
                 selectedKeys: ['src/index.ts'],
                 expandedKeys: ['src'],
                 topVisibleRowIndex: 12,
@@ -173,7 +173,7 @@ describe('restorable-workspace-state', () => {
       },
       filetreeViewStateByWorktreeByWorkspace: {
         [stubRepo.id]: {
-          '/tmp/stub-worktree': {
+          'goblin+file:///tmp/stub-worktree': {
             selectedKeys: ['src/index.ts'],
             expandedKeys: ['src'],
             topVisibleRowIndex: 12,
