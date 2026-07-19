@@ -128,8 +128,8 @@ vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', asyn
   const original =
     await importOriginal<typeof import('#/server/worktree-removal/physical-worktree-identity-resolver.ts')>()
   class RuntimeTestPhysicalWorktreeResolver extends original.PhysicalWorktreeIdentityResolver {
-    issue(input: { userId: string; repoRoot: WorkspaceId; workspaceRuntimeId: string; worktreePath: string }) {
-      const remote = input.repoRoot.startsWith('goblin+ssh://')
+    issue(input: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string; worktreePath: string }) {
+      const remote = input.workspaceId.startsWith('goblin+ssh://')
       return this.issueCapability({
         ...input,
         identity: remote
@@ -146,7 +146,7 @@ vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', asyn
               configFingerprint: 'terminal-runtime-test-config-fingerprint',
               endpointMarker: { deviceId: '10', inode: '20' },
               target: {
-                id: workspaceIdForTest(input.repoRoot),
+                id: input.workspaceId,
                 alias: 'prod',
                 host: 'example.test',
                 user: 'deploy',
@@ -170,7 +170,7 @@ vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', asyn
     ...original,
     createPhysicalWorktreeIdentityResolver: () => ({
       capture: vi.fn(
-        async (input: { userId: string; repoRoot: WorkspaceId; workspaceRuntimeId: string; worktreePath: string }) =>
+        async (input: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string; worktreePath: string }) =>
           resolver.issue(input),
       ),
       dispose: vi.fn(),

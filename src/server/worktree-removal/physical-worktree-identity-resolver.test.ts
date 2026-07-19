@@ -8,7 +8,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const LOCAL_INPUT = {
   userId: 'user-1',
-  repoRoot: workspaceIdForTest('goblin+file:///repos/main'),
+  workspaceId: workspaceIdForTest('goblin+file:///repos/main'),
   workspaceRuntimeId: 'repo-runtime-1',
   worktreePath: '/worktrees/alias',
 }
@@ -120,14 +120,14 @@ describe('PhysicalWorktreeIdentityResolver', () => {
   })
 
   test('marks a remote runtime stale when the execution endpoint changes under one SSH config', async () => {
-    const repoRoot = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const workspaceId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     let remoteOutput = remoteIdentityOutput('0123456789abcdef0123456789abcdef', 'machine-a', 'mnt-a')
     const runRemoteCommand = vi.fn(async () => ({ ok: true, stdout: remoteOutput, stderr: '' }))
     const resolver = new PhysicalWorktreeIdentityResolver({
       async resolveRemoteTarget() {
         return {
           target: {
-            id: repoRoot,
+            id: workspaceId,
             alias: 'prod',
             host: 'example.invalid',
             user: 'developer',
@@ -145,7 +145,7 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       isCurrentWorkspaceRuntime: () => true,
       onWorkspaceRuntimeClosed: () => () => undefined,
     })
-    const input = { ...LOCAL_INPUT, repoRoot, worktreePath: '/srv/worktrees/feature' }
+    const input = { ...LOCAL_INPUT, workspaceId, worktreePath: '/srv/worktrees/feature' }
 
     await resolver.capture(input)
     remoteOutput = remoteIdentityOutput('fedcba9876543210fedcba9876543210', 'machine-b', 'mnt-b')
@@ -155,12 +155,12 @@ describe('PhysicalWorktreeIdentityResolver', () => {
   })
 
   test('classifies transport failures while resolving the remote worktree list', async () => {
-    const repoRoot = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const workspaceId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const resolver = new PhysicalWorktreeIdentityResolver({
       async resolveRemoteTarget() {
         return {
           target: {
-            id: repoRoot,
+            id: workspaceId,
             alias: 'prod',
             host: 'example.invalid',
             user: 'developer',
@@ -188,10 +188,10 @@ describe('PhysicalWorktreeIdentityResolver', () => {
     })
 
     await expect(
-      resolver.capture({ ...LOCAL_INPUT, repoRoot, worktreePath: '/srv/worktrees/feature' }),
+      resolver.capture({ ...LOCAL_INPUT, workspaceId, worktreePath: '/srv/worktrees/feature' }),
     ).rejects.toMatchObject({
       name: 'RemoteWorkspaceRuntimeFailureError',
-      workspaceId: repoRoot,
+      workspaceId: workspaceId,
       workspaceRuntimeId: LOCAL_INPUT.workspaceRuntimeId,
       reason: 'handshake-failed',
     })
@@ -223,7 +223,7 @@ describe('PhysicalWorktreeIdentityResolver', () => {
     current = false
     closedListener({
       userId: LOCAL_INPUT.userId,
-      workspaceId: LOCAL_INPUT.repoRoot,
+      workspaceId: LOCAL_INPUT.workspaceId,
       workspaceRuntimeId: LOCAL_INPUT.workspaceRuntimeId,
     })
     worktrees.resolve([{ path: LOCAL_INPUT.worktreePath } as WorktreeInfo])
@@ -262,7 +262,7 @@ describe('PhysicalWorktreeIdentityResolver', () => {
   test('workspace runtime close aborts every waiter for the shared resolve', async () => {
     let closedListener: (event: WorkspaceRuntimeClosedEvent) => void = () => undefined
     const resolver = new PhysicalWorktreeIdentityResolver({
-      async getLocalWorktrees(_repoRoot, options) {
+      async getLocalWorktrees(_workspacePath, options) {
         return await new Promise<WorktreeInfo[]>((_resolve, reject) => {
           options?.signal?.addEventListener('abort', () => reject(new Error('runtime-aborted')), { once: true })
         })
@@ -277,7 +277,7 @@ describe('PhysicalWorktreeIdentityResolver', () => {
     const second = resolver.capture(LOCAL_INPUT)
     closedListener({
       userId: LOCAL_INPUT.userId,
-      workspaceId: LOCAL_INPUT.repoRoot,
+      workspaceId: LOCAL_INPUT.workspaceId,
       workspaceRuntimeId: LOCAL_INPUT.workspaceRuntimeId,
     })
 

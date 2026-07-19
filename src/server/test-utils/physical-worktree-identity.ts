@@ -25,7 +25,7 @@ class TestPhysicalWorktreeIdentityResolver extends PhysicalWorktreeIdentityResol
   issue(input: {
     identity: PhysicalWorktreeIdentity
     userId?: string
-    repoRoot?: WorkspaceId
+    workspaceId?: WorkspaceId
     workspaceRuntimeId?: string
     worktreePath?: string
     execution?: PhysicalWorktreeExecutionBinding
@@ -36,7 +36,7 @@ class TestPhysicalWorktreeIdentityResolver extends PhysicalWorktreeIdentityResol
     return this.issueCapability({
       identity: input.identity,
       userId: input.userId ?? 'test-user',
-      repoRoot: input.repoRoot ?? DEFAULT_WORKSPACE_ID,
+      workspaceId: input.workspaceId ?? DEFAULT_WORKSPACE_ID,
       workspaceRuntimeId: input.workspaceRuntimeId ?? 'test-runtime',
       worktreePath: endpoint,
       execution: input.execution ?? {
@@ -61,14 +61,14 @@ export function issueTestPhysicalWorktreeExecutionCapability(
 export function testPhysicalWorktreeExecutionCapability(
   endpoint: string,
   input: Partial<
-    Pick<ResolvePhysicalWorktreeIdentityInput, 'userId' | 'repoRoot' | 'workspaceRuntimeId' | 'worktreePath'>
+    Pick<ResolvePhysicalWorktreeIdentityInput, 'userId' | 'workspaceId' | 'workspaceRuntimeId' | 'worktreePath'>
   > = {},
 ): PhysicalWorktreeExecutionCapability {
   const worktreePath = input.worktreePath ?? endpoint
   return issueTestPhysicalWorktreeExecutionCapability({
     identity: testPhysicalWorktreeIdentity(endpoint),
     userId: input.userId,
-    repoRoot: input.repoRoot,
+    workspaceId: input.workspaceId,
     workspaceRuntimeId: input.workspaceRuntimeId,
     worktreePath,
   })

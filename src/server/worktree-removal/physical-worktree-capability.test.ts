@@ -89,7 +89,7 @@ function remoteCapability(target: ReturnType<typeof remoteTarget>): PhysicalWork
       endpoint: REMOTE_PATH,
     },
     userId: 'user-a',
-    repoRoot: REMOTE_REPO,
+    workspaceId: REMOTE_REPO,
     workspaceRuntimeId: 'runtime-a',
     worktreePath: REMOTE_PATH,
     execution: {

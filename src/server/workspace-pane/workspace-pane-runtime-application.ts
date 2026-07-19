@@ -45,7 +45,12 @@ interface WorkspacePaneRuntimeApplicationDependencies {
     listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
   }
   isCurrentWorkspaceRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean
-  broadcastWorkspaceTabsChanged(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string, revision: number): void
+  broadcastWorkspaceTabsChanged(
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+    revision: number,
+  ): void
 }
 
 /**
@@ -302,7 +307,7 @@ export class WorkspacePaneRuntimeApplication {
   ): Promise<PhysicalWorktreeExecutionCapability> {
     const input = {
       userId,
-      repoRoot: target.workspaceId,
+      workspaceId: target.workspaceId,
       workspaceRuntimeId: target.workspaceRuntimeId,
       worktreePath,
     }

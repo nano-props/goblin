@@ -23,7 +23,7 @@ describe('terminal session create provider', () => {
     })
     const expectedIdentity = testPhysicalWorktreeExecutionCapability('/repo/expected', {
       userId: 'user-test',
-      repoRoot: workspaceId,
+      workspaceId: workspaceId,
       workspaceRuntimeId: 'repo-runtime-test',
     })
     const wrongIdentity = testPhysicalWorktreeExecutionCapability('/repo/wrong')

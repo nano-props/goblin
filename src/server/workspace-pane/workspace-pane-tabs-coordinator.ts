@@ -126,7 +126,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
     if (
       physicalScope.worktreePath !== input.worktreePath ||
       physicalScope.userId !== input.userId ||
-      physicalScope.repoRoot !== input.target.workspaceId ||
+      physicalScope.workspaceId !== input.target.workspaceId ||
       physicalScope.workspaceRuntimeId !== input.target.workspaceRuntimeId
     ) {
       return { kind: 'runtime-stale' }
@@ -631,7 +631,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
     const workspaceRuntimeId = separator >= 0 ? input.scope.slice(separator + 1) : ''
     return await this.physicalWorktrees.capture({
       userId: input.userId,
-      repoRoot: input.workspaceId,
+      workspaceId: input.workspaceId,
       workspaceRuntimeId,
       worktreePath,
     })

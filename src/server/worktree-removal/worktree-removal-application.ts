@@ -57,7 +57,7 @@ export class WorktreeRemovalApplication {
     try {
       physicalCapability = await this.deps.physicalWorktrees.capture({
         userId,
-        repoRoot: input.repoRoot,
+        workspaceId: input.repoRoot,
         workspaceRuntimeId: input.workspaceRuntimeId,
         worktreePath,
       })
@@ -175,7 +175,7 @@ export class WorktreeRemovalApplication {
     const targets = this.deps.workspaceTabs.physicalWorktreeTargets(physicalWorktreeCapability)
     const terminal = await this.deps.terminalWorktree.closeSessionsForPhysicalWorktree(physicalWorktreeCapability)
     const scopes = uniqueScopes([
-      ...terminal.scopes.map((item) => ({ ...item, worktreePath })),
+      ...terminal.scopes.map(({ workspaceId, ...item }) => ({ ...item, repoRoot: workspaceId, worktreePath })),
       ...targets.map(({ userId, scope, target }) => ({
         userId,
         repoRoot: target.workspaceId,

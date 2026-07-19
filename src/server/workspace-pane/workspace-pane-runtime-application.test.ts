@@ -267,7 +267,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
 
     await application.open('client-test', 'user-test', { runtimeType: 'terminal', request: workspaceRequest })
 
-    expect(capture).toHaveBeenCalledWith(expect.objectContaining({ repoRoot: workspaceId, worktreePath: '/repo' }))
+    expect(capture).toHaveBeenCalledWith(expect.objectContaining({ workspaceId, worktreePath: '/repo' }))
     expect(createAdmitted).toHaveBeenCalledWith(
       'client-test',
       'user-test',

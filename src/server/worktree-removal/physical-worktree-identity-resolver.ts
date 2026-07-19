@@ -29,7 +29,7 @@ import {
 
 export interface ResolvePhysicalWorktreeIdentityInput {
   userId: string
-  repoRoot: WorkspaceId
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   worktreePath: string
   signal?: AbortSignal
@@ -38,7 +38,7 @@ export interface ResolvePhysicalWorktreeIdentityInput {
 interface PhysicalWorktreeRuntimeEpoch {
   key: string
   userId: string
-  repoRoot: WorkspaceId
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   active: boolean
   abortController: AbortController
@@ -69,7 +69,7 @@ const defaultDependencies: PhysicalWorktreeIdentityResolverDependencies = {
   onWorkspaceRuntimeClosed,
 }
 
-/** Provider-owned canonical identity resolver, scoped to live repo-runtime epochs. */
+/** Provider-owned canonical identity resolver, scoped to live workspace-runtime epochs. */
 export class PhysicalWorktreeIdentityResolver {
   private readonly deps: PhysicalWorktreeIdentityResolverDependencies
   private readonly epochs = new Map<string, PhysicalWorktreeRuntimeEpoch>()
@@ -85,7 +85,7 @@ export class PhysicalWorktreeIdentityResolver {
   protected issueCapability(input: {
     identity: PhysicalWorktreeIdentity
     userId: string
-    repoRoot: WorkspaceId
+    workspaceId: WorkspaceId
     workspaceRuntimeId: string
     worktreePath: string
     execution: PhysicalWorktreeExecutionBinding
@@ -94,7 +94,7 @@ export class PhysicalWorktreeIdentityResolver {
   }): PhysicalWorktreeExecutionCapability {
     return issuePhysicalWorktreeExecutionCapability(input.identity, {
       userId: input.userId,
-      repoRoot: input.repoRoot,
+      workspaceId: input.workspaceId,
       workspaceRuntimeId: input.workspaceRuntimeId,
       worktreePath: input.worktreePath,
       execution: input.execution,
@@ -104,10 +104,10 @@ export class PhysicalWorktreeIdentityResolver {
   }
 
   async capture(input: ResolvePhysicalWorktreeIdentityInput): Promise<PhysicalWorktreeExecutionCapability> {
-    if (!input.userId || !input.repoRoot || !input.workspaceRuntimeId)
+    if (!input.userId || !input.workspaceId || !input.workspaceRuntimeId)
       throw new Error('error.invalid-worktree-identity')
     const platform = process.platform === 'win32' ? 'win32' : 'posix'
-    const workspace = parseWorkspaceLocator(input.repoRoot, platform)
+    const workspace = parseWorkspaceLocator(input.workspaceId, platform)
     if (!workspace) throw new Error('error.workspace-locator-malformed')
     const targetsWorkspaceRoot =
       workspace.transport === 'file'
@@ -131,10 +131,10 @@ export class PhysicalWorktreeIdentityResolver {
   }
 
   async captureWorkspace(input: ResolvePhysicalWorktreeIdentityInput): Promise<PhysicalWorktreeExecutionCapability> {
-    if (!input.userId || !input.repoRoot || !input.workspaceRuntimeId)
+    if (!input.userId || !input.workspaceId || !input.workspaceRuntimeId)
       throw new Error('error.invalid-worktree-identity')
     const platform = process.platform === 'win32' ? 'win32' : 'posix'
-    const locator = parseWorkspaceLocator(input.repoRoot, platform)
+    const locator = parseWorkspaceLocator(input.workspaceId, platform)
     if (!locator) throw new Error('error.workspace-locator-malformed')
     const epoch = this.activeEpoch(input)
     const targetKey = `workspace\0${locator.path}`
@@ -168,7 +168,7 @@ export class PhysicalWorktreeIdentityResolver {
     epoch.expectedIdentityKeyByTarget.set(targetKey, identityKey)
     return issuePhysicalWorktreeExecutionCapability(resolved.identity, {
       userId: input.userId,
-      repoRoot: input.repoRoot,
+      workspaceId: input.workspaceId,
       workspaceRuntimeId: input.workspaceRuntimeId,
       worktreePath: locator.path,
       execution: resolved.execution,
@@ -200,7 +200,7 @@ export class PhysicalWorktreeIdentityResolver {
     )
     this.assertEpochActive(epoch)
     const run = this.runtimeAwareRemoteRunner({
-      repoRoot: input.repoRoot,
+      workspaceId: input.workspaceId,
       workspaceRuntimeId: input.workspaceRuntimeId,
     })
     const result = await run({ type: 'resolvePhysicalWorktreeIdentity', path: workspacePath }, resolved.target, {
@@ -247,7 +247,7 @@ export class PhysicalWorktreeIdentityResolver {
     epoch.expectedIdentityKeyByTarget.set(targetKey, identityKey)
     return issuePhysicalWorktreeExecutionCapability(identity, {
       userId: input.userId,
-      repoRoot: input.repoRoot,
+      workspaceId: input.workspaceId,
       workspaceRuntimeId: input.workspaceRuntimeId,
       worktreePath: targetPath,
       execution: resolved.execution,
@@ -262,7 +262,7 @@ export class PhysicalWorktreeIdentityResolver {
     worktreePath: string,
     signal: AbortSignal,
   ): Promise<{ identity: PhysicalWorktreeIdentity; execution: PhysicalWorktreeExecutionBinding }> {
-    const workspacePath = localWorkspaceNativePath(input.repoRoot)
+    const workspacePath = localWorkspaceNativePath(input.workspaceId)
     if (!workspacePath) throw new Error('error.workspace-locator-malformed')
     const worktrees = await this.deps.getLocalWorktrees(workspacePath, { includeStatus: false, signal })
     this.assertEpochActive(epoch)
@@ -284,9 +284,12 @@ export class PhysicalWorktreeIdentityResolver {
     worktreePath: string,
     signal: AbortSignal,
   ): Promise<{ identity: PhysicalWorktreeIdentity; execution: PhysicalWorktreeExecutionBinding }> {
-    const repo = parseRemoteWorkspaceId(input.repoRoot)
-    if (!repo) throw new Error('error.invalid-worktree-identity')
-    const resolved = await this.deps.resolveRemoteTarget({ alias: repo.alias, remotePath: repo.remotePath }, signal)
+    const workspace = parseRemoteWorkspaceId(input.workspaceId)
+    if (!workspace) throw new Error('error.invalid-worktree-identity')
+    const resolved = await this.deps.resolveRemoteTarget(
+      { alias: workspace.alias, remotePath: workspace.remotePath },
+      signal,
+    )
     this.assertEpochActive(epoch)
     if (epoch.remoteConfigFingerprint && epoch.remoteConfigFingerprint !== resolved.configFingerprint) {
       throw new Error('error.workspace-runtime-stale')
@@ -294,7 +297,7 @@ export class PhysicalWorktreeIdentityResolver {
     epoch.remoteConfigFingerprint = resolved.configFingerprint
 
     const runRemoteCommand = this.runtimeAwareRemoteRunner({
-      repoRoot: input.repoRoot,
+      workspaceId: input.workspaceId,
       workspaceRuntimeId: input.workspaceRuntimeId,
     })
     const known = await this.deps.resolveRemoteWorktree(resolved.target, worktreePath, {
@@ -340,7 +343,7 @@ export class PhysicalWorktreeIdentityResolver {
       return
     }
     const result = await this.runtimeAwareRemoteRunner({
-      repoRoot: epoch.repoRoot,
+      workspaceId: epoch.workspaceId,
       workspaceRuntimeId: epoch.workspaceRuntimeId,
     })({ type: 'resolvePhysicalWorktreeIdentity', path: execution.canonicalWorktreePath }, execution.target, { signal })
     signal.throwIfAborted()
@@ -356,7 +359,10 @@ export class PhysicalWorktreeIdentityResolver {
   }
 
   private activeEpoch(input: ResolvePhysicalWorktreeIdentityInput): PhysicalWorktreeRuntimeEpoch {
-    if (this.disposed || !this.deps.isCurrentWorkspaceRuntime(input.userId, input.repoRoot, input.workspaceRuntimeId)) {
+    if (
+      this.disposed ||
+      !this.deps.isCurrentWorkspaceRuntime(input.userId, input.workspaceId, input.workspaceRuntimeId)
+    ) {
       throw new Error('error.workspace-runtime-stale')
     }
     const key = runtimeKey(input)
@@ -368,7 +374,7 @@ export class PhysicalWorktreeIdentityResolver {
     const epoch: PhysicalWorktreeRuntimeEpoch = {
       key,
       userId: input.userId,
-      repoRoot: input.repoRoot,
+      workspaceId: input.workspaceId,
       workspaceRuntimeId: input.workspaceRuntimeId,
       active: true,
       abortController: new AbortController(),
@@ -385,17 +391,20 @@ export class PhysicalWorktreeIdentityResolver {
       this.disposed ||
       !epoch.active ||
       this.epochs.get(epoch.key) !== epoch ||
-      !this.deps.isCurrentWorkspaceRuntime(epoch.userId, epoch.repoRoot, epoch.workspaceRuntimeId)
+      !this.deps.isCurrentWorkspaceRuntime(epoch.userId, epoch.workspaceId, epoch.workspaceRuntimeId)
     ) {
       throw new Error('error.workspace-runtime-stale')
     }
   }
 
-  private runtimeAwareRemoteRunner(input: { repoRoot: WorkspaceId; workspaceRuntimeId: string }): RemoteCommandRunner {
+  private runtimeAwareRemoteRunner(input: {
+    workspaceId: WorkspaceId
+    workspaceRuntimeId: string
+  }): RemoteCommandRunner {
     return async (command, target, options) => {
       const result = await this.deps.runRemoteCommand(command, target, options)
       const runtimeFailure = remoteWorkspaceRuntimeFailureFromCommandResult({
-        workspaceId: input.repoRoot,
+        workspaceId: input.workspaceId,
         workspaceRuntimeId: input.workspaceRuntimeId,
         target,
         result,
@@ -408,7 +417,7 @@ export class PhysicalWorktreeIdentityResolver {
   private releaseRuntime(event: WorkspaceRuntimeClosedEvent): void {
     const key = runtimeKey({
       userId: event.userId,
-      repoRoot: event.workspaceId,
+      workspaceId: event.workspaceId,
       workspaceRuntimeId: event.workspaceRuntimeId,
     })
     const epoch = this.epochs.get(key)
@@ -488,9 +497,11 @@ function validEndpointMarkerPart(value: string): boolean {
 }
 
 function normalizedRemoteWorktreePath(input: ResolvePhysicalWorktreeIdentityInput): string {
-  const repo = parseRemoteWorkspaceId(input.repoRoot)
-  const worktree = repo ? normalizeRemoteWorkspaceRef({ alias: repo.alias, remotePath: input.worktreePath }) : null
-  if (!repo || !worktree) throw new Error('error.invalid-worktree-identity')
+  const workspace = parseRemoteWorkspaceId(input.workspaceId)
+  const worktree = workspace
+    ? normalizeRemoteWorkspaceRef({ alias: workspace.alias, remotePath: input.worktreePath })
+    : null
+  if (!workspace || !worktree) throw new Error('error.invalid-worktree-identity')
   return worktree.remotePath
 }
 
@@ -498,8 +509,8 @@ function validRemoteNamespaceFact(value: string): boolean {
   return value.length > 0 && value.length <= 256 && /^[A-Za-z0-9._:-]+$/u.test(value)
 }
 
-function runtimeKey(input: { userId: string; repoRoot: WorkspaceId; workspaceRuntimeId: string }): string {
-  return `${input.userId}\0${input.repoRoot}\0${input.workspaceRuntimeId}`
+function runtimeKey(input: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string }): string {
+  return `${input.userId}\0${input.workspaceId}\0${input.workspaceRuntimeId}`
 }
 
 function deactivateEpoch(epoch: PhysicalWorktreeRuntimeEpoch): void {

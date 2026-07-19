@@ -103,14 +103,14 @@ describe('WorktreeRemovalApplication', () => {
     const affectedScopes = [
       {
         userId: 'user-a',
-        repoRoot: workspaceId,
+        workspaceId,
         workspaceRuntimeId: 'runtime-a',
         scope: 'goblin+file:///repo\0runtime-a',
         worktreePath: '/repo/worktree',
       },
       {
         userId: 'user-b',
-        repoRoot: workspaceId,
+        workspaceId,
         workspaceRuntimeId: 'runtime-b',
         scope: 'goblin+file:///repo\0runtime-b',
         worktreePath: '/repo/worktree',
@@ -376,7 +376,7 @@ describe('WorktreeRemovalApplication', () => {
 
 interface TestTerminalScope {
   userId: string
-  repoRoot: WorkspaceId
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   scope: string
 }

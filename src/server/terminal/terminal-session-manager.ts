@@ -127,7 +127,7 @@ export interface TerminalEventSink<TUser extends string | number> {
 
 export interface TerminalPhysicalWorktreeScope<TUser extends string | number> {
   userId: TUser
-  repoRoot: WorkspaceId
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   scope: string
 }
@@ -742,7 +742,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       const coordinates = terminalExecutionCoordinates(session.target)
       affected.set(key, {
         userId: session.userId,
-        repoRoot: coordinates.workspaceId,
+        workspaceId: coordinates.workspaceId,
         workspaceRuntimeId: coordinates.workspaceRuntimeId,
         scope: session.scope,
       })

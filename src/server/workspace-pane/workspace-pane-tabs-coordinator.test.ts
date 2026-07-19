@@ -34,7 +34,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const commitAdmission = vi.fn()
@@ -84,7 +84,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const commitAdmission = vi.fn()
@@ -138,7 +138,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const aggregate = aggregateFor(memoryRepository())
@@ -202,7 +202,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const aggregate = aggregateFor(repository)
@@ -246,7 +246,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const workspaceId = canonicalWorkspaceLocator(WORKSPACE_ID)!
@@ -306,7 +306,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/detached', {
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const workspaceId = canonicalWorkspaceLocator(WORKSPACE_ID)!
@@ -349,7 +349,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
       worktreePath: '/repo',
     })
@@ -410,7 +410,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/other', {
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const projection = testRuntimeTargetProjection({
@@ -451,7 +451,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-b',
     })
     const projection = testRuntimeTargetProjection({
@@ -492,7 +492,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const targets: TestWorkspacePaneTarget[] = [
@@ -559,7 +559,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     let targets: TestWorkspacePaneTarget[] = [
@@ -830,7 +830,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     let releaseRemoval!: () => void
@@ -877,7 +877,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     let releaseFinalSample!: () => void
@@ -951,12 +951,12 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capabilityA = testPhysicalWorktreeExecutionCapability('/repo/worktree-a', {
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const capabilityC = testPhysicalWorktreeExecutionCapability('/repo/worktree-c', {
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     let releaseStableSample!: () => void
@@ -1065,7 +1065,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = issueTestPhysicalWorktreeExecutionCapability({
       identity: testPhysicalWorktreeIdentity('/repo/worktree-x'),
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
       worktreePath: '/repo/worktree-x',
       validateExecution: async () => {
@@ -1143,7 +1143,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = issueTestPhysicalWorktreeExecutionCapability({
       identity: testPhysicalWorktreeIdentity('/repo/worktree-x'),
       userId: 'user-a',
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
       worktreePath: '/repo/worktree-x',
       validateExecution: async () => {

@@ -1035,8 +1035,8 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     supervisor.killAndWait = killAndWait
     const onSessionClosed = vi.fn()
     const manager = createManager(supervisor, { onSessionClosed })
-    const repoRoot = WORKSPACE_ID
-    const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
+    const workspaceId = WORKSPACE_ID
+    const scope = terminalSessionRuntimeScope(workspaceId, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
       target: WORKTREE_TARGET,
@@ -1071,7 +1071,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     acknowledgeKill()
     await expect(quiescence).resolves.toEqual({
       ok: true,
-      scopes: [{ userId: USER_ID, repoRoot, workspaceRuntimeId: 'repo-runtime-test', scope }],
+      scopes: [{ userId: USER_ID, workspaceId, workspaceRuntimeId: 'repo-runtime-test', scope }],
     })
     await expect(directClose).resolves.toBe(true)
     expect(onSessionClosed).toHaveBeenCalledOnce()
@@ -1101,7 +1101,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(physicalWorktreePath)),
     ).resolves.toEqual({
       ok: true,
-      scopes: [{ userId: USER_ID, repoRoot: linkedRepoRoot, workspaceRuntimeId: 'repo-runtime-linked', scope }],
+      scopes: [{ userId: USER_ID, workspaceId: linkedRepoRoot, workspaceRuntimeId: 'repo-runtime-linked', scope }],
     })
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
   })
@@ -1114,8 +1114,8 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     })
     supervisor.killAndWait = vi.fn(async () => await killAcknowledged)
     const manager = createManager(supervisor)
-    const repoRoot = WORKSPACE_ID
-    const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
+    const workspaceId = WORKSPACE_ID
+    const scope = terminalSessionRuntimeScope(workspaceId, 'repo-runtime-test')
     const pendingCreate = ensureSession(manager, {
       userId: USER_ID,
       target: WORKTREE_TARGET,
@@ -1140,7 +1140,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     acknowledgeKill()
     await expect(quiescence).resolves.toEqual({
       ok: true,
-      scopes: [{ userId: USER_ID, repoRoot, workspaceRuntimeId: 'repo-runtime-test', scope }],
+      scopes: [{ userId: USER_ID, workspaceId, workspaceRuntimeId: 'repo-runtime-test', scope }],
     })
     await expect(pendingCreate).resolves.toEqual({ ok: false, message: 'error.unavailable' })
   })
@@ -1152,8 +1152,8 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     })
     supervisor.killAndWait = killAndWait
     const manager = createManager(supervisor)
-    const repoRoot = WORKSPACE_ID
-    const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
+    const workspaceId = WORKSPACE_ID
+    const scope = terminalSessionRuntimeScope(workspaceId, 'repo-runtime-test')
     const pending = ensureSession(manager, {
       userId: USER_ID,
       target: WORKTREE_TARGET,
@@ -1170,7 +1170,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)),
     ).resolves.toEqual({
       ok: false,
-      scopes: [{ userId: USER_ID, repoRoot, workspaceRuntimeId: 'repo-runtime-test', scope }],
+      scopes: [{ userId: USER_ID, workspaceId, workspaceRuntimeId: 'repo-runtime-test', scope }],
       message: 'PTY close timed out',
     })
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([
@@ -1182,7 +1182,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)),
     ).resolves.toEqual({
       ok: true,
-      scopes: [{ userId: USER_ID, repoRoot, workspaceRuntimeId: 'repo-runtime-test', scope }],
+      scopes: [{ userId: USER_ID, workspaceId, workspaceRuntimeId: 'repo-runtime-test', scope }],
     })
     expect(killAndWait).toHaveBeenCalledTimes(2)
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
@@ -1194,8 +1194,8 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const killAndWait = vi.fn(async () => await killAcknowledged.promise)
     supervisor.killAndWait = killAndWait
     const manager = createManager(supervisor)
-    const repoRoot = WORKSPACE_ID
-    const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
+    const workspaceId = WORKSPACE_ID
+    const scope = terminalSessionRuntimeScope(workspaceId, 'repo-runtime-test')
     const controller = new AbortController()
     const pendingCreate = ensureSession(manager, {
       userId: USER_ID,
@@ -1225,7 +1225,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     killAcknowledged.resolve()
     await expect(quiescence).resolves.toEqual({
       ok: true,
-      scopes: [{ userId: USER_ID, repoRoot, workspaceRuntimeId: 'repo-runtime-test', scope }],
+      scopes: [{ userId: USER_ID, workspaceId, workspaceRuntimeId: 'repo-runtime-test', scope }],
     })
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
   })
@@ -1236,8 +1236,8 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     killAndWait.mockRejectedValueOnce(new Error('PTY close timed out'))
     supervisor.killAndWait = killAndWait
     const manager = createManager(supervisor)
-    const repoRoot = WORKSPACE_ID
-    const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
+    const workspaceId = WORKSPACE_ID
+    const scope = terminalSessionRuntimeScope(workspaceId, 'repo-runtime-test')
     const controller = new AbortController()
     const pendingCreate = ensureSession(manager, {
       userId: USER_ID,
@@ -1261,7 +1261,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)),
     ).resolves.toEqual({
       ok: false,
-      scopes: [{ userId: USER_ID, repoRoot, workspaceRuntimeId: 'repo-runtime-test', scope }],
+      scopes: [{ userId: USER_ID, workspaceId, workspaceRuntimeId: 'repo-runtime-test', scope }],
       message: 'PTY close timed out',
     })
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([
@@ -1274,7 +1274,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
       manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)),
     ).resolves.toEqual({
       ok: true,
-      scopes: [{ userId: USER_ID, repoRoot, workspaceRuntimeId: 'repo-runtime-test', scope }],
+      scopes: [{ userId: USER_ID, workspaceId, workspaceRuntimeId: 'repo-runtime-test', scope }],
     })
     expect(killAndWait).toHaveBeenCalledTimes(2)
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])

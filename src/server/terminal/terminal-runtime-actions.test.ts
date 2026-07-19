@@ -148,7 +148,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const provider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: USER_ID,
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     await expect(
@@ -180,7 +180,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const provider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: USER_ID,
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     await expect(
@@ -214,7 +214,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const provider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: USER_ID,
-      repoRoot: WORKSPACE_ID,
+      workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-stale',
     })
     await expect(

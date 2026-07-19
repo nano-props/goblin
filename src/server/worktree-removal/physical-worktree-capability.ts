@@ -10,7 +10,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface PhysicalWorktreeExecutionInput {
   userId: string
-  repoRoot: WorkspaceId
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   worktreePath: string
 }
@@ -89,7 +89,7 @@ export function physicalWorktreeExecutionScope(
   const state = capabilityState(capability)
   return {
     userId: state.userId,
-    repoRoot: state.repoRoot,
+    workspaceId: state.workspaceId,
     workspaceRuntimeId: state.workspaceRuntimeId,
     worktreePath: state.worktreePath,
   }
@@ -128,12 +128,12 @@ export function assertPhysicalWorktreeExecutionCapability(
   input: PhysicalWorktreeExecutionInput,
 ): void {
   const state = capabilityState(capability)
-  const worktreePath = isRemoteWorkspaceId(input.repoRoot)
+  const worktreePath = isRemoteWorkspaceId(input.workspaceId)
     ? path.posix.resolve(input.worktreePath)
     : path.resolve(input.worktreePath)
   if (
     state.userId !== input.userId ||
-    state.repoRoot !== input.repoRoot ||
+    state.workspaceId !== input.workspaceId ||
     state.workspaceRuntimeId !== input.workspaceRuntimeId ||
     state.worktreePath !== worktreePath
   )
