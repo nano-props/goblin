@@ -15,13 +15,14 @@ import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { TitleBarDragRegion } from '#/web/components/title-bar-chrome-region.tsx'
 import type { GitWorkspaceProjection } from '#/web/stores/workspaces/types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const NOOP = () => {}
 const SIDEBAR_TOP_CLASS_NAME = 'flex shrink-0 items-center gap-1 bg-card text-sm'
 type RepoShellSidebarChromeRegion = 'drag' | 'none'
 
 interface RepoShellSidebarProps {
-  workspaceId?: string
+  workspaceId?: WorkspaceId
   git: GitWorkspaceProjection | null
   compact: boolean
   branchContent?: ReactNode
@@ -115,7 +116,7 @@ function RepoShellPrimaryActions({
   newWorktreeSelected,
   gitAvailable,
 }: {
-  workspaceId?: string
+  workspaceId?: WorkspaceId
   onCreateWorktree?: () => void
   onOpenDashboard?: () => void
   dashboardSelected?: boolean
@@ -143,7 +144,7 @@ function RepoShellPrimaryActions({
   )
 }
 
-function WorkspacePickerRow({ workspaceId }: { workspaceId?: string }) {
+function WorkspacePickerRow({ workspaceId }: { workspaceId?: WorkspaceId }) {
   const overlayActions = useContext(LayoutOverlayActions)
   return (
     <div className="flex h-8 min-w-0 shrink-0 items-center">

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
 import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 beforeEach(() => {
   vi.stubGlobal('matchMedia', createMatchMedia(false))
@@ -20,8 +21,8 @@ describe('WorkspacePicker keyboard navigation', () => {
 
     renderInJsdom(
       <WorkspacePicker
-        workspaces={[workspace('workspace-a', '/tmp/workspace-a'), workspace('workspace-b', '/tmp/workspace-b')]}
-        currentWorkspaceId="/tmp/workspace-a"
+        workspaces={[workspace('workspace-a', 'goblin+file:///tmp/workspace-a'), workspace('workspace-b', 'goblin+file:///tmp/workspace-b')]}
+        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={onActivate}
         onClose={() => {}}
@@ -31,7 +32,7 @@ describe('WorkspacePicker keyboard navigation', () => {
       />,
     )
 
-    const currentWorkspaceButton = document.body.querySelector('[data-current-workspace-id="/tmp/workspace-a"]')
+    const currentWorkspaceButton = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
     if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
 
     act(() => {
@@ -40,7 +41,7 @@ describe('WorkspacePicker keyboard navigation', () => {
       )
     })
 
-    expect(onActivate).toHaveBeenCalledWith('/tmp/workspace-b')
+    expect(onActivate).toHaveBeenCalledWith('goblin+file:///tmp/workspace-b')
   })
 
   test('moves between workspaces from the sidebar current workspace button', () => {
@@ -48,8 +49,8 @@ describe('WorkspacePicker keyboard navigation', () => {
 
     renderInJsdom(
       <WorkspacePicker
-        workspaces={[workspace('workspace-a', '/tmp/workspace-a'), workspace('workspace-b', '/tmp/workspace-b')]}
-        currentWorkspaceId="/tmp/workspace-a"
+        workspaces={[workspace('workspace-a', 'goblin+file:///tmp/workspace-a'), workspace('workspace-b', 'goblin+file:///tmp/workspace-b')]}
+        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={onActivate}
         onClose={() => {}}
@@ -60,7 +61,7 @@ describe('WorkspacePicker keyboard navigation', () => {
       />,
     )
 
-    const currentWorkspaceButton = document.body.querySelector('[data-current-workspace-id="/tmp/workspace-a"]')
+    const currentWorkspaceButton = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
     if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
 
     act(() => {
@@ -69,13 +70,13 @@ describe('WorkspacePicker keyboard navigation', () => {
       )
     })
 
-    expect(onActivate).toHaveBeenCalledWith('/tmp/workspace-b')
+    expect(onActivate).toHaveBeenCalledWith('goblin+file:///tmp/workspace-b')
   })
 })
 
 function workspace(name: string, id: string): WorkspacePickerItem {
   return {
-    id,
+    id: workspaceIdForTest(id),
     name,
     gitCapability: 'available',
     git: { remoteDetails: [], lastSyncedAt: null },

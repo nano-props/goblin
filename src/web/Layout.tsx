@@ -154,7 +154,7 @@ function AuthenticatedWorkspaceShell() {
   // `hydratedRouteRepoId` means the routed repo is present in the hydrated repo store and
   // can safely drive refreshes, dialogs, and commands that need repo data.
   const hydratedRouteRepoId = useWorkspacesStore((s) => {
-    return routedRepoId && s.workspaces[routedRepoId] ? routedRepoId : null
+    return routedRepoId ? (s.workspaces[routedRepoId]?.id ?? null) : null
   })
   const commandRepo = useWorkspacesStore((s) => (hydratedRouteRepoId ? s.workspaces[hydratedRouteRepoId] : undefined))
   const currentBranchName = routeContext?.kind === 'branch' ? (routeContext.branchName ?? null) : null

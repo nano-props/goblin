@@ -382,12 +382,12 @@ function workspaceShellForNewRuntimeEpoch(workspace: WorkspaceState, workspaceRu
   return next
 }
 
-async function runWorkspaceRuntimeMembershipCommand<T>(repoKey: string, command: () => Promise<T>): Promise<T> {
+async function runWorkspaceRuntimeMembershipCommand<T>(workspaceKey: string, command: () => Promise<T>): Promise<T> {
   const precedingExclusive = workspaceRuntimeMembershipExclusiveTail
-  let queue = workspaceRuntimeMembershipQueues.get(repoKey)
+  let queue = workspaceRuntimeMembershipQueues.get(workspaceKey)
   if (!queue) {
     queue = new PQueue({ concurrency: 1 })
-    workspaceRuntimeMembershipQueues.set(repoKey, queue)
+    workspaceRuntimeMembershipQueues.set(workspaceKey, queue)
   }
   const work = (async () => {
     await precedingExclusive
@@ -399,8 +399,8 @@ async function runWorkspaceRuntimeMembershipCommand<T>(repoKey: string, command:
   } finally {
     activeWorkspaceRuntimeMembershipCommands.delete(work)
     void queue.onIdle().then(() => {
-      if (workspaceRuntimeMembershipQueues.get(repoKey) === queue && queue.size === 0 && queue.pending === 0) {
-        workspaceRuntimeMembershipQueues.delete(repoKey)
+      if (workspaceRuntimeMembershipQueues.get(workspaceKey) === queue && queue.size === 0 && queue.pending === 0) {
+        workspaceRuntimeMembershipQueues.delete(workspaceKey)
       }
     })
   }

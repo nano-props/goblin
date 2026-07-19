@@ -16,9 +16,10 @@ import { latestRepoSyncTime } from '#/web/stores/workspaces/sync-time.ts'
 import { useMemo } from 'react'
 import { useWorkspaceTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
 import { toast } from 'sonner'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface WorkspacePickerHostProps {
-  currentWorkspaceId: string | null
+  currentWorkspaceId: WorkspaceId | null
   onOpenWorkspacePathDialog: () => void
   onOpenRemote: () => void
   onClone: () => void
@@ -93,8 +94,8 @@ export function WorkspacePickerHost({
     })
   }
 
-  async function handleClose(workspaceLocator: string) {
-    const workspace = useWorkspacesStore.getState().workspaces[workspaceLocator]
+  async function handleClose(workspaceId: WorkspaceId) {
+    const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
     if (!workspace) return
     const result = await navigation.closeWorkspace(workspace.id)
     if (!result.ok) toast.error(t(result.message))

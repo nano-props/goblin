@@ -10,13 +10,14 @@ import { cn } from '#/web/lib/cn.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
 import { composeRefs } from '#/web/components/ui/refs.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const CURRENT_WORKSPACE_ICON_CLASS = 'flex size-3.5 shrink-0 items-center justify-center'
 
 interface CurrentWorkspaceButtonBaseProps {
   workspace: WorkspacePickerItem
   focusRegistry?: FocusRegistry<string, HTMLButtonElement>
-  onKeyboardNavigate: (id: string, direction: 'prev' | 'next' | 'first' | 'last') => void
+  onKeyboardNavigate: (id: WorkspaceId, direction: 'prev' | 'next' | 'first' | 'last') => void
   unavailableLabel: string
   terminalBellCount?: number
   fill?: boolean
@@ -24,7 +25,7 @@ interface CurrentWorkspaceButtonBaseProps {
 
 interface CurrentWorkspaceToolbarButtonProps extends CurrentWorkspaceButtonBaseProps {
   isCurrent: boolean
-  onActivate: (id: string) => void
+  onActivate: (id: WorkspaceId) => void
 }
 
 type CurrentWorkspaceSidebarButtonProps = Omit<ComponentProps<'button'>, 'children' | 'type'> &
@@ -202,7 +203,7 @@ function CurrentWorkspaceButtonText({
 
 function handleWorkspaceKeyboardNavigation(
   event: KeyboardEvent<HTMLButtonElement>,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   onKeyboardNavigate: CurrentWorkspaceButtonBaseProps['onKeyboardNavigate'],
 ) {
   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return

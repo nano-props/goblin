@@ -17,7 +17,7 @@ const WORKTREE_KEY = formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH)
 
 afterEach(() => {
   setTerminalSessionCommandBridge(null)
-  useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
+  useTerminalProjectionHydrationStore.setState({ hydrationByWorkspace: new Map(), refreshedAtByWorkspace: new Map() })
   useWorkspacesStore.setState({ selectedTerminalSessionIdByTerminalWorktree: {} })
 })
 

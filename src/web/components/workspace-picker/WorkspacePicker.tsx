@@ -20,12 +20,13 @@ import type {
 import { isRemoteWorkspaceId, remoteWorkspaceConnectionTarget } from '#/shared/remote-workspace.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 function navigatedWorkspaceId(
   workspaces: WorkspacePickerItem[],
-  currentId: string,
+  currentId: WorkspaceId,
   direction: 'prev' | 'next' | 'first' | 'last',
-): string | null {
+): WorkspaceId | null {
   if (workspaces.length === 0) return null
   const current = workspaces.findIndex((workspace) => workspace.id === currentId)
   const index =
@@ -43,10 +44,10 @@ function navigatedWorkspaceId(
 
 interface WorkspacePickerProps {
   workspaces: WorkspacePickerItem[]
-  currentWorkspaceId: string | null
+  currentWorkspaceId: WorkspaceId | null
   labels: WorkspacePickerLabels
-  onActivate: (id: string) => void
-  onClose: (id: string) => void
+  onActivate: (id: WorkspaceId) => void
+  onClose: (id: WorkspaceId) => void
   onOpenLocal: () => void
   onOpenRemote: () => void
   onClone: () => void
@@ -91,10 +92,10 @@ function WorkspaceMenuContent({
   onSelectAction,
 }: {
   workspaces: WorkspacePickerItem[]
-  currentWorkspaceId: string | null
+  currentWorkspaceId: WorkspaceId | null
   labels: WorkspacePickerLabels
-  onSelectWorkspace: (id: string) => void
-  onClose: (id: string) => void
+  onSelectWorkspace: (id: WorkspaceId) => void
+  onClose: (id: WorkspaceId) => void
   onOpenLocal: () => void
   onOpenRemote: () => void
   onClone: () => void
@@ -236,7 +237,7 @@ export function WorkspacePicker({
   const [menuOpen, setMenuOpen] = useState(false)
 
   const handleClose = useCallback(
-    (id: string) => {
+    (id: WorkspaceId) => {
       const isCurrent = id === currentWorkspaceId
       const idx = workspaces.findIndex((r) => r.id === id)
       const nextId = workspaces[idx + 1]?.id ?? workspaces[idx - 1]?.id ?? null
@@ -248,7 +249,7 @@ export function WorkspacePicker({
     [workspaces, currentWorkspaceId, onClose, focusRegistry],
   )
 
-  const handleKeyboardNavigate = (id: string, direction: 'prev' | 'next' | 'first' | 'last') => {
+  const handleKeyboardNavigate = (id: WorkspaceId, direction: 'prev' | 'next' | 'first' | 'last') => {
     const nextId = navigatedWorkspaceId(workspaces, id, direction)
     if (!nextId) return
     onActivate(nextId)

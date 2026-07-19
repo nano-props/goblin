@@ -1,8 +1,9 @@
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import { sessionLog } from '#/web/logger.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 interface Options {
   ensureWorkspaceOpen: (path: string) => Promise<OpenWorkspaceResult>
-  activateWorkspace?: (id: string) => void
+  activateWorkspace?: (id: WorkspaceId) => void
   onOpenFailed?: (path: string, message: string) => void
   onPostOpenError?: (path: string, message: string) => void
 }
@@ -10,8 +11,8 @@ interface Options {
 export async function openWorkspacePaths(
   paths: string[],
   { ensureWorkspaceOpen, activateWorkspace, onOpenFailed, onPostOpenError }: Options,
-): Promise<string | null> {
-  let firstId: string | null = null
+): Promise<WorkspaceId | null> {
+  let firstId: WorkspaceId | null = null
   for (const path of paths) {
     const result = await ensureWorkspaceOpen(path)
     if (!result.ok) {

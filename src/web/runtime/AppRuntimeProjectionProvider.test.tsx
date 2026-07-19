@@ -166,7 +166,7 @@ describe('AppRuntimeProjectionProvider', () => {
     const result = renderRuntimeProvider(REPO_ID)
     try {
       expect(recoverSessionsMock).not.toHaveBeenCalled()
-      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)?.workspaceRuntimeId).not.toBe(
+      expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.workspaceRuntimeId).not.toBe(
         repo.workspaceRuntimeId,
       )
 
@@ -183,7 +183,7 @@ describe('AppRuntimeProjectionProvider', () => {
           },
           'client_sharedterminal',
         )
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
           workspaceRuntimeId: repo.workspaceRuntimeId,
           phase: 'ready',
         })
@@ -328,7 +328,7 @@ describe('AppRuntimeProjectionProvider', () => {
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() =>
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)?.phase).toBe('ready'),
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.phase).toBe('ready'),
       )
       recoverSessionsMock.mockClear()
 
@@ -351,7 +351,7 @@ describe('AppRuntimeProjectionProvider', () => {
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() =>
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)?.phase).toBe('ready'),
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.phase).toBe('ready'),
       )
       recoverSessionsMock.mockClear()
       recoverSessionsMock.mockResolvedValueOnce({ revision: 3, sessions: [] })
@@ -386,7 +386,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(2))
       await vi.waitFor(() =>
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
           workspaceRuntimeId: repo.workspaceRuntimeId,
           phase: 'ready',
         }),
@@ -439,7 +439,7 @@ describe('AppRuntimeProjectionProvider', () => {
       })
 
       await vi.waitFor(() =>
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)?.phase).toBe('ready'),
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.phase).toBe('ready'),
       )
       expect(recoverSessionsMock).toHaveBeenCalledOnce()
     } finally {
@@ -573,7 +573,7 @@ describe('AppRuntimeProjectionProvider', () => {
       })
 
       await vi.waitFor(() =>
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
           workspaceRuntimeId: repo.workspaceRuntimeId,
           phase: 'failed',
           errorMessage: 'network unavailable',
@@ -586,7 +586,7 @@ describe('AppRuntimeProjectionProvider', () => {
       })
 
       await vi.waitFor(() =>
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
           workspaceRuntimeId: repo.workspaceRuntimeId,
           phase: 'ready',
         }),
@@ -721,7 +721,7 @@ describe('AppRuntimeProjectionProvider', () => {
       })
 
       expect(projectionMocks.reconcileServerSessionsSnapshot).not.toHaveBeenCalled()
-      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).not.toMatchObject({
+      expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).not.toMatchObject({
         workspaceRuntimeId: firstRepo.workspaceRuntimeId,
         phase: 'ready',
       })
@@ -736,7 +736,7 @@ describe('AppRuntimeProjectionProvider', () => {
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() => {
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
           workspaceRuntimeId: repo.workspaceRuntimeId,
           phase: 'failed',
           errorMessage: 'error.workspace-runtime-stale',
@@ -753,7 +753,7 @@ describe('AppRuntimeProjectionProvider', () => {
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() => {
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
           workspaceRuntimeId: repo.workspaceRuntimeId,
           phase: 'failed',
           errorMessage: 'Terminal sessions snapshot rejected by the active runtime membership',
@@ -781,7 +781,7 @@ describe('AppRuntimeProjectionProvider', () => {
     await Promise.resolve()
 
     expect(projectionMocks.reconcileServerSessionsSnapshot).not.toHaveBeenCalled()
-    expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).not.toMatchObject({
+    expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).not.toMatchObject({
       workspaceRuntimeId: repo.workspaceRuntimeId,
       phase: 'ready',
     })
@@ -824,7 +824,7 @@ describe('AppRuntimeProjectionProvider', () => {
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() => {
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
           workspaceRuntimeId: repo.workspaceRuntimeId,
           phase: 'ready',
         })
@@ -837,7 +837,7 @@ describe('AppRuntimeProjectionProvider', () => {
       })
 
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
-      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
+      expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
         workspaceRuntimeId: repo.workspaceRuntimeId,
         phase: 'ready',
       })

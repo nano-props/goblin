@@ -33,7 +33,7 @@ export type WorkspaceRootPanePresentation =
   { kind: 'static'; tab: WorkspacePaneStaticTabType } | { kind: 'terminal'; terminalSessionId: string }
 
 export interface PrimaryWindowNavigationActions {
-  activateWorkspace: (workspaceId: string) => void
+  activateWorkspace: (workspaceId: WorkspaceId) => void
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   cycleWorkspace: (direction: 1 | -1) => void
   selectRepoBranch: (workspaceId: string, branch: string, options?: { replace?: boolean }) => boolean
@@ -81,7 +81,7 @@ export interface PrimaryWindowNavigationActions {
 }
 
 interface CreatePrimaryWindowNavigationActionsOptions {
-  currentWorkspaceId: string | null
+  currentWorkspaceId: WorkspaceId | null
   workspaceOrder: WorkspaceId[]
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   peekWorkspaceNavigation: (
@@ -259,10 +259,10 @@ function rememberWorkspacePaneRouteSelection(
   route: WorkspacePaneRememberedRoute,
 ): void {
   const state = useWorkspacesStore.getState()
-  const repo = state.workspaces[workspaceId]
-  const branchModel = repo?.capability.kind === 'git' ? readRepoBranchSnapshotQueryProjection(repo) : null
+  const workspace = state.workspaces[workspaceId]
+  const branchModel = workspace?.capability.kind === 'git' ? readRepoBranchSnapshotQueryProjection(workspace) : null
   const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
-  if (!repo || !branchModel || !branch) return
+  if (!workspace || !branchModel || !branch) return
   state.setWorkspacePaneTab(
     workspaceId,
     branchName,
@@ -301,7 +301,7 @@ function restoreWorkspacePresentationOrOpenDashboard(
   options: { onBlocked: 'stay' | 'dashboard' },
 ): void {
   const state = useWorkspacesStore.getState()
-  const repo = state.workspaces[workspaceId]
+  const workspace = state.workspaces[workspaceId]
   const entry = state.navigationHistoryByWorkspace[workspaceId]?.current ?? null
   // Creating a worktree is a transient workflow, not a repo workspace to resume.
   // A non-Git workspace may resume only capability-invariant presentations;
@@ -309,7 +309,7 @@ function restoreWorkspacePresentationOrOpenDashboard(
   const entryCanResume =
     entry &&
     entry.route.kind !== 'newWorktree' &&
-    (repo?.capability.kind === 'git' || entry.route.kind === 'workspace-root' || entry.route.kind === 'dashboard')
+    (workspace?.capability.kind === 'git' || entry.route.kind === 'workspace-root' || entry.route.kind === 'dashboard')
   if (entryCanResume) {
     const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, { presentationToken })
     if (result.kind === 'accepted' || (result.kind === 'blocked' && options.onBlocked === 'stay')) return
@@ -317,7 +317,7 @@ function restoreWorkspacePresentationOrOpenDashboard(
   routeNavigation.openRepoDashboard(workspaceId, { presentationToken })
 }
 
-function nextWorkspaceIdAfterClose(workspaceOrder: WorkspaceId[], closingWorkspaceId: string): WorkspaceId | null {
+function nextWorkspaceIdAfterClose(workspaceOrder: WorkspaceId[], closingWorkspaceId: WorkspaceId): WorkspaceId | null {
   const currentIndex = workspaceOrder.findIndex((workspaceId) => workspaceId === closingWorkspaceId)
   if (currentIndex === -1) return workspaceOrder[0] ?? null
   return workspaceOrder[currentIndex + 1] ?? workspaceOrder[currentIndex - 1] ?? null
@@ -325,7 +325,7 @@ function nextWorkspaceIdAfterClose(workspaceOrder: WorkspaceId[], closingWorkspa
 
 function nextNavigationWorkspaceId(
   workspaceOrder: WorkspaceId[],
-  currentWorkspaceId: string | null,
+  currentWorkspaceId: WorkspaceId | null,
   direction: 1 | -1,
 ): WorkspaceId | null {
   if (workspaceOrder.length === 0) return null

@@ -99,7 +99,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
           : undefined,
         reject: (error) => {
           appRuntimeProjectionLog.debug('failed to reconcile terminal sessions from server', { error })
-          const hydration = useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(scope.target.workspaceId)
+          const hydration = useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(scope.target.workspaceId)
           if (hydration?.workspaceRuntimeId !== scope.target.workspaceRuntimeId || hydration.phase !== 'pending') return
           useTerminalProjectionHydrationStore
             .getState()
@@ -176,7 +176,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
         const scope = currentScopeForRepo(scopeRegistry, event.workspaceId)
         if (!scope) return
         if (scope.target.workspaceRuntimeId !== event.workspaceRuntimeId) return
-        const hydration = useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(event.workspaceId)
+        const hydration = useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(event.workspaceId)
         const ready = hydration?.workspaceRuntimeId === event.workspaceRuntimeId && hydration.phase === 'ready'
         const localRevision = terminalProjection.terminalSessionsCatalogCoverageRevision(scope.target) ?? -1
         if (ready && localRevision >= event.revision) return

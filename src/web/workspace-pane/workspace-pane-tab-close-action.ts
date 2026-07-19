@@ -140,9 +140,9 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
 ): Promise<boolean> {
   const base = options.confirmedTerminal.base
   const coordinates = terminalExecutionCoordinates(base.target)
-  const queueRepoId = options.workspaceId ?? coordinates.workspaceId
+  const queueWorkspaceId = options.workspaceId ?? coordinates.workspaceId
   const queueWorkspaceRuntimeId = coordinates.workspaceRuntimeId
-  if (queueRepoId !== coordinates.workspaceId) return false
+  if (queueWorkspaceId !== coordinates.workspaceId) return false
   const queueTarget = workspacePaneActionTargetFromFilesystemTarget(base.target)
   const presentationToken = beginPrimaryWindowPresentation()
   return await runWorkspacePaneAction(queueTarget, () =>

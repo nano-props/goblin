@@ -172,7 +172,7 @@ describe('workspace pane destination navigation', () => {
     })
     await Promise.resolve()
 
-    primaryNavigationActions().actions.activateWorkspace('/tmp/another-repo')
+    primaryNavigationActions().actions.activateWorkspace(workspaceIdForTest('goblin+file:///tmp/another-repo'))
     routeCommit.resolve(true)
 
     await expect(committed).resolves.toEqual({ kind: 'superseded' })

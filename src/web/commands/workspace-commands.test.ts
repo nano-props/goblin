@@ -177,7 +177,7 @@ beforeEach(() => {
   resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
   resetTerminalActionDialogsStore()
-  useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
+  useTerminalProjectionHydrationStore.setState({ hydrationByWorkspace: new Map(), refreshedAtByWorkspace: new Map() })
 })
 
 afterEach(() => {

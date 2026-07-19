@@ -131,7 +131,7 @@ beforeEach(() => {
   primaryWindowQueryClient.clear()
   resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
-  useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
+  useTerminalProjectionHydrationStore.setState({ hydrationByWorkspace: new Map(), refreshedAtByWorkspace: new Map() })
 })
 
 afterEach(() => {

@@ -157,7 +157,7 @@ export function RepoView({
   ) => (
     <RepoWorkspacePane>
       <RepoLayoutSidebar
-        workspaceId={workspaceId}
+        workspaceId={repo.id}
         git={git}
         compact={compact}
         branchContent={branchContent ?? (!gitCapabilitySettled ? <BranchNavigatorSkeleton /> : undefined)}

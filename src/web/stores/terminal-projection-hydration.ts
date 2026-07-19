@@ -1,4 +1,4 @@
-// Per-repo terminal server-projection hydration state.
+// Per-workspace terminal server-projection hydration state.
 //
 // Terminal sessions are server-owned runtime state. The client keeps a local
 // projection for UI rendering; this store records whether that server ->
@@ -21,42 +21,42 @@ export interface TerminalProjectionHydrationEntry {
 interface TerminalProjectionHydrationState {
   /** Minimum gap between focus-triggered projection refreshes. */
   refreshCooldownMs: number
-  /** repoRoot -> hydration state for the current terminal projection runtime. */
-  hydrationByRepo: Map<string, TerminalProjectionHydrationEntry>
-  /** repoRoot -> ms-since-epoch recorded by the latest successful projection hydrate. */
-  refreshedAtByRepo: Map<string, number>
-  beginProjectionHydration: (repoRoot: string, workspaceRuntimeId: string) => void
-  markProjectionReady: (repoRoot: string, workspaceRuntimeId: string) => void
-  markProjectionFailed: (repoRoot: string, workspaceRuntimeId: string, errorMessage?: string) => void
-  shouldRefreshProjection: (repoRoot: string) => boolean
+  /** workspaceId -> hydration state for the current terminal projection runtime. */
+  hydrationByWorkspace: Map<string, TerminalProjectionHydrationEntry>
+  /** workspaceId -> ms-since-epoch recorded by the latest successful projection hydrate. */
+  refreshedAtByWorkspace: Map<string, number>
+  beginProjectionHydration: (workspaceId: string, workspaceRuntimeId: string) => void
+  markProjectionReady: (workspaceId: string, workspaceRuntimeId: string) => void
+  markProjectionFailed: (workspaceId: string, workspaceRuntimeId: string, errorMessage?: string) => void
+  shouldRefreshProjection: (workspaceId: string) => boolean
 }
 
 export const useTerminalProjectionHydrationStore = create<TerminalProjectionHydrationState>((set, get) => ({
   refreshCooldownMs: DEFAULT_REFRESH_COOLDOWN_MS,
-  hydrationByRepo: new Map(),
-  refreshedAtByRepo: new Map(),
-  beginProjectionHydration: (repoRoot, workspaceRuntimeId) => {
-    const current = get().hydrationByRepo.get(repoRoot)
+  hydrationByWorkspace: new Map(),
+  refreshedAtByWorkspace: new Map(),
+  beginProjectionHydration: (workspaceId, workspaceRuntimeId) => {
+    const current = get().hydrationByWorkspace.get(workspaceId)
     if (current?.workspaceRuntimeId === workspaceRuntimeId && current.phase === 'pending') return
     set((s) => {
-      const hydrationByRepo = new Map(s.hydrationByRepo)
-      hydrationByRepo.set(repoRoot, { workspaceRuntimeId, phase: 'pending' })
-      return { hydrationByRepo }
+      const hydrationByWorkspace = new Map(s.hydrationByWorkspace)
+      hydrationByWorkspace.set(workspaceId, { workspaceRuntimeId, phase: 'pending' })
+      return { hydrationByWorkspace }
     })
   },
-  markProjectionReady: (repoRoot, workspaceRuntimeId) => {
-    const current = get().hydrationByRepo.get(repoRoot)
+  markProjectionReady: (workspaceId, workspaceRuntimeId) => {
+    const current = get().hydrationByWorkspace.get(workspaceId)
     if (current?.workspaceRuntimeId === workspaceRuntimeId && current.phase === 'ready') return
     set((s) => {
-      const hydrationByRepo = new Map(s.hydrationByRepo)
-      hydrationByRepo.set(repoRoot, { workspaceRuntimeId, phase: 'ready' })
-      const refreshedAtByRepo = new Map(s.refreshedAtByRepo)
-      refreshedAtByRepo.set(repoRoot, Date.now())
-      return { hydrationByRepo, refreshedAtByRepo }
+      const hydrationByWorkspace = new Map(s.hydrationByWorkspace)
+      hydrationByWorkspace.set(workspaceId, { workspaceRuntimeId, phase: 'ready' })
+      const refreshedAtByWorkspace = new Map(s.refreshedAtByWorkspace)
+      refreshedAtByWorkspace.set(workspaceId, Date.now())
+      return { hydrationByWorkspace, refreshedAtByWorkspace }
     })
   },
-  markProjectionFailed: (repoRoot, workspaceRuntimeId, errorMessage) => {
-    const current = get().hydrationByRepo.get(repoRoot)
+  markProjectionFailed: (workspaceId, workspaceRuntimeId, errorMessage) => {
+    const current = get().hydrationByWorkspace.get(workspaceId)
     if (
       current?.workspaceRuntimeId === workspaceRuntimeId &&
       current.phase === 'failed' &&
@@ -64,44 +64,44 @@ export const useTerminalProjectionHydrationStore = create<TerminalProjectionHydr
     )
       return
     set((s) => {
-      const hydrationByRepo = new Map(s.hydrationByRepo)
-      hydrationByRepo.set(repoRoot, { workspaceRuntimeId, phase: 'failed', errorMessage })
-      return { hydrationByRepo }
+      const hydrationByWorkspace = new Map(s.hydrationByWorkspace)
+      hydrationByWorkspace.set(workspaceId, { workspaceRuntimeId, phase: 'failed', errorMessage })
+      return { hydrationByWorkspace }
     })
   },
-  shouldRefreshProjection: (repoRoot) => {
-    const last = get().refreshedAtByRepo.get(repoRoot) ?? 0
+  shouldRefreshProjection: (workspaceId) => {
+    const last = get().refreshedAtByWorkspace.get(workspaceId) ?? 0
     return Date.now() - last >= get().refreshCooldownMs
   },
 }))
 
 export function useTerminalProjectionHydrationPhase(
-  repoRoot: string | null | undefined,
+  workspaceId: string | null | undefined,
   workspaceRuntimeId: string | null | undefined,
 ): TerminalProjectionHydrationPhase {
-  return useTerminalProjectionHydrationEntry(repoRoot, workspaceRuntimeId).phase
+  return useTerminalProjectionHydrationEntry(workspaceId, workspaceRuntimeId).phase
 }
 
 export function useTerminalProjectionHydrationEntry(
-  repoRoot: string | null | undefined,
+  workspaceId: string | null | undefined,
   workspaceRuntimeId: string | null | undefined,
 ): TerminalProjectionHydrationEntry {
-  const hydrationByRepo = useTerminalProjectionHydrationStore((s) => s.hydrationByRepo)
+  const hydrationByWorkspace = useTerminalProjectionHydrationStore((s) => s.hydrationByWorkspace)
   return useMemo(() => {
-    if (!repoRoot || !workspaceRuntimeId) return { workspaceRuntimeId: workspaceRuntimeId ?? '', phase: 'pending' }
-    const current = hydrationByRepo.get(repoRoot)
+    if (!workspaceId || !workspaceRuntimeId) return { workspaceRuntimeId: workspaceRuntimeId ?? '', phase: 'pending' }
+    const current = hydrationByWorkspace.get(workspaceId)
     return current?.workspaceRuntimeId === workspaceRuntimeId ? current : { workspaceRuntimeId, phase: 'pending' }
-  }, [hydrationByRepo, workspaceRuntimeId, repoRoot])
+  }, [hydrationByWorkspace, workspaceRuntimeId, workspaceId])
 }
 
 export function useIsInitialTerminalProjectionHydrating(
-  repoRoot: string | null | undefined,
+  workspaceId: string | null | undefined,
   workspaceRuntimeId: string | null | undefined,
 ): boolean {
-  const hydrationByRepo = useTerminalProjectionHydrationStore((s) => s.hydrationByRepo)
+  const hydrationByWorkspace = useTerminalProjectionHydrationStore((s) => s.hydrationByWorkspace)
   return useMemo(() => {
-    if (!repoRoot || !workspaceRuntimeId) return false
-    const current = hydrationByRepo.get(repoRoot)
+    if (!workspaceId || !workspaceRuntimeId) return false
+    const current = hydrationByWorkspace.get(workspaceId)
     return (current?.workspaceRuntimeId === workspaceRuntimeId ? current.phase : 'pending') === 'pending'
-  }, [hydrationByRepo, workspaceRuntimeId, repoRoot])
+  }, [hydrationByWorkspace, workspaceRuntimeId, workspaceId])
 }

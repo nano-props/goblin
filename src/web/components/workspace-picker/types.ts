@@ -1,7 +1,8 @@
 import type { GitRemoteInfo } from '#/web/types.ts'
 import type { RemoteWorkspaceConnectionLifecycle } from '#/shared/remote-workspace.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 export interface WorkspacePickerItem {
-  id: string
+  id: WorkspaceId
   name: string
   /** Git capability reported by the authoritative workspace probe. */
   gitCapability: 'unknown' | 'available' | 'unavailable'

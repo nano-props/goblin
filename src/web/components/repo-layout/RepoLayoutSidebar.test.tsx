@@ -9,6 +9,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 vi.mock('#/web/components/WorkspacePickerHost.tsx', () => ({
   WorkspacePickerHost: () => (
@@ -29,7 +30,7 @@ vi.mock('#/web/commands/workspace-commands.ts', () => ({
   runTerminalPrimaryActionCommand: workspaceCommandMocks.terminal,
 }))
 
-const REPO_ID = 'goblin+file:///tmp/repo-shell-sidebar-test'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-shell-sidebar-test')
 
 function gitProjection() {
   const capability = useWorkspacesStore.getState().workspaces[REPO_ID]?.capability

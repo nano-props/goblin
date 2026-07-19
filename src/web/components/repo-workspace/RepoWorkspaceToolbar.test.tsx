@@ -189,7 +189,7 @@ beforeEach(() => {
   // useTerminalProjectionHydrationStore; existing tests assume the repo has been
   // synced. Mark ready by default so the "+ New" button renders; the
   // loading-state test skips this and expects the same button to be busy.
-  useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
+  useTerminalProjectionHydrationStore.setState({ hydrationByWorkspace: new Map(), refreshedAtByWorkspace: new Map() })
 })
 
 afterEach(() => {

@@ -4,7 +4,7 @@ import { canonicalWorkspaceLocator, workspaceLocatorForPath } from '#/shared/wor
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
-  useTerminalRepoProjectionHydrationEntry,
+  useTerminalWorkspaceProjectionHydrationEntry,
   useTerminalSessionSummaries,
   useTerminalWorktreeCreatePending,
 } from '#/web/components/terminal/terminal-session-store.ts'
@@ -164,7 +164,7 @@ function useTerminalRuntimeTabProviderProjection({
   const targetKey = terminalRuntimeTabTargetKey({ workspaceId, worktreePath })
   const terminalSessionSummaries = useTerminalSessionSummaries(targetKey)
   const terminalCreatePending = useTerminalWorktreeCreatePending(targetKey)
-  const terminalProjectionHydration = useTerminalRepoProjectionHydrationEntry(workspaceId)
+  const terminalProjectionHydration = useTerminalWorkspaceProjectionHydrationEntry(workspaceId)
   const selectedTerminalSessionId = useWorkspacesStore((s) =>
     targetKey ? s.selectedTerminalSessionIdByTerminalWorktree[targetKey] : undefined,
   )
@@ -218,7 +218,7 @@ function readTerminalRuntimeProjectionState(
   workspaceId: string,
   workspaceRuntimeId: string,
 ): WorkspacePaneRuntimeProjectionState {
-  const terminalProjectionHydration = useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(workspaceId)
+  const terminalProjectionHydration = useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(workspaceId)
   const currentTerminalProjectionHydration =
     terminalProjectionHydration?.workspaceRuntimeId === workspaceRuntimeId ? terminalProjectionHydration : null
   return {

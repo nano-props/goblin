@@ -86,7 +86,7 @@ function createRestorableWorkspaceLifecycleActions(
           if (repo && isProjectedRestoredWorkspaceRuntime(restoredRepo)) {
             initialRefreshes.push({ id: repo.id, workspaceRuntimeId: repo.workspaceRuntimeId })
           }
-          const nextRestoredRepoId = restoredWorkspaceIdAfterWorkspaceHydration(
+          const nextRestoredWorkspaceId = restoredWorkspaceIdAfterWorkspaceHydration(
             s.restoredWorkspaceId,
             workspaces,
             workspaceOrder,
@@ -96,10 +96,10 @@ function createRestorableWorkspaceLifecycleActions(
           if (
             workspaces === s.workspaces &&
             workspaceOrder === s.workspaceOrder &&
-            nextRestoredRepoId === s.restoredWorkspaceId
+            nextRestoredWorkspaceId === s.restoredWorkspaceId
           )
             return s
-          return { workspaces, workspaceOrder, restoredWorkspaceId: nextRestoredRepoId }
+          return { workspaces, workspaceOrder, restoredWorkspaceId: nextRestoredWorkspaceId }
         })
         acceptRepoProjectionReadModel(
           set,

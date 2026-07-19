@@ -27,6 +27,7 @@ import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
@@ -60,7 +61,7 @@ interface SharedClientIntentDeps {
 
 interface ExternalOpenIntentDrainerDeps {
   ensureWorkspaceOpen: (path: string) => Promise<OpenWorkspaceResult>
-  activateWorkspace: (workspaceId: string) => void
+  activateWorkspace: (workspaceId: WorkspaceId) => void
   t: (key: string) => string
 }
 

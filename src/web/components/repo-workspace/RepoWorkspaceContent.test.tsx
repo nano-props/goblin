@@ -177,7 +177,7 @@ beforeEach(() => {
   primaryWindowQueryClient.clear()
   resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
-  useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
+  useTerminalProjectionHydrationStore.setState({ hydrationByWorkspace: new Map(), refreshedAtByWorkspace: new Map() })
   repoClientMocks.getRepoLog.mockResolvedValue([])
   repoClientMocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
   filetreeClientMocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
 import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -15,11 +16,11 @@ describe('WorkspacePicker', () => {
     render(
       <WorkspacePicker
         workspaces={[
-          workspace('Folder', '/tmp/folder', { gitCapability: 'unavailable' }),
-          workspace('Git', '/tmp/git'),
-          workspace('Remote', 'goblin+ssh://example/tmp%2Fremote', { gitCapability: 'unavailable' }),
+          workspace('Folder', 'goblin+file:///tmp/folder', { gitCapability: 'unavailable' }),
+          workspace('Git', 'goblin+file:///tmp/git'),
+          workspace('Remote', 'goblin+ssh://example/tmp/remote', { gitCapability: 'unavailable' }),
         ]}
-        currentWorkspaceId="/tmp/folder"
+        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/folder')}
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -29,7 +30,7 @@ describe('WorkspacePicker', () => {
       />,
     )
 
-    const current = document.body.querySelector('[data-current-workspace-id="/tmp/folder"]')
+    const current = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/folder"]')
     expect(current?.querySelector('.lucide-folder')).not.toBeNull()
     expect(current?.querySelector('.lucide-folder-git-2')).toBeNull()
   })
@@ -37,8 +38,8 @@ describe('WorkspacePicker', () => {
   test('keeps the current workspace button as the only workspace chrome inside the current workspace group', () => {
     render(
       <WorkspacePicker
-        workspaces={[workspace('Repo-A', '/tmp/workspace-a'), workspace('workspace-b', '/tmp/workspace-b')]}
-        currentWorkspaceId="/tmp/workspace-a"
+        workspaces={[workspace('Repo-A', 'goblin+file:///tmp/workspace-a'), workspace('workspace-b', 'goblin+file:///tmp/workspace-b')]}
+        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -50,7 +51,7 @@ describe('WorkspacePicker', () => {
 
     const currentWorkspaceGroup = document.body.querySelector('[data-current-workspace-group]')
     expect(currentWorkspaceGroup).not.toBeNull()
-    expect(currentWorkspaceGroup?.querySelector('[data-current-workspace-id="/tmp/workspace-a"]')).not.toBeNull()
+    expect(currentWorkspaceGroup?.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')).not.toBeNull()
     // The "All repositories" chevron button is gone — the tab is the
     // single popover trigger now.
     expect(currentWorkspaceGroup?.querySelector('button[aria-label="More"]')).toBeNull()
@@ -60,8 +61,8 @@ describe('WorkspacePicker', () => {
   test('exposes the current workspace button as a selected tab in a horizontal tablist', () => {
     render(
       <WorkspacePicker
-        workspaces={[workspace('Repo-A', '/tmp/workspace-a'), workspace('workspace-b', '/tmp/workspace-b')]}
-        currentWorkspaceId="/tmp/workspace-a"
+        workspaces={[workspace('Repo-A', 'goblin+file:///tmp/workspace-a'), workspace('workspace-b', 'goblin+file:///tmp/workspace-b')]}
+        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -75,7 +76,7 @@ describe('WorkspacePicker', () => {
     expect(tablist?.getAttribute('role')).toBe('tablist')
     expect(tablist?.getAttribute('aria-orientation')).toBe('horizontal')
 
-    const activeTab = document.body.querySelector('[data-current-workspace-id="/tmp/workspace-a"]')
+    const activeTab = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
     if (!(activeTab instanceof HTMLButtonElement)) throw new Error('missing current workspace tab')
     expect(activeTab.getAttribute('role')).toBe('tab')
     expect(activeTab.getAttribute('aria-selected')).toBe('true')
@@ -85,8 +86,8 @@ describe('WorkspacePicker', () => {
   test('renders the sidebar surface as a plain full-width picker button instead of a tab strip', () => {
     render(
       <WorkspacePicker
-        workspaces={[workspace('Repo-A', '/tmp/workspace-a'), workspace('workspace-b', '/tmp/workspace-b')]}
-        currentWorkspaceId="/tmp/workspace-a"
+        workspaces={[workspace('Repo-A', 'goblin+file:///tmp/workspace-a'), workspace('workspace-b', 'goblin+file:///tmp/workspace-b')]}
+        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -99,7 +100,7 @@ describe('WorkspacePicker', () => {
 
     expect(document.body.querySelector('[data-current-workspace-group]')).toBeNull()
 
-    const currentWorkspaceButton = document.body.querySelector('[data-current-workspace-id="/tmp/workspace-a"]')
+    const currentWorkspaceButton = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
     if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
     expect(currentWorkspaceButton.getAttribute('role')).toBeNull()
     expect(currentWorkspaceButton.getAttribute('aria-selected')).toBeNull()
@@ -117,8 +118,8 @@ describe('WorkspacePicker', () => {
   test('opens the workspace menu popover from the sidebar surface', async () => {
     render(
       <WorkspacePicker
-        workspaces={[workspace('workspace-a', '/tmp/workspace-a'), workspace('workspace-b', '/tmp/workspace-b')]}
-        currentWorkspaceId="/tmp/workspace-a"
+        workspaces={[workspace('workspace-a', 'goblin+file:///tmp/workspace-a'), workspace('workspace-b', 'goblin+file:///tmp/workspace-b')]}
+        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -129,7 +130,7 @@ describe('WorkspacePicker', () => {
       />,
     )
 
-    const trigger = document.body.querySelector('[data-current-workspace-id="/tmp/workspace-a"]')
+    const trigger = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing sidebar workspace trigger')
 
     await act(async () => {
@@ -146,7 +147,7 @@ describe('WorkspacePicker', () => {
   })
 
   test('renders canonical workspace ids as user-facing locations in the workspace menu', async () => {
-    const workspaceId = 'goblin+file:///workspace/sample-project'
+    const workspaceId = workspaceIdForTest('goblin+file:///workspace/sample-project')
     render(
       <WorkspacePicker
         workspaces={[workspace('sample-project', workspaceId), workspace('other', 'goblin+file:///workspace/other')]}
@@ -175,8 +176,8 @@ describe('WorkspacePicker', () => {
   test('opens the workspace menu popover when the current workspace tab is clicked', async () => {
     render(
       <WorkspacePicker
-        workspaces={[workspace('workspace-a', '/tmp/workspace-a'), workspace('workspace-b', '/tmp/workspace-b')]}
-        currentWorkspaceId="/tmp/workspace-a"
+        workspaces={[workspace('workspace-a', 'goblin+file:///tmp/workspace-a'), workspace('workspace-b', 'goblin+file:///tmp/workspace-b')]}
+        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -186,7 +187,7 @@ describe('WorkspacePicker', () => {
       />,
     )
 
-    const tab = document.body.querySelector('[data-current-workspace-id="/tmp/workspace-a"]')
+    const tab = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing current workspace tab')
 
     await act(async () => {
@@ -206,11 +207,11 @@ describe('WorkspacePicker', () => {
     render(
       <WorkspacePicker
         workspaces={[
-          workspace('workspace-a', '/tmp/workspace-a'),
-          workspace('workspace-b', '/tmp/workspace-b', { terminalBellCount: 2 }),
-          workspace('workspace-c', '/tmp/workspace-c', { terminalBellCount: 1 }),
+          workspace('workspace-a', 'goblin+file:///tmp/workspace-a'),
+          workspace('workspace-b', 'goblin+file:///tmp/workspace-b', { terminalBellCount: 2 }),
+          workspace('workspace-c', 'goblin+file:///tmp/workspace-c', { terminalBellCount: 1 }),
         ]}
-        currentWorkspaceId="/tmp/workspace-a"
+        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -220,7 +221,7 @@ describe('WorkspacePicker', () => {
       />,
     )
 
-    const trigger = document.body.querySelector('[data-current-workspace-id="/tmp/workspace-a"]')
+    const trigger = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
     const triggerBadge = trigger.querySelector('.bg-notification')
     expect(triggerBadge?.textContent).toBe('3')
@@ -247,11 +248,11 @@ describe('WorkspacePicker', () => {
     render(
       <WorkspacePicker
         workspaces={[
-          workspace('workspace-a', '/tmp/workspace-a'),
-          workspace('workspace-b', '/tmp/workspace-b'),
-          workspace('workspace-c', '/tmp/workspace-c'),
+          workspace('workspace-a', 'goblin+file:///tmp/workspace-a'),
+          workspace('workspace-b', 'goblin+file:///tmp/workspace-b'),
+          workspace('workspace-c', 'goblin+file:///tmp/workspace-c'),
         ]}
-        currentWorkspaceId="/tmp/workspace-b"
+        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-b')}
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -261,9 +262,9 @@ describe('WorkspacePicker', () => {
       />,
     )
 
-    expect(document.body.querySelector('[data-current-workspace-id="/tmp/workspace-b"]')).not.toBeNull()
-    expect(document.body.querySelector('[data-current-workspace-id="/tmp/workspace-a"]')).toBeNull()
-    expect(document.body.querySelector('[data-current-workspace-id="/tmp/workspace-c"]')).toBeNull()
+    expect(document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-b"]')).not.toBeNull()
+    expect(document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')).toBeNull()
+    expect(document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-c"]')).toBeNull()
     // No standalone "All repositories" button — the tab is the trigger.
     expect(document.body.querySelector('button[aria-label="More"]')).toBeNull()
   })
@@ -271,8 +272,8 @@ describe('WorkspacePicker', () => {
   test('keeps current workspace chrome borderless with hover and shows two-line rows with path in the popover', async () => {
     render(
       <WorkspacePicker
-        workspaces={[workspace('workspace-a', '/tmp/workspace-a'), workspace('workspace-b', '/tmp/workspace-b')]}
-        currentWorkspaceId="/tmp/workspace-a"
+        workspaces={[workspace('workspace-a', 'goblin+file:///tmp/workspace-a'), workspace('workspace-b', 'goblin+file:///tmp/workspace-b')]}
+        currentWorkspaceId={workspaceIdForTest('goblin+file:///tmp/workspace-a')}
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -282,7 +283,7 @@ describe('WorkspacePicker', () => {
       />,
     )
 
-    const currentWorkspaceButton = document.body.querySelector('[data-current-workspace-id="/tmp/workspace-a"]')
+    const currentWorkspaceButton = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
     if (!(currentWorkspaceButton instanceof HTMLButtonElement)) throw new Error('missing current workspace button')
 
     const currentWorkspaceChrome = currentWorkspaceButton.closest('[data-current-workspace-chrome]')
@@ -304,7 +305,7 @@ describe('WorkspacePicker', () => {
       ),
     ).toBeNull()
 
-    const tab = document.body.querySelector('[data-current-workspace-id="/tmp/workspace-a"]')
+    const tab = document.body.querySelector('[data-current-workspace-id="goblin+file:///tmp/workspace-a"]')
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing current workspace tab')
 
     await act(async () => {
@@ -419,7 +420,7 @@ function render(element: React.ReactNode) {
 
 function workspace(name: string, id: string, overrides: Partial<WorkspacePickerItem> = {}): WorkspacePickerItem {
   return {
-    id,
+    id: workspaceIdForTest(id),
     name,
     gitCapability: 'available',
     git: { remoteDetails: [], lastSyncedAt: null },

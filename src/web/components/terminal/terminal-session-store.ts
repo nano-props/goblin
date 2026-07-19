@@ -156,22 +156,22 @@ export function useTerminalSessionSummaries(terminalWorktreeKey: string | null):
   return useTerminalWorktreeField(terminalWorktreeKey, (s) => s.sessions)
 }
 
-export function useTerminalRepoProjectionPhase(repoRoot: string | null): TerminalProjectionHydrationPhase {
+export function useTerminalWorkspaceProjectionPhase(workspaceId: string | null): TerminalProjectionHydrationPhase {
   const workspaceRuntimeId = useWorkspacesStore((s) =>
-    repoRoot ? s.workspaces[repoRoot]?.workspaceRuntimeId : undefined,
+    workspaceId ? s.workspaces[workspaceId]?.workspaceRuntimeId : undefined,
   )
-  return useTerminalProjectionHydrationPhase(repoRoot, workspaceRuntimeId)
+  return useTerminalProjectionHydrationPhase(workspaceId, workspaceRuntimeId)
 }
 
-export function useTerminalRepoProjectionHydrationEntry(repoRoot: string | null): TerminalProjectionHydrationEntry {
+export function useTerminalWorkspaceProjectionHydrationEntry(workspaceId: string | null): TerminalProjectionHydrationEntry {
   const workspaceRuntimeId = useWorkspacesStore((s) =>
-    repoRoot ? s.workspaces[repoRoot]?.workspaceRuntimeId : undefined,
+    workspaceId ? s.workspaces[workspaceId]?.workspaceRuntimeId : undefined,
   )
-  return useTerminalProjectionHydrationEntry(repoRoot, workspaceRuntimeId)
+  return useTerminalProjectionHydrationEntry(workspaceId, workspaceRuntimeId)
 }
 
-export function useTerminalRepoProjectionReady(repoRoot: string | null): boolean {
-  return useTerminalRepoProjectionPhase(repoRoot) === 'ready'
+export function useTerminalWorkspaceProjectionReady(workspaceId: string | null): boolean {
+  return useTerminalWorkspaceProjectionPhase(workspaceId) === 'ready'
 }
 
 export function useTerminalSnapshot(terminalSessionId: string | null): TerminalSnapshot {
