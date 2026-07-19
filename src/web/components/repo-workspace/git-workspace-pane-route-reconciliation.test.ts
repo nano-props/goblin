@@ -7,9 +7,9 @@ import {
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
-  reconcileWorkspacePaneRoute,
-  workspacePaneRouteHistoryResolution,
-} from '#/web/components/repo-workspace/workspace-pane-route-reconciliation.ts'
+  reconcileGitWorkspacePaneRoute,
+  gitWorkspacePaneRouteHistoryResolution,
+} from '#/web/components/repo-workspace/git-workspace-pane-route-reconciliation.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-route-reconciliation-repo')
@@ -40,7 +40,7 @@ describe('workspace pane route reconciliation', () => {
     const model = terminalModel({ routedSessionId: 'term-111111111111111111111', terminalProjectionPhase: 'ready' })
 
     expect(
-      reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
+      reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
     ).toEqual({
       kind: 'none',
     })
@@ -49,7 +49,7 @@ describe('workspace pane route reconciliation', () => {
   test('waits for terminal projection before replacing a missing routed terminal session', () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'pending' })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
+    expect(reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
       kind: 'pending',
     })
   })
@@ -75,7 +75,7 @@ describe('workspace pane route reconciliation', () => {
     })
 
     expect(
-      reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
+      reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
     ).toEqual({
       kind: 'pending',
     })
@@ -85,7 +85,7 @@ describe('workspace pane route reconciliation', () => {
     const model = terminalModel({ routedSessionId: 'term-111111111111111111111', terminalProjectionPhase: 'pending' })
 
     expect(
-      reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
+      reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
     ).toEqual({
       kind: 'pending',
     })
@@ -94,7 +94,7 @@ describe('workspace pane route reconciliation', () => {
   test('leaves a routed terminal session unverified while terminal projection has failed', () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'failed' })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
+    expect(reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
       kind: 'unverified',
     })
   })
@@ -120,7 +120,7 @@ describe('workspace pane route reconciliation', () => {
     })
 
     expect(
-      reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
+      reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model),
     ).toEqual({
       kind: 'unverified',
     })
@@ -133,7 +133,7 @@ describe('workspace pane route reconciliation', () => {
       createPending: true,
     })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
+    expect(reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
       kind: 'pending',
     })
   })
@@ -141,7 +141,7 @@ describe('workspace pane route reconciliation', () => {
   test('replaces a stale terminal route with the bare branch route', () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'ready' })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
+    expect(reconcileGitWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
       kind: 'replace-empty-pane',
     })
   })
@@ -162,7 +162,7 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
+    expect(reconcileGitWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
   })
 
   test('leaves a static route unverified while tab-entry projection has failed', () => {
@@ -181,7 +181,7 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'unverified' })
+    expect(reconcileGitWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'unverified' })
   })
 
   test('does not verify a materialized static route while tab-entry projection has failed', () => {
@@ -200,11 +200,11 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'unverified' })
+    expect(reconcileGitWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'unverified' })
   })
 
   test('defers history while a route is unverified', () => {
-    expect(workspacePaneRouteHistoryResolution({ kind: 'static', tab: 'history' }, { kind: 'unverified' })).toEqual({
+    expect(gitWorkspacePaneRouteHistoryResolution({ kind: 'static', tab: 'history' }, { kind: 'unverified' })).toEqual({
       kind: 'defer',
     })
   })
@@ -225,7 +225,7 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
+    expect(reconcileGitWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
   })
 
   test('replaces an unmaterialized static route with the bare branch route', () => {
@@ -244,7 +244,7 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'changes' }, model)).toEqual({
+    expect(reconcileGitWorkspacePaneRoute({ kind: 'static', tab: 'changes' }, model)).toEqual({
       kind: 'replace-empty-pane',
     })
   })
@@ -265,7 +265,7 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'invalid-static', tabKey: 'not-a-tab' }, model)).toEqual({
+    expect(reconcileGitWorkspacePaneRoute({ kind: 'invalid-static', tabKey: 'not-a-tab' }, model)).toEqual({
       kind: 'replace-empty-pane',
     })
   })
@@ -286,7 +286,7 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'invalid-static', tabKey: 'not-a-tab' }, model)).toEqual({
+    expect(reconcileGitWorkspacePaneRoute({ kind: 'invalid-static', tabKey: 'not-a-tab' }, model)).toEqual({
       kind: 'unverified',
     })
   })
@@ -307,7 +307,7 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'changes' }, model)).toEqual({
+    expect(reconcileGitWorkspacePaneRoute({ kind: 'static', tab: 'changes' }, model)).toEqual({
       kind: 'replace-empty-pane',
     })
   })

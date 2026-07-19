@@ -38,6 +38,10 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import {
+  gitWorktreePaneFilesystemTarget,
+  workspaceRootPaneFilesystemTarget,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
 const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/keyboard-repo')
@@ -300,14 +304,13 @@ describe('useKeyboard', () => {
       currentWorkspacePaneCommandTarget: {
         kind: 'git-worktree',
         workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
-        filesystemTarget: {
-          kind: 'git-worktree',
+        filesystemTarget: gitWorktreePaneFilesystemTarget({
           workspaceId: REPO_ID,
           workspaceRuntimeId: workspaceRuntimeIdForTest(),
-          rootPath: WORKTREE_PATH,
+          worktreePath: WORKTREE_PATH,
           head: { kind: 'branch', branchName: 'feature/worktree' },
           capabilities: FILESYSTEM_CAPABILITIES,
-        },
+        }),
       },
     })
 
@@ -356,17 +359,15 @@ describe('useKeyboard', () => {
       currentWorkspacePaneCommandTarget: {
         kind: 'workspace-root',
         workspacePaneRoute: null,
-        filesystemTarget: {
-          kind: 'workspace-root',
+        filesystemTarget: workspaceRootPaneFilesystemTarget({
           workspaceId: REPO_ID,
           workspaceRuntimeId: workspaceRuntimeIdForTest(),
-          rootPath: REPO_PATH,
           capabilities: {
             files: { read: true, write: true },
             terminal: { available: true },
             git: { status: 'unavailable' },
           },
-        },
+        }),
       },
     })
 
@@ -589,14 +590,13 @@ describe('useKeyboard', () => {
       currentBranchName: 'feature/worktree',
       currentWorkspacePaneCommandTarget: {
         kind: 'git-worktree',
-        filesystemTarget: {
-          kind: 'git-worktree',
+        filesystemTarget: gitWorktreePaneFilesystemTarget({
           workspaceId: REPO_ID,
           workspaceRuntimeId: workspaceRuntimeIdForTest(),
-          rootPath: WORKTREE_PATH,
+          worktreePath: WORKTREE_PATH,
           head: { kind: 'branch', branchName: 'feature/worktree' },
           capabilities: FILESYSTEM_CAPABILITIES,
-        },
+        }),
         workspacePaneRoute: {
           kind: 'terminal',
           terminalSessionId: 'term-111111111111111111111',
@@ -670,14 +670,13 @@ function HookHost(overrides: Partial<HookHostOptions>) {
           kind: 'git-worktree' as const,
           branchName: overrides.currentBranchName,
           workspacePaneRoute: null,
-          filesystemTarget: {
-            kind: 'git-worktree' as const,
+          filesystemTarget: gitWorktreePaneFilesystemTarget({
             workspaceId: repo.id,
             workspaceRuntimeId: repo.workspaceRuntimeId,
-            rootPath: branch.worktree.path,
+            worktreePath: branch.worktree.path,
             head: { kind: 'branch' as const, branchName: overrides.currentBranchName },
             capabilities: repo.capability.probe.capabilities,
-          },
+          }),
         }
       : overrides.currentBranchName
         ? { kind: 'git-branch' as const, branchName: overrides.currentBranchName, workspacePaneRoute: null }

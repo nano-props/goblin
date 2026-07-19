@@ -284,7 +284,7 @@ export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
     (candidate) =>
       candidate.branchName !== null &&
       workspacePaneCommittedRuntimeTargetIsCurrent({
-        repoId: candidate.workspaceId,
+        workspaceId: candidate.workspaceId,
         workspaceRuntimeId: candidate.workspaceRuntimeId,
         branchName: candidate.branchName,
         worktreePath: candidate.worktreePath,
@@ -317,7 +317,7 @@ async function commitWorkspacePaneValidatedTargetRoute(
     onCommit: () => {
       supplementCommitted = commitSupplement(
         {
-          repoId: target.workspaceId,
+          workspaceId: target.workspaceId,
           workspaceRuntimeId: target.workspaceRuntimeId,
           branchName,
           worktreePath: target.worktreePath,
@@ -352,7 +352,7 @@ export async function commitWorkspacePaneExactTargetRoute(
     onCommit: () => {
       supplementCommitted = commitWorkspacePaneRouteSupplement(
         {
-          repoId: target.workspaceId,
+          workspaceId: target.workspaceId,
           workspaceRuntimeId: target.workspaceRuntimeId,
           branchName,
           worktreePath: target.worktreePath,
@@ -374,7 +374,7 @@ export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneC
       target.branchName === target.paneTarget.branchName &&
       target.worktreePath === null &&
       workspacePaneTargetLeaseIsCurrent({
-        repoId: target.workspaceId,
+        workspaceId: target.workspaceId,
         workspaceRuntimeId: target.workspaceRuntimeId,
         branchName: target.paneTarget.branchName,
         worktreePath: target.worktreePath,
@@ -387,7 +387,7 @@ export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneC
     return target.branchName === null
       ? true
       : workspacePaneTargetLeaseIsCurrent({
-          repoId: target.workspaceId,
+          workspaceId: target.workspaceId,
           workspaceRuntimeId: target.workspaceRuntimeId,
           branchName: target.branchName,
           worktreePath: target.paneTarget.worktreePath,

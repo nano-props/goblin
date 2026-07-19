@@ -43,7 +43,10 @@ import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/sha
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import {
+  gitWorktreePaneFilesystemTarget,
+  type WorkspacePaneFilesystemTarget,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
@@ -451,18 +454,17 @@ describe('useClientEffectIntentRouter', () => {
     currentWorkspaceId = repo.id
     currentBranchName = 'main'
     currentWorkspacePaneRoute = { kind: 'static', tab: 'status' }
-    currentFilesystemTarget = {
-      kind: 'git-worktree',
+    currentFilesystemTarget = gitWorktreePaneFilesystemTarget({
       workspaceId: repo.id,
       workspaceRuntimeId: repo.workspaceRuntimeId,
-      rootPath: '/tmp/repo-worktree',
+      worktreePath: '/tmp/repo-worktree',
       head: { kind: 'branch', branchName: 'main' },
       capabilities: {
         files: { read: true, write: true },
         terminal: { available: true },
         git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
       },
-    }
+    })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(repo.id, repo.workspaceRuntimeId)
     const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(repo.id, '/tmp/repo-worktree')
     let visibleSessionIds = ['term-111111111111111111111']

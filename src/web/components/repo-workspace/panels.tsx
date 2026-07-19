@@ -24,6 +24,7 @@ import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspa
 import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { terminalGitWorktreePresentation } from '#/shared/terminal-types.ts'
 import { gitHead } from '#/shared/git-head.ts'
+import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
 const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
@@ -70,7 +71,6 @@ export function renderGitWorkspacePanePanel(input: WorkspacePanePanelRenderInput
       target: {
         runtimeTarget,
         presentation: terminalGitWorktreePresentation(branchName),
-        worktreePath,
       },
       runtimeState: {
         projectionPhase: runtimeState.projectionPhase,
@@ -144,14 +144,13 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
   return (
     <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} {...panelLabel}>
       <WorkspaceFilesystemTabPanel
-        target={{
-          kind: 'git-worktree',
+        target={gitWorktreePaneFilesystemTarget({
           workspaceId: repo.id,
           workspaceRuntimeId: repo.workspaceRuntimeId,
+          worktreePath,
           head: gitHead(branch.name),
-          rootPath: worktreePath,
           capabilities,
-        }}
+        })}
       />
     </WorkspacePanePanelFrame>
   )

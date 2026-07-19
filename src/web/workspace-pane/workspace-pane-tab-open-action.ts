@@ -61,9 +61,9 @@ export interface OpenWorkspacePaneTargetStaticTabActionOptions {
 export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
   input: OpenWorkspacePaneTargetStaticTabActionOptions,
 ): Promise<WorkspacePaneActionOutcome> {
-  const repo = useWorkspacesStore.getState().workspaces[input.workspaceId]
-  if (!repo || input.paneTarget.workspaceId !== input.workspaceId) return { kind: 'target-missing' }
-  const workspaceRuntimeId = repo.workspaceRuntimeId
+  const workspace = useWorkspacesStore.getState().workspaces[input.workspaceId]
+  if (!workspace || input.paneTarget.workspaceId !== input.workspaceId) return { kind: 'target-missing' }
+  const workspaceRuntimeId = workspace.workspaceRuntimeId
   const worktreePath = workspacePaneTabsTargetWorktreePath(input.paneTarget)
   const branchName =
     input.paneTarget.kind === 'git-branch'
@@ -189,7 +189,7 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
   }
   return await runWorkspacePaneAction(
     workspacePaneActionTargetFromCoordinates({
-      workspaceId: lease.repoId,
+      workspaceId: lease.workspaceId,
       workspaceRuntimeId: lease.workspaceRuntimeId,
       branchName: lease.branchName,
       worktreePath: lease.worktreePath,
@@ -274,9 +274,9 @@ async function openWorkspacePaneStaticTabAction(
   )
     return { kind: 'blocked' }
   const state = useWorkspacesStore.getState()
-  const repo = state.workspaces[input.workspaceId]
-  if (!repo) return { kind: 'target-missing' }
-  if (repo.workspaceRuntimeId !== input.workspaceRuntimeId) return { kind: 'superseded' }
+  const workspace = state.workspaces[input.workspaceId]
+  if (!workspace) return { kind: 'target-missing' }
+  if (workspace.workspaceRuntimeId !== input.workspaceRuntimeId) return { kind: 'superseded' }
   const branchName = input.branchName
   const coordinatorTarget = {
     workspaceId: input.workspaceId,

@@ -38,7 +38,7 @@ export interface WorkspacePaneTabTargetOptions {
 export const workspacePanePreferenceTargetOptions: WorkspacePaneTabTargetOptions = { workspacePaneRoute: undefined }
 
 export interface WorkspacePaneDestinationTargetLease {
-  repoId: WorkspaceId
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string
   worktreePath: string | null
@@ -50,20 +50,20 @@ export type WorkspacePaneDestinationTargetResolution =
   { kind: 'ready'; lease: WorkspacePaneDestinationTargetLease } | { kind: 'missing' }
 
 export function resolveWorkspacePaneDestinationTarget(
-  repoId: WorkspaceId,
+  workspaceId: WorkspaceId,
   branchName: string,
 ): WorkspacePaneDestinationTargetResolution {
-  const repo = useWorkspacesStore.getState().workspaces[repoId]
-  if (!repo || repo.capability.kind !== 'git') return { kind: 'missing' }
-  const branchModel = readRepoBranchSnapshotQueryProjection(repo)
+  const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
+  if (!workspace || workspace.capability.kind !== 'git') return { kind: 'missing' }
+  const branchModel = readRepoBranchSnapshotQueryProjection(workspace)
   const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return { kind: 'missing' }
   const worktreePath = branch.worktree?.path ?? null
   return {
     kind: 'ready',
     lease: {
-      repoId,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
+      workspaceId,
+      workspaceRuntimeId: workspace.workspaceRuntimeId,
       branchName,
       worktreePath,
     },
@@ -71,15 +71,15 @@ export function resolveWorkspacePaneDestinationTarget(
 }
 
 export function resolveWorkspacePaneDestinationTargetLease(
-  repoId: WorkspaceId,
+  workspaceId: WorkspaceId,
   branchName: string,
 ): WorkspacePaneDestinationTargetLease | null {
-  const resolution = resolveWorkspacePaneDestinationTarget(repoId, branchName)
+  const resolution = resolveWorkspacePaneDestinationTarget(workspaceId, branchName)
   return resolution.kind === 'ready' ? resolution.lease : null
 }
 
 export function workspacePaneTargetLeaseIsCurrent(lease: WorkspacePaneTargetLease): boolean {
-  const current = resolveWorkspacePaneDestinationTargetLease(lease.repoId, lease.branchName)
+  const current = resolveWorkspacePaneDestinationTargetLease(lease.workspaceId, lease.branchName)
   return (
     current !== null &&
     current.workspaceRuntimeId === lease.workspaceRuntimeId &&
@@ -89,31 +89,32 @@ export function workspacePaneTargetLeaseIsCurrent(lease: WorkspacePaneTargetLeas
 
 export function workspacePaneCommittedRuntimeTargetIsCurrent(target: WorkspacePaneTargetLease): boolean {
   if (!target.worktreePath) return false
-  const repo = useWorkspacesStore.getState().workspaces[target.repoId]
-  if (!repo || repo.capability.kind !== 'git' || repo.workspaceRuntimeId !== target.workspaceRuntimeId) return false
+  const workspace = useWorkspacesStore.getState().workspaces[target.workspaceId]
+  if (!workspace || workspace.capability.kind !== 'git' || workspace.workspaceRuntimeId !== target.workspaceRuntimeId)
+    return false
   return (
-    readRepoBranchSnapshotQueryProjection(repo)?.branches.some(
+    readRepoBranchSnapshotQueryProjection(workspace)?.branches.some(
       (branch) => branch.worktree?.path === target.worktreePath,
     ) ?? false
   )
 }
 
 export function workspacePaneTabTargetForBranch(
-  repoId: WorkspaceId,
+  workspaceId: WorkspaceId,
   branchName: string,
   options: WorkspacePaneTabTargetOptions,
 ): WorkspacePaneTabModel | null {
-  const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName, options)
+  const resolution = resolveWorkspacePaneTabTargetForBranch(workspaceId, branchName, options)
   return resolution.kind === 'ready' ? resolution.target : null
 }
 
 export function workspacePaneTabTargetForCreatedRuntime(
-  repoId: WorkspaceId,
+  workspaceId: WorkspaceId,
   canonicalBranch: string,
   worktreePath: string,
   options: WorkspacePaneTabTargetOptions,
 ): WorkspacePaneTabModel | null {
-  const resolution = resolveWorkspacePaneTabTarget(repoId, canonicalBranch, worktreePath, options)
+  const resolution = resolveWorkspacePaneTabTarget(workspaceId, canonicalBranch, worktreePath, options)
   return resolution.kind === 'ready' ? resolution.target : null
 }
 
@@ -131,12 +132,12 @@ function resolveWorkspacePaneTabTarget(
   worktreePath: string | null,
   options: WorkspacePaneTabTargetOptions,
 ): WorkspacePaneTabTargetResolution {
-  const repo = useWorkspacesStore.getState().workspaces[workspaceId]
-  if (!repo) return { kind: 'missing' }
-  if (branchName !== null && repo.capability.kind !== 'git') return { kind: 'missing' }
+  const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
+  if (!workspace) return { kind: 'missing' }
+  if (branchName !== null && workspace.capability.kind !== 'git') return { kind: 'missing' }
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: workspaceId,
-    workspaceRuntimeId: repo.workspaceRuntimeId,
+    workspaceRuntimeId: workspace.workspaceRuntimeId,
     worktreePath,
   })
   const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget(
@@ -144,11 +145,11 @@ function resolveWorkspacePaneTabTarget(
       ? {
           kind: 'workspace-root',
           workspaceId: workspaceId,
-          workspaceRuntimeId: repo.workspaceRuntimeId,
+          workspaceRuntimeId: workspace.workspaceRuntimeId,
         }
       : {
           ...requiredGitWorkspacePaneTabsTarget(workspaceId, branchName, worktreePath),
-          workspaceRuntimeId: repo.workspaceRuntimeId,
+          workspaceRuntimeId: workspace.workspaceRuntimeId,
         },
   )
   if (tabEntriesProjection.phase !== 'ready') {
@@ -165,10 +166,10 @@ function resolveWorkspacePaneTabTarget(
     kind: 'ready',
     target: createWorkspacePaneTabModel({
       workspaceId,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
+      workspaceRuntimeId: workspace.workspaceRuntimeId,
       paneTarget: preferenceTarget,
       worktreeHead: preferenceTarget.kind === 'git-worktree' && branchName ? { kind: 'branch', branchName } : undefined,
-      preferredTab: preferredWorkspacePaneTabForRoute(repo.ui, preferenceTarget, options),
+      preferredTab: preferredWorkspacePaneTabForRoute(workspace.ui, preferenceTarget, options),
       allowPreferredTabFallback: options.workspacePaneRoute === undefined,
       tabEntries: tabEntriesProjection.tabs,
       tabEntriesProjectionPhase: tabEntriesProjection.phase,
@@ -187,26 +188,26 @@ export function workspacePaneTabTargetForPaneTarget(
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
   worktreeHead?: GitHead,
 ): WorkspacePaneTabModel | null {
-  const repo = useWorkspacesStore.getState().workspaces[paneTarget.workspaceId]
-  if (!repo) return null
-  if (paneTarget.kind !== 'workspace-root' && repo.capability.kind !== 'git') return null
+  const workspace = useWorkspacesStore.getState().workspaces[paneTarget.workspaceId]
+  if (!workspace) return null
+  if (paneTarget.kind !== 'workspace-root' && workspace.capability.kind !== 'git') return null
   const worktreePath = workspacePaneTabsTargetWorktreePath(paneTarget)
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
-    workspaceId: repo.id,
-    workspaceRuntimeId: repo.workspaceRuntimeId,
+    workspaceId: workspace.id,
+    workspaceRuntimeId: workspace.workspaceRuntimeId,
     worktreePath,
   })
   const tabsProjection = readWorkspacePaneTabsProjectionForTarget({
     ...paneTarget,
-    workspaceRuntimeId: repo.workspaceRuntimeId,
+    workspaceRuntimeId: workspace.workspaceRuntimeId,
   })
   if (tabsProjection.phase !== 'ready') return null
   return createWorkspacePaneTabModel({
-    workspaceId: repo.id,
-    workspaceRuntimeId: repo.workspaceRuntimeId,
+    workspaceId: workspace.id,
+    workspaceRuntimeId: workspace.workspaceRuntimeId,
     paneTarget,
     worktreeHead,
-    preferredTab: preferredWorkspacePaneTabForRoute(repo.ui, paneTarget, { workspacePaneRoute }),
+    preferredTab: preferredWorkspacePaneTabForRoute(workspace.ui, paneTarget, { workspacePaneRoute }),
     allowPreferredTabFallback: workspacePaneRoute === undefined,
     tabEntries: tabsProjection.tabs,
     tabEntriesProjectionPhase: tabsProjection.phase,
@@ -218,51 +219,51 @@ export function workspacePaneTabTargetForPaneTarget(
 }
 
 export function workspacePaneTabInteractionBlockedForBranch(
-  repoId: WorkspaceId,
+  workspaceId: WorkspaceId,
   branchName: string,
   options: WorkspacePaneTabTargetOptions,
 ): boolean {
-  const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName, options)
+  const resolution = resolveWorkspacePaneTabTargetForBranch(workspaceId, branchName, options)
   if (resolution.kind === 'unavailable') return true
   return resolution.kind === 'ready' ? workspacePaneTabTargetBlocksInteraction(resolution.target) : false
 }
 
-export function workspacePaneRouteNavigationBlockedForBranch(repoId: WorkspaceId, branchName: string): boolean {
+export function workspacePaneRouteNavigationBlockedForBranch(workspaceId: WorkspaceId, branchName: string): boolean {
   const state = useWorkspacesStore.getState()
-  const repo = state.workspaces[repoId]
-  if (!repo || repo.capability.kind !== 'git') return false
-  const branchModel = readRepoBranchSnapshotQueryProjection(repo)
+  const workspace = state.workspaces[workspaceId]
+  if (!workspace || workspace.capability.kind !== 'git') return false
+  const branchModel = readRepoBranchSnapshotQueryProjection(workspace)
   if (!branchModel) return false
   const branch = branchModel.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return false
   if (
     workspacePaneTabsInteractionBlockedForTarget({
-      ...requiredGitWorkspacePaneTabsTarget(repo.id, branchName, branch.worktree?.path ?? null),
+      ...requiredGitWorkspacePaneTabsTarget(workspace.id, branchName, branch.worktree?.path ?? null),
     })
   )
     return true
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
-    workspaceId: repo.id,
-    workspaceRuntimeId: repo.workspaceRuntimeId,
+    workspaceId: workspace.id,
+    workspaceRuntimeId: workspace.workspaceRuntimeId,
     worktreePath: branch.worktree?.path ?? null,
   })
   return Object.values(runtimeProjection.runtimeTabStateByType).some((state) => state.createPending)
 }
 
 export function resolveWorkspacePaneTabTargetForBranch(
-  repoId: WorkspaceId,
+  workspaceId: WorkspaceId,
   branchName: string,
   options: WorkspacePaneTabTargetOptions,
 ): WorkspacePaneTabTargetResolution {
   const state = useWorkspacesStore.getState()
-  const repo = state.workspaces[repoId]
-  if (!repo || repo.capability.kind !== 'git') return { kind: 'missing' }
-  const branchModel = readRepoBranchSnapshotQueryProjection(repo)
+  const workspace = state.workspaces[workspaceId]
+  if (!workspace || workspace.capability.kind !== 'git') return { kind: 'missing' }
+  const branchModel = readRepoBranchSnapshotQueryProjection(workspace)
   if (!branchModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
   const branch = branchModel.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return { kind: 'missing' }
   const worktreePath = branch.worktree?.path ?? null
-  return resolveWorkspacePaneTabTarget(repoId, branchName, worktreePath, options)
+  return resolveWorkspacePaneTabTarget(workspaceId, branchName, worktreePath, options)
 }
 
 function preferredWorkspacePaneTabForRoute(

@@ -9,6 +9,7 @@ import {
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
 const CURRENT_GIT_REPO = {
   id: workspaceIdForTest('goblin+file:///tmp/repo'),
@@ -227,13 +228,11 @@ describe('client effect intent plans', () => {
         currentWorkspacePaneCommandTarget: {
           kind: 'workspace-root',
           workspacePaneRoute: null,
-          filesystemTarget: {
-            kind: 'workspace-root',
+          filesystemTarget: workspaceRootPaneFilesystemTarget({
             workspaceId: CURRENT_DIRECTORY_REPO.id,
             workspaceRuntimeId: CURRENT_DIRECTORY_REPO.workspaceRuntimeId,
-            rootPath: '/workspace/directory',
             capabilities: CURRENT_DIRECTORY_REPO.workspaceProbe.capabilities,
-          },
+          }),
         },
       },
     )
@@ -349,13 +348,11 @@ describe('client effect intent plans', () => {
         currentWorkspacePaneCommandTarget: {
           kind: 'workspace-root',
           workspacePaneRoute: null,
-          filesystemTarget: {
-            kind: 'workspace-root',
+          filesystemTarget: workspaceRootPaneFilesystemTarget({
             workspaceId: CURRENT_DIRECTORY_REPO.id,
             workspaceRuntimeId: CURRENT_DIRECTORY_REPO.workspaceRuntimeId,
-            rootPath: '/workspace/directory',
             capabilities: CURRENT_DIRECTORY_REPO.workspaceProbe.capabilities,
-          },
+          }),
         },
       },
     )

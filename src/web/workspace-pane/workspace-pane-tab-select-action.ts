@@ -132,7 +132,7 @@ export async function dispatchShowWorkspacePaneTerminalRouteAction(
 ): Promise<WorkspacePaneActionOutcome> {
   if (!options.workspaceId || !options.branchName) return { kind: 'target-missing' }
   return await dispatchWorkspacePaneDestinationRoute({
-    repoId: options.workspaceId,
+    workspaceId: options.workspaceId,
     branchName: options.branchName,
     route: { kind: 'terminal', terminalSessionId: options.terminalSessionId },
     navigation: options.navigation,

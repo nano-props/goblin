@@ -32,19 +32,19 @@ const INITIAL_STATE: FiletreeInteractionState = {
   interactionByScope: {},
 }
 
-export function filetreeInteractionScopeKey(workspaceId: WorkspaceId, worktreePath: string): string {
-  return `${workspaceId}\0${worktreePath}`
+export function filetreeInteractionScopeKey(workspaceId: WorkspaceId, rootPath: string): string {
+  return `${workspaceId}\0${rootPath}`
 }
 
 export function parseFiletreeInteractionScopeKey(
   scopeKey: string,
-): { readonly workspaceId: WorkspaceId; readonly worktreePath: string } | null {
+): { readonly workspaceId: WorkspaceId; readonly rootPath: string } | null {
   const parts = scopeKey.split('\0')
   if (parts.length !== 2) return null
-  const [workspaceIdInput, worktreePath] = parts
-  if (!workspaceIdInput || !worktreePath) return null
+  const [workspaceIdInput, rootPath] = parts
+  if (!workspaceIdInput || !rootPath) return null
   const workspaceId = canonicalWorkspaceLocator(workspaceIdInput)
-  return workspaceId ? { workspaceId, worktreePath } : null
+  return workspaceId ? { workspaceId, rootPath } : null
 }
 
 export function emptyFiletreeInteractionSnapshot(): FiletreeInteractionSnapshot {

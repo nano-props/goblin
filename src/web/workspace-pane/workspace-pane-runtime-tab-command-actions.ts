@@ -30,7 +30,10 @@ import {
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
 import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
-import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import {
+  workspacePaneFilesystemRootPath,
+  type WorkspacePaneFilesystemTarget,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
 export interface WorkspacePaneRuntimeTabCommandContext {
   terminal?: {
@@ -195,7 +198,13 @@ function showTerminalRuntimeTab(
 ): boolean | Promise<boolean> {
   if (type !== 'terminal') return false
   if (filesystemTarget?.kind === 'git-worktree' && filesystemTarget.head.kind === 'detached') {
-    return navigation.showRepoWorktreeTerminalSession?.(workspaceId, filesystemTarget.rootPath, sessionId) ?? false
+    return (
+      navigation.showRepoWorktreeTerminalSession?.(
+        workspaceId,
+        workspacePaneFilesystemRootPath(filesystemTarget),
+        sessionId,
+      ) ?? false
+    )
   }
   const target = branchName
     ? workspacePaneTabTargetForBranch(workspaceId, branchName, { workspacePaneRoute })

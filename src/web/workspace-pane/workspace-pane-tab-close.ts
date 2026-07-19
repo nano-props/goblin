@@ -56,12 +56,12 @@ export function beginWorkspacePaneTabEntryClose(
 
 function closeStaticTabWithCommit(target: WorkspacePaneTabModel) {
   return async (type: WorkspacePaneStaticTabType): Promise<boolean> => {
-    const repo = useWorkspacesStore.getState().workspaces[target.workspaceId]
-    if (!repo) return false
+    const workspace = useWorkspacesStore.getState().workspaces[target.workspaceId]
+    if (!workspace) return false
     if (target.paneTarget.kind === 'inactive') return false
     const persistenceTarget = target.paneTarget
     const result = await updateWorkspacePaneTabs({
-      workspaceRuntimeId: repo.workspaceRuntimeId,
+      workspaceRuntimeId: workspace.workspaceRuntimeId,
       ...persistenceTarget,
       operation: { type: 'close-static', tabType: type },
     })

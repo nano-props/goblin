@@ -20,6 +20,7 @@ import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/works
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
   workspacePaneFilesystemRuntimeTarget,
+  workspacePaneFilesystemRootPath,
   workspacePaneFilesystemTerminalBase,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { showCreatedWorkspacePaneFilesystemTerminal } from '#/web/workspace-pane/workspace-pane-filesystem-terminal.ts'
@@ -27,12 +28,11 @@ import { showCreatedWorkspacePaneFilesystemTerminal } from '#/web/workspace-pane
 export function WorkspaceFilesystemTabPanel({ target }: { target: WorkspacePaneFilesystemTarget }) {
   const workspaceId = target.workspaceId
   const workspaceRuntimeId = target.workspaceRuntimeId
-  const rootPath = target.rootPath
+  const rootPath = workspacePaneFilesystemRootPath(target)
   const executionTarget = useMemo(
     () => workspacePaneFilesystemRuntimeTarget(target),
     [rootPath, target.kind, workspaceId, workspaceRuntimeId],
   )
-  if (!executionTarget) throw new Error('filesystem target is invalid')
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
   const { createTerminalWithAdmission } = useTerminalSessionContext()

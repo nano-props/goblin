@@ -30,11 +30,11 @@ export function persistedFiletreeViewStateByWorktreeByWorkspaceForSession(
     const scope = parseFiletreeInteractionScopeKey(scopeKey)
     if (!scope || !openWorkspaceIds.has(scope.workspaceId)) continue
     const workspace = workspaces[scope.workspaceId]
-    if (!workspace || !knownFilesystemRootPaths(scope.workspaceId, workspace).has(scope.worktreePath)) continue
+    if (!workspace || !knownFilesystemRootPaths(scope.workspaceId, workspace).has(scope.rootPath)) continue
     const viewState = sessionViewStateFromInteractionSnapshot(snapshot)
     if (!hasRestorableFiletreeViewState(viewState)) continue
     byWorkspace[scope.workspaceId] ??= {}
-    const worktreeId = workspaceLocatorForPath(scope.workspaceId, scope.worktreePath)
+    const worktreeId = workspaceLocatorForPath(scope.workspaceId, scope.rootPath)
     if (!worktreeId) continue
     byWorkspace[scope.workspaceId][worktreeId] = viewState
   }

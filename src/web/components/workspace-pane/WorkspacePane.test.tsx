@@ -5,6 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspacePane } from '#/web/components/workspace-pane/WorkspacePane.tsx'
+import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
   EMPTY_TERMINAL_SNAPSHOT,
   EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
@@ -154,14 +155,13 @@ function directoryWorkspaceProbe(name: string, options: { filesWritable?: boolea
 
 function gitWorktreeFilesystemTarget(repo: WorkspaceState, rootPath: string, branchName: string) {
   if (repo.capability.kind !== 'git') throw new Error('expected Git workspace fixture')
-  return {
-    kind: 'git-worktree' as const,
+  return gitWorktreePaneFilesystemTarget({
     workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
-    rootPath,
-    head: { kind: 'branch' as const, branchName },
+    worktreePath: rootPath,
+    head: { kind: 'branch', branchName },
     capabilities: repo.capability.probe.capabilities,
-  }
+  })
 }
 
 describe('WorkspacePane', () => {

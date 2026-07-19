@@ -189,7 +189,6 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
               root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
             },
             presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
-            worktreePath: '/repo-worktree',
           },
           selectedSessionId: 'term-111111111111111111111',
           runtimeState: {

@@ -1,6 +1,7 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { workspacePaneFilesystemRootPath } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { GitHead } from '#/shared/git-head.ts'
 import { gitHeadBranch } from '#/shared/git-head.ts'
@@ -46,7 +47,11 @@ export function workspacePaneCommandPaneTarget(
 ): WorkspacePaneTabsTarget {
   if (target.kind === 'workspace-root') return { kind: 'workspace-root', workspaceId: workspaceId }
   if (target.kind === 'git-worktree') {
-    return { kind: 'git-worktree', workspaceId: workspaceId, worktreePath: target.filesystemTarget.rootPath }
+    return {
+      kind: 'git-worktree',
+      workspaceId,
+      worktreePath: workspacePaneFilesystemRootPath(target.filesystemTarget),
+    }
   }
   return { kind: 'git-branch', workspaceId: workspaceId, branchName: target.branchName }
 }

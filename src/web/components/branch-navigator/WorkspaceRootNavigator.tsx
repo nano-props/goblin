@@ -16,7 +16,8 @@ import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { runShowWorkspacePaneTabCommand, runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
 import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
-import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
 interface WorkspaceRootNavigatorProps {
   workspaceId: WorkspaceId
@@ -43,16 +44,13 @@ export function WorkspaceRootNavigator({ workspaceId, selected, onSelect }: Work
       }
     }),
   )
-  const root = parseCanonicalWorkspaceLocator(workspaceId)
   const filesystemTarget =
-    root && workspace.workspaceRuntimeId && workspace.capabilities
-      ? {
-          kind: 'workspace-root' as const,
+    workspace.workspaceRuntimeId && workspace.capabilities
+      ? workspaceRootPaneFilesystemTarget({
           workspaceId,
           workspaceRuntimeId: workspace.workspaceRuntimeId,
-          rootPath: root.path,
           capabilities: workspace.capabilities,
-        }
+        })
       : null
   const commandTarget = filesystemTarget
     ? { kind: 'workspace-root' as const, workspacePaneRoute: null, filesystemTarget }

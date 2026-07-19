@@ -7,7 +7,10 @@ import type {
 } from '#/web/components/repo-workspace/model.ts'
 import { GitWorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/GitWorkspaceOpenExternallyMenu.tsx'
 import { WorkspacePaneTargetToolbar } from '#/web/components/workspace-pane/WorkspacePaneTargetToolbar.tsx'
-import type { WorkspacePaneSurfaceTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import {
+  gitWorktreePaneFilesystemTarget,
+  type WorkspacePaneSurfaceTarget,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { gitHead } from '#/shared/git-head.ts'
 import {
   WorkspaceToolbar,
@@ -49,14 +52,13 @@ export function GitWorkspacePaneToolbar({
   }
   if (repo.probe.status !== 'ready') return null
   const target: WorkspacePaneSurfaceTarget = branch.worktree
-    ? {
-        kind: 'git-worktree',
+    ? gitWorktreePaneFilesystemTarget({
         workspaceId: repo.id,
         workspaceRuntimeId: repo.workspaceRuntimeId,
         head: gitHead(branch.name),
-        rootPath: branch.worktree.path,
+        worktreePath: branch.worktree.path,
         capabilities: repo.probe.capabilities,
-      }
+      })
     : {
         kind: 'git-branch',
         workspaceId: repo.id,

@@ -22,8 +22,6 @@ export interface WorkspacePaneRuntimeTabPanelState {
 export interface WorkspacePaneRuntimeTabPanelTarget {
   runtimeTarget: RuntimeWorkspacePaneTarget
   presentation: TerminalPresentation
-  /** Native path used only by the terminal view execution adapter. */
-  worktreePath: string
 }
 
 export interface WorkspacePaneRuntimeTabPanelRenderInput {

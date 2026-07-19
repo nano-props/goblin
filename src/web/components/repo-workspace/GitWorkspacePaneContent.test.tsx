@@ -8,6 +8,10 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
 import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
+import {
+  gitWorktreePaneFilesystemTarget,
+  workspaceRootPaneFilesystemTarget,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import {
   getCurrentGitWorkspacePanePresentation as buildGitWorkspacePanePresentation,
@@ -1383,17 +1387,15 @@ describe('GitWorkspacePaneContent', () => {
         <PrimaryWindowNavigationProvider value={navigationWith({})}>
           <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <WorkspaceFilesystemTabPanel
-              target={{
-                kind: 'workspace-root',
+              target={workspaceRootPaneFilesystemTarget({
                 workspaceId,
                 workspaceRuntimeId: repo.workspaceRuntimeId,
-                rootPath: workspaceId,
                 capabilities: {
                   files: { read: true, write: true },
                   terminal: { available: true },
                   git: { status: 'unavailable' },
                 },
-              }}
+              })}
             />
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -1452,17 +1454,15 @@ describe('GitWorkspacePaneContent', () => {
         <PrimaryWindowNavigationProvider value={navigationWith({})}>
           <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <WorkspaceFilesystemTabPanel
-              target={{
-                kind: 'workspace-root',
+              target={workspaceRootPaneFilesystemTarget({
                 workspaceId,
                 workspaceRuntimeId: repo.workspaceRuntimeId,
-                rootPath: workspaceId,
                 capabilities: {
                   files: { read: true, write: false },
                   terminal: { available: false },
                   git: { status: 'unavailable' },
                 },
-              }}
+              })}
             />
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -1656,14 +1656,13 @@ const emptyTerminalReadContext: TerminalSessionReadContextValue = {
 
 function gitWorktreeFilesystemTarget(repo: WorkspaceState, rootPath: string, branchName: string) {
   if (repo.capability.kind !== 'git') throw new Error('expected Git workspace fixture')
-  return {
-    kind: 'git-worktree' as const,
+  return gitWorktreePaneFilesystemTarget({
     workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
-    rootPath,
-    head: { kind: 'branch' as const, branchName },
+    worktreePath: rootPath,
+    head: { kind: 'branch', branchName },
     capabilities: repo.capability.probe.capabilities,
-  }
+  })
 }
 
 function terminalCommandContextWith(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {

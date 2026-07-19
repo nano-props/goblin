@@ -47,7 +47,7 @@ describe('workspace pane destination navigation', () => {
 
     await expect(
       dispatchWorkspacePaneDestinationRoute({
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/no-worktree',
         route: DESTINATION_ROUTE,
         navigation: { commitWorkspacePaneRoute },
@@ -63,7 +63,7 @@ describe('workspace pane destination navigation', () => {
 
     await expect(
       dispatchWorkspacePaneDestinationRoute({
-        repoId: REPO_ID,
+        workspaceId: REPO_ID,
         branchName: 'feature/no-worktree',
         route: { kind: 'static', tab: 'changes' },
         navigation: { commitWorkspacePaneRoute },

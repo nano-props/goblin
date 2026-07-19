@@ -4,19 +4,19 @@ import {
   workspacePaneCommandCoordinates,
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
+import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
-const filesystemTarget = {
-  kind: 'git-worktree' as const,
+const filesystemTarget = gitWorktreePaneFilesystemTarget({
   workspaceId: workspaceIdForTest('goblin+file:///tmp/command-target-repo'),
   workspaceRuntimeId: 'repo-runtime-command-target',
-  rootPath: '/tmp/command-target-worktree',
-  head: { kind: 'branch' as const, branchName: 'feature/example' },
+  worktreePath: '/tmp/command-target-worktree',
+  head: { kind: 'branch', branchName: 'feature/example' },
   capabilities: {
     files: { read: true as const, write: true as const },
     terminal: { available: true as const },
     git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
   },
-}
+})
 
 describe('workspace pane command target', () => {
   test('derives the worktree branch presentation from its single Git head authority', () => {

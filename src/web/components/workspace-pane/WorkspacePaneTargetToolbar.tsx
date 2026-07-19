@@ -27,7 +27,10 @@ import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspacePaneSurfaceTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import { workspacePaneFilesystemTerminalBase } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import {
+  workspacePaneFilesystemRootPath,
+  workspacePaneFilesystemTerminalBase,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { gitHeadBranch } from '#/shared/git-head.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 
@@ -62,7 +65,7 @@ export function WorkspacePaneTargetToolbar({
       : target.kind === 'git-branch'
         ? target.branchName
         : gitHeadBranch(target.head)
-  const rootPath = target.kind === 'git-branch' ? null : target.rootPath
+  const rootPath = target.kind === 'git-branch' ? null : workspacePaneFilesystemRootPath(target)
   const commandTarget: WorkspacePaneCommandTarget =
     target.kind === 'workspace-root'
       ? { kind: 'workspace-root', workspacePaneRoute: workspacePaneRoute ?? null, filesystemTarget: target }
@@ -78,7 +81,7 @@ export function WorkspacePaneTargetToolbar({
           : {
               kind: 'git-worktree' as const,
               workspaceId: target.workspaceId,
-              worktreePath: target.rootPath,
+              worktreePath: workspacePaneFilesystemRootPath(target),
             },
     [branchName, rootPath, target.kind, target.workspaceId],
   )
@@ -98,7 +101,7 @@ export function WorkspacePaneTargetToolbar({
       if (target.kind === 'workspace-root') {
         if (presentation.kind !== 'workspace-root') return false
         const state = useWorkspacesStore.getState()
-        state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootPath), sessionId)
+        state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootId), sessionId)
         state.setWorkspacePaneTabForTarget(persistenceTarget, 'terminal')
         return true
       }
@@ -114,7 +117,7 @@ export function WorkspacePaneTargetToolbar({
       if (type !== 'terminal') return false
       if (target.kind === 'workspace-root') {
         const state = useWorkspacesStore.getState()
-        state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootPath), sessionId)
+        state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootId), sessionId)
         state.setWorkspacePaneTabForTarget(persistenceTarget, 'terminal')
         return true
       }
@@ -122,7 +125,7 @@ export function WorkspacePaneTargetToolbar({
       const targetBranch = gitHeadBranch(target.head)
       if (targetBranch) return navigation.showRepoBranchTerminalSession(target.workspaceId, targetBranch, sessionId)
       const state = useWorkspacesStore.getState()
-      state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootPath), sessionId)
+      state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootId), sessionId)
       state.setWorkspacePaneTabForTarget(persistenceTarget, 'terminal')
       return true
     },

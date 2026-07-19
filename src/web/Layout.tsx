@@ -58,7 +58,11 @@ import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import {
+  gitWorktreePaneFilesystemTarget,
+  workspaceRootPaneFilesystemTarget,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { gitHead } from '#/shared/git-head.ts'
 
 const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapResult>({
@@ -161,7 +165,6 @@ function AuthenticatedWorkspaceShell() {
     commandWorkspace?.capability.kind === 'git' || commandWorkspace?.capability.kind === 'filesystem'
       ? commandWorkspace.capability.probe.capabilities
       : null
-  const commandWorkspaceLocator = commandWorkspace ? parseCanonicalWorkspaceLocator(commandWorkspace.id) : null
   const commandWorktreePath = routeContext?.kind === 'worktree' ? routeContext.worktreePath : null
   const commandBranch =
     commandWorkspace && routeContext?.kind === 'branch' && routeContext.branchName
@@ -171,48 +174,44 @@ function AuthenticatedWorkspaceShell() {
       : null
   const currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null =
     routeContext?.kind === 'branch' && routeContext.branchName
-      ? commandWorkspace && commandCapabilities && commandBranch?.worktree?.path
+      ? commandWorkspace?.capability.kind === 'git' && commandBranch?.worktree?.path
         ? {
             kind: 'git-worktree',
             workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
-            filesystemTarget: {
-              kind: 'git-worktree',
+            filesystemTarget: gitWorktreePaneFilesystemTarget({
               workspaceId: commandWorkspace.id,
               workspaceRuntimeId: commandWorkspace.workspaceRuntimeId,
-              rootPath: commandBranch.worktree.path,
+              worktreePath: commandBranch.worktree.path,
               head: gitHead(commandBranch.name),
-              capabilities: commandCapabilities,
-            },
+              capabilities: commandWorkspace.capability.probe.capabilities,
+            }),
           }
         : {
             kind: 'git-branch',
             branchName: routeContext.branchName,
             workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
           }
-      : routeContext?.kind === 'worktree' && commandWorkspace && commandCapabilities && commandWorktreePath
+      : routeContext?.kind === 'worktree' && commandWorkspace?.capability.kind === 'git' && commandWorktreePath
         ? {
             kind: 'git-worktree',
             workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
-            filesystemTarget: {
-              kind: 'git-worktree',
+            filesystemTarget: gitWorktreePaneFilesystemTarget({
               workspaceId: commandWorkspace.id,
               workspaceRuntimeId: commandWorkspace.workspaceRuntimeId,
-              rootPath: commandWorktreePath,
+              worktreePath: commandWorktreePath,
               head: { kind: 'detached' },
-              capabilities: commandCapabilities,
-            },
+              capabilities: commandWorkspace.capability.probe.capabilities,
+            }),
           }
-        : routeContext?.kind === 'workspace-root' && commandWorkspace && commandCapabilities && commandWorkspaceLocator
+        : routeContext?.kind === 'workspace-root' && commandWorkspace && commandCapabilities
           ? {
               kind: 'workspace-root',
               workspacePaneRoute: null,
-              filesystemTarget: {
-                kind: 'workspace-root',
+              filesystemTarget: workspaceRootPaneFilesystemTarget({
                 workspaceId: commandWorkspace.id,
                 workspaceRuntimeId: commandWorkspace.workspaceRuntimeId,
-                rootPath: commandWorkspaceLocator.path,
                 capabilities: commandCapabilities,
-              },
+              }),
             }
           : null
   const workspaceOrder = useWorkspacesStore((s) => s.workspaceOrder)

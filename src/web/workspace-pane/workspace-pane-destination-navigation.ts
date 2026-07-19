@@ -44,13 +44,13 @@ export function resetWorkspacePaneDestinationPresentationForTest(): void {
 }
 
 export async function dispatchWorkspacePaneDestinationRoute(input: {
-  repoId: WorkspaceId
+  workspaceId: WorkspaceId
   branchName: string
   route: WorkspacePaneRouteTarget
   navigation: WorkspacePaneDestinationNavigation
   options?: { replace?: boolean }
 }): Promise<WorkspacePaneActionOutcome> {
-  const lease = resolveWorkspacePaneDestinationTargetLease(input.repoId, input.branchName)
+  const lease = resolveWorkspacePaneDestinationTargetLease(input.workspaceId, input.branchName)
   if (!lease) return { kind: 'target-missing' }
   if (!workspacePaneDestinationRouteSupported(lease, input.route)) {
     return { kind: 'unsupported', reason: 'worktree-required' }
@@ -58,7 +58,7 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
   const presentation = beginWorkspacePaneDestinationPresentation(lease)
   return await runWorkspacePaneAction(
     workspacePaneActionTargetFromCoordinates({
-      workspaceId: lease.repoId,
+      workspaceId: lease.workspaceId,
       workspaceRuntimeId: lease.workspaceRuntimeId,
       branchName: lease.branchName,
       worktreePath: lease.worktreePath,
@@ -68,7 +68,7 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
 }
 
 /**
- * Commits an absolute destination route from live repo/branch identity.
+ * Commits an absolute destination route from live Git Workspace/branch identity.
  * Unlike a current-target presentation lease, this never reads route-controller
  * observation state. Callers that mutate server state first must invoke this
  * only after applying the canonical snapshot; the lease check then rejects a
@@ -85,7 +85,7 @@ export async function commitWorkspacePaneDestinationRoute(
   let accepted = false
   let supplementCommitted = false
   try {
-    accepted = await navigation.commitWorkspacePaneRoute(lease.repoId, lease.branchName, route, {
+    accepted = await navigation.commitWorkspacePaneRoute(lease.workspaceId, lease.branchName, route, {
       ...options,
       presentationToken: presentation.token,
       onCommit: () => {

@@ -14,6 +14,7 @@ import { createTerminalWithAdmissionForTest } from '#/web/test-utils/terminal-se
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
+import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { resolveWorkspacePaneTerminalExecutionTarget } from '#/web/workspace-pane/workspace-pane-terminal-execution-target.ts'
 import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
@@ -51,7 +52,9 @@ describe('workspace pane runtime tab command actions', () => {
       branches: [],
       currentBranchName: null,
     })
-    useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: repo.id }, 'files')
+    useWorkspacesStore
+      .getState()
+      .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: repo.id }, 'files')
 
     const workspaceId = canonicalWorkspaceLocator(repo.id)
     if (!workspaceId) throw new Error('expected canonical workspace fixture')
@@ -115,11 +118,10 @@ describe('workspace pane runtime tab command actions', () => {
     const context = workspacePaneRuntimeTabCommandContext({
       filesystemTarget:
         terminalBase.target.kind === 'git-worktree'
-          ? {
-              kind: 'git-worktree',
+          ? gitWorktreePaneFilesystemTarget({
               workspaceId: terminalBase.target.workspaceId,
               workspaceRuntimeId: terminalBase.target.workspaceRuntimeId,
-              rootPath: terminalExecutionPath(terminalBase.target),
+              worktreePath: terminalExecutionPath(terminalBase.target),
               head:
                 terminalBase.presentation.kind === 'git-worktree'
                   ? terminalBase.presentation.head
@@ -129,7 +131,7 @@ describe('workspace pane runtime tab command actions', () => {
                 terminal: { available: true },
                 git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
               },
-            }
+            })
           : null,
       workspaceId: terminalCoordinates.workspaceId,
       branchName: terminalPresentationBranch(terminalBase.presentation),

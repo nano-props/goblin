@@ -41,6 +41,10 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import type { TerminalCreateOptions, TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
+import {
+  gitWorktreePaneFilesystemTarget,
+  workspaceRootPaneFilesystemTarget,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
 interface WorkspaceCommandFixtureOptions {
   workspaceId: string | null
@@ -62,18 +66,17 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
     const branch = repo
       ? readRepoBranchSnapshotQueryProjection(repo)?.branches.find((candidate) => candidate.name === options.branchName)
       : null
-    if (repo?.capability.probe.status === 'ready' && branch?.worktree) {
+    if (repo?.capability.kind === 'git' && branch?.worktree) {
       return {
         kind: 'git-worktree',
         workspacePaneRoute: options.workspacePaneRoute,
-        filesystemTarget: {
-          kind: 'git-worktree',
+        filesystemTarget: gitWorktreePaneFilesystemTarget({
           workspaceId: repo.id,
           workspaceRuntimeId: repo.workspaceRuntimeId,
-          rootPath: branch.worktree.path,
+          worktreePath: branch.worktree.path,
           head: { kind: 'branch', branchName: options.branchName },
           capabilities: repo.capability.probe.capabilities,
-        },
+        }),
       }
     }
     return { kind: 'git-branch', branchName: options.branchName, workspacePaneRoute: options.workspacePaneRoute }
@@ -83,13 +86,11 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
   return {
     kind: 'workspace-root',
     workspacePaneRoute: options.workspacePaneRoute,
-    filesystemTarget: {
-      kind: 'workspace-root',
+    filesystemTarget: workspaceRootPaneFilesystemTarget({
       workspaceId: repo.id,
       workspaceRuntimeId: repo.workspaceRuntimeId,
-      rootPath: repo.id,
       capabilities: repo.capability.probe.capabilities,
-    },
+    }),
   }
 }
 
@@ -2950,18 +2951,17 @@ function expectedTerminalBase(): TerminalSessionBase {
 }
 
 function filesystemTargetForTest() {
-  return {
-    kind: 'git-worktree' as const,
+  return gitWorktreePaneFilesystemTarget({
     workspaceId: REPO_ID,
     workspaceRuntimeId: workspaceRuntimeIdForTest(),
-    rootPath: WORKTREE_PATH,
-    head: { kind: 'branch' as const, branchName: 'feature/worktree' },
+    worktreePath: WORKTREE_PATH,
+    head: { kind: 'branch', branchName: 'feature/worktree' },
     capabilities: {
       files: { read: true as const, write: true as const },
       terminal: { available: true as const },
       git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
     },
-  }
+  })
 }
 
 function createTerminalWithProjection(resolveSessionId: () => string | Promise<string>) {
