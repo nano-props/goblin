@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { RepoPageToolbar } from '#/web/components/repo-pages/RepoPageToolbar.tsx'
+import { WorkspacePageToolbar } from '#/web/components/workspace-pages/WorkspacePageToolbar.tsx'
 import { ScrollPane } from '#/web/components/Layout.tsx'
 import { Skeleton } from '#/web/components/ui/skeleton.tsx'
 
-interface RepoPagePaneProps {
+interface WorkspacePagePaneProps {
   icon: LucideIcon
   label: string
   compact?: boolean
@@ -13,17 +13,17 @@ interface RepoPagePaneProps {
   children: ReactNode
 }
 
-export function RepoPagePane({
+export function WorkspacePagePane({
   icon,
   label,
   compact = false,
   trafficLightOffset = false,
   onBack,
   children,
-}: RepoPagePaneProps) {
+}: WorkspacePagePaneProps) {
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
-      <RepoPageToolbar
+      <WorkspacePageToolbar
         icon={icon}
         label={label}
         compact={compact}
@@ -35,10 +35,10 @@ export function RepoPagePane({
   )
 }
 
-export function RepoPageLoadingBody() {
+export function WorkspacePageLoadingBody() {
   return (
     <ScrollPane>
-      <div data-testid="repo-page-loading" className="w-full p-4" aria-busy="true">
+      <div data-testid="workspace-page-loading" className="w-full p-4" aria-busy="true">
         <div className="space-y-4">
           <Skeleton className="h-6 w-40" />
           <div className="space-y-2">
@@ -59,6 +59,6 @@ export function RepoPageLoadingBody() {
   )
 }
 
-export function RepoPageQuietLoadingBody() {
-  return <div data-testid="repo-page-quiet-loading" className="min-h-0 flex-1" aria-busy="true" />
+export function WorkspacePageQuietLoadingBody() {
+  return <div data-testid="workspace-page-quiet-loading" className="min-h-0 flex-1" aria-busy="true" />
 }

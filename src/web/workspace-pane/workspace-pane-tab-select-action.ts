@@ -3,7 +3,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import { adjacentRepoWorkspaceTab, type RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import { adjacentWorkspacePaneTab, type WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import {
   selectWorkspacePaneControllerTab,
   selectWorkspacePaneControllerTabEntry,
@@ -76,7 +76,7 @@ export async function dispatchSelectWorkspacePaneTabByIndexAction(
 
 async function selectWorkspacePaneTabByIndexAction(
   options: SelectWorkspacePaneTabByIndexActionOptions,
-  coordinatorTarget: RepoWorkspaceTabModel,
+  coordinatorTarget: WorkspacePaneTabModel,
   presentationToken: PrimaryWindowPresentationToken,
 ): Promise<boolean> {
   const { workspaceId, workspacePaneRoute, tabIndex, navigation } = options
@@ -104,7 +104,7 @@ export async function dispatchSelectWorkspacePaneTabByIdentityAction(
 
 async function selectWorkspacePaneTabByIdentityAction(
   options: SelectWorkspacePaneTabByIdentityActionOptions,
-  coordinatorTarget: RepoWorkspaceTabModel,
+  coordinatorTarget: WorkspacePaneTabModel,
   presentationToken: PrimaryWindowPresentationToken,
 ): Promise<boolean> {
   const { workspaceId, workspacePaneRoute, identity, navigation, runtimeActionContext, reselect } = options
@@ -150,7 +150,7 @@ export async function dispatchMoveWorkspacePaneTabAction(options: MoveWorkspaceP
 
 async function moveWorkspacePaneTabAction(
   options: MoveWorkspacePaneTabActionOptions,
-  queuedTarget: RepoWorkspaceTabModel,
+  queuedTarget: WorkspacePaneTabModel,
 ): Promise<boolean> {
   const { workspaceId, direction, navigation } = options
   if (!workspaceId) return false
@@ -158,13 +158,13 @@ async function moveWorkspacePaneTabAction(
   const currentRoute = branchName ? navigation.currentWorkspacePaneRoute(workspaceId, branchName) : undefined
   if (branchName && currentRoute === undefined) return false
   const target = resolveSelectableWorkspacePaneTarget(options, currentRoute)
-  const tab = target ? adjacentRepoWorkspaceTab(target.tabs, target.activeTab?.identity, direction) : null
+  const tab = target ? adjacentWorkspacePaneTab(target.tabs, target.activeTab?.identity, direction) : null
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(queuedTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
   return await selectWorkspacePaneControllerTab(target, tab, navigation, beginPrimaryWindowPresentation())
 }
 
-function queuedWorkspacePaneTargetMatches(queued: RepoWorkspaceTabModel, current: RepoWorkspaceTabModel): boolean {
+function queuedWorkspacePaneTargetMatches(queued: WorkspacePaneTabModel, current: WorkspacePaneTabModel): boolean {
   return (
     workspacePaneTabControllerTargetIsCurrent(queued) &&
     current.workspaceId === queued.workspaceId &&
@@ -179,7 +179,7 @@ function workspacePaneTabActionCoordinatorTarget(input: {
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
-}): RepoWorkspaceTabModel | null {
+}): WorkspacePaneTabModel | null {
   if (!input.workspaceId) return null
   return resolveSelectableWorkspacePaneTarget(input, input.workspacePaneRoute)
 }
@@ -191,7 +191,7 @@ function resolveSelectableWorkspacePaneTarget(
     worktreeHead?: GitHead
   },
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
-): RepoWorkspaceTabModel | null {
+): WorkspacePaneTabModel | null {
   if (!input.workspaceId) return null
   return workspacePaneTabTargetForPaneTarget(input.paneTarget, workspacePaneRoute, input.worktreeHead)
 }
@@ -204,7 +204,7 @@ function paneTargetPresentationBranch(
   return target.kind === 'git-worktree' && worktreeHead ? gitHeadBranch(worktreeHead) : null
 }
 
-function workspacePaneQueuedActionTarget(model: RepoWorkspaceTabModel) {
+function workspacePaneQueuedActionTarget(model: WorkspacePaneTabModel) {
   return workspacePaneActionTargetFromCoordinates({
     workspaceId: model.workspaceId,
     workspaceRuntimeId: model.workspaceRuntimeId,

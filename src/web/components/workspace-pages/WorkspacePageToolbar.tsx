@@ -12,7 +12,7 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 
-interface RepoPageToolbarProps {
+interface WorkspacePageToolbarProps {
   icon: LucideIcon
   label: string
   compact?: boolean
@@ -20,13 +20,13 @@ interface RepoPageToolbarProps {
   onBack?: () => void
 }
 
-export function RepoPageToolbar({
+export function WorkspacePageToolbar({
   icon: Icon,
   label,
   compact = false,
   trafficLightOffset = false,
   onBack,
-}: RepoPageToolbarProps) {
+}: WorkspacePageToolbarProps) {
   const t = useT()
   const backLabel = t('workspace.back-to-branch-navigator')
   const tab = (

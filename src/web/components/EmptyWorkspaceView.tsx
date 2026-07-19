@@ -1,17 +1,17 @@
 import { FolderGit2 } from 'lucide-react'
-import { RepoLayoutSidebar } from '#/web/components/repo-layout/RepoLayoutSidebar.tsx'
-import { RepoLayoutWorkspaceShell } from '#/web/components/repo-layout/RepoLayoutWorkspaceShell.tsx'
-import { RepoWorkspacePane } from '#/web/components/Layout.tsx'
+import { WorkspaceLayoutSidebar } from '#/web/components/workspace-layout/WorkspaceLayoutSidebar.tsx'
+import { WorkspaceLayoutShell } from '#/web/components/workspace-layout/WorkspaceLayoutShell.tsx'
+import { WorkspaceLayoutPane } from '#/web/components/Layout.tsx'
 import { WorkspaceChrome } from '#/web/components/workspace-toolbar-chrome.tsx'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 
-interface EmptyRepoViewProps {
+interface EmptyWorkspaceViewProps {
   onOpenSettings?: () => void
 }
 
-export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
+export function EmptyWorkspaceView({ onOpenSettings }: EmptyWorkspaceViewProps) {
   const t = useT()
   const uiMode = useResponsiveUiMode()
   const compact = uiMode === 'compact'
@@ -19,20 +19,20 @@ export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
   const setWorkspacePaneSize = useWorkspacesStore((s) => s.setWorkspacePaneSize)
 
   return (
-    <RepoLayoutWorkspaceShell
+    <WorkspaceLayoutShell
       compact={compact}
       zenMode={false}
-      repoWorkspaceActive={false}
+      workspacePaneActive={false}
       workspacePaneSize={workspacePaneSize}
       onWorkspacePaneSizeChange={setWorkspacePaneSize}
       zenModeToggleEnabled={false}
       sidebarPane={
-        <RepoWorkspacePane>
-          <RepoLayoutSidebar git={null} compact={compact} onOpenSettings={onOpenSettings} />
-        </RepoWorkspacePane>
+        <WorkspaceLayoutPane>
+          <WorkspaceLayoutSidebar git={null} compact={compact} onOpenSettings={onOpenSettings} />
+        </WorkspaceLayoutPane>
       }
-      repoWorkspacePane={
-        <RepoWorkspacePane>
+      workspacePane={
+        <WorkspaceLayoutPane>
           <WorkspaceChrome />
           <div className="flex flex-1 items-center justify-center">
             <div className="max-w-sm text-center">
@@ -41,7 +41,7 @@ export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
               <div className="text-xs leading-relaxed text-muted-foreground">{t('empty.body')}</div>
             </div>
           </div>
-        </RepoWorkspacePane>
+        </WorkspaceLayoutPane>
       }
       singlePaneActivePane="navigator"
     />

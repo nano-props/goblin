@@ -3,17 +3,18 @@ import { omit } from 'es-toolkit'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
-  getCurrentRepoWorkspacePresentation,
-  type RepoWorkspaceRepo,
-  type CurrentRepoWorkspacePresentation,
+  getCurrentGitWorkspacePanePresentation,
+  type GitWorkspacePaneProjection,
+  type CurrentGitWorkspacePanePresentation,
 } from '#/web/components/repo-workspace/model.ts'
-import { RepoWorkspaceToolbar } from '#/web/components/repo-workspace/RepoWorkspaceToolbar.tsx'
-import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
+import { GitWorkspacePaneToolbar } from '#/web/components/repo-workspace/GitWorkspacePaneToolbar.tsx'
+import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
 import {
-  useFilesystemWorkspaceTabModel,
+  useGitWorktreeWorkspacePaneTabModel,
   useWorkspaceRootTabModel,
-  useRepoWorkspaceTabModel,
-} from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
+  useGitWorkspacePaneTabModel,
+  type WorkspacePaneRuntimeContext,
+} from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import { useWorkspacePaneVisibleStatusRefresh } from '#/web/components/repo-workspace/use-workspace-pane-visible-status-refresh.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
@@ -25,7 +26,7 @@ import {
   useWorkspaceDirectoryOverview,
 } from '#/web/repo-data-query.ts'
 import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
-import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
+import { WorkspacePaneSkeleton } from '#/web/components/Skeleton.tsx'
 import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { useWorkspacePaneRouteController } from '#/web/components/repo-workspace/workspace-pane-route-controller.ts'
@@ -43,12 +44,12 @@ import { WorkspaceDirectoryStatus } from '#/web/components/repo-workspace/Worksp
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import type { WorkspaceReadyProbeState } from '#/shared/workspace-runtime.ts'
 import { gitHead, type GitHead } from '#/shared/git-head.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { GitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { StatusList } from '#/web/components/StatusList.tsx'
 import type { WorktreeStatus } from '#/web/types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-export type RepoWorkspacePaneRouteContext =
+export type WorkspacePaneRouteContext =
   | { kind: 'workspace-root' }
   | { kind: 'git-worktree'; worktreePath: string; route: ParsedWorkspacePaneRoute | null }
   | { kind: 'routed'; route: ParsedWorkspacePaneRoute | null }
@@ -57,14 +58,14 @@ export type RepoWorkspacePaneRouteContext =
 interface Props {
   workspaceId: WorkspaceId
   currentBranchName?: string | null
-  workspacePaneRouteContext: RepoWorkspacePaneRouteContext
+  workspacePaneRouteContext: WorkspacePaneRouteContext
   shortcutsEnabled?: boolean
   toolbarTrafficLightOffset?: boolean
   onBackToBranchNavigator?: () => void
 }
 
-// Keep this equality in sync with fields read by RepoWorkspace children.
-type RepoWorkspaceRepoShell = Omit<RepoWorkspaceRepo, 'branchModel' | 'branchAction'> & {
+// Keep this equality in sync with fields read by WorkspacePane children.
+type GitWorkspacePaneShell = Omit<GitWorkspacePaneProjection, 'branchModel' | 'branchAction'> & {
   operations: Pick<GitWorkspaceProjection['operations'], 'branchAction'>
   probe: WorkspaceReadyProbeState
 }
@@ -76,6 +77,13 @@ interface WorkspacePaneShell {
   unavailable: boolean
   capability: WorkspaceCapabilityState
   admission: WorkspaceState['admission']
+}
+
+interface FilesystemWorkspacePaneProjection {
+  id: WorkspaceId
+  workspaceRuntimeId: string
+  ui: WorkspacePaneShell['ui']
+  probe: WorkspaceReadyProbeState
 }
 
 function workspacePaneShellEqual(a: WorkspacePaneShell | undefined, b: WorkspacePaneShell | undefined): boolean {
@@ -93,7 +101,7 @@ function workspacePaneShellEqual(a: WorkspacePaneShell | undefined, b: Workspace
   )
 }
 
-export function RepoWorkspace({
+export function WorkspacePane({
   workspaceId,
   currentBranchName,
   workspacePaneRouteContext,
@@ -102,32 +110,32 @@ export function RepoWorkspace({
   onBackToBranchNavigator,
 }: Props) {
   const workspacePaneId = useId()
-  const repoShell = useStoreWithEqualityFn(
+  const workspaceShell = useStoreWithEqualityFn(
     useWorkspacesStore,
     (s) => {
-      const repo = s.workspaces[workspaceId]
-      const currentBranch = repo ? (currentBranchName ?? null) : null
-      return repo
+      const workspace = s.workspaces[workspaceId]
+      const currentBranch = workspace ? (currentBranchName ?? null) : null
+      return workspace
         ? {
-            id: repo.id,
-            workspaceRuntimeId: repo.workspaceRuntimeId,
+            id: workspace.id,
+            workspaceRuntimeId: workspace.workspaceRuntimeId,
             ui: {
               currentBranchName: currentBranch,
-              preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
+              preferredWorkspacePaneTabByTarget: workspace.ui.preferredWorkspacePaneTabByTarget,
             },
-            unavailable: isWorkspaceUnavailable(repo),
-            capability: repo.capability,
-            admission: repo.admission,
+            unavailable: isWorkspaceUnavailable(workspace),
+            capability: workspace.capability,
+            admission: workspace.admission,
           }
         : undefined
     },
     workspacePaneShellEqual,
   )
-  if (!repoShell) return null
+  if (!workspaceShell) return null
 
   return (
-    <RepoWorkspaceLoaded
-      repoShell={repoShell}
+    <WorkspacePaneLoaded
+      workspaceShell={workspaceShell}
       workspacePaneRouteContext={workspacePaneRouteContext}
       workspacePaneId={workspacePaneId}
       shortcutsEnabled={shortcutsEnabled}
@@ -137,23 +145,23 @@ export function RepoWorkspace({
   )
 }
 
-function RepoWorkspaceLoaded(props: {
-  repoShell: WorkspacePaneShell
-  workspacePaneRouteContext: RepoWorkspacePaneRouteContext
+function WorkspacePaneLoaded(props: {
+  workspaceShell: WorkspacePaneShell
+  workspacePaneRouteContext: WorkspacePaneRouteContext
   workspacePaneId: string
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset: boolean
   onBackToBranchNavigator?: () => void
 }) {
-  if (props.repoShell.capability.kind === 'probing' || props.repoShell.capability.kind === 'unavailable') {
-    return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={props.toolbarTrafficLightOffset} />
+  if (props.workspaceShell.capability.kind === 'probing' || props.workspaceShell.capability.kind === 'unavailable') {
+    return <WorkspacePaneSkeleton toolbarTrafficLightOffset={props.toolbarTrafficLightOffset} />
   }
-  if (props.workspacePaneRouteContext.kind === 'git-worktree' && props.repoShell.capability.kind === 'git') {
-    const repo = gitRepoWorkspaceShell(props.repoShell, props.repoShell.capability)
+  if (props.workspacePaneRouteContext.kind === 'git-worktree' && props.workspaceShell.capability.kind === 'git') {
+    const repo = gitWorkspacePaneShell(props.workspaceShell, props.workspaceShell.capability)
     return (
       <GitWorktreeFilesystemPane
         repo={repo}
-        workspaceProbe={props.repoShell.capability.probe}
+        workspaceProbe={props.workspaceShell.capability.probe}
         worktreePath={props.workspacePaneRouteContext.worktreePath}
         route={props.workspacePaneRouteContext.route}
         workspacePaneId={props.workspacePaneId}
@@ -165,14 +173,17 @@ function RepoWorkspaceLoaded(props: {
   // The selected pane target owns presentation. Capability discovery may
   // expose Git navigation, but it must not replace an already-open
   // filesystem workspace with an unrelated branch surface.
-  if (props.workspacePaneRouteContext.kind === 'workspace-root' || props.repoShell.capability.kind === 'filesystem') {
+  if (
+    props.workspacePaneRouteContext.kind === 'workspace-root' ||
+    props.workspaceShell.capability.kind === 'filesystem'
+  ) {
     return (
       <WorkspaceRootPane
-        repo={{
-          id: props.repoShell.id,
-          workspaceRuntimeId: props.repoShell.workspaceRuntimeId,
-          ui: props.repoShell.ui,
-          probe: props.repoShell.capability.probe,
+        workspace={{
+          id: props.workspaceShell.id,
+          workspaceRuntimeId: props.workspaceShell.workspaceRuntimeId,
+          ui: props.workspaceShell.ui,
+          probe: props.workspaceShell.capability.probe,
         }}
         workspacePaneId={props.workspacePaneId}
         toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
@@ -180,22 +191,25 @@ function RepoWorkspaceLoaded(props: {
       />
     )
   }
-  if (props.repoShell.capability.kind !== 'git') {
-    return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={props.toolbarTrafficLightOffset} />
+  if (props.workspaceShell.capability.kind !== 'git') {
+    return <WorkspacePaneSkeleton toolbarTrafficLightOffset={props.toolbarTrafficLightOffset} />
   }
   return (
-    <GitRepoWorkspaceLoaded
-      {...props}
-      repoShell={gitRepoWorkspaceShell(props.repoShell, props.repoShell.capability)}
+    <GitWorkspacePaneLoaded
+      gitWorkspace={gitWorkspacePaneShell(props.workspaceShell, props.workspaceShell.capability)}
       workspacePaneRouteContext={props.workspacePaneRouteContext}
+      workspacePaneId={props.workspacePaneId}
+      shortcutsEnabled={props.shortcutsEnabled}
+      toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
+      onBackToBranchNavigator={props.onBackToBranchNavigator}
     />
   )
 }
 
-function gitRepoWorkspaceShell(
+function gitWorkspacePaneShell(
   workspace: WorkspacePaneShell,
   capability: Extract<WorkspaceCapabilityState, { kind: 'git' }>,
-): RepoWorkspaceRepoShell {
+): GitWorkspacePaneShell {
   const git = capability.git
   return {
     id: workspace.id,
@@ -218,7 +232,7 @@ function GitWorktreeFilesystemPane({
   toolbarTrafficLightOffset,
   onBackToNavigator,
 }: {
-  repo: RepoWorkspaceRepoShell
+  repo: GitWorkspacePaneShell
   workspaceProbe: WorkspaceReadyProbeState
   worktreePath: string
   route: ParsedWorkspacePaneRoute | null
@@ -231,7 +245,7 @@ function GitWorktreeFilesystemPane({
   const worktree = statusReadModel.data?.status.find((candidate) => candidate.path === worktreePath)
   const target = gitWorktreeWorkspacePaneTabsTarget(repo.id, worktreePath)
   if (statusReadModel.isPending) {
-    return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
+    return <WorkspacePaneSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }
   if (statusReadModel.isError) {
     return <EmptyState title={t('dashboard.directory.read-failed')} />
@@ -241,9 +255,8 @@ function GitWorktreeFilesystemPane({
   }
   return (
     <GitWorktreeFilesystemPaneReady
-      repo={repo}
+      workspaceRuntime={{ workspaceRuntimeId: repo.workspaceRuntimeId, ui: repo.ui }}
       workspaceProbe={workspaceProbe}
-      worktreePath={worktreePath}
       head={gitHead(worktree.branch ?? null)}
       status={worktree}
       target={target}
@@ -256,9 +269,8 @@ function GitWorktreeFilesystemPane({
 }
 
 function GitWorktreeFilesystemPaneReady({
-  repo,
+  workspaceRuntime,
   workspaceProbe,
-  worktreePath,
   head,
   status,
   target,
@@ -267,30 +279,30 @@ function GitWorktreeFilesystemPaneReady({
   toolbarTrafficLightOffset,
   onBackToNavigator,
 }: {
-  repo: RepoWorkspaceRepoShell
+  workspaceRuntime: WorkspacePaneRuntimeContext
   workspaceProbe: WorkspaceReadyProbeState
-  worktreePath: string
   head: GitHead
   status: WorktreeStatus
-  target: WorkspacePaneTabsTarget
+  target: GitWorktreeWorkspacePaneTabsTarget
   route: ParsedWorkspacePaneRoute | null
   workspacePaneId: string
   toolbarTrafficLightOffset: boolean
   onBackToNavigator?: () => void
 }) {
   const t = useT()
+  const worktreePath = target.worktreePath
   const requestedSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
   const requestedTab = route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
-  const model = useFilesystemWorkspaceTabModel(repo, target, head, worktreePath, requestedTab, requestedSessionId)
-  const runtimeTarget = runtimeWorkspacePaneTarget(target, repo.workspaceRuntimeId)
+  const model = useGitWorktreeWorkspacePaneTabModel(workspaceRuntime, target, head, requestedTab, requestedSessionId)
+  const runtimeTarget = runtimeWorkspacePaneTarget(target, workspaceRuntime.workspaceRuntimeId)
   const selectedTerminalSessionId =
     model.selection?.kind === 'materialized-tab' && model.selection.materializedTab.kind === 'runtime'
       ? model.selection.materializedTab.sessionId
       : null
   const surfaceTarget = {
     kind: 'git-worktree' as const,
-    workspaceId: repo.id,
-    workspaceRuntimeId: repo.workspaceRuntimeId,
+    workspaceId: target.workspaceId,
+    workspaceRuntimeId: workspaceRuntime.workspaceRuntimeId,
     rootPath: worktreePath,
     head,
     capabilities: workspaceProbe.capabilities,
@@ -337,31 +349,31 @@ function GitWorktreeFilesystemPaneReady({
   )
 }
 
-function GitRepoWorkspaceLoaded({
-  repoShell,
+function GitWorkspacePaneLoaded({
+  gitWorkspace,
   workspacePaneRouteContext,
   workspacePaneId,
   shortcutsEnabled,
   toolbarTrafficLightOffset,
   onBackToBranchNavigator,
 }: {
-  repoShell: RepoWorkspaceRepoShell
-  workspacePaneRouteContext: RepoWorkspacePaneRouteContext
+  gitWorkspace: GitWorkspacePaneShell
+  workspacePaneRouteContext: WorkspacePaneRouteContext
   workspacePaneId: string
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset: boolean
   onBackToBranchNavigator?: () => void
 }) {
-  const currentBranchName = repoShell.ui.currentBranchName
+  const currentBranchName = gitWorkspace.ui.currentBranchName
   const projectionReadModel = useRepoProjectionReadModel(
-    repoShell.id,
-    repoShell.workspaceRuntimeId,
+    gitWorkspace.id,
+    gitWorkspace.workspaceRuntimeId,
     currentBranchName,
     'full',
     true,
   )
   const projection = projectionReadModel.data
-  const statusReadModel = useRepoWorktreeStatusReadModel(repoShell.id, repoShell.workspaceRuntimeId, true)
+  const statusReadModel = useRepoWorktreeStatusReadModel(gitWorkspace.id, gitWorkspace.workspaceRuntimeId, true)
   const statusSnapshot = statusReadModel.data
   if (projection?.snapshot && !statusSnapshot && statusReadModel.isError) {
     const statusErrorKey =
@@ -374,8 +386,8 @@ function GitRepoWorkspaceLoaded({
           onRetry={() => {
             void refreshRepoWorktreeStatus(
               { get: useWorkspacesStore.getState },
-              repoShell.id,
-              repoShell.workspaceRuntimeId,
+              gitWorkspace.id,
+              gitWorkspace.workspaceRuntimeId,
             )
           }}
         />
@@ -387,9 +399,9 @@ function GitRepoWorkspaceLoaded({
       ? repoBranchReadModelFromSnapshot(projection.snapshot, statusSnapshot.status)
       : null
   if (!branchReadModel || !projection) {
-    return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
+    return <WorkspacePaneSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }
-  let presentationBranchModel: RepoWorkspaceRepo['branchModel'] = branchReadModel
+  let presentationBranchModel: GitWorkspacePaneProjection['branchModel'] = branchReadModel
   if (currentBranchName && Array.isArray(projection.pullRequests)) {
     const pullRequest = projection.pullRequests.find((entry) => entry.branch === currentBranchName)?.pullRequest
     presentationBranchModel = {
@@ -401,19 +413,19 @@ function GitRepoWorkspaceLoaded({
       }),
     }
   }
-  const presentationRepo: RepoWorkspaceRepo = {
-    ...projectBranchActionRepo(repoShell, projection.operations.operations, currentBranchName),
+  const gitWorkspaceProjection: GitWorkspacePaneProjection = {
+    ...projectBranchActionRepo(gitWorkspace, projection.operations.operations, currentBranchName),
     branchModel: presentationBranchModel,
-    probe: repoShell.probe,
+    probe: gitWorkspace.probe,
   }
   const statusError = statusReadModel.error
   const statusErrorKey = statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
-  const detailBase = getCurrentRepoWorkspacePresentation(presentationRepo, {
+  const detailBase = getCurrentGitWorkspacePanePresentation(gitWorkspaceProjection, {
     loading: statusReadModel.isFetching,
     error: statusErrorKey,
     stale: !!statusSnapshot && statusReadModel.isError,
   })
-  const detail: CurrentRepoWorkspacePresentation = {
+  const detail: CurrentGitWorkspacePanePresentation = {
     ...detailBase,
     loading: {
       ...detailBase.loading,
@@ -424,8 +436,8 @@ function GitRepoWorkspaceLoaded({
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
       {detail.branch ? (
-        <BranchActionWorkspacePane
-          repo={presentationRepo}
+        <GitBranchActionWorkspacePane
+          repo={gitWorkspaceProjection}
           detail={detail}
           workspacePaneRouteContext={workspacePaneRouteContext}
           branch={detail.branch}
@@ -435,8 +447,8 @@ function GitRepoWorkspaceLoaded({
           onBackToBranchNavigator={onBackToBranchNavigator}
         />
       ) : (
-        <RepoWorkspacePane
-          repo={presentationRepo}
+        <GitWorkspacePaneSurface
+          repo={gitWorkspaceProjection}
           detail={detail}
           workspacePaneRouteContext={workspacePaneRouteContext}
           workspacePaneId={workspacePaneId}
@@ -449,23 +461,27 @@ function GitRepoWorkspaceLoaded({
 }
 
 function WorkspaceRootPane({
-  repo,
+  workspace,
   workspacePaneId,
   toolbarTrafficLightOffset,
   onBackToNavigator,
 }: {
-  repo: Pick<RepoWorkspaceRepoShell, 'id' | 'workspaceRuntimeId' | 'ui'> & { probe: WorkspaceReadyProbeState }
+  workspace: FilesystemWorkspacePaneProjection
   workspacePaneId: string
   toolbarTrafficLightOffset: boolean
   onBackToNavigator?: () => void
 }) {
   const t = useT()
-  const model = useWorkspaceRootTabModel(repo)
-  const target = { kind: 'workspace-root' as const, workspaceId: repo.id }
-  const runtimeTarget = runtimeWorkspacePaneTarget(target, repo.workspaceRuntimeId)
-  const terminalAvailable = repo.probe.capabilities.terminal.available
+  const model = useWorkspaceRootTabModel(workspace)
+  const target = { kind: 'workspace-root' as const, workspaceId: workspace.id }
+  const runtimeTarget = runtimeWorkspacePaneTarget(target, workspace.workspaceRuntimeId)
+  const terminalAvailable = workspace.probe.capabilities.terminal.available
   const activePanel = model.selection?.tab === 'terminal' && !terminalAvailable ? null : (model.selection?.tab ?? null)
-  const overviewReadModel = useWorkspaceDirectoryOverview(repo.id, repo.workspaceRuntimeId, activePanel === 'status')
+  const overviewReadModel = useWorkspaceDirectoryOverview(
+    workspace.id,
+    workspace.workspaceRuntimeId,
+    activePanel === 'status',
+  )
   const selectedTerminalSessionId =
     model.selection?.kind === 'materialized-tab' && model.selection.materializedTab.kind === 'runtime'
       ? model.selection.materializedTab.sessionId
@@ -475,10 +491,10 @@ function WorkspaceRootPane({
       <WorkspacePaneTargetToolbar
         target={{
           kind: 'workspace-root',
-          workspaceId: repo.id,
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-          rootPath: repo.id,
-          capabilities: repo.probe.capabilities,
+          workspaceId: workspace.id,
+          workspaceRuntimeId: workspace.workspaceRuntimeId,
+          rootPath: workspace.id,
+          capabilities: workspace.probe.capabilities,
         }}
         model={model}
         workspacePaneId={workspacePaneId}
@@ -505,10 +521,10 @@ function WorkspaceRootPane({
           <FiletreeTab
             target={{
               kind: 'workspace-root',
-              workspaceId: repo.id,
-              workspaceRuntimeId: repo.workspaceRuntimeId,
-              rootPath: repo.id,
-              capabilities: repo.probe.capabilities,
+              workspaceId: workspace.id,
+              workspaceRuntimeId: workspace.workspaceRuntimeId,
+              rootPath: workspace.id,
+              capabilities: workspace.probe.capabilities,
             }}
           />
         </WorkspacePanePanelFrame>
@@ -520,7 +536,7 @@ function WorkspaceRootPane({
           target: {
             runtimeTarget,
             presentation: { kind: 'workspace-root' },
-            worktreePath: repo.id,
+            worktreePath: workspace.id,
           },
           selectedSessionId: selectedTerminalSessionId,
           runtimeState: model.runtimeTabStateByType.terminal,
@@ -532,17 +548,17 @@ function WorkspaceRootPane({
   )
 }
 
-interface RepoWorkspacePaneProps {
-  repo: RepoWorkspaceRepo
-  detail: CurrentRepoWorkspacePresentation
-  workspacePaneRouteContext: RepoWorkspacePaneRouteContext
+interface GitWorkspacePaneSurfaceProps {
+  repo: GitWorkspacePaneProjection
+  detail: CurrentGitWorkspacePanePresentation
+  workspacePaneRouteContext: WorkspacePaneRouteContext
   workspacePaneId: string
   toolbarTrafficLightOffset?: boolean
   branchActions?: BranchActions
   onBackToBranchNavigator?: () => void
 }
 
-function RepoWorkspacePane({
+function GitWorkspacePaneSurface({
   repo,
   detail,
   workspacePaneRouteContext,
@@ -550,10 +566,10 @@ function RepoWorkspacePane({
   toolbarTrafficLightOffset = false,
   branchActions,
   onBackToBranchNavigator,
-}: RepoWorkspacePaneProps) {
+}: GitWorkspacePaneSurfaceProps) {
   const workspacePaneRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : undefined
   const routeControllerRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : null
-  const workspacePaneTabModel = useRepoWorkspaceTabModel(repo, detail, workspacePaneRoute)
+  const workspacePaneTabModel = useGitWorkspacePaneTabModel(repo, detail, workspacePaneRoute)
   useWorkspacePaneVisibleStatusRefresh({
     workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
@@ -572,7 +588,7 @@ function RepoWorkspacePane({
 
   return (
     <>
-      <RepoWorkspaceToolbar
+      <GitWorkspacePaneToolbar
         repo={repo}
         detail={detail}
         workspacePaneId={workspacePaneId}
@@ -582,7 +598,7 @@ function RepoWorkspacePane({
         branchActions={branchActions}
         onBackToBranchNavigator={onBackToBranchNavigator}
       />
-      <RepoWorkspaceContent
+      <GitWorkspacePaneContent
         repo={repo}
         detail={detail}
         workspacePaneId={workspacePaneId}
@@ -596,18 +612,18 @@ function RepoWorkspacePane({
   )
 }
 
-interface BranchActionWorkspacePaneProps {
-  repo: RepoWorkspaceRepo
-  detail: CurrentRepoWorkspacePresentation
-  workspacePaneRouteContext: RepoWorkspacePaneRouteContext
-  branch: NonNullable<CurrentRepoWorkspacePresentation['branch']>
+interface GitBranchActionWorkspacePaneProps {
+  repo: GitWorkspacePaneProjection
+  detail: CurrentGitWorkspacePanePresentation
+  workspacePaneRouteContext: WorkspacePaneRouteContext
+  branch: NonNullable<CurrentGitWorkspacePanePresentation['branch']>
   workspacePaneId: string
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset?: boolean
   onBackToBranchNavigator?: () => void
 }
 
-function BranchActionWorkspacePane({
+function GitBranchActionWorkspacePane({
   repo,
   detail,
   workspacePaneRouteContext,
@@ -616,7 +632,7 @@ function BranchActionWorkspacePane({
   shortcutsEnabled,
   toolbarTrafficLightOffset = false,
   onBackToBranchNavigator,
-}: BranchActionWorkspacePaneProps) {
+}: GitBranchActionWorkspacePaneProps) {
   const workspacePaneRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : undefined
   const branchActions = useBranchActions(repo, branch)
   const actions = useBranchActionItems(repo, branch, branchActions, { workspacePaneRoute })
@@ -624,7 +640,7 @@ function BranchActionWorkspacePane({
 
   return (
     <BranchActionSurfaceContext value={actions}>
-      <RepoWorkspacePane
+      <GitWorkspacePaneSurface
         repo={repo}
         detail={detail}
         workspacePaneRouteContext={workspacePaneRouteContext}

@@ -19,14 +19,14 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const NOOP = () => {}
 const SIDEBAR_TOP_CLASS_NAME = 'flex shrink-0 items-center gap-1 bg-card text-sm'
-type RepoShellSidebarChromeRegion = 'drag' | 'none'
+type WorkspaceShellSidebarChromeRegion = 'drag' | 'none'
 
-interface RepoShellSidebarProps {
+interface WorkspaceShellSidebarProps {
   workspaceId?: WorkspaceId
   git: GitWorkspaceProjection | null
   compact: boolean
   branchContent?: ReactNode
-  chromeRegion?: RepoShellSidebarChromeRegion
+  chromeRegion?: WorkspaceShellSidebarChromeRegion
   onOpenSettings?: () => void
   onSelectBranch?: (branch: string) => void
   onCreateWorktree?: () => void
@@ -38,7 +38,7 @@ interface RepoShellSidebarProps {
   onSelectWorkspaceRoot?: () => void
 }
 
-export function RepoLayoutSidebar({
+export function WorkspaceLayoutSidebar({
   workspaceId,
   git,
   compact,
@@ -53,7 +53,7 @@ export function RepoLayoutSidebar({
   currentBranchName,
   workspaceRootSelected = false,
   onSelectWorkspaceRoot,
-}: RepoShellSidebarProps) {
+}: WorkspaceShellSidebarProps) {
   const t = useT()
   const navigatorTitleKey = git ? 'tab.branches' : 'workspace.navigation-title'
   return (
@@ -62,17 +62,17 @@ export function RepoLayoutSidebar({
         (chromeRegion === 'drag' ? (
           <TitleBarDragRegion
             className={SIDEBAR_TOP_CLASS_NAME}
-            data-testid="repo-shell-sidebar-top"
+            data-testid="workspace-shell-sidebar-top"
             style={{ height: TITLE_BAR_HEIGHT_PX }}
           />
         ) : (
           <div
             className={SIDEBAR_TOP_CLASS_NAME}
-            data-testid="repo-shell-sidebar-top"
+            data-testid="workspace-shell-sidebar-top"
             style={{ height: TITLE_BAR_HEIGHT_PX }}
           />
         ))}
-      <RepoShellPrimaryActions
+      <WorkspaceShellPrimaryActions
         workspaceId={workspaceId}
         onCreateWorktree={onCreateWorktree}
         onOpenDashboard={onOpenDashboard}
@@ -82,7 +82,11 @@ export function RepoLayoutSidebar({
       />
       {workspaceId ? (
         <>
-          <RepoShellBranchHeader workspaceId={workspaceId} title={t(navigatorTitleKey)} gitAvailable={git !== null} />
+          <WorkspaceShellNavigatorHeader
+            workspaceId={workspaceId}
+            title={t(navigatorTitleKey)}
+            gitAvailable={git !== null}
+          />
           <div className="flex min-h-0 flex-1 bg-card">
             {branchContent ??
               (git ? (
@@ -108,7 +112,7 @@ export function RepoLayoutSidebar({
   )
 }
 
-function RepoShellPrimaryActions({
+function WorkspaceShellPrimaryActions({
   workspaceId,
   onCreateWorktree,
   onOpenDashboard,
@@ -159,7 +163,7 @@ function WorkspacePickerRow({ workspaceId }: { workspaceId?: WorkspaceId }) {
   )
 }
 
-function RepoShellBranchHeader({
+function WorkspaceShellNavigatorHeader({
   workspaceId,
   title,
   gitAvailable,

@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { ZenModeSidebarChrome } from '#/web/components/repo-layout/ZenModeSidebarChrome.tsx'
+import { ZenModeSidebarChrome } from '#/web/components/workspace-layout/ZenModeSidebarChrome.tsx'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
 

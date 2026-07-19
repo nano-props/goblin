@@ -14,7 +14,7 @@ import {
   type WorkspacePaneStaticTabType,
 } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import type { RepoWorkspaceStaticTab, RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import type { WorkspacePaneStaticTab, WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
@@ -262,14 +262,14 @@ describe('workspace pane tab controller transactions', () => {
   })
 })
 
-function workspacePaneTarget(): RepoWorkspaceTabModel {
+function workspacePaneTarget(): WorkspacePaneTabModel {
   return {
     workspaceId: WORKSPACE_ID,
     workspaceRuntimeId: 'repo-runtime-1',
     branchName: 'feature/a',
     worktreePath: '/worktree-a',
     paneTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/worktree-a' },
-  } as RepoWorkspaceTabModel
+  } as WorkspacePaneTabModel
 }
 
 function committingNavigation(): WorkspacePaneTabControllerCommitNavigation {
@@ -281,6 +281,6 @@ function committingNavigation(): WorkspacePaneTabControllerCommitNavigation {
   }
 }
 
-function staticTab(type: WorkspacePaneStaticTabType): RepoWorkspaceStaticTab {
+function staticTab(type: WorkspacePaneStaticTabType): WorkspacePaneStaticTab {
   return { identity: workspacePaneStaticTabId(type), type, kind: 'static', view: null }
 }

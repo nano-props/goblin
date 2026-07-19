@@ -5,7 +5,7 @@ import { act, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
 import { advanceTimersAndFlush, flushMicrotasks, renderInJsdom, useFakeTimers } from '#/test-utils/index.ts'
-import { CreateWorktreePagePane } from '#/web/components/repo-pages/CreateWorktreePagePane.tsx'
+import { CreateWorktreePagePane } from '#/web/components/workspace-pages/CreateWorktreePagePane.tsx'
 import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -113,8 +113,8 @@ describe('CreateWorktreePagePane', () => {
     const { container } = renderPane(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
 
     expect(container.textContent).toContain('action.create-worktree-title')
-    expect(container.querySelector('[data-testid="repo-page-quiet-loading"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="repo-page-loading"]')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-page-quiet-loading"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-page-loading"]')).toBeNull()
     expect(container.querySelector('[data-testid="submit-create-worktree"]')).toBeNull()
   })
 
@@ -133,25 +133,25 @@ describe('CreateWorktreePagePane', () => {
     )
 
     expect(container.textContent).toContain('action.create-worktree-title')
-    expect(container.querySelector('[data-testid="repo-page-quiet-loading"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="repo-page-loading"]')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-page-quiet-loading"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-page-loading"]')).toBeNull()
     expect(container.querySelector('[data-testid="submit-create-worktree"]')).toBeNull()
 
     await advanceReactTimers(DEFAULT_LOADING_DELAY_MS)
 
-    expect(container.querySelector('[data-testid="repo-page-quiet-loading"]')).toBeNull()
-    expect(container.querySelector('[data-testid="repo-page-loading"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-page-quiet-loading"]')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-page-loading"]')).not.toBeNull()
 
     await act(async () => {
       resolvePreview({ ok: false, message: 'error.failed-read-repo' })
       await flushMicrotasks(5)
     })
 
-    expect(container.querySelector('[data-testid="repo-page-loading"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-page-loading"]')).not.toBeNull()
 
     await advanceReactTimers(DEFAULT_MIN_LOADING_VISIBLE_MS)
 
-    expect(container.querySelector('[data-testid="repo-page-loading"]')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-page-loading"]')).toBeNull()
     expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull()
   })
 
@@ -169,8 +169,8 @@ describe('CreateWorktreePagePane', () => {
       <CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />,
     )
 
-    expect(container.querySelector('[data-testid="repo-page-quiet-loading"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="repo-page-loading"]')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-page-quiet-loading"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-page-loading"]')).toBeNull()
 
     await act(async () => {
       resolvePreview({ ok: false, message: 'error.failed-read-repo' })
@@ -178,12 +178,12 @@ describe('CreateWorktreePagePane', () => {
     })
 
     expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="repo-page-loading"]')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-page-loading"]')).toBeNull()
 
     await advanceReactTimers(DEFAULT_LOADING_DELAY_MS)
 
     expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="repo-page-loading"]')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-page-loading"]')).toBeNull()
   })
 
   test('keeps stable page chrome while the bootstrap load is still pending', async () => {
@@ -267,7 +267,7 @@ describe('CreateWorktreePagePane', () => {
     })
 
     await waitFor(() => {
-      expect(container.querySelector('[data-testid="repo-page-loading"]')).toBeNull()
+      expect(container.querySelector('[data-testid="workspace-page-loading"]')).toBeNull()
       expect(button(container).dataset.loading).toBe('false')
     })
   })

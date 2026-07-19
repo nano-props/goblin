@@ -1,13 +1,13 @@
-const REPO_SIDEBAR_MIN_WIDTH_REM = 14
-const REPO_WORKSPACE_MIN_WIDTH_REM = 22
-export const REPO_SIDEBAR_MIN_WIDTH = `${REPO_SIDEBAR_MIN_WIDTH_REM}rem`
-export const REPO_WORKSPACE_MIN_WIDTH = `${REPO_WORKSPACE_MIN_WIDTH_REM}rem`
+const WORKSPACE_SIDEBAR_MIN_WIDTH_REM = 14
+const WORKSPACE_PANE_MIN_WIDTH_REM = 22
+export const WORKSPACE_SIDEBAR_MIN_WIDTH = `${WORKSPACE_SIDEBAR_MIN_WIDTH_REM}rem`
+export const WORKSPACE_PANE_MIN_WIDTH = `${WORKSPACE_PANE_MIN_WIDTH_REM}rem`
 
-export function repoSidebarWidthExpression(sidebarSize: number): string {
-  return `max(${REPO_SIDEBAR_MIN_WIDTH}, min(${sidebarSize}%, calc(100% - ${REPO_WORKSPACE_MIN_WIDTH})))`
+export function workspaceSidebarWidthExpression(sidebarSize: number): string {
+  return `max(${WORKSPACE_SIDEBAR_MIN_WIDTH}, min(${sidebarSize}%, calc(100% - ${WORKSPACE_PANE_MIN_WIDTH})))`
 }
 
-export function repoSidebarWidthPx({
+export function workspaceSidebarWidthPx({
   sidebarSize,
   totalPx,
   rootFontSizePx,
@@ -18,14 +18,14 @@ export function repoSidebarWidthPx({
 }): number | null {
   if (!Number.isFinite(sidebarSize) || !Number.isFinite(totalPx) || totalPx <= 0) return null
 
-  const minSidebarPx = REPO_SIDEBAR_MIN_WIDTH_REM * rootFontSizePx
-  const minWorkspacePx = REPO_WORKSPACE_MIN_WIDTH_REM * rootFontSizePx
+  const minSidebarPx = WORKSPACE_SIDEBAR_MIN_WIDTH_REM * rootFontSizePx
+  const minWorkspacePx = WORKSPACE_PANE_MIN_WIDTH_REM * rootFontSizePx
   const maxSidebarPx = Math.max(minSidebarPx, totalPx - minWorkspacePx)
   const requestedPx = (sidebarSize / 100) * totalPx
   return Math.max(minSidebarPx, Math.min(maxSidebarPx, requestedPx))
 }
 
-export function clampRepoSidebarSizePercent({
+export function clampWorkspaceSidebarSizePercent({
   sidebarPx,
   totalPx,
   rootFontSizePx,
@@ -37,7 +37,7 @@ export function clampRepoSidebarSizePercent({
   if (!Number.isFinite(sidebarPx) || !Number.isFinite(totalPx) || totalPx <= 0) return 50
 
   const clampedPx =
-    repoSidebarWidthPx({
+    workspaceSidebarWidthPx({
       sidebarSize: (sidebarPx / totalPx) * 100,
       totalPx,
       rootFontSizePx,

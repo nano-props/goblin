@@ -4,7 +4,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { RepoWorkspace } from '#/web/components/RepoWorkspace.tsx'
+import { WorkspacePane } from '#/web/components/WorkspacePane.tsx'
 import {
   EMPTY_TERMINAL_SNAPSHOT,
   EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
@@ -47,7 +47,7 @@ import {
   workspaceDirectoryOverviewQueryKey,
 } from '#/web/repo-data-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import { nextWorkspacePaneTabEntryAfterClose } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import { nextWorkspacePaneTabEntryAfterClose } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
@@ -164,7 +164,7 @@ function gitWorktreeFilesystemTarget(repo: WorkspaceState, rootPath: string, bra
   }
 }
 
-describe('RepoWorkspace', () => {
+describe('WorkspacePane', () => {
   test('renders a remote non-Git workspace with canonical Status, Files, and Terminal targets', async () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://example/srv/workspace')
     const repo = seedRepoWithReadModelForTest({
@@ -180,7 +180,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
+              <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -218,7 +218,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={workspaceId}
                 currentBranchName={null}
                 workspacePaneRouteContext={{ kind: 'workspace-root' }}
@@ -287,7 +287,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContextWithSession(terminalWorktreeKey, terminalSessionId)}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={workspaceId}
                 currentBranchName={null}
                 workspacePaneRouteContext={{
@@ -322,7 +322,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={workspaceId}
                 workspacePaneRouteContext={{ kind: 'routed', route: null }}
                 onBackToBranchNavigator={onBackToNavigator}
@@ -360,7 +360,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
+              <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -392,7 +392,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
+              <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -467,7 +467,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={workspaceNavigation}>
           <TerminalSessionContext value={workspaceTerminalCommands}>
             <TerminalSessionReadContext value={workspaceTerminalReadContext}>
-              <RepoWorkspace workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'workspace-root' }} />
+              <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'workspace-root' }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -523,7 +523,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
+              <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -550,7 +550,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="feature/removed"
                 workspacePaneRouteContext={{ kind: 'routed', route: null }}
@@ -588,7 +588,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="main"
                 workspacePaneRouteContext={{ kind: 'routed', route: null }}
@@ -611,7 +611,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace workspaceId={REPO_ID} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
+              <WorkspacePane workspaceId={REPO_ID} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -644,7 +644,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="feature/a"
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
@@ -666,7 +666,7 @@ describe('RepoWorkspace', () => {
           <PrimaryWindowNavigationProvider value={navigation}>
             <TerminalSessionContext value={terminalCommandContext}>
               <TerminalSessionReadContext value={terminalReadContext}>
-                <RepoWorkspace
+                <WorkspacePane
                   workspaceId={REPO_ID}
                   currentBranchName="feature/b"
                   workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
@@ -692,7 +692,7 @@ describe('RepoWorkspace', () => {
           <PrimaryWindowNavigationProvider value={navigation}>
             <TerminalSessionContext value={terminalCommandContext}>
               <TerminalSessionReadContext value={terminalReadContext}>
-                <RepoWorkspace
+                <WorkspacePane
                   workspaceId={REPO_ID}
                   currentBranchName="feature/a"
                   workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
@@ -733,7 +733,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="feature/a"
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
@@ -778,7 +778,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="feature/stale"
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'changes' } }}
@@ -873,7 +873,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={testNavigation}>
           <TerminalSessionContext value={commandContext}>
             <TerminalSessionReadContext value={nextReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="feature/a"
                 workspacePaneRouteContext={{ kind: 'routed', route: workspacePaneRoute }}
@@ -958,7 +958,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={readContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{
@@ -1014,7 +1014,7 @@ describe('RepoWorkspace', () => {
                 'term-222222222222222222222',
               ])}
             >
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{
@@ -1065,7 +1065,7 @@ describe('RepoWorkspace', () => {
                 'term-222222222222222222222',
               ])}
             >
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{
@@ -1117,7 +1117,7 @@ describe('RepoWorkspace', () => {
             <TerminalSessionReadContext
               value={terminalReadContextWithSession(terminalWorktreeKey, 'term-111111111111111111111')}
             >
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{
@@ -1181,7 +1181,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={readContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{
@@ -1239,7 +1239,7 @@ describe('RepoWorkspace', () => {
                 },
               )}
             >
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{
@@ -1270,7 +1270,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigationWithStore()}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'history' } }}
@@ -1323,7 +1323,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigationWithStore()}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{ kind: 'routed', route: null }}
@@ -1367,7 +1367,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{ kind: 'inactive' }}
@@ -1447,7 +1447,7 @@ describe('RepoWorkspace', () => {
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
               <div data-testid="workspace-route">{routeLabel}</div>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{ kind: 'routed', route }}
@@ -1548,7 +1548,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={actions}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'files' } }}
@@ -1629,7 +1629,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={actions}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'files' } }}
@@ -1676,7 +1676,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'changes' } }}
@@ -1726,7 +1726,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'changes' } }}
@@ -1786,7 +1786,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="feature/query"
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
@@ -1826,7 +1826,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
+              <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="feature/pr"
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}

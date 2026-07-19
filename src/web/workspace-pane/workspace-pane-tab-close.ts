@@ -1,4 +1,4 @@
-import type { RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import {
   isWorkspacePaneRuntimeTabEntry,
   type WorkspacePaneStaticTabType,
@@ -19,7 +19,7 @@ type WorkspacePaneTabCloseStart =
   { accepted: false; completion: null } | { accepted: true; completion: Promise<boolean> }
 
 export function beginWorkspacePaneTabEntryClose(
-  target: RepoWorkspaceTabModel,
+  target: WorkspacePaneTabModel,
   entry: WorkspacePaneTabEntry,
 ): WorkspacePaneTabCloseStart {
   if (!isWorkspacePaneRuntimeTabEntry(entry)) {
@@ -54,7 +54,7 @@ export function beginWorkspacePaneTabEntryClose(
   }
 }
 
-function closeStaticTabWithCommit(target: RepoWorkspaceTabModel) {
+function closeStaticTabWithCommit(target: WorkspacePaneTabModel) {
   return async (type: WorkspacePaneStaticTabType): Promise<boolean> => {
     const repo = useWorkspacesStore.getState().workspaces[target.workspaceId]
     if (!repo) return false

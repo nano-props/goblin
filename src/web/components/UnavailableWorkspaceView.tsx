@@ -13,10 +13,10 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 interface Props {
-  repo: WorkspaceState
+  workspace: WorkspaceState
 }
 
-export function UnavailableRepoView({ repo }: Props) {
+export function UnavailableWorkspaceView({ workspace }: Props) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
   // Phase 4 invariant: the `availability.phase` mirror is a
@@ -24,18 +24,18 @@ export function UnavailableRepoView({ repo }: Props) {
   // authoritative source. The lifecycle union is. Gate on
   // `isWorkspaceUnavailable` (which dispatches by workspace kind) and
   // read the reason from the field that owns it for each kind.
-  const isUnavailable = isWorkspaceUnavailable(repo)
-  const isRemote = isRemoteWorkspaceId(repo.id)
+  const isUnavailable = isWorkspaceUnavailable(workspace)
+  const isRemote = isRemoteWorkspaceId(workspace.id)
   const reason = isRemote
-    ? repo.admission.kind === 'remote' && repo.admission.lifecycle?.kind === 'failed'
-      ? repo.admission.lifecycle.reason
+    ? workspace.admission.kind === 'remote' && workspace.admission.lifecycle?.kind === 'failed'
+      ? workspace.admission.lifecycle.reason
       : 'error.failed-read-repo'
-    : repo.availability.phase === 'unavailable'
-      ? repo.availability.reason
+    : workspace.availability.phase === 'unavailable'
+      ? workspace.availability.reason
       : 'error.failed-read-repo'
   if (!isUnavailable) {
-    // Defensive: this view is only mounted by RepoView when
-    // the repo is unavailable, but a stale render after a state
+    // Defensive: this view is only mounted when the workspace is unavailable,
+    // but a stale render after a state
     // transition shouldn't render an empty body.
     return null
   }
@@ -43,7 +43,7 @@ export function UnavailableRepoView({ repo }: Props) {
   const canOpenSshSettings = isRemote && shouldOfferSshSettings(reason)
 
   async function handleClose() {
-    const result = await navigation.closeWorkspace(repo.id)
+    const result = await navigation.closeWorkspace(workspace.id)
     if (!result.ok) toast.error(t(result.message))
   }
 
@@ -61,8 +61,11 @@ export function UnavailableRepoView({ repo }: Props) {
               </div>
               <div className="mt-1 break-all font-mono text-[11px] text-foreground">
                 {formatWorkspaceDisplayLocation(
-                  repo.id,
-                  remoteWorkspaceTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null),
+                  workspace.id,
+                  remoteWorkspaceTarget(
+                    workspace.id,
+                    workspace.admission.kind === 'remote' ? workspace.admission.lifecycle : null,
+                  ),
                 )}
               </div>
               <div className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -77,8 +80,8 @@ export function UnavailableRepoView({ repo }: Props) {
                 onClick={() =>
                   void runManualRepoSync(
                     { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
-                    repo.id,
-                    { workspaceRuntimeId: repo.workspaceRuntimeId },
+                    workspace.id,
+                    { workspaceRuntimeId: workspace.workspaceRuntimeId },
                   )
                 }
               >

@@ -18,7 +18,7 @@ import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
 import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import type { RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import {
   workspacePaneTabEntryForItem,
   workspacePaneTabItems,
@@ -33,7 +33,7 @@ import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-
 
 interface WorkspacePaneTargetToolbarProps {
   target: WorkspacePaneSurfaceTarget
-  model: RepoWorkspaceTabModel
+  model: WorkspacePaneTabModel
   workspacePaneId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   statusCount: number
@@ -213,7 +213,7 @@ export function WorkspacePaneTargetToolbar({
   )
 }
 
-function activePendingTabIdentity(model: RepoWorkspaceTabModel): string | null {
+function activePendingTabIdentity(model: WorkspacePaneTabModel): string | null {
   const selection = model.selection
   if (selection?.kind !== 'runtime-host') return null
   return model.tabs.find((tab) => tab.kind === 'pending' && tab.runtimeType === selection.runtimeType)?.identity ?? null

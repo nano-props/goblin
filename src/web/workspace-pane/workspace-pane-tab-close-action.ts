@@ -8,10 +8,10 @@ import {
   type TerminalSessionBase,
 } from '#/shared/terminal-types.ts'
 import {
-  isRepoWorkspaceRuntimeTab,
+  isWorkspacePaneRuntimeTab,
   nextWorkspacePaneTabEntryAfterClose,
-  type RepoWorkspaceTabModel,
-} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+  type WorkspacePaneTabModel,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import {
   beginWorkspacePaneCloseActiveTabPresentationLease,
   commitWorkspacePaneControllerCloseBackTarget,
@@ -86,7 +86,7 @@ type CloseWorkspacePaneTabActionStart =
   | { kind: 'done'; result: boolean }
   | {
       kind: 'started'
-      target: RepoWorkspaceTabModel
+      target: WorkspacePaneTabModel
       closingIdentity: string
       wasActive: boolean
       nextEntry: WorkspacePaneTabEntry | null
@@ -210,7 +210,7 @@ function beginCloseWorkspacePaneTabAction(
   if (!tabEntry) return { kind: 'done', result: false }
   const closingIdentity = workspacePaneTabEntryIdentity(tabEntry)
   const tab = target.tabs.find((candidate) => candidate.identity === closingIdentity) ?? null
-  const runtimeView = tab && isRepoWorkspaceRuntimeTab(tab) ? tab.view : options.runtimeView
+  const runtimeView = tab && isWorkspacePaneRuntimeTab(tab) ? tab.view : options.runtimeView
   if (!skipRuntimeCloseConfirm && runtimeView?.type === 'terminal') {
     const terminalBase = terminalBaseForPaneModel(target)
     if (!terminalBase) return { kind: 'done', result: false }
@@ -270,7 +270,7 @@ interface WorkspacePaneCloseTransition {
 }
 
 function workspacePaneCloseTransition(
-  target: RepoWorkspaceTabModel,
+  target: WorkspacePaneTabModel,
   closingIdentity: string,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
   presentationToken: PrimaryWindowPresentationToken | undefined,
@@ -300,7 +300,7 @@ function workspacePaneCloseTransition(
   return { wasActive, nextEntry, presentationLease }
 }
 
-function terminalBaseForPaneModel(target: RepoWorkspaceTabModel): TerminalSessionBase | null {
+function terminalBaseForPaneModel(target: WorkspacePaneTabModel): TerminalSessionBase | null {
   if (!target.worktreePath) return null
   return workspacePaneTerminalBaseFromCoordinates({
     workspaceId: target.workspaceId,
@@ -333,18 +333,18 @@ function openWorkspacePaneRuntimeCloseConfirm(
   return false
 }
 
-function completeWorkspacePaneTabClose(target: RepoWorkspaceTabModel, identity: string): void {
+function completeWorkspacePaneTabClose(target: WorkspacePaneTabModel, identity: string): void {
   clearWorkspacePaneTabOpener(workspacePaneTabsTargetForModel(target), target.workspaceRuntimeId, identity)
 }
 
-function workspacePaneTabsTargetForModel(target: RepoWorkspaceTabModel): WorkspacePaneTabsTarget {
+function workspacePaneTabsTargetForModel(target: WorkspacePaneTabModel): WorkspacePaneTabsTarget {
   if (target.paneTarget.kind === 'inactive') throw new Error('inactive workspace pane has no persistence target')
   return target.paneTarget
 }
 
 function resolveCloseWorkspacePaneTarget(
   input: Pick<CloseWorkspacePaneTabActionOptions, 'workspaceId' | 'workspacePaneRoute' | 'paneTarget' | 'worktreeHead'>,
-): RepoWorkspaceTabModel | null {
+): WorkspacePaneTabModel | null {
   if (!input.workspaceId) return null
   return workspacePaneTabTargetForPaneTarget(input.paneTarget, input.workspacePaneRoute, input.worktreeHead)
 }

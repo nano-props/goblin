@@ -3,7 +3,7 @@ import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { formatByteSize } from '#/web/lib/format-byte-size.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
-import { DashboardMetricCard } from '#/web/components/repo-pages/dashboard-ui.tsx'
+import { DashboardMetricCard } from '#/web/components/workspace-pages/dashboard-ui.tsx'
 
 export function DirectoryOverviewContent({
   overview,

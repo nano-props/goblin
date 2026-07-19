@@ -13,10 +13,10 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { WorkspaceNavigationControls } from '#/web/components/WorkspaceNavigationControls.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import {
-  clampRepoSidebarSizePercent,
-  repoSidebarWidthExpression,
-  repoSidebarWidthPx,
-} from '#/web/components/repo-layout/sidebar-sizing.ts'
+  clampWorkspaceSidebarSizePercent,
+  workspaceSidebarWidthExpression,
+  workspaceSidebarWidthPx,
+} from '#/web/components/workspace-layout/sidebar-sizing.ts'
 import { ResizeHandleLine, resizeHandleClassNames } from '#/web/components/ui/resizable.tsx'
 import { FloatingSurfaceBoundary } from '#/web/components/ui/floating-surface-boundary.tsx'
 import { useElementInlineSize } from '#/web/hooks/useElementInlineSize.ts'
@@ -240,12 +240,12 @@ function ZenModeSidebarReveal({
   const measuredWidthPx =
     hostWidth === null
       ? null
-      : repoSidebarWidthPx({
+      : workspaceSidebarWidthPx({
           sidebarSize,
           totalPx: hostWidth,
           rootFontSizePx,
         })
-  const width = measuredWidthPx === null ? repoSidebarWidthExpression(sidebarSize) : `${measuredWidthPx}px`
+  const width = measuredWidthPx === null ? workspaceSidebarWidthExpression(sidebarSize) : `${measuredWidthPx}px`
   const style = {
     width,
   } as CSSProperties
@@ -290,7 +290,7 @@ function ZenModeSidebarReveal({
 
       const update = (clientX: number) => {
         onSidebarSizeChange(
-          clampRepoSidebarSizePercent({
+          clampWorkspaceSidebarSizePercent({
             sidebarPx: clientX - rect.left,
             totalPx: rect.width,
             rootFontSizePx,

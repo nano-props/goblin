@@ -19,12 +19,12 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => responsiveMocks.mode === 'compact',
 }))
 
-vi.mock('#/web/components/EmptyRepoView.tsx', () => ({
-  EmptyRepoView: () => <div data-testid="empty-repo-view" />,
+vi.mock('#/web/components/EmptyWorkspaceView.tsx', () => ({
+  EmptyWorkspaceView: () => <div data-testid="empty-workspace-view" />,
 }))
 
-vi.mock('#/web/components/RepoView.tsx', () => ({
-  RepoView: () => <div data-testid="repo-view" />,
+vi.mock('#/web/components/WorkspaceView.tsx', () => ({
+  WorkspaceView: () => <div data-testid="workspace-view" />,
 }))
 
 vi.mock('#/web/components/SettingsPageScreen.tsx', () => ({
@@ -46,8 +46,8 @@ describe('App workspace membership skeleton', () => {
 
     const { container } = render(<App />)
 
-    expect(container.querySelector('[data-testid="empty-repo-view"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="repo-view"]')).toBeNull()
+    expect(container.querySelector('[data-testid="empty-workspace-view"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-view"]')).toBeNull()
   })
 
   test('renders the current repository shell when a repository is open', () => {
@@ -55,8 +55,8 @@ describe('App workspace membership skeleton', () => {
 
     const { container } = render(<App routeWorkspaceView={{ kind: 'dashboard', workspaceId: WORKSPACE_ID }} />)
 
-    expect(container.querySelector('[data-testid="repo-view"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="empty-repo-view"]')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-view"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="empty-workspace-view"]')).toBeNull()
   })
 
   test('uses a single-pane navigator skeleton in compact mode before workspace membership is ready', () => {

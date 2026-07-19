@@ -3,11 +3,11 @@
 import { describe, expect, test, vi } from 'vitest'
 import { LayoutDashboard } from 'lucide-react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { RepoPageToolbar } from '#/web/components/repo-pages/RepoPageToolbar.tsx'
+import { WorkspacePageToolbar } from '#/web/components/workspace-pages/WorkspacePageToolbar.tsx'
 
-describe('RepoPageToolbar', () => {
+describe('WorkspacePageToolbar', () => {
   test('renders a selected workspace-style tab outside compact mode', () => {
-    const { container } = renderInJsdom(<RepoPageToolbar icon={LayoutDashboard} label="Dashboard" />)
+    const { container } = renderInJsdom(<WorkspacePageToolbar icon={LayoutDashboard} label="Dashboard" />)
 
     expect(container.querySelector('[role="tablist"]')).not.toBeNull()
     expect(container.querySelector('[role="tab"]')?.getAttribute('aria-selected')).toBe('true')
@@ -17,7 +17,7 @@ describe('RepoPageToolbar', () => {
   test('renders compact back-title chrome without a tab strip', () => {
     const onBack = vi.fn()
     const { container } = renderInJsdom(
-      <RepoPageToolbar icon={LayoutDashboard} label="Dashboard" compact onBack={onBack} />,
+      <WorkspacePageToolbar icon={LayoutDashboard} label="Dashboard" compact onBack={onBack} />,
     )
 
     expect(container.querySelector('[role="tablist"]')).toBeNull()

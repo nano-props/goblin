@@ -7,7 +7,7 @@
 // during that 240 ms window pressing a branch-action shortcut would
 // act on the new branch while the user sees the old one.
 //
-// `RepoView` sets `isCompactWorkspaceTransitioning = true` while the
+// `WorkspaceView` sets `isCompactWorkspaceTransitioning = true` while the
 // transition is in flight and clears it when the timer elapses. The
 // keyboard handler reads the flag in `isWorkspaceShortcutSuppressed`
 // (via the Layout) and suppresses branch-action shortcuts for the

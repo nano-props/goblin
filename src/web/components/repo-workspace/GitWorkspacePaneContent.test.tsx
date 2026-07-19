@@ -6,14 +6,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
+import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
 import { FiletreeTab } from '#/web/components/repo-workspace/panels.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import {
-  getCurrentRepoWorkspacePresentation as buildRepoWorkspacePresentation,
-  type RepoWorkspaceRepo,
+  getCurrentGitWorkspacePanePresentation as buildGitWorkspacePanePresentation,
+  type GitWorkspacePaneProjection,
 } from '#/web/components/repo-workspace/model.ts'
-import { useRepoWorkspaceTabModel } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
+import { useGitWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 import {
@@ -89,26 +89,31 @@ vi.mock('#/web/filetree-client.ts', () => ({
 }))
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-repo-workspace-content-repo')
 
-type RepoWorkspaceContentHarnessProps = Omit<ComponentProps<typeof RepoWorkspaceContent>, 'workspacePaneTabModel'> & {
+type GitWorkspacePaneContentHarnessProps = Omit<
+  ComponentProps<typeof GitWorkspacePaneContent>,
+  'workspacePaneTabModel'
+> & {
   workspacePaneRouteMode?: 'preference-route' | 'bare-branch'
 }
 
-function RepoWorkspaceContentHarness(props: RepoWorkspaceContentHarnessProps) {
+function GitWorkspacePaneContentHarness(props: GitWorkspacePaneContentHarnessProps) {
   return (
     <QueryClientProvider client={primaryWindowQueryClient}>
-      <RepoWorkspaceContentInner {...props} />
+      <GitWorkspacePaneContentInner {...props} />
     </QueryClientProvider>
   )
 }
 
-function RepoWorkspaceContentInner(props: RepoWorkspaceContentHarnessProps) {
+function GitWorkspacePaneContentInner(props: GitWorkspacePaneContentHarnessProps) {
   const { workspacePaneRouteMode, ...contentProps } = props
   const workspacePaneRoute = useHarnessWorkspacePaneRoute(props)
-  const workspacePaneTabModel = useRepoWorkspaceTabModel(contentProps.repo, contentProps.detail, workspacePaneRoute)
-  return <RepoWorkspaceContent {...contentProps} workspacePaneTabModel={workspacePaneTabModel} />
+  const workspacePaneTabModel = useGitWorkspacePaneTabModel(contentProps.repo, contentProps.detail, workspacePaneRoute)
+  return <GitWorkspacePaneContent {...contentProps} workspacePaneTabModel={workspacePaneTabModel} />
 }
 
-function useHarnessWorkspacePaneRoute(props: RepoWorkspaceContentHarnessProps): WorkspacePaneRoute | null | undefined {
+function useHarnessWorkspacePaneRoute(
+  props: GitWorkspacePaneContentHarnessProps,
+): WorkspacePaneRoute | null | undefined {
   if (props.workspacePaneRouteMode === 'bare-branch') return undefined
   const branch = props.detail.branch
   const preferredTab = preferredWorkspacePaneTabForTarget(
@@ -147,11 +152,11 @@ function workspacePaneRouteForStaticPreferredTab(tab: WorkspacePaneTabType | nul
   return isWorkspacePaneStaticTabType(tab) ? { kind: 'static', tab } : null
 }
 
-function getTestRepoWorkspacePresentation(repo: RepoWorkspaceRepo) {
-  return buildRepoWorkspacePresentation(repo, { loading: false, error: null, stale: false })
+function getTestGitWorkspacePanePresentation(repo: GitWorkspacePaneProjection) {
+  return buildGitWorkspacePanePresentation(repo, { loading: false, error: null, stale: false })
 }
 
-function repoWorkspaceRepo(repo: WorkspaceState): RepoWorkspaceRepo {
+function gitWorkspacePaneProjection(repo: WorkspaceState): GitWorkspacePaneProjection {
   if (repo.capability.kind !== 'git') throw new Error('expected Git workspace fixture')
   const branchModel = readRepoBranchQueryProjection(repo)
   if (!branchModel) throw new Error('missing branch read model')
@@ -194,7 +199,7 @@ afterEach(() => {
   setClientBridgeForTests(null)
 })
 
-describe('RepoWorkspaceContent', () => {
+describe('GitWorkspacePaneContent', () => {
   // The status tab pulls `copyPatchAction` from the action surface
   // context. Surface it directly so the test can drive it without
   // mounting the whole `useBranchActionItems` machinery.
@@ -227,18 +232,18 @@ describe('RepoWorkspaceContent', () => {
       branchSnapshots: [],
       currentBranchName: null,
     })
-    const existingPresentationRepo = repoWorkspaceRepo(repo)
+    const existingPresentationRepo = gitWorkspacePaneProjection(repo)
     const presentationRepo = {
       ...existingPresentationRepo,
       ui: { ...existingPresentationRepo.ui, currentBranchName: 'feature/removed' },
     }
-    const detail = getTestRepoWorkspacePresentation(presentationRepo)
+    const detail = getTestGitWorkspacePanePresentation(presentationRepo)
     const onBackToBranchNavigator = vi.fn()
 
     const renderMissingBranch = () =>
       renderInJsdom(
         <TerminalSessionReadContext value={emptyTerminalReadContext}>
-          <RepoWorkspaceContentHarness
+          <GitWorkspacePaneContentHarness
             repo={presentationRepo}
             detail={detail}
             workspacePaneId="workspace"
@@ -289,8 +294,8 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const presentationRepo = repoWorkspaceRepo(repo)
-    const detail = buildRepoWorkspacePresentation(presentationRepo, {
+    const presentationRepo = gitWorkspacePaneProjection(repo)
+    const detail = buildGitWorkspacePanePresentation(presentationRepo, {
       loading: true,
       error: null,
       stale: false,
@@ -308,7 +313,7 @@ describe('RepoWorkspaceContent', () => {
             onSelect: onCopyPatch,
           })}
         >
-          <RepoWorkspaceContent
+          <GitWorkspacePaneContent
             repo={presentationRepo}
             detail={detail}
             workspacePaneId="workspace"
@@ -356,7 +361,7 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     const onCopyPatch = vi.fn().mockResolvedValue(true)
 
     const { container } = renderInJsdom(
@@ -370,7 +375,11 @@ describe('RepoWorkspaceContent', () => {
             onSelect: onCopyPatch,
           })}
         >
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <GitWorkspacePaneContentHarness
+            repo={gitWorkspacePaneProjection(repo)}
+            detail={detail}
+            workspacePaneId="workspace"
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -412,7 +421,7 @@ describe('RepoWorkspaceContent', () => {
       },
       status: [{ path: worktreePath, branch: 'feature/clean', isMain: false, entries: [] }],
     })
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -425,7 +434,11 @@ describe('RepoWorkspaceContent', () => {
             onSelect: vi.fn(),
           })}
         >
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <GitWorkspacePaneContentHarness
+            repo={gitWorkspacePaneProjection(repo)}
+            detail={detail}
+            workspacePaneId="workspace"
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -464,14 +477,18 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchEmptyWorkspacePane })
 
     const { container } = renderInJsdom(
       <PrimaryWindowNavigationProvider value={navigation}>
         <TerminalSessionReadContext value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-            <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+            <GitWorkspacePaneContentHarness
+              repo={gitWorkspacePaneProjection(repo)}
+              detail={detail}
+              workspacePaneId="workspace"
+            />
           </BranchActionSurfaceContext>
         </TerminalSessionReadContext>
       </PrimaryWindowNavigationProvider>,
@@ -556,13 +573,17 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
       <PrimaryWindowNavigationProvider value={navigationWith({ showRepoBranchWorkspacePaneTab })}>
         <TerminalSessionReadContext value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-            <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+            <GitWorkspacePaneContentHarness
+              repo={gitWorkspacePaneProjection(repo)}
+              detail={detail}
+              workspacePaneId="workspace"
+            />
           </BranchActionSurfaceContext>
         </TerminalSessionReadContext>
       </PrimaryWindowNavigationProvider>,
@@ -613,14 +634,14 @@ describe('RepoWorkspaceContent', () => {
         hasGitHubRemote: true,
       },
     })
-    const presentationRepo = repoWorkspaceRepo(repo)
-    const detail = getTestRepoWorkspacePresentation(presentationRepo)
+    const presentationRepo = gitWorkspacePaneProjection(repo)
+    const detail = getTestGitWorkspacePanePresentation(presentationRepo)
     const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/open-links')
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContent
+          <GitWorkspacePaneContent
             repo={presentationRepo}
             detail={detail}
             workspacePaneId="workspace"
@@ -681,7 +702,7 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -694,7 +715,11 @@ describe('RepoWorkspaceContent', () => {
             onSelect: vi.fn(),
           })}
         >
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <GitWorkspacePaneContentHarness
+            repo={gitWorkspacePaneProjection(repo)}
+            detail={detail}
+            workspacePaneId="workspace"
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -729,14 +754,14 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const presentationRepo = repoWorkspaceRepo(repo)
-    const detail = getTestRepoWorkspacePresentation(presentationRepo)
+    const presentationRepo = gitWorkspacePaneProjection(repo)
+    const detail = getTestGitWorkspacePanePresentation(presentationRepo)
     const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/changes-panel')
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContent
+          <GitWorkspacePaneContent
             repo={presentationRepo}
             detail={detail}
             workspacePaneId="workspace"
@@ -779,8 +804,8 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const presentationRepo = repoWorkspaceRepo(repo)
-    const detail = buildRepoWorkspacePresentation(presentationRepo, {
+    const presentationRepo = gitWorkspacePaneProjection(repo)
+    const detail = buildGitWorkspacePanePresentation(presentationRepo, {
       loading: false,
       error: 'status failed',
       stale: true,
@@ -790,7 +815,7 @@ describe('RepoWorkspaceContent', () => {
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness
+          <GitWorkspacePaneContentHarness
             repo={presentationRepo}
             detail={detail}
             workspacePaneId="workspace"
@@ -822,12 +847,16 @@ describe('RepoWorkspaceContent', () => {
       currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'status',
     })
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <GitWorkspacePaneContentHarness
+            repo={gitWorkspacePaneProjection(repo)}
+            detail={detail}
+            workspacePaneId="workspace"
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -855,11 +884,15 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: { 'feature/no-worktree': [] },
     })
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+        <GitWorkspacePaneContentHarness
+          repo={gitWorkspacePaneProjection(repo)}
+          detail={detail}
+          workspacePaneId="workspace"
+        />
       </TerminalSessionReadContext>,
     )
 
@@ -875,13 +908,13 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/no-worktree': [staticEntry('status')] },
     })
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContent
-            repo={repoWorkspaceRepo(repo)}
+          <GitWorkspacePaneContent
+            repo={gitWorkspacePaneProjection(repo)}
             detail={detail}
             workspacePaneId="workspace"
             workspacePaneTabModel={preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/no-worktree')}
@@ -908,13 +941,13 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: { 'feature/hook-terminal-empty': [staticEntry('status')] },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness
-            repo={repoWorkspaceRepo(repo)}
+          <GitWorkspacePaneContentHarness
+            repo={gitWorkspacePaneProjection(repo)}
             detail={detail}
             workspacePaneId="workspace"
             workspacePaneRouteMode="bare-branch"
@@ -938,13 +971,13 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: { 'feature/terminal-empty': [staticEntry('status')] },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContent
-            repo={repoWorkspaceRepo(repo)}
+          <GitWorkspacePaneContent
+            repo={gitWorkspacePaneProjection(repo)}
             detail={detail}
             workspacePaneId="workspace"
             workspacePaneTabModel={preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/terminal-empty')}
@@ -973,7 +1006,7 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: { 'feature/terminal-pending': [staticEntry('status')] },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
@@ -988,7 +1021,11 @@ describe('RepoWorkspaceContent', () => {
     const { container } = renderInJsdom(
       <TerminalSessionContext value={terminalCommandContextWith({ registerHost })}>
         <TerminalSessionReadContext value={readContext}>
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <GitWorkspacePaneContentHarness
+            repo={gitWorkspacePaneProjection(repo)}
+            detail={detail}
+            workspacePaneId="workspace"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -1016,7 +1053,7 @@ describe('RepoWorkspaceContent', () => {
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, seededRepo.workspaceRuntimeId)
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
@@ -1031,7 +1068,11 @@ describe('RepoWorkspaceContent', () => {
     renderInJsdom(
       <TerminalSessionContext value={terminalCommandContextWith({ registerHost })}>
         <TerminalSessionReadContext value={readContext}>
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <GitWorkspacePaneContentHarness
+            repo={gitWorkspacePaneProjection(repo)}
+            detail={detail}
+            workspacePaneId="workspace"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -1051,7 +1092,7 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-loading': [staticEntry('status')] },
     })
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     const createTerminal = vi.fn(async () => 'term-111111111111111111111')
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
@@ -1067,7 +1108,11 @@ describe('RepoWorkspaceContent', () => {
     const { container } = renderInJsdom(
       <TerminalSessionContext value={terminalCommandContextWith({ createTerminal, registerHost })}>
         <TerminalSessionReadContext value={readContext}>
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <GitWorkspacePaneContentHarness
+            repo={gitWorkspacePaneProjection(repo)}
+            detail={detail}
+            workspacePaneId="workspace"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -1100,7 +1145,7 @@ describe('RepoWorkspaceContent', () => {
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
@@ -1119,7 +1164,11 @@ describe('RepoWorkspaceContent', () => {
     const { container } = renderInJsdom(
       <TerminalSessionContext value={terminalCommandContextWith({ registerHost })}>
         <TerminalSessionReadContext value={readContext}>
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <GitWorkspacePaneContentHarness
+            repo={gitWorkspacePaneProjection(repo)}
+            detail={detail}
+            workspacePaneId="workspace"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -1154,7 +1203,7 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: { [branchName]: [staticEntry('files'), staticEntry('status')] },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     let resolvedStartupShellCommand: string | null = null
     const createTerminalWithAdmission: TerminalSessionContextValue['createTerminalWithAdmission'] = vi.fn(
       async (_base, options) => {
@@ -1195,8 +1244,8 @@ describe('RepoWorkspaceContent', () => {
           <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission, writeInput })}>
             <TerminalSessionReadContext value={emptyTerminalReadContext}>
               <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-                <RepoWorkspaceContentHarness
-                  repo={repoWorkspaceRepo(repo)}
+                <GitWorkspacePaneContentHarness
+                  repo={gitWorkspacePaneProjection(repo)}
                   detail={detail}
                   workspacePaneId="workspace"
                 />
@@ -1437,14 +1486,14 @@ describe('RepoWorkspaceContent', () => {
         'feature/b': [staticEntry('status')],
       },
     })
-    const presentationRepo = repoWorkspaceRepo(repo)
-    const detail = getTestRepoWorkspacePresentation(presentationRepo)
+    const presentationRepo = gitWorkspacePaneProjection(repo)
+    const detail = getTestGitWorkspacePanePresentation(presentationRepo)
     const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/b')
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContent
+          <GitWorkspacePaneContent
             repo={presentationRepo}
             detail={detail}
             workspacePaneId="workspace"
@@ -1493,11 +1542,15 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+        <GitWorkspacePaneContentHarness
+          repo={gitWorkspacePaneProjection(repo)}
+          detail={detail}
+          workspacePaneId="workspace"
+        />
       </TerminalSessionReadContext>,
     )
     await flushAsyncWork()
@@ -1542,11 +1595,15 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+        <GitWorkspacePaneContentHarness
+          repo={gitWorkspacePaneProjection(repo)}
+          detail={detail}
+          workspacePaneId="workspace"
+        />
       </TerminalSessionReadContext>,
     )
     await flushAsyncWork()
@@ -1565,11 +1622,15 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/history': [staticEntry('history')] },
     })
-    const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+        <GitWorkspacePaneContentHarness
+          repo={gitWorkspacePaneProjection(repo)}
+          detail={detail}
+          workspacePaneId="workspace"
+        />
       </TerminalSessionReadContext>,
     )
     await flushAsyncWork()

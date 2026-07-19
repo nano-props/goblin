@@ -41,23 +41,23 @@ import {
   type WorkspacePaneRuntimeTabTargetKeyByType,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
-export type RepoWorkspacePaneModelTarget = WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: WorkspaceId }
+export type WorkspacePaneModelTarget = WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: WorkspaceId }
 
-export type RepoWorkspaceTabKind = 'static' | 'runtime' | 'pending'
+export type WorkspacePaneTabKind = 'static' | 'runtime' | 'pending'
 
-interface RepoWorkspaceTabBase {
+interface WorkspacePaneTabBase {
   identity: string
   type: WorkspacePaneTabType
-  kind: RepoWorkspaceTabKind
+  kind: WorkspacePaneTabKind
 }
 
-export interface RepoWorkspaceStaticTab extends RepoWorkspaceTabBase {
+export interface WorkspacePaneStaticTab extends WorkspacePaneTabBase {
   type: WorkspacePaneStaticTabType
   kind: 'static'
   view: null
 }
 
-export interface RepoWorkspaceRuntimeTab extends RepoWorkspaceTabBase {
+export interface WorkspacePaneRuntimeTab extends WorkspacePaneTabBase {
   type: WorkspacePaneRuntimeTabType
   kind: 'runtime'
   runtimeType: WorkspacePaneRuntimeTabType
@@ -65,7 +65,7 @@ export interface RepoWorkspaceRuntimeTab extends RepoWorkspaceTabBase {
   sessionId: string
 }
 
-export interface RepoWorkspacePendingTab extends RepoWorkspaceTabBase {
+export interface WorkspacePanePendingTab extends WorkspacePaneTabBase {
   type: WorkspacePaneRuntimeTabType
   kind: 'pending'
   runtimeType: WorkspacePaneRuntimeTabType
@@ -74,10 +74,10 @@ export interface RepoWorkspacePendingTab extends RepoWorkspaceTabBase {
   selected: true
 }
 
-export type RepoWorkspaceMaterializedTab = RepoWorkspaceStaticTab | RepoWorkspaceRuntimeTab
-export type RepoWorkspaceTab = RepoWorkspaceMaterializedTab | RepoWorkspacePendingTab
+export type WorkspacePaneMaterializedTab = WorkspacePaneStaticTab | WorkspacePaneRuntimeTab
+export type WorkspacePaneTab = WorkspacePaneMaterializedTab | WorkspacePanePendingTab
 
-export interface RepoWorkspaceRuntimeTabState {
+export interface WorkspacePaneRuntimeTabState {
   type: WorkspacePaneRuntimeTabType
   createPending: boolean
   projectionPhase: WorkspacePaneRuntimeProjectionPhase
@@ -85,27 +85,27 @@ export interface RepoWorkspaceRuntimeTabState {
   selectedSessionId: string | null
 }
 
-export type RepoWorkspaceRuntimeTabStateByType = Record<WorkspacePaneRuntimeTabType, RepoWorkspaceRuntimeTabState>
-export type RepoWorkspaceRuntimeViewsByType = Record<WorkspacePaneRuntimeTabType, WorkspacePaneRuntimeTabSummary[]>
-export type RepoWorkspaceTabEntriesProjectionPhase = 'pending' | 'ready' | 'failed'
-export type RepoWorkspaceRequestedRuntimeSessionByType = Partial<Record<WorkspacePaneRuntimeTabType, string | null>>
+export type WorkspacePaneRuntimeTabStateByType = Record<WorkspacePaneRuntimeTabType, WorkspacePaneRuntimeTabState>
+export type WorkspacePaneRuntimeViewsByType = Record<WorkspacePaneRuntimeTabType, WorkspacePaneRuntimeTabSummary[]>
+export type WorkspacePaneTabEntriesProjectionPhase = 'pending' | 'ready' | 'failed'
+export type WorkspacePaneRequestedRuntimeSessionByType = Partial<Record<WorkspacePaneRuntimeTabType, string | null>>
 
-export interface RepoWorkspaceRuntimeTabStateInput {
+export interface WorkspacePaneRuntimeTabStateInput {
   createPending?: boolean
   projectionPhase?: WorkspacePaneRuntimeProjectionPhase
   projectionErrorMessage?: string
   selectedSessionId?: string | null
 }
 
-export type RepoWorkspaceRuntimeTabStateInputByType = Partial<
-  Record<WorkspacePaneRuntimeTabType, RepoWorkspaceRuntimeTabStateInput>
+export type WorkspacePaneRuntimeTabStateInputByType = Partial<
+  Record<WorkspacePaneRuntimeTabType, WorkspacePaneRuntimeTabStateInput>
 >
 
-export type RepoWorkspaceSelection =
+export type WorkspacePaneSelection =
   | {
       kind: 'materialized-tab'
       tab: WorkspacePaneTabType
-      materializedTab: RepoWorkspaceMaterializedTab
+      materializedTab: WorkspacePaneMaterializedTab
     }
   | {
       /** Render a runtime host even though no materialized runtime tab exists yet. */
@@ -115,42 +115,42 @@ export type RepoWorkspaceSelection =
       materializedTab: null
     }
 
-export interface RepoWorkspaceTabModel {
+export interface WorkspacePaneTabModel {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string | null
   worktreePath: string | null
-  paneTarget: RepoWorkspacePaneModelTarget
+  paneTarget: WorkspacePaneModelTarget
   runtimeTabTargetKeyByType: WorkspacePaneRuntimeTabTargetKeyByType
   runtimeTabTargetKey: string | null
   /** Runtime-tab lifecycle, pending, and selection state keyed by runtime type. */
-  runtimeTabStateByType: RepoWorkspaceRuntimeTabStateByType
+  runtimeTabStateByType: WorkspacePaneRuntimeTabStateByType
   /** Live runtime session views keyed by server-owned runtime type. */
-  runtimeViewsByType: RepoWorkspaceRuntimeViewsByType
+  runtimeViewsByType: WorkspacePaneRuntimeViewsByType
   /** Single target-scoped mixed workspace pane tab list. */
   tabEntries: WorkspacePaneTabEntry[]
   /** Hydration state for the target-scoped tab-entry projection. */
-  tabEntriesProjectionPhase: RepoWorkspaceTabEntriesProjectionPhase
+  tabEntriesProjectionPhase: WorkspacePaneTabEntriesProjectionPhase
   /** Open static workspace pane tabs derived from tabEntries. */
   staticTabs: WorkspacePaneStaticTabType[]
   /** Live runtime session views owned by server-side runtime features. */
   runtimeViews: WorkspacePaneTabSummary[]
-  tabs: RepoWorkspaceTab[]
+  tabs: WorkspacePaneTab[]
   /** The render target for the workspace pane body. */
-  selection: RepoWorkspaceSelection | null
+  selection: WorkspacePaneSelection | null
   /** The selected tab, when a body can be rendered. */
   renderedTab: WorkspacePaneTabType | null
   /** The selected materialized tab, when one exists in the tab strip. */
-  activeTab: RepoWorkspaceMaterializedTab | null
+  activeTab: WorkspacePaneMaterializedTab | null
   /** Canonical selected entry, independent of whether its live runtime view has projected. */
   selectedEntry: WorkspacePaneTabEntry | null
   selectedIdentity: string | null
 }
 
-export interface RepoWorkspaceTabModelInput {
+export interface WorkspacePaneTabModelInput {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
-  paneTarget: RepoWorkspacePaneModelTarget
+  paneTarget: WorkspacePaneModelTarget
   worktreeHead?: GitHead
   preferredTab: WorkspacePaneTabType | null
   /**
@@ -161,13 +161,13 @@ export interface RepoWorkspaceTabModelInput {
    */
   allowPreferredTabFallback?: boolean
   tabEntries: readonly WorkspacePaneTabEntry[]
-  tabEntriesProjectionPhase?: RepoWorkspaceTabEntriesProjectionPhase
+  tabEntriesProjectionPhase?: WorkspacePaneTabEntriesProjectionPhase
   runtimeTabViews: readonly WorkspacePaneTabSummary[]
-  runtimeTabStateByType: RepoWorkspaceRuntimeTabStateInputByType
-  requestedSessionIdByRuntimeType?: RepoWorkspaceRequestedRuntimeSessionByType
+  runtimeTabStateByType: WorkspacePaneRuntimeTabStateInputByType
+  requestedSessionIdByRuntimeType?: WorkspacePaneRequestedRuntimeSessionByType
 }
 
-export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): RepoWorkspaceTabModel {
+export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): WorkspacePaneTabModel {
   const worktreePath = paneTargetFilesystemPath(input.paneTarget)
   const branchName = paneTargetPresentationBranch(input.paneTarget, input.worktreeHead)
   const normalizedTabEntries =
@@ -202,7 +202,7 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
       })
     : null
   const materializedActiveTab = candidateTab
-    ? activeRepoWorkspaceTab(
+    ? activeWorkspacePaneTab(
         materializedTabs,
         candidateTab,
         runtimeTabStateByType,
@@ -254,14 +254,14 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
   }
 }
 
-function paneTargetFilesystemPath(target: RepoWorkspacePaneModelTarget): string | null {
+function paneTargetFilesystemPath(target: WorkspacePaneModelTarget): string | null {
   if (target.kind === 'inactive' || target.kind === 'git-branch') return null
   if (target.kind === 'git-worktree') return workspacePaneTabsTargetWorktreePath(target)
   return parseCanonicalWorkspaceLocator(target.workspaceId)?.path ?? null
 }
 
 function paneTargetPresentationBranch(
-  target: RepoWorkspacePaneModelTarget,
+  target: WorkspacePaneModelTarget,
   worktreeHead: GitHead | undefined,
 ): string | null {
   if (target.kind === 'git-branch') return target.branchName
@@ -282,11 +282,11 @@ export function nextWorkspacePaneTabEntryAfterClose(
   return entries[index + 1] ?? entries[index - 1] ?? null
 }
 
-export function adjacentRepoWorkspaceTab(
-  tabs: readonly RepoWorkspaceTab[],
+export function adjacentWorkspacePaneTab(
+  tabs: readonly WorkspacePaneTab[],
   activeIdentity: string | null | undefined,
   direction: 1 | -1,
-): RepoWorkspaceMaterializedTab | null {
+): WorkspacePaneMaterializedTab | null {
   if (tabs.length === 0) return null
   if (!activeIdentity) return null
   const activeIndex = tabs.findIndex((tab) => tab.identity === activeIdentity)
@@ -294,12 +294,12 @@ export function adjacentRepoWorkspaceTab(
   for (let offset = 1; offset < tabs.length; offset += 1) {
     const nextIndex = (activeIndex + direction * offset + tabs.length) % tabs.length
     const tab = tabs[nextIndex]
-    if (tab && isMaterializedRepoWorkspaceTab(tab)) return tab
+    if (tab && isMaterializedWorkspacePaneTab(tab)) return tab
   }
   return null
 }
 
-function staticWorkspacePaneTab(type: WorkspacePaneStaticTabType): RepoWorkspaceStaticTab {
+function staticWorkspacePaneTab(type: WorkspacePaneStaticTabType): WorkspacePaneStaticTab {
   const provider = workspacePaneStaticTabProvider(type)
   return {
     identity: provider.identity(),
@@ -309,7 +309,7 @@ function staticWorkspacePaneTab(type: WorkspacePaneStaticTabType): RepoWorkspace
   }
 }
 
-function runtimeWorkspacePaneTab(view: WorkspacePaneRuntimeTabSummary): RepoWorkspaceRuntimeTab {
+function runtimeWorkspacePaneTab(view: WorkspacePaneRuntimeTabSummary): WorkspacePaneRuntimeTab {
   const sessionId = workspacePaneRuntimeTabSummarySessionId(view)
   return {
     identity: workspacePaneRuntimeTabSummaryIdentity(view),
@@ -321,7 +321,7 @@ function runtimeWorkspacePaneTab(view: WorkspacePaneRuntimeTabSummary): RepoWork
   }
 }
 
-function pendingRuntimeWorkspacePaneTab(type: WorkspacePaneRuntimeTabType): RepoWorkspacePendingTab {
+function pendingRuntimeWorkspacePaneTab(type: WorkspacePaneRuntimeTabType): WorkspacePanePendingTab {
   return {
     identity: workspacePanePendingRuntimeTabIdentity(type),
     type,
@@ -333,36 +333,36 @@ function pendingRuntimeWorkspacePaneTab(type: WorkspacePaneRuntimeTabType): Repo
   }
 }
 
-function nextSelectableRepoWorkspaceTab(
-  tabs: readonly RepoWorkspaceTab[],
+function nextSelectableWorkspacePaneTab(
+  tabs: readonly WorkspacePaneTab[],
   index: number,
   direction: 1 | -1,
-): RepoWorkspaceMaterializedTab | null {
+): WorkspacePaneMaterializedTab | null {
   for (let offset = 1; offset < tabs.length; offset += 1) {
     const tab = tabs[index + direction * offset]
     if (!tab) return null
-    if (isMaterializedRepoWorkspaceTab(tab)) return tab
+    if (isMaterializedWorkspacePaneTab(tab)) return tab
   }
   return null
 }
 
-function isMaterializedRepoWorkspaceTab(tab: RepoWorkspaceTab): tab is RepoWorkspaceMaterializedTab {
+function isMaterializedWorkspacePaneTab(tab: WorkspacePaneTab): tab is WorkspacePaneMaterializedTab {
   return tab.kind !== 'pending'
 }
 
-export function isRepoWorkspaceRuntimeTab(tab: RepoWorkspaceTab): tab is RepoWorkspaceRuntimeTab {
+export function isWorkspacePaneRuntimeTab(tab: WorkspacePaneTab): tab is WorkspacePaneRuntimeTab {
   return tab.kind === 'runtime'
 }
 
-export function repoWorkspaceRuntimeTabSessionId(
-  tab: RepoWorkspaceTab | null | undefined,
+export function materializedWorkspacePaneRuntimeTabSessionId(
+  tab: WorkspacePaneTab | null | undefined,
   type: WorkspacePaneRuntimeTabType,
 ): string | null {
   return tab?.kind === 'runtime' && tab.runtimeType === type ? tab.sessionId : null
 }
 
-export function repoWorkspaceTabModelBlocksTabInteraction(
-  model: Pick<RepoWorkspaceTabModel, 'runtimeTabStateByType'>,
+export function workspacePaneTabModelBlocksTabInteraction(
+  model: Pick<WorkspacePaneTabModel, 'runtimeTabStateByType'>,
 ): boolean {
   return WORKSPACE_PANE_RUNTIME_TAB_TYPES.some((type) => model.runtimeTabStateByType[type].createPending)
 }
@@ -371,12 +371,12 @@ function materializedWorkspacePaneTabs(input: {
   tabEntries: readonly WorkspacePaneTabEntry[]
   runtimeViews: readonly WorkspacePaneRuntimeTabSummary[]
   hasWorktree: boolean
-}): RepoWorkspaceMaterializedTab[] {
+}): WorkspacePaneMaterializedTab[] {
   const runtimeViewByIdentity = new Map(
     input.runtimeViews.map((view) => [workspacePaneRuntimeTabSummaryIdentity(view), view]),
   )
   const seenRuntimeTabs = new Set<string>()
-  const tabs: RepoWorkspaceMaterializedTab[] = []
+  const tabs: WorkspacePaneMaterializedTab[] = []
 
   for (const entry of input.tabEntries) {
     if (!isWorkspacePaneRuntimeTabEntry(entry)) {
@@ -403,11 +403,11 @@ function workspacePaneSelection({
   allowFallback,
 }: {
   renderableTab: WorkspacePaneTabType | null
-  activeTab: RepoWorkspaceMaterializedTab | null
-  materializedTabs: readonly RepoWorkspaceMaterializedTab[]
-  runtimeTabStateByType: RepoWorkspaceRuntimeTabStateByType
+  activeTab: WorkspacePaneMaterializedTab | null
+  materializedTabs: readonly WorkspacePaneMaterializedTab[]
+  runtimeTabStateByType: WorkspacePaneRuntimeTabStateByType
   allowFallback: boolean
-}): RepoWorkspaceSelection | null {
+}): WorkspacePaneSelection | null {
   if (activeTab) return { kind: 'materialized-tab', tab: activeTab.type, materializedTab: activeTab }
   // Runtime-host is reserved for the "actively waiting" states: the user
   // wants a server-owned runtime tab but no session exists yet, so the
@@ -426,10 +426,10 @@ function workspacePaneSelection({
 }
 
 function selectedWorkspacePaneTabEntry(input: {
-  selection: RepoWorkspaceSelection | null
+  selection: WorkspacePaneSelection | null
   tabEntries: readonly WorkspacePaneTabEntry[]
-  runtimeTabStateByType: RepoWorkspaceRuntimeTabStateByType
-  requestedSessionIdByRuntimeType: RepoWorkspaceRequestedRuntimeSessionByType | undefined
+  runtimeTabStateByType: WorkspacePaneRuntimeTabStateByType
+  requestedSessionIdByRuntimeType: WorkspacePaneRequestedRuntimeSessionByType | undefined
 }): WorkspacePaneTabEntry | null {
   const materializedTab = input.selection?.materializedTab
   if (materializedTab) {
@@ -451,12 +451,12 @@ function selectedWorkspacePaneTabEntry(input: {
   )
 }
 
-function activeRepoWorkspaceTab(
-  tabs: readonly RepoWorkspaceMaterializedTab[],
+function activeWorkspacePaneTab(
+  tabs: readonly WorkspacePaneMaterializedTab[],
   renderableTab: WorkspacePaneTabType,
-  runtimeTabStateByType: RepoWorkspaceRuntimeTabStateByType,
-  requestedSessionIdByRuntimeType: RepoWorkspaceRequestedRuntimeSessionByType | undefined,
-): RepoWorkspaceMaterializedTab | null {
+  runtimeTabStateByType: WorkspacePaneRuntimeTabStateByType,
+  requestedSessionIdByRuntimeType: WorkspacePaneRequestedRuntimeSessionByType | undefined,
+): WorkspacePaneMaterializedTab | null {
   if (isWorkspacePaneRuntimeTabType(renderableTab)) {
     const requestedSessionId = requestedSessionIdByRuntimeType?.[renderableTab]
     if (requestedSessionId !== undefined) {
@@ -482,8 +482,8 @@ function runtimeTabEntryIdentity(entry: WorkspacePaneRuntimeTabEntry): string {
   return workspacePaneRuntimeTabIdentity(entry.type, workspacePaneRuntimeTabSessionId(entry))
 }
 
-function runtimeTabStateByTypeFromInput(input: RepoWorkspaceTabModelInput): RepoWorkspaceRuntimeTabStateByType {
-  const runtimeTabStateByType: Partial<RepoWorkspaceRuntimeTabStateByType> = {}
+function runtimeTabStateByTypeFromInput(input: WorkspacePaneTabModelInput): WorkspacePaneRuntimeTabStateByType {
+  const runtimeTabStateByType: Partial<WorkspacePaneRuntimeTabStateByType> = {}
   for (const type of WORKSPACE_PANE_RUNTIME_TAB_TYPES) {
     const state = input.runtimeTabStateByType[type]
     runtimeTabStateByType[type] = {
@@ -494,25 +494,25 @@ function runtimeTabStateByTypeFromInput(input: RepoWorkspaceTabModelInput): Repo
       selectedSessionId: state?.selectedSessionId ?? null,
     }
   }
-  return runtimeTabStateByType as RepoWorkspaceRuntimeTabStateByType
+  return runtimeTabStateByType as WorkspacePaneRuntimeTabStateByType
 }
 
 function runtimeViewsByTypeFromViews(
   views: readonly WorkspacePaneRuntimeTabSummary[],
-): RepoWorkspaceRuntimeViewsByType {
-  const runtimeViewsByType: Partial<RepoWorkspaceRuntimeViewsByType> = {}
+): WorkspacePaneRuntimeViewsByType {
+  const runtimeViewsByType: Partial<WorkspacePaneRuntimeViewsByType> = {}
   for (const type of WORKSPACE_PANE_RUNTIME_TAB_TYPES) runtimeViewsByType[type] = []
   for (const view of views) runtimeViewsByType[view.type]?.push(view)
-  return runtimeViewsByType as RepoWorkspaceRuntimeViewsByType
+  return runtimeViewsByType as WorkspacePaneRuntimeViewsByType
 }
 
 function runtimeTabAvailabilityByTypeForTabs(
-  tabs: readonly RepoWorkspaceMaterializedTab[],
-  runtimeTabStateByType: RepoWorkspaceRuntimeTabStateByType,
+  tabs: readonly WorkspacePaneMaterializedTab[],
+  runtimeTabStateByType: WorkspacePaneRuntimeTabStateByType,
 ): WorkspacePaneRuntimeTabAvailabilityByType {
   const sessionCountByType = new Map<WorkspacePaneRuntimeTabType, number>()
   for (const tab of tabs) {
-    if (!isRepoWorkspaceRuntimeTab(tab)) continue
+    if (!isWorkspacePaneRuntimeTab(tab)) continue
     sessionCountByType.set(tab.runtimeType, (sessionCountByType.get(tab.runtimeType) ?? 0) + 1)
   }
   const runtimeTabAvailabilityByType: WorkspacePaneRuntimeTabAvailabilityByType = {}

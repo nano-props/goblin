@@ -5,7 +5,7 @@ import type * as ReactModule from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from '@testing-library/react'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx'
+import { CompactWorkspaceLayout, WorkspaceSplitLayout } from '#/web/components/Layout.tsx'
 import { Layout, authenticatedAppShellMode } from '#/web/Layout.tsx'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -58,9 +58,7 @@ vi.mock('#/web/hooks/useSettingsWriteErrorToast.ts', () => ({
 }))
 
 vi.mock('#/web/workspace-navigation-history.ts', async () => {
-  const actual = await vi.importActual<typeof WorkspaceNavigationHistoryModule>(
-    '#/web/workspace-navigation-history.ts',
-  )
+  const actual = await vi.importActual<typeof WorkspaceNavigationHistoryModule>('#/web/workspace-navigation-history.ts')
   return {
     ...actual,
     usePrimaryWindowHistoryPresentationObserver: () => undefined,
@@ -156,7 +154,7 @@ describe('Layout shell providers', () => {
   })
 })
 
-describe('CompactRepoWorkspace', () => {
+describe('CompactWorkspaceLayout', () => {
   test('marks the inactive pane inert while sharing workspace motion tokens', () => {
     const { container, rerender } = renderCompactWorkspace('navigator')
 
@@ -170,10 +168,10 @@ describe('CompactRepoWorkspace', () => {
     expect(compactPane(container, 'workspace')?.hasAttribute('inert')).toBe(true)
 
     rerender(
-      <CompactRepoWorkspace
+      <CompactWorkspaceLayout
         activePane="workspace"
         sidebarPane={<button type="button">navigator</button>}
-        repoWorkspacePane={<button type="button">workspace</button>}
+        workspacePane={<button type="button">workspace</button>}
       />,
     )
 
@@ -188,10 +186,10 @@ describe('CompactRepoWorkspace', () => {
     vi.useFakeTimers()
     try {
       const { container, rerender } = renderInJsdom(
-        <CompactRepoWorkspace
+        <CompactWorkspaceLayout
           activePane="workspace"
           sidebarPane={<button type="button">navigator</button>}
-          repoWorkspacePane={<div data-testid="workspace-a">workspace-a</div>}
+          workspacePane={<div data-testid="workspace-a">workspace-a</div>}
           transitionScopeKey="repo-a"
         />,
       )
@@ -199,10 +197,10 @@ describe('CompactRepoWorkspace', () => {
       expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-a')
 
       rerender(
-        <CompactRepoWorkspace
+        <CompactWorkspaceLayout
           activePane="navigator"
           sidebarPane={<button type="button">navigator</button>}
-          repoWorkspacePane={<div data-testid="workspace-b">workspace-b</div>}
+          workspacePane={<div data-testid="workspace-b">workspace-b</div>}
           transitionScopeKey="repo-a"
         />,
       )
@@ -222,10 +220,10 @@ describe('CompactRepoWorkspace', () => {
   })
 })
 
-describe('RepoWorkspace', () => {
+describe('WorkspaceSplitLayout', () => {
   test('defaults the split layout to a 30/70 sidebar/workspace ratio', () => {
     const { container } = renderInJsdom(
-      <RepoWorkspace sidebarPane={<div>navigator</div>} repoWorkspacePane={<div>workspace</div>} />,
+      <WorkspaceSplitLayout sidebarPane={<div>navigator</div>} workspacePane={<div>workspace</div>} />,
     )
 
     expect(splitPane(container)?.dataset.afterSize).toBe('70')
@@ -248,10 +246,10 @@ describe('authenticatedAppShellMode', () => {
 
 function renderCompactWorkspace(activePane: 'navigator' | 'workspace') {
   return renderInJsdom(
-    <CompactRepoWorkspace
+    <CompactWorkspaceLayout
       activePane={activePane}
       sidebarPane={<button type="button">navigator</button>}
-      repoWorkspacePane={<button type="button">workspace</button>}
+      workspacePane={<button type="button">workspace</button>}
     />,
   )
 }

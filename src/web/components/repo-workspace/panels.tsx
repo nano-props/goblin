@@ -10,14 +10,17 @@ import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
 import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
 import { useLazyRepoTree } from '#/web/hooks/useLazyRepoTree.ts'
 import type { RepoTreeNode } from '#/shared/api-types.ts'
-import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
+import type {
+  CurrentGitWorkspacePanePresentation,
+  GitWorkspacePaneProjection,
+} from '#/web/components/repo-workspace/model.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { isWorkspacePaneRuntimeTabType, workspacePaneStaticTabId } from '#/shared/workspace-pane.ts'
 import type {
-  RepoWorkspaceRuntimeTabStateByType,
-  RepoWorkspaceSelection,
-} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+  WorkspacePaneRuntimeTabStateByType,
+  WorkspacePaneSelection,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'
@@ -47,19 +50,19 @@ const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
 export interface WorkspacePanePanelRenderInput {
   type: WorkspacePaneTabType
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'workspaceRuntimeId' | 'branchModel' | 'ui' | 'probe'> & {
-    branchModel: RepoWorkspaceRepo['branchModel']
+  repo: Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'branchModel' | 'ui' | 'probe'> & {
+    branchModel: GitWorkspacePaneProjection['branchModel']
   }
-  detail: CurrentRepoWorkspacePresentation
+  detail: CurrentGitWorkspacePanePresentation
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
-  selection: RepoWorkspaceSelection
-  runtimeTabStateByType: RepoWorkspaceRuntimeTabStateByType
+  selection: WorkspacePaneSelection
+  runtimeTabStateByType: WorkspacePaneRuntimeTabStateByType
 }
 
 interface WorkspacePanePanelProps extends Omit<WorkspacePanePanelRenderInput, 'type' | 'selection'> {}
 
-type RepoWorkspaceBranch = NonNullable<CurrentRepoWorkspacePresentation['branch']>
+type GitWorkspacePaneBranch = NonNullable<CurrentGitWorkspacePanePresentation['branch']>
 type WorkspacePaneStaticPanelComponent = (props: WorkspacePanePanelProps) => ReactNode
 
 const REPO_WORKSPACE_STATIC_PANEL_BY_TYPE: Record<WorkspacePaneStaticTabType, WorkspacePaneStaticPanelComponent> = {
@@ -69,7 +72,7 @@ const REPO_WORKSPACE_STATIC_PANEL_BY_TYPE: Record<WorkspacePaneStaticTabType, Wo
   files: FilesWorkspacePanePanel,
 }
 
-export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInput): ReactNode {
+export function renderGitWorkspacePanePanel(input: WorkspacePanePanelRenderInput): ReactNode {
   const { type, selection, ...panelProps } = input
   if (isWorkspacePaneRuntimeTabType(type)) {
     const runtimeState = input.runtimeTabStateByType[type]
@@ -100,7 +103,7 @@ export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInpu
   return <Panel {...panelProps} />
 }
 
-function selectedRuntimeSessionId(selection: RepoWorkspaceSelection, type: WorkspacePaneTabType): string | null {
+function selectedRuntimeSessionId(selection: WorkspacePaneSelection, type: WorkspacePaneTabType): string | null {
   if (selection.kind !== 'materialized-tab') return null
   const tab = selection.materializedTab
   return tab.kind === 'runtime' && tab.runtimeType === type ? tab.sessionId : null
@@ -412,8 +415,8 @@ function BranchChangesTab({
 }: {
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
-  branch: RepoWorkspaceBranch
-  currentBranchStatus: CurrentRepoWorkspacePresentation['currentBranchStatus']
+  branch: GitWorkspacePaneBranch
+  currentBranchStatus: CurrentGitWorkspacePanePresentation['currentBranchStatus']
   statusLoading: boolean
 }) {
   const t = useT()

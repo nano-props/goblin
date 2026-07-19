@@ -38,12 +38,12 @@ import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import { openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
-import type { CurrentRepoWorkspace } from '#/web/components/repo-workspace/model.ts'
+import type { CurrentGitWorkspacePane } from '#/web/components/repo-workspace/model.ts'
 import { CommitHashLink } from '#/web/components/repo-workspace/repo-link-actions.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { dispatchOpenWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 interface Props {
-  detail: CurrentRepoWorkspace
+  detail: CurrentGitWorkspacePane
   workspaceRuntimeId: string
 }
 
@@ -164,7 +164,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
   // selector is keyed on the lifecycle itself, so a re-probe
   // (e.g. network reconnect) re-renders this row.
   const worktreeTarget = useWorkspacesStore((s) => {
-    const repo = s.workspaces[detail.repoId]
+    const repo = s.workspaces[detail.workspaceId]
     return repo
       ? remoteWorkspaceTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null)
       : null
@@ -175,7 +175,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
         () => {
           if (!branchName || !worktreePathRaw) return
           void dispatchOpenWorkspacePaneStaticTabAction({
-            workspaceId: detail.repoId,
+            workspaceId: detail.workspaceId,
             branchName,
             worktreePath: worktreePathRaw,
             type: 'files',
@@ -186,7 +186,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
         500,
         { edges: ['leading'] },
       ),
-    [branchName, worktreePathRaw, detail.repoId, navigation],
+    [branchName, worktreePathRaw, detail.workspaceId, navigation],
   )
   const openChangesTab = useMemo(
     () =>
@@ -194,7 +194,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
         () => {
           if (!branchName || !worktreePathRaw) return
           void dispatchOpenWorkspacePaneStaticTabAction({
-            workspaceId: detail.repoId,
+            workspaceId: detail.workspaceId,
             branchName,
             worktreePath: worktreePathRaw,
             type: 'changes',
@@ -205,7 +205,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
         500,
         { edges: ['leading'] },
       ),
-    [branchName, worktreePathRaw, detail.repoId, navigation],
+    [branchName, worktreePathRaw, detail.workspaceId, navigation],
   )
   // History doesn't require a worktree, unlike files/changes above.
   const openHistoryTab = useMemo(
@@ -214,7 +214,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
         () => {
           if (!branchName) return
           void dispatchOpenWorkspacePaneStaticTabAction({
-            workspaceId: detail.repoId,
+            workspaceId: detail.workspaceId,
             branchName,
             worktreePath: worktreePathRaw,
             type: 'history',
@@ -225,7 +225,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
         500,
         { edges: ['leading'] },
       ),
-    [branchName, worktreePathRaw, detail.repoId, navigation],
+    [branchName, worktreePathRaw, detail.workspaceId, navigation],
   )
   if (!branch) return <EmptyState title={t('branches.empty')} />
   const protectedBranch = PROTECTED_BRANCHES.has(branch.name)
@@ -283,7 +283,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
   ) : undefined
   const upstreamValue = branch.tracking ? (
     <UpstreamLink
-      repoId={detail.repoId}
+      repoId={detail.workspaceId}
       workspaceRuntimeId={workspaceRuntimeId}
       tracking={branch.tracking}
       title={t('branch-status.upstream.open-externally')}
@@ -407,7 +407,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
           <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden text-sm text-foreground">
             {branch.lastCommitHash ? (
               <CommitHashLink
-                repoId={detail.repoId}
+                repoId={detail.workspaceId}
                 workspaceRuntimeId={workspaceRuntimeId}
                 hash={branch.lastCommitHash}
                 shortHash={branch.lastCommitShortHash}
@@ -450,7 +450,7 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
         />
       )}
       <PullRequestStatusRow
-        repoId={detail.repoId}
+        repoId={detail.workspaceId}
         workspaceRuntimeId={workspaceRuntimeId}
         branchName={branch.name}
         pullRequest={pullRequest}

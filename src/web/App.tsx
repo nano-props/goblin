@@ -1,12 +1,12 @@
-import { EmptyRepoView } from '#/web/components/EmptyRepoView.tsx'
+import { EmptyWorkspaceView } from '#/web/components/EmptyWorkspaceView.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
 import { SettingsPageScreen } from '#/web/components/SettingsPageScreen.tsx'
-import { RepoView } from '#/web/components/RepoView.tsx'
-import { RepoWorkspaceLayoutSkeleton } from '#/web/components/Skeleton.tsx'
+import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
+import { WorkspaceLayoutSkeleton } from '#/web/components/Skeleton.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
-import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
+import { workspaceLayoutBehavior } from '#/web/lib/workspace-layout.ts'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
@@ -70,7 +70,7 @@ export function App({
   const workspaceMembershipReady = useWorkspacesStore((s) => s.workspaceMembershipReady)
   const zenMode = useWorkspacesStore((s) => s.zenMode)
   const uiMode = useResponsiveUiMode()
-  const bootWorkspaceBehavior = repoWorkspaceBehavior({
+  const bootWorkspaceBehavior = workspaceLayoutBehavior({
     compact: uiMode === 'compact',
     zenMode,
   })
@@ -89,7 +89,7 @@ export function App({
     <main className="flex flex-1 min-h-0 min-w-0">
       <ErrorBoundary resetKey={routeWorkspaceView?.workspaceId ?? 'empty'}>
         {routeWorkspaceView ? (
-          <RepoView
+          <WorkspaceView
             workspaceId={routeWorkspaceView.workspaceId}
             routeView={routeWorkspaceView}
             onOpenSettings={() => onRouteSettingsPageChange?.('general')}
@@ -102,13 +102,13 @@ export function App({
             onReplaceRepoBranch={onReplaceRepoBranch}
           />
         ) : !workspaceMembershipReady ? (
-          <RepoWorkspaceLayoutSkeleton
+          <WorkspaceLayoutSkeleton
             singlePane={bootWorkspaceBehavior.singlePane}
             singlePaneView="navigator"
-            repoWorkspaceState="empty"
+            workspacePaneState="empty"
           />
         ) : (
-          <EmptyRepoView onOpenSettings={() => onRouteSettingsPageChange?.('general')} />
+          <EmptyWorkspaceView onOpenSettings={() => onRouteSettingsPageChange?.('general')} />
         )}
       </ErrorBoundary>
     </main>

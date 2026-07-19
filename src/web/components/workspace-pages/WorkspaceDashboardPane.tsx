@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { useMemo, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { RepoPagePane } from '#/web/components/repo-pages/RepoPagePane.tsx'
+import { WorkspacePagePane } from '#/web/components/workspace-pages/WorkspacePagePane.tsx'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSummaryInline.tsx'
@@ -26,11 +26,12 @@ import {
   useWorkspaceDirectoryOverview,
 } from '#/web/repo-data-query.ts'
 import type { PullRequestEntry } from '#/shared/api-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitWorkspaceProjection, RepoBranchState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
-import { DirectoryOverviewContent } from '#/web/components/repo-pages/DirectoryOverviewContent.tsx'
-import { DASHBOARD_CARD_CLASS_NAME, DashboardMetricCard } from '#/web/components/repo-pages/dashboard-ui.tsx'
+import { DirectoryOverviewContent } from '#/web/components/workspace-pages/DirectoryOverviewContent.tsx'
+import { DASHBOARD_CARD_CLASS_NAME, DashboardMetricCard } from '#/web/components/workspace-pages/dashboard-ui.tsx'
 import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
 const DASHBOARD_BRANCH_ROW_CLASS_NAME =
   'w-full px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45'
@@ -52,26 +53,26 @@ interface DashboardSummary {
   recentBranches: DashboardBranchItem[]
 }
 
-interface RepoDashboardPaneProps {
-  repoId: string
+interface WorkspaceDashboardPaneProps {
+  workspaceId: WorkspaceId
   compact?: boolean
   trafficLightOffset?: boolean
   onBack?: () => void
   onSelectBranch?: (branchName: string) => void
 }
 
-export function RepoDashboardPane({
-  repoId,
+export function WorkspaceDashboardPane({
+  workspaceId,
   compact = false,
   trafficLightOffset = false,
   onBack,
   onSelectBranch,
-}: RepoDashboardPaneProps) {
+}: WorkspaceDashboardPaneProps) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
-  const repo = useWorkspacesStore(
+  const workspace = useWorkspacesStore(
     useShallow((s) => {
-      const state = s.workspaces[repoId]
+      const state = s.workspaces[workspaceId]
       return state
         ? {
             id: state.id,
@@ -83,21 +84,25 @@ export function RepoDashboardPane({
         : null
     }),
   )
-  const directoryWorkspace = repo?.capability.kind === 'filesystem'
-  const gitQueriesEnabled = repo?.capability.kind === 'git'
+  const directoryWorkspace = workspace?.capability.kind === 'filesystem'
+  const gitQueriesEnabled = workspace?.capability.kind === 'git'
   const projectionReadModel = useRepoProjectionReadModel(
-    repoId,
-    repo?.workspaceRuntimeId ?? '',
+    workspaceId,
+    workspace?.workspaceRuntimeId ?? '',
     null,
     'summary',
     gitQueriesEnabled,
   )
   const projection = projectionReadModel.data
-  const statusReadModel = useRepoWorktreeStatusReadModel(repoId, repo?.workspaceRuntimeId ?? '', gitQueriesEnabled)
+  const statusReadModel = useRepoWorktreeStatusReadModel(
+    workspaceId,
+    workspace?.workspaceRuntimeId ?? '',
+    gitQueriesEnabled,
+  )
   const overviewReadModel = useWorkspaceDirectoryOverview(
-    repoId,
-    repo?.workspaceRuntimeId ?? '',
-    !!repo && directoryWorkspace,
+    workspaceId,
+    workspace?.workspaceRuntimeId ?? '',
+    !!workspace && directoryWorkspace,
   )
   const branchModel = useMemo(
     () =>
@@ -116,12 +121,12 @@ export function RepoDashboardPane({
   const statusErrorKey = statusError instanceof Error ? statusError.message : String(statusError)
   const statusStale = !!statusReadModel.data && statusReadModel.isError
   const retryStatus = () => {
-    if (!repo) return
-    void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, repo.id, repo.workspaceRuntimeId)
+    if (!workspace) return
+    void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, workspace.id, workspace.workspaceRuntimeId)
   }
 
   return (
-    <RepoPagePane
+    <WorkspacePagePane
       icon={LayoutDashboard}
       label={t('repo.dashboard')}
       compact={compact}
@@ -130,19 +135,19 @@ export function RepoDashboardPane({
     >
       <ScrollArea className="min-h-0 flex-1 bg-background">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-5">
-          {repo && directoryWorkspace && overviewReadModel.data ? (
-            <DirectoryDashboard repo={repo} overview={overviewReadModel.data} compact={compact} />
-          ) : repo && directoryWorkspace && overviewReadModel.isError ? (
+          {workspace && directoryWorkspace && overviewReadModel.data ? (
+            <DirectoryDashboard workspace={workspace} overview={overviewReadModel.data} compact={compact} />
+          ) : workspace && directoryWorkspace && overviewReadModel.isError ? (
             <div className={cn(DASHBOARD_CARD_CLASS_NAME, 'p-4 text-sm text-destructive')}>
               {t('dashboard.directory.read-failed')}
             </div>
-          ) : repo && projection?.snapshot && !statusReadModel.data && statusReadModel.isError ? (
+          ) : workspace && projection?.snapshot && !statusReadModel.data && statusReadModel.isError ? (
             <RepoStatusFailureView
               messageKey={statusErrorKey}
               retrying={statusReadModel.isFetching}
               onRetry={retryStatus}
             />
-          ) : repo && repo.capability.kind === 'git' && branchModel && summary ? (
+          ) : workspace && workspace.capability.kind === 'git' && branchModel && summary ? (
             <>
               {statusStale && (
                 <RepoStatusStaleNotice
@@ -152,8 +157,8 @@ export function RepoDashboardPane({
                 />
               )}
               <DashboardHeader
-                repo={repo}
-                git={repo.capability.git}
+                workspace={workspace}
+                git={workspace.capability.git}
                 currentBranch={branchModel.currentBranch}
                 lang={lang}
               />
@@ -181,28 +186,28 @@ export function RepoDashboardPane({
           )}
         </div>
       </ScrollArea>
-    </RepoPagePane>
+    </WorkspacePagePane>
   )
 }
 
 function DirectoryDashboard({
-  repo,
+  workspace,
   overview,
   compact,
 }: {
-  repo: Pick<WorkspaceState, 'name' | 'id' | 'admission'>
+  workspace: Pick<WorkspaceState, 'name' | 'id' | 'admission'>
   overview: { topLevelFileCount: number; topLevelDirectoryCount: number; totalSizeBytes: number }
   compact: boolean
 }) {
   const t = useT()
   const displayLocation = formatWorkspaceDisplayLocation(
-    repo.id,
-    remoteWorkspaceTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null),
+    workspace.id,
+    remoteWorkspaceTarget(workspace.id, workspace.admission.kind === 'remote' ? workspace.admission.lifecycle : null),
   )
   return (
     <>
       <div className={cn(DASHBOARD_CARD_CLASS_NAME, 'p-4')}>
-        <h1 className="truncate text-base font-semibold text-foreground">{repo.name}</h1>
+        <h1 className="truncate text-base font-semibold text-foreground">{workspace.name}</h1>
         <div className="mt-1 truncate text-xs text-muted-foreground" title={displayLocation}>
           {displayLocation}
         </div>
@@ -286,12 +291,12 @@ function branchWorktreeDirty(branchModel: RepoBranchReadModelData, branch: RepoB
 }
 
 function DashboardHeader({
-  repo,
+  workspace,
   git,
   currentBranch,
   lang,
 }: {
-  repo: Pick<WorkspaceState, 'name' | 'id' | 'admission'>
+  workspace: Pick<WorkspaceState, 'name' | 'id' | 'admission'>
   git: GitWorkspaceProjection
   currentBranch: string
   lang: Lang
@@ -302,8 +307,8 @@ function DashboardHeader({
     : null
   const remoteState = dashboardRemoteState(git)
   const displayLocation = formatWorkspaceDisplayLocation(
-    repo.id,
-    remoteWorkspaceTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null),
+    workspace.id,
+    remoteWorkspaceTarget(workspace.id, workspace.admission.kind === 'remote' ? workspace.admission.lifecycle : null),
   )
 
   return (
@@ -315,7 +320,7 @@ function DashboardHeader({
     >
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">
-          <h1 className="min-w-0 truncate text-base font-semibold text-foreground">{repo.name}</h1>
+          <h1 className="min-w-0 truncate text-base font-semibold text-foreground">{workspace.name}</h1>
           <Badge variant="outline" className="text-muted-foreground">
             {currentBranch || t('dashboard.no-current-branch')}
           </Badge>

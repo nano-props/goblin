@@ -6,7 +6,7 @@ import type { CSSProperties, ReactNode } from 'react'
 // that comes from dozens of tiny bars pulsing in unison.
 
 import { Skeleton } from '#/web/components/ui/skeleton.tsx'
-import { RepoWorkspace, RepoWorkspacePane } from '#/web/components/Layout.tsx'
+import { WorkspaceLayoutPane, WorkspaceSplitLayout } from '#/web/components/Layout.tsx'
 import {
   BRANCH_ROW_ACTION_BOX_CLASS,
   BRANCH_ROW_ACTION_SLOT_CLASS,
@@ -33,7 +33,7 @@ interface RowCountProps {
 interface WorkspaceSkeletonProps {
   singlePane?: boolean
   singlePaneView?: 'navigator' | 'workspace'
-  repoWorkspaceState?: 'empty' | 'content'
+  workspacePaneState?: 'empty' | 'content'
 }
 
 export function BranchNavigatorSkeleton({ rows = 6 }: BranchNavigatorSkeletonProps) {
@@ -57,41 +57,41 @@ export function StatusListSkeleton({ rows = 6 }: RowCountProps) {
   )
 }
 
-// RepoWorkspaceLayoutSkeleton renders the sidebar + workspace pane while
-// a repo is being hydrated. The current repo shell owns the sidebar
+// WorkspaceLayoutSkeleton renders the sidebar + workspace pane while
+// a workspace is being hydrated. The current workspace shell owns the sidebar
 // chrome, so the workspace skeleton just shows the panes.
-export function RepoWorkspaceLayoutSkeleton({
+export function WorkspaceLayoutSkeleton({
   singlePane = false,
   singlePaneView = 'navigator',
-  repoWorkspaceState = 'empty',
+  workspacePaneState = 'empty',
 }: WorkspaceSkeletonProps) {
-  const repoWorkspacePane = (
-    <RepoWorkspacePane>
-      {repoWorkspaceState === 'content' ? <RepoWorkspaceSkeleton /> : <RepoWorkspaceEmptySkeleton />}
-    </RepoWorkspacePane>
+  const workspacePane = (
+    <WorkspaceLayoutPane>
+      {workspacePaneState === 'content' ? <WorkspacePaneSkeleton /> : <EmptyWorkspacePaneSkeleton />}
+    </WorkspaceLayoutPane>
   )
   const sidebarPane = (
-    <RepoWorkspacePane>
+    <WorkspaceLayoutPane>
       <BranchNavigatorSkeleton />
-    </RepoWorkspacePane>
+    </WorkspaceLayoutPane>
   )
 
   if (singlePane) {
     return (
       <section className="flex min-w-0 flex-1 flex-col">
-        {singlePaneView === 'workspace' ? repoWorkspacePane : sidebarPane}
+        {singlePaneView === 'workspace' ? workspacePane : sidebarPane}
       </section>
     )
   }
 
   return (
     <section className="flex min-w-0 flex-1 flex-col">
-      <RepoWorkspace mode="split" sidebarPane={sidebarPane} repoWorkspacePane={repoWorkspacePane} />
+      <WorkspaceSplitLayout mode="split" sidebarPane={sidebarPane} workspacePane={workspacePane} />
     </section>
   )
 }
 
-export function RepoWorkspaceSkeleton({
+export function WorkspacePaneSkeleton({
   toolbarDraggable = true,
   toolbarTrafficLightOffset = false,
 }: {
@@ -99,7 +99,7 @@ export function RepoWorkspaceSkeleton({
   toolbarTrafficLightOffset?: boolean
 }) {
   return (
-    <section data-testid="repo-workspace-skeleton" className="flex min-h-0 flex-1 flex-col bg-background">
+    <section data-testid="workspace-pane-skeleton" className="flex min-h-0 flex-1 flex-col bg-background">
       <WorkspaceToolbar draggable={toolbarDraggable} trafficLightOffset={toolbarTrafficLightOffset}>
         <WorkspaceToolbarLeadingSpacer reserve={toolbarTrafficLightOffset} />
         <WorkspaceToolbarContent>
@@ -119,9 +119,9 @@ export function RepoWorkspaceSkeleton({
   )
 }
 
-export function RepoWorkspaceEmptySkeleton() {
+export function EmptyWorkspacePaneSkeleton() {
   return (
-    <section data-testid="repo-workspace-empty-skeleton" className="flex min-h-0 flex-1 flex-col bg-background">
+    <section data-testid="empty-workspace-pane-skeleton" className="flex min-h-0 flex-1 flex-col bg-background">
       <div className="flex flex-1 items-center justify-center p-6 text-center">
         <Skeleton className="mx-auto h-4 w-32" />
       </div>

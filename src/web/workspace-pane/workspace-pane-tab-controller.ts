@@ -7,11 +7,11 @@ import {
 } from '#/shared/workspace-pane.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import {
-  isRepoWorkspaceRuntimeTab,
-  type RepoWorkspacePaneModelTarget,
-  type RepoWorkspaceTab,
-  type RepoWorkspaceTabModel,
-} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+  isWorkspacePaneRuntimeTab,
+  type WorkspacePaneModelTarget,
+  type WorkspacePaneTab,
+  type WorkspacePaneTabModel,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import {
   beginWorkspacePaneRouteIntent,
   workspacePaneActionTargetFromCoordinates,
@@ -40,7 +40,7 @@ export interface WorkspacePaneControllerTarget {
   workspaceRuntimeId: string
   branchName: string | null
   worktreePath: string | null
-  paneTarget: RepoWorkspacePaneModelTarget
+  paneTarget: WorkspacePaneModelTarget
 }
 export type WorkspacePaneTabControllerObservedRoute = ParsedWorkspacePaneRouteTarget
 export type WorkspacePaneTabControllerShowNavigation = Pick<
@@ -55,8 +55,8 @@ export type WorkspacePaneTabControllerCommitNavigation = Pick<
   Pick<PrimaryWindowNavigationActions, 'showRepoWorktreeWorkspacePaneTab' | 'showWorkspaceRootPaneTab'>
 type WorkspacePaneTabControllerOptionalShowNavigation = Partial<WorkspacePaneTabControllerShowNavigation>
 
-export function workspacePaneControllerRouteForTab(tab: RepoWorkspaceTab): WorkspacePaneTabControllerRoute | undefined {
-  if (isRepoWorkspaceRuntimeTab(tab)) {
+export function workspacePaneControllerRouteForTab(tab: WorkspacePaneTab): WorkspacePaneTabControllerRoute | undefined {
+  if (isWorkspacePaneRuntimeTab(tab)) {
     if (tab.runtimeType === 'terminal') return { kind: 'terminal', terminalSessionId: tab.sessionId }
     return undefined
   }
@@ -73,9 +73,9 @@ export interface WorkspacePaneControllerPresentationLease {
 }
 
 export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
-  target: RepoWorkspaceTabModel
-  closingTab: RepoWorkspaceTab
-  nextTab: RepoWorkspaceTab | null
+  target: WorkspacePaneTabModel
+  closingTab: WorkspacePaneTab
+  nextTab: WorkspacePaneTab | null
   workspacePaneRoute: ParsedWorkspacePaneRouteTarget | undefined
   presentationToken?: PrimaryWindowPresentationToken
 }): WorkspacePaneControllerPresentationLease | null {
@@ -113,15 +113,15 @@ export function workspacePaneRouteKey(route: WorkspacePaneTabControllerRoute): s
 }
 
 export async function selectWorkspacePaneControllerTab(
-  target: RepoWorkspaceTabModel,
-  tab: RepoWorkspaceTab,
+  target: WorkspacePaneTabModel,
+  tab: WorkspacePaneTab,
   navigation: WorkspacePaneTabControllerCommitNavigation,
   presentationToken: PrimaryWindowPresentationToken = beginPrimaryWindowPresentation(),
 ): Promise<boolean> {
   if (!primaryWindowPresentationIsCurrent(presentationToken)) return false
   if (target.paneTarget.kind === 'git-worktree' && target.branchName === null) {
     if (!workspacePaneTabControllerTargetIsCurrent(target) || tab.kind === 'pending') return false
-    if (isRepoWorkspaceRuntimeTab(tab) && tab.runtimeType === 'terminal') {
+    if (isWorkspacePaneRuntimeTab(tab) && tab.runtimeType === 'terminal') {
       return (
         navigation.showRepoWorktreeTerminalSession?.(
           target.workspaceId,
@@ -141,7 +141,7 @@ export async function selectWorkspacePaneControllerTab(
   if (target.paneTarget.kind === 'workspace-root') {
     if (!workspacePaneTabControllerTargetIsCurrent(target) || tab.kind === 'pending') return false
     const presentation =
-      isRepoWorkspaceRuntimeTab(tab) && tab.runtimeType === 'terminal'
+      isWorkspacePaneRuntimeTab(tab) && tab.runtimeType === 'terminal'
         ? { kind: 'terminal' as const, terminalSessionId: tab.sessionId }
         : tab.kind === 'static'
           ? { kind: 'static' as const, tab: tab.type }
@@ -158,7 +158,7 @@ export async function selectWorkspacePaneControllerTab(
 
 /** Selects canonical tab authority without requiring a live presentation view. */
 export async function selectWorkspacePaneControllerTabEntry(
-  target: RepoWorkspaceTabModel,
+  target: WorkspacePaneTabModel,
   entry: WorkspacePaneTabEntry,
   navigation: WorkspacePaneTabControllerCommitNavigation,
   presentationToken: PrimaryWindowPresentationToken = beginPrimaryWindowPresentation(),

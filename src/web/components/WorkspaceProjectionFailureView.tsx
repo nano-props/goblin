@@ -6,12 +6,12 @@ import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 
-export function RepoProjectionFailureView({
-  repo,
+export function WorkspaceProjectionFailureView({
+  workspace,
   message,
   onRetry,
 }: {
-  repo: WorkspaceState
+  workspace: WorkspaceState
   message: string
   onRetry: () => void
 }) {
@@ -19,7 +19,7 @@ export function RepoProjectionFailureView({
   const navigation = usePrimaryWindowNavigation()
 
   async function handleClose() {
-    const result = await navigation.closeWorkspace(repo.id)
+    const result = await navigation.closeWorkspace(workspace.id)
     if (!result.ok) toast.error(t(result.message))
   }
 

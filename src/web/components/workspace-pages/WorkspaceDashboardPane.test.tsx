@@ -3,7 +3,7 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { RepoDashboardPane } from '#/web/components/repo-pages/RepoDashboardPane.tsx'
+import { WorkspaceDashboardPane } from '#/web/components/workspace-pages/WorkspaceDashboardPane.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   repoWorktreeStatusQueryKey,
@@ -12,6 +12,7 @@ import {
   workspaceDirectoryOverviewQueryKey,
 } from '#/web/repo-data-query.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   createPullRequest,
   createRepoBranch,
@@ -21,7 +22,7 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 
-const REPO_ID = 'goblin+file:///tmp/repo-dashboard-pane-test'
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
@@ -33,29 +34,31 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe('RepoDashboardPane', () => {
+describe('WorkspaceDashboardPane', () => {
   test('does not admit Git or directory reads before workspace capability settles', () => {
-    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, name: 'probing' })
-    setWorkspaceProbeForTest(REPO_ID, { status: 'probing' })
+    const workspace = seedRepoWithReadModelForTest({ id: WORKSPACE_ID, name: 'probing' })
+    setWorkspaceProbeForTest(WORKSPACE_ID, { status: 'probing' })
     primaryWindowQueryClient.removeQueries({
-      queryKey: repoProjectionQueryKey(REPO_ID, repo.workspaceRuntimeId, null, 'summary'),
+      queryKey: repoProjectionQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId, null, 'summary'),
     })
-    primaryWindowQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
+    primaryWindowQueryClient.removeQueries({
+      queryKey: repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
+    })
 
     renderInJsdom(
       <QueryClientProvider client={primaryWindowQueryClient}>
-        <RepoDashboardPane repoId={REPO_ID} />
+        <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
       </QueryClientProvider>,
     )
 
     const projectionState = primaryWindowQueryClient.getQueryState(
-      repoProjectionQueryKey(REPO_ID, repo.workspaceRuntimeId, null, 'summary'),
+      repoProjectionQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId, null, 'summary'),
     )
     const statusState = primaryWindowQueryClient.getQueryState(
-      repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
+      repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
     )
     const overviewState = primaryWindowQueryClient.getQueryState(
-      workspaceDirectoryOverviewQueryKey(REPO_ID, repo.workspaceRuntimeId),
+      workspaceDirectoryOverviewQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
     )
     for (const queryState of [projectionState, statusState, overviewState]) {
       expect(queryState?.fetchStatus).not.toBe('fetching')
@@ -64,8 +67,8 @@ describe('RepoDashboardPane', () => {
   })
 
   test('shows directory metrics without mounting Git reads for a non-Git workspace', () => {
-    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, name: 'notes' })
-    setWorkspaceProbeForTest(REPO_ID, {
+    const workspace = seedRepoWithReadModelForTest({ id: WORKSPACE_ID, name: 'notes' })
+    setWorkspaceProbeForTest(WORKSPACE_ID, {
       status: 'ready',
       name: 'notes',
       capabilities: {
@@ -75,42 +78,46 @@ describe('RepoDashboardPane', () => {
       },
       diagnostics: [],
     })
-    primaryWindowQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(REPO_ID, repo.workspaceRuntimeId), {
-      topLevelFileCount: 4,
-      topLevelDirectoryCount: 2,
-      totalSizeBytes: 2048,
-    })
+    primaryWindowQueryClient.setQueryData(
+      workspaceDirectoryOverviewQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
+      {
+        topLevelFileCount: 4,
+        topLevelDirectoryCount: 2,
+        totalSizeBytes: 2048,
+      },
+    )
 
     const { container } = renderInJsdom(
       <QueryClientProvider client={primaryWindowQueryClient}>
-        <RepoDashboardPane repoId={REPO_ID} />
+        <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
       </QueryClientProvider>,
     )
 
     expect(container.textContent).toContain('dashboard.directory.files4')
     expect(container.textContent).toContain('dashboard.directory.folders2')
     expect(container.textContent).toContain('2.0 KB')
-    expect(container.textContent).toContain('/tmp/repo-dashboard-pane-test')
+    expect(container.textContent).toContain('/workspace')
     expect(container.textContent).not.toContain('goblin+file://')
     expect(
-      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId))?.fetchStatus,
+      primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId))
+        ?.fetchStatus,
     ).not.toBe('fetching')
   })
 
   test('shows a retryable error when worktree status is unavailable', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
+    const workspace = seedRepoWithReadModelForTest({
+      id: WORKSPACE_ID,
       branches: [createRepoBranch('main')],
       currentBranchName: 'main',
     })
-    setRepoProjectionQueryData(REPO_ID, repo.workspaceRuntimeId, null, 'summary', {
+    setRepoProjectionQueryData(WORKSPACE_ID, workspace.workspaceRuntimeId, null, 'summary', {
       snapshot: { current: 'main', branches: [createRepoBranch('main')] },
       pullRequests: null,
       operations: { operations: [], loadedAt: 123 },
       requested: { branch: null, pullRequestMode: 'summary' },
       loadedAt: 123,
     })
-    const statusQueryKey = repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId)
+    const statusQueryKey = repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId)
     primaryWindowQueryClient.removeQueries({ queryKey: statusQueryKey })
     primaryWindowQueryClient.setQueryDefaults(statusQueryKey, { refetchOnMount: false })
     await expect(
@@ -125,7 +132,7 @@ describe('RepoDashboardPane', () => {
 
     const { container } = renderInJsdom(
       <QueryClientProvider client={primaryWindowQueryClient}>
-        <RepoDashboardPane repoId={REPO_ID} />
+        <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
       </QueryClientProvider>,
     )
 
@@ -137,19 +144,19 @@ describe('RepoDashboardPane', () => {
 
   test('keeps accepted dashboard data visible with a stale warning after status refresh fails', async () => {
     const mainBranch = createRepoBranch('main')
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
+    const workspace = seedRepoWithReadModelForTest({
+      id: WORKSPACE_ID,
       branches: [mainBranch],
       currentBranchName: 'main',
     })
-    setRepoProjectionQueryData(REPO_ID, repo.workspaceRuntimeId, null, 'summary', {
+    setRepoProjectionQueryData(WORKSPACE_ID, workspace.workspaceRuntimeId, null, 'summary', {
       snapshot: { current: 'main', branches: [mainBranch] },
       pullRequests: null,
       operations: { operations: [], loadedAt: 123 },
       requested: { branch: null, pullRequestMode: 'summary' },
       loadedAt: 123,
     })
-    const statusQueryKey = repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId)
+    const statusQueryKey = repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId)
     primaryWindowQueryClient.setQueryDefaults(statusQueryKey, { refetchOnMount: false })
     await expect(
       primaryWindowQueryClient.fetchQuery({
@@ -164,7 +171,7 @@ describe('RepoDashboardPane', () => {
 
     const { container } = renderInJsdom(
       <QueryClientProvider client={primaryWindowQueryClient}>
-        <RepoDashboardPane repoId={REPO_ID} />
+        <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
       </QueryClientProvider>,
     )
 
@@ -176,14 +183,14 @@ describe('RepoDashboardPane', () => {
 
   test('hides the attention section when no branch needs attention', () => {
     seedRepoWithReadModelForTest({
-      id: REPO_ID,
+      id: WORKSPACE_ID,
       branches: [createRepoBranch('main')],
       currentBranchName: 'main',
     })
 
     const { container } = renderInJsdom(
       <QueryClientProvider client={primaryWindowQueryClient}>
-        <RepoDashboardPane repoId={REPO_ID} />
+        <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
       </QueryClientProvider>,
     )
 
@@ -194,12 +201,12 @@ describe('RepoDashboardPane', () => {
   test('uses projection pull request data for PR metrics and attention badges', () => {
     const featureBranch = createRepoBranch('feature/pr')
     const mainBranch = createRepoBranch('main')
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
+    const workspace = seedRepoWithReadModelForTest({
+      id: WORKSPACE_ID,
       branches: [featureBranch, mainBranch],
       currentBranchName: 'main',
     })
-    setRepoProjectionQueryData(REPO_ID, repo.workspaceRuntimeId, null, 'summary', {
+    setRepoProjectionQueryData(WORKSPACE_ID, workspace.workspaceRuntimeId, null, 'summary', {
       snapshot: { current: 'main', branches: [featureBranch, mainBranch] },
       pullRequests: [
         {
@@ -217,7 +224,7 @@ describe('RepoDashboardPane', () => {
 
     const { container } = renderInJsdom(
       <QueryClientProvider client={primaryWindowQueryClient}>
-        <RepoDashboardPane repoId={REPO_ID} />
+        <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
       </QueryClientProvider>,
     )
 
@@ -230,14 +237,14 @@ describe('RepoDashboardPane', () => {
   test('opens a branch from dashboard branch rows', () => {
     const onSelectBranch = vi.fn()
     seedRepoWithReadModelForTest({
-      id: REPO_ID,
+      id: WORKSPACE_ID,
       branches: [createRepoBranch('feature/open')],
       currentBranchName: 'feature/open',
     })
 
     const { getByTestId } = renderInJsdom(
       <QueryClientProvider client={primaryWindowQueryClient}>
-        <RepoDashboardPane repoId={REPO_ID} onSelectBranch={onSelectBranch} />
+        <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} onSelectBranch={onSelectBranch} />
       </QueryClientProvider>,
     )
 

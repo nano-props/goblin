@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
 import { fireEvent } from '@testing-library/react'
-import { RepoLayoutSidebar } from '#/web/components/repo-layout/RepoLayoutSidebar.tsx'
+import { WorkspaceLayoutSidebar } from '#/web/components/workspace-layout/WorkspaceLayoutSidebar.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -30,10 +30,10 @@ vi.mock('#/web/commands/workspace-commands.ts', () => ({
   runTerminalPrimaryActionCommand: workspaceCommandMocks.terminal,
 }))
 
-const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-shell-sidebar-test')
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/workspace-shell-sidebar-test')
 
 function gitProjection() {
-  const capability = useWorkspacesStore.getState().workspaces[REPO_ID]?.capability
+  const capability = useWorkspacesStore.getState().workspaces[WORKSPACE_ID]?.capability
   if (capability?.kind !== 'git') throw new Error('Expected Git workspace fixture')
   return capability.git
 }
@@ -45,7 +45,7 @@ beforeEach(() => {
   primaryWindowQueryClient.clear()
   resetWorkspacesStore()
   seedRepoWithReadModelForTest({
-    id: REPO_ID,
+    id: WORKSPACE_ID,
     branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
   })
 })
@@ -56,18 +56,18 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('RepoLayoutSidebar', () => {
+describe('WorkspaceLayoutSidebar', () => {
   test('renders sidebar actions before the branch content without growing action rows', () => {
     const { container } = renderSidebar(
-      <RepoLayoutSidebar
-        workspaceId={REPO_ID}
+      <WorkspaceLayoutSidebar
+        workspaceId={WORKSPACE_ID}
         git={gitProjection()}
         compact={false}
         branchContent={<div data-testid="branch-content" />}
       />,
     )
 
-    const sidebarTop = container.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
+    const sidebarTop = container.querySelector<HTMLElement>('[data-testid="workspace-shell-sidebar-top"]')
     expect(sidebarTop?.dataset.titleBarChromeRegion).toBe('drag')
     expect(sidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
 
@@ -90,7 +90,7 @@ describe('RepoLayoutSidebar', () => {
   })
 
   test('renders placeholder state when no repo is open', () => {
-    const { container } = renderSidebar(<RepoLayoutSidebar git={null} compact={false} />)
+    const { container } = renderSidebar(<WorkspaceLayoutSidebar git={null} compact={false} />)
 
     expect(container.querySelector('[data-testid="workspace-picker-host"]')).not.toBeNull()
 
@@ -110,8 +110,8 @@ describe('RepoLayoutSidebar', () => {
     const onOpenDashboard = vi.fn()
     const onSelectWorkspaceRoot = vi.fn()
     const { container } = renderSidebar(
-      <RepoLayoutSidebar
-        workspaceId={REPO_ID}
+      <WorkspaceLayoutSidebar
+        workspaceId={WORKSPACE_ID}
         compact={false}
         git={null}
         onOpenDashboard={onOpenDashboard}
@@ -149,7 +149,7 @@ describe('RepoLayoutSidebar', () => {
     }
     fireEvent.click(statusAction)
     expect(workspaceCommandMocks.showTab).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: REPO_ID, tab: 'status' }),
+      expect.objectContaining({ workspaceId: WORKSPACE_ID, tab: 'status' }),
     )
 
     fireEvent.click(menuTrigger)
@@ -159,13 +159,13 @@ describe('RepoLayoutSidebar', () => {
     if (!(reopenedFilesAction instanceof HTMLButtonElement)) throw new Error('missing reopened Files action')
     fireEvent.click(reopenedFilesAction)
     expect(workspaceCommandMocks.showTab).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: REPO_ID, tab: 'files' }),
+      expect.objectContaining({ workspaceId: WORKSPACE_ID, tab: 'files' }),
     )
   })
 
   test('keeps the workspace row action menu visible in compact UI', () => {
     responsiveMocks.compact = true
-    const { container } = renderSidebar(<RepoLayoutSidebar workspaceId={REPO_ID} compact git={null} />)
+    const { container } = renderSidebar(<WorkspaceLayoutSidebar workspaceId={WORKSPACE_ID} compact git={null} />)
 
     const menuTrigger = container.querySelector('button[aria-label="action.menu"]')
     expect(menuTrigger?.parentElement?.className).toContain('opacity-100')
@@ -175,8 +175,8 @@ describe('RepoLayoutSidebar', () => {
   test('opens create-worktree from the row action', () => {
     const onCreateWorktree = vi.fn()
     const { container } = renderSidebar(
-      <RepoLayoutSidebar
-        workspaceId={REPO_ID}
+      <WorkspaceLayoutSidebar
+        workspaceId={WORKSPACE_ID}
         git={gitProjection()}
         compact={false}
         branchContent={<div />}
@@ -194,15 +194,15 @@ describe('RepoLayoutSidebar', () => {
 
   test('renders zen reveal top chrome as draggable without owning zen-toggle geometry', () => {
     const { container } = renderSidebar(
-      <RepoLayoutSidebar
-        workspaceId={REPO_ID}
+      <WorkspaceLayoutSidebar
+        workspaceId={WORKSPACE_ID}
         git={gitProjection()}
         compact={false}
         branchContent={<div data-testid="branch-content" />}
       />,
     )
 
-    const sidebarTop = container.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
+    const sidebarTop = container.querySelector<HTMLElement>('[data-testid="workspace-shell-sidebar-top"]')
     expect(sidebarTop?.dataset.titleBarChromeRegion).toBe('drag')
     expect(sidebarTop?.className).toContain('title-bar-chrome')
     expect(sidebarTop?.className).not.toContain('relative')
@@ -212,8 +212,8 @@ describe('RepoLayoutSidebar', () => {
 
   test('can render the top chrome as neutral when the docked sidebar is collapsed', () => {
     const { container } = renderSidebar(
-      <RepoLayoutSidebar
-        workspaceId={REPO_ID}
+      <WorkspaceLayoutSidebar
+        workspaceId={WORKSPACE_ID}
         git={gitProjection()}
         compact={false}
         chromeRegion="none"
@@ -221,7 +221,7 @@ describe('RepoLayoutSidebar', () => {
       />,
     )
 
-    const sidebarTop = container.querySelector<HTMLElement>('[data-testid="repo-shell-sidebar-top"]')
+    const sidebarTop = container.querySelector<HTMLElement>('[data-testid="workspace-shell-sidebar-top"]')
     expect(sidebarTop?.dataset.titleBarChromeRegion).toBeUndefined()
     expect(sidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
     expect(sidebarTop?.hasAttribute('data-interactive')).toBe(false)

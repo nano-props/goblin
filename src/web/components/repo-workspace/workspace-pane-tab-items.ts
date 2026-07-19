@@ -1,6 +1,6 @@
 import type { WorkspacePaneStaticTabMetadataInput } from '#/web/workspace-pane/tab-providers.ts'
 import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
-import type { RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import {
   createPendingWorkspacePaneTabItem,
@@ -11,7 +11,7 @@ import {
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 
 interface WorkspacePaneTabItemsInput {
-  model: RepoWorkspaceTabModel
+  model: WorkspacePaneTabModel
   workspacePaneId: string
   branchName: string | null
   statusCount: number

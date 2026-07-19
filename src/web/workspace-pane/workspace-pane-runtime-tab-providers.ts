@@ -1,10 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import {
-  canonicalWorkspaceLocator,
-  type WorkspaceId,
-  workspaceLocatorForPath,
-} from '#/shared/workspace-locator.ts'
+import { canonicalWorkspaceLocator, type WorkspaceId, workspaceLocatorForPath } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
@@ -15,7 +11,7 @@ import {
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import type { RepoWorkspaceRuntimeTabStateInput } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import type { WorkspacePaneRuntimeTabStateInput } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import type { WorkspacePaneRuntimeProjectionState } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 
 export type WorkspacePaneRuntimeTabTargetSelectionByType = Partial<Record<WorkspacePaneRuntimeTabType, string | null>>
@@ -31,7 +27,7 @@ export interface WorkspacePaneRuntimeTabProviderProjection {
   type: WorkspacePaneRuntimeTabType
   targetKey: string | null
   views: readonly WorkspacePaneRuntimeTabSummary[]
-  state: RepoWorkspaceRuntimeTabStateInput
+  state: WorkspacePaneRuntimeTabStateInput
   selectedSessionId: string | null
 }
 
@@ -222,7 +218,9 @@ function readTerminalRuntimeProjectionState(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
 ): WorkspacePaneRuntimeProjectionState {
-  const terminalProjectionHydration = useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(workspaceId)
+  const terminalProjectionHydration = useTerminalProjectionHydrationStore
+    .getState()
+    .hydrationByWorkspace.get(workspaceId)
   const currentTerminalProjectionHydration =
     terminalProjectionHydration?.workspaceRuntimeId === workspaceRuntimeId ? terminalProjectionHydration : null
   return {

@@ -1,22 +1,22 @@
 import { type ReactNode } from 'react'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { ZenModeSidebarChrome } from '#/web/components/repo-layout/ZenModeSidebarChrome.tsx'
-import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx'
-import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
+import { ZenModeSidebarChrome } from '#/web/components/workspace-layout/ZenModeSidebarChrome.tsx'
+import { CompactWorkspaceLayout, WorkspaceSplitLayout } from '#/web/components/Layout.tsx'
+import { workspaceLayoutBehavior } from '#/web/lib/workspace-layout.ts'
 
-interface RepoWorkspaceShellBaseProps {
+interface WorkspaceShellBaseProps {
   workspaceId?: WorkspaceId
   compact: boolean
   zenMode: boolean
-  repoWorkspaceActive: boolean
+  workspacePaneActive: boolean
   workspacePaneSize: number
   onWorkspacePaneSizeChange: (size: number) => void
   sidebarPane: ReactNode
-  repoWorkspacePane: ReactNode
+  workspacePane: ReactNode
   singlePaneActivePane?: 'navigator' | 'workspace'
 }
 
-type RepoWorkspaceShellProps = RepoWorkspaceShellBaseProps &
+type WorkspaceShellProps = WorkspaceShellBaseProps &
   (
     | {
         zenModeToggleEnabled?: true
@@ -28,24 +28,24 @@ type RepoWorkspaceShellProps = RepoWorkspaceShellBaseProps &
       }
   )
 
-export function RepoLayoutWorkspaceShell({
+export function WorkspaceLayoutShell({
   workspaceId,
   compact,
   zenMode,
-  repoWorkspaceActive,
+  workspacePaneActive,
   workspacePaneSize,
   onWorkspacePaneSizeChange,
   sidebarPane,
   zenRevealSidebarPane,
-  repoWorkspacePane,
+  workspacePane,
   singlePaneActivePane = 'navigator',
   zenModeToggleEnabled = true,
-}: RepoWorkspaceShellProps) {
+}: WorkspaceShellProps) {
   const effectiveZenMode = zenModeToggleEnabled && zenMode
-  const behavior = repoWorkspaceBehavior({
+  const behavior = workspaceLayoutBehavior({
     compact,
     zenMode: effectiveZenMode,
-    repoWorkspaceActive,
+    workspacePaneActive,
   })
   const sidebarPaneSize = 100 - workspacePaneSize
   const zenRevealEnabled = !compact && behavior.sidebarCollapsed
@@ -57,10 +57,10 @@ export function RepoLayoutWorkspaceShell({
   ) => {
     if (compact) {
       return (
-        <CompactRepoWorkspace
+        <CompactWorkspaceLayout
           activePane={activePane}
           sidebarPane={navigatorPane}
-          repoWorkspacePane={workspacePane}
+          workspacePane={workspacePane}
           transitionScopeKey={workspaceId}
         />
       )
@@ -69,20 +69,20 @@ export function RepoLayoutWorkspaceShell({
     if (behavior.singlePane) return activePane === 'workspace' ? workspacePane : navigatorPane
 
     return (
-      <RepoWorkspace
+      <WorkspaceSplitLayout
         mode="split"
         workspacePaneSize={workspacePaneSize}
         onWorkspacePaneSizeChange={onWorkspacePaneSizeChange}
         sidebarCollapsed={behavior.sidebarCollapsed}
         sidebarPane={navigatorPane}
-        repoWorkspacePane={workspacePane}
+        workspacePane={workspacePane}
       />
     )
   }
 
   return (
     <section className="relative flex min-w-0 flex-1 flex-col">
-      {renderWorkspaceBody(repoWorkspacePane, sidebarPane)}
+      {renderWorkspaceBody(workspacePane, sidebarPane)}
       {!compact && zenModeToggleEnabled ? (
         <ZenModeSidebarChrome
           workspaceId={workspaceId}

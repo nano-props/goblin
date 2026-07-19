@@ -1,6 +1,6 @@
 import type { ParsedWorkspacePaneRoute, ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import { WORKSPACE_PANE_RUNTIME_TAB_TYPES } from '#/shared/workspace-pane.ts'
-import type { RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 
 export type WorkspacePaneRouteReconciliation =
   { kind: 'none' } | { kind: 'pending' } | { kind: 'unverified' } | { kind: 'replace-empty-pane' }
@@ -10,7 +10,7 @@ export type WorkspacePaneRouteHistoryResolution =
 
 export function reconcileWorkspacePaneRoute(
   route: ParsedWorkspacePaneRouteTarget,
-  model: RepoWorkspaceTabModel,
+  model: WorkspacePaneTabModel,
 ): WorkspacePaneRouteReconciliation {
   if (!route || !model.branchName) return { kind: 'none' }
   if (workspacePaneRouteReconciliationBlocked(model)) return { kind: 'pending' }
@@ -19,13 +19,13 @@ export function reconcileWorkspacePaneRoute(
   return reconcileTerminalWorkspacePaneRoute(route, model)
 }
 
-function workspacePaneRouteReconciliationBlocked(model: RepoWorkspaceTabModel): boolean {
+function workspacePaneRouteReconciliationBlocked(model: WorkspacePaneTabModel): boolean {
   return WORKSPACE_PANE_RUNTIME_TAB_TYPES.some((type) => model.runtimeTabStateByType[type].createPending)
 }
 
 function reconcileStaticWorkspacePaneRoute(
   route: Extract<ParsedWorkspacePaneRoute, { kind: 'static' }>,
-  model: RepoWorkspaceTabModel,
+  model: WorkspacePaneTabModel,
 ): WorkspacePaneRouteReconciliation {
   if (model.tabEntriesProjectionPhase === 'pending') return { kind: 'pending' }
   if (model.tabEntriesProjectionPhase === 'failed') return { kind: 'unverified' }
@@ -35,7 +35,7 @@ function reconcileStaticWorkspacePaneRoute(
 
 function reconcileTerminalWorkspacePaneRoute(
   route: Extract<ParsedWorkspacePaneRoute, { kind: 'terminal' }>,
-  model: RepoWorkspaceTabModel,
+  model: WorkspacePaneTabModel,
 ): WorkspacePaneRouteReconciliation {
   if (model.tabEntriesProjectionPhase === 'pending') return { kind: 'pending' }
   if (model.tabEntriesProjectionPhase === 'failed') return { kind: 'unverified' }
@@ -53,7 +53,7 @@ function reconcileTerminalWorkspacePaneRoute(
 
 function reconcileInvalidWorkspacePaneRoute(
   route: Extract<ParsedWorkspacePaneRoute, { kind: 'invalid-static' }>,
-  model: RepoWorkspaceTabModel,
+  model: WorkspacePaneTabModel,
 ): WorkspacePaneRouteReconciliation {
   if (model.tabEntriesProjectionPhase === 'pending') return { kind: 'pending' }
   if (model.tabEntriesProjectionPhase === 'failed') return { kind: 'unverified' }

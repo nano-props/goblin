@@ -5,13 +5,13 @@ import type { ComponentProps } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { RepoWorkspaceToolbar } from '#/web/components/repo-workspace/RepoWorkspaceToolbar.tsx'
+import { GitWorkspacePaneToolbar } from '#/web/components/repo-workspace/GitWorkspacePaneToolbar.tsx'
 import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/WorkspaceOpenExternallyMenu.tsx'
 import {
-  getCurrentRepoWorkspacePresentation as buildRepoWorkspacePresentation,
-  type RepoWorkspaceRepo,
+  getCurrentGitWorkspacePanePresentation as buildGitWorkspacePanePresentation,
+  type GitWorkspacePaneProjection,
 } from '#/web/components/repo-workspace/model.ts'
-import { useRepoWorkspaceTabModel } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
+import { useGitWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
@@ -142,22 +142,24 @@ function defaultRuntimeExternalAppSettings() {
   }
 }
 
-type RepoWorkspaceToolbarHarnessProps = Omit<
-  ComponentProps<typeof RepoWorkspaceToolbar>,
+type GitWorkspacePaneToolbarHarnessProps = Omit<
+  ComponentProps<typeof GitWorkspacePaneToolbar>,
   'workspacePaneTabModel' | 'branchActions'
 > & { workspacePaneRoute: WorkspacePaneRoute | null | undefined }
 
-function RepoWorkspaceToolbarHarness(props: RepoWorkspaceToolbarHarnessProps) {
-  const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail, props.workspacePaneRoute)
+function GitWorkspacePaneToolbarHarness(props: GitWorkspacePaneToolbarHarnessProps) {
+  const workspacePaneTabModel = useGitWorkspacePaneTabModel(props.repo, props.detail, props.workspacePaneRoute)
   const branchActions = useBranchActions(props.repo, props.detail.branch!)
-  return <RepoWorkspaceToolbar {...props} workspacePaneTabModel={workspacePaneTabModel} branchActions={branchActions} />
+  return (
+    <GitWorkspacePaneToolbar {...props} workspacePaneTabModel={workspacePaneTabModel} branchActions={branchActions} />
+  )
 }
 
-function getTestRepoWorkspacePresentation(repo: RepoWorkspaceRepo) {
-  return buildRepoWorkspacePresentation(repo, { loading: false, error: null, stale: false })
+function getTestGitWorkspacePanePresentation(repo: GitWorkspacePaneProjection) {
+  return buildGitWorkspacePanePresentation(repo, { loading: false, error: null, stale: false })
 }
 
-function repoWorkspaceRepo(repo: WorkspaceState): RepoWorkspaceRepo {
+function gitWorkspacePaneProjection(repo: WorkspaceState): GitWorkspacePaneProjection {
   if (repo.capability.kind !== 'git') throw new Error('expected Git workspace fixture')
   const branchModel = readRepoBranchQueryProjection(repo)
   if (!branchModel) throw new Error('missing branch read model')
@@ -201,7 +203,7 @@ afterEach(() => {
   setTerminalSessionCommandBridge(null)
 })
 
-describe('RepoWorkspaceToolbar', () => {
+describe('GitWorkspacePaneToolbar', () => {
   test('renders a status tab for a selected branch without a worktree', async () => {
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
     const { container: c, terminalTab } = renderToolbar({
@@ -478,7 +480,7 @@ describe('RepoWorkspaceToolbar', () => {
         ])}
       >
         <WorkspaceOpenExternallyMenu
-          repo={repoWorkspaceRepo(repo)}
+          repo={gitWorkspacePaneProjection(repo)}
           branch={createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })}
           branchActions={branchActions}
         />
@@ -499,7 +501,7 @@ describe('RepoWorkspaceToolbar', () => {
         ])}
       >
         <WorkspaceOpenExternallyMenu
-          repo={repoWorkspaceRepo(repo)}
+          repo={gitWorkspacePaneProjection(repo)}
           branch={createBranchSnapshot('feature/worktree', { worktree: { path: nextWorktreePath } })}
           branchActions={branchActions}
         />
@@ -1353,7 +1355,7 @@ function renderToolbar(options: {
   if (!options.loading) {
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
   }
-  const detail = getTestRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+  const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
   const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
     type: 'terminal',
     terminalSessionId: `term-${String(index + 1).repeat(21)}`,
@@ -1476,8 +1478,8 @@ function renderToolbar(options: {
       <PrimaryWindowNavigationProvider value={navigation}>
         <TerminalSessionContext value={commandContext}>
           <TerminalSessionReadContext value={readContext}>
-            <RepoWorkspaceToolbarHarness
-              repo={repoWorkspaceRepo(repo)}
+            <GitWorkspacePaneToolbarHarness
+              repo={gitWorkspacePaneProjection(repo)}
               detail={detail}
               workspacePaneId="workspace"
               workspacePaneRoute={workspacePaneRoute}
@@ -1519,9 +1521,9 @@ function renderToolbar(options: {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={commandContext}>
             <TerminalSessionReadContext value={readContext}>
-              <RepoWorkspaceToolbarHarness
-                repo={repoWorkspaceRepo(nextRepo)}
-                detail={getTestRepoWorkspacePresentation(repoWorkspaceRepo(nextRepo))}
+              <GitWorkspacePaneToolbarHarness
+                repo={gitWorkspacePaneProjection(nextRepo)}
+                detail={getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(nextRepo))}
                 workspacePaneId="workspace"
                 workspacePaneRoute={workspacePaneRoute}
                 trafficLightOffset={options.trafficLightOffset}

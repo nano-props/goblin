@@ -4,9 +4,9 @@ import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-na
 import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
 import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import {
-  createRepoWorkspaceTabModel,
-  isRepoWorkspaceRuntimeTab,
-} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+  createWorkspacePaneTabModel,
+  isWorkspacePaneRuntimeTab,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import {
   preferredWorkspacePaneTabForTarget,
@@ -31,7 +31,10 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
   if (!repo || repo.capability.kind !== 'git') return { kind: 'missing' }
   const branchModel = readRepoBranchSnapshotQueryProjection(repo)
   if (!branchModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
-  const target = workspacePaneTabsTargetForRepoBranch({ workspaceId: repo.id, branches: branchModel.branches }, branchName)
+  const target = workspacePaneTabsTargetForRepoBranch(
+    { workspaceId: repo.id, branches: branchModel.branches },
+    branchName,
+  )
   if (!target) return { kind: 'missing' }
   const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget({
     ...target,
@@ -48,7 +51,7 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
     workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreePath: workspacePaneTabsTargetWorktreePath(target),
   })
-  const model = createRepoWorkspaceTabModel({
+  const model = createWorkspacePaneTabModel({
     workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     worktreeHead: target.kind === 'git-worktree' ? { kind: 'branch', branchName } : undefined,
@@ -62,7 +65,7 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
   })
   const activeTab = model.activeTab
   if (!activeTab) return { kind: 'route', route: null }
-  if (isRepoWorkspaceRuntimeTab(activeTab)) {
+  if (isWorkspacePaneRuntimeTab(activeTab)) {
     if (activeTab.runtimeType === 'terminal') {
       return { kind: 'route', route: { kind: 'terminal', terminalSessionId: activeTab.sessionId } }
     }

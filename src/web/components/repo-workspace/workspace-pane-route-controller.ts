@@ -9,8 +9,8 @@ import { usePrimaryWindowNavigation, type PrimaryWindowNavigationActions } from 
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import type { RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
-import { useSyncRepoWorkspaceRuntimeTabSelection } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
+import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import { useSyncWorkspacePaneRuntimeTabSelection } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import {
   reconcileWorkspacePaneRoute,
   workspacePaneRouteHistoryResolution,
@@ -33,7 +33,7 @@ export interface WorkspacePaneRouteControllerInput {
   branchName: string | null
   worktreePath: string | null
   route: ParsedWorkspacePaneRouteTarget
-  model: RepoWorkspaceTabModel
+  model: WorkspacePaneTabModel
 }
 
 // Single side-effect boundary for URL-backed workspace-pane routes.
@@ -88,7 +88,7 @@ export function useWorkspacePaneRouteController({
     route,
     reconciliation,
   })
-  useSyncRepoWorkspaceRuntimeTabSelection(model, { enabled: enabled && reconciliation.kind === 'none' })
+  useSyncWorkspacePaneRuntimeTabSelection(model, { enabled: enabled && reconciliation.kind === 'none' })
   useReconcileWorkspacePaneRoute({
     enabled,
     workspaceId,

@@ -2,7 +2,7 @@
 
 import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { RepoWorkspaceLayoutSkeleton } from '#/web/components/Skeleton.tsx'
+import { WorkspaceLayoutSkeleton } from '#/web/components/Skeleton.tsx'
 
 vi.mock('#/web/components/SplitPane.tsx', () => ({
   SplitPane: ({ before, after }: { before: React.ReactNode; after: React.ReactNode }) => (
@@ -13,14 +13,14 @@ vi.mock('#/web/components/SplitPane.tsx', () => ({
   ),
 }))
 
-describe('RepoWorkspaceLayoutSkeleton', () => {
+describe('WorkspaceLayoutSkeleton', () => {
   test('shows branch rows and an empty workspace placeholder by default in split mode', () => {
-    const { container } = renderInJsdom(<RepoWorkspaceLayoutSkeleton />)
+    const { container } = renderInJsdom(<WorkspaceLayoutSkeleton />)
 
     expect(container.querySelectorAll('li')).toHaveLength(6)
     expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
-    expect(container.querySelector('[data-testid="repo-workspace-empty-skeleton"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="repo-workspace-skeleton"]')).toBeNull()
+    expect(container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).toBeNull()
     expect(container.querySelector('[data-testid="repo-workspace-skeleton-action"]')).toBeNull()
     // The current repo shell owns the sidebar chrome, so the
     // workspace skeleton no longer carries repo-level controls —
@@ -31,17 +31,17 @@ describe('RepoWorkspaceLayoutSkeleton', () => {
   })
 
   test('renders split workspace content when a repo workspace is selected', () => {
-    const { container } = renderInJsdom(<RepoWorkspaceLayoutSkeleton repoWorkspaceState="content" />)
+    const { container } = renderInJsdom(<WorkspaceLayoutSkeleton workspacePaneState="content" />)
 
     expect(container.querySelectorAll('li')).toHaveLength(14)
     expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
     expect(container.querySelector('[data-testid="mock-split-pane"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="repo-workspace-skeleton"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="repo-workspace-empty-skeleton"]')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).toBeNull()
   })
 
   test('renders a single Branch Navigator skeleton in single-pane mode', () => {
-    const { container } = renderInJsdom(<RepoWorkspaceLayoutSkeleton singlePane />)
+    const { container } = renderInJsdom(<WorkspaceLayoutSkeleton singlePane />)
 
     expect(container.querySelectorAll('li')).toHaveLength(6)
     expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
@@ -50,17 +50,17 @@ describe('RepoWorkspaceLayoutSkeleton', () => {
 
   test('renders a single Repo Workspace skeleton in selected single-pane mode', () => {
     const { container } = renderInJsdom(
-      <RepoWorkspaceLayoutSkeleton singlePane singlePaneView="workspace" repoWorkspaceState="content" />,
+      <WorkspaceLayoutSkeleton singlePane singlePaneView="workspace" workspacePaneState="content" />,
     )
 
     expect(container.querySelectorAll('li')).toHaveLength(8)
     expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(0)
-    expect(container.querySelector('[data-testid="repo-workspace-skeleton"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="mock-split-pane"]')).toBeNull()
   })
 
   test('sizes branch action placeholders like the icon-only action button', () => {
-    const { container } = renderInJsdom(<RepoWorkspaceLayoutSkeleton singlePane />)
+    const { container } = renderInJsdom(<WorkspaceLayoutSkeleton singlePane />)
 
     const action = container.querySelector('[data-testid="branch-navigator-skeleton-action"] > div')
     expect(action?.className).toContain('h-6')
@@ -68,7 +68,7 @@ describe('RepoWorkspaceLayoutSkeleton', () => {
   })
 
   test('uses the same row metrics as the real Branch Navigator list', () => {
-    const { container } = renderInJsdom(<RepoWorkspaceLayoutSkeleton singlePane />)
+    const { container } = renderInJsdom(<WorkspaceLayoutSkeleton singlePane />)
 
     const row = container.querySelector('li')
     const content = row?.firstElementChild

@@ -10,10 +10,10 @@ import {
 } from '#/web/components/create-worktree/create-worktree-bootstrap-host.logic.ts'
 import { ScrollPane } from '#/web/components/Layout.tsx'
 import {
-  RepoPageLoadingBody,
-  RepoPagePane,
-  RepoPageQuietLoadingBody,
-} from '#/web/components/repo-pages/RepoPagePane.tsx'
+  WorkspacePageLoadingBody,
+  WorkspacePagePane,
+  WorkspacePageQuietLoadingBody,
+} from '#/web/components/workspace-pages/WorkspacePagePane.tsx'
 import { useLoadingVisibility } from '#/web/hooks/useLoadingVisibility.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
@@ -117,7 +117,7 @@ export function CreateWorktreePagePane({
   if (holdLoadingPage) {
     return (
       <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={onCancel}>
-        {showLoadingSkeleton ? <RepoPageLoadingBody /> : <RepoPageQuietLoadingBody />}
+        {showLoadingSkeleton ? <WorkspacePageLoadingBody /> : <WorkspacePageQuietLoadingBody />}
       </CreateWorktreePageShell>
     )
   }
@@ -225,7 +225,7 @@ function CreateWorktreePageShell({
 }) {
   const t = useT()
   return (
-    <RepoPagePane
+    <WorkspacePagePane
       icon={GitBranchPlus}
       label={t('action.create-worktree-title')}
       compact={compact}
@@ -233,7 +233,7 @@ function CreateWorktreePageShell({
       onBack={onBack}
     >
       {children}
-    </RepoPagePane>
+    </WorkspacePagePane>
   )
 }
 

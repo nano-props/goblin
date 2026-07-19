@@ -1,7 +1,10 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
-import type { RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
-import type { CurrentRepoWorkspacePresentation, RepoWorkspaceRepo } from '#/web/components/repo-workspace/model.ts'
+import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import type {
+  CurrentGitWorkspacePanePresentation,
+  GitWorkspacePaneProjection,
+} from '#/web/components/repo-workspace/model.ts'
 import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/WorkspaceOpenExternallyMenu.tsx'
 import { WorkspacePaneTargetToolbar } from '#/web/components/workspace-pane/WorkspacePaneTargetToolbar.tsx'
 import type { WorkspacePaneSurfaceTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
@@ -14,17 +17,17 @@ import {
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 
 interface Props {
-  repo: RepoWorkspaceRepo
-  detail: CurrentRepoWorkspacePresentation
+  repo: GitWorkspacePaneProjection
+  detail: CurrentGitWorkspacePanePresentation
   workspacePaneId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-  workspacePaneTabModel: RepoWorkspaceTabModel
+  workspacePaneTabModel: WorkspacePaneTabModel
   trafficLightOffset?: boolean
   branchActions?: BranchActions
   onBackToBranchNavigator?: () => void
 }
 
-export function RepoWorkspaceToolbar({
+export function GitWorkspacePaneToolbar({
   repo,
   detail,
   workspacePaneId,

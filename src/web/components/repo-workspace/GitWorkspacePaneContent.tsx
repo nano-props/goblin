@@ -1,27 +1,30 @@
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
-import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
+import type {
+  CurrentGitWorkspacePanePresentation,
+  GitWorkspacePaneProjection,
+} from '#/web/components/repo-workspace/model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import type {
-  RepoWorkspaceTabModel,
-  RepoWorkspaceTab,
-  RepoWorkspaceSelection,
-  RepoWorkspaceRuntimeTabStateByType,
-} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+  WorkspacePaneTabModel,
+  WorkspacePaneTab,
+  WorkspacePaneSelection,
+  WorkspacePaneRuntimeTabStateByType,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import {
   workspacePaneRuntimeTabProvider,
   workspacePaneStaticTabProvider,
   type WorkspacePanePanelLabel,
 } from '#/web/workspace-pane/tab-providers.ts'
-import { renderRepoWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
+import { renderGitWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
 import { RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 
 interface Props {
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'workspaceRuntimeId' | 'branchModel' | 'ui' | 'probe'>
-  detail: CurrentRepoWorkspacePresentation
+  repo: Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'branchModel' | 'ui' | 'probe'>
+  detail: CurrentGitWorkspacePanePresentation
   workspacePaneId: string
-  workspacePaneTabModel: RepoWorkspaceTabModel
+  workspacePaneTabModel: WorkspacePaneTabModel
   onRetryStatus?: () => void
   onBackToBranchNavigator?: () => void
 }
@@ -31,7 +34,7 @@ interface Props {
 // never re-projects on snapshot refresh, branch switch, or session restore.
 // The tab model keeps the body render target separate from the active
 // materialized tab.
-export function RepoWorkspaceContent({
+export function GitWorkspacePaneContent({
   repo,
   detail,
   workspacePaneId,
@@ -86,7 +89,7 @@ export function RepoWorkspaceContent({
         />
       )}
       {renderedTab
-        ? renderRepoWorkspacePanePanel({
+        ? renderGitWorkspacePanePanel({
             type: renderedTab,
             repo,
             detail,
@@ -101,12 +104,12 @@ export function RepoWorkspaceContent({
 }
 
 function workspacePanePanelLabel(input: {
-  selection: RepoWorkspaceSelection | null
-  tabs: readonly RepoWorkspaceTab[]
+  selection: WorkspacePaneSelection | null
+  tabs: readonly WorkspacePaneTab[]
   workspacePaneId: string
   compact: boolean
   t: (key: string, params?: Record<string, string | number>) => string
-  runtimeTabStateByType: RepoWorkspaceRuntimeTabStateByType
+  runtimeTabStateByType: WorkspacePaneRuntimeTabStateByType
 }): WorkspacePanePanelLabel {
   const tab = input.selection?.kind === 'materialized-tab' ? input.selection.materializedTab : null
   if (tab?.kind === 'runtime') {

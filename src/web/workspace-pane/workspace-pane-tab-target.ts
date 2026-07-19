@@ -1,8 +1,8 @@
 import {
-  createRepoWorkspaceTabModel,
-  repoWorkspaceTabModelBlocksTabInteraction,
-  type RepoWorkspaceTabModel,
-} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+  createWorkspacePaneTabModel,
+  workspacePaneTabModelBlocksTabInteraction,
+  type WorkspacePaneTabModel,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
@@ -19,7 +19,7 @@ import {
 import type { GitHead } from '#/shared/git-head.ts'
 
 export type WorkspacePaneTabTargetResolution =
-  | { kind: 'ready'; target: RepoWorkspaceTabModel }
+  | { kind: 'ready'; target: WorkspacePaneTabModel }
   | { kind: 'missing' }
   | {
       kind: 'unavailable'
@@ -102,7 +102,7 @@ export function workspacePaneTabTargetForBranch(
   repoId: WorkspaceId,
   branchName: string,
   options: WorkspacePaneTabTargetOptions,
-): RepoWorkspaceTabModel | null {
+): WorkspacePaneTabModel | null {
   const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName, options)
   return resolution.kind === 'ready' ? resolution.target : null
 }
@@ -112,7 +112,7 @@ export function workspacePaneTabTargetForCreatedRuntime(
   canonicalBranch: string,
   worktreePath: string,
   options: WorkspacePaneTabTargetOptions,
-): RepoWorkspaceTabModel | null {
+): WorkspacePaneTabModel | null {
   const resolution = resolveWorkspacePaneTabTarget(repoId, canonicalBranch, worktreePath, options)
   return resolution.kind === 'ready' ? resolution.target : null
 }
@@ -120,7 +120,7 @@ export function workspacePaneTabTargetForCreatedRuntime(
 export function workspacePaneTabTargetForWorkspace(
   workspaceId: WorkspaceId,
   options: WorkspacePaneTabTargetOptions = workspacePanePreferenceTargetOptions,
-): RepoWorkspaceTabModel | null {
+): WorkspacePaneTabModel | null {
   const resolution = resolveWorkspacePaneTabTarget(workspaceId, null, workspaceId, options)
   return resolution.kind === 'ready' ? resolution.target : null
 }
@@ -163,7 +163,7 @@ function resolveWorkspacePaneTabTarget(
       : requiredGitWorkspacePaneTabsTarget(workspaceId, branchName, worktreePath)
   return {
     kind: 'ready',
-    target: createRepoWorkspaceTabModel({
+    target: createWorkspacePaneTabModel({
       workspaceId,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       paneTarget: preferenceTarget,
@@ -186,7 +186,7 @@ export function workspacePaneTabTargetForPaneTarget(
   paneTarget: WorkspacePaneTabsTarget,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
   worktreeHead?: GitHead,
-): RepoWorkspaceTabModel | null {
+): WorkspacePaneTabModel | null {
   const repo = useWorkspacesStore.getState().workspaces[paneTarget.workspaceId]
   if (!repo) return null
   if (paneTarget.kind !== 'workspace-root' && repo.capability.kind !== 'git') return null
@@ -201,7 +201,7 @@ export function workspacePaneTabTargetForPaneTarget(
     workspaceRuntimeId: repo.workspaceRuntimeId,
   })
   if (tabsProjection.phase !== 'ready') return null
-  return createRepoWorkspaceTabModel({
+  return createWorkspacePaneTabModel({
     workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     paneTarget,
@@ -278,10 +278,10 @@ function preferredWorkspacePaneTabForRoute(
   return null
 }
 
-export function workspacePaneTabTargetBlocksInteraction(model: RepoWorkspaceTabModel): boolean {
+export function workspacePaneTabTargetBlocksInteraction(model: WorkspacePaneTabModel): boolean {
   const target =
     model.branchName === null
       ? { kind: 'workspace-root' as const, workspaceId: model.workspaceId }
       : requiredGitWorkspacePaneTabsTarget(model.workspaceId, model.branchName, model.worktreePath)
-  return repoWorkspaceTabModelBlocksTabInteraction(model) || workspacePaneTabsInteractionBlockedForTarget(target)
+  return workspacePaneTabModelBlocksTabInteraction(model) || workspacePaneTabsInteractionBlockedForTarget(target)
 }
