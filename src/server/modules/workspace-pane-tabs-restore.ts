@@ -6,6 +6,7 @@ import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.t
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { ServerWorkspaceMatchOutcome } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import { workspaceGitProbeConclusion } from '#/server/modules/workspace-capability-transition.ts'
 
 interface WorkspacePaneTabsRestoreInput {
   userId: string
@@ -57,13 +58,13 @@ async function restoreWorkspacePaneTabsForWorkspaces(
   let repaired = false
   for (const workspace of workspaces) {
     input.signal?.throwIfAborted()
-    const targets = restorableTargetsForWorkspace(workspace)
-    if (!targets) continue
+    const admission = workspacePaneLayoutRestoreAdmission(workspace)
+    if (admission.kind === 'deferred') continue
     const result = await input.workspacePaneTabsHost.restoreTabs(input.userId, {
       workspaceId: workspace.workspaceId,
       workspaceRuntimeId: workspace.workspaceRuntimeId,
       expectedWorkspaceEntry: workspace.entry,
-      targets,
+      targets: admission.targets,
     })
     if (result.kind === 'membership-conflict') return result
     snapshots.push({
@@ -76,18 +77,22 @@ async function restoreWorkspacePaneTabsForWorkspaces(
   return { kind: 'restored' as const, snapshots, repaired }
 }
 
-function restorableTargetsForWorkspace(workspace: RestoredWorkspaceRuntime) {
-  if (workspace.workspaceProbe.status !== 'ready') return null
-  if (workspace.projection) {
-    const gitTargets = (workspace.projection.snapshot?.branches ?? []).flatMap((branch) => {
+type WorkspacePaneLayoutRestoreAdmission =
+  { kind: 'ready'; targets: RestorableWorkspacePaneTarget[] } | { kind: 'deferred' }
+
+function workspacePaneLayoutRestoreAdmission(workspace: RestoredWorkspaceRuntime): WorkspacePaneLayoutRestoreAdmission {
+  if (workspace.projection?.snapshot) {
+    const gitTargets = workspace.projection.snapshot.branches.flatMap((branch) => {
       const target: RestorableWorkspacePaneTarget | null = branch.worktree
         ? restorableWorktreeTarget(workspace.workspaceId, branch.worktree.path)
         : { kind: 'git-branch', branch: branch.name }
       return target ? [target] : []
     })
-    return [{ kind: 'workspace-root' as const }, ...gitTargets]
+    return { kind: 'ready', targets: [{ kind: 'workspace-root' }, ...gitTargets] }
   }
-  return [{ kind: 'workspace-root' as const }]
+  return workspaceGitProbeConclusion(workspace.workspaceProbe) === 'conclusive-unavailable'
+    ? { kind: 'ready', targets: [{ kind: 'workspace-root' }] }
+    : { kind: 'deferred' }
 }
 
 function restorableWorktreeTarget(workspaceId: WorkspaceId, nativePath: string): RestorableWorkspacePaneTarget | null {

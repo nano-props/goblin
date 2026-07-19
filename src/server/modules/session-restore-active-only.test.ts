@@ -153,8 +153,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(stub.projection).toBeNull()
     expect(stub.workspaceRuntimeId).toBe('runtime-goblin_file____repo_stub')
     expect(stub.name).toBe('repo')
-    // Every readable workspace contributes its workspace-level tabs scope;
-    // only the active repo performs the Git projection read.
+    // The non-active Git workspace has no complete target authority yet, so
+    // its entire layout remains deferred until lazy projection.
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
     expect(result.runtime.workspacePaneTabs).toEqual([
       {
@@ -162,12 +162,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
         workspaceRuntimeId: 'runtime-goblin_file____repo_active',
         snapshot: { revision: 0, entries: [] },
       },
-      {
-        workspaceId: 'goblin+file:///repo-stub',
-        workspaceRuntimeId: 'runtime-goblin_file____repo_stub',
-        snapshot: { revision: 0, entries: [] },
-      },
     ])
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledOnce()
   })
 
   test('converges to a repo added while restore is opening the original membership', async () => {
@@ -458,7 +454,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(result.status).toBe('restored')
   })
 
-  test('restores workspace-level layout when Git enrichment has a diagnostic', async () => {
+  test('keeps the complete layout deferred when Git enrichment has an operational diagnostic', async () => {
     const workspaceId = 'goblin+file:///repo'
     const workspace = {
       ...defaultServerWorkspaceState(),
@@ -488,12 +484,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(result.runtime.workspaces[0]).toMatchObject({ projection: null, workspaceProbe: { status: 'ready' } })
     expect(mocks.readRepoProjection).not.toHaveBeenCalled()
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).not.toHaveBeenCalled()
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
-      workspaceId: workspaceId,
-      workspaceRuntimeId: 'runtime-goblin_file____repo',
-      expectedWorkspaceEntry: { kind: 'local', id: workspaceId },
-      targets: [{ kind: 'workspace-root' }],
-    })
+    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
+    expect(result.runtime.workspacePaneTabs).toEqual([])
   })
 })
 

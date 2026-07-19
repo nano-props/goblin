@@ -107,7 +107,17 @@ async function projectWorkspace(
       mode: 'full',
     })
     assertCurrentWorkspaceRuntimeMembership(input)
-    if (!projection.snapshot) return null
+    if (!projection.snapshot) {
+      return {
+        entry,
+        workspaceId: entry.id,
+        workspaceRuntimeId: input.workspaceRuntimeId,
+        name: lifecycle.name,
+        target: lifecycle.lifecycle.target,
+        workspaceProbe,
+        projection: null,
+      }
+    }
     return {
       entry,
       workspaceId: entry.id,
@@ -159,7 +169,16 @@ async function projectWorkspace(
     mode: 'full',
   })
   assertCurrentWorkspaceRuntimeMembership(input)
-  if (!projection.snapshot) return null
+  if (!projection.snapshot) {
+    return {
+      entry,
+      workspaceId: entry.id,
+      workspaceRuntimeId: input.workspaceRuntimeId,
+      name: probe.name ?? workspaceDisplayName(entry.id),
+      workspaceProbe: probe,
+      projection: null,
+    }
+  }
   return {
     entry,
     workspaceId: entry.id,

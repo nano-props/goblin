@@ -297,6 +297,8 @@ describe('restoreServerWorkspace', () => {
         projection: null,
       }),
     ])
+    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
+    expect(result.runtime.workspacePaneTabs).toEqual([])
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 

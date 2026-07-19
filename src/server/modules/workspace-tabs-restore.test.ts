@@ -256,7 +256,7 @@ describe('restoreWorkspaceTabs', () => {
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
-    await restoreWorkspaceTabs({
+    const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: 'user-test',
       clientId: 'client_test000000000000',
@@ -266,6 +266,8 @@ describe('restoreWorkspaceTabs', () => {
     })
 
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).not.toHaveBeenCalled()
+    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
+    expect(result.snapshot).toBeNull()
   })
 
   test('restores workspace tabs for a lazy remote plain workspace', async () => {
@@ -446,18 +448,53 @@ describe('restoreWorkspaceTabs', () => {
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
-    await expect(
-      restoreWorkspaceTabs({
-        workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-        userId: 'user-test',
-        clientId: 'client_test000000000000',
-        workspaceId: LOCAL_WORKSPACE_ID,
-        workspaceRuntimeId: 'repo-runtime-test',
-        workspacePaneTabsHost,
-      }),
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
+    const result = await restoreWorkspaceTabs({
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      workspaceId: LOCAL_WORKSPACE_ID,
+      workspaceRuntimeId: 'repo-runtime-test',
+      workspacePaneTabsHost,
+    })
+    expect(result.workspace).toMatchObject({ workspaceId: LOCAL_WORKSPACE_ID, projection: null })
+    expect(result.snapshot).toBeNull()
+    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
     expect(mocks.acquireWorkspaceRuntimeLease).not.toHaveBeenCalled()
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
+  })
+
+  test('keeps the existing membership when lazy remote projection fails', async () => {
+    const remoteEntry = {
+      kind: 'remote' as const,
+      id: REMOTE_WORKSPACE_ID,
+      ref: { id: REMOTE_WORKSPACE_ID, alias: 'host', remotePath: '/repo', displayName: 'repo' },
+    }
+    mocks.getServerWorkspaceState.mockResolvedValue({
+      ...defaultServerWorkspaceState(),
+      openWorkspaceEntries: [remoteEntry],
+    })
+    mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
+      kind: 'settled',
+      lifecycle: { kind: 'ready', target: remoteEntry.ref },
+      name: 'repo',
+    })
+    mocks.workspaceProbeStateForRuntime.mockReturnValue(gitProbe())
+    mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
+
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const result = await restoreWorkspaceTabs({
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      workspaceId: remoteEntry.id,
+      workspaceRuntimeId: 'repo-runtime-test',
+      workspacePaneTabsHost,
+    })
+
+    expect(result.workspace).toMatchObject({ workspaceId: remoteEntry.id, target: remoteEntry.ref, projection: null })
+    expect(result.snapshot).toBeNull()
+    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
   })
 
   test('keeps the existing membership when lazy remote ensure fails', async () => {
