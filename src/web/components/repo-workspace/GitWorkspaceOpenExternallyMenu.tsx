@@ -16,7 +16,7 @@ import {
   workspaceExternalAppAvailable,
   type WorkspaceExternalAppItem,
 } from '#/web/external-workspace-apps.tsx'
-import { getRecentWorkspaceExternalAppId } from '#/shared/workspace-settings.ts'
+import { getRecentWorkspaceExternalAppId, workspaceExternalAppTargetForWorktree } from '#/shared/workspace-settings.ts'
 import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
 import { setRecentWorkspaceExternalAppPreference } from '#/web/settings-actions.ts'
 import { cn } from '#/web/lib/cn.ts'
@@ -39,9 +39,13 @@ export function GitWorkspaceOpenExternallyMenu({ repo, branch, branchActions }: 
   const finderAvailable = capabilities.canOpenFinder && hostPlatform === 'darwin'
   const { data: settingsSnapshot } = useSettingsSnapshotQuery()
   const workspaceSettings = settingsSnapshot?.workspaceSettings
+  const externalAppTarget = useMemo(
+    () => (branch.worktree ? workspaceExternalAppTargetForWorktree(repo.id, branch.worktree.path) : null),
+    [branch.worktree, repo.id],
+  )
   const serverRecentItemId = useMemo(
-    () => getRecentWorkspaceExternalAppId(workspaceSettings ?? [], repo.id, branch.worktree?.path),
-    [workspaceSettings, repo.id, branch.worktree?.path],
+    () => getRecentWorkspaceExternalAppId(workspaceSettings ?? [], repo.id, externalAppTarget),
+    [externalAppTarget, repo.id, workspaceSettings],
   )
   // Mirror the server-derived recent in local state so the split-button
   // primary icon swaps instantly on click, then re-syncs once the
@@ -79,7 +83,7 @@ export function GitWorkspaceOpenExternallyMenu({ repo, branch, branchActions }: 
     if (busy) return
     setOpen(false)
     const previousRecentItemId = recentItemId
-    const shouldWriteRecent = item.id !== recentItemId
+    const shouldWriteRecent = externalAppTarget !== null && item.id !== recentItemId
     if (shouldWriteRecent) {
       setRecentItemId(item.id)
     }
@@ -88,7 +92,7 @@ export function GitWorkspaceOpenExternallyMenu({ repo, branch, branchActions }: 
         try {
           await setRecentWorkspaceExternalAppPreference({
             workspaceId: repo.id,
-            worktreePath: branch.worktree?.path ?? null,
+            target: externalAppTarget,
             itemId: item.id,
           })
         } catch (err) {

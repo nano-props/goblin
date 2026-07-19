@@ -245,12 +245,11 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
   globalShortcutState: v.object({ registered: v.boolean() }),
   recentWorkspacesAdd: v.object({ workspace: WorkspaceSessionEntrySchema }),
   // Body for `POST /api/settings/workspace-external-app-recent`. The
-  // server-side mutator still re-validates workspaceId, worktreePath and
-  // itemId, including path and NUL checks, before touching disk; this
-  // schema only enforces the basic wire shape.
+  // The server re-validates that targetKey is canonical and belongs to
+  // workspaceId before touching disk.
   workspaceExternalAppRecentSet: v.object({
     workspaceId: WorkspaceIdSchema,
-    worktreePath: v.nullable(v.pipe(v.string(), v.minLength(1))),
+    targetKey: v.pipe(v.string(), v.minLength(1)),
     itemId: v.pipe(v.string(), v.minLength(1), v.maxLength(64)),
   }),
   githubCli: GITHUB_CLI_REFRESH_SCHEMA,

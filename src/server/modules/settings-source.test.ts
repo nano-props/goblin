@@ -439,7 +439,7 @@ test('clears workspace-level worktree bootstrap trust without dropping other wor
   })
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: '/repo-a-worktree',
+    targetKey: externalAppTargetKey('/repo-a-worktree'),
     itemId: 'editor:vscode',
   })
 
@@ -456,7 +456,7 @@ test('clears workspace-level worktree bootstrap trust without dropping other wor
   expect(await mod.getServerWorkspaceSettings()).toEqual([
     {
       workspaceId: REPO_A,
-      workspaceExternalAppRecent: { byWorktree: { '/repo-a-worktree': 'editor:vscode' } },
+      workspaceExternalAppRecent: { byTarget: { [externalAppTargetKey('/repo-a-worktree')]: 'editor:vscode' } },
     },
   ])
 })
@@ -487,7 +487,7 @@ test('normalizes workspace pane tab list in server sessions', async () => {
 
   const mod = await import('#/server/modules/settings-source.ts')
   const mainTargetKey = branchTargetKey(REPO_B, 'main')
-  const worktreeTargetKeyValue = worktreeTargetKey(REPO_B, 'feature/worktree', '/tmp/repo-b-worktree')
+  const worktreeTargetKeyValue = worktreeTargetKey('/tmp/repo-b-worktree')
   const emptyTargetKey = branchTargetKey(REPO_B, 'empty')
   const invalidTargetKey = branchTargetKey(REPO_B, 'invalid')
   await writeWorkspacePaneLayout(mod, REPO_B, {
@@ -525,7 +525,7 @@ test('normalizes workspace pane tab list in server sessions', async () => {
   })
 })
 
-test('records the most recent workspace external app per (repo, worktree)', async () => {
+test('records the most recent workspace external app per canonical filesystem target', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
@@ -534,17 +534,17 @@ test('records the most recent workspace external app per (repo, worktree)', asyn
 
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: '/repo-a/worktree-x',
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: '/repo-a/worktree-y',
+    targetKey: externalAppTargetKey('/repo-a/worktree-y'),
     itemId: 'terminal:ghostty',
   })
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: null,
+    targetKey: 'workspace-root',
     itemId: 'finder',
   })
 
@@ -552,10 +552,10 @@ test('records the most recent workspace external app per (repo, worktree)', asyn
     {
       workspaceId: REPO_A,
       workspaceExternalAppRecent: {
-        byWorktree: {
-          '/repo-a/worktree-x': 'editor:vscode',
-          '/repo-a/worktree-y': 'terminal:ghostty',
-          '': 'finder',
+        byTarget: {
+          [externalAppTargetKey('/repo-a/worktree-x')]: 'editor:vscode',
+          [externalAppTargetKey('/repo-a/worktree-y')]: 'terminal:ghostty',
+          'workspace-root': 'finder',
         },
       },
     },
@@ -568,10 +568,10 @@ test('records the most recent workspace external app per (repo, worktree)', asyn
     {
       workspaceId: REPO_A,
       workspaceExternalAppRecent: {
-        byWorktree: {
-          '/repo-a/worktree-x': 'editor:vscode',
-          '/repo-a/worktree-y': 'terminal:ghostty',
-          '': 'finder',
+        byTarget: {
+          [externalAppTargetKey('/repo-a/worktree-x')]: 'editor:vscode',
+          [externalAppTargetKey('/repo-a/worktree-y')]: 'terminal:ghostty',
+          'workspace-root': 'finder',
         },
       },
     },
@@ -587,12 +587,12 @@ test('overwrites an existing workspace external app recent on the same worktree 
 
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: '/repo-a/worktree-x',
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: '/repo-a/worktree-x',
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
 
@@ -600,8 +600,8 @@ test('overwrites an existing workspace external app recent on the same worktree 
     {
       workspaceId: REPO_A,
       workspaceExternalAppRecent: {
-        byWorktree: {
-          '/repo-a/worktree-x': 'editor:vscode',
+        byTarget: {
+          [externalAppTargetKey('/repo-a/worktree-x')]: 'editor:vscode',
         },
       },
     },
@@ -619,7 +619,7 @@ test('skips the file rewrite when the workspace external app recent is already c
 
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: '/repo-a/worktree-x',
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
   const mtimeBefore = (await fs.stat(dataFile)).mtimeMs
@@ -629,7 +629,7 @@ test('skips the file rewrite when the workspace external app recent is already c
 
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: '/repo-a/worktree-x',
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
 
@@ -637,7 +637,7 @@ test('skips the file rewrite when the workspace external app recent is already c
   expect(mtimeAfter).toBe(mtimeBefore)
 })
 
-test('rejects invalid workspace external app recent path and item without touching disk', async () => {
+test('rejects invalid workspace external app target and item without touching disk', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
@@ -646,17 +646,17 @@ test('rejects invalid workspace external app recent path and item without touchi
 
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: 'relative/path',
+    targetKey: 'git-worktree\0relative/path',
     itemId: 'editor:vscode',
   })
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: '/repo-a',
+    targetKey: externalAppTargetKey('/repo-a'),
     itemId: '',
   })
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: '/repo-a',
+    targetKey: externalAppTargetKey('/repo-a'),
     itemId: 'editor:vscode\0with-nul',
   })
 
@@ -667,9 +667,13 @@ function branchTargetKey(_workspaceId: string, branchName: string): string {
   return restorableWorkspacePaneTargetKey({ kind: 'git-branch', branch: branchName })
 }
 
-function worktreeTargetKey(_workspaceId: string, _branchName: string, worktreePath: string): string {
+function worktreeTargetKey(worktreePath: string): string {
   const root = requiredFileWorkspaceLocator(worktreePath)
   return restorableWorkspacePaneTargetKey({ kind: 'git-worktree', root })
+}
+
+function externalAppTargetKey(worktreePath: string): string {
+  return worktreeTargetKey(worktreePath)
 }
 
 function requiredFileWorkspaceLocator(worktreePath: string) {
@@ -691,16 +695,17 @@ test('normalizer drops malformed workspace external app recent entries on load',
         {
           workspaceId: REPO_A,
           workspaceExternalAppRecent: {
-            byWorktree: {
-              '/repo-a/worktree-x': 'editor:vscode',
+            byWorktree: { '/legacy/native/path': 'terminal:ghostty' },
+            byTarget: {
+              [externalAppTargetKey('/repo-a/worktree-x')]: 'editor:vscode',
               // Unknown item id (not in WORKSPACE_EXTERNAL_APP_IDS) —
               // the normalizer must drop the entry.
-              '/repo-a/worktree-y': 'editor:webstorm',
-              // Path-invalid entries (relative path, NUL byte) must
+              [externalAppTargetKey('/repo-a/worktree-y')]: 'editor:webstorm',
+              // Target-invalid entries (relative locator, NUL byte) must
               // also be dropped.
               'relative/path': 'editor:vscode',
               '/repo-a/nul\0key': 'editor:vscode',
-              '': 'finder',
+              'workspace-root': 'finder',
             },
           },
         },
@@ -715,15 +720,14 @@ test('normalizer drops malformed workspace external app recent entries on load',
     {
       workspaceId: REPO_A,
       workspaceExternalAppRecent: {
-        byWorktree: {
-          '/repo-a/worktree-x': 'editor:vscode',
-          '': 'finder',
+        byTarget: {
+          [externalAppTargetKey('/repo-a/worktree-x')]: 'editor:vscode',
+          'workspace-root': 'finder',
         },
       },
     },
   ])
 })
-
 
 test('setServerWorkspaceExternalAppRecent silently drops unknown item ids without overwriting valid entries', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
@@ -735,13 +739,13 @@ test('setServerWorkspaceExternalAppRecent silently drops unknown item ids withou
   // is dropped (not persisted) without losing the existing one.
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: '/repo-a/worktree-x',
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
 
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: '/repo-a/worktree-y',
+    targetKey: externalAppTargetKey('/repo-a/worktree-y'),
     itemId: 'editor:webstorm',
   })
 
@@ -750,8 +754,8 @@ test('setServerWorkspaceExternalAppRecent silently drops unknown item ids withou
     {
       workspaceId: REPO_A,
       workspaceExternalAppRecent: {
-        byWorktree: {
-          '/repo-a/worktree-x': 'editor:vscode',
+        byTarget: {
+          [externalAppTargetKey('/repo-a/worktree-x')]: 'editor:vscode',
         },
       },
     },
@@ -772,12 +776,12 @@ test('prunes removed-worktree settings without dropping repo-level trust', async
   })
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: '/repo-a/worktree-x',
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: '/repo-a/worktree-y',
+    targetKey: externalAppTargetKey('/repo-a/worktree-y'),
     itemId: 'terminal:ghostty',
   })
 
@@ -796,8 +800,8 @@ test('prunes removed-worktree settings without dropping repo-level trust', async
         trustedAt: expect.any(String),
       },
       workspaceExternalAppRecent: {
-        byWorktree: {
-          '/repo-a/worktree-y': 'terminal:ghostty',
+        byTarget: {
+          [externalAppTargetKey('/repo-a/worktree-y')]: 'terminal:ghostty',
         },
       },
     },
@@ -813,7 +817,7 @@ test('prunes empty workspace settings entries after removed-worktree cleanup', a
 
   await mod.setServerWorkspaceExternalAppRecent({
     workspaceId: REPO_A,
-    worktreePath: '/repo-a/worktree-x',
+    targetKey: externalAppTargetKey('/repo-a/worktree-x'),
     itemId: 'editor:vscode',
   })
 

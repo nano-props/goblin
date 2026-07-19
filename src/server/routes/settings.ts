@@ -126,11 +126,11 @@ export function createSettingsRoutes(options: {
   })
   app.post('/recent-workspaces/clear', async (c) => c.json(await handleClearRecentWorkspaces()))
   app.post('/workspace-external-app-recent', async (c) => {
-    const { workspaceId, worktreePath, itemId } = await parseHttpBody(
+    const { workspaceId, targetKey, itemId } = await parseHttpBody(
       SETTINGS_PROCEDURE_SCHEMAS.workspaceExternalAppRecentSet,
       c,
     )
-    return c.json(await handleSetWorkspaceExternalAppRecent({ workspaceId, worktreePath, itemId }))
+    return c.json(await handleSetWorkspaceExternalAppRecent({ workspaceId, targetKey, itemId }))
   })
   return app
 }

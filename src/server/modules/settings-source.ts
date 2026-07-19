@@ -1,10 +1,4 @@
-import path from 'node:path'
-import {
-  MAX_IPC_PATH_LENGTH,
-  toSafeWorkspaceLocator,
-  toSafeSessionPath,
-  toSafeWorkspaceSessionEntry,
-} from '#/shared/input-validation.ts'
+import { toSafeWorkspaceLocator, toSafeWorkspaceSessionEntry } from '#/shared/input-validation.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
   readUserSettingsJson,
@@ -22,6 +16,8 @@ import { recordWithoutKey } from '#/shared/record.ts'
 import {
   isKnownWorkspaceExternalAppItemId,
   isWorktreeBootstrapConfigHash,
+  parseWorkspaceExternalAppRecentKey,
+  workspaceExternalAppTargetForWorktree,
   type WorkspaceSettingsEntry,
   type WorkspaceExternalAppRecent,
   type WorktreeBootstrapTrust,
@@ -226,21 +222,22 @@ function normalizeWorktreeBootstrapTrust(value: unknown): WorktreeBootstrapTrust
   }
 }
 
-function normalizeWorkspaceExternalAppRecent(value: unknown): WorkspaceExternalAppRecent | undefined {
+function normalizeWorkspaceExternalAppRecent(
+  workspaceId: WorkspaceId,
+  value: unknown,
+): WorkspaceExternalAppRecent | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
   const raw = value as Partial<WorkspaceExternalAppRecent>
-  if (!raw.byWorktree || typeof raw.byWorktree !== 'object' || Array.isArray(raw.byWorktree)) return undefined
-  const byWorktree: Record<string, string> = {}
-  for (const [worktreePath, itemId] of Object.entries(raw.byWorktree)) {
-    if (typeof worktreePath !== 'string' || worktreePath.includes('\0')) continue
-    // Empty string is the reserved key for "no worktree" (bare repo);
-    // any other key must be an absolute path with no NULs.
-    if (worktreePath !== '' && (!path.isAbsolute(worktreePath) || worktreePath.length > MAX_IPC_PATH_LENGTH)) continue
+  if (!raw.byTarget || typeof raw.byTarget !== 'object' || Array.isArray(raw.byTarget)) return undefined
+  const byTarget: Record<string, string> = {}
+  for (const [targetKey, itemId] of Object.entries(raw.byTarget)) {
+    const target = parseWorkspaceExternalAppRecentKey(workspaceId, targetKey)
+    if (!target) continue
     if (!isKnownWorkspaceExternalAppItemId(itemId)) continue
-    byWorktree[worktreePath] = itemId
+    byTarget[workspaceExternalAppRecentKey(target)] = itemId
   }
-  if (Object.keys(byWorktree).length === 0) return undefined
-  return { byWorktree }
+  if (Object.keys(byTarget).length === 0) return undefined
+  return { byTarget }
 }
 
 interface RawWorkspaceSettingsEntry {
@@ -262,7 +259,7 @@ function normalizeWorkspaceSettings(value: unknown): WorkspaceSettingsEntry[] {
     const entry: WorkspaceSettingsEntry = { workspaceId }
     const worktreeBootstrapTrust = normalizeWorktreeBootstrapTrust(raw.worktreeBootstrapTrust)
     if (worktreeBootstrapTrust) entry.worktreeBootstrapTrust = worktreeBootstrapTrust
-    const workspaceExternalAppRecent = normalizeWorkspaceExternalAppRecent(raw.workspaceExternalAppRecent)
+    const workspaceExternalAppRecent = normalizeWorkspaceExternalAppRecent(workspaceId, raw.workspaceExternalAppRecent)
     if (workspaceExternalAppRecent) entry.workspaceExternalAppRecent = workspaceExternalAppRecent
     normalized.push(entry)
   }
@@ -281,7 +278,7 @@ function cloneWorkspaceSettings(workspaceSettings: readonly WorkspaceSettingsEnt
         }
       : {}),
     ...(entry.workspaceExternalAppRecent
-      ? { workspaceExternalAppRecent: { byWorktree: { ...entry.workspaceExternalAppRecent.byWorktree } } }
+      ? { workspaceExternalAppRecent: { byTarget: { ...entry.workspaceExternalAppRecent.byTarget } } }
       : {}),
   }))
 }
@@ -710,37 +707,29 @@ export async function untrustServerWorkspaceWorktreeBootstrapConfig(input: {
 }
 
 /**
- * Record the most recently chosen workspace external app id for a
- * (repo, worktree) scope. The split-button primary in the workspace
- * toolbar reads this on mount. No-op when the value is already current
- * — callers can fire on every selection without coordinating with the
- * server.
+ * Record the most recently chosen external app for one canonical
+ * Workspace filesystem target. No-op when the value is already current.
  */
 export async function setServerWorkspaceExternalAppRecent(input: {
   workspaceId: WorkspaceId
-  worktreePath: string | null
+  targetKey: string
   itemId: string
 }): Promise<WorkspaceSettingsEntry[]> {
   return await mutateUserSettings(async (data) => {
-    // Validate the worktree key: `null`/`undefined` collapses to "" (bare
-    // repo); otherwise the path must be a normalized absolute path with
-    // no NULs. `toSafeSessionPath` encodes the same validation used
-    // elsewhere in the codebase, so the rules can't drift.
-    const isBareRepoScope = input.worktreePath === null || input.worktreePath === undefined
-    const safeWorktreePath = isBareRepoScope ? null : toSafeSessionPath(input.worktreePath)
-    if ((!isBareRepoScope && safeWorktreePath === null) || !isKnownWorkspaceExternalAppItemId(input.itemId)) {
+    const target = parseWorkspaceExternalAppRecentKey(input.workspaceId, input.targetKey)
+    if (!target || !isKnownWorkspaceExternalAppItemId(input.itemId)) {
       return unchangedUserSettings(data, cloneWorkspaceSettings(data.workspaceSettings))
     }
-    const worktreeKey = workspaceExternalAppRecentKey(safeWorktreePath)
+    const targetKey = workspaceExternalAppRecentKey(target)
     // No-op when the value hasn't changed — keeps a no-op click from
     // triggering a full user-settings.json rewrite.
     const workspaceSettings = updateWorkspaceSettingsEntry(data.workspaceSettings, input.workspaceId, (existing) => {
-      const existingByWorktree = existing?.workspaceExternalAppRecent?.byWorktree ?? {}
-      if (existingByWorktree[worktreeKey] === input.itemId) return null
+      const existingByTarget = existing?.workspaceExternalAppRecent?.byTarget ?? {}
+      if (existingByTarget[targetKey] === input.itemId) return null
       return {
         workspaceId: input.workspaceId,
         ...existing,
-        workspaceExternalAppRecent: { byWorktree: { ...existingByWorktree, [worktreeKey]: input.itemId } },
+        workspaceExternalAppRecent: { byTarget: { ...existingByTarget, [targetKey]: input.itemId } },
       }
     })
     const nextData = workspaceSettings ? { ...data, workspaceSettings } : data
@@ -762,20 +751,20 @@ export async function pruneServerWorkspaceSettingsForRemovedWorktree(input: {
   worktreePath: string
 }): Promise<boolean> {
   return await mutateUserSettings(async (data) => {
-    const safeWorktreePath = toSafeSessionPath(input.worktreePath)
-    if (safeWorktreePath === null) return unchangedUserSettings(data, false)
-    const worktreeKey = workspaceExternalAppRecentKey(safeWorktreePath)
+    const target = workspaceExternalAppTargetForWorktree(input.workspaceId, input.worktreePath)
+    if (!target) return unchangedUserSettings(data, false)
+    const targetKey = workspaceExternalAppRecentKey(target)
     const existingIndex = data.workspaceSettings.findIndex((entry) => entry.workspaceId === input.workspaceId)
     if (existingIndex < 0) return unchangedUserSettings(data, false)
     const existing = data.workspaceSettings[existingIndex]
-    const existingByWorktree = existing.workspaceExternalAppRecent?.byWorktree
-    if (!existingByWorktree || !(worktreeKey in existingByWorktree)) return unchangedUserSettings(data, false)
+    const existingByTarget = existing.workspaceExternalAppRecent?.byTarget
+    if (!existingByTarget || !(targetKey in existingByTarget)) return unchangedUserSettings(data, false)
 
-    const nextByWorktree = { ...existingByWorktree }
-    delete nextByWorktree[worktreeKey]
+    const nextByTarget = { ...existingByTarget }
+    delete nextByTarget[targetKey]
     const nextEntry: WorkspaceSettingsEntry = { ...existing }
-    if (Object.keys(nextByWorktree).length > 0) {
-      nextEntry.workspaceExternalAppRecent = { byWorktree: nextByWorktree }
+    if (Object.keys(nextByTarget).length > 0) {
+      nextEntry.workspaceExternalAppRecent = { byTarget: nextByTarget }
     } else {
       delete nextEntry.workspaceExternalAppRecent
     }

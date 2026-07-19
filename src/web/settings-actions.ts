@@ -2,6 +2,7 @@
 // projects server-returned values into React Query.
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspaceExternalAppTarget } from '#/shared/workspace-settings.ts'
 import { settingsLog } from '#/web/logger.ts'
 import type { GlobalShortcutState, I18nSnapshot, ThemeState, WorkspaceRestoreResult } from '#/shared/api-types.ts'
 import {
@@ -156,7 +157,7 @@ export async function refreshGitHubCliDetection(hosts?: string[]): Promise<void>
 
 export async function setRecentWorkspaceExternalAppPreference(input: {
   workspaceId: WorkspaceId
-  worktreePath: string | null
+  target: WorkspaceExternalAppTarget
   itemId: string
 }): Promise<void> {
   const state = await setRecentWorkspaceExternalApp(input)

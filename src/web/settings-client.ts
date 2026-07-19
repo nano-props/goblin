@@ -21,6 +21,7 @@ import type {
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspaceExternalAppRecentKey, type WorkspaceExternalAppTarget } from '#/shared/workspace-settings.ts'
 import {
   nativeSettingsProjectionStateFromSettings,
   pickNativeSettingsProjectionPatch,
@@ -145,13 +146,17 @@ export async function clearRecentWorkspaces(): Promise<void> {
  */
 export async function setRecentWorkspaceExternalApp(input: {
   workspaceId: WorkspaceId
-  worktreePath: string | null
+  target: WorkspaceExternalAppTarget
   itemId: string
 }): Promise<WorkspaceSettingsState> {
   return await postServerJson<
-    { workspaceId: WorkspaceId; worktreePath: string | null; itemId: string },
+    { workspaceId: WorkspaceId; targetKey: string; itemId: string },
     { ok: true } & WorkspaceSettingsState
-  >('/api/settings/workspace-external-app-recent', input)
+  >('/api/settings/workspace-external-app-recent', {
+    workspaceId: input.workspaceId,
+    targetKey: workspaceExternalAppRecentKey(input.target),
+    itemId: input.itemId,
+  })
 }
 
 export async function restoreServerWorkspace(

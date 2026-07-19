@@ -5,6 +5,7 @@ import type { ComponentProps } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { workspaceExternalAppRecentKey, workspaceExternalAppTargetForWorktree } from '#/shared/workspace-settings.ts'
 import { GitWorkspacePaneToolbar } from '#/web/components/repo-workspace/GitWorkspacePaneToolbar.tsx'
 import { GitWorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/GitWorkspaceOpenExternallyMenu.tsx'
 import {
@@ -395,7 +396,11 @@ describe('GitWorkspacePaneToolbar', () => {
       expect.stringContaining('/api/settings/workspace-external-app-recent'),
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ workspaceId: REPO_ID, worktreePath: WORKTREE_PATH, itemId: 'finder' }),
+        body: JSON.stringify({
+          workspaceId: REPO_ID,
+          targetKey: externalAppTargetKey(WORKTREE_PATH),
+          itemId: 'finder',
+        }),
       }),
     )
     expect(workspaceExternalAppMocks.openWorkspaceInFinder).toHaveBeenCalledWith(
@@ -488,7 +493,10 @@ describe('GitWorkspacePaneToolbar', () => {
           {
             workspaceId: REPO_ID,
             workspaceExternalAppRecent: {
-              byWorktree: { [WORKTREE_PATH]: 'finder', [nextWorktreePath]: 'editor:vscode' },
+              byTarget: {
+                [externalAppTargetKey(WORKTREE_PATH)]: 'finder',
+                [externalAppTargetKey(nextWorktreePath)]: 'editor:vscode',
+              },
             },
           },
         ])}
@@ -509,7 +517,10 @@ describe('GitWorkspacePaneToolbar', () => {
           {
             workspaceId: REPO_ID,
             workspaceExternalAppRecent: {
-              byWorktree: { [WORKTREE_PATH]: 'finder', [nextWorktreePath]: 'editor:vscode' },
+              byTarget: {
+                [externalAppTargetKey(WORKTREE_PATH)]: 'finder',
+                [externalAppTargetKey(nextWorktreePath)]: 'editor:vscode',
+              },
             },
           },
         ])}
@@ -1672,7 +1683,7 @@ function mockRecentAppPostFetch(
         })
       }
       const body = init?.body
-        ? (JSON.parse(init.body as string) as { itemId: string; worktreePath: string | null; workspaceId: string })
+        ? (JSON.parse(init.body as string) as { itemId: string; targetKey: string; workspaceId: string })
         : null
       if (body) {
         currentSnapshot = {
@@ -1680,7 +1691,7 @@ function mockRecentAppPostFetch(
           workspaceSettings: [
             {
               workspaceId: body.workspaceId,
-              workspaceExternalAppRecent: { byWorktree: { [body.worktreePath ?? '']: body.itemId } },
+              workspaceExternalAppRecent: { byTarget: { [body.targetKey]: body.itemId } },
             },
           ],
         }
@@ -1700,6 +1711,12 @@ function mockRecentAppPostFetch(
   })
   vi.stubGlobal('fetch', fetchSpy)
   return fetchSpy
+}
+
+function externalAppTargetKey(worktreePath: string): string {
+  const target = workspaceExternalAppTargetForWorktree(REPO_ID, worktreePath)
+  if (!target) throw new Error('invalid external app target fixture')
+  return workspaceExternalAppRecentKey(target)
 }
 
 /**

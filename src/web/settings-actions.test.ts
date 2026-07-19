@@ -343,7 +343,7 @@ describe('settings actions', () => {
       workspaceSettings: [
         {
           workspaceId: WORKSPACE_A,
-          workspaceExternalAppRecent: { byWorktree: { 'goblin+file:///tmp/repo-a': 'editor:vscode' } },
+          workspaceExternalAppRecent: { byTarget: { 'workspace-root': 'editor:vscode' } },
         },
       ],
     })
@@ -351,7 +351,7 @@ describe('settings actions', () => {
 
     await setRecentWorkspaceExternalAppPreference({
       workspaceId: WORKSPACE_A,
-      worktreePath: 'goblin+file:///tmp/repo-a',
+      target: { kind: 'workspace-root' },
       itemId: 'editor:vscode',
     })
 
@@ -359,7 +359,7 @@ describe('settings actions', () => {
       workspaceSettings: [
         {
           workspaceId: WORKSPACE_A,
-          workspaceExternalAppRecent: { byWorktree: { 'goblin+file:///tmp/repo-a': 'editor:vscode' } },
+          workspaceExternalAppRecent: { byTarget: { 'workspace-root': 'editor:vscode' } },
         },
       ],
     })

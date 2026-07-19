@@ -38,7 +38,7 @@ export interface AddRecentWorkspaceInput {
 }
 export interface SetWorkspaceExternalAppRecentInput {
   workspaceId: WorkspaceId
-  worktreePath: string | null
+  targetKey: string
   itemId: string
 }
 

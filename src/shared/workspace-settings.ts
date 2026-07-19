@@ -1,18 +1,28 @@
+import { workspaceLocatorForPath, type WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import {
+  parseRestorableWorkspacePaneTargetKey,
+  restorableWorkspacePaneTargetKey,
+  workspacePaneTabsTargetFromRestorable,
+} from '#/shared/workspace-pane-tabs-target.ts'
+
 export interface WorktreeBootstrapTrust {
   configHash: string
   trustedAt: string
 }
 
 /**
- * Per-worktree record of the most recently chosen workspace external app
- * (the split-button primary in the workspace toolbar). The key is the
- * worktree's absolute path; an empty string represents the bare repo
- * (no worktree attached). Lives under
- * `WorkspaceSettingsEntry.workspaceExternalAppRecent.byWorktree`.
+ * Per-filesystem-target record of the most recently chosen external app.
+ * Keys use the canonical restorable target codec, never native paths.
  */
 export interface WorkspaceExternalAppRecent {
-  byWorktree: Record<string, string>
+  byTarget: Record<string, string>
 }
+
+export type WorkspaceExternalAppTarget = Extract<
+  RestorableWorkspacePaneTarget,
+  { kind: 'workspace-root' } | { kind: 'git-worktree' }
+>
 
 export interface WorkspaceSettingsEntry {
   workspaceId: WorkspaceId
@@ -74,28 +84,40 @@ export function isWorkspaceWorktreeBootstrapConfigTrusted(
   return workspaceSettingsEntry(workspaceSettings, workspaceId)?.worktreeBootstrapTrust?.configHash === configHash
 }
 
-/**
- * Encode the persisted recent-app key for a worktree scope. Path validation
- * and canonicalization happen on the server before writes; this shared helper
- * intentionally stays browser-pure so client readers can use the same key
- * shape without importing Node built-ins.
- */
-export function workspaceExternalAppRecentKey(worktreePath: string | null | undefined): string {
-  return worktreePath ?? ''
+/** Encode the persisted recent-app key through the canonical target codec. */
+export function workspaceExternalAppRecentKey(target: WorkspaceExternalAppTarget): string {
+  return restorableWorkspacePaneTargetKey(target)
+}
+
+export function parseWorkspaceExternalAppRecentKey(
+  workspaceId: WorkspaceId,
+  key: string,
+): WorkspaceExternalAppTarget | null {
+  const target = parseRestorableWorkspacePaneTargetKey(key)
+  if (!target || target.kind === 'git-branch') return null
+  if (restorableWorkspacePaneTargetKey(target) !== key) return null
+  return workspacePaneTabsTargetFromRestorable(workspaceId, target) ? target : null
+}
+
+export function workspaceExternalAppTargetForWorktree(
+  workspaceId: WorkspaceId,
+  worktreePath: string,
+): Extract<WorkspaceExternalAppTarget, { kind: 'git-worktree' }> | null {
+  const root = workspaceLocatorForPath(workspaceId, worktreePath)
+  return root ? { kind: 'git-worktree', root } : null
 }
 
 /**
  * Read the most recently chosen workspace-external-app id for a
- * (workspace, worktree) scope. Returns null when no entry exists for the workspace
- * or for that worktree.
+ * Workspace filesystem target. Returns null when no matching entry exists.
  */
 export function getRecentWorkspaceExternalAppId(
   workspaceSettings: readonly WorkspaceSettingsEntry[],
   workspaceId: WorkspaceId,
-  worktreePath: string | null | undefined,
+  target: WorkspaceExternalAppTarget | null,
 ): string | null {
-  const byWorktree = workspaceSettingsEntry(workspaceSettings, workspaceId)?.workspaceExternalAppRecent?.byWorktree
-  if (!byWorktree) return null
-  return byWorktree[workspaceExternalAppRecentKey(worktreePath)] ?? null
+  if (!target) return null
+  const byTarget = workspaceSettingsEntry(workspaceSettings, workspaceId)?.workspaceExternalAppRecent?.byTarget
+  if (!byTarget) return null
+  return byTarget[workspaceExternalAppRecentKey(target)] ?? null
 }
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
