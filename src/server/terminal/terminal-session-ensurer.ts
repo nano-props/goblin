@@ -145,14 +145,10 @@ class TerminalSessionEnsurer {
   ): Promise<TerminalSessionEnsureResult> {
     const execution = physicalWorktreeExecutionBinding(context.physicalWorktreeCapability)
     if (execution.kind !== 'local') return { ok: false, message: 'error.invalid-worktree-capability' }
-    const coordinates = terminalExecutionCoordinates(input.target)
-    const repoRoot = coordinates.workspaceId
     const worktreePath = execution.canonicalWorktreePath
     const env = this.options.gCommand
       ? (buildGoblinTerminalCommandEnvironment({
           ...this.options.gCommand,
-          repoRoot,
-          worktreePath,
         }) ?? undefined)
       : undefined
     const result = await this.options.manager.prepareSession({
