@@ -1,24 +1,31 @@
 import { describe, expect, test } from 'vitest'
-import { emptyLazyRepoTreeState, lazyRepoTreeReducer } from '#/web/filetree-lazy-state.ts'
-import type { RepoTreeNode } from '#/shared/api-types.ts'
+import {
+  emptyLazyWorkspaceFilesystemTreeState,
+  lazyWorkspaceFilesystemTreeReducer,
+} from '#/web/workspace-filesystem-lazy-state.ts'
+import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
 
-function node(id: string, parentId: string | null, kind: RepoTreeNode['kind'] = 'file'): RepoTreeNode {
+function node(
+  id: string,
+  parentId: string | null,
+  kind: WorkspaceFilesystemNode['kind'] = 'file',
+): WorkspaceFilesystemNode {
   const name = id.includes('/') ? id.slice(id.lastIndexOf('/') + 1) : id
   return { id, path: id, name, parentId, kind, status: 'clean', ...(kind === 'directory' ? { hasChildren: true } : {}) }
 }
 
 describe('filetree lazy state', () => {
   test('tracks loading and loaded prefixes around child reads', () => {
-    let state = emptyLazyRepoTreeState()
-    state = lazyRepoTreeReducer(state, { type: 'childrenLoading', prefix: 'src' })
+    let state = emptyLazyWorkspaceFilesystemTreeState()
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenLoading', prefix: 'src' })
     expect(state.loadingPrefixes.has('src')).toBe(true)
 
-    state = lazyRepoTreeReducer(state, {
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
       type: 'childrenLoaded',
       prefix: 'src',
       result: { nodes: [node('src/index.ts', 'src')], truncated: false },
     })
-    state = lazyRepoTreeReducer(state, { type: 'childrenSettled', prefix: 'src' })
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenSettled', prefix: 'src' })
 
     expect(state.loadingPrefixes.has('src')).toBe(false)
     expect(state.loadedPrefixes.has('src')).toBe(true)
@@ -26,31 +33,31 @@ describe('filetree lazy state', () => {
   })
 
   test('tracks child read failures by prefix and clears them on retry', () => {
-    let state = emptyLazyRepoTreeState()
-    state = lazyRepoTreeReducer(state, { type: 'childrenLoading', prefix: 'src' })
-    state = lazyRepoTreeReducer(state, { type: 'childrenFailed', prefix: 'src' })
-    state = lazyRepoTreeReducer(state, { type: 'childrenSettled', prefix: 'src' })
+    let state = emptyLazyWorkspaceFilesystemTreeState()
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenLoading', prefix: 'src' })
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenFailed', prefix: 'src' })
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenSettled', prefix: 'src' })
     expect(state.errorPrefixes.has('src')).toBe(true)
     expect(state.loadingPrefixes.has('src')).toBe(false)
 
-    state = lazyRepoTreeReducer(state, { type: 'childrenLoading', prefix: 'src' })
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenLoading', prefix: 'src' })
     expect(state.errorPrefixes.has('src')).toBe(false)
   })
 
   test('marks loaded prefixes for reload without dropping the current tree', () => {
-    let state = emptyLazyRepoTreeState()
-    state = lazyRepoTreeReducer(state, {
+    let state = emptyLazyWorkspaceFilesystemTreeState()
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
       type: 'childrenLoaded',
       prefix: '',
       result: { nodes: [node('src', null, 'directory')], truncated: false },
     })
-    state = lazyRepoTreeReducer(state, {
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
       type: 'childrenLoaded',
       prefix: 'src',
       result: { nodes: [node('src/index.ts', 'src')], truncated: false },
     })
 
-    state = lazyRepoTreeReducer(state, { type: 'markForReload' })
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'markForReload' })
 
     expect(state.loadedPrefixes.size).toBe(0)
     expect(state.reloadEpoch).toBe(1)
@@ -58,18 +65,18 @@ describe('filetree lazy state', () => {
   })
 
   test('replacing children prunes stale descendants', () => {
-    let state = emptyLazyRepoTreeState()
-    state = lazyRepoTreeReducer(state, {
+    let state = emptyLazyWorkspaceFilesystemTreeState()
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
       type: 'childrenLoaded',
       prefix: '',
       result: { nodes: [node('src', null, 'directory')], truncated: false },
     })
-    state = lazyRepoTreeReducer(state, {
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
       type: 'childrenLoaded',
       prefix: 'src',
       result: { nodes: [node('src/old.ts', 'src')], truncated: false },
     })
-    state = lazyRepoTreeReducer(state, {
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
       type: 'childrenLoaded',
       prefix: '',
       result: { nodes: [node('docs', null, 'directory')], truncated: false },

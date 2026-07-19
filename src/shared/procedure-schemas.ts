@@ -15,7 +15,7 @@ import {
   RemoteWorkspaceTargetSchema,
 } from '#/shared/api-types.ts'
 import { NativeHostProjectionSchema } from '#/shared/native-host-projection.ts'
-import { RepoTreePrefixSchema } from '#/shared/repo-tree-schema.ts'
+import { WorkspaceFilesystemPathSchema } from '#/shared/workspace-filesystem-schema.ts'
 import { GIT_HASH_RE } from '#/shared/git-types.ts'
 import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/workspace-settings.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
@@ -81,6 +81,24 @@ export const WORKSPACE_PROCEDURE_SCHEMAS = {
   }),
   runtimeList: EmptyBodySchema,
   runtimeClose: WorkspaceRuntimeCloseSchema,
+  tree: v.object({
+    target: WorkspacePaneFilesystemExecutionTargetSchema,
+    prefix: v.optional(WorkspaceFilesystemPathSchema),
+  }),
+  trashFile: v.object({
+    target: WorkspacePaneFilesystemExecutionTargetSchema,
+    path: WorkspaceFilesystemPathSchema,
+  }),
+  fileViewer: v.object({ target: WorkspacePaneFilesystemExecutionTargetSchema }),
+  openTerminal: v.object({
+    target: WorkspacePaneFilesystemExecutionTargetSchema,
+    app: TerminalAppSchema,
+  }),
+  openEditor: v.object({
+    target: WorkspacePaneFilesystemExecutionTargetSchema,
+    app: EditorAppSchema,
+  }),
+  openInFinder: v.object({ target: WorkspacePaneFilesystemExecutionTargetSchema }),
 } as const
 
 export const REPO_PROCEDURE_SCHEMAS = {
@@ -135,22 +153,6 @@ export const REPO_PROCEDURE_SCHEMAS = {
     workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     target: RepoUrlTargetSchema,
   }),
-  openTerminal: v.object({
-    workspaceId: WorkspaceIdSchema,
-    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
-    worktreePath: v.string(),
-    app: TerminalAppSchema,
-  }),
-  openEditor: v.object({
-    workspaceId: WorkspaceIdSchema,
-    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
-    worktreePath: v.string(),
-    app: EditorAppSchema,
-  }),
-  openInFinder: v.object({
-    workspaceId: WorkspaceIdSchema,
-    worktreePath: v.string(),
-  }),
   backgroundSyncRepos: v.object({ repoIds: StringArray }),
   probe: CwdInput,
   log: v.object({
@@ -161,23 +163,6 @@ export const REPO_PROCEDURE_SCHEMAS = {
     skip: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100_000))),
   }),
   patch: v.object({ cwd: WorkspaceIdSchema, workspaceRuntimeId: WorkspaceRuntimeIdSchema, worktreePath: v.string() }),
-  // Filesystem-target-scoped file tree (docs/filetree.md). The route
-  // returns direct children of `prefix`; omitted prefix means the root.
-  tree: v.object({
-    target: WorkspacePaneFilesystemExecutionTargetSchema,
-    prefix: v.optional(RepoTreePrefixSchema),
-  }),
-  trashFile: v.object({
-    cwd: WorkspaceIdSchema,
-    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
-    worktreePath: v.string(),
-    path: RepoTreePrefixSchema,
-  }),
-  fileViewer: v.object({
-    cwd: WorkspaceIdSchema,
-    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
-    worktreePath: v.string(),
-  }),
   projection: v.object({
     cwd: WorkspaceIdSchema,
     workspaceRuntimeId: WorkspaceRuntimeIdSchema,

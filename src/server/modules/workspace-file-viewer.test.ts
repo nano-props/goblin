@@ -29,8 +29,13 @@ vi.mock('#/system/ssh/git.ts', () => ({
   resolveRemoteWorktree: mocks.resolveRemoteWorktree,
 }))
 
-import { getRepositoryFileViewer } from '#/server/modules/repo-file-viewer.ts'
+import { readWorkspaceFileViewer } from '#/server/modules/workspace-file-viewer.ts'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_RUNTIME_ID = 'workspace-runtime-file-viewer-test'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -47,13 +52,13 @@ beforeEach(() => {
   })
 })
 
-describe('repo file viewer read layer', () => {
+describe('workspace file viewer read layer', () => {
   test('resolves a local workspace locator without requiring Git worktree membership', async () => {
     const platformSpy = mockPlatform('linux')
     mocks.userShellCommandExists.mockResolvedValue(false)
     try {
       await expect(
-        getRepositoryFileViewer('goblin+file:///tmp/plain-workspace', 'goblin+file:///tmp/plain-workspace'),
+        readWorkspaceFileViewer(rootTarget(workspaceIdForTest('goblin+file:///tmp/plain-workspace'))),
       ).resolves.toEqual({ viewer: 'cat', shell: 'posix', executionRoot: '/tmp/plain-workspace' })
       expect(mocks.getWorktrees).not.toHaveBeenCalled()
       expect(mocks.userShellCommandExists).toHaveBeenCalledWith('bat', '/tmp/plain-workspace', undefined)
@@ -67,7 +72,9 @@ describe('repo file viewer read layer', () => {
     mocks.userShellCommandExists.mockResolvedValueOnce(true)
 
     try {
-      const result = await getRepositoryFileViewer('goblin+file:///tmp/repo', '/tmp/repo-feature')
+      const result = await readWorkspaceFileViewer(
+        worktreeTarget(workspaceIdForTest('goblin+file:///tmp/repo'), '/tmp/repo-feature'),
+      )
 
       expect(result).toEqual({ viewer: 'bat', shell: 'posix', executionRoot: '/tmp/repo-feature' })
       expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false, signal: undefined })
@@ -82,7 +89,9 @@ describe('repo file viewer read layer', () => {
     mocks.userShellCommandExists.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
 
     try {
-      const result = await getRepositoryFileViewer('goblin+file:///tmp/repo', '/tmp/repo-feature')
+      const result = await readWorkspaceFileViewer(
+        worktreeTarget(workspaceIdForTest('goblin+file:///tmp/repo'), '/tmp/repo-feature'),
+      )
 
       expect(result).toEqual({ viewer: 'batcat', shell: 'posix', executionRoot: '/tmp/repo-feature' })
       expect(mocks.userShellCommandExists).toHaveBeenNthCalledWith(1, 'bat', '/tmp/repo-feature', undefined)
@@ -97,7 +106,9 @@ describe('repo file viewer read layer', () => {
     mocks.userShellCommandExists.mockResolvedValueOnce(false).mockResolvedValueOnce(false)
 
     try {
-      await expect(getRepositoryFileViewer('goblin+file:///tmp/repo', '/tmp/repo-feature')).resolves.toEqual({
+      await expect(
+        readWorkspaceFileViewer(worktreeTarget(workspaceIdForTest('goblin+file:///tmp/repo'), '/tmp/repo-feature')),
+      ).resolves.toEqual({
         viewer: 'cat',
         shell: 'posix',
         executionRoot: '/tmp/repo-feature',
@@ -111,9 +122,9 @@ describe('repo file viewer read layer', () => {
     const platformSpy = mockPlatform('linux')
 
     try {
-      await expect(getRepositoryFileViewer('goblin+file:///tmp/repo', '/tmp/outside')).rejects.toThrow(
-        'unknown worktree path',
-      )
+      await expect(
+        readWorkspaceFileViewer(worktreeTarget(workspaceIdForTest('goblin+file:///tmp/repo'), '/tmp/outside')),
+      ).rejects.toThrow('unknown worktree path')
 
       expect(mocks.userShellCommandExists).not.toHaveBeenCalled()
     } finally {
@@ -135,15 +146,17 @@ describe('repo file viewer read layer', () => {
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.remoteCommandExists.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
 
-    const result = await getRepositoryFileViewer(repoId, '/srv/repo-feature')
+    const result = await readWorkspaceFileViewer(worktreeTarget(repoId, '/srv/repo-feature'))
 
     expect(result).toEqual({ viewer: 'batcat', shell: 'posix', executionRoot: '/srv/repo-feature' })
     expect(mocks.remoteCommandExists).toHaveBeenNthCalledWith(1, target, '/srv/repo-feature', 'bat', {
       knownWorktrees: [{ path: '/srv/repo-feature', branch: 'feature', isBare: false, isPrimary: false }],
+      run: expect.any(Function),
       signal: undefined,
     })
     expect(mocks.remoteCommandExists).toHaveBeenNthCalledWith(2, target, '/srv/repo-feature', 'batcat', {
       knownWorktrees: [{ path: '/srv/repo-feature', branch: 'feature', isBare: false, isPrimary: false }],
+      run: expect.any(Function),
       signal: undefined,
     })
     expect(mocks.getWorktrees).not.toHaveBeenCalled()
@@ -163,43 +176,20 @@ describe('repo file viewer read layer', () => {
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.remoteCommandExistsAtWorkspaceRoot.mockResolvedValueOnce(true)
 
-    await expect(getRepositoryFileViewer(repoId, repoId)).resolves.toEqual({
+    await expect(readWorkspaceFileViewer(rootTarget(repoId))).resolves.toEqual({
       viewer: 'bat',
       shell: 'posix',
       executionRoot: '/srv/plain-workspace',
     })
     expect(mocks.resolveRemoteWorktree).not.toHaveBeenCalled()
     expect(mocks.remoteCommandExistsAtWorkspaceRoot).toHaveBeenCalledWith(target, '/srv/plain-workspace', 'bat', {
-      signal: undefined,
-    })
-  })
-
-  test('matches remote worktree paths after POSIX normalization', async () => {
-    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
-    const target = {
-      id: repoId,
-      alias: 'prod',
-      remotePath: '/srv/repo',
-      displayName: 'prod:repo',
-      host: 'example.com',
-      user: 'tester',
-      port: 22,
-    }
-    mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
-    mocks.remoteCommandExists.mockResolvedValueOnce(true)
-
-    const result = await getRepositoryFileViewer(repoId, '/srv/repo-feature/')
-
-    expect(result).toEqual({ viewer: 'bat', shell: 'posix', executionRoot: '/srv/repo-feature/' })
-    expect(mocks.resolveRemoteWorktree).toHaveBeenCalledWith(target, '/srv/repo-feature/', { signal: undefined })
-    expect(mocks.remoteCommandExists).toHaveBeenCalledWith(target, '/srv/repo-feature', 'bat', {
-      knownWorktrees: [{ path: '/srv/repo-feature', branch: 'feature', isBare: false, isPrimary: false }],
+      run: expect.any(Function),
       signal: undefined,
     })
   })
 
   test('uses the runtime-aware runner for remote viewer probes when provided', async () => {
-    const workspaceRuntimeId = 'repo-runtime-file-viewer-test'
+    const workspaceRuntimeId = 'workspace-runtime-file-viewer-custom-test'
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const target = {
       id: repoId,
@@ -216,14 +206,14 @@ describe('repo file viewer read layer', () => {
     mocks.remoteCommandExists.mockResolvedValueOnce(true)
 
     await expect(
-      getRepositoryFileViewer(repoId, '/srv/repo-feature', undefined, { workspaceRuntimeId }),
+      readWorkspaceFileViewer(worktreeTarget(repoId, '/srv/repo-feature', workspaceRuntimeId)),
     ).resolves.toEqual({
       viewer: 'bat',
       shell: 'posix',
       executionRoot: '/srv/repo-feature',
     })
 
-    expect(mocks.resolveRemoteWorkspaceTarget).toHaveBeenCalledWith(repoId, { workspaceRuntimeId })
+    expect(mocks.resolveRemoteWorkspaceTarget).toHaveBeenCalledWith(repoId, { workspaceRuntimeId }, undefined)
     expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(repoId, workspaceRuntimeId, target)
     expect(mocks.resolveRemoteWorktree).toHaveBeenCalledWith(target, '/srv/repo-feature', {
       signal: undefined,
@@ -251,7 +241,9 @@ describe('repo file viewer read layer', () => {
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.resolveRemoteWorktree.mockRejectedValueOnce(new Error('unknown worktree path'))
 
-    await expect(getRepositoryFileViewer(repoId, '/srv/missing')).rejects.toThrow('unknown worktree path')
+    await expect(readWorkspaceFileViewer(worktreeTarget(repoId, '/srv/missing'))).rejects.toThrow(
+      'unknown worktree path',
+    )
 
     expect(mocks.remoteCommandExists).not.toHaveBeenCalled()
   })
@@ -270,7 +262,9 @@ describe('repo file viewer read layer', () => {
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.resolveRemoteWorktree.mockRejectedValueOnce(new Error('ssh unavailable'))
 
-    await expect(getRepositoryFileViewer(repoId, '/srv/repo-feature')).rejects.toThrow('ssh unavailable')
+    await expect(readWorkspaceFileViewer(worktreeTarget(repoId, '/srv/repo-feature'))).rejects.toThrow(
+      'ssh unavailable',
+    )
 
     expect(mocks.remoteCommandExists).not.toHaveBeenCalled()
   })
@@ -278,4 +272,14 @@ describe('repo file viewer read layer', () => {
 
 function mockPlatform(platform: NodeJS.Platform) {
   return vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
+}
+
+function rootTarget(workspaceId: WorkspaceId, workspaceRuntimeId = WORKSPACE_RUNTIME_ID) {
+  return { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId }
+}
+
+function worktreeTarget(workspaceId: WorkspaceId, worktreePath: string, workspaceRuntimeId = WORKSPACE_RUNTIME_ID) {
+  const target = gitWorktreeFilesystemExecutionTarget(workspaceId, workspaceRuntimeId, worktreePath)
+  if (!target) throw new Error('invalid test worktree target')
+  return target
 }

@@ -4,19 +4,19 @@ import path from 'node:path'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
-  MAX_REPO_TREE_NODES,
-  type RepoTreeSourceOptions,
-  getRepoTreeSourceLocal,
-  getRepoTreeSourceRemote,
-  getWorkspaceTreeSourceLocal,
-  getWorkspaceTreeSourceRemote,
-} from '#/server/modules/repo-tree-source.ts'
-import { buildChildNodes, buildLimitedChildNodes } from '#/server/modules/repo-tree-source-pure.ts'
+  MAX_WORKSPACE_FILESYSTEM_NODES,
+  type WorkspaceFilesystemSourceOptions,
+  readGitWorktreeFilesystemSourceLocal,
+  readGitWorktreeFilesystemSourceRemote,
+  readWorkspaceFilesystemSourceLocal,
+  readWorkspaceFilesystemSourceRemote,
+} from '#/server/modules/workspace-filesystem-source.ts'
+import { buildChildNodes, buildLimitedChildNodes } from '#/server/modules/workspace-filesystem-source-pure.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 async function makeTempWorktree(files: Record<string, string>): Promise<string> {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'repo-tree-source-'))
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'workspace-filesystem-source-'))
   await execa('git', ['-C', root, 'init', '-q'])
   // Isolate from the host machine's global gitignore (`core.excludesFile`).
   // Without this, a developer's personal excludes (e.g. a global rule for
@@ -31,7 +31,7 @@ async function makeTempWorktree(files: Record<string, string>): Promise<string> 
   return root
 }
 
-describe('repo-tree-source — local direct children', () => {
+describe('workspace-filesystem-source — local direct children', () => {
   let worktree: string | null = null
 
   beforeEach(() => {
@@ -45,7 +45,7 @@ describe('repo-tree-source — local direct children', () => {
   test('rejects when the signal is already aborted', async () => {
     const controller = new AbortController()
     controller.abort()
-    await expect(getRepoTreeSourceLocal('/tmp', {}, controller.signal)).rejects.toThrow('aborted')
+    await expect(readGitWorktreeFilesystemSourceLocal('/tmp', {}, controller.signal)).rejects.toThrow('aborted')
   })
 
   test('returns only root direct children', async () => {
@@ -55,7 +55,7 @@ describe('repo-tree-source — local direct children', () => {
       'README.md': '',
     })
 
-    const result = await getRepoTreeSourceLocal(worktree, {}, undefined)
+    const result = await readGitWorktreeFilesystemSourceLocal(worktree, {}, undefined)
     expect(result.nodes).toEqual([
       expect.objectContaining({ id: 'src', parentId: null, kind: 'directory', hasChildren: true }),
       expect.objectContaining({ id: 'README.md', parentId: null, kind: 'file' }),
@@ -70,7 +70,7 @@ describe('repo-tree-source — local direct children', () => {
       'plain-workspace/visible.txt': 'visible',
     })
 
-    const result = await getWorkspaceTreeSourceLocal(path.join(worktree, 'plain-workspace'), {}, undefined)
+    const result = await readWorkspaceFilesystemSourceLocal(path.join(worktree, 'plain-workspace'), {}, undefined)
 
     expect(result.nodes.map((node) => node.name).sort()).toEqual(['ignored.txt', 'visible.txt'])
   })
@@ -82,7 +82,7 @@ describe('repo-tree-source — local direct children', () => {
       'docs/readme.md': '',
     })
 
-    const result = await getRepoTreeSourceLocal(worktree, { prefix: 'src' }, undefined)
+    const result = await readGitWorktreeFilesystemSourceLocal(worktree, { prefix: 'src' }, undefined)
     expect(result.nodes).toEqual([
       expect.objectContaining({ id: 'src/sub', parentId: 'src', kind: 'directory', hasChildren: true }),
       expect.objectContaining({ id: 'src/a.ts', parentId: 'src', kind: 'file' }),
@@ -100,7 +100,7 @@ describe('repo-tree-source — local direct children', () => {
       'README.md': '',
     })
 
-    const result = await getRepoTreeSourceLocal(worktree, {}, undefined)
+    const result = await readGitWorktreeFilesystemSourceLocal(worktree, {}, undefined)
     const ids = result.nodes.map((node) => node.id)
     expect(ids).toContain('src')
     expect(ids).toContain('README.md')
@@ -123,31 +123,31 @@ describe('repo-tree-source — local direct children', () => {
     })
     await execa('git', ['-C', worktree, 'add', '-f', '.env', 'secrets/tracked.txt'])
 
-    const result = await getRepoTreeSourceLocal(worktree, {}, undefined)
+    const result = await readGitWorktreeFilesystemSourceLocal(worktree, {}, undefined)
     const ids = result.nodes.map((node) => node.id)
     expect(ids).toContain('.env')
     expect(ids).toContain('secrets')
     expect(ids).toContain('README.md')
     expect(ids).not.toContain('build')
 
-    const secrets = await getRepoTreeSourceLocal(worktree, { prefix: 'secrets' }, undefined)
+    const secrets = await readGitWorktreeFilesystemSourceLocal(worktree, { prefix: 'secrets' }, undefined)
     expect(secrets.nodes.map((node) => node.id)).toEqual(['secrets/tracked.txt'])
   })
 
   test('rejects when the worktree path does not exist', async () => {
     const missing = path.join(os.tmpdir(), 'definitely-not-a-real-path-' + Date.now())
-    await expect(getRepoTreeSourceLocal(missing, {}, undefined)).rejects.toThrow()
+    await expect(readGitWorktreeFilesystemSourceLocal(missing, {}, undefined)).rejects.toThrow()
   })
 
   test('rejects unsafe prefixes before filesystem reads', async () => {
     worktree = await makeTempWorktree({ 'src/a.ts': '' })
-    await expect(getRepoTreeSourceLocal(worktree, { prefix: '../secret' }, undefined)).rejects.toThrow(
+    await expect(readGitWorktreeFilesystemSourceLocal(worktree, { prefix: '../secret' }, undefined)).rejects.toThrow(
       'invalid tree prefix',
     )
   })
 })
 
-describe('repo-tree-source — buildChildNodes pure helper', () => {
+describe('workspace-filesystem-source — buildChildNodes pure helper', () => {
   test('sorts directories before files and rejects nested entries', () => {
     const nodes = buildChildNodes({
       prefix: 'src',
@@ -169,10 +169,10 @@ describe('repo-tree-source — buildChildNodes pure helper', () => {
   })
 
   test('truncates large direct-child result sets', () => {
-    const entries = Array.from({ length: MAX_REPO_TREE_NODES + 16 }, (_, index) => `f${index}.txt`)
-    const result = buildLimitedChildNodes({ prefix: '', entries, maxNodes: MAX_REPO_TREE_NODES })
+    const entries = Array.from({ length: MAX_WORKSPACE_FILESYSTEM_NODES + 16 }, (_, index) => `f${index}.txt`)
+    const result = buildLimitedChildNodes({ prefix: '', entries, maxNodes: MAX_WORKSPACE_FILESYSTEM_NODES })
 
-    expect(result.nodes).toHaveLength(MAX_REPO_TREE_NODES)
+    expect(result.nodes).toHaveLength(MAX_WORKSPACE_FILESYSTEM_NODES)
     expect(result.truncated).toBe(true)
   })
 })
@@ -203,7 +203,7 @@ const NUL = String.fromCharCode(0)
 
 function makeRemoteInput(
   worktreePath: string,
-  options: RepoTreeSourceOptions = {},
+  options: WorkspaceFilesystemSourceOptions = {},
   signal: AbortSignal | undefined = undefined,
 ) {
   return {
@@ -214,7 +214,7 @@ function makeRemoteInput(
   }
 }
 
-describe('repo-tree-source — remote direct children', () => {
+describe('workspace-filesystem-source — remote direct children', () => {
   beforeEach(() => {
     remoteMocks.getRemoteTreeWalk.mockReset()
     remoteMocks.getRemoteDirectoryWalk.mockReset()
@@ -224,7 +224,9 @@ describe('repo-tree-source — remote direct children', () => {
     const controller = new AbortController()
     controller.abort()
     await expect(
-      getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', {}, controller.signal)),
+      readGitWorktreeFilesystemSourceRemote(
+        makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', {}, controller.signal),
+      ),
     ).rejects.toThrow('aborted')
     expect(remoteMocks.getRemoteTreeWalk).not.toHaveBeenCalled()
   })
@@ -237,7 +239,7 @@ describe('repo-tree-source — remote direct children', () => {
       ),
     })
 
-    const result = await getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature'))
+    const result = await readGitWorktreeFilesystemSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature'))
     expect(result.nodes).toEqual([
       expect.objectContaining({ id: 'src', parentId: null, kind: 'directory', hasChildren: true }),
       expect.objectContaining({ id: 'README.md', parentId: null, kind: 'file' }),
@@ -247,7 +249,7 @@ describe('repo-tree-source — remote direct children', () => {
   test('reads an authorized workspace root without invoking Git membership', async () => {
     remoteMocks.getRemoteDirectoryWalk.mockResolvedValueOnce({ ok: true, message: 'README.md' })
 
-    const result = await getWorkspaceTreeSourceRemote(makeRemoteInput('/srv/workspace'))
+    const result = await readWorkspaceFilesystemSourceRemote(makeRemoteInput('/srv/workspace'))
 
     expect(remoteMocks.getRemoteDirectoryWalk).toHaveBeenCalledWith(
       remoteTarget(),
@@ -261,7 +263,9 @@ describe('repo-tree-source — remote direct children', () => {
   test('passes prefix to the remote tree walk', async () => {
     remoteMocks.getRemoteTreeWalk.mockResolvedValueOnce({ ok: true, message: 'src/a.ts' })
 
-    await getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', { prefix: 'src' }))
+    await readGitWorktreeFilesystemSourceRemote(
+      makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', { prefix: 'src' }),
+    )
 
     expect(remoteMocks.getRemoteTreeWalk).toHaveBeenCalledWith(
       remoteTarget(),
@@ -281,7 +285,7 @@ describe('repo-tree-source — remote direct children', () => {
       ].join(NUL),
     })
 
-    const result = await getRepoTreeSourceRemote(
+    const result = await readGitWorktreeFilesystemSourceRemote(
       makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', { prefix: 'src' }),
     )
     expect(result.nodes.map((node) => node.id)).toEqual(['src/a.ts'])
@@ -289,9 +293,9 @@ describe('repo-tree-source — remote direct children', () => {
 
   test('rejects when the remote walk fails', async () => {
     remoteMocks.getRemoteTreeWalk.mockResolvedValueOnce({ ok: false, message: 'no worktree found' })
-    await expect(getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature'))).rejects.toThrow(
-      'no worktree found',
-    )
+    await expect(
+      readGitWorktreeFilesystemSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature')),
+    ).rejects.toThrow('no worktree found')
   })
 })
 

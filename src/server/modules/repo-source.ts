@@ -112,6 +112,8 @@ export interface RepoMutationResult extends ExecResult {
    * command result is a partial failure after an earlier write succeeded.
    */
   affectedRepoIds?: readonly string[]
+  /** Filesystem roots whose checked-out contents changed during the mutation. */
+  affectedWorktreePaths?: readonly string[]
 }
 
 export type WorkspacePaneTargetIdentity =

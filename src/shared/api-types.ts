@@ -46,7 +46,11 @@ import { RemoteAbsolutePathSchema } from '#/shared/remote-workspace-schema.ts'
 import type { CreateWorktreeIpcInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceSettingsEntry } from '#/shared/workspace-settings.ts'
-import type { WorkspaceCapabilities, WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
+import type {
+  WorkspaceCapabilities,
+  WorkspacePaneFilesystemExecutionTarget,
+  WorkspaceProbeState,
+} from '#/shared/workspace-runtime.ts'
 
 export type { SettingsPage } from '#/shared/settings-pages.ts'
 export type {
@@ -251,38 +255,38 @@ export interface RepoSnapshot {
   remote?: RepoRemoteInfo
 }
 
-// Worktree-scoped file tree types — see docs/filetree.md. Wire and
+// Workspace-filesystem-scoped tree types — see docs/filetree.md. Wire and
 // domain shapes coincide in v1; if they diverge, move these into a
 // dedicated `src/shared/filetree.ts` and map at the hook boundary.
 
-export type RepoTreeNodeStatus = 'clean' | 'modified' | 'staged' | 'untracked' | 'ignored'
+export type WorkspaceFilesystemNodeStatus = 'clean' | 'modified' | 'staged' | 'untracked' | 'ignored'
 
-export interface RepoTreeNode {
-  /** Stable id: relative POSIX path inside the worktree. */
+export interface WorkspaceFilesystemNode {
+  /** Stable id: relative POSIX path inside the filesystem root. */
   readonly id: string
-  /** Relative POSIX path inside the worktree (matches id; named for readability). */
+  /** Relative POSIX path inside the filesystem root (matches id; named for readability). */
   readonly path: string
   /** Final path segment, used as the display name. */
   readonly name: string
   readonly parentId: string | null
   readonly kind: 'directory' | 'file'
-  readonly status: RepoTreeNodeStatus
+  readonly status: WorkspaceFilesystemNodeStatus
   /** Present for lazily-loaded directory rows when the server knows the directory has children. */
   readonly hasChildren?: boolean
 }
 
-export interface RepoTreeResult {
-  readonly nodes: ReadonlyArray<RepoTreeNode>
+export interface WorkspaceFilesystemTreeResult {
+  readonly nodes: ReadonlyArray<WorkspaceFilesystemNode>
   /** True if the direct-children result was truncated by the node-count cap. */
   readonly truncated: boolean
 }
 
-export type RepoFileViewer = 'bat' | 'batcat' | 'cat' | 'type'
-export type RepoFileViewerShell = 'posix' | 'cmd'
+export type WorkspaceFileViewer = 'bat' | 'batcat' | 'cat' | 'type'
+export type WorkspaceFileViewerShell = 'posix' | 'cmd'
 
-export interface RepoFileViewerResult {
-  readonly viewer: RepoFileViewer
-  readonly shell: RepoFileViewerShell
+export interface WorkspaceFileViewerResult {
+  readonly viewer: WorkspaceFileViewer
+  readonly shell: WorkspaceFileViewerShell
   readonly executionRoot: string
 }
 
@@ -423,6 +427,15 @@ export interface AppIpcHandlers {
       released: boolean
       runtimeClosed: boolean
     }>
+    tree: (input: {
+      target: WorkspacePaneFilesystemExecutionTarget
+      prefix?: string
+    }) => Promise<WorkspaceFilesystemTreeResult>
+    trashFile: (input: { target: WorkspacePaneFilesystemExecutionTarget; path: string }) => Promise<ExecResult>
+    fileViewer: (input: { target: WorkspacePaneFilesystemExecutionTarget }) => Promise<WorkspaceFileViewerResult>
+    openTerminal: (input: { target: WorkspacePaneFilesystemExecutionTarget; app: TerminalApp }) => Promise<ExecResult>
+    openEditor: (input: { target: WorkspacePaneFilesystemExecutionTarget; app: EditorApp }) => Promise<ExecResult>
+    openInFinder: (input: { target: WorkspacePaneFilesystemExecutionTarget }) => Promise<ExecResult>
   }
   repo: {
     probe: (input: { cwd: string }) => Promise<ProbeResult>
@@ -439,12 +452,6 @@ export interface AppIpcHandlers {
       includeSettled?: boolean
     }) => Promise<RepoOperationsSnapshot>
     patch: (input: { cwd: string; workspaceRuntimeId: string; worktreePath: string }) => Promise<ExecResult>
-    trashFile: (input: {
-      cwd: string
-      workspaceRuntimeId: string
-      worktreePath: string
-      path: string
-    }) => Promise<ExecResult>
     deleteBranch: (input: {
       cwd: string
       workspaceRuntimeId: string
@@ -476,18 +483,6 @@ export interface AppIpcHandlers {
     push: (input: { cwd: string; workspaceRuntimeId: string; branch: string }) => Promise<ExecResult>
     fetch: (input: { cwd: string; workspaceRuntimeId: string }) => Promise<ExecResult>
     openUrl: (input: { cwd: string; workspaceRuntimeId: string; target: RepoUrlTarget }) => Promise<ExecResult>
-    openTerminal: (input: {
-      workspaceId: WorkspaceId
-      workspaceRuntimeId: string
-      worktreePath: string
-      app: TerminalApp
-    }) => Promise<ExecResult>
-    openEditor: (input: {
-      workspaceId: WorkspaceId
-      workspaceRuntimeId: string
-      worktreePath: string
-      app: EditorApp
-    }) => Promise<ExecResult>
     openRemote: (input: { cwd: string; branch?: string }) => Promise<ExecResult>
   }
   remote: {

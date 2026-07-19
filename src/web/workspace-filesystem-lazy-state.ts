@@ -1,30 +1,30 @@
-import type { RepoTreeNode, RepoTreeResult } from '#/shared/api-types.ts'
+import type { WorkspaceFilesystemNode, WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
 
-export interface LazyRepoTreeAggregate {
-  readonly nodes: ReadonlyArray<RepoTreeNode>
+export interface LazyWorkspaceFilesystemTreeAggregate {
+  readonly nodes: ReadonlyArray<WorkspaceFilesystemNode>
   readonly truncated: boolean
 }
 
-export interface LazyRepoTreeState {
-  readonly nodesById: ReadonlyMap<string, RepoTreeNode>
+export interface LazyWorkspaceFilesystemTreeState {
+  readonly nodesById: ReadonlyMap<string, WorkspaceFilesystemNode>
   readonly childIdsByParentId: ReadonlyMap<string | null, readonly string[]>
   readonly truncatedPrefixes: ReadonlySet<string>
   readonly loadedPrefixes: ReadonlySet<string>
   readonly loadingPrefixes: ReadonlySet<string>
   readonly errorPrefixes: ReadonlySet<string>
   readonly reloadEpoch: number
-  readonly result: LazyRepoTreeAggregate
+  readonly result: LazyWorkspaceFilesystemTreeAggregate
 }
 
-export type LazyRepoTreeAction =
-  | { readonly type: 'replace'; readonly state: LazyRepoTreeState }
+export type LazyWorkspaceFilesystemTreeAction =
+  | { readonly type: 'replace'; readonly state: LazyWorkspaceFilesystemTreeState }
   | { readonly type: 'markForReload' }
   | { readonly type: 'childrenLoading'; readonly prefix: string }
-  | { readonly type: 'childrenLoaded'; readonly prefix: string; readonly result: RepoTreeResult }
+  | { readonly type: 'childrenLoaded'; readonly prefix: string; readonly result: WorkspaceFilesystemTreeResult }
   | { readonly type: 'childrenFailed'; readonly prefix: string }
   | { readonly type: 'childrenSettled'; readonly prefix: string }
 
-export function emptyLazyRepoTreeState(): LazyRepoTreeState {
+export function emptyLazyWorkspaceFilesystemTreeState(): LazyWorkspaceFilesystemTreeState {
   return {
     nodesById: new Map(),
     childIdsByParentId: new Map(),
@@ -37,7 +37,10 @@ export function emptyLazyRepoTreeState(): LazyRepoTreeState {
   }
 }
 
-export function lazyRepoTreeReducer(state: LazyRepoTreeState, action: LazyRepoTreeAction): LazyRepoTreeState {
+export function lazyWorkspaceFilesystemTreeReducer(
+  state: LazyWorkspaceFilesystemTreeState,
+  action: LazyWorkspaceFilesystemTreeAction,
+): LazyWorkspaceFilesystemTreeState {
   switch (action.type) {
     case 'replace':
       return action.state
@@ -68,7 +71,11 @@ export function lazyRepoTreeReducer(state: LazyRepoTreeState, action: LazyRepoTr
   return exhaustive
 }
 
-function mergeChildren(current: LazyRepoTreeState, prefix: string, result: RepoTreeResult): LazyRepoTreeState {
+function mergeChildren(
+  current: LazyWorkspaceFilesystemTreeState,
+  prefix: string,
+  result: WorkspaceFilesystemTreeResult,
+): LazyWorkspaceFilesystemTreeState {
   const parentId = prefix || null
   const nodesById = new Map(current.nodesById)
   const childIdsByParentId = new Map(current.childIdsByParentId)
@@ -102,7 +109,7 @@ function mergeChildren(current: LazyRepoTreeState, prefix: string, result: RepoT
 
 function removeSubtree(
   id: string,
-  nodesById: Map<string, RepoTreeNode>,
+  nodesById: Map<string, WorkspaceFilesystemNode>,
   childIdsByParentId: Map<string | null, readonly string[]>,
 ): void {
   const childIds = childIdsByParentId.get(id) ?? []

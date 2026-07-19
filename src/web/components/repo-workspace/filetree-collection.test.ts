@@ -1,19 +1,19 @@
 import { describe, expect, test } from 'vitest'
 import { buildFiletreeCollection } from '#/web/components/repo-workspace/filetree-collection.ts'
-import type { LazyRepoTreeAggregate } from '#/web/filetree-lazy-state.ts'
-import type { RepoTreeNode } from '#/shared/api-types.ts'
+import type { LazyWorkspaceFilesystemTreeAggregate } from '#/web/workspace-filesystem-lazy-state.ts'
+import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
 
-function fileNode(id: string, parentId: string | null = null): RepoTreeNode {
+function fileNode(id: string, parentId: string | null = null): WorkspaceFilesystemNode {
   const name = id.includes('/') ? id.slice(id.lastIndexOf('/') + 1) : id
   return { id, path: id, name, parentId, kind: 'file', status: 'clean' }
 }
 
-function dirNode(id: string, parentId: string | null = null): RepoTreeNode {
+function dirNode(id: string, parentId: string | null = null): WorkspaceFilesystemNode {
   const name = id.includes('/') ? id.slice(id.lastIndexOf('/') + 1) : id
   return { id, path: id, name, parentId, kind: 'directory', status: 'clean', hasChildren: true }
 }
 
-function aggregate(nodes: ReadonlyArray<RepoTreeNode>): LazyRepoTreeAggregate {
+function aggregate(nodes: ReadonlyArray<WorkspaceFilesystemNode>): LazyWorkspaceFilesystemTreeAggregate {
   return { nodes, truncated: false }
 }
 

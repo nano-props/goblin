@@ -1,4 +1,4 @@
-import type { RepoFileViewerResult } from '#/shared/api-types.ts'
+import type { WorkspaceFileViewerResult } from '#/shared/api-types.ts'
 import { shellEscapePath } from '#/web/clipboard/terminal-path-write.ts'
 
 export function absoluteFilePathForTerminal(executionRoot: string, filePath: string): string {
@@ -9,12 +9,12 @@ export function absoluteFilePathForTerminal(executionRoot: string, filePath: str
   return `${normalizedRoot}/${filePath}`
 }
 
-export function fileReadCommand(reader: Pick<RepoFileViewerResult, 'viewer' | 'shell'>, filePath: string): string {
+export function fileReadCommand(reader: Pick<WorkspaceFileViewerResult, 'viewer' | 'shell'>, filePath: string): string {
   const quotedPath = reader.shell === 'cmd' ? cmdQuotePath(filePath) : shellEscapePath(filePath)
   return `${fileReadViewerCommand(reader.viewer)} ${quotedPath}\r`
 }
 
-function fileReadViewerCommand(viewer: RepoFileViewerResult['viewer']): string {
+function fileReadViewerCommand(viewer: WorkspaceFileViewerResult['viewer']): string {
   return viewer === 'bat' || viewer === 'batcat' ? `${viewer} --paging=never --style=plain` : viewer
 }
 

@@ -13,14 +13,6 @@ import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/repo')
-function treeTarget(workspaceRuntimeId: string) {
-  return {
-    kind: 'git-worktree' as const,
-    workspaceId: WORKSPACE_ID,
-    workspaceRuntimeId,
-    root: 'goblin+file:///tmp/repo/.worktrees/feature',
-  }
-}
 
 const mocks = vi.hoisted(() => ({
   probeRepo: vi.fn(),
@@ -39,17 +31,12 @@ const mocks = vi.hoisted(() => ({
   getRepoWorktreeBootstrapPreview: vi.fn(),
   deleteRepoBranch: vi.fn(),
   removeCapturedRepoWorktree: vi.fn(),
-  openRepoTerminal: vi.fn(),
   openRepoUrl: vi.fn(),
-  openRepoEditor: vi.fn(),
-  openRepoInFinder: vi.fn(),
   setBackgroundSyncRepos: vi.fn(),
   getBackgroundSyncRepos: vi.fn(),
   getServerFetchIntervalSec: vi.fn(),
-  getRepositoryTree: vi.fn(),
-  getRepositoryFileViewer: vi.fn(),
-  trashRepositoryFile: vi.fn(),
   publishRepoQueryInvalidation: vi.fn(),
+  publishUserWorkspaceFilesystemInvalidation: vi.fn(),
   publishUserWorkspaceRuntimeInvalidation: vi.fn(),
 }))
 
@@ -71,15 +58,6 @@ vi.mock('#/server/modules/workspace-probe.ts', () => ({
   probeLocalWorkspace: mocks.probeLocalWorkspace,
   probeWorkspace: mocks.probeWorkspace,
 }))
-vi.mock('#/server/modules/repo-tree.ts', () => ({
-  getRepositoryTree: mocks.getRepositoryTree,
-}))
-vi.mock('#/server/modules/repo-file-viewer.ts', () => ({
-  getRepositoryFileViewer: mocks.getRepositoryFileViewer,
-}))
-vi.mock('#/server/modules/repo-tree-trash.ts', () => ({
-  trashRepositoryFile: mocks.trashRepositoryFile,
-}))
 vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   cloneRepo: mocks.cloneRepo,
   pullRepoBranch: mocks.pullRepoBranch,
@@ -88,16 +66,14 @@ vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   deleteRepoBranch: mocks.deleteRepoBranch,
   removeCapturedRepoWorktree: mocks.removeCapturedRepoWorktree,
   fetchRepo: mocks.fetchRepo,
-  openRepoTerminal: mocks.openRepoTerminal,
   openRepoUrl: mocks.openRepoUrl,
-  openRepoEditor: mocks.openRepoEditor,
-  openRepoInFinder: mocks.openRepoInFinder,
 }))
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerFetchIntervalSec: mocks.getServerFetchIntervalSec,
 }))
 vi.mock('#/server/modules/invalidation-broker.ts', () => ({
   publishRepoQueryInvalidation: mocks.publishRepoQueryInvalidation,
+  publishUserWorkspaceFilesystemInvalidation: mocks.publishUserWorkspaceFilesystemInvalidation,
   publishUserWorkspaceRuntimeInvalidation: mocks.publishUserWorkspaceRuntimeInvalidation,
 }))
 vi.mock('#/server/common/identity.ts', () => ({
@@ -118,6 +94,7 @@ beforeEach(() => {
     diagnostics: [],
   })
   mocks.probeWorkspace.mockImplementation(mocks.probeLocalWorkspace)
+  mocks.pullRepoBranch.mockResolvedValue({ ok: true, message: '' })
 })
 
 function createTestRepoRoutes(
@@ -517,29 +494,6 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       mock: mocks.getRepoWorktreeBootstrapPreview,
     },
     {
-      name: 'tree',
-      path: '/tree',
-      body: (repoId: string, workspaceRuntimeId: string) => ({
-        target: {
-          kind: 'git-worktree',
-          workspaceId: repoId,
-          workspaceRuntimeId: workspaceRuntimeId,
-          root: 'goblin+ssh://prod/home/alice/service/.worktrees/feature',
-        },
-      }),
-      mock: mocks.getRepositoryTree,
-    },
-    {
-      name: 'file-viewer',
-      path: '/file-viewer',
-      body: (repoId: string, workspaceRuntimeId: string) => ({
-        cwd: repoId,
-        workspaceRuntimeId,
-        worktreePath: '/home/alice/service/.worktrees/feature',
-      }),
-      mock: mocks.getRepositoryFileViewer,
-    },
-    {
       name: 'open-url',
       path: '/open-url',
       body: (repoId: string, workspaceRuntimeId: string) => ({
@@ -548,17 +502,6 @@ describe('repo routes — POST body validation (read endpoints)', () => {
         target: { type: 'branch' as const, branch: 'feature/work' },
       }),
       mock: mocks.openRepoUrl,
-    },
-    {
-      name: 'trash-file',
-      path: '/trash-file',
-      body: (repoId: string, workspaceRuntimeId: string) => ({
-        cwd: repoId,
-        workspaceRuntimeId,
-        worktreePath: '/home/alice/service/.worktrees/feature',
-        path: 'src/index.ts',
-      }),
-      mock: mocks.trashRepositoryFile,
     },
   ])('marks remote lifecycle failed when /$name hits transport failure', async ({ path, body, mock }) => {
     const app = createTestRepoRoutes()
@@ -618,199 +561,40 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     await expectRemoteRuntimeFailed(app, repoId, workspaceRuntimeId)
   })
 
-  test('passes /tree requests through to the read layer', async () => {
-    mocks.getRepositoryTree.mockResolvedValueOnce({
-      nodes: [
-        { id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' },
-        {
-          id: 'src/index.ts',
-          path: 'src/index.ts',
-          name: 'index.ts',
-          parentId: 'src',
-          kind: 'file',
-          status: 'modified',
-        },
-      ],
-      truncated: false,
+  test('publishes exact filesystem invalidations for worktrees changed by pull', async () => {
+    const app = createTestRepoRoutes()
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+    const worktreePath = '/tmp/repo-worktree'
+    mocks.pullRepoBranch.mockResolvedValueOnce({
+      ok: true,
+      message: '',
+      affectedWorktreePaths: [worktreePath, worktreePath],
     })
-    const app = createTestRepoRoutes()
-    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+
     const response = await app.request(
-      new Request('http://localhost/tree', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          target: treeTarget(workspaceRuntimeId),
-          prefix: 'src',
-        }),
-      }),
-    )
-    expect(response.status).toBe(200)
-    const json = (await response.json()) as { nodes: Array<{ id: string }>; truncated: boolean }
-    expect(json.nodes.map((n) => n.id)).toEqual(['src', 'src/index.ts'])
-    expect(json.truncated).toBe(false)
-    expect(mocks.getRepositoryTree).toHaveBeenCalledWith(treeTarget(workspaceRuntimeId), {
-      prefix: 'src',
-      workspaceRuntimeId,
-      signal: expect.any(AbortSignal),
-    })
-  })
-
-  test('passes the HTTP request signal into /tree reads', async () => {
-    mocks.getRepositoryTree.mockResolvedValueOnce({ nodes: [], truncated: false })
-    const app = createTestRepoRoutes()
-    const workspaceRuntimeId = await openTestWorkspaceRuntime()
-    const response = await app.request(
-      new Request('http://localhost/tree', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ target: treeTarget(workspaceRuntimeId) }),
-      }),
-    )
-
-    expect(response.status).toBe(200)
-    const options = mocks.getRepositoryTree.mock.calls[0]?.[1] as { signal?: AbortSignal } | undefined
-    expect(options).toEqual({ prefix: undefined, workspaceRuntimeId, signal: expect.any(AbortSignal) })
-  })
-
-  test('returns 400 when /tree prefix is invalid', async () => {
-    const app = createTestRepoRoutes()
-    const workspaceRuntimeId = await openTestWorkspaceRuntime()
-    const response = await app.request(
-      new Request('http://localhost/tree', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ target: treeTarget(workspaceRuntimeId), prefix: '../secret' }),
-      }),
-    )
-    expect(response.status).toBe(400)
-    expect(mocks.getRepositoryTree).not.toHaveBeenCalled()
-  })
-
-  test('returns 400 before the read layer for a cross-transport tree target', async () => {
-    const app = createTestRepoRoutes()
-    const workspaceRuntimeId = await openTestWorkspaceRuntime()
-    const response = await app.request(
-      new Request('http://localhost/tree', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          target: {
-            kind: 'git-worktree',
-            workspaceId: WORKSPACE_ID,
-            workspaceRuntimeId: workspaceRuntimeId,
-            root: 'goblin+file:///C:/mock-worktree',
-          },
-        }),
-      }),
-    )
-
-    expect(response.status).toBe(400)
-    expect(mocks.getRepositoryTree).not.toHaveBeenCalled()
-  })
-
-  test('hard-fails when /tree read fails', async () => {
-    mocks.getRepositoryTree.mockRejectedValueOnce(new Error('boom'))
-    const app = createTestRepoRoutes()
-    const workspaceRuntimeId = await openTestWorkspaceRuntime()
-    const response = await app.request(
-      new Request('http://localhost/tree', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ target: treeTarget(workspaceRuntimeId) }),
-      }),
-    )
-    expect(response.status).toBe(500)
-  })
-
-  test('passes /file-viewer requests through to the read layer', async () => {
-    mocks.getRepositoryFileViewer.mockResolvedValueOnce({
-      viewer: 'bat',
-      shell: 'posix',
-      executionRoot: '/tmp/repo/.worktrees/feature',
-    })
-    const app = createTestRepoRoutes()
-    const workspaceRuntimeId = await openTestWorkspaceRuntime()
-    const response = await app.request(
-      new Request('http://localhost/file-viewer', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
-      }),
-    )
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({
-      viewer: 'bat',
-      shell: 'posix',
-      executionRoot: '/tmp/repo/.worktrees/feature',
-    })
-    expect(mocks.getRepositoryFileViewer).toHaveBeenCalledWith(
-      WORKSPACE_ID,
-      '/tmp/repo/.worktrees/feature',
-      expect.any(AbortSignal),
-      { workspaceRuntimeId },
-    )
-  })
-
-  test('hard-fails when /file-viewer read fails', async () => {
-    mocks.getRepositoryFileViewer.mockRejectedValueOnce(new Error('boom'))
-    const app = createTestRepoRoutes()
-    const workspaceRuntimeId = await openTestWorkspaceRuntime()
-    const response = await app.request(
-      new Request('http://localhost/file-viewer', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
-      }),
-    )
-    expect(response.status).toBe(500)
-  })
-
-  test('passes /trash-file requests through to the filetree write layer', async () => {
-    mocks.trashRepositoryFile.mockResolvedValueOnce({ ok: true, message: 'ok' })
-    const app = createTestRepoRoutes()
-    const workspaceRuntimeId = await openTestWorkspaceRuntime()
-    const response = await app.request(
-      new Request('http://localhost/trash-file', {
+      new Request('http://localhost/pull', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           cwd: WORKSPACE_ID,
           workspaceRuntimeId,
-          worktreePath: '/tmp/repo/.worktrees/feature',
-          path: 'src/index.ts',
+          branch: 'feature/work',
+          worktreePath,
         }),
       }),
     )
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ ok: true, message: 'ok' })
-    expect(mocks.trashRepositoryFile).toHaveBeenCalledWith(
-      WORKSPACE_ID,
-      '/tmp/repo/.worktrees/feature',
-      'src/index.ts',
-      expect.any(AbortSignal),
-      { workspaceRuntimeId },
-    )
-  })
-
-  test('returns 400 when /trash-file path escapes the worktree', async () => {
-    const app = createTestRepoRoutes()
-    const workspaceRuntimeId = await openTestWorkspaceRuntime()
-    const response = await app.request(
-      new Request('http://localhost/trash-file', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          cwd: WORKSPACE_ID,
-          workspaceRuntimeId,
-          worktreePath: '/tmp/repo',
-          path: '../secret.txt',
-        }),
-      }),
-    )
-    expect(response.status).toBe(400)
-    expect(mocks.trashRepositoryFile).not.toHaveBeenCalled()
+    await expect(response.json()).resolves.toEqual({ ok: true, message: '' })
+    expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledOnce()
+    expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith('user-test', {
+      target: {
+        kind: 'git-worktree',
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId,
+        root: workspaceIdForTest('goblin+file:///tmp/repo-worktree'),
+      },
+    })
   })
 
   test('returns 400 when count is below the minimum (1)', async () => {
@@ -1063,108 +847,5 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, branch: 'feature/kept' }),
     })
     expect(deleteBranch).toHaveBeenCalledTimes(2)
-  })
-
-  test('forwards external workspace app open routes', async () => {
-    mocks.openRepoTerminal.mockResolvedValue({ ok: true, message: '' })
-    mocks.openRepoEditor.mockResolvedValue({ ok: true, message: '' })
-    mocks.openRepoInFinder.mockResolvedValue({ ok: true, message: '' })
-    const app = createTestRepoRoutes()
-    const workspaceRuntimeId = await openTestWorkspaceRuntime()
-
-    await app.request(
-      new Request('http://localhost/open-terminal', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          workspaceId: WORKSPACE_ID,
-          workspaceRuntimeId,
-          worktreePath: '/tmp/repo',
-          app: 'ghostty',
-        }),
-      }),
-    )
-    await app.request(
-      new Request('http://localhost/open-editor', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          workspaceId: WORKSPACE_ID,
-          workspaceRuntimeId,
-          worktreePath: '/tmp/repo',
-          app: 'vscode',
-        }),
-      }),
-    )
-    await app.request(
-      new Request('http://localhost/open-in-finder', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ workspaceId: WORKSPACE_ID, worktreePath: '/tmp/repo' }),
-      }),
-    )
-
-    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(WORKSPACE_ID, '/tmp/repo', 'ghostty', expect.any(AbortSignal), {
-      workspaceRuntimeId,
-    })
-    expect(mocks.openRepoEditor).toHaveBeenCalledWith(WORKSPACE_ID, '/tmp/repo', 'vscode', expect.any(AbortSignal), {
-      workspaceRuntimeId,
-    })
-    expect(mocks.openRepoInFinder).toHaveBeenCalledWith(WORKSPACE_ID, '/tmp/repo')
-  })
-
-  test('marks the current runtime failed when external app open hits a remote runtime failure', async () => {
-    const app = createTestRepoRoutes()
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.test',
-      user: 'deploy',
-      port: 22,
-      remotePath: '/srv/repo',
-    })
-    expect(target).not.toBeNull()
-    const repoId = target!.id
-    const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
-    mocks.openRepoTerminal.mockRejectedValue(
-      new RemoteWorkspaceRuntimeFailureError({
-        workspaceId: repoId,
-        workspaceRuntimeId,
-        reason: 'unreachable',
-      }),
-    )
-
-    const response = await app.request(
-      new Request('http://localhost/open-terminal', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          workspaceId: repoId,
-          workspaceRuntimeId,
-          worktreePath: '/srv/repo',
-          app: 'ghostty',
-        }),
-      }),
-    )
-
-    expect(response.status).toBe(400)
-    await expectRemoteRuntimeFailed(app, repoId, workspaceRuntimeId)
-  })
-
-  test('returns 400 for invalid external app choices', async () => {
-    const app = createTestRepoRoutes()
-    const response = await app.request(
-      new Request('http://localhost/open-editor', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          workspaceId: WORKSPACE_ID,
-          worktreePath: '/tmp/repo',
-          app: 'not-an-editor',
-        }),
-      }),
-    )
-
-    expect(response.status).toBe(400)
-    expect(mocks.openRepoEditor).not.toHaveBeenCalled()
   })
 })

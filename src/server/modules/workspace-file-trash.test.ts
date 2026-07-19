@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   movePathToTrash: vi.fn(),
   resolveRemoteWorkspaceTarget: vi.fn(),
   remoteRuntimeAwareGitRunner: vi.fn(),
+  resolveRemoteWorktree: vi.fn(),
   trashRemoteFile: vi.fn(),
 }))
 
@@ -27,11 +28,17 @@ vi.mock('#/server/modules/repo-source.ts', () => ({
 }))
 
 vi.mock('#/system/ssh/git.ts', () => ({
+  resolveRemoteWorktree: mocks.resolveRemoteWorktree,
   trashRemoteFile: mocks.trashRemoteFile,
 }))
 
-import { trashRepositoryFile } from '#/server/modules/repo-tree-trash.ts'
+import { trashWorkspaceFile } from '#/server/modules/workspace-file-trash.ts'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_RUNTIME_ID = 'workspace-runtime-trash-test'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -42,13 +49,18 @@ beforeEach(() => {
   mocks.lstat.mockResolvedValue({ isDirectory: () => false })
   mocks.movePathToTrash.mockResolvedValue({ ok: true, message: 'ok', repositoryStateChanged: true })
   mocks.remoteRuntimeAwareGitRunner.mockReturnValue(async () => ({ ok: true, stdout: '', stderr: '', code: 0 }))
+  mocks.resolveRemoteWorktree.mockResolvedValue({
+    path: '/srv/repo-feature',
+    branch: 'feature',
+    isBare: false,
+    isPrimary: false,
+  })
 })
 
-describe('repo-tree trash write layer', () => {
+describe('workspace file trash write layer', () => {
   test('resolves a local workspace locator without requiring Git worktree membership', async () => {
-    const result = await trashRepositoryFile(
-      'goblin+file:///tmp/plain-workspace',
-      'goblin+file:///tmp/plain-workspace',
+    const result = await trashWorkspaceFile(
+      rootTarget(workspaceIdForTest('goblin+file:///tmp/plain-workspace')),
       'notes.txt',
     )
 
@@ -58,7 +70,10 @@ describe('repo-tree trash write layer', () => {
   })
 
   test('moves a local worktree file to the system trash', async () => {
-    const result = await trashRepositoryFile('goblin+file:///tmp/repo', '/tmp/repo-feature', 'src/index.ts')
+    const result = await trashWorkspaceFile(
+      worktreeTarget(workspaceIdForTest('goblin+file:///tmp/repo'), '/tmp/repo-feature'),
+      'src/index.ts',
+    )
 
     expect(result).toEqual({ ok: true, message: 'ok', repositoryStateChanged: true })
     expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false, signal: undefined })
@@ -67,9 +82,9 @@ describe('repo-tree trash write layer', () => {
   })
 
   test('rejects an unknown local worktree before touching the file', async () => {
-    const result = await trashRepositoryFile('goblin+file:///tmp/repo', '/tmp/outside', 'src/index.ts')
-
-    expect(result).toEqual({ ok: false, message: 'error.invalid-worktree-path' })
+    await expect(
+      trashWorkspaceFile(worktreeTarget(workspaceIdForTest('goblin+file:///tmp/repo'), '/tmp/outside'), 'src/index.ts'),
+    ).rejects.toThrow('unknown worktree path')
     expect(mocks.lstat).not.toHaveBeenCalled()
     expect(mocks.movePathToTrash).not.toHaveBeenCalled()
   })
@@ -77,13 +92,16 @@ describe('repo-tree trash write layer', () => {
   test('rejects directories', async () => {
     mocks.lstat.mockResolvedValueOnce({ isDirectory: () => true })
 
-    const result = await trashRepositoryFile('goblin+file:///tmp/repo', '/tmp/repo-feature', 'src')
+    const result = await trashWorkspaceFile(
+      worktreeTarget(workspaceIdForTest('goblin+file:///tmp/repo'), '/tmp/repo-feature'),
+      'src',
+    )
 
     expect(result).toEqual({ ok: false, message: 'error.filetree-delete-directory-unsupported' })
     expect(mocks.movePathToTrash).not.toHaveBeenCalled()
   })
 
-  test('delegates remote repo files to the SSH trash helper', async () => {
+  test('delegates remote workspace files to the SSH trash helper', async () => {
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const target = {
       id: repoId,
@@ -97,10 +115,13 @@ describe('repo-tree trash write layer', () => {
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok', repositoryStateChanged: true })
 
-    const result = await trashRepositoryFile(repoId, '/srv/repo-feature', 'README.md')
+    const result = await trashWorkspaceFile(worktreeTarget(repoId, '/srv/repo-feature'), 'README.md')
 
     expect(result).toEqual({ ok: true, message: 'ok', repositoryStateChanged: true })
-    expect(mocks.trashRemoteFile).toHaveBeenCalledWith(target, '/srv/repo-feature', 'README.md', { signal: undefined })
+    expect(mocks.trashRemoteFile).toHaveBeenCalledWith(target, '/srv/repo-feature', 'README.md', {
+      run: expect.any(Function),
+      signal: undefined,
+    })
     expect(mocks.getWorktrees).not.toHaveBeenCalled()
   })
 
@@ -118,14 +139,15 @@ describe('repo-tree trash write layer', () => {
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok' })
 
-    await trashRepositoryFile(repoId, repoId, 'notes.txt')
+    await trashWorkspaceFile(rootTarget(repoId), 'notes.txt')
     expect(mocks.trashRemoteFile).toHaveBeenCalledWith(target, '/srv/plain-workspace', 'notes.txt', {
+      run: expect.any(Function),
       signal: undefined,
     })
   })
 
   test('uses the runtime-aware runner for remote trash when provided', async () => {
-    const workspaceRuntimeId = 'repo-runtime-trash-test'
+    const workspaceRuntimeId = 'workspace-runtime-trash-custom-test'
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const target = {
       id: repoId,
@@ -142,14 +164,14 @@ describe('repo-tree trash write layer', () => {
     mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok', repositoryStateChanged: true })
 
     await expect(
-      trashRepositoryFile(repoId, '/srv/repo-feature', 'README.md', undefined, { workspaceRuntimeId }),
+      trashWorkspaceFile(worktreeTarget(repoId, '/srv/repo-feature', workspaceRuntimeId), 'README.md'),
     ).resolves.toEqual({
       ok: true,
       message: 'ok',
       repositoryStateChanged: true,
     })
 
-    expect(mocks.resolveRemoteWorkspaceTarget).toHaveBeenCalledWith(repoId, { workspaceRuntimeId })
+    expect(mocks.resolveRemoteWorkspaceTarget).toHaveBeenCalledWith(repoId, { workspaceRuntimeId }, undefined)
     expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(repoId, workspaceRuntimeId, target)
     expect(mocks.trashRemoteFile).toHaveBeenCalledWith(target, '/srv/repo-feature', 'README.md', {
       signal: undefined,
@@ -157,3 +179,13 @@ describe('repo-tree trash write layer', () => {
     })
   })
 })
+
+function rootTarget(workspaceId: WorkspaceId, workspaceRuntimeId = WORKSPACE_RUNTIME_ID) {
+  return { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId }
+}
+
+function worktreeTarget(workspaceId: WorkspaceId, worktreePath: string, workspaceRuntimeId = WORKSPACE_RUNTIME_ID) {
+  const target = gitWorktreeFilesystemExecutionTarget(workspaceId, workspaceRuntimeId, worktreePath)
+  if (!target) throw new Error('invalid test worktree target')
+  return target
+}

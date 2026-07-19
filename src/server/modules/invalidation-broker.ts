@@ -1,5 +1,6 @@
 import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
 import type { WorkspaceRuntimeInvalidationEvent } from '#/shared/workspace-runtime-invalidation.ts'
+import type { WorkspaceFilesystemInvalidationEvent } from '#/shared/workspace-filesystem-invalidation.ts'
 import type { SettingsInvalidationEvent, SettingsInvalidationScope } from '#/shared/server-invalidation.ts'
 
 interface InvalidationSocket {
@@ -78,6 +79,19 @@ export function publishUserWorkspaceRuntimeInvalidation(
 ): void {
   publishInvalidationPayload(
     JSON.stringify({ type: 'workspace-runtime-invalidated', ...event } satisfies WorkspaceRuntimeInvalidationEvent),
+    userId,
+  )
+}
+
+export function publishUserWorkspaceFilesystemInvalidation(
+  userId: string,
+  event: Omit<WorkspaceFilesystemInvalidationEvent, 'type'>,
+): void {
+  publishInvalidationPayload(
+    JSON.stringify({
+      type: 'workspace-filesystem-invalidated',
+      ...event,
+    } satisfies WorkspaceFilesystemInvalidationEvent),
     userId,
   )
 }

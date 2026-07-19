@@ -90,8 +90,8 @@ const runtimeExternalAppSettings = vi.hoisted(() => ({
 const appShellMocks = vi.hoisted(() => ({
   openExternalUrl: vi.fn(),
 }))
-const repoClientMocks = vi.hoisted(() => ({
-  openRepoInFinder: vi.fn(async (path: string) => ({ ok: true, message: path })),
+const workspaceExternalAppMocks = vi.hoisted(() => ({
+  openWorkspaceInFinder: vi.fn(async () => ({ ok: true, message: '' })),
 }))
 
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
@@ -106,11 +106,13 @@ vi.mock('#/web/app-shell-client.ts', () => ({
   openExternalUrl: appShellMocks.openExternalUrl,
 }))
 
-vi.mock('#/web/repo-client.ts', async () => {
-  const actual = (await vi.importActual('#/web/repo-client.ts')) as typeof import('#/web/repo-client.ts')
+vi.mock('#/web/workspace-external-app-client.ts', async () => {
+  const actual = (await vi.importActual(
+    '#/web/workspace-external-app-client.ts',
+  )) as typeof import('#/web/workspace-external-app-client.ts')
   return {
     ...actual,
-    openRepoInFinder: repoClientMocks.openRepoInFinder,
+    openWorkspaceInFinder: workspaceExternalAppMocks.openWorkspaceInFinder,
   }
 })
 
@@ -179,8 +181,8 @@ beforeEach(() => {
   compactUi = false
   runtimeExternalAppSettings.value = defaultRuntimeExternalAppSettings()
   appShellMocks.openExternalUrl.mockReset()
-  repoClientMocks.openRepoInFinder.mockReset()
-  repoClientMocks.openRepoInFinder.mockImplementation(async (path: string) => ({ ok: true, message: path }))
+  workspaceExternalAppMocks.openWorkspaceInFinder.mockReset()
+  workspaceExternalAppMocks.openWorkspaceInFinder.mockImplementation(async () => ({ ok: true, message: '' }))
   useHostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test-host', pid: 1 },
     hydrated: true,
@@ -197,7 +199,7 @@ beforeEach(() => {
 afterEach(() => {
   toastMocks.error.mockClear()
   appShellMocks.openExternalUrl.mockReset()
-  repoClientMocks.openRepoInFinder.mockReset()
+  workspaceExternalAppMocks.openWorkspaceInFinder.mockReset()
   useHostInfoStore.setState({ snapshot: null, hydrated: false })
   setClientBridgeForTests(null)
   setTerminalSessionCommandBridge(null)
@@ -396,7 +398,13 @@ describe('GitWorkspacePaneToolbar', () => {
         body: JSON.stringify({ workspaceId: REPO_ID, worktreePath: WORKTREE_PATH, itemId: 'finder' }),
       }),
     )
-    expect(repoClientMocks.openRepoInFinder).toHaveBeenCalledWith(REPO_ID, WORKTREE_PATH)
+    expect(workspaceExternalAppMocks.openWorkspaceInFinder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'git-worktree',
+        workspaceId: REPO_ID,
+        root: canonicalWorkspaceLocator(`goblin+file://${WORKTREE_PATH}`),
+      }),
+    )
 
     // Simulate the server-driven settings-snapshot invalidation that
     // `publishSettingsInvalidation(['settings-snapshot'])` would push to
@@ -423,7 +431,7 @@ describe('GitWorkspacePaneToolbar', () => {
       return url.endsWith('/api/settings/workspace-external-app-recent')
     })
     expect(postCalls).toHaveLength(1)
-    expect(repoClientMocks.openRepoInFinder).toHaveBeenCalledTimes(2)
+    expect(workspaceExternalAppMocks.openWorkspaceInFinder).toHaveBeenCalledTimes(2)
   })
 
   test('shows an error toast when storing the recent external app fails', async () => {
@@ -456,7 +464,13 @@ describe('GitWorkspacePaneToolbar', () => {
     expect(toastMocks.error).toHaveBeenCalledWith('action.result-error', {
       description: 'Server request failed (HTTP 500)',
     })
-    expect(repoClientMocks.openRepoInFinder).toHaveBeenCalledWith(REPO_ID, WORKTREE_PATH)
+    expect(workspaceExternalAppMocks.openWorkspaceInFinder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'git-worktree',
+        workspaceId: REPO_ID,
+        root: canonicalWorkspaceLocator(`goblin+file://${WORKTREE_PATH}`),
+      }),
+    )
     expect(c.querySelector<HTMLButtonElement>('button[aria-label="settings.terminal.ghostty"]')).not.toBeNull()
   })
 

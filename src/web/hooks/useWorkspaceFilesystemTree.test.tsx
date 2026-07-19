@@ -3,30 +3,31 @@ import { StrictMode, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { useLazyRepoTree } from '#/web/hooks/useLazyRepoTree.ts'
-import type { RepoTreeResult } from '#/shared/api-types.ts'
+import { useWorkspaceFilesystemTree } from '#/web/hooks/useWorkspaceFilesystemTree.ts'
+import type { WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
 import { canonicalWorkspaceLocator, workspaceLocatorForPath } from '#/shared/workspace-locator.ts'
+import { startWorkspaceFilesystemQueryInvalidationSync } from '#/web/workspace-filesystem-query.ts'
 
 const mocks = vi.hoisted(() => ({
-  getRepositoryTree: vi.fn(),
+  getWorkspaceFilesystemTree: vi.fn(),
 }))
 
-vi.mock('#/web/filetree-client.ts', () => ({
-  getRepositoryTree: mocks.getRepositoryTree,
+vi.mock('#/web/workspace-filesystem-client.ts', () => ({
+  getWorkspaceFilesystemTree: mocks.getWorkspaceFilesystemTree,
 }))
 
 const listeners = new Set<(event: unknown) => void>()
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-lazy-tree-test'
 
-vi.mock('#/web/repo-query-invalidation-ingress.ts', () => ({
-  subscribeRepoQueryInvalidation(listener: (event: unknown) => void) {
+vi.mock('#/web/workspace-filesystem-invalidation-ingress.ts', () => ({
+  subscribeWorkspaceFilesystemInvalidation(listener: (event: unknown) => void) {
     listeners.add(listener)
     return () => listeners.delete(listener)
   },
 }))
 
 type HarnessSnapshot = {
-  tree: RepoTreeResult | null
+  tree: WorkspaceFilesystemTreeResult | null
   loading: boolean
   error: string | null
   loadingKeys: ReadonlySet<string>
@@ -39,6 +40,7 @@ interface HarnessProps {
   readonly repoId: string
   readonly workspaceRuntimeId?: string
   readonly worktreePath: string
+  readonly targetKind?: 'workspace-root' | 'git-worktree'
   readonly expandedKeys?: readonly string[]
   readonly onSnapshot: (snapshot: HarnessSnapshot) => void
 }
@@ -47,32 +49,42 @@ function Harness({
   repoId,
   workspaceRuntimeId = WORKSPACE_RUNTIME_ID,
   worktreePath,
+  targetKind = 'git-worktree',
   expandedKeys,
   onSnapshot,
 }: HarnessProps) {
-  const target = mockExecutionTarget(repoId, workspaceRuntimeId, worktreePath)
-  const result = useLazyRepoTree({ target, expandedKeys })
+  const target = mockExecutionTarget(repoId, workspaceRuntimeId, worktreePath, targetKind)
+  const result = useWorkspaceFilesystemTree({ target, expandedKeys })
   onSnapshot(result)
   return null
 }
 
-function mockExecutionTarget(repoId: string, workspaceRuntimeId: string, worktreePath: string) {
+function mockExecutionTarget(
+  repoId: string,
+  workspaceRuntimeId: string,
+  worktreePath: string,
+  targetKind: 'workspace-root' | 'git-worktree' = 'git-worktree',
+) {
   const workspaceId = canonicalWorkspaceLocator(`goblin+file://${repoId}`)
   const root = workspaceId ? workspaceLocatorForPath(workspaceId, worktreePath) : null
   if (!workspaceId || !root) throw new Error('invalid mock workspace target')
-  return { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: workspaceRuntimeId, root }
+  return targetKind === 'workspace-root'
+    ? ({ kind: 'workspace-root', workspaceId, workspaceRuntimeId } as const)
+    : ({ kind: 'git-worktree', workspaceId, workspaceRuntimeId, root } as const)
 }
 
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 let lastSnapshot: HarnessSnapshot | null = null
 let queryClient: QueryClient
+let stopInvalidationSync: (() => void) | null = null
 
 beforeEach(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  mocks.getRepositoryTree.mockReset()
+  mocks.getWorkspaceFilesystemTree.mockReset()
   listeners.clear()
+  stopInvalidationSync = startWorkspaceFilesystemQueryInvalidationSync(queryClient)
   lastSnapshot = null
   container = document.createElement('div')
   document.body.append(container)
@@ -81,13 +93,15 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => root?.unmount())
+  stopInvalidationSync?.()
+  stopInvalidationSync = null
   queryClient.clear()
   container?.remove()
   root = null
   container = null
   lastSnapshot = null
   listeners.clear()
-  mocks.getRepositoryTree.mockReset()
+  mocks.getWorkspaceFilesystemTree.mockReset()
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false
 })
 
@@ -134,11 +148,19 @@ async function flush() {
   })
 }
 
-describe('useLazyRepoTree', () => {
+describe('useWorkspaceFilesystemTree', () => {
   test('hydrates the initial aggregate from cached root data without an empty-tree flash', async () => {
     const snapshots: HarnessSnapshot[] = []
-    queryClient.setQueryData<RepoTreeResult>(
-      ['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', ''],
+    queryClient.setQueryData<WorkspaceFilesystemTreeResult>(
+      [
+        'workspace-filesystem-children',
+        'goblin+file:///repo-a',
+        WORKSPACE_RUNTIME_ID,
+        'git-worktree',
+        'goblin+file:///repo-a/main',
+        '/repo-a/main',
+        '',
+      ],
       {
         nodes: [
           { id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' },
@@ -146,7 +168,7 @@ describe('useLazyRepoTree', () => {
         truncated: false,
       },
     )
-    mocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
+    mocks.getWorkspaceFilesystemTree.mockResolvedValue({ nodes: [], truncated: false })
 
     await render({
       repoId: '/repo-a',
@@ -162,22 +184,46 @@ describe('useLazyRepoTree', () => {
 
   test('hydrates cached restored children and ancestors into the initial aggregate', async () => {
     const snapshots: HarnessSnapshot[] = []
-    queryClient.setQueryData<RepoTreeResult>(
-      ['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', ''],
+    queryClient.setQueryData<WorkspaceFilesystemTreeResult>(
+      [
+        'workspace-filesystem-children',
+        'goblin+file:///repo-a',
+        WORKSPACE_RUNTIME_ID,
+        'git-worktree',
+        'goblin+file:///repo-a/main',
+        '/repo-a/main',
+        '',
+      ],
       {
         nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
         truncated: false,
       },
     )
-    queryClient.setQueryData<RepoTreeResult>(
-      ['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', 'src'],
+    queryClient.setQueryData<WorkspaceFilesystemTreeResult>(
+      [
+        'workspace-filesystem-children',
+        'goblin+file:///repo-a',
+        WORKSPACE_RUNTIME_ID,
+        'git-worktree',
+        'goblin+file:///repo-a/main',
+        '/repo-a/main',
+        'src',
+      ],
       {
         nodes: [{ id: 'src/web', path: 'src/web', name: 'web', parentId: 'src', kind: 'directory', status: 'clean' }],
         truncated: false,
       },
     )
-    queryClient.setQueryData<RepoTreeResult>(
-      ['repo-tree-children', 'goblin+file:///repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main', 'src/web'],
+    queryClient.setQueryData<WorkspaceFilesystemTreeResult>(
+      [
+        'workspace-filesystem-children',
+        'goblin+file:///repo-a',
+        WORKSPACE_RUNTIME_ID,
+        'git-worktree',
+        'goblin+file:///repo-a/main',
+        '/repo-a/main',
+        'src/web',
+      ],
       {
         nodes: [
           {
@@ -192,7 +238,7 @@ describe('useLazyRepoTree', () => {
         truncated: false,
       },
     )
-    mocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
+    mocks.getWorkspaceFilesystemTree.mockResolvedValue({ nodes: [], truncated: false })
 
     await render({
       repoId: '/repo-a',
@@ -212,8 +258,8 @@ describe('useLazyRepoTree', () => {
   })
 
   test('kicks an initial fetch on mount and exposes loading=true', async () => {
-    const deferred = makeDeferred<RepoTreeResult>()
-    mocks.getRepositoryTree.mockReturnValueOnce(deferred.promise)
+    const deferred = makeDeferred<WorkspaceFilesystemTreeResult>()
+    mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(deferred.promise)
 
     await render({
       repoId: '/repo-a',
@@ -223,7 +269,7 @@ describe('useLazyRepoTree', () => {
       },
     })
 
-    expect(mocks.getRepositoryTree).toHaveBeenCalledWith(
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledWith(
       mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main'),
       {},
     )
@@ -232,11 +278,11 @@ describe('useLazyRepoTree', () => {
   })
 
   test('resolves to the fetched tree and clears loading on success', async () => {
-    const result: RepoTreeResult = {
+    const result: WorkspaceFilesystemTreeResult = {
       nodes: [{ id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' }],
       truncated: false,
     }
-    mocks.getRepositoryTree.mockResolvedValueOnce(result)
+    mocks.getWorkspaceFilesystemTree.mockResolvedValueOnce(result)
 
     await render({
       repoId: '/repo-a',
@@ -253,11 +299,11 @@ describe('useLazyRepoTree', () => {
   })
 
   test('applies the latest result after StrictMode re-runs mount effects', async () => {
-    const result: RepoTreeResult = {
+    const result: WorkspaceFilesystemTreeResult = {
       nodes: [{ id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' }],
       truncated: false,
     }
-    mocks.getRepositoryTree.mockResolvedValue(result)
+    mocks.getWorkspaceFilesystemTree.mockResolvedValue(result)
 
     await act(async () => {
       root!.render(
@@ -276,13 +322,13 @@ describe('useLazyRepoTree', () => {
     })
     await flush()
 
-    expect(mocks.getRepositoryTree).toHaveBeenCalledOnce()
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledOnce()
     expect(lastSnapshot?.tree).toEqual(result)
     expect(lastSnapshot?.loading).toBe(false)
   })
 
   test('treats an authoritative empty tree as success', async () => {
-    mocks.getRepositoryTree.mockResolvedValueOnce({ nodes: [], truncated: false })
+    mocks.getWorkspaceFilesystemTree.mockResolvedValueOnce({ nodes: [], truncated: false })
 
     await render({
       repoId: '/repo-a',
@@ -299,7 +345,7 @@ describe('useLazyRepoTree', () => {
   })
 
   test('reports an error when the client rejects with a real failure', async () => {
-    mocks.getRepositoryTree.mockRejectedValueOnce(new Error('boom'))
+    mocks.getWorkspaceFilesystemTree.mockRejectedValueOnce(new Error('boom'))
 
     await render({
       repoId: '/repo-a',
@@ -315,10 +361,10 @@ describe('useLazyRepoTree', () => {
   })
 
   test('starts the new target read without letting the previous cache read clobber it', async () => {
-    const first = makeDeferred<RepoTreeResult>()
-    const second = makeDeferred<RepoTreeResult>()
-    mocks.getRepositoryTree.mockReturnValueOnce(first.promise)
-    mocks.getRepositoryTree.mockReturnValueOnce(second.promise)
+    const first = makeDeferred<WorkspaceFilesystemTreeResult>()
+    const second = makeDeferred<WorkspaceFilesystemTreeResult>()
+    mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(first.promise)
+    mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(second.promise)
 
     await render({
       repoId: '/repo-a',
@@ -336,8 +382,8 @@ describe('useLazyRepoTree', () => {
       },
     })
 
-    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
-    expect(mocks.getRepositoryTree.mock.calls[1]?.[0]).toEqual(
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
+    expect(mocks.getWorkspaceFilesystemTree.mock.calls[1]?.[0]).toEqual(
       mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/feature'),
     )
 
@@ -361,8 +407,8 @@ describe('useLazyRepoTree', () => {
   })
 
   test('lets the query-owned root read settle after the consumer unmounts', async () => {
-    const deferred = makeDeferred<RepoTreeResult>()
-    mocks.getRepositoryTree.mockReturnValueOnce(deferred.promise)
+    const deferred = makeDeferred<WorkspaceFilesystemTreeResult>()
+    mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(deferred.promise)
 
     await render({
       repoId: '/repo-a',
@@ -376,11 +422,11 @@ describe('useLazyRepoTree', () => {
       deferred.resolve({ nodes: [], truncated: false })
       await deferred.promise
     })
-    expect(mocks.getRepositoryTree).toHaveBeenCalledOnce()
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledOnce()
   })
 
-  test('refetches when a repo-snapshot invalidation arrives for the current repo', async () => {
-    mocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
+  test('refetches when a filesystem invalidation arrives for the current execution target', async () => {
+    mocks.getWorkspaceFilesystemTree.mockResolvedValue({ nodes: [], truncated: false })
 
     await render({
       repoId: '/repo-a',
@@ -391,20 +437,23 @@ describe('useLazyRepoTree', () => {
     })
     await flush()
 
-    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(1)
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(1)
 
     await act(async () => {
       for (const listener of listeners) {
-        listener({ type: 'repo-query-invalidated', repoId: 'goblin+file:///repo-a', query: 'repo-snapshot' })
+        listener({
+          type: 'workspace-filesystem-invalidated',
+          target: mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main'),
+        })
       }
       await Promise.resolve()
     })
 
-    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
   })
 
   test('ignores invalidation events for a different repoId', async () => {
-    mocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
+    mocks.getWorkspaceFilesystemTree.mockResolvedValue({ nodes: [], truncated: false })
 
     await render({
       repoId: '/repo-a',
@@ -415,20 +464,23 @@ describe('useLazyRepoTree', () => {
     })
     await flush()
 
-    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(1)
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(1)
 
     await act(async () => {
       for (const listener of listeners) {
-        listener({ type: 'repo-query-invalidated', repoId: '/repo-other', query: 'repo-snapshot' })
+        listener({
+          type: 'workspace-filesystem-invalidated',
+          target: mockExecutionTarget('/repo-other', WORKSPACE_RUNTIME_ID, '/repo-other/main'),
+        })
       }
       await Promise.resolve()
     })
 
-    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(1)
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(1)
   })
 
   test('manual refresh() re-runs the fetch', async () => {
-    mocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
+    mocks.getWorkspaceFilesystemTree.mockResolvedValue({ nodes: [], truncated: false })
 
     await render({
       repoId: '/repo-a',
@@ -439,17 +491,17 @@ describe('useLazyRepoTree', () => {
     })
     await flush()
 
-    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(1)
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(1)
 
     await act(async () => {
       lastSnapshot?.refresh()
       await Promise.resolve()
     })
-    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
   })
 
   test('loads and merges direct children for an expanded directory', async () => {
-    mocks.getRepositoryTree
+    mocks.getWorkspaceFilesystemTree
       .mockResolvedValueOnce({
         nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
         truncated: false,
@@ -482,7 +534,7 @@ describe('useLazyRepoTree', () => {
     })
     await flush()
 
-    expect(mocks.getRepositoryTree).toHaveBeenLastCalledWith(
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenLastCalledWith(
       mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main'),
       expect.objectContaining({ prefix: 'src', signal: expect.any(AbortSignal) }),
     )
@@ -490,8 +542,8 @@ describe('useLazyRepoTree', () => {
   })
 
   test('keeps child loading state when expanded keys hydrate cached prefixes', async () => {
-    const child = makeDeferred<RepoTreeResult>()
-    mocks.getRepositoryTree
+    const child = makeDeferred<WorkspaceFilesystemTreeResult>()
+    mocks.getWorkspaceFilesystemTree
       .mockResolvedValueOnce({
         nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
         truncated: false,
@@ -547,7 +599,7 @@ describe('useLazyRepoTree', () => {
   })
 
   test('auto-loads restored expanded directory keys after the root read', async () => {
-    mocks.getRepositoryTree
+    mocks.getWorkspaceFilesystemTree
       .mockResolvedValueOnce({
         nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
         truncated: false,
@@ -576,15 +628,15 @@ describe('useLazyRepoTree', () => {
     })
     await flush()
 
-    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
-    expect(mocks.getRepositoryTree.mock.calls[1]?.[1]).toEqual(
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
+    expect(mocks.getWorkspaceFilesystemTree.mock.calls[1]?.[1]).toEqual(
       expect.objectContaining({ prefix: 'src', signal: expect.any(AbortSignal) }),
     )
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/index.ts'])
   })
 
   test('records restored expanded directory load failures without replacing the root tree error', async () => {
-    mocks.getRepositoryTree
+    mocks.getWorkspaceFilesystemTree
       .mockResolvedValueOnce({
         nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
         truncated: false,
@@ -601,7 +653,7 @@ describe('useLazyRepoTree', () => {
     })
     await flush()
 
-    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
     expect(lastSnapshot?.error).toBeNull()
     expect(lastSnapshot?.errorKeys.has('src')).toBe(true)
     expect(lastSnapshot?.loadingKeys.has('src')).toBe(false)
@@ -609,7 +661,7 @@ describe('useLazyRepoTree', () => {
   })
 
   test('invalidating after a successful read refreshes the cached tree', async () => {
-    mocks.getRepositoryTree
+    mocks.getWorkspaceFilesystemTree
       .mockResolvedValueOnce({
         nodes: [{ id: 'first.ts', path: 'first.ts', name: 'first.ts', parentId: null, kind: 'file', status: 'clean' }],
         truncated: false,
@@ -634,18 +686,21 @@ describe('useLazyRepoTree', () => {
 
     await act(async () => {
       for (const listener of listeners) {
-        listener({ type: 'repo-query-invalidated', repoId: 'goblin+file:///repo-a', query: 'repo-snapshot' })
+        listener({
+          type: 'workspace-filesystem-invalidated',
+          target: mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main'),
+        })
       }
     })
     await flush()
 
-    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(2)
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
     expect(lastSnapshot?.loading).toBe(false)
     expect(lastSnapshot?.tree?.nodes[0]?.id).toBe('second.ts')
   })
 
   test('invalidating keeps the current tree visible and reloads restored expanded children', async () => {
-    mocks.getRepositoryTree
+    mocks.getWorkspaceFilesystemTree
       .mockResolvedValueOnce({
         nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
         truncated: false,
@@ -680,19 +735,27 @@ describe('useLazyRepoTree', () => {
 
     await act(async () => {
       for (const listener of listeners) {
-        listener({ type: 'repo-query-invalidated', repoId: 'goblin+file:///repo-a', query: 'repo-snapshot' })
+        listener({
+          type: 'workspace-filesystem-invalidated',
+          target: mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main'),
+        })
       }
       expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
     })
     await flush()
 
-    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(4)
+    expect(mocks.getWorkspaceFilesystemTree.mock.calls.map(([, options]) => options.prefix ?? 'root')).toEqual([
+      'root',
+      'src',
+      'root',
+      'src',
+    ])
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/new.ts'])
   })
 
   test('manual refresh() while a request is in flight reuses the in-flight query', async () => {
-    const first = makeDeferred<RepoTreeResult>()
-    mocks.getRepositoryTree.mockReturnValueOnce(first.promise)
+    const first = makeDeferred<WorkspaceFilesystemTreeResult>()
+    mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(first.promise)
 
     await render({
       repoId: '/repo-a',
@@ -707,7 +770,7 @@ describe('useLazyRepoTree', () => {
       await Promise.resolve()
     })
 
-    expect(mocks.getRepositoryTree).toHaveBeenCalledTimes(1)
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(1)
 
     await act(async () => {
       first.resolve({
@@ -726,5 +789,139 @@ describe('useLazyRepoTree', () => {
     })
     await flush()
     expect(lastSnapshot?.tree?.nodes[0]?.id).toBe('first.ts')
+  })
+
+  test('coalesces invalidation during an in-flight read and discards the pre-invalidation result', async () => {
+    const first = makeDeferred<WorkspaceFilesystemTreeResult>()
+    const current = {
+      nodes: [
+        {
+          id: 'current.ts',
+          path: 'current.ts',
+          name: 'current.ts',
+          parentId: null,
+          kind: 'file',
+          status: 'clean' as const,
+        },
+      ],
+      truncated: false,
+    }
+    mocks.getWorkspaceFilesystemTree.mockReturnValueOnce(first.promise).mockResolvedValueOnce(current)
+
+    await render({
+      repoId: '/repo-a',
+      worktreePath: '/repo-a/main',
+      onSnapshot: (snapshot) => {
+        lastSnapshot = snapshot
+      },
+    })
+    await act(async () => {
+      for (const listener of listeners) {
+        listener({
+          type: 'workspace-filesystem-invalidated',
+          target: mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main'),
+        })
+      }
+      await Promise.resolve()
+    })
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledOnce()
+
+    await act(async () => {
+      first.resolve({
+        nodes: [{ id: 'stale.ts', path: 'stale.ts', name: 'stale.ts', parentId: null, kind: 'file', status: 'clean' }],
+        truncated: false,
+      })
+    })
+    await flush()
+
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
+    expect(lastSnapshot?.tree).toEqual(current)
+  })
+
+  test('shares one invalidation ingress and one refetch across observers of the same target', async () => {
+    mocks.getWorkspaceFilesystemTree.mockResolvedValueOnce({ nodes: [], truncated: false }).mockResolvedValueOnce({
+      nodes: [
+        { id: 'current.ts', path: 'current.ts', name: 'current.ts', parentId: null, kind: 'file', status: 'clean' },
+      ],
+      truncated: false,
+    })
+
+    await act(async () => {
+      root!.render(
+        <QueryClientProvider client={queryClient}>
+          <Harness repoId="/repo-a" worktreePath="/repo-a/main" onSnapshot={() => {}} />
+          <Harness repoId="/repo-a" worktreePath="/repo-a/main" onSnapshot={() => {}} />
+        </QueryClientProvider>,
+      )
+    })
+    await flush()
+    expect(listeners.size).toBe(1)
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledOnce()
+
+    await act(async () => {
+      for (const listener of listeners) {
+        listener({
+          type: 'workspace-filesystem-invalidated',
+          target: mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main'),
+        })
+      }
+    })
+    await flush()
+
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
+  })
+
+  test('keeps cached data invalidatable while every filesystem observer is unmounted', async () => {
+    mocks.getWorkspaceFilesystemTree.mockResolvedValueOnce({ nodes: [], truncated: false }).mockResolvedValueOnce({
+      nodes: [
+        { id: 'current.ts', path: 'current.ts', name: 'current.ts', parentId: null, kind: 'file', status: 'clean' },
+      ],
+      truncated: false,
+    })
+    await render({ repoId: '/repo-a', worktreePath: '/repo-a/main', onSnapshot: () => {} })
+    await flush()
+
+    act(() => root?.unmount())
+    for (const listener of listeners) {
+      listener({
+        type: 'workspace-filesystem-invalidated',
+        target: mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main'),
+      })
+    }
+    root = createRoot(container!)
+    await render({ repoId: '/repo-a', worktreePath: '/repo-a/main', onSnapshot: () => {} })
+    await flush()
+
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
+  })
+
+  test('keeps workspace-root and Git worktree caches separate at the same filesystem path', async () => {
+    mocks.getWorkspaceFilesystemTree.mockResolvedValueOnce({ nodes: [], truncated: false }).mockResolvedValueOnce({
+      nodes: [
+        { id: 'tracked.ts', path: 'tracked.ts', name: 'tracked.ts', parentId: null, kind: 'file', status: 'clean' },
+      ],
+      truncated: false,
+    })
+
+    await render({
+      repoId: '/repo-a',
+      worktreePath: '/repo-a',
+      targetKind: 'workspace-root',
+      onSnapshot: () => {},
+    })
+    await flush()
+    await setProps({
+      repoId: '/repo-a',
+      worktreePath: '/repo-a',
+      targetKind: 'git-worktree',
+      onSnapshot: () => {},
+    })
+    await flush()
+
+    expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
+    expect(mocks.getWorkspaceFilesystemTree.mock.calls.map(([target]) => target.kind)).toEqual([
+      'workspace-root',
+      'git-worktree',
+    ])
   })
 })

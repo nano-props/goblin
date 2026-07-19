@@ -16,37 +16,42 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import type { ExecResult } from '#/web/types.ts'
+import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const mocks = vi.hoisted(() => ({
   getRepoPatch: vi.fn(),
-  openRepoEditor: vi.fn(),
-  openRepoInFinder: vi.fn(),
-  openRepoTerminal: vi.fn(),
+  openWorkspaceEditor: vi.fn(),
+  openWorkspaceInFinder: vi.fn(),
+  openWorkspaceTerminal: vi.fn(),
   openRepoUrl: vi.fn(),
   openExternalUrl: vi.fn(),
 }))
 
 vi.mock('#/web/repo-client.ts', () => ({
   getRepoPatch: mocks.getRepoPatch,
-  openRepoEditor: mocks.openRepoEditor,
-  openRepoInFinder: mocks.openRepoInFinder,
-  openRepoTerminal: mocks.openRepoTerminal,
-  openRepoUrl: mocks.openRepoUrl,
+}))
+
+vi.mock('#/web/workspace-external-app-client.ts', () => ({
+  openWorkspaceEditor: mocks.openWorkspaceEditor,
+  openWorkspaceInFinder: mocks.openWorkspaceInFinder,
+  openWorkspaceTerminal: mocks.openWorkspaceTerminal,
 }))
 
 vi.mock('#/web/app-shell-client.ts', () => ({
   openExternalUrl: mocks.openExternalUrl,
 }))
 
-const REPO_ID = 'goblin+file:///tmp/goblin-use-branch-actions-test-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-use-branch-actions-test-repo')
 
 describe('useBranchActions', () => {
   beforeEach(() => {
     resetWorkspacesStore()
     mocks.getRepoPatch.mockReset()
-    mocks.openRepoEditor.mockReset()
-    mocks.openRepoInFinder.mockReset()
-    mocks.openRepoTerminal.mockReset()
+    mocks.openWorkspaceEditor.mockReset()
+    mocks.openWorkspaceInFinder.mockReset()
+    mocks.openWorkspaceTerminal.mockReset()
   })
 
   test('openTerminal routes to the remote IPC for remote repos', async () => {
@@ -72,7 +77,7 @@ describe('useBranchActions', () => {
         hasGitHubRemote: true,
       },
     })
-    mocks.openRepoTerminal.mockResolvedValue({ ok: true, message: '' })
+    mocks.openWorkspaceTerminal.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
     renderInJsdom(
@@ -83,10 +88,8 @@ describe('useBranchActions', () => {
       await actions?.openTerminal?.('ghostty')
     })
 
-    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(
-      target!.id,
-      repo.workspaceRuntimeId,
-      '/srv/repo-feature',
+    expect(mocks.openWorkspaceTerminal).toHaveBeenCalledWith(
+      worktreeTarget(target!.id, repo.workspaceRuntimeId, '/srv/repo-feature'),
       'ghostty',
     )
   })
@@ -142,7 +145,7 @@ describe('useBranchActions', () => {
         hasGitHubRemote: true,
       },
     })
-    mocks.openRepoEditor.mockResolvedValue({ ok: true, message: '' })
+    mocks.openWorkspaceEditor.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
     renderInJsdom(
@@ -153,10 +156,8 @@ describe('useBranchActions', () => {
       await actions?.openEditor?.('vscode')
     })
 
-    expect(mocks.openRepoEditor).toHaveBeenCalledWith(
-      target!.id,
-      repo.workspaceRuntimeId,
-      '/srv/repo-feature',
+    expect(mocks.openWorkspaceEditor).toHaveBeenCalledWith(
+      worktreeTarget(target!.id, repo.workspaceRuntimeId, '/srv/repo-feature'),
       'vscode',
     )
   })
@@ -184,8 +185,8 @@ describe('useBranchActions', () => {
         hasGitHubRemote: true,
       },
     })
-    mocks.openRepoTerminal.mockResolvedValue({ ok: true, message: '' })
-    mocks.openRepoEditor.mockResolvedValue({ ok: true, message: '' })
+    mocks.openWorkspaceTerminal.mockResolvedValue({ ok: true, message: '' })
+    mocks.openWorkspaceEditor.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
     renderInJsdom(
@@ -199,16 +200,12 @@ describe('useBranchActions', () => {
       await actions?.openEditor?.('vscode')
     })
 
-    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(
-      target!.id,
-      repo.workspaceRuntimeId,
-      '/srv/repo-feature',
+    expect(mocks.openWorkspaceTerminal).toHaveBeenCalledWith(
+      worktreeTarget(target!.id, repo.workspaceRuntimeId, '/srv/repo-feature'),
       'ghostty',
     )
-    expect(mocks.openRepoEditor).toHaveBeenCalledWith(
-      target!.id,
-      repo.workspaceRuntimeId,
-      '/srv/repo-feature',
+    expect(mocks.openWorkspaceEditor).toHaveBeenCalledWith(
+      worktreeTarget(target!.id, repo.workspaceRuntimeId, '/srv/repo-feature'),
       'vscode',
     )
   })
@@ -219,7 +216,7 @@ describe('useBranchActions', () => {
       id: REPO_ID,
       branches: [branch],
     })
-    mocks.openRepoTerminal.mockResolvedValue({ ok: true, message: '' })
+    mocks.openWorkspaceTerminal.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
     renderInJsdom(
@@ -230,10 +227,8 @@ describe('useBranchActions', () => {
       await actions?.openTerminal?.('ghostty')
     })
 
-    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(
-      REPO_ID,
-      repo.workspaceRuntimeId,
-      '/tmp/local-feature',
+    expect(mocks.openWorkspaceTerminal).toHaveBeenCalledWith(
+      worktreeTarget(REPO_ID, repo.workspaceRuntimeId, '/tmp/local-feature'),
       'ghostty',
     )
   })
@@ -244,7 +239,7 @@ describe('useBranchActions', () => {
       id: REPO_ID,
       branches: [branch],
     })
-    mocks.openRepoEditor.mockResolvedValue({ ok: true, message: '' })
+    mocks.openWorkspaceEditor.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
     renderInJsdom(
@@ -255,7 +250,10 @@ describe('useBranchActions', () => {
       await actions?.openEditor?.('vscode')
     })
 
-    expect(mocks.openRepoEditor).toHaveBeenCalledWith(REPO_ID, repo.workspaceRuntimeId, '/tmp/local-feature', 'vscode')
+    expect(mocks.openWorkspaceEditor).toHaveBeenCalledWith(
+      worktreeTarget(REPO_ID, repo.workspaceRuntimeId, '/tmp/local-feature'),
+      'vscode',
+    )
   })
 
   test('openFinder uses the embedded server route for non-remote repos', async () => {
@@ -264,7 +262,7 @@ describe('useBranchActions', () => {
       id: REPO_ID,
       branches: [branch],
     })
-    mocks.openRepoInFinder.mockResolvedValue({ ok: true, message: '/tmp/local-feature' })
+    mocks.openWorkspaceInFinder.mockResolvedValue({ ok: true, message: '/tmp/local-feature' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
     renderInJsdom(
@@ -275,7 +273,9 @@ describe('useBranchActions', () => {
       await actions?.openFinder?.()
     })
 
-    expect(mocks.openRepoInFinder).toHaveBeenCalledWith(REPO_ID, '/tmp/local-feature')
+    expect(mocks.openWorkspaceInFinder).toHaveBeenCalledWith(
+      worktreeTarget(REPO_ID, repo.workspaceRuntimeId, '/tmp/local-feature'),
+    )
   })
 
   test('clears local pending state when the branch action target changes', async () => {
@@ -286,7 +286,7 @@ describe('useBranchActions', () => {
       id: REPO_ID,
       branches: [branchA, branchB],
     })
-    mocks.openRepoTerminal.mockReturnValue(firstOpen.promise)
+    mocks.openWorkspaceTerminal.mockReturnValue(firstOpen.promise)
 
     const surfaceRef: { current: ReturnType<typeof useBranchActions> | null } = { current: null }
     const view = renderInJsdom(
@@ -330,6 +330,12 @@ describe('useBranchActions', () => {
     })
   })
 })
+
+function worktreeTarget(workspaceId: WorkspaceId, workspaceRuntimeId: string, worktreePath: string) {
+  const target = gitWorktreeFilesystemExecutionTarget(workspaceId, workspaceRuntimeId, worktreePath)
+  if (!target) throw new Error('invalid test worktree target')
+  return target
+}
 
 function BranchActionsHarness({
   repo,

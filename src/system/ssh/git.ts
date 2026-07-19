@@ -418,7 +418,7 @@ export async function pullRemoteBranch(
   branch: string,
   worktreePath?: string,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
-): Promise<ExecResult> {
+): Promise<RemoteWorktreeMutationResult> {
   if (!isSafeBranchName(branch)) return { ok: false, message: 'error.invalid-arguments' }
   if (worktreePath && !isValidRemotePath(worktreePath)) return { ok: false, message: 'error.invalid-path' }
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
@@ -427,7 +427,8 @@ export async function pullRemoteBranch(
       signal: options.signal,
       timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS,
     })
-    return remoteExecResult(result)
+    const pulled = remoteExecResult(result)
+    return pulled.ok || pulled.repositoryStateChanged ? { ...pulled, affectedWorktreePaths: [worktreePath] } : pulled
   }
 
   const snapshot = await getRemoteSnapshot(target, { signal: options.signal, run })
@@ -437,7 +438,10 @@ export async function pullRemoteBranch(
       signal: options.signal,
       timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS,
     })
-    return remoteExecResult(result)
+    const pulled = remoteExecResult(result)
+    return pulled.ok || pulled.repositoryStateChanged
+      ? { ...pulled, affectedWorktreePaths: [target.remotePath] }
+      : pulled
   }
 
   const upstream = await getRemoteUpstream(target, branch, { signal: options.signal, run })

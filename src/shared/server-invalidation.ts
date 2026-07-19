@@ -3,6 +3,10 @@ import {
   isWorkspaceRuntimeInvalidationEvent,
   type WorkspaceRuntimeInvalidationEvent,
 } from '#/shared/workspace-runtime-invalidation.ts'
+import {
+  isWorkspaceFilesystemInvalidationEvent,
+  type WorkspaceFilesystemInvalidationEvent,
+} from '#/shared/workspace-filesystem-invalidation.ts'
 
 export const SETTINGS_INVALIDATION_SCOPES = ['settings-snapshot', 'external-apps', 'i18n', 'theme'] as const
 
@@ -14,7 +18,10 @@ export interface SettingsInvalidationEvent {
 }
 
 export type ServerInvalidationEvent =
-  RepoQueryInvalidationEvent | WorkspaceRuntimeInvalidationEvent | SettingsInvalidationEvent
+  | RepoQueryInvalidationEvent
+  | WorkspaceRuntimeInvalidationEvent
+  | WorkspaceFilesystemInvalidationEvent
+  | SettingsInvalidationEvent
 
 export function isSettingsInvalidationScope(value: unknown): value is SettingsInvalidationScope {
   return value === 'settings-snapshot' || value === 'external-apps' || value === 'i18n' || value === 'theme'
@@ -34,6 +41,7 @@ export function isServerInvalidationEvent(value: unknown): value is ServerInvali
   return (
     isRepoQueryInvalidationEvent(value) ||
     isWorkspaceRuntimeInvalidationEvent(value) ||
+    isWorkspaceFilesystemInvalidationEvent(value) ||
     isSettingsInvalidationEvent(value)
   )
 }

@@ -9,34 +9,33 @@ import {
   getRepoWorktreeBootstrapPreview,
   probeRepo,
 } from '#/server/modules/repo-read-paths.ts'
-import { getRepositoryFileViewer } from '#/server/modules/repo-file-viewer.ts'
-import { getRepositoryTree } from '#/server/modules/repo-tree.ts'
-import { canonicalRuntimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-validators.ts'
-import { trashRepositoryFile } from '#/server/modules/repo-tree-trash.ts'
 import {
   cloneRepo,
   createRepoWorktree,
   deleteRepoBranch,
   fetchRepo,
   getRepoRemoteBranches,
-  openRepoEditor,
-  openRepoInFinder,
-  openRepoTerminal,
   openRepoUrl,
   pullRepoBranch,
   pushRepoBranch,
   removeCapturedRepoWorktree,
+  type RepoFilesystemMutationOutcome,
 } from '#/server/modules/repo-write-paths.ts'
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
-import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
+import {
+  publishRepoQueryInvalidation,
+  publishUserWorkspaceFilesystemInvalidation,
+} from '#/server/modules/invalidation-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
-import { isCurrentWorkspaceRuntime, workspaceRuntimeHasGitCapability } from '#/server/modules/workspace-runtimes.ts'
+import { workspaceRuntimeHasGitCapability } from '#/server/modules/workspace-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspaceLocatorForPath, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import { IpcError, type RepoLogResponse } from '#/shared/api-types.ts'
-import { isRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure.ts'
-import { settleRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
+import {
+  requireCurrentWorkspaceRuntime,
+  runGitWorkspaceRuntimeRequest,
+} from '#/server/modules/workspace-runtime-request.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { ServerRepoMutationHost } from '#/server/repo-mutation/repo-mutation-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
@@ -72,27 +71,14 @@ export function createRepoRoutes(options: {
     label: string,
     signal?: AbortSignal,
   ): Promise<T> {
-    try {
-      return await run()
-    } catch (err) {
-      if (signal?.aborted) throw err
-      if (isRemoteWorkspaceRuntimeFailure(err)) {
-        await settleRemoteWorkspaceRuntimeFailure(userId, err)
-        serverRepoNodeLog.warn({ err, label }, 'failed')
-        throw new IpcError({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
-      }
-      serverRepoNodeLog.warn({ err, label }, 'failed')
-      throw err
-    }
+    return await runGitWorkspaceRuntimeRequest({ userId, run, label, signal })
   }
   function assertCurrentWorkspaceRuntimeForRead(
     userId: string | null | undefined,
     repoRoot: WorkspaceId,
     workspaceRuntimeId: string,
   ): asserts userId is string {
-    if (!userId || !isCurrentWorkspaceRuntime(userId, repoRoot, workspaceRuntimeId)) {
-      throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
-    }
+    requireCurrentWorkspaceRuntime(userId, repoRoot, workspaceRuntimeId)
   }
   function assertGitCapability(userId: string, repoRoot: WorkspaceId, workspaceRuntimeId: string): void {
     if (!workspaceRuntimeHasGitCapability(userId, repoRoot, workspaceRuntimeId)) {
@@ -161,54 +147,6 @@ export function createRepoRoutes(options: {
         'patch',
       ),
     )
-  })
-  app.post('/tree', async (c) => {
-    const { target, prefix } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.tree, c)
-    const executionTarget = canonicalRuntimeWorkspacePaneTarget(target)
-    if (!executionTarget || executionTarget.kind === 'git-branch') {
-      throw new Error('error.workspace-target-transport-mismatch')
-    }
-    const userId = userIdFromContext(c)
-    assertCurrentWorkspaceRuntimeForRead(userId, executionTarget.workspaceId, executionTarget.workspaceRuntimeId)
-    return c.json(
-      await runtimeReadJsonOrThrow(
-        userId,
-        () =>
-          getRepositoryTree(executionTarget, {
-            prefix,
-            workspaceRuntimeId: executionTarget.workspaceRuntimeId,
-            signal: c.req.raw.signal,
-          }),
-        'tree',
-        c.req.raw.signal,
-      ),
-    )
-  })
-  app.post('/file-viewer', async (c) => {
-    const { cwd, workspaceRuntimeId, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fileViewer, c)
-    const userId = userIdFromContext(c)
-    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
-    return c.json(
-      await runtimeReadJsonOrThrow(
-        userId,
-        () => getRepositoryFileViewer(cwd, worktreePath, c.req.raw.signal, { workspaceRuntimeId }),
-        'file-viewer',
-      ),
-    )
-  })
-  app.post('/trash-file', async (c) => {
-    const { cwd, workspaceRuntimeId, worktreePath, path } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.trashFile, c)
-    const userId = userIdFromContext(c)
-    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
-    const result = await runtimeReadJsonOrThrow(
-      userId,
-      () => trashRepositoryFile(cwd, worktreePath, path, c.req.raw.signal, { workspaceRuntimeId }),
-      'trash-file',
-    )
-    if (result.ok || result.repositoryStateChanged === true) {
-      publishRepoQueryInvalidation({ repoId: cwd, query: 'repo-snapshot' })
-    }
-    return c.json(result)
   })
   app.post('/projection', async (c) => {
     const { cwd, workspaceRuntimeId, branch, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.projection, c)
@@ -279,13 +217,12 @@ export function createRepoRoutes(options: {
     const userId = userIdFromContext(c)
     assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
-    return c.json(
-      await runtimeReadJsonOrThrow(
-        userId,
-        () => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal, { workspaceRuntimeId }),
-        'pull',
-      ),
+    const result = await runtimeReadJsonOrThrow(
+      userId,
+      () => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal, { workspaceRuntimeId }),
+      'pull',
     )
+    return c.json(publishPullFilesystemInvalidations(userId, cwd, workspaceRuntimeId, result))
   })
   app.post('/push', async (c) => {
     const { cwd, workspaceRuntimeId, branch } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.push, c)
@@ -393,40 +330,6 @@ export function createRepoRoutes(options: {
       ),
     )
   })
-  app.post('/open-terminal', async (c) => {
-    const { workspaceId, workspaceRuntimeId, worktreePath, app } = await parseHttpBody(
-      REPO_PROCEDURE_SCHEMAS.openTerminal,
-      c,
-    )
-    const userId = userIdFromContext(c)
-    assertCurrentWorkspaceRuntimeForRead(userId, workspaceId, workspaceRuntimeId)
-    return c.json(
-      await runtimeReadJsonOrThrow(
-        userId,
-        () => openRepoTerminal(workspaceId, worktreePath, app, c.req.raw.signal, { workspaceRuntimeId }),
-        'open-terminal',
-      ),
-    )
-  })
-  app.post('/open-editor', async (c) => {
-    const { workspaceId, workspaceRuntimeId, worktreePath, app } = await parseHttpBody(
-      REPO_PROCEDURE_SCHEMAS.openEditor,
-      c,
-    )
-    const userId = userIdFromContext(c)
-    assertCurrentWorkspaceRuntimeForRead(userId, workspaceId, workspaceRuntimeId)
-    return c.json(
-      await runtimeReadJsonOrThrow(
-        userId,
-        () => openRepoEditor(workspaceId, worktreePath, app, c.req.raw.signal, { workspaceRuntimeId }),
-        'open-editor',
-      ),
-    )
-  })
-  app.post('/open-in-finder', async (c) => {
-    const { workspaceId, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openInFinder, c)
-    return c.json(await jsonOr(() => openRepoInFinder(workspaceId, worktreePath), READ_REPO_ERROR, 'open-in-finder'))
-  })
   app.post('/background-sync-repos', async (c) => {
     const { repoIds } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.backgroundSyncRepos, c)
     return c.json(
@@ -441,4 +344,24 @@ export function createRepoRoutes(options: {
     )
   })
   return app
+}
+
+function publishPullFilesystemInvalidations(
+  userId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+  outcome: RepoFilesystemMutationOutcome,
+) {
+  const { affectedWorktreePaths = [], ...result } = outcome
+  const roots = new Set(
+    affectedWorktreePaths
+      .map((worktreePath) => workspaceLocatorForPath(workspaceId, worktreePath))
+      .filter((root): root is WorkspaceId => root !== null),
+  )
+  for (const root of roots) {
+    publishUserWorkspaceFilesystemInvalidation(userId, {
+      target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId, root },
+    })
+  }
+  return result
 }

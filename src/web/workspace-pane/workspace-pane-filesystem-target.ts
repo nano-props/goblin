@@ -1,7 +1,7 @@
 import { terminalGitWorktreePresentation, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitHead } from '#/shared/git-head.ts'
-import type { RuntimeWorkspacePaneTarget, WorkspaceCapabilities } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceCapabilities, WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 interface WorkspacePaneSurfaceTargetBase {
@@ -19,12 +19,13 @@ export type WorkspacePaneFilesystemTarget = Exclude<WorkspacePaneSurfaceTarget, 
 
 export function workspacePaneFilesystemRuntimeTarget(
   target: WorkspacePaneFilesystemTarget,
-): RuntimeWorkspacePaneTarget | null {
+): WorkspacePaneFilesystemExecutionTarget | null {
   const tabsTarget =
     target.kind === 'workspace-root'
       ? { kind: 'workspace-root' as const, workspaceId: target.workspaceId }
       : gitWorktreeWorkspacePaneTabsTarget(target.workspaceId, target.rootPath)
-  return tabsTarget ? runtimeWorkspacePaneTarget(tabsTarget, target.workspaceRuntimeId) : null
+  const runtimeTarget = tabsTarget ? runtimeWorkspacePaneTarget(tabsTarget, target.workspaceRuntimeId) : null
+  return runtimeTarget?.kind === 'workspace-root' || runtimeTarget?.kind === 'git-worktree' ? runtimeTarget : null
 }
 
 export function workspacePaneFilesystemTerminalBase(target: WorkspacePaneFilesystemTarget): TerminalSessionBase | null {

@@ -1,4 +1,4 @@
-// Source layer for the worktree-scoped file tree (docs/filetree.md).
+// Source layer for workspace-root and Git-worktree filesystem trees.
 //
 // This module reads one directory level at a time. The UI composes
 // those direct-children responses into a lazy tree; this layer never
@@ -7,7 +7,7 @@
 import path from 'node:path'
 import { readdir } from 'node:fs/promises'
 import { execa } from 'execa'
-import type { RepoTreeNode } from '#/shared/api-types.ts'
+import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { getRemoteTreeWalk, type RemoteGitRunner } from '#/system/ssh/git.ts'
@@ -16,36 +16,36 @@ import {
   buildLimitedChildNodes,
   parseNullSeparatedPaths,
   stripRemoteEntryPrefix,
-} from '#/server/modules/repo-tree-source-pure.ts'
+} from '#/server/modules/workspace-filesystem-source-pure.ts'
 
-export const MAX_REPO_TREE_NODES = 50_000
+export const MAX_WORKSPACE_FILESYSTEM_NODES = 50_000
 
-export interface RepoTreeSourceOptions {
+export interface WorkspaceFilesystemSourceOptions {
   /** POSIX path relative to the worktree root. Empty means the root directory. */
   readonly prefix?: string
 }
 
-export interface RepoTreeSourceResult {
-  readonly nodes: ReadonlyArray<RepoTreeNode>
+export interface WorkspaceFilesystemSourceResult {
+  readonly nodes: ReadonlyArray<WorkspaceFilesystemNode>
   readonly truncated: boolean
 }
 
-export async function getRepoTreeSourceLocal(
+export async function readGitWorktreeFilesystemSourceLocal(
   worktreePath: string,
-  options: RepoTreeSourceOptions,
+  options: WorkspaceFilesystemSourceOptions,
   signal: AbortSignal | undefined,
-): Promise<RepoTreeSourceResult> {
+): Promise<WorkspaceFilesystemSourceResult> {
   if (signal?.aborted) throw new Error('aborted')
   const prefix = normalizePrefix(options.prefix)
   if (!isSafeNormalizedPrefix(prefix)) throw new Error('invalid tree prefix')
-  return await getRepoTreeDirectoryChildrenLocal(worktreePath, prefix, signal)
+  return await readFilesystemDirectoryChildrenLocal(worktreePath, prefix, signal)
 }
 
-export async function getWorkspaceTreeSourceLocal(
+export async function readWorkspaceFilesystemSourceLocal(
   workspacePath: string,
-  options: RepoTreeSourceOptions,
+  options: WorkspaceFilesystemSourceOptions,
   signal: AbortSignal | undefined,
-): Promise<RepoTreeSourceResult> {
+): Promise<WorkspaceFilesystemSourceResult> {
   if (signal?.aborted) throw new Error('aborted')
   const prefix = normalizePrefix(options.prefix)
   if (!isSafeNormalizedPrefix(prefix)) throw new Error('invalid tree prefix')
@@ -56,30 +56,32 @@ export async function getWorkspaceTreeSourceLocal(
   )
 }
 
-export interface GetRepoTreeSourceRemoteInput {
+export interface GitWorktreeFilesystemSourceRemoteInput {
   readonly target: RemoteWorkspaceTarget
   readonly worktreePath: string
-  readonly options: RepoTreeSourceOptions
+  readonly options: WorkspaceFilesystemSourceOptions
   readonly signal: AbortSignal | undefined
   readonly run?: RemoteGitRunner
   /** Optional trusted worktree list from the caller. */
   readonly knownWorktrees?: ReadonlyArray<WorktreeInfo>
 }
 
-export async function getRepoTreeSourceRemote(input: GetRepoTreeSourceRemoteInput): Promise<RepoTreeSourceResult> {
-  return await readRepoTreeSourceRemote(input, getRemoteTreeWalk)
+export async function readGitWorktreeFilesystemSourceRemote(
+  input: GitWorktreeFilesystemSourceRemoteInput,
+): Promise<WorkspaceFilesystemSourceResult> {
+  return await readFilesystemSourceRemote(input, getRemoteTreeWalk)
 }
 
-export async function getWorkspaceTreeSourceRemote(
-  input: Omit<GetRepoTreeSourceRemoteInput, 'knownWorktrees'>,
-): Promise<RepoTreeSourceResult> {
-  return await readRepoTreeSourceRemote(input, getRemoteDirectoryWalk)
+export async function readWorkspaceFilesystemSourceRemote(
+  input: Omit<GitWorktreeFilesystemSourceRemoteInput, 'knownWorktrees'>,
+): Promise<WorkspaceFilesystemSourceResult> {
+  return await readFilesystemSourceRemote(input, getRemoteDirectoryWalk)
 }
 
-async function readRepoTreeSourceRemote(
-  input: GetRepoTreeSourceRemoteInput,
+async function readFilesystemSourceRemote(
+  input: GitWorktreeFilesystemSourceRemoteInput,
   readDirectory: typeof getRemoteTreeWalk | typeof getRemoteDirectoryWalk,
-): Promise<RepoTreeSourceResult> {
+): Promise<WorkspaceFilesystemSourceResult> {
   const { target, worktreePath, options, signal, run, knownWorktrees } = input
   if (signal?.aborted) throw new Error('aborted')
 
@@ -106,11 +108,11 @@ async function readRepoTreeSourceRemote(
   return nodesFromDirectoryEntries(prefix, entries)
 }
 
-async function getRepoTreeDirectoryChildrenLocal(
+async function readFilesystemDirectoryChildrenLocal(
   worktreePath: string,
   prefix: string,
   signal: AbortSignal | undefined,
-): Promise<RepoTreeSourceResult> {
+): Promise<WorkspaceFilesystemSourceResult> {
   const entries = await readDirectoryEntriesLocal(worktreePath, prefix, signal)
   const visibleEntries = await visibleGitDirectoryEntries(worktreePath, entries, signal)
   if (signal?.aborted) throw new Error('aborted')
@@ -164,9 +166,9 @@ async function visibleGitDirectoryEntries(
   return entries.filter((entry) => !ignored.has(entry.checkPath) || trackedIgnored.has(entry.checkPath))
 }
 
-function nodesFromDirectoryEntries(prefix: string, entries: ReadonlyArray<string>): RepoTreeSourceResult {
-  const result = buildLimitedChildNodes({ prefix, entries, maxNodes: MAX_REPO_TREE_NODES })
-  const nodes: RepoTreeNode[] = result.nodes.map((node) => ({ ...node, status: 'clean' }))
+function nodesFromDirectoryEntries(prefix: string, entries: ReadonlyArray<string>): WorkspaceFilesystemSourceResult {
+  const result = buildLimitedChildNodes({ prefix, entries, maxNodes: MAX_WORKSPACE_FILESYSTEM_NODES })
+  const nodes: WorkspaceFilesystemNode[] = result.nodes.map((node) => ({ ...node, status: 'clean' }))
   return { nodes, truncated: result.truncated }
 }
 

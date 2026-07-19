@@ -2,6 +2,7 @@ import {
   parseCanonicalWorkspaceLocator,
   type ParsedWorkspaceLocator,
   type WorkspaceId,
+  workspaceLocatorForPath,
 } from '#/shared/workspace-locator.ts'
 
 export type WorkspaceUnavailableReason =
@@ -84,6 +85,15 @@ export function workspacePaneFilesystemExecutionPath(target: WorkspacePaneFilesy
   const locator = parseCanonicalWorkspaceLocator(target.kind === 'workspace-root' ? target.workspaceId : target.root)
   if (!locator) throw new Error('filesystem execution target locator is invalid')
   return locator.path
+}
+
+export function gitWorktreeFilesystemExecutionTarget(
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+  worktreePath: string,
+): WorkspacePaneFilesystemExecutionTarget | null {
+  const root = workspaceLocatorForPath(workspaceId, worktreePath)
+  return root ? { kind: 'git-worktree', workspaceId, workspaceRuntimeId, root } : null
 }
 
 export function capabilitiesFromGitProbe(

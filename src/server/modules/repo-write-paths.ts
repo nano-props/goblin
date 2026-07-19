@@ -27,22 +27,11 @@ import {
   untrustServerWorkspaceWorktreeBootstrapConfig,
 } from '#/server/modules/settings-source.ts'
 import { cloneRepo as cloneGitRepo } from '#/system/git/clone.ts'
-import { openInPreferredEditor } from '#/system/editors.ts'
-import { openInPreferredTerminal } from '#/system/terminals.ts'
-import { openInFinder } from '#/system/finder.ts'
-import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
-import { openServerRemoteEditor, openServerRemoteTerminal } from '#/server/modules/remote-workspace.ts'
 import { type ExecResult, type RepoUrlTarget } from '#/shared/git-types.ts'
 import type { NetworkOpKind, RepoServerOperationKind, RepoServerOperationTarget } from '#/shared/api-types.ts'
-import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import { checkGitAvailable } from '#/system/git/git-exec.ts'
-import {
-  isValidCwd,
-  isValidWorkspaceLocatorInput,
-  toSafeWorkspaceLocator,
-} from '#/shared/input-validation.ts'
+import { isValidCwd, isValidWorkspaceLocatorInput, toSafeWorkspaceLocator } from '#/shared/input-validation.ts'
 import { isWorkspaceWorktreeBootstrapConfigTrusted } from '#/shared/workspace-settings.ts'
-import { resolveWorkspaceScopedPath } from '#/server/modules/workspace-path.ts'
 import { type CloneRepoResult } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { normalizeCreateWorktreeInput, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
@@ -115,10 +104,15 @@ function publishRepoSnapshotInvalidation(cwd: string): void {
 }
 
 async function publishSnapshotInvalidationAfterMutation(cwd: string, result: RepoMutationResult): Promise<ExecResult> {
+  return execResultOnly(publishSnapshotInvalidationForMutation(cwd, result))
+}
+
+function publishSnapshotInvalidationForMutation(cwd: string, result: RepoMutationResult): RepoMutationResult {
   const affectedRepoIds = result.affectedRepoIds ?? []
-  if (!result.ok && !result.repositoryStateChanged && affectedRepoIds.length === 0) return execResultOnly(result)
-  publishRepoSnapshotInvalidations(cwd, affectedRepoIds)
-  return execResultOnly(result)
+  if (result.ok || result.repositoryStateChanged || affectedRepoIds.length > 0) {
+    publishRepoSnapshotInvalidations(cwd, affectedRepoIds)
+  }
+  return result
 }
 
 function publishRepoSnapshotInvalidations(cwd: string, affectedRepoIds: readonly string[]): void {
@@ -137,12 +131,12 @@ async function runUserNetworkMutation(
   signal: AbortSignal | undefined,
   operationKind: 'pull' | 'push',
   target: { branch?: string; worktreePath?: string } | null,
-  task: (signal: AbortSignal | undefined) => Promise<ExecResult>,
+  task: (signal: AbortSignal | undefined) => Promise<RepoMutationResult>,
   options: { workspaceRuntimeId?: string } = {},
-): Promise<ExecResult> {
-  return await publishSnapshotInvalidationAfterMutation(
+): Promise<RepoMutationResult> {
+  return publishSnapshotInvalidationForMutation(
     cwd,
-    await enqueueRepoWriteOperation(
+    await enqueueRepoWriteOperation<RepoMutationResult>(
       cwd,
       signal,
       {
@@ -157,6 +151,14 @@ async function runUserNetworkMutation(
         await context.runNetworkOperation(async (networkSignal) => await task(networkSignal)),
     ),
   )
+}
+
+export interface RepoFilesystemMutationOutcome extends ExecResult {
+  affectedWorktreePaths?: readonly string[]
+}
+
+function filesystemMutationOutcome(result: RepoMutationResult): RepoFilesystemMutationOutcome {
+  return omit(result, ['affectedRepoIds'])
 }
 
 function createWorktreeTargetBranch(input: CreateWorktreeInput): string {
@@ -311,20 +313,22 @@ export async function pullRepoBranch(
   worktreePath?: string,
   signal?: AbortSignal,
   options: { workspaceRuntimeId?: string } = {},
-): Promise<ExecResult> {
+): Promise<RepoFilesystemMutationOutcome> {
   const source = await resolveRepoSource(
     cwd,
     options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
   )
-  return await runUserNetworkMutation(
-    cwd,
-    signal,
-    'pull',
-    { branch, worktreePath },
-    async (mergedSignal) => {
-      return await source.pull(branch, worktreePath, mergedSignal)
-    },
-    options,
+  return filesystemMutationOutcome(
+    await runUserNetworkMutation(
+      cwd,
+      signal,
+      'pull',
+      { branch, worktreePath },
+      async (mergedSignal) => {
+        return await source.pull(branch, worktreePath, mergedSignal)
+      },
+      options,
+    ),
   )
 }
 
@@ -338,15 +342,17 @@ export async function pushRepoBranch(
     cwd,
     options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
   )
-  return await runUserNetworkMutation(
-    cwd,
-    signal,
-    'push',
-    { branch },
-    async (mergedSignal) => {
-      return await source.push(branch, mergedSignal)
-    },
-    options,
+  return execResultOnly(
+    await runUserNetworkMutation(
+      cwd,
+      signal,
+      'push',
+      { branch },
+      async (mergedSignal) => {
+        return await source.push(branch, mergedSignal)
+      },
+      options,
+    ),
   )
 }
 
@@ -565,41 +571,4 @@ export async function openRepoUrl(
     options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
   )
   return url ? { ok: true, message: url } : { ok: false, message: 'error.no-remote-url' }
-}
-
-export async function openRepoTerminal(
-  workspaceId: WorkspaceId,
-  worktreePath: string,
-  app: TerminalApp,
-  signal?: AbortSignal,
-  options: { workspaceRuntimeId?: string } = {},
-): Promise<ExecResult> {
-  const executionPath = resolveWorkspaceScopedPath(workspaceId, worktreePath) ?? worktreePath
-  if (isRemoteWorkspaceId(workspaceId))
-    return await openServerRemoteTerminal(
-      { workspaceId, worktreePath: executionPath, app, workspaceRuntimeId: options.workspaceRuntimeId },
-      signal,
-    )
-  return await openInPreferredTerminal(executionPath, app)
-}
-
-export async function openRepoEditor(
-  workspaceId: WorkspaceId,
-  worktreePath: string,
-  app: EditorApp,
-  signal?: AbortSignal,
-  options: { workspaceRuntimeId?: string } = {},
-): Promise<ExecResult> {
-  const executionPath = resolveWorkspaceScopedPath(workspaceId, worktreePath) ?? worktreePath
-  if (isRemoteWorkspaceId(workspaceId))
-    return await openServerRemoteEditor(
-      { workspaceId, worktreePath: executionPath, app, workspaceRuntimeId: options.workspaceRuntimeId },
-      signal,
-    )
-  return await openInPreferredEditor(executionPath, app)
-}
-
-export async function openRepoInFinder(workspaceId: WorkspaceId, worktreePath: string): Promise<ExecResult> {
-  if (isRemoteWorkspaceId(workspaceId)) return { ok: false, message: 'error.invalid-path' }
-  return await openInFinder(resolveWorkspaceScopedPath(workspaceId, worktreePath) ?? worktreePath)
 }

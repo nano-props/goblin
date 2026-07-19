@@ -6,7 +6,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import type { Key } from 'react-aria-components'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
-import type { RepoTreeNode, RepoTreeResult } from '#/shared/api-types.ts'
+import type { WorkspaceFilesystemNode, WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
 
 vi.mock('#/web/stores/i18n.ts', () => ({
   useT: () => (key: string, params?: Record<string, string | number>) => {
@@ -45,12 +45,16 @@ type FiletreeViewHarnessProps = Omit<
   readonly onTopVisibleRowIndexChange?: (topVisibleRowIndex: number) => void
 }
 
-function fileNode(id: string, parentId: string | null = null, status: RepoTreeNode['status'] = 'clean'): RepoTreeNode {
+function fileNode(
+  id: string,
+  parentId: string | null = null,
+  status: WorkspaceFilesystemNode['status'] = 'clean',
+): WorkspaceFilesystemNode {
   const name = id.includes('/') ? id.slice(id.lastIndexOf('/') + 1) : id
   return { id, path: id, name, parentId, kind: 'file', status }
 }
 
-function dirNode(id: string, parentId: string | null = null): RepoTreeNode {
+function dirNode(id: string, parentId: string | null = null): WorkspaceFilesystemNode {
   const name = id.includes('/') ? id.slice(id.lastIndexOf('/') + 1) : id
   return { id, path: id, name, parentId, kind: 'directory', status: 'clean' }
 }
@@ -156,7 +160,7 @@ function scrollViewport(): HTMLDivElement {
   return element
 }
 
-function buildTree(): RepoTreeResult {
+function buildTree(): WorkspaceFilesystemTreeResult {
   return {
     nodes: [
       dirNode('src'),
@@ -171,7 +175,7 @@ function buildTree(): RepoTreeResult {
 
 describe('FiletreeView', () => {
   test('renders the empty state when the tree has no nodes', () => {
-    const tree: RepoTreeResult = { nodes: [], truncated: false }
+    const tree: WorkspaceFilesystemTreeResult = { nodes: [], truncated: false }
     renderView({ tree, loading: false, error: null })
     expect(container?.querySelector('[data-filetree=""]')).not.toBeNull()
     expect(container?.querySelectorAll('[role="treeitem"]').length).toBe(0)
@@ -185,7 +189,7 @@ describe('FiletreeView', () => {
   })
 
   test('renders error state when error is set', () => {
-    const tree: RepoTreeResult = { nodes: [], truncated: false }
+    const tree: WorkspaceFilesystemTreeResult = { nodes: [], truncated: false }
     renderView({ tree, loading: false, error: 'boom' })
     expect(container?.textContent).toMatch(/filetree\.error/)
   })
@@ -230,7 +234,7 @@ describe('FiletreeView', () => {
   })
 
   test('lists root-level files and directories, directories before files', () => {
-    const tree: RepoTreeResult = {
+    const tree: WorkspaceFilesystemTreeResult = {
       nodes: [
         dirNode('src'),
         fileNode('README.md'),
@@ -251,7 +255,7 @@ describe('FiletreeView', () => {
 
   test('selects and toggles a directory when clicking the row', async () => {
     const user = userEvent.setup()
-    const tree: RepoTreeResult = {
+    const tree: WorkspaceFilesystemTreeResult = {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src')],
       truncated: false,
     }
@@ -277,7 +281,7 @@ describe('FiletreeView', () => {
 
   test('row click replaces selection and toggles directory expansion in one interaction', async () => {
     const user = userEvent.setup()
-    const tree: RepoTreeResult = {
+    const tree: WorkspaceFilesystemTreeResult = {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src'), fileNode('README.md')],
       truncated: false,
     }
@@ -295,7 +299,7 @@ describe('FiletreeView', () => {
 
   test('clicking a nested file does not toggle or select its parent directory', async () => {
     const user = userEvent.setup()
-    const tree: RepoTreeResult = {
+    const tree: WorkspaceFilesystemTreeResult = {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src')],
       truncated: false,
     }
@@ -315,7 +319,7 @@ describe('FiletreeView', () => {
     const user = userEvent.setup()
     const onOpenFile = vi.fn()
     const onRequestTrashFile = vi.fn()
-    const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
+    const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
     renderView({ tree, loading: false, error: null, onOpenFile, onRequestTrashFile })
 
     const actionButton = row('README.md').querySelector<HTMLButtonElement>('[data-action-popover-trigger]')
@@ -347,7 +351,7 @@ describe('FiletreeView', () => {
 
   test('keeps the file action menu trigger visible in compact mode', () => {
     compactUi = true
-    const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
+    const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
     renderView({ tree, loading: false, error: null, onOpenFile: vi.fn() })
 
     const actionButton = row('README.md').querySelector<HTMLButtonElement>('[data-action-popover-trigger]')
@@ -360,7 +364,7 @@ describe('FiletreeView', () => {
 
   test('keeps the file action menu trigger visible and busy while opening the file', async () => {
     const user = userEvent.setup()
-    const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
+    const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
     renderView({
       tree,
       loading: false,
@@ -387,7 +391,7 @@ describe('FiletreeView', () => {
   test('opens a file on double click', async () => {
     const user = userEvent.setup()
     const onOpenFile = vi.fn()
-    const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
+    const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
     renderView({ tree, loading: false, error: null, onOpenFile })
 
     await user.dblClick(row('README.md'))
@@ -398,7 +402,7 @@ describe('FiletreeView', () => {
 
   test('renders selected rows without rounded corners', async () => {
     const user = userEvent.setup()
-    const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
+    const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
     renderView({ tree, loading: false, error: null })
 
     await user.click(row('README.md'))
@@ -409,7 +413,7 @@ describe('FiletreeView', () => {
 
   test('still expands a directory via the chevron control', async () => {
     const user = userEvent.setup()
-    const tree: RepoTreeResult = {
+    const tree: WorkspaceFilesystemTreeResult = {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src')],
       truncated: false,
     }
@@ -425,7 +429,7 @@ describe('FiletreeView', () => {
   test('emits onSelect when a row is clicked', async () => {
     const user = userEvent.setup()
     const onSelect = vi.fn()
-    const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
+    const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
     renderView({ tree, loading: false, error: null, onSelect })
 
     await user.click(row('README.md'))
@@ -438,7 +442,7 @@ describe('FiletreeView', () => {
   test('emits onActivate on Enter key for files', async () => {
     const user = userEvent.setup()
     const onActivate = vi.fn()
-    const tree: RepoTreeResult = { nodes: [fileNode('README.md')], truncated: false }
+    const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
     renderView({ tree, loading: false, error: null, onActivate })
 
     row('README.md').focus()
@@ -449,7 +453,7 @@ describe('FiletreeView', () => {
   })
 
   test('shows the truncated footer when truncated is true', () => {
-    const tree: RepoTreeResult = {
+    const tree: WorkspaceFilesystemTreeResult = {
       nodes: [fileNode('README.md')],
       truncated: true,
     }
@@ -458,7 +462,7 @@ describe('FiletreeView', () => {
   })
 
   test('does not render a status dot in v1 (git-status overlay deferred)', () => {
-    const tree: RepoTreeResult = {
+    const tree: WorkspaceFilesystemTreeResult = {
       nodes: [fileNode('README.md', null, 'modified')],
       truncated: false,
     }
@@ -492,7 +496,7 @@ describe('FiletreeView', () => {
 
   test('preserves selection and expansion when the tree refreshes with the same keys', async () => {
     const user = userEvent.setup()
-    const treeA: RepoTreeResult = {
+    const treeA: WorkspaceFilesystemTreeResult = {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src'), fileNode('README.md')],
       truncated: false,
     }
@@ -503,7 +507,7 @@ describe('FiletreeView', () => {
     expect(rowNames()).toEqual(['src', 'index.ts', 'README.md'])
     expect(row('README.md').getAttribute('aria-selected')).toBe('true')
 
-    const treeB: RepoTreeResult = {
+    const treeB: WorkspaceFilesystemTreeResult = {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src'), fileNode('README.md')],
       truncated: false,
     }
@@ -518,7 +522,7 @@ describe('FiletreeView', () => {
 
   test('prunes selection and expansion when refreshed nodes disappear', async () => {
     const user = userEvent.setup()
-    const treeA: RepoTreeResult = {
+    const treeA: WorkspaceFilesystemTreeResult = {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src'), fileNode('README.md')],
       truncated: false,
     }
@@ -529,7 +533,7 @@ describe('FiletreeView', () => {
     expect(rowNames()).toEqual(['src', 'index.ts', 'README.md'])
     expect(row('README.md').getAttribute('aria-selected')).toBe('true')
 
-    const treeB: RepoTreeResult = {
+    const treeB: WorkspaceFilesystemTreeResult = {
       nodes: [fileNode('CHANGELOG.md'), dirNode('docs')],
       truncated: false,
     }
@@ -588,7 +592,7 @@ describe('FiletreeView — React Aria keyboard integration', () => {
 
 describe('FiletreeView — locale-aware sorting', () => {
   test('sorts child lists by locale-aware name compare, directories first', () => {
-    const tree: RepoTreeResult = {
+    const tree: WorkspaceFilesystemTreeResult = {
       nodes: [fileNode('10.txt'), dirNode('a'), fileNode('2.txt'), dirNode('A'), fileNode('b.txt'), fileNode('a.txt')],
       truncated: false,
     }

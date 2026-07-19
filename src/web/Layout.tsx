@@ -28,6 +28,7 @@ import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRo
 import { useWorkspaceDrop } from '#/web/hooks/useWorkspaceDrop.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { useWorkspaceRuntimeInvalidationRefresh } from '#/web/hooks/useWorkspaceRuntimeInvalidationRefresh.ts'
+import { useWorkspaceFilesystemInvalidationSync } from '#/web/hooks/useWorkspaceFilesystemInvalidationSync.ts'
 import { useRepoProjectionQueryEffects } from '#/web/repo-projection-query-effects.ts'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToast.ts'
@@ -100,6 +101,7 @@ export function Layout() {
 }
 
 function AuthenticatedAppShell() {
+  useWorkspaceFilesystemInvalidationSync()
   const routeMatches = useRouterState({ select: (s) => s.matches })
   const activeWorkspaceSlug = workspaceRouteContextFromMatches(routeMatches)?.workspaceSlug ?? null
   const activeWorkspaceId = activeWorkspaceSlug ? workspaceIdFromSlug(activeWorkspaceSlug) : null
@@ -282,6 +284,7 @@ function AuthenticatedWorkspaceShell() {
                 workspaceDrop={workspaceDrop}
                 navigation={navigation}
                 hydratedRouteWorkspaceId={hydratedRouteWorkspaceId}
+                currentWorkspaceRuntimeId={commandWorkspace?.workspaceRuntimeId ?? null}
                 currentBranchName={currentBranchName}
                 currentWorkspacePaneRoute={currentWorkspacePaneRoute}
               />
@@ -398,6 +401,7 @@ interface PrimaryWindowOverlaysProps {
   workspaceDrop: ReturnType<typeof useWorkspaceDrop>
   navigation: PrimaryWindowNavigationActions
   hydratedRouteWorkspaceId: WorkspaceId | null
+  currentWorkspaceRuntimeId: string | null
   currentBranchName: string | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
 }
@@ -407,6 +411,7 @@ function PrimaryWindowOverlays({
   workspaceDrop,
   navigation,
   hydratedRouteWorkspaceId,
+  currentWorkspaceRuntimeId,
   currentBranchName,
   currentWorkspacePaneRoute,
 }: PrimaryWindowOverlaysProps) {
@@ -419,7 +424,10 @@ function PrimaryWindowOverlays({
         onOpenChange={overlays.setOpenRemoteWorkspaceOpen}
       />
       <BranchActionDialogHost currentWorkspaceId={hydratedRouteWorkspaceId} currentBranchName={currentBranchName} />
-      <FiletreeActionDialogHost currentWorkspaceId={hydratedRouteWorkspaceId} />
+      <FiletreeActionDialogHost
+        currentWorkspaceId={hydratedRouteWorkspaceId}
+        currentWorkspaceRuntimeId={currentWorkspaceRuntimeId}
+      />
       <TerminalActionDialogHost
         currentWorkspaceId={hydratedRouteWorkspaceId}
         currentWorkspacePaneRoute={currentWorkspacePaneRoute}

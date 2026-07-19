@@ -4,6 +4,7 @@ import {
   InvalidationSocketLimitError,
   MAX_INVALIDATION_SOCKETS,
   publishRepoQueryInvalidation,
+  publishUserWorkspaceFilesystemInvalidation,
   publishUserRepoQueryInvalidation,
   publishUserWorkspaceRuntimeInvalidation,
   registerInvalidationSocket,
@@ -67,5 +68,19 @@ describe('invalidation broker', () => {
     publishUserWorkspaceRuntimeInvalidation('user_a', { workspaceId })
 
     expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: 'workspace-runtime-invalidated', workspaceId }))
+  })
+
+  test('publishes filesystem invalidations only to the owning user', () => {
+    const owner = { send: vi.fn(), close: vi.fn() }
+    const other = { send: vi.fn(), close: vi.fn() }
+    registerInvalidationSocket(owner, 'user_a')
+    registerInvalidationSocket(other, 'user_b')
+    const workspaceId = workspaceIdForTest('goblin+file:///workspace')
+    const target = { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: 'workspace-runtime-test' }
+
+    publishUserWorkspaceFilesystemInvalidation('user_a', { target })
+
+    expect(owner.send).toHaveBeenCalledWith(JSON.stringify({ type: 'workspace-filesystem-invalidated', target }))
+    expect(other.send).not.toHaveBeenCalled()
   })
 })

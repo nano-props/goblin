@@ -1,10 +1,10 @@
-// Pure transforms for the worktree-scoped file tree source layer
+// Pure transforms for the workspace filesystem tree source layer
 // (docs/filetree.md). Kept in a separate module so the source
 // layer's public surface stays narrow while the helpers behind it
 // remain unit-testable in isolation.
 
 import path from 'node:path'
-import type { RepoTreeNode } from '#/shared/api-types.ts'
+import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
 
 /** NUL byte used as the record separator for git path streams. */
 export const NULL = String.fromCharCode(0)
@@ -19,16 +19,16 @@ export interface BuildLimitedChildNodesInput extends BuildChildNodesInput {
 }
 
 export interface BuildLimitedChildNodesResult {
-  readonly nodes: RepoTreeNode[]
+  readonly nodes: WorkspaceFilesystemNode[]
   readonly truncated: boolean
 }
 
 /** Build only the direct children of `prefix`. Directory entries are
  *  represented by a trailing slash in the input and are marked as
  *  expandable without recursively reading their descendants. */
-export function buildChildNodes(input: BuildChildNodesInput): RepoTreeNode[] {
+export function buildChildNodes(input: BuildChildNodesInput): WorkspaceFilesystemNode[] {
   const prefix = normalizeTreePrefix(input.prefix)
-  const byId = new Map<string, RepoTreeNode>()
+  const byId = new Map<string, WorkspaceFilesystemNode>()
 
   for (const rawEntry of input.entries) {
     const relative = sanitizeRelativeEntry(rawEntry)
@@ -48,7 +48,7 @@ export function buildLimitedChildNodes(input: BuildLimitedChildNodesInput): Buil
   return { nodes: truncated ? allNodes.slice(0, input.maxNodes) : allNodes, truncated }
 }
 
-function directChildForPrefix(relative: string, prefix: string): RepoTreeNode | null {
+function directChildForPrefix(relative: string, prefix: string): WorkspaceFilesystemNode | null {
   if (prefix && relative !== prefix && !relative.startsWith(`${prefix}/`)) return null
   if (relative === prefix) return null
 
@@ -71,7 +71,7 @@ function directChildForPrefix(relative: string, prefix: string): RepoTreeNode | 
   }
 }
 
-function compareNodes(a: RepoTreeNode, b: RepoTreeNode): number {
+function compareNodes(a: WorkspaceFilesystemNode, b: WorkspaceFilesystemNode): number {
   if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1
   return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
 }

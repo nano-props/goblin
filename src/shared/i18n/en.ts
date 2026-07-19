@@ -514,6 +514,7 @@ export const en = {
 
   // ---- Errors / banners ---------------------------------------------------
   'error.workspace-git-unavailable': 'Git features are unavailable for this workspace',
+  'error.workspace-operation-failed': 'Workspace operation failed',
   'error.failed-read-repo': 'Failed to read repository',
   'error.ssh-config-changed': 'SSH config changed',
   'error.git-not-found': 'Git not found',

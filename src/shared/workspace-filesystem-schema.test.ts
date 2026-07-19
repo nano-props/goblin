@@ -1,8 +1,8 @@
 import * as v from 'valibot'
 import { describe, expect, test } from 'vitest'
-import { RepoTreePrefixSchema } from '#/shared/repo-tree-schema.ts'
+import { WorkspaceFilesystemPathSchema } from '#/shared/workspace-filesystem-schema.ts'
 
-describe('RepoTreePrefixSchema', () => {
+describe('WorkspaceFilesystemPathSchema', () => {
   const cases: { input: string; ok: boolean; label: string }[] = [
     { input: 'src', ok: true, label: 'top-level relative' },
     { input: 'src/util', ok: true, label: 'nested relative' },
@@ -26,7 +26,7 @@ describe('RepoTreePrefixSchema', () => {
 
   for (const { input, ok, label } of cases) {
     test(`validates ${label} as ${ok ? 'ok' : 'rejected'}`, () => {
-      const result = v.safeParse(RepoTreePrefixSchema, input)
+      const result = v.safeParse(WorkspaceFilesystemPathSchema, input)
       if (ok) {
         expect(result.success).toBe(true)
       } else {
@@ -36,7 +36,7 @@ describe('RepoTreePrefixSchema', () => {
   }
 
   test('rejects strings longer than 4096 characters', () => {
-    const result = v.safeParse(RepoTreePrefixSchema, 'a'.repeat(4097))
+    const result = v.safeParse(WorkspaceFilesystemPathSchema, 'a'.repeat(4097))
     expect(result.success).toBe(false)
   })
 })

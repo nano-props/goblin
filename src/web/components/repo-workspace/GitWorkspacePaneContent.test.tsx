@@ -72,8 +72,8 @@ const repoClientMocks = vi.hoisted(() => ({
   openRepoUrl: vi.fn(),
 }))
 const filetreeClientMocks = vi.hoisted(() => ({
-  getRepositoryTree: vi.fn(),
-  getRepositoryFileViewer: vi.fn(),
+  getWorkspaceFilesystemTree: vi.fn(),
+  getWorkspaceFileViewer: vi.fn(),
 }))
 const responsiveMocks = vi.hoisted(() => ({ compact: false }))
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
@@ -83,9 +83,9 @@ vi.mock('#/web/repo-client.ts', () => ({
   getRepoLog: repoClientMocks.getRepoLog,
   openRepoUrl: repoClientMocks.openRepoUrl,
 }))
-vi.mock('#/web/filetree-client.ts', () => ({
-  getRepositoryTree: filetreeClientMocks.getRepositoryTree,
-  getRepositoryFileViewer: filetreeClientMocks.getRepositoryFileViewer,
+vi.mock('#/web/workspace-filesystem-client.ts', () => ({
+  getWorkspaceFilesystemTree: filetreeClientMocks.getWorkspaceFilesystemTree,
+  getWorkspaceFileViewer: filetreeClientMocks.getWorkspaceFileViewer,
 }))
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-repo-workspace-content-repo')
 
@@ -187,8 +187,8 @@ beforeEach(() => {
   useTerminalProjectionHydrationStore.setState({ hydrationByWorkspace: new Map(), refreshedAtByWorkspace: new Map() })
   repoClientMocks.getRepoLog.mockResolvedValue([])
   repoClientMocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
-  filetreeClientMocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
-  filetreeClientMocks.getRepositoryFileViewer.mockResolvedValue({
+  filetreeClientMocks.getWorkspaceFilesystemTree.mockResolvedValue({ nodes: [], truncated: false })
+  filetreeClientMocks.getWorkspaceFileViewer.mockResolvedValue({
     viewer: 'bat',
     shell: 'posix',
     executionRoot: '/tmp/repo',
@@ -1182,7 +1182,7 @@ describe('GitWorkspacePaneContent', () => {
   test('opens a file by creating a terminal with a startup shell command instead of writing to an opening PTY', async () => {
     const worktreePath = '/tmp/filetree-open-worktree'
     const branchName = 'feature/filetree-open'
-    filetreeClientMocks.getRepositoryTree.mockResolvedValueOnce({
+    filetreeClientMocks.getWorkspaceFilesystemTree.mockResolvedValueOnce({
       nodes: [
         {
           id: 'README.md',
@@ -1230,7 +1230,7 @@ describe('GitWorkspacePaneContent', () => {
     const showRepoBranchTerminalSession = vi.fn(() => true)
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession })
     let resolveViewer!: (value: { viewer: 'bat'; shell: 'posix'; executionRoot: string }) => void
-    filetreeClientMocks.getRepositoryFileViewer.mockImplementationOnce(
+    filetreeClientMocks.getWorkspaceFileViewer.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
           resolveViewer = resolve
@@ -1276,7 +1276,7 @@ describe('GitWorkspacePaneContent', () => {
       row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
       await Promise.resolve()
     })
-    expect(filetreeClientMocks.getRepositoryFileViewer).toHaveBeenCalledTimes(1)
+    expect(filetreeClientMocks.getWorkspaceFileViewer).toHaveBeenCalledTimes(1)
     useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/changes', 'status')
     await act(async () => {
       resolveViewer({ viewer: 'bat', shell: 'posix', executionRoot: worktreePath })
@@ -1338,7 +1338,7 @@ describe('GitWorkspacePaneContent', () => {
   test('opens a workspace-root file through the shared filesystem terminal flow', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///Users/example/Workspace/sample-project')
     const repo = seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
-    filetreeClientMocks.getRepositoryTree.mockResolvedValueOnce({
+    filetreeClientMocks.getWorkspaceFilesystemTree.mockResolvedValueOnce({
       nodes: [
         {
           id: 'sample-document.md',
@@ -1351,7 +1351,7 @@ describe('GitWorkspacePaneContent', () => {
       ],
       truncated: false,
     })
-    filetreeClientMocks.getRepositoryFileViewer.mockResolvedValueOnce({
+    filetreeClientMocks.getWorkspaceFileViewer.mockResolvedValueOnce({
       viewer: 'bat',
       shell: 'posix',
       executionRoot: '/Users/example/Workspace/sample-project',
@@ -1432,7 +1432,7 @@ describe('GitWorkspacePaneContent', () => {
   test('does not expose terminal-open or trash actions without filesystem capabilities', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/read-only-filetree-workspace')
     const repo = seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
-    filetreeClientMocks.getRepositoryTree.mockResolvedValueOnce({
+    filetreeClientMocks.getWorkspaceFilesystemTree.mockResolvedValueOnce({
       nodes: [
         {
           id: 'README.md',

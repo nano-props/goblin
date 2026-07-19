@@ -15,8 +15,8 @@ import {
 import { type Key } from 'react-aria-components'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ChevronRight, File, Folder, FolderTree, Loader2, Trash2 } from 'lucide-react'
-import type { RepoTreeNode } from '#/shared/api-types.ts'
-import type { LazyRepoTreeAggregate } from '#/web/filetree-lazy-state.ts'
+import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
+import type { LazyWorkspaceFilesystemTreeAggregate } from '#/web/workspace-filesystem-lazy-state.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
@@ -28,15 +28,15 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
 export interface FiletreeViewProps {
-  readonly tree: LazyRepoTreeAggregate | null
+  readonly tree: LazyWorkspaceFilesystemTreeAggregate | null
   readonly loading: boolean
   readonly loadingKeys?: ReadonlySet<string>
   readonly openingFileKeys?: ReadonlySet<string>
   readonly error: string | null
-  readonly onSelect?: (node: RepoTreeNode) => void
-  readonly onActivate?: (node: RepoTreeNode) => void
-  readonly onOpenFile?: (node: RepoTreeNode) => void
-  readonly onRequestTrashFile?: (node: RepoTreeNode) => void
+  readonly onSelect?: (node: WorkspaceFilesystemNode) => void
+  readonly onActivate?: (node: WorkspaceFilesystemNode) => void
+  readonly onOpenFile?: (node: WorkspaceFilesystemNode) => void
+  readonly onRequestTrashFile?: (node: WorkspaceFilesystemNode) => void
   readonly selectedKeys: ReadonlySet<Key>
   readonly expandedKeys: ReadonlySet<Key>
   readonly onSelectedKeysChange: (keys: Set<Key>) => void
@@ -153,7 +153,7 @@ export function FiletreeView({
   })
 
   const selectNode = useCallback(
-    (node: RepoTreeNode) => {
+    (node: WorkspaceFilesystemNode) => {
       onSelectedKeysChange(new Set<Key>([node.id]))
       onSelect?.(node)
     },
@@ -161,7 +161,7 @@ export function FiletreeView({
   )
 
   const handleRowPress = useCallback(
-    (node: RepoTreeNode, isExpanded: boolean) => {
+    (node: WorkspaceFilesystemNode, isExpanded: boolean) => {
       selectNode(node)
       if (node.kind !== 'directory') return
       onDirectoryRowToggle(node.id, !isExpanded)
@@ -170,7 +170,7 @@ export function FiletreeView({
   )
 
   const handleOpenFile = useCallback(
-    (node: RepoTreeNode) => {
+    (node: WorkspaceFilesystemNode) => {
       if (node.kind !== 'file') return
       onOpenFile?.(node)
       onActivate?.(node)
@@ -186,7 +186,7 @@ export function FiletreeView({
   )
 
   const handleRowKeyDown = useCallback(
-    (node: RepoTreeNode, event: KeyboardEvent<HTMLDivElement>) => {
+    (node: WorkspaceFilesystemNode, event: KeyboardEvent<HTMLDivElement>) => {
       const rowIndex = collection.rows.findIndex((row) => row.id === node.id)
       if (event.key === 'ArrowDown') {
         event.preventDefault()
@@ -345,12 +345,12 @@ function FiletreeTreeRow({
   readonly isLoading: boolean
   readonly isOpeningFile: boolean
   readonly virtualStart: number
-  readonly onKeyDown: (node: RepoTreeNode, event: KeyboardEvent<HTMLDivElement>) => void
-  readonly onRowClick: (node: RepoTreeNode, isExpanded: boolean) => void
+  readonly onKeyDown: (node: WorkspaceFilesystemNode, event: KeyboardEvent<HTMLDivElement>) => void
+  readonly onRowClick: (node: WorkspaceFilesystemNode, isExpanded: boolean) => void
   readonly onToggleDirectory: (key: string, expanded: boolean) => void
-  readonly onSelect: (node: RepoTreeNode) => void
-  readonly onOpenFile?: (node: RepoTreeNode) => void
-  readonly onRequestTrashFile?: (node: RepoTreeNode) => void
+  readonly onSelect: (node: WorkspaceFilesystemNode) => void
+  readonly onOpenFile?: (node: WorkspaceFilesystemNode) => void
+  readonly onRequestTrashFile?: (node: WorkspaceFilesystemNode) => void
 }) {
   const { node, level } = row
   const isDirectory = node.kind === 'directory'
@@ -434,9 +434,9 @@ function FiletreeTreeRow({
 
 function handleTreeItemClick(
   event: MouseEvent<Element>,
-  node: RepoTreeNode,
+  node: WorkspaceFilesystemNode,
   isExpanded: boolean,
-  onRowClick: (node: RepoTreeNode, isExpanded: boolean) => void,
+  onRowClick: (node: WorkspaceFilesystemNode, isExpanded: boolean) => void,
 ) {
   if (event.target instanceof Element && isFiletreeRowControl(event.target)) return
   onRowClick(node, isExpanded)
@@ -448,8 +448,8 @@ function isFiletreeRowControl(target: Element): boolean {
 
 function handleItemDoubleClick(
   event: MouseEvent<HTMLElement>,
-  node: RepoTreeNode,
-  onOpenFile: (node: RepoTreeNode) => void,
+  node: WorkspaceFilesystemNode,
+  onOpenFile: (node: WorkspaceFilesystemNode) => void,
 ): void {
   if (node.kind !== 'file') return
   if ((event.target as HTMLElement | null)?.closest('[data-action-popover-trigger]')) return
@@ -462,10 +462,10 @@ function FiletreeActionMenu({
   onOpenFile,
   onRequestTrashFile,
 }: {
-  readonly node: RepoTreeNode
+  readonly node: WorkspaceFilesystemNode
   readonly busy: boolean
-  readonly onOpenFile?: (node: RepoTreeNode) => void
-  readonly onRequestTrashFile?: (node: RepoTreeNode) => void
+  readonly onOpenFile?: (node: WorkspaceFilesystemNode) => void
+  readonly onRequestTrashFile?: (node: WorkspaceFilesystemNode) => void
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)

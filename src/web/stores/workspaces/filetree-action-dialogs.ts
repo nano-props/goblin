@@ -1,10 +1,9 @@
 import { create } from 'zustand'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 
 export interface FiletreeTrashFilePayload {
-  readonly workspaceId: WorkspaceId
-  readonly workspaceRuntimeId: string
-  readonly worktreePath: string
+  readonly target: WorkspacePaneFilesystemExecutionTarget
   readonly path: string
   readonly name: string
 }
@@ -16,7 +15,7 @@ interface FiletreeActionDialogsState {
 interface FiletreeActionDialogsActions {
   openTrashFileConfirm: (payload: FiletreeTrashFilePayload) => void
   closeTrashFileConfirm: () => void
-  closeStaleDialogs: (currentWorkspaceId: WorkspaceId | null) => void
+  closeStaleDialogs: (currentRuntime: { workspaceId: WorkspaceId; workspaceRuntimeId: string } | null) => void
 }
 
 type FiletreeActionDialogsStore = FiletreeActionDialogsState & FiletreeActionDialogsActions
@@ -29,10 +28,14 @@ export const useFiletreeActionDialogsStore = create<FiletreeActionDialogsStore>(
   ...INITIAL_STATE,
   openTrashFileConfirm: (payload) => set({ trashFileConfirm: payload }),
   closeTrashFileConfirm: () => set({ trashFileConfirm: null }),
-  closeStaleDialogs: (currentWorkspaceId) =>
+  closeStaleDialogs: (currentRuntime) =>
     set((state) => {
       if (!state.trashFileConfirm) return state
-      return state.trashFileConfirm.workspaceId === currentWorkspaceId ? state : { trashFileConfirm: null }
+      const target = state.trashFileConfirm.target
+      return target.workspaceId === currentRuntime?.workspaceId &&
+        target.workspaceRuntimeId === currentRuntime.workspaceRuntimeId
+        ? state
+        : { trashFileConfirm: null }
     }),
 }))
 

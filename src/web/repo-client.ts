@@ -7,7 +7,6 @@ import type {
   RepoWorktreeStatusSnapshot,
   RepoLogResponse,
 } from '#/shared/api-types.ts'
-import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import type { ExecResult, LogEntry, PullRequestFetchMode, RepoUrlTarget } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { ProbeResult } from '#/shared/api-types.ts'
@@ -263,28 +262,6 @@ export async function openRepoUrl(cwd: string, workspaceRuntimeId: string, targe
   if (!result.ok || !result.message) return result
   const opened = await openExternalUrl(result.message)
   return opened.ok ? { ok: true, message: '' } : opened
-}
-
-export async function openRepoTerminal(
-  workspaceId: WorkspaceId,
-  workspaceRuntimeId: string,
-  worktreePath: string,
-  app: TerminalApp,
-): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-terminal', { workspaceId, workspaceRuntimeId, worktreePath, app })
-}
-
-export async function openRepoEditor(
-  workspaceId: WorkspaceId,
-  workspaceRuntimeId: string,
-  worktreePath: string,
-  app: EditorApp,
-): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-editor', { workspaceId, workspaceRuntimeId, worktreePath, app })
-}
-
-export async function openRepoInFinder(workspaceId: WorkspaceId, worktreePath: string): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-in-finder', { workspaceId, worktreePath })
 }
 
 export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {

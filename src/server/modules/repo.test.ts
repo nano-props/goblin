@@ -1030,7 +1030,10 @@ describe('repo mutation invalidation publishing', () => {
       expectedConfigHash: configHash,
     })
     expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
-    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({ workspaceId: REPO_ID, configHash })
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
+      configHash,
+    })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
   })
 
@@ -1065,7 +1068,10 @@ describe('repo mutation invalidation publishing', () => {
     )
 
     expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repositoryStateChanged: true })
-    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({ workspaceId: REPO_ID, configHash })
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
+      configHash,
+    })
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })
 
@@ -1200,7 +1206,10 @@ describe('repo mutation invalidation publishing', () => {
     expect(mocks.createWorktree.mock.calls[0]?.[1]).toMatchObject({ worktreePath: '/tmp/repo-worktree-a' })
     expect(mocks.createWorktree.mock.calls[1]?.[1]).toMatchObject({ worktreePath: '/tmp/repo-worktree-b' })
     expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({ workspaceId: REPO_ID, configHash })
-    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({ workspaceId: REPO_ID, configHash })
+    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
+      configHash,
+    })
     expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.createWorktree.mock.invocationCallOrder[1],
     )
@@ -1441,6 +1450,23 @@ describe('repo mutation invalidation publishing', () => {
         }),
       ]),
     )
+  })
+
+  test('pullRepoBranch preserves the authoritative changed worktree paths for route projection', async () => {
+    mocks.pullBranch.mockResolvedValueOnce({
+      ok: true,
+      message: 'ok',
+      affectedWorktreePaths: ['/tmp/repo-worktree'],
+    })
+    const { pullRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await pullRepoBranch(REPO_ID, 'feature/a', '/tmp/repo-worktree')
+
+    expect(result).toEqual({
+      ok: true,
+      message: 'ok',
+      affectedWorktreePaths: ['/tmp/repo-worktree'],
+    })
   })
 
   test.each([

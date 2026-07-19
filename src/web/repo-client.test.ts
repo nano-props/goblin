@@ -7,6 +7,11 @@ import { mockFetch } from '#/test-utils/fetch-mock.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const workspaceId = workspaceIdForTest('goblin+file:///workspace')
+const executionTarget = {
+  kind: 'workspace-root' as const,
+  workspaceId,
+  workspaceRuntimeId: 'workspace-runtime-test',
+}
 
 function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
   return {
@@ -398,16 +403,17 @@ describe('repo-client', () => {
         matchMedia: vi.fn(() => ({ matches: true })),
       },
     })
-    const { openRepoEditor, openRepoInFinder, openRepoTerminal } = await import('#/web/repo-client.ts')
-    await expect(openRepoTerminal(workspaceId, 'repo-runtime-test', '/workspace', 'ghostty')).resolves.toEqual({
+    const { openWorkspaceEditor, openWorkspaceInFinder, openWorkspaceTerminal } =
+      await import('#/web/workspace-external-app-client.ts')
+    await expect(openWorkspaceTerminal(executionTarget, 'ghostty')).resolves.toEqual({
       ok: true,
       message: 'server-terminal',
     })
-    await expect(openRepoEditor(workspaceId, 'repo-runtime-test', '/workspace', 'vscode')).resolves.toEqual({
+    await expect(openWorkspaceEditor(executionTarget, 'vscode')).resolves.toEqual({
       ok: true,
       message: 'server-editor',
     })
-    await expect(openRepoInFinder(workspaceId, '/workspace')).resolves.toEqual({
+    await expect(openWorkspaceInFinder(executionTarget)).resolves.toEqual({
       ok: true,
       message: 'server-finder',
     })
@@ -415,39 +421,29 @@ describe('repo-client', () => {
     expect(openEditor).not.toHaveBeenCalled()
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      'http://127.0.0.1:32100/api/repo/open-terminal',
+      'http://127.0.0.1:32100/api/workspace/open-terminal',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({
-          workspaceId,
-          workspaceRuntimeId: 'repo-runtime-test',
-          worktreePath: '/workspace',
-          app: 'ghostty',
-        }),
+        body: JSON.stringify({ target: executionTarget, app: 'ghostty' }),
       }),
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      'http://127.0.0.1:32100/api/repo/open-editor',
+      'http://127.0.0.1:32100/api/workspace/open-editor',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({
-          workspaceId,
-          workspaceRuntimeId: 'repo-runtime-test',
-          worktreePath: '/workspace',
-          app: 'vscode',
-        }),
+        body: JSON.stringify({ target: executionTarget, app: 'vscode' }),
       }),
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      'http://127.0.0.1:32100/api/repo/open-in-finder',
+      'http://127.0.0.1:32100/api/workspace/open-in-finder',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ workspaceId, worktreePath: '/workspace' }),
+        body: JSON.stringify({ target: executionTarget }),
       }),
     )
   })
@@ -460,34 +456,24 @@ describe('repo-client', () => {
         .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-terminal' }) })
         .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-editor' }) }),
     )
-    const { openRepoEditor, openRepoTerminal } = await import('#/web/repo-client.ts')
-    await openRepoTerminal(workspaceId, 'repo-runtime-test', '/workspace', 'ghostty')
-    await openRepoEditor(workspaceId, 'repo-runtime-test', '/workspace', 'vscode')
+    const { openWorkspaceEditor, openWorkspaceTerminal } = await import('#/web/workspace-external-app-client.ts')
+    await openWorkspaceTerminal(executionTarget, 'ghostty')
+    await openWorkspaceEditor(executionTarget, 'vscode')
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      'http://127.0.0.1:32100/api/repo/open-terminal',
+      'http://127.0.0.1:32100/api/workspace/open-terminal',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({
-          workspaceId,
-          workspaceRuntimeId: 'repo-runtime-test',
-          worktreePath: '/workspace',
-          app: 'ghostty',
-        }),
+        body: JSON.stringify({ target: executionTarget, app: 'ghostty' }),
       }),
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      'http://127.0.0.1:32100/api/repo/open-editor',
+      'http://127.0.0.1:32100/api/workspace/open-editor',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({
-          workspaceId,
-          workspaceRuntimeId: 'repo-runtime-test',
-          worktreePath: '/workspace',
-          app: 'vscode',
-        }),
+        body: JSON.stringify({ target: executionTarget, app: 'vscode' }),
       }),
     )
   })

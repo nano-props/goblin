@@ -18,17 +18,11 @@ import {
   type ResolvedRemoteWorkspaceTarget,
   type SshConfigHostsResult,
 } from '#/shared/remote-workspace.ts'
-import { openRemoteInPreferredEditor } from '#/system/editors.ts'
-import { openRemoteInPreferredTerminal } from '#/system/terminals.ts'
 import {
   listSshConfigHosts,
   resolveRemoteTarget as resolveSshRemoteTarget,
   resolveTrackedRemoteTarget,
 } from '#/system/ssh/config.ts'
-import { isSafeRemoteAbsolutePath } from '#/system/remote-shell.ts'
-import type { ExecResult } from '#/shared/git-types.ts'
-import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
-import { remoteWorkspaceRuntimeFailureFromTargetResolutionError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 async function resolveRemoteHomeDirectory(target: RemoteWorkspaceTarget, signal?: AbortSignal): Promise<string> {
@@ -298,63 +292,6 @@ export async function testServerRemoteWorkspace(
     const message = err instanceof Error ? err.message : 'error.ssh-config-changed'
     return makeUnresolvedTargetDiagnostic(normalized, classifyResolutionFailure(message), message)
   }
-}
-
-/** Open a remote workspace path in the user's preferred editor. The workspace
- *  id is parsed back into its alias / remotePath parts, then re-resolved so the
- *  SSH config hasn't been edited out from under us. */
-export async function openServerRemoteEditor(
-  input: { workspaceId: WorkspaceId; workspaceRuntimeId?: string; worktreePath: string; app: EditorApp },
-  signal?: AbortSignal,
-): Promise<ExecResult> {
-  if (!isRemoteWorkspaceId(input.workspaceId) || !isSafeRemoteAbsolutePath(input.worktreePath)) {
-    return { ok: false, message: 'error.invalid-path' }
-  }
-  const ref = parseRemoteWorkspaceId(input.workspaceId)
-  if (!ref) return { ok: false, message: 'error.invalid-arguments' }
-
-  let resolved: ResolvedRemoteWorkspaceTarget
-  try {
-    resolved = await resolveSshRemoteTarget(ref, signal)
-  } catch (err) {
-    if (input.workspaceRuntimeId) {
-      throw remoteWorkspaceRuntimeFailureFromTargetResolutionError({
-        workspaceId: input.workspaceId,
-        workspaceRuntimeId: input.workspaceRuntimeId,
-        error: err,
-      })
-    }
-    return { ok: false, message: 'error.ssh-config-changed' }
-  }
-
-  return await openRemoteInPreferredEditor(resolved.target.alias, input.worktreePath, input.app)
-}
-
-export async function openServerRemoteTerminal(
-  input: { workspaceId: WorkspaceId; workspaceRuntimeId?: string; worktreePath: string; app: TerminalApp },
-  signal?: AbortSignal,
-): Promise<ExecResult> {
-  if (!isRemoteWorkspaceId(input.workspaceId) || !isSafeRemoteAbsolutePath(input.worktreePath)) {
-    return { ok: false, message: 'error.invalid-path' }
-  }
-  const ref = parseRemoteWorkspaceId(input.workspaceId)
-  if (!ref) return { ok: false, message: 'error.invalid-arguments' }
-
-  let resolved: ResolvedRemoteWorkspaceTarget
-  try {
-    resolved = await resolveSshRemoteTarget(ref, signal)
-  } catch (err) {
-    if (input.workspaceRuntimeId) {
-      throw remoteWorkspaceRuntimeFailureFromTargetResolutionError({
-        workspaceId: input.workspaceId,
-        workspaceRuntimeId: input.workspaceRuntimeId,
-        error: err,
-      })
-    }
-    return { ok: false, message: 'error.ssh-config-changed' }
-  }
-
-  return await openRemoteInPreferredTerminal(resolved.target.alias, input.worktreePath, input.app)
 }
 
 function classifyResolutionFailure(message: string): RemoteDiagnosticCategory {

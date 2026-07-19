@@ -1,10 +1,10 @@
 import { type Key } from 'react-aria-components'
-import type { RepoTreeNode } from '#/shared/api-types.ts'
-import type { LazyRepoTreeAggregate } from '#/web/filetree-lazy-state.ts'
+import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
+import type { LazyWorkspaceFilesystemTreeAggregate } from '#/web/workspace-filesystem-lazy-state.ts'
 
 export interface FiletreeRow {
   readonly id: string
-  readonly node: RepoTreeNode
+  readonly node: WorkspaceFilesystemNode
   readonly level: number
   readonly posInSet: number
   readonly setSize: number
@@ -12,16 +12,16 @@ export interface FiletreeRow {
 
 export interface FiletreeCollection {
   readonly rows: ReadonlyArray<FiletreeRow>
-  readonly byId: ReadonlyMap<string, RepoTreeNode>
+  readonly byId: ReadonlyMap<string, WorkspaceFilesystemNode>
   readonly childIdsByParentId: ReadonlyMap<string | null, readonly string[]>
 }
 
 export function buildFiletreeCollection(
-  result: LazyRepoTreeAggregate | null,
+  result: LazyWorkspaceFilesystemTreeAggregate | null,
   expandedKeys: ReadonlySet<Key>,
 ): FiletreeCollection {
-  const byId = new Map<string, RepoTreeNode>()
-  const childrenByParent = new Map<string | null, RepoTreeNode[]>()
+  const byId = new Map<string, WorkspaceFilesystemNode>()
+  const childrenByParent = new Map<string | null, WorkspaceFilesystemNode[]>()
   if (!result) return { rows: [], byId, childIdsByParentId: new Map() }
 
   for (const node of result.nodes) {
@@ -57,7 +57,7 @@ export function buildFiletreeCollection(
   return { rows, byId, childIdsByParentId }
 }
 
-function compareNodesForRender(a: RepoTreeNode, b: RepoTreeNode): number {
+function compareNodesForRender(a: WorkspaceFilesystemNode, b: WorkspaceFilesystemNode): number {
   if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1
   return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
 }

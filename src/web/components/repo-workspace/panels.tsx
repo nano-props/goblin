@@ -8,8 +8,8 @@ import { StatusList } from '#/web/components/StatusList.tsx'
 import { useRepoLogQuery } from '#/web/repo-data-query.ts'
 import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
 import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
-import { useLazyRepoTree } from '#/web/hooks/useLazyRepoTree.ts'
-import type { RepoTreeNode } from '#/shared/api-types.ts'
+import { useWorkspaceFilesystemTree } from '#/web/hooks/useWorkspaceFilesystemTree.ts'
+import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
 import type {
   CurrentGitWorkspacePanePresentation,
   GitWorkspacePaneProjection,
@@ -32,7 +32,7 @@ import {
   filetreeInteractionScopeKey,
   useFiletreeInteractionStore,
 } from '#/web/stores/workspaces/filetree-interaction-state.ts'
-import { getRepositoryFileViewer } from '#/web/filetree-client.ts'
+import { getWorkspaceFileViewer } from '#/web/workspace-filesystem-client.ts'
 import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/repo-workspace/file-read-command.ts'
 import { HistoryCommitGraph, HistoryCommitGraphSkeleton } from '#/web/components/repo-workspace/HistoryCommitGraph.tsx'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
@@ -186,7 +186,7 @@ export function FiletreeTab({ target }: { target: WorkspacePaneFilesystemTarget 
     () => workspacePaneFilesystemRuntimeTarget(target),
     [workspaceId, workspaceRuntimeId, target.kind, worktreePath],
   )
-  if (!executionTarget || executionTarget.kind === 'git-branch') throw new Error('filesystem target is invalid')
+  if (!executionTarget) throw new Error('filesystem target is invalid')
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
   const { createTerminalWithAdmission } = useTerminalSessionContext()
@@ -201,7 +201,7 @@ export function FiletreeTab({ target }: { target: WorkspacePaneFilesystemTarget 
   const expandedKeyList = useFiletreeInteractionStore(
     (s) => s.interactionByScope[interactionScopeKey]?.expandedKeys ?? emptyFiletreeInteractionSnapshot().expandedKeys,
   )
-  const result = useLazyRepoTree({ target: executionTarget, expandedKeys: expandedKeyList })
+  const result = useWorkspaceFilesystemTree({ target: executionTarget, expandedKeys: expandedKeyList })
   const setSelectedKeys = useFiletreeInteractionStore((s) => s.setSelectedKeys)
   const setExpandedKey = useFiletreeInteractionStore((s) => s.setExpandedKey)
   const setTopVisibleRowIndex = useFiletreeInteractionStore((s) => s.setTopVisibleRowIndex)
@@ -260,7 +260,7 @@ export function FiletreeTab({ target }: { target: WorkspacePaneFilesystemTarget 
   )
 
   const openFileInTerminal = useCallback(
-    async (node: RepoTreeNode) => {
+    async (node: WorkspaceFilesystemNode) => {
       if (node.kind !== 'file') return
       const openingFileKey = `${openingFileKeyPrefix}${node.id}`
       if (!beginOpeningFile(openingFileKey)) return
@@ -277,7 +277,7 @@ export function FiletreeTab({ target }: { target: WorkspacePaneFilesystemTarget 
           insertAfterIdentity: openerIdentity,
           options: {
             resolveStartupShellCommand: async () => {
-              const viewerResult = await getRepositoryFileViewer(workspaceId, worktreePath, { workspaceRuntimeId })
+              const viewerResult = await getWorkspaceFileViewer(executionTarget, {})
               return fileReadCommand(viewerResult, absoluteFilePathForTerminal(viewerResult.executionRoot, node.path))
             },
           },
@@ -298,16 +298,17 @@ export function FiletreeTab({ target }: { target: WorkspacePaneFilesystemTarget 
       workspaceRuntimeId,
       t,
       worktreePath,
+      executionTarget,
       target,
     ],
   )
 
   const requestTrashFile = useCallback(
-    (node: RepoTreeNode) => {
+    (node: WorkspaceFilesystemNode) => {
       if (node.kind !== 'file') return
-      openTrashFileConfirm({ workspaceId, workspaceRuntimeId, worktreePath, path: node.path, name: node.name })
+      openTrashFileConfirm({ target: executionTarget, path: node.path, name: node.name })
     },
-    [openTrashFileConfirm, workspaceId, workspaceRuntimeId, worktreePath],
+    [executionTarget, openTrashFileConfirm],
   )
 
   return (

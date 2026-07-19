@@ -1,11 +1,17 @@
 import { useMutation } from '@tanstack/react-query'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import type { ExecResult } from '#/web/types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
-import { getRepoPatch, openRepoEditor, openRepoInFinder, openRepoTerminal } from '#/web/repo-client.ts'
+import { getRepoPatch } from '#/web/repo-client.ts'
+import {
+  openWorkspaceEditor,
+  openWorkspaceInFinder,
+  openWorkspaceTerminal,
+} from '#/web/workspace-external-app-client.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { getBranchWorktreeState } from '#/web/stores/workspaces/worktree-state.ts'
 import {
@@ -178,21 +184,24 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
 
   function openTerminal(app: TerminalApp) {
     if (!branch.worktree?.path) return
-    const worktreePath = branch.worktree.path
-    return runUiAction('terminal', () => openRepoTerminal(repo.id, repo.workspaceRuntimeId, worktreePath, app))
+    const target = gitWorktreeFilesystemExecutionTarget(repo.id, repo.workspaceRuntimeId, branch.worktree.path)
+    if (!target) return
+    return runUiAction('terminal', () => openWorkspaceTerminal(target, app))
   }
 
   function openEditor(app: EditorApp) {
     if (!branch.worktree?.path) return
-    const worktreePath = branch.worktree.path
-    return runUiAction('editor', () => openRepoEditor(repo.id, repo.workspaceRuntimeId, worktreePath, app))
+    const target = gitWorktreeFilesystemExecutionTarget(repo.id, repo.workspaceRuntimeId, branch.worktree.path)
+    if (!target) return
+    return runUiAction('editor', () => openWorkspaceEditor(target, app))
   }
 
   function openFinder() {
     if (!branch.worktree?.path) return
-    const worktreePath = branch.worktree.path
     if (isRemoteWorkspaceId(repo.id)) return
-    return runUiAction('finder', () => openRepoInFinder(repo.id, worktreePath))
+    const target = gitWorktreeFilesystemExecutionTarget(repo.id, repo.workspaceRuntimeId, branch.worktree.path)
+    if (!target) return
+    return runUiAction('finder', () => openWorkspaceInFinder(target))
   }
 
   function requestDeleteBranch() {

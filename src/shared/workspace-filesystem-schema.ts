@@ -1,4 +1,4 @@
-// Path schemas for the worktree-scoped file tree (docs/filetree.md).
+// Relative path schema for workspace-root and Git-worktree filesystem operations.
 //
 // `prefix` is a relative POSIX path inside the worktree root. We
 // reject:
@@ -22,7 +22,7 @@ const CONTROL_CHARS = /[\x00-\x1F\x7F]/u
 /** Strictly relative POSIX path inside a worktree. The worktree
  *  root itself is represented by omitting the field, NOT by the
  *  literal `.`. */
-export const RepoTreePrefixSchema = v.pipe(
+export const WorkspaceFilesystemPathSchema = v.pipe(
   v.string(),
   v.minLength(1, 'prefix cannot be empty'),
   v.maxLength(4096, 'prefix too long'),

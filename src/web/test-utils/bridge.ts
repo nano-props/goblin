@@ -1246,12 +1246,16 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/repo/delete-branch') return call('repo.deleteBranch', body)
         if (url.pathname === '/api/repo/remove-worktree') return call('repo.removeWorktree', body)
         if (url.pathname === '/api/repo/open-url') return call('repo.openUrl', body)
-        if (url.pathname === '/api/repo/open-terminal') return call('repo.openTerminal', body)
-        if (url.pathname === '/api/repo/open-editor') return call('repo.openEditor', body)
         if (url.pathname === '/api/repo/background-sync-repos') return call('repo.backgroundSyncRepos', body)
         if (url.pathname === '/api/workspace/runtime-open') {
           return handlers['workspace.runtimeOpen'] ? call('workspace.runtimeOpen', body) : openWorkspaceRuntime(body)
         }
+        if (url.pathname === '/api/workspace/tree') return call('workspace.tree', body)
+        if (url.pathname === '/api/workspace/trash-file') return call('workspace.trashFile', body)
+        if (url.pathname === '/api/workspace/file-viewer') return call('workspace.fileViewer', body)
+        if (url.pathname === '/api/workspace/open-terminal') return call('workspace.openTerminal', body)
+        if (url.pathname === '/api/workspace/open-editor') return call('workspace.openEditor', body)
+        if (url.pathname === '/api/workspace/open-in-finder') return call('workspace.openInFinder', body)
         if (url.pathname === '/api/workspace/runtime-list') {
           return handlers['workspace.runtimeList'] ? call('workspace.runtimeList', body) : listWorkspaceRuntimes()
         }

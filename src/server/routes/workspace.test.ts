@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createWorkspaceRoutes } from '#/server/routes/workspace.ts'
-import { clearWorkspaceRuntimesForUser, commitWorkspaceProbeState } from '#/server/modules/workspace-runtimes.ts'
+import {
+  clearWorkspaceRuntimesForUser,
+  commitWorkspaceProbeState,
+  listWorkspaceRuntimes,
+} from '#/server/modules/workspace-runtimes.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 
 const USER_ID = 'workspace-route-user'
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/workspace-route')
@@ -10,11 +16,38 @@ const CLIENT_ID = 'workspace-route-client'
 const mocks = vi.hoisted(() => ({
   probeLocalWorkspace: vi.fn(),
   probeWorkspace: vi.fn(),
+  readWorkspaceFilesystemTree: vi.fn(),
+  readWorkspaceFileViewer: vi.fn(),
+  trashWorkspaceFile: vi.fn(),
+  openWorkspaceTerminal: vi.fn(),
+  openWorkspaceEditor: vi.fn(),
+  openWorkspaceInFinder: vi.fn(),
+  publishUserRepoQueryInvalidation: vi.fn(),
+  publishUserWorkspaceFilesystemInvalidation: vi.fn(),
+  publishUserWorkspaceRuntimeInvalidation: vi.fn(),
 }))
 
 vi.mock('#/server/modules/workspace-probe.ts', () => ({
   probeLocalWorkspace: mocks.probeLocalWorkspace,
   probeWorkspace: mocks.probeWorkspace,
+}))
+
+vi.mock('#/server/modules/workspace-filesystem-tree.ts', () => ({
+  readWorkspaceFilesystemTree: mocks.readWorkspaceFilesystemTree,
+}))
+vi.mock('#/server/modules/workspace-file-viewer.ts', () => ({
+  readWorkspaceFileViewer: mocks.readWorkspaceFileViewer,
+}))
+vi.mock('#/server/modules/workspace-file-trash.ts', () => ({ trashWorkspaceFile: mocks.trashWorkspaceFile }))
+vi.mock('#/server/modules/workspace-external-apps.ts', () => ({
+  openWorkspaceTerminal: mocks.openWorkspaceTerminal,
+  openWorkspaceEditor: mocks.openWorkspaceEditor,
+  openWorkspaceInFinder: mocks.openWorkspaceInFinder,
+}))
+vi.mock('#/server/modules/invalidation-broker.ts', () => ({
+  publishUserRepoQueryInvalidation: mocks.publishUserRepoQueryInvalidation,
+  publishUserWorkspaceFilesystemInvalidation: mocks.publishUserWorkspaceFilesystemInvalidation,
+  publishUserWorkspaceRuntimeInvalidation: mocks.publishUserWorkspaceRuntimeInvalidation,
 }))
 
 vi.mock('#/server/common/identity.ts', () => ({
@@ -38,6 +71,16 @@ describe('workspace routes', () => {
     clearWorkspaceRuntimesForUser(USER_ID)
     mocks.probeLocalWorkspace.mockResolvedValue(readyPlainWorkspace)
     mocks.probeWorkspace.mockResolvedValue(readyPlainWorkspace)
+    mocks.readWorkspaceFilesystemTree.mockResolvedValue({ nodes: [], truncated: false })
+    mocks.readWorkspaceFileViewer.mockResolvedValue({
+      viewer: 'cat',
+      shell: 'posix',
+      executionRoot: '/tmp/workspace-route',
+    })
+    mocks.trashWorkspaceFile.mockResolvedValue({ ok: true, message: '' })
+    mocks.openWorkspaceTerminal.mockResolvedValue({ ok: true, message: '' })
+    mocks.openWorkspaceEditor.mockResolvedValue({ ok: true, message: '' })
+    mocks.openWorkspaceInFinder.mockResolvedValue({ ok: true, message: '' })
   })
 
   test('opens a command input as one canonical workspace runtime', async () => {
@@ -152,9 +195,7 @@ describe('workspace routes', () => {
     })
 
     await expect(response.json()).resolves.toMatchObject({
-      runtimes: [
-        { workspaceId: windowsWorkspaceId, workspaceRuntimeId: expect.stringMatching(/^workspace-runtime-/) },
-      ],
+      runtimes: [{ workspaceId: windowsWorkspaceId, workspaceRuntimeId: expect.stringMatching(/^workspace-runtime-/) }],
     })
   })
 
@@ -186,6 +227,113 @@ describe('workspace routes', () => {
       probe: { status: 'ready', capabilities: { git: { status: 'unavailable' } } },
     })
     expect(commitGitCapabilityRemoval).toHaveBeenCalledOnce()
+  })
+
+  test('routes filesystem operations through one runtime-bound target', async () => {
+    const app = createTestWorkspaceRoutes()
+    const workspaceRuntimeId = await openWorkspaceRuntime(app, WORKSPACE_ID)
+    const target = workspaceRootTarget(WORKSPACE_ID, workspaceRuntimeId)
+
+    expect((await post(app, '/tree', { target, prefix: 'src' })).status).toBe(200)
+    expect((await post(app, '/file-viewer', { target })).status).toBe(200)
+    expect((await post(app, '/trash-file', { target, path: 'src/example.ts' })).status).toBe(200)
+    expect((await post(app, '/open-terminal', { target, app: 'ghostty' })).status).toBe(200)
+    expect((await post(app, '/open-editor', { target, app: 'vscode' })).status).toBe(200)
+    expect((await post(app, '/open-in-finder', { target })).status).toBe(200)
+
+    expect(mocks.readWorkspaceFilesystemTree).toHaveBeenCalledWith(target, {
+      prefix: 'src',
+      signal: expect.any(AbortSignal),
+    })
+    expect(mocks.readWorkspaceFileViewer).toHaveBeenCalledWith(target, expect.any(AbortSignal))
+    expect(mocks.trashWorkspaceFile).toHaveBeenCalledWith(target, 'src/example.ts', expect.any(AbortSignal))
+    expect(mocks.openWorkspaceTerminal).toHaveBeenCalledWith(target, 'ghostty', expect.any(AbortSignal))
+    expect(mocks.openWorkspaceEditor).toHaveBeenCalledWith(target, 'vscode', expect.any(AbortSignal))
+    expect(mocks.openWorkspaceInFinder).toHaveBeenCalledWith(target, expect.any(AbortSignal))
+    expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith(USER_ID, { target })
+    expect(mocks.publishUserRepoQueryInvalidation).not.toHaveBeenCalled()
+  })
+
+  test('publishes Git projection invalidation only for a Git worktree trash mutation', async () => {
+    const app = createTestWorkspaceRoutes()
+    const workspaceRuntimeId = await openWorkspaceRuntime(app, WORKSPACE_ID)
+    const target = gitWorktreeTarget(
+      WORKSPACE_ID,
+      workspaceRuntimeId,
+      workspaceIdForTest('goblin+file:///tmp/workspace-worktree'),
+    )
+
+    const response = await post(app, '/trash-file', { target, path: 'src/example.ts' })
+
+    expect(response.status).toBe(200)
+    expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith(USER_ID, { target })
+    expect(mocks.publishUserRepoQueryInvalidation).toHaveBeenCalledWith(USER_ID, {
+      repoId: WORKSPACE_ID,
+      query: 'repo-snapshot',
+    })
+  })
+
+  test('rejects a stale filesystem target before invoking native operations', async () => {
+    const app = createTestWorkspaceRoutes()
+    await openWorkspaceRuntime(app, WORKSPACE_ID)
+    const target = workspaceRootTarget(WORKSPACE_ID, 'workspace-runtime-stale')
+
+    const response = await post(app, '/open-in-finder', { target })
+
+    expect(response.status).toBe(400)
+    expect(mocks.openWorkspaceInFinder).not.toHaveBeenCalled()
+  })
+
+  test.each([
+    ['/tree', mocks.readWorkspaceFilesystemTree, (target: ReturnType<typeof workspaceRootTarget>) => ({ target })],
+    ['/file-viewer', mocks.readWorkspaceFileViewer, (target: ReturnType<typeof workspaceRootTarget>) => ({ target })],
+    [
+      '/trash-file',
+      mocks.trashWorkspaceFile,
+      (target: ReturnType<typeof workspaceRootTarget>) => ({ target, path: 'src/example.ts' }),
+    ],
+    [
+      '/open-terminal',
+      mocks.openWorkspaceTerminal,
+      (target: ReturnType<typeof workspaceRootTarget>) => ({ target, app: 'ghostty' }),
+    ],
+    [
+      '/open-editor',
+      mocks.openWorkspaceEditor,
+      (target: ReturnType<typeof workspaceRootTarget>) => ({ target, app: 'vscode' }),
+    ],
+    ['/open-in-finder', mocks.openWorkspaceInFinder, (target: ReturnType<typeof workspaceRootTarget>) => ({ target })],
+  ])('settles the remote workspace runtime when %s hits a transport failure', async (route, mock, body) => {
+    const workspaceId = workspaceIdForTest('goblin+ssh://example.test/workspace')
+    const app = createTestWorkspaceRoutes()
+    const workspaceRuntimeId = await openWorkspaceRuntime(app, workspaceId)
+    const target = workspaceRootTarget(workspaceId, workspaceRuntimeId)
+    mock.mockRejectedValueOnce(
+      new RemoteWorkspaceRuntimeFailureError({
+        workspaceId,
+        workspaceRuntimeId,
+        reason: 'unreachable',
+        message: 'connection refused',
+      }),
+    )
+
+    const response = await post(app, route, body(target))
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      message: 'error.workspace-operation-failed',
+    })
+    expect(listWorkspaceRuntimes(USER_ID)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          workspaceId,
+          workspaceRuntimeId,
+          remoteLifecycle: expect.objectContaining({ kind: 'failed', reason: 'unreachable' }),
+        }),
+      ]),
+    )
+    expect(mocks.publishUserWorkspaceRuntimeInvalidation).toHaveBeenCalledWith(USER_ID, { workspaceId })
   })
 
   test.each([
@@ -223,4 +371,21 @@ async function post(app: ReturnType<typeof createWorkspaceRoutes>, route: string
       body: JSON.stringify(body),
     }),
   )
+}
+
+async function openWorkspaceRuntime(
+  app: ReturnType<typeof createWorkspaceRoutes>,
+  workspaceId: WorkspaceId,
+): Promise<string> {
+  const response = await post(app, '/runtime-open', { workspaceId, clientId: CLIENT_ID })
+  const result = (await response.json()) as { workspaceRuntimeId: string }
+  return result.workspaceRuntimeId
+}
+
+function workspaceRootTarget(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
+  return { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId }
+}
+
+function gitWorktreeTarget(workspaceId: WorkspaceId, workspaceRuntimeId: string, root: WorkspaceId) {
+  return { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId, root }
 }
