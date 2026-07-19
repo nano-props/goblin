@@ -52,7 +52,6 @@ import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-remo
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
-import { readWorkspaceDirectoryOverview } from '#/server/modules/workspace-directory-overview.ts'
 import { resolveRepoSource } from '#/server/modules/repo-source.ts'
 
 // Soft-fail envelope returned by `jsonOr` for every repo action that
@@ -177,18 +176,6 @@ export function createRepoRoutes(options: {
         userId,
         () => readRepoWorktreeStatus(cwd, { signal: c.req.raw.signal, workspaceRuntimeId }),
         'worktree-status',
-      ),
-    )
-  })
-  app.post('/workspace-overview', async (c) => {
-    const { cwd, workspaceRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.workspaceOverview, c)
-    const userId = userIdFromContext(c)
-    assertCurrentWorkspaceRuntimeForRead(userId, cwd, workspaceRuntimeId)
-    return c.json(
-      await runtimeReadJsonOrThrow(
-        userId,
-        () => readWorkspaceDirectoryOverview(cwd, { workspaceRuntimeId, signal: c.req.raw.signal }),
-        'workspace-overview',
       ),
     )
   })

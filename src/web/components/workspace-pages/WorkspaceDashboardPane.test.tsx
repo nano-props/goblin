@@ -9,8 +9,8 @@ import {
   repoWorktreeStatusQueryKey,
   repoProjectionQueryKey,
   setRepoProjectionQueryData,
-  workspaceDirectoryOverviewQueryKey,
 } from '#/web/repo-data-query.ts'
+import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {

@@ -5,6 +5,7 @@ import type {
 } from '#/shared/api-types.ts'
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { postServerJson } from '#/web/lib/server-fetch.ts'
 
@@ -54,4 +55,12 @@ export async function closeWorkspaceRuntime(workspaceId: WorkspaceId, workspaceR
 
 export async function listWorkspaceRuntimes(signal?: AbortSignal): Promise<WorkspaceRuntimesSnapshot> {
   return await postServerJson<{}, WorkspaceRuntimesSnapshot>('/api/workspace/runtime-list', {}, { signal })
+}
+
+export async function getWorkspaceDirectoryOverview(
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceDirectoryOverview> {
+  return await postServerJson('/api/workspace/directory-overview', { workspaceId, workspaceRuntimeId }, { signal })
 }

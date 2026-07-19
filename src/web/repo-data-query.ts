@@ -7,7 +7,6 @@ import {
   getRepoProjection,
   getRepoRemoteBranches,
   getRepoWorktreeStatus,
-  getWorkspaceDirectoryOverview,
 } from '#/web/repo-client.ts'
 import type {
   RepoOperationsSnapshot,
@@ -85,10 +84,6 @@ export function repoOperationsQueryKey(repoRoot: string, workspaceRuntimeId: str
 
 export function repoWorktreeStatusQueryKey(repoRoot: string, workspaceRuntimeId: string) {
   return ['repo-data', repoRoot, workspaceRuntimeId, 'worktree-status'] as const
-}
-
-export function workspaceDirectoryOverviewQueryKey(repoRoot: string, workspaceRuntimeId: string) {
-  return ['repo-data', repoRoot, workspaceRuntimeId, 'workspace-overview'] as const
 }
 
 export function repoDataQueryKey(repoRoot: string, workspaceRuntimeId: string) {
@@ -489,16 +484,6 @@ export function useRepoProjectionReadModel(
 export function useRepoWorktreeStatusReadModel(repoRoot: string, workspaceRuntimeId: string, enabled: boolean) {
   return useQuery({
     ...repoWorktreeStatusQueryOptions(repoRoot, workspaceRuntimeId),
-    enabled,
-    subscribed: enabled,
-  })
-}
-
-export function useWorkspaceDirectoryOverview(repoRoot: string, workspaceRuntimeId: string, enabled: boolean) {
-  return useQuery({
-    queryKey: workspaceDirectoryOverviewQueryKey(repoRoot, workspaceRuntimeId),
-    queryFn: ({ signal }) => getWorkspaceDirectoryOverview(repoRoot, workspaceRuntimeId, signal),
-    staleTime: 30_000,
     enabled,
     subscribed: enabled,
   })

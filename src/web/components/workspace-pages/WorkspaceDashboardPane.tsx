@@ -20,11 +20,8 @@ import { cn } from '#/web/lib/cn.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { repoBranchReadModelFromSnapshot, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
-import {
-  useRepoProjectionReadModel,
-  useRepoWorktreeStatusReadModel,
-  useWorkspaceDirectoryOverview,
-} from '#/web/repo-data-query.ts'
+import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
+import { useWorkspaceDirectoryOverview } from '#/web/workspace-directory-overview-query.ts'
 import type { PullRequestEntry } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitWorkspaceProjection, RepoBranchState, WorkspaceState } from '#/web/stores/workspaces/types.ts'

@@ -11,7 +11,6 @@ import type { ExecResult, LogEntry, PullRequestFetchMode, RepoUrlTarget } from '
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
-import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
@@ -112,14 +111,6 @@ export async function getRepoWorktreeStatus(
     async () => await postServerJson('/api/repo/worktree-status', { cwd, workspaceRuntimeId }, { signal }),
     signal,
   )
-}
-
-export async function getWorkspaceDirectoryOverview(
-  cwd: string,
-  workspaceRuntimeId: string,
-  signal?: AbortSignal,
-): Promise<WorkspaceDirectoryOverview> {
-  return await postServerJson('/api/repo/workspace-overview', { cwd, workspaceRuntimeId }, { signal })
 }
 
 export async function getRepoOperations(

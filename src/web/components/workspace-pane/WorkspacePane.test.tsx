@@ -45,8 +45,8 @@ import {
   repoWorktreeStatusQueryKey,
   setRepoProjectionQueryData,
   setRepoWorktreeStatusQueryData,
-  workspaceDirectoryOverviewQueryKey,
 } from '#/web/repo-data-query.ts'
+import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { nextWorkspacePaneTabEntryAfterClose } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'

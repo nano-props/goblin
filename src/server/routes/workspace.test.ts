@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   probeWorkspace: vi.fn(),
   readWorkspaceFilesystemTree: vi.fn(),
   readWorkspaceFileViewer: vi.fn(),
+  readWorkspaceDirectoryOverview: vi.fn(),
   trashWorkspaceFile: vi.fn(),
   openWorkspaceTerminal: vi.fn(),
   openWorkspaceEditor: vi.fn(),
@@ -39,6 +40,9 @@ vi.mock('#/server/modules/workspace-filesystem-tree.ts', () => ({
 }))
 vi.mock('#/server/modules/workspace-file-viewer.ts', () => ({
   readWorkspaceFileViewer: mocks.readWorkspaceFileViewer,
+}))
+vi.mock('#/server/modules/workspace-directory-overview.ts', () => ({
+  readWorkspaceDirectoryOverview: mocks.readWorkspaceDirectoryOverview,
 }))
 vi.mock('#/server/modules/workspace-file-trash.ts', () => ({ trashWorkspaceFile: mocks.trashWorkspaceFile }))
 vi.mock('#/server/modules/workspace-external-apps.ts', () => ({
@@ -79,6 +83,11 @@ describe('workspace routes', () => {
       shell: 'posix',
       executionRoot: '/tmp/workspace-route',
     })
+    mocks.readWorkspaceDirectoryOverview.mockResolvedValue({
+      topLevelFileCount: 2,
+      topLevelDirectoryCount: 1,
+      totalSizeBytes: 128,
+    })
     mocks.trashWorkspaceFile.mockResolvedValue({ ok: true, message: '' })
     mocks.openWorkspaceTerminal.mockResolvedValue({ ok: true, message: '' })
     mocks.openWorkspaceEditor.mockResolvedValue({ ok: true, message: '' })
@@ -104,6 +113,24 @@ describe('workspace routes', () => {
     expect(captureWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID).entries).toEqual([
       expect.objectContaining({ workspaceId: WORKSPACE_ID, generation: 1 }),
     ])
+  })
+
+  test('reads a directory overview through the current Workspace runtime', async () => {
+    const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, WORKSPACE_ID, CLIENT_ID)
+    const app = createWorkspaceRoutes({ workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval: vi.fn() } })
+
+    const response = await post(app, '/directory-overview', { workspaceId: WORKSPACE_ID, workspaceRuntimeId })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      topLevelFileCount: 2,
+      topLevelDirectoryCount: 1,
+      totalSizeBytes: 128,
+    })
+    expect(mocks.readWorkspaceDirectoryOverview).toHaveBeenCalledWith(WORKSPACE_ID, {
+      workspaceRuntimeId,
+      signal: expect.any(AbortSignal),
+    })
   })
 
   test('rolls back a newly acquired membership when initial capability cleanup fails', async () => {

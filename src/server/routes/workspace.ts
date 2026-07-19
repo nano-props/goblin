@@ -11,6 +11,7 @@ import {
 } from '#/server/modules/workspace-runtimes.ts'
 import { readWorkspaceFilesystemTree } from '#/server/modules/workspace-filesystem-tree.ts'
 import { readWorkspaceFileViewer } from '#/server/modules/workspace-file-viewer.ts'
+import { readWorkspaceDirectoryOverview } from '#/server/modules/workspace-directory-overview.ts'
 import { trashWorkspaceFile } from '#/server/modules/workspace-file-trash.ts'
 import {
   openWorkspaceEditor,
@@ -111,7 +112,7 @@ export function createWorkspaceRoutes(options: {
             capabilities: authoritativeProbe.capabilities,
             diagnostics: authoritativeProbe.diagnostics,
           }
-        })
+        }),
       )
     }
     const workspaceRuntimeId = acquireWorkspaceRuntime(userId, input.workspaceId, input.clientId)
@@ -140,6 +141,23 @@ export function createWorkspaceRoutes(options: {
       ok: true as const,
       ...releaseWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId, clientId),
     })
+  })
+
+  app.post('/directory-overview', async (c) => {
+    const { workspaceId, workspaceRuntimeId } = await parseHttpBody(WORKSPACE_PROCEDURE_SCHEMAS.directoryOverview, c)
+    const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), workspaceId, workspaceRuntimeId)
+    return c.json(
+      await runWorkspaceRuntimeRequest({
+        userId,
+        run: async () =>
+          await readWorkspaceDirectoryOverview(workspaceId, {
+            workspaceRuntimeId,
+            signal: c.req.raw.signal,
+          }),
+        label: 'directory-overview',
+        signal: c.req.raw.signal,
+      }),
+    )
   })
 
   app.post('/tree', async (c) => {

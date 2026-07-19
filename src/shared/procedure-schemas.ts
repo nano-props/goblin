@@ -82,6 +82,10 @@ export const WORKSPACE_PROCEDURE_SCHEMAS = {
   }),
   runtimeList: EmptyBodySchema,
   runtimeClose: WorkspaceRuntimeCloseSchema,
+  directoryOverview: v.object({
+    workspaceId: WorkspaceIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
+  }),
   tree: v.object({
     target: WorkspacePaneFilesystemExecutionTargetSchema,
     prefix: v.optional(WorkspaceFilesystemPathSchema),
@@ -183,10 +187,6 @@ export const REPO_PROCEDURE_SCHEMAS = {
     mode: v.optional(v.picklist(['summary', 'full'])),
   }),
   worktreeStatus: v.object({
-    cwd: WorkspaceIdSchema,
-    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
-  }),
-  workspaceOverview: v.object({
     cwd: WorkspaceIdSchema,
     workspaceRuntimeId: WorkspaceRuntimeIdSchema,
   }),

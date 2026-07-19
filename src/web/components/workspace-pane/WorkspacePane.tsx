@@ -20,11 +20,8 @@ import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
-import {
-  useRepoProjectionReadModel,
-  useRepoWorktreeStatusReadModel,
-  useWorkspaceDirectoryOverview,
-} from '#/web/repo-data-query.ts'
+import { useRepoProjectionReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-data-query.ts'
+import { useWorkspaceDirectoryOverview } from '#/web/workspace-directory-overview-query.ts'
 import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import { WorkspacePaneSkeleton } from '#/web/components/Skeleton.tsx'
 import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
