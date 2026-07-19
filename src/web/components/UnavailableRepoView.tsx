@@ -8,7 +8,7 @@ import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { formatTranslatableReason, shouldOfferSshSettings, unavailableBodyKey } from '#/web/lib/remote-diagnostics.ts'
 import { runManualRepoSync } from '#/web/stores/workspaces/refresh.ts'
-import { isRepoUnavailable, remoteRepoTarget } from '#/web/stores/workspaces/workspace-guards.ts'
+import { isWorkspaceUnavailable, remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
@@ -22,9 +22,9 @@ export function UnavailableRepoView({ repo }: Props) {
   // Phase 4 invariant: the `availability.phase` mirror is a
   // legacy hint for the refresh-pipeline guards, NOT the
   // authoritative source. The lifecycle union is. Gate on
-  // `isRepoUnavailable` (which dispatches by repo kind) and
+  // `isWorkspaceUnavailable` (which dispatches by workspace kind) and
   // read the reason from the field that owns it for each kind.
-  const isUnavailable = isRepoUnavailable(repo)
+  const isUnavailable = isWorkspaceUnavailable(repo)
   const isRemote = isRemoteWorkspaceId(repo.id)
   const reason = isRemote
     ? repo.admission.kind === 'remote' && repo.admission.lifecycle?.kind === 'failed'
@@ -62,7 +62,7 @@ export function UnavailableRepoView({ repo }: Props) {
               <div className="mt-1 break-all font-mono text-[11px] text-foreground">
                 {formatWorkspaceDisplayLocation(
                   repo.id,
-                  remoteRepoTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null),
+                  remoteWorkspaceTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null),
                 )}
               </div>
               <div className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">

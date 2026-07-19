@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useShallow } from 'zustand/react/shallow'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { isRepoUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
+import { isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
 import { RepoWorkspace, type RepoWorkspacePaneRouteContext } from '#/web/components/RepoWorkspace.tsx'
 import {
   BranchNavigatorSkeleton,
@@ -25,7 +25,7 @@ import { WorkspaceChrome } from '#/web/components/workspace-toolbar-chrome.tsx'
 import { RepoLayoutWorkspaceShell } from '#/web/components/repo-layout/RepoLayoutWorkspaceShell.tsx'
 import { RepoDashboardPane } from '#/web/components/repo-pages/RepoDashboardPane.tsx'
 import { CreateWorktreePagePane } from '#/web/components/repo-pages/CreateWorktreePagePane.tsx'
-import type { RepoRouteView } from '#/web/App.tsx'
+import type { WorkspaceRouteView } from '#/web/App.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import type { WorkspaceProjectionPromotionViewState } from '#/web/hooks/useRestoreWorkspaceTabsOnView.ts'
@@ -46,11 +46,11 @@ function EmptyRepoWorkspacePane({ trafficLightOffset }: { trafficLightOffset: bo
 
 interface Props {
   workspaceId: WorkspaceId
-  routeView?: RepoRouteView | null
+  routeView?: WorkspaceRouteView | null
   onOpenSettings?: () => void
-  onOpenRepoRoot?: (workspaceId: WorkspaceId) => void
-  onOpenWorkspaceRoot?: (workspaceId: WorkspaceId) => void
-  onOpenRepoDashboard?: (workspaceId: WorkspaceId) => void
+  onOpenWorkspaceNavigator?: (workspaceId: WorkspaceId) => void
+  onOpenWorkspaceRootPane?: (workspaceId: WorkspaceId) => void
+  onOpenWorkspaceDashboard?: (workspaceId: WorkspaceId) => void
   onOpenRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
   onOpenRepoNewWorktree?: (workspaceId: WorkspaceId) => void
   onCancelRepoNewWorktree?: (workspaceId: WorkspaceId) => void
@@ -61,9 +61,9 @@ export function RepoView({
   workspaceId,
   routeView = null,
   onOpenSettings,
-  onOpenRepoRoot,
-  onOpenWorkspaceRoot,
-  onOpenRepoDashboard,
+  onOpenWorkspaceNavigator,
+  onOpenWorkspaceRootPane,
+  onOpenWorkspaceDashboard,
   onOpenRepoBranch,
   onOpenRepoNewWorktree,
   onCancelRepoNewWorktree,
@@ -149,7 +149,7 @@ export function RepoView({
   const workspaceTrafficLightOffset = zenModeCollapsed
   const sidebarSelectBranch = routeView ? (branchName: string) => onOpenRepoBranch?.(repo.id, branchName) : undefined
   const sidebarCreateWorktree = routeView ? () => onOpenRepoNewWorktree?.(repo.id) : undefined
-  const sidebarOpenDashboard = routeView ? () => onOpenRepoDashboard?.(repo.id) : undefined
+  const sidebarOpenDashboard = routeView ? () => onOpenWorkspaceDashboard?.(repo.id) : undefined
   const dashboardSelected = routeView?.kind === 'dashboard'
   const newWorktreeSelected = routeView?.kind === 'newWorktree'
   const renderSidebarPane = (
@@ -171,12 +171,12 @@ export function RepoView({
         newWorktreeSelected={newWorktreeSelected}
         currentBranchName={routeBranchName}
         workspaceRootSelected={gitUnavailable && routeView?.kind === 'workspace-root'}
-        onSelectWorkspaceRoot={gitUnavailable ? () => onOpenWorkspaceRoot?.(repo.id) : undefined}
+        onSelectWorkspaceRoot={gitUnavailable ? () => onOpenWorkspaceRootPane?.(repo.id) : undefined}
       />
     </RepoWorkspacePane>
   )
 
-  if (isRepoUnavailable(repo)) {
+  if (isWorkspaceUnavailable(repo)) {
     return (
       <RepoLayoutWorkspaceShell
         workspaceId={workspaceId}
@@ -282,7 +282,7 @@ export function RepoView({
                 repoId={repo.id}
                 compact={compact}
                 trafficLightOffset={workspaceTrafficLightOffset}
-                onBack={() => onOpenRepoRoot?.(repo.id)}
+                onBack={() => onOpenWorkspaceNavigator?.(repo.id)}
                 onSelectBranch={(branchName) => onOpenRepoBranch?.(repo.id, branchName)}
               />
             ) : routeView?.kind === 'workspace-root' ? (
@@ -292,7 +292,7 @@ export function RepoView({
                 workspacePaneRouteContext={{ kind: 'workspace-root' }}
                 shortcutsEnabled={!compact || singlePane === 'workspace'}
                 toolbarTrafficLightOffset={workspaceTrafficLightOffset}
-                onBackToBranchNavigator={() => onOpenRepoRoot?.(repo.id)}
+                onBackToBranchNavigator={() => onOpenWorkspaceNavigator?.(repo.id)}
               />
             ) : routeView?.kind === 'worktree' ? (
               <RepoWorkspace
@@ -305,7 +305,7 @@ export function RepoView({
                 }}
                 shortcutsEnabled={!compact || singlePane === 'workspace'}
                 toolbarTrafficLightOffset={workspaceTrafficLightOffset}
-                onBackToBranchNavigator={() => onOpenRepoRoot?.(repo.id)}
+                onBackToBranchNavigator={() => onOpenWorkspaceNavigator?.(repo.id)}
               />
             ) : routeView?.kind === 'newWorktree' ? (
               <CreateWorktreePagePane
@@ -314,7 +314,7 @@ export function RepoView({
                 trafficLightOffset={workspaceTrafficLightOffset}
                 onCancel={() => {
                   if (onCancelRepoNewWorktree) onCancelRepoNewWorktree(repo.id)
-                  else onOpenRepoRoot?.(repo.id)
+                  else onOpenWorkspaceNavigator?.(repo.id)
                 }}
                 onCreated={(branchName) => onReplaceRepoBranch?.(repo.id, branchName)}
               />
@@ -327,7 +327,7 @@ export function RepoView({
                 workspacePaneRouteContext={workspacePaneRouteContext}
                 shortcutsEnabled={!compact || singlePane === 'workspace'}
                 toolbarTrafficLightOffset={workspaceTrafficLightOffset}
-                onBackToBranchNavigator={routeView ? () => onOpenRepoRoot?.(repo.id) : undefined}
+                onBackToBranchNavigator={routeView ? () => onOpenWorkspaceNavigator?.(repo.id) : undefined}
               />
             )}
           </RepoWorkspacePane>

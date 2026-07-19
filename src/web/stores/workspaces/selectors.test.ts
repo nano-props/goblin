@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   keyboardRuntimeStateFromStore,
   restorableWorkspaceStateFromStore,
-  runtimeCoherentRepoProjectionStateFromStore,
+  runtimeCoherentWorkspaceStateFromStore,
   workspaceRestoreStatusFromStore,
   workspaceSessionPersistenceOpenFromStore,
 } from '#/web/stores/workspaces/selector-state.ts'
@@ -20,10 +20,10 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/repo')
 
-describe('repo selectors', () => {
+describe('workspace selectors', () => {
   test('builds explicit runtime-coherent and local state slices from store fields', () => {
     expect(
-      runtimeCoherentRepoProjectionStateFromStore({
+      runtimeCoherentWorkspaceStateFromStore({
         workspaces: {
           [WORKSPACE_ID]: {
             id: WORKSPACE_ID,
@@ -135,7 +135,7 @@ describe('repo selectors', () => {
     })
   })
 
-  test('builds keyboard runtime state from the current repo selection', () => {
+  test('builds keyboard runtime state from the current workspace selection', () => {
     expect(
       keyboardRuntimeStateFromStore(
         {
@@ -145,10 +145,10 @@ describe('repo selectors', () => {
             } as never,
           },
         },
-        'goblin+file:///tmp/repo-a',
+        workspaceIdForTest('goblin+file:///tmp/repo-a'),
       ),
     ).toMatchObject({
-      repo: { id: 'goblin+file:///tmp/repo-a' },
+      workspace: { id: 'goblin+file:///tmp/repo-a' },
     })
     expect(
       keyboardRuntimeStateFromStore(
@@ -158,7 +158,7 @@ describe('repo selectors', () => {
         null,
       ),
     ).toEqual({
-      repo: null,
+      workspace: null,
     })
   })
 

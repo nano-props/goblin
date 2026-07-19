@@ -314,7 +314,7 @@ function restoreWorkspacePresentationOrOpenDashboard(
     const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, { presentationToken })
     if (result.kind === 'accepted' || (result.kind === 'blocked' && options.onBlocked === 'stay')) return
   }
-  routeNavigation.openRepoDashboard(workspaceId, { presentationToken })
+  routeNavigation.openWorkspaceDashboard(workspaceId, { presentationToken })
 }
 
 function nextWorkspaceIdAfterClose(workspaceOrder: WorkspaceId[], closingWorkspaceId: WorkspaceId): WorkspaceId | null {

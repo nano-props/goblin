@@ -30,7 +30,7 @@ import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.ts
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { useWorkspacePaneRouteController } from '#/web/components/repo-workspace/workspace-pane-route-controller.ts'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import { isRepoUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
+import { isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { GitWorkspaceProjection, WorkspaceCapabilityState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -115,7 +115,7 @@ export function RepoWorkspace({
               currentBranchName: currentBranch,
               preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
             },
-            unavailable: isRepoUnavailable(repo),
+            unavailable: isWorkspaceUnavailable(repo),
             capability: repo.capability,
             admission: repo.admission,
           }

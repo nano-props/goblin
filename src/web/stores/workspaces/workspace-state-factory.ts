@@ -17,8 +17,8 @@ let nextEventId = 1
 
 const MAX_REPO_EVENTS = 50
 
-type RepoMutator = (repo: Draft<WorkspaceState>) => void
-type ReposPatch = Pick<WorkspacesStore, 'workspaces'>
+type WorkspaceMutator = (workspace: Draft<WorkspaceState>) => void
+type WorkspacesPatch = Pick<WorkspacesStore, 'workspaces'>
 
 export function emptyWorkspace(id: string, name: string, workspaceRuntimeId: string): WorkspaceState {
   const workspaceId: WorkspaceId | null = canonicalWorkspaceLocator(id)
@@ -73,11 +73,17 @@ export function appendRepoEvent(events: RepoEvent[], event: RepoEvent): RepoEven
   return [...events, event].slice(-MAX_REPO_EVENTS)
 }
 
-export function replaceWorkspace(repo: WorkspaceState, mutator: RepoMutator): WorkspaceState {
-  return produce(repo, mutator)
+export function replaceWorkspace(workspace: WorkspaceState, mutator: WorkspaceMutator): WorkspaceState {
+  return produce(workspace, mutator)
 }
 
-export function replaceWorkspaceState(state: ReposPatch, repo: WorkspaceState, mutator: RepoMutator): ReposPatch {
-  const nextRepo = replaceWorkspace(repo, mutator)
-  return nextRepo === repo ? state : { workspaces: { ...state.workspaces, [repo.id]: nextRepo } }
+export function replaceWorkspaceState(
+  state: WorkspacesPatch,
+  workspace: WorkspaceState,
+  mutator: WorkspaceMutator,
+): WorkspacesPatch {
+  const nextWorkspace = replaceWorkspace(workspace, mutator)
+  return nextWorkspace === workspace
+    ? state
+    : { workspaces: { ...state.workspaces, [workspace.id]: nextWorkspace } }
 }

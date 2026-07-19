@@ -268,14 +268,14 @@ export function restoreWorkspaceNavigationEntry(
   if (workspaceNavigationEntryBlocksWorkspacePaneInteraction(entry)) return { kind: 'blocked' }
   switch (entry.route.kind) {
     case 'empty':
-      routeNavigation.openRepoRoot(entry.workspaceId, options)
+      routeNavigation.openWorkspaceNavigator(entry.workspaceId, options)
       return { kind: 'accepted' }
     case 'workspace-root':
       return routeNavigation.openWorkspaceRootPane(entry.workspaceId, options)
         ? { kind: 'accepted' }
         : { kind: 'unavailable' }
     case 'dashboard':
-      routeNavigation.openRepoDashboard(entry.workspaceId, options)
+      routeNavigation.openWorkspaceDashboard(entry.workspaceId, options)
       return { kind: 'accepted' }
     case 'newWorktree':
       routeNavigation.openRepoNewWorktree(entry.workspaceId, { ...options, returnTo: entry.route.returnTo })

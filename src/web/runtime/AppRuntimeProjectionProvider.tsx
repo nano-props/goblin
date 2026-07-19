@@ -20,14 +20,14 @@ import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-
 
 interface AppRuntimeProjectionProviderProps {
   children: ReactNode
-  currentRepoId: WorkspaceId | null
+  currentWorkspaceId: WorkspaceId | null
 }
 
 const WORKSPACE_TABS_REFRESH_LANE = 'workspace-tabs-refresh'
 
-export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRuntimeProjectionProviderProps) {
+export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: AppRuntimeProjectionProviderProps) {
   const currentWorkspaceRuntimeId = useWorkspacesStore((s) =>
-    currentRepoId ? (s.workspaces[currentRepoId]?.workspaceRuntimeId ?? null) : null,
+    currentWorkspaceId ? (s.workspaces[currentWorkspaceId]?.workspaceRuntimeId ?? null) : null,
   )
   const workspaceMembershipReady = useWorkspacesStore((s) => s.workspaceMembershipReady)
   const terminalProjection = useTerminalSessionProjection()
@@ -136,10 +136,8 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
   }, [scopeRegistry])
 
   useEffect(() => {
-    if (!workspaceMembershipReady || !currentRepoId || !currentWorkspaceRuntimeId) return
-    const workspaceId = canonicalWorkspaceLocator(currentRepoId)
-    if (!workspaceId) return
-    const target = { workspaceId, workspaceRuntimeId: currentWorkspaceRuntimeId }
+    if (!workspaceMembershipReady || !currentWorkspaceId || !currentWorkspaceRuntimeId) return
+    const target = { workspaceId: currentWorkspaceId, workspaceRuntimeId: currentWorkspaceRuntimeId }
     const scope = scopeRegistry.scopeFor(target)
     scope.commit(() => {
       useTerminalProjectionHydrationStore
@@ -160,7 +158,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
     return () => window.removeEventListener('focus', handleFocus)
   }, [
     workspaceMembershipReady,
-    currentRepoId,
+    currentWorkspaceId,
     currentWorkspaceRuntimeId,
     recoverTerminalSessionsFromServer,
     scopeRegistry,
@@ -173,7 +171,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
     }
     const offSessionsChanged = scopeRegistry.track(
       terminalClient.onSessionsChanged((event) => {
-        const scope = currentScopeForRepo(scopeRegistry, event.workspaceId)
+        const scope = currentScopeForWorkspace(scopeRegistry, event.workspaceId)
         if (!scope) return
         if (scope.target.workspaceRuntimeId !== event.workspaceRuntimeId) return
         const hydration = useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(event.workspaceId)
@@ -215,7 +213,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
     )
     const offWorkspaceTabsChanged = scopeRegistry.track(
       workspacePaneTabsClient.onChanged((message) => {
-        const scope = currentScopeForRepo(scopeRegistry, message.workspaceId)
+        const scope = currentScopeForWorkspace(scopeRegistry, message.workspaceId)
         if (!scope) return
         if (
           message.change === 'revision' &&
@@ -238,7 +236,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
   return <>{children}</>
 }
 
-function currentScopeForRepo(
+function currentScopeForWorkspace(
   registry: RuntimeProjectionScopeRegistry,
   workspaceIdInput: string,
 ): RuntimeProjectionScope | null {

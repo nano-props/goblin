@@ -1905,13 +1905,13 @@ function navigationWithStore(
 
 function routeNavigation(): PrimaryWindowRouteNavigation {
   return {
-    repoSlugForId: vi.fn(() => 'repo-workspace-container-repo'),
+    workspaceSlugForId: vi.fn(() => 'repo-workspace-container-repo'),
     currentWorkspacePaneRoute: () => undefined,
     openHome: vi.fn(),
     openSettings: vi.fn(),
     closeSettings: vi.fn(),
-    openRepoRoot: vi.fn(),
-    openRepoDashboard: vi.fn(),
+    openWorkspaceNavigator: vi.fn(),
+    openWorkspaceDashboard: vi.fn(),
     openWorkspaceRootPane: vi.fn(),
     openRepoBranch: vi.fn((_repoId, _branchName, options) => {
       options?.onCommit?.()

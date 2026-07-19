@@ -1,6 +1,6 @@
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { toRemoteWorkspaceFailureReason, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
-type RepoAvailabilityTarget = Pick<WorkspaceState, 'availability' | 'admission' | 'capability'>
+type WorkspaceAvailabilityTarget = Pick<WorkspaceState, 'availability' | 'admission' | 'capability'>
 
 const UNAVAILABLE_REASONS = new Set([
   'error.path-not-found',
@@ -9,17 +9,17 @@ const UNAVAILABLE_REASONS = new Set([
   'error.ssh-config-changed',
 ])
 
-export function isRepoUnavailableReason(message: string): boolean {
+export function isWorkspaceUnavailableReason(message: string): boolean {
   return UNAVAILABLE_REASONS.has(message)
 }
 
-export function markRepoAvailable(repo: Pick<WorkspaceState, 'availability'>): void {
-  repo.availability = { phase: 'available' }
+export function markWorkspaceAvailable(workspace: Pick<WorkspaceState, 'availability'>): void {
+  workspace.availability = { phase: 'available' }
 }
 
-export function markRepoUnavailable(repo: RepoAvailabilityTarget, reason: string): void {
-  repo.availability = { phase: 'unavailable', reason, checkedAt: Date.now() }
-  clearGitFetchFailure(repo)
+export function markWorkspaceUnavailable(workspace: WorkspaceAvailabilityTarget, reason: string): void {
+  workspace.availability = { phase: 'unavailable', reason, checkedAt: Date.now() }
+  clearGitFetchFailure(workspace)
 }
 
 /**
@@ -31,53 +31,53 @@ export function markRepoUnavailable(repo: RepoAvailabilityTarget, reason: string
  * availability mirror is still useful as a hint, not as the
  * lifecycle signal.
  */
-export function markRemoteLifecycleConnecting(repo: RepoAvailabilityTarget): void {
-  const admission = remoteRepoAdmission(repo)
+export function markRemoteLifecycleConnecting(workspace: WorkspaceAvailabilityTarget): void {
+  const admission = remoteWorkspaceAdmission(workspace)
   admission.lifecycle = { kind: 'connecting' }
-  clearGitFetchFailure(repo)
+  clearGitFetchFailure(workspace)
 }
 
 /**
  * Set the remote lifecycle to `ready` with a concrete target. This is
  * the success terminus of a remote-workspace run. Mirrors
- * `markRepoAvailable` on the availability field (kept as a hint
+ * `markWorkspaceAvailable` on the availability field (kept as a hint
  * for the refresh-pipeline guards in refresh.ts).
  */
-export function markRemoteLifecycleReady(repo: RepoAvailabilityTarget, target: RemoteWorkspaceTarget): void {
-  const admission = remoteRepoAdmission(repo)
+export function markRemoteLifecycleReady(workspace: WorkspaceAvailabilityTarget, target: RemoteWorkspaceTarget): void {
+  const admission = remoteWorkspaceAdmission(workspace)
   admission.lifecycle = { kind: 'ready', target }
-  markRepoAvailable(repo)
+  markWorkspaceAvailable(workspace)
 }
 
 /**
  * Set the remote lifecycle to `failed` with a reason and an optional
- * last-known target. Mirrors `markRepoUnavailable` on the
+ * last-known target. Mirrors `markWorkspaceUnavailable` on the
  * availability field (kept as a hint for the refresh-pipeline
  * guards in refresh.ts).
  */
 export function markRemoteLifecycleFailed(
-  repo: RepoAvailabilityTarget,
+  workspace: WorkspaceAvailabilityTarget,
   reason: string,
   target?: RemoteWorkspaceTarget,
 ): void {
   const lifecycleReason = toRemoteWorkspaceFailureReason(reason)
-  const admission = remoteRepoAdmission(repo)
+  const admission = remoteWorkspaceAdmission(workspace)
   admission.lifecycle = target
     ? { kind: 'failed', reason: lifecycleReason, target }
     : { kind: 'failed', reason: lifecycleReason }
-  markRepoUnavailable(repo, reason)
+  markWorkspaceUnavailable(workspace, reason)
 }
 
-function clearGitFetchFailure(repo: Pick<WorkspaceState, 'capability'>): void {
-  if (repo.capability.kind !== 'git') return
-  repo.capability.git.remote.fetchFailed = false
-  repo.capability.git.remote.fetchError = null
+function clearGitFetchFailure(workspace: Pick<WorkspaceState, 'capability'>): void {
+  if (workspace.capability.kind !== 'git') return
+  workspace.capability.git.remote.fetchFailed = false
+  workspace.capability.git.remote.fetchError = null
 }
 
-function remoteRepoAdmission(
-  repo: Pick<WorkspaceState, 'admission'>,
+function remoteWorkspaceAdmission(
+  workspace: Pick<WorkspaceState, 'admission'>,
 ): Extract<WorkspaceState['admission'], { kind: 'remote' }> {
-  if (repo.admission.kind !== 'remote')
-    throw new Error('Remote repository lifecycle requires remote workspace admission')
-  return repo.admission
+  if (workspace.admission.kind !== 'remote')
+    throw new Error('Remote lifecycle requires remote workspace admission')
+  return workspace.admission
 }

@@ -9,7 +9,7 @@ import {
   useMatch,
 } from '@tanstack/react-router'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { App, type RepoRouteView } from '#/web/App.tsx'
+import { App, type WorkspaceRouteView } from '#/web/App.tsx'
 import { Layout, WorkspaceSessionRestoreGate } from '#/web/Layout.tsx'
 import { isSettingsPage } from '#/shared/settings-pages.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
@@ -113,9 +113,11 @@ const settingsRoute = createRoute({
 })
 
 function IndexRoute() {
-  const firstRepoSlug = useWorkspacesStore(initialRepoRouteSlugFromStore)
-  const navigation = useRepoRouteNavigation()
-  if (firstRepoSlug) return <Navigate to="/repo/$repoSlug/dashboard" params={{ repoSlug: firstRepoSlug }} replace />
+  const firstWorkspaceSlug = useWorkspacesStore(initialWorkspaceRouteSlugFromStore)
+  const navigation = useWorkspaceRouteNavigation()
+  if (firstWorkspaceSlug) {
+    return <Navigate to="/repo/$repoSlug/dashboard" params={{ repoSlug: firstWorkspaceSlug }} replace />
+  }
   return (
     <WorkspaceSessionRestoreGate>
       <App routeSettingsPage={null} {...navigation} />
@@ -123,15 +125,15 @@ function IndexRoute() {
   )
 }
 
-export function initialRepoRouteSlugFromStore(
+export function initialWorkspaceRouteSlugFromStore(
   state: Pick<WorkspacesStore, 'restoredWorkspaceId' | 'workspaceOrder' | 'workspaces' | 'workspaceMembershipReady'>,
 ): string | null {
-  const restoredRepo = state.restoredWorkspaceId ? state.workspaces[state.restoredWorkspaceId] : null
-  if (restoredRepo) return repoSlugFromId(restoredRepo.id)
+  const restoredWorkspace = state.restoredWorkspaceId ? state.workspaces[state.restoredWorkspaceId] : null
+  if (restoredWorkspace) return repoSlugFromId(restoredWorkspace.id)
   if (!state.workspaceMembershipReady) return null
-  const firstRepoId = state.workspaceOrder[0]
-  const firstRepo = firstRepoId ? state.workspaces[firstRepoId] : null
-  return firstRepo ? repoSlugFromId(firstRepo.id) : null
+  const firstWorkspaceId = state.workspaceOrder[0]
+  const firstWorkspace = firstWorkspaceId ? state.workspaces[firstWorkspaceId] : null
+  return firstWorkspace ? repoSlugFromId(firstWorkspace.id) : null
 }
 
 function RepoRoute() {
@@ -145,16 +147,16 @@ function RepoRoute() {
   const worktreeMatch = useMatch({ from: repoWorktreeRoute.id, shouldThrow: false })
   const worktreeTerminalMatch = useMatch({ from: repoWorktreeTerminalRoute.id, shouldThrow: false })
   const worktreeTabMatch = useMatch({ from: repoWorktreeTabRoute.id, shouldThrow: false })
-  const navigation = useRepoRouteNavigation()
-  const repoId = workspaceIdFromSlug(repoSlug)
+  const navigation = useWorkspaceRouteNavigation()
+  const workspaceId = workspaceIdFromSlug(repoSlug)
   const gitUnavailable = useWorkspacesStore((state) => {
-    const repo = repoId ? state.workspaces[repoId] : null
-    return repo?.capability.kind === 'filesystem'
+    const workspace = workspaceId ? state.workspaces[workspaceId] : null
+    return workspace?.capability.kind === 'filesystem'
   })
   if (gitUnavailable && (branchMatch || worktreeMatch || newWorktreeMatch)) {
     return <Navigate to="/repo/$repoSlug/dashboard" params={{ repoSlug }} replace />
   }
-  const routeRepoView = repoRouteViewFromSlugChildRoute(repoSlug, {
+  const routeWorkspaceView = workspaceRouteViewFromSlugChildRoute(repoSlug, {
     dashboard: !!dashboardMatch,
     workspace: !!workspaceMatch,
     branchSlug: branchMatch?.params.branchSlug ?? null,
@@ -167,12 +169,12 @@ function RepoRoute() {
   })
   return (
     <WorkspaceSessionRestoreGate>
-      <App routeRepoView={routeRepoView} {...navigation} />
+      <App routeWorkspaceView={routeWorkspaceView} {...navigation} />
     </WorkspaceSessionRestoreGate>
   )
 }
 
-export function repoRouteViewFromSlugChildRoute(
+export function workspaceRouteViewFromSlugChildRoute(
   repoSlug: string,
   childRoute: {
     dashboard: boolean
@@ -185,13 +187,13 @@ export function repoRouteViewFromSlugChildRoute(
     worktreeTabKey?: string | null
     newWorktree: boolean
   },
-): RepoRouteView | null {
-  const repoId = workspaceIdFromSlug(repoSlug)
-  return repoId ? repoRouteViewFromChildRoute(repoId, childRoute) : null
+): WorkspaceRouteView | null {
+  const workspaceId = workspaceIdFromSlug(repoSlug)
+  return workspaceId ? workspaceRouteViewFromChildRoute(workspaceId, childRoute) : null
 }
 
-export function repoRouteViewFromChildRoute(
-  repoId: WorkspaceId,
+export function workspaceRouteViewFromChildRoute(
+  workspaceId: WorkspaceId,
   childRoute: {
     dashboard: boolean
     workspace?: boolean
@@ -203,13 +205,13 @@ export function repoRouteViewFromChildRoute(
     worktreeTabKey?: string | null
     newWorktree: boolean
   },
-): RepoRouteView {
+): WorkspaceRouteView {
   if (childRoute.worktreeSlug) {
     const worktreePath = worktreePathFromSlug(childRoute.worktreeSlug)
-    if (!worktreePath) return { kind: 'empty', repoId }
+    if (!worktreePath) return { kind: 'empty', workspaceId }
     return {
       kind: 'worktree',
-      repoId,
+      workspaceId,
       worktreePath,
       workspacePaneRoute: childRoute.worktreeTerminalSessionId
         ? { kind: 'terminal', terminalSessionId: childRoute.worktreeTerminalSessionId }
@@ -222,11 +224,11 @@ export function repoRouteViewFromChildRoute(
   }
   if (childRoute.branchSlug) {
     const branchName = branchNameFromSlug(childRoute.branchSlug)
-    if (!branchName) return { kind: 'empty', repoId }
+    if (!branchName) return { kind: 'empty', workspaceId }
     if (childRoute.terminalSessionId) {
       return {
         kind: 'branch',
-        repoId,
+        workspaceId,
         branchName,
         workspacePaneRoute: { kind: 'terminal', terminalSessionId: childRoute.terminalSessionId },
       }
@@ -234,22 +236,22 @@ export function repoRouteViewFromChildRoute(
     if (childRoute.tabKey) {
       return {
         kind: 'branch',
-        repoId,
+        workspaceId,
         branchName,
         workspacePaneRoute: isWorkspacePaneStaticTabType(childRoute.tabKey)
           ? { kind: 'static', tab: childRoute.tabKey }
           : { kind: 'invalid-static', tabKey: childRoute.tabKey },
       }
     }
-    return { kind: 'branch', repoId, branchName, workspacePaneRoute: null }
+    return { kind: 'branch', workspaceId, branchName, workspacePaneRoute: null }
   }
-  if (childRoute.newWorktree) return { kind: 'newWorktree', repoId }
-  if (childRoute.dashboard) return { kind: 'dashboard', repoId }
-  if (childRoute.workspace) return { kind: 'workspace-root', repoId }
-  return { kind: 'empty', repoId }
+  if (childRoute.newWorktree) return { kind: 'newWorktree', workspaceId }
+  if (childRoute.dashboard) return { kind: 'dashboard', workspaceId }
+  if (childRoute.workspace) return { kind: 'workspace-root', workspaceId }
+  return { kind: 'empty', workspaceId }
 }
 
-function useRepoRouteNavigation() {
+function useWorkspaceRouteNavigation() {
   const routeActions = usePrimaryWindowRouteActions()
   return primaryWindowRouterCallbacks(routeActions)
 }
@@ -259,14 +261,14 @@ export function primaryWindowRouterCallbacks(routeActions: PrimaryWindowRouteNav
     onRouteSettingsPageChange: (page: SettingsPage | null) => {
       if (page) routeActions.openSettings(page)
     },
-    onOpenRepoRoot: (repoId: WorkspaceId) => routeActions.openRepoRoot(repoId),
-    onOpenWorkspaceRoot: (workspaceId: WorkspaceId) => routeActions.openWorkspaceRootPane(workspaceId),
-    onOpenRepoDashboard: (repoId: WorkspaceId) => routeActions.openRepoDashboard(repoId),
-    onOpenRepoBranch: (repoId: WorkspaceId, branchName: string) => openWorkspacePaneRoute(routeActions, repoId, branchName),
-    onOpenRepoNewWorktree: (repoId: WorkspaceId) => routeActions.openRepoNewWorktree(repoId),
-    onCancelRepoNewWorktree: (repoId: WorkspaceId) => routeActions.cancelRepoNewWorktree(repoId),
-    onReplaceRepoBranch: (repoId: WorkspaceId, branchName: string) =>
-      openWorkspacePaneRoute(routeActions, repoId, branchName, { replace: true }),
+    onOpenWorkspaceNavigator: (workspaceId: WorkspaceId) => routeActions.openWorkspaceNavigator(workspaceId),
+    onOpenWorkspaceRootPane: (workspaceId: WorkspaceId) => routeActions.openWorkspaceRootPane(workspaceId),
+    onOpenWorkspaceDashboard: (workspaceId: WorkspaceId) => routeActions.openWorkspaceDashboard(workspaceId),
+    onOpenRepoBranch: (workspaceId: WorkspaceId, branchName: string) => openWorkspacePaneRoute(routeActions, workspaceId, branchName),
+    onOpenRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.openRepoNewWorktree(workspaceId),
+    onCancelRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.cancelRepoNewWorktree(workspaceId),
+    onReplaceRepoBranch: (workspaceId: WorkspaceId, branchName: string) =>
+      openWorkspacePaneRoute(routeActions, workspaceId, branchName, { replace: true }),
   }
 }
 

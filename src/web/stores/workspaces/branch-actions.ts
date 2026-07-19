@@ -7,7 +7,7 @@ import {
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { RepoOperationCancelledError } from '#/web/stores/workspaces/operation-cancellation.ts'
 import type { RepoBranchActionReason, RepoOperationReason } from '#/web/stores/workspaces/operations.ts'
-import { isRepoUnavailable, updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
+import { isWorkspaceUnavailable, updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
   repoOperation,
   repoLocalBranchActionScheduleGuard,
@@ -279,7 +279,7 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       if (repoBefore.workspaceRuntimeId !== workspaceRuntimeId) return null
       const network = isNetworkBranchAction(action)
       const branchOperation = repoOperation(id, 'branchAction')
-      if (isRepoUnavailable(repoBefore)) {
+      if (isWorkspaceUnavailable(repoBefore)) {
         // Per the lifecycle union: local repos carry their
         // failure reason in `availability.reason`; remote repos
         // carry it in `admission.lifecycle.reason` (or 'unknown'

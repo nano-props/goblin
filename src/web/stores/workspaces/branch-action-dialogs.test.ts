@@ -3,6 +3,7 @@
 // that the previous per-component design violated.
 
 import { beforeEach, describe, expect, test } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   branchCheckboxKey,
   branchCheckboxesFor,
@@ -10,6 +11,11 @@ import {
   useBranchActionDialogsStore,
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/workspaces/branch-action-dialogs.ts'
+
+const WORKSPACE_1 = workspaceIdForTest('goblin+file:///workspace-1')
+const WORKSPACE_A = workspaceIdForTest('goblin+file:///workspace-a')
+const WORKSPACE_B = workspaceIdForTest('goblin+file:///workspace-b')
+const UNKNOWN_WORKSPACE = workspaceIdForTest('goblin+file:///unknown-workspace')
 
 describe('useBranchActionDialogsStore', () => {
   beforeEach(() => {
@@ -28,12 +34,12 @@ describe('useBranchActionDialogsStore', () => {
 
   test('openPushConfirm sets the pushConfirm slot', () => {
     useBranchActionDialogsStore.getState().openPushConfirm({
-      repoId: 'repo-1',
+      repoId: WORKSPACE_1,
       branchName: 'main',
       payload: 'main',
     })
     expect(useBranchActionDialogsStore.getState().pushConfirm).toEqual({
-      repoId: 'repo-1',
+      repoId: WORKSPACE_1,
       branchName: 'main',
       payload: 'main',
     })
@@ -42,7 +48,7 @@ describe('useBranchActionDialogsStore', () => {
   test('openRemoveWorktreeConfirm seeds removeAlsoDeletes from isProtectedBranch on first open', () => {
     useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
       {
-        repoId: 'repo-1',
+        repoId: WORKSPACE_1,
         branchName: 'feature/x',
         payload: { branch: 'feature/x', path: '/tmp/x' },
       },
@@ -50,7 +56,7 @@ describe('useBranchActionDialogsStore', () => {
     )
     const state = useBranchActionDialogsStore.getState()
     expect(state.removeConfirm?.payload).toEqual({ branch: 'feature/x', path: '/tmp/x' })
-    expect(state.checkboxStateByBranch[branchCheckboxKey('repo-1', 'feature/x')]).toEqual({
+    expect(state.checkboxStateByBranch[branchCheckboxKey(WORKSPACE_1, 'feature/x')]).toEqual({
       removeAlsoDeletes: true,
       removeAlsoUpstream: false,
       deleteAlsoUpstream: false,
@@ -60,13 +66,13 @@ describe('useBranchActionDialogsStore', () => {
   test('openRemoveWorktreeConfirm locks removeAlsoDeletes off when branch is protected', () => {
     useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
       {
-        repoId: 'repo-1',
+        repoId: WORKSPACE_1,
         branchName: 'main',
         payload: { branch: 'main', path: '/tmp/main' },
       },
       { isProtectedBranch: true },
     )
-    expect(useBranchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey('repo-1', 'main')]).toEqual({
+    expect(useBranchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey(WORKSPACE_1, 'main')]).toEqual({
       removeAlsoDeletes: false,
       removeAlsoUpstream: false,
       deleteAlsoUpstream: false,
@@ -77,25 +83,25 @@ describe('useBranchActionDialogsStore', () => {
     // First open: user toggles removeAlsoDeletes off
     useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
       {
-        repoId: 'repo-1',
+        repoId: WORKSPACE_1,
         branchName: 'feature/x',
         payload: { branch: 'feature/x', path: '/tmp/x' },
       },
       { isProtectedBranch: false },
     )
-    useBranchActionDialogsStore.getState().setRemoveAlsoDeletes('repo-1', 'feature/x', false)
+    useBranchActionDialogsStore.getState().setRemoveAlsoDeletes(WORKSPACE_1, 'feature/x', false)
 
     // Second open: user choice is kept
     useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
       {
-        repoId: 'repo-1',
+        repoId: WORKSPACE_1,
         branchName: 'feature/x',
         payload: { branch: 'feature/x', path: '/tmp/x' },
       },
       { isProtectedBranch: false },
     )
     expect(
-      useBranchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey('repo-1', 'feature/x')],
+      useBranchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey(WORKSPACE_1, 'feature/x')],
     ).toMatchObject({ removeAlsoDeletes: false })
   })
 
@@ -103,11 +109,11 @@ describe('useBranchActionDialogsStore', () => {
     const payload: RemoveWorktreeDialogPayload = { branch: 'feature/x', path: '/tmp/x' }
     useBranchActionDialogsStore
       .getState()
-      .openRemoveWorktreeConfirm({ repoId: 'repo-1', branchName: 'feature/x', payload }, { isProtectedBranch: false })
+      .openRemoveWorktreeConfirm({ repoId: WORKSPACE_1, branchName: 'feature/x', payload }, { isProtectedBranch: false })
     expect(useBranchActionDialogsStore.getState().removeConfirm).not.toBeNull()
 
     useBranchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({
-      repoId: 'repo-1',
+      repoId: WORKSPACE_1,
       branchName: 'feature/x',
       payload,
     })
@@ -118,7 +124,7 @@ describe('useBranchActionDialogsStore', () => {
 
   test('closeDialog closes a single named slot', () => {
     useBranchActionDialogsStore.getState().openPushConfirm({
-      repoId: 'repo-1',
+      repoId: WORKSPACE_1,
       branchName: 'main',
       payload: 'main',
     })
@@ -132,10 +138,10 @@ describe('useBranchActionDialogsStore', () => {
     // elsewhere). The bug being covered is in the close path, not
     // the open path.
     useBranchActionDialogsStore.setState({
-      pushConfirm: { repoId: 'repo-a', branchName: 'main', payload: 'main' },
-      deleteConfirm: { repoId: 'repo-a', branchName: 'feature/x', payload: 'feature/x' },
+      pushConfirm: { repoId: WORKSPACE_A, branchName: 'main', payload: 'main' },
+      deleteConfirm: { repoId: WORKSPACE_A, branchName: 'feature/x', payload: 'feature/x' },
       removeConfirm: {
-        repoId: 'repo-b',
+        repoId: WORKSPACE_B,
         branchName: 'main',
         payload: { branch: 'main', path: '/b/main' },
       },
@@ -143,10 +149,27 @@ describe('useBranchActionDialogsStore', () => {
 
     // Active workspace is (repo-a, main). Only the matching
     // pushConfirm should survive; the other two close.
-    useBranchActionDialogsStore.getState().closeStaleDialogs('repo-a', 'main')
+    useBranchActionDialogsStore.getState().closeStaleDialogs(WORKSPACE_A, 'main')
     const state = useBranchActionDialogsStore.getState()
     expect(state.pushConfirm).not.toBeNull()
     expect(state.deleteConfirm).toBeNull()
+    expect(state.removeConfirm).toBeNull()
+  })
+
+  test('closeStaleDialogs closes every dialog when there is no current workspace', () => {
+    useBranchActionDialogsStore.setState({
+      pushConfirm: { repoId: WORKSPACE_A, branchName: 'main', payload: 'main' },
+      removeConfirm: {
+        repoId: WORKSPACE_B,
+        branchName: 'feature/x',
+        payload: { branch: 'feature/x', path: '/workspace-b/feature-x' },
+      },
+    })
+
+    useBranchActionDialogsStore.getState().closeStaleDialogs(null, null)
+
+    const state = useBranchActionDialogsStore.getState()
+    expect(state.pushConfirm).toBeNull()
     expect(state.removeConfirm).toBeNull()
   })
 
@@ -160,21 +183,21 @@ describe('useBranchActionDialogsStore', () => {
     // one-dialog-at-a-time invariant of `openXxx` (which is tested
     // separately); the bug is in the reset path, not the open path.
     useBranchActionDialogsStore.setState({
-      pushConfirm: { repoId: 'repo-1', branchName: 'main', payload: 'main' },
-      deleteConfirm: { repoId: 'repo-1', branchName: 'main', payload: 'main' },
-      forceDeleteConfirm: { repoId: 'repo-1', branchName: 'main', payload: 'main' },
+      pushConfirm: { repoId: WORKSPACE_1, branchName: 'main', payload: 'main' },
+      deleteConfirm: { repoId: WORKSPACE_1, branchName: 'main', payload: 'main' },
+      forceDeleteConfirm: { repoId: WORKSPACE_1, branchName: 'main', payload: 'main' },
       removeConfirm: {
-        repoId: 'repo-1',
+        repoId: WORKSPACE_1,
         branchName: 'main',
         payload: { branch: 'main', path: '/p' },
       },
       forceRemoveConfirm: {
-        repoId: 'repo-1',
+        repoId: WORKSPACE_1,
         branchName: 'main',
         payload: { branch: 'main', path: '/p' },
       },
       checkboxStateByBranch: {
-        'repo-1\0main': {
+        [branchCheckboxKey(WORKSPACE_1, 'main')]: {
           removeAlsoDeletes: true,
           removeAlsoUpstream: false,
           deleteAlsoUpstream: true,
@@ -195,25 +218,25 @@ describe('useBranchActionDialogsStore', () => {
   test('checkbox state survives across dialog close/reopen of the same branch', () => {
     useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
       {
-        repoId: 'repo-1',
+        repoId: WORKSPACE_1,
         branchName: 'feature/x',
         payload: { branch: 'feature/x', path: '/tmp/x' },
       },
       { isProtectedBranch: false },
     )
-    useBranchActionDialogsStore.getState().setRemoveAlsoUpstream('repo-1', 'feature/x', true)
+    useBranchActionDialogsStore.getState().setRemoveAlsoUpstream(WORKSPACE_1, 'feature/x', true)
     useBranchActionDialogsStore.getState().closeDialog('removeConfirm')
     // Reopen — keep user's toggle.
     useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
       {
-        repoId: 'repo-1',
+        repoId: WORKSPACE_1,
         branchName: 'feature/x',
         payload: { branch: 'feature/x', path: '/tmp/x' },
       },
       { isProtectedBranch: false },
     )
     expect(
-      useBranchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey('repo-1', 'feature/x')],
+      useBranchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey(WORKSPACE_1, 'feature/x')],
     ).toMatchObject({ removeAlsoUpstream: true })
   })
 
@@ -221,27 +244,27 @@ describe('useBranchActionDialogsStore', () => {
     useBranchActionDialogsStore
       .getState()
       .openRemoveWorktreeConfirm(
-        { repoId: 'repo-1', branchName: 'feature/a', payload: { branch: 'feature/a', path: '/a' } },
+        { repoId: WORKSPACE_1, branchName: 'feature/a', payload: { branch: 'feature/a', path: '/a' } },
         { isProtectedBranch: false },
       )
     useBranchActionDialogsStore
       .getState()
       .openRemoveWorktreeConfirm(
-        { repoId: 'repo-1', branchName: 'feature/b', payload: { branch: 'feature/b', path: '/b' } },
+        { repoId: WORKSPACE_1, branchName: 'feature/b', payload: { branch: 'feature/b', path: '/b' } },
         { isProtectedBranch: false },
       )
-    useBranchActionDialogsStore.getState().setRemoveAlsoUpstream('repo-1', 'feature/a', true)
+    useBranchActionDialogsStore.getState().setRemoveAlsoUpstream(WORKSPACE_1, 'feature/a', true)
 
-    expect(branchCheckboxesFor(useBranchActionDialogsStore.getState(), 'repo-1', 'feature/a')).toMatchObject({
+    expect(branchCheckboxesFor(useBranchActionDialogsStore.getState(), WORKSPACE_1, 'feature/a')).toMatchObject({
       removeAlsoUpstream: true,
     })
-    expect(branchCheckboxesFor(useBranchActionDialogsStore.getState(), 'repo-1', 'feature/b')).toMatchObject({
+    expect(branchCheckboxesFor(useBranchActionDialogsStore.getState(), WORKSPACE_1, 'feature/b')).toMatchObject({
       removeAlsoUpstream: false,
     })
   })
 
   test('branchCheckboxesFor returns default checkboxes for unknown branches', () => {
-    expect(branchCheckboxesFor(useBranchActionDialogsStore.getState(), 'unknown', 'branch')).toEqual({
+    expect(branchCheckboxesFor(useBranchActionDialogsStore.getState(), UNKNOWN_WORKSPACE, 'branch')).toEqual({
       removeAlsoDeletes: false,
       removeAlsoUpstream: false,
       deleteAlsoUpstream: false,
@@ -256,10 +279,11 @@ describe('useBranchActionDialogsStore', () => {
     // state was destroyed. The fix moves state out of any React
     // subtree, so this test simply verifies the store keeps the slot
     // open regardless of any "component" events.
+    const payload: RemoveWorktreeDialogPayload = { branch: 'feature/x', path: '/tmp/x' }
     const entry = {
-      repoId: 'repo-1',
+      repoId: WORKSPACE_1,
       branchName: 'feature/x',
-      payload: { branch: 'feature/x', path: '/tmp/x' } as RemoveWorktreeDialogPayload,
+      payload,
     }
     useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(entry, { isProtectedBranch: false })
     expect(useBranchActionDialogsStore.getState().removeConfirm).toEqual(entry)

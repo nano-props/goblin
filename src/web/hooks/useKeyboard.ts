@@ -254,7 +254,7 @@ export function useKeyboard({
 
       const state = useWorkspacesStore.getState()
       const keyboardState = keyboardRuntimeStateFromStore(state, currentWorkspaceIdRef.current)
-      const repo = keyboardState.repo
+      const repo = keyboardState.workspace
       const overlayOpen = workspaceShortcutsSuppressed
       const interactiveTarget = isInteractiveTarget(e.target)
 

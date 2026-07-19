@@ -41,7 +41,7 @@ import {
   RemoveWorktreeConfirmBody,
 } from '#/web/components/branch-action-dialogs/bodies.tsx'
 import { formatWorktreePath } from '#/web/lib/paths.ts'
-import { remoteRepoTarget } from '#/web/stores/workspaces/workspace-guards.ts'
+import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
 import { useBranchActionDialogsStore } from '#/web/stores/workspaces/branch-action-dialogs.ts'
@@ -49,6 +49,7 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { dispatchDeleteBranch, dispatchPush, dispatchRemoveWorktree } from '#/web/hooks/branchActionDispatch.ts'
 import { useBranchActionDialogDisplay } from '#/web/hooks/useBranchActionDialogDisplay.ts'
 import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface Props {
   /**
@@ -56,7 +57,7 @@ interface Props {
    * `closeStaleDialogs`. Pass `null` when no repo is current — the
    * host closes any stale dialog before rendering.
    */
-  currentRepoId: string | null
+  currentWorkspaceId: WorkspaceId | null
   currentBranchName: string | null
 }
 
@@ -64,7 +65,7 @@ function hasUpstream(branch: RepoBranchState): boolean {
   return !!branch.tracking && !branch.trackingGone
 }
 
-export function BranchActionDialogHost({ currentRepoId, currentBranchName }: Props) {
+export function BranchActionDialogHost({ currentWorkspaceId, currentBranchName }: Props) {
   const t = useT()
 
   // One subscription per slot — re-renders are scoped to the dialog
@@ -116,11 +117,11 @@ export function BranchActionDialogHost({ currentRepoId, currentBranchName }: Pro
   // matches the current workspace route. The effect's deps include the
   // `closeStaleDialogs` action reference for exhaustive-deps; the
   // action function is a stable zustand reference, so the effect
-  // still fires exactly when `currentRepoId` or `currentBranchName`
+  // still fires exactly when `currentWorkspaceId` or `currentBranchName`
   // changes — not when the user opens or closes a dialog.
   useEffect(() => {
-    closeStaleDialogs(currentRepoId ?? '', currentBranchName ?? '')
-  }, [currentRepoId, currentBranchName, closeStaleDialogs])
+    closeStaleDialogs(currentWorkspaceId, currentBranchName)
+  }, [currentWorkspaceId, currentBranchName, closeStaleDialogs])
 
   return (
     <>
@@ -249,7 +250,7 @@ export function BranchActionDialogHost({ currentRepoId, currentBranchName }: Pro
               body={t('action.confirm-remove-worktree-body')}
               path={formatWorktreePath(
                 removeConfirmView.entry.payload.path,
-                remoteRepoTarget(
+                remoteWorkspaceTarget(
                   removeConfirmView.displayContext.repo.id,
                   removeConfirmView.displayContext.repo.remoteLifecycle,
                 ),
@@ -303,7 +304,7 @@ export function BranchActionDialogHost({ currentRepoId, currentBranchName }: Pro
               removeBody={t('action.confirm-remove-worktree-body')}
               path={formatWorktreePath(
                 forceRemoveConfirmView.entry.payload.path,
-                remoteRepoTarget(
+                remoteWorkspaceTarget(
                   forceRemoveConfirmView.displayContext.repo.id,
                   forceRemoveConfirmView.displayContext.repo.remoteLifecycle,
                 ),

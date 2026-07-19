@@ -227,9 +227,9 @@ interface LocalWorkspaceState {
   /** Client-only workspace UI state that should never be serialized into
    *  ClientWorkspaceState or treated as restorable workspace state. */
   /** Workspace membership restore flag. True once boot workspace entries have
-   *  produced the placeholder repo set (or proved there are no repos), so the
+   *  produced the placeholder workspace set (or proved there are no workspaces), so the
    *  workspace shell can render without overwriting the saved workspace with an
-   *  empty one before restore. Repo content hydration may still be running. */
+   *  empty one before restore. Workspace content hydration may still be running. */
   workspaceMembershipReady: boolean
   /** Persistence gate — true only after all boot-restored state that can
    *  affect ClientWorkspaceState has converged back into the client store. */
@@ -238,7 +238,7 @@ interface LocalWorkspaceState {
    *  persisted workspace state must not be overwritten until the restore issue
    *  is resolved by a successful boot. */
   sessionRestoreError: string | null
-  /** Client-owned state from boot restore, retained while repos remain stubs. */
+  /** Client-owned state from boot restore, retained while workspaces remain stubs. */
   restoredClientWorkspaceBaseline: ClientWorkspaceState | null
   /** Chrome-tab-style "opener" tracking, covering every workspace pane tab
    *  (static and terminal): maps a tab's identity (see
@@ -251,8 +251,8 @@ interface LocalWorkspaceState {
    *  unlike terminal identities. Session-local only — openers don't need to
    *  survive reload/restart. */
   tabOpenerIdentityByScope: Record<string, Record<string, string>>
-  /** Session-only app navigation history, scoped by repo. The route owns
-   *  the visible repo/branch, while this store keeps enough local context
+  /** Session-only app navigation history, scoped by workspace. The route owns
+   *  the visible workspace/branch, while this store keeps enough local context
    *  to restore branch-level workspace tab and terminal selection. */
   navigationHistoryByWorkspace: Record<string, WorkspaceNavigationHistoryState>
 }
@@ -290,7 +290,7 @@ interface WorkspaceLifecycleActions {
   ensureWorkspaceOpen: (path: string | WorkspaceSessionEntry) => Promise<OpenWorkspaceResult>
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   /**
-   * Re-probe a remote repo's lifecycle. The single user-facing
+   * Re-probe a remote workspace's lifecycle. The single user-facing
    * entry point for "retry" (and the only path the
    * `useNetworkReconnect` hook calls to recover from a failed
    * lifecycle). Safe to call regardless of the current lifecycle
@@ -318,14 +318,14 @@ interface WorkspaceLifecycleActions {
   clearFetchFailed: (id: WorkspaceId, workspaceRuntimeId: string) => void
 }
 
-interface RepoMutationActions {
+interface GitWorkspaceMutationActions {
   runBranchAction: (
     id: WorkspaceId,
     action: RepoBranchAction,
     options?: RunBranchActionOptions,
   ) => Promise<ExecResult | null>
   /** Fire-and-forget submission for branch actions whose UI should close
-   *  immediately and let repo activity/toasts carry completion. This only
+   *  immediately and let Git activity/toasts carry completion. This only
    *  triggers submission; callers should not treat it as accepted/completed. */
   submitBranchAction: (id: WorkspaceId, action: RepoBranchAction, options?: RunBranchActionOptions) => void
 }
@@ -339,7 +339,7 @@ export interface WorkspacesStore
     RestorableWorkspaceActions,
     LocalWorkspaceActions,
     WorkspaceLifecycleActions,
-    RepoMutationActions {}
+    GitWorkspaceMutationActions {}
 
 export type WorkspacesSet = StoreApi<WorkspacesStore>['setState']
 export type WorkspacesGet = StoreApi<WorkspacesStore>['getState']

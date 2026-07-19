@@ -17,34 +17,34 @@ import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
 interface AppProps {
   routeSettingsPage?: SettingsPage | null
-  routeRepoView?: RepoRouteView | null
+  routeWorkspaceView?: WorkspaceRouteView | null
   onRouteSettingsPageChange?: (page: SettingsPage | null) => void
-  onOpenRepoRoot?: (repoId: WorkspaceId) => void
-  onOpenWorkspaceRoot?: (workspaceId: WorkspaceId) => void
-  onOpenRepoDashboard?: (repoId: WorkspaceId) => void
-  onOpenRepoBranch?: (repoId: WorkspaceId, branchName: string) => void
-  onOpenRepoNewWorktree?: (repoId: WorkspaceId) => void
-  onCancelRepoNewWorktree?: (repoId: WorkspaceId) => void
-  onReplaceRepoBranch?: (repoId: WorkspaceId, branchName: string) => void
+  onOpenWorkspaceNavigator?: (workspaceId: WorkspaceId) => void
+  onOpenWorkspaceRootPane?: (workspaceId: WorkspaceId) => void
+  onOpenWorkspaceDashboard?: (workspaceId: WorkspaceId) => void
+  onOpenRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
+  onOpenRepoNewWorktree?: (workspaceId: WorkspaceId) => void
+  onCancelRepoNewWorktree?: (workspaceId: WorkspaceId) => void
+  onReplaceRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
 }
 
-export type RepoRouteView =
-  | { kind: 'empty'; repoId: WorkspaceId }
-  | { kind: 'workspace-root'; repoId: WorkspaceId }
+export type WorkspaceRouteView =
+  | { kind: 'empty'; workspaceId: WorkspaceId }
+  | { kind: 'workspace-root'; workspaceId: WorkspaceId }
   | {
       kind: 'worktree'
-      repoId: WorkspaceId
+      workspaceId: WorkspaceId
       worktreePath: string
       workspacePaneRoute: ParsedWorkspacePaneRoute | null
     }
-  | { kind: 'dashboard'; repoId: WorkspaceId }
+  | { kind: 'dashboard'; workspaceId: WorkspaceId }
   | {
       kind: 'branch'
-      repoId: WorkspaceId
+      workspaceId: WorkspaceId
       branchName: string
       workspacePaneRoute: ParsedWorkspacePaneRoute | null
     }
-  | { kind: 'newWorktree'; repoId: WorkspaceId }
+  | { kind: 'newWorktree'; workspaceId: WorkspaceId }
 
 export type WorkspacePaneRoute =
   { kind: 'static'; tab: WorkspacePaneStaticTabType } | { kind: 'terminal'; terminalSessionId: string }
@@ -57,11 +57,11 @@ export type ParsedWorkspacePaneRouteTarget = ParsedWorkspacePaneRoute | null
 
 export function App({
   routeSettingsPage = null,
-  routeRepoView = null,
+  routeWorkspaceView = null,
   onRouteSettingsPageChange,
-  onOpenRepoRoot,
-  onOpenWorkspaceRoot,
-  onOpenRepoDashboard,
+  onOpenWorkspaceNavigator,
+  onOpenWorkspaceRootPane,
+  onOpenWorkspaceDashboard,
   onOpenRepoBranch,
   onOpenRepoNewWorktree,
   onCancelRepoNewWorktree,
@@ -87,15 +87,15 @@ export function App({
 
   return (
     <main className="flex flex-1 min-h-0 min-w-0">
-      <ErrorBoundary resetKey={routeRepoView?.repoId ?? 'empty'}>
-        {routeRepoView ? (
+      <ErrorBoundary resetKey={routeWorkspaceView?.workspaceId ?? 'empty'}>
+        {routeWorkspaceView ? (
           <RepoView
-            workspaceId={routeRepoView.repoId}
-            routeView={routeRepoView}
+            workspaceId={routeWorkspaceView.workspaceId}
+            routeView={routeWorkspaceView}
             onOpenSettings={() => onRouteSettingsPageChange?.('general')}
-            onOpenRepoRoot={onOpenRepoRoot}
-            onOpenWorkspaceRoot={onOpenWorkspaceRoot}
-            onOpenRepoDashboard={onOpenRepoDashboard}
+            onOpenWorkspaceNavigator={onOpenWorkspaceNavigator}
+            onOpenWorkspaceRootPane={onOpenWorkspaceRootPane}
+            onOpenWorkspaceDashboard={onOpenWorkspaceDashboard}
             onOpenRepoBranch={onOpenRepoBranch}
             onOpenRepoNewWorktree={onOpenRepoNewWorktree}
             onCancelRepoNewWorktree={onCancelRepoNewWorktree}

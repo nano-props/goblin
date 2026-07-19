@@ -23,68 +23,68 @@ export interface PrimaryWindowRouteNavigationOptions {
 }
 
 export interface PrimaryWindowRouteNavigation {
-  repoSlugForId: (repoId: WorkspaceId) => string | null
-  currentWorkspacePaneRoute: (repoId: WorkspaceId, branchName: string) => WorkspacePaneRouteTarget | undefined
+  workspaceSlugForId: (workspaceId: WorkspaceId) => string | null
+  currentWorkspacePaneRoute: (workspaceId: WorkspaceId, branchName: string) => WorkspacePaneRouteTarget | undefined
   openHome: (options?: PrimaryWindowRouteNavigationOptions) => void
   openSettings: (page: SettingsPage, options?: PrimaryWindowRouteNavigationOptions) => void
   closeSettings: (options?: PrimaryWindowRouteNavigationOptions) => void
-  openRepoRoot: (repoId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => void
+  openWorkspaceNavigator: (workspaceId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => void
   openWorkspaceRootPane: (workspaceId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => boolean
-  openRepoDashboard: (repoId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => void
-  openRepoBranch: (repoId: WorkspaceId, branchName: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
+  openWorkspaceDashboard: (workspaceId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => void
+  openRepoBranch: (workspaceId: WorkspaceId, branchName: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
   openRepoBranchTab: (
-    repoId: WorkspaceId,
+    workspaceId: WorkspaceId,
     branchName: string,
     tab: WorkspacePaneStaticTabType,
     options?: PrimaryWindowRouteNavigationOptions,
   ) => boolean
   openRepoBranchTerminal: (
-    repoId: WorkspaceId,
+    workspaceId: WorkspaceId,
     branchName: string,
     terminalSessionId: string,
     options?: PrimaryWindowRouteNavigationOptions,
   ) => boolean
-  openRepoWorktree: (repoId: WorkspaceId, worktreePath: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
+  openRepoWorktree: (workspaceId: WorkspaceId, worktreePath: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
   openRepoWorktreeTerminal?: (
-    repoId: WorkspaceId,
+    workspaceId: WorkspaceId,
     worktreePath: string,
     terminalSessionId: string,
     options?: PrimaryWindowRouteNavigationOptions,
   ) => boolean
   openRepoWorktreeTab?: (
-    repoId: WorkspaceId,
+    workspaceId: WorkspaceId,
     worktreePath: string,
     tab: WorkspacePaneStaticTabType,
     options?: PrimaryWindowRouteNavigationOptions,
   ) => boolean
   /** Operation-owned navigation that settles only after the requested route is the router's current location. */
   commitWorkspacePaneRoute?: (
-    repoId: WorkspaceId,
+    workspaceId: WorkspaceId,
     branchName: string,
     route: WorkspacePaneRouteTarget,
     options?: PrimaryWindowRouteNavigationOptions,
   ) => Promise<boolean>
   openRepoNewWorktree: (
-    repoId: WorkspaceId,
+    workspaceId: WorkspaceId,
     options?: {
       returnTo?: string | null
       presentationToken?: PrimaryWindowPresentationToken
       onCommit?: () => void
     },
   ) => void
-  cancelRepoNewWorktree: (repoId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => void
+  cancelRepoNewWorktree: (workspaceId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => void
 }
 
 export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation {
   const router = useRouter({ warn: false })
   return useMemo(() => {
     return {
-      repoSlugForId(repoId) {
-        const repo = useWorkspacesStore.getState().workspaces[repoId]
-        return repo ? repoSlugFromId(repo.id) : null
+      workspaceSlugForId(workspaceId) {
+        const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
+        return workspace ? repoSlugFromId(workspace.id) : null
       },
-      currentWorkspacePaneRoute(repoId, branchName) {
-        const repoSlug = repoSlugForId(repoId)
+      currentWorkspacePaneRoute(workspaceId, branchName) {
+        const repoSlug = workspaceSlugForId(workspaceId)
         if (!repoSlug) return undefined
         const branchRootHref = router.buildLocation({
           to: '/repo/$repoSlug/branch/$branchSlug',
@@ -146,8 +146,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           this.openHome(options)
         }
       },
-      openRepoRoot(repoId, options) {
-        const repoSlug = repoSlugForId(repoId)
+      openWorkspaceNavigator(workspaceId, options) {
+        const repoSlug = workspaceSlugForId(workspaceId)
         if (!repoSlug || !router) return
         const target = router.buildLocation({ to: '/repo/$repoSlug', params: { repoSlug } })
         void runOwnedPrimaryWindowNavigation({
@@ -163,8 +163,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           },
         })
       },
-      openRepoDashboard(repoId, options) {
-        const repoSlug = repoSlugForId(repoId)
+      openWorkspaceDashboard(workspaceId, options) {
+        const repoSlug = workspaceSlugForId(workspaceId)
         if (!repoSlug || !router) return
         const target = router.buildLocation({ to: '/repo/$repoSlug/dashboard', params: { repoSlug } })
         void runOwnedPrimaryWindowNavigation({
@@ -181,7 +181,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         })
       },
       openWorkspaceRootPane(workspaceId, options) {
-        const repoSlug = repoSlugForId(workspaceId)
+        const repoSlug = workspaceSlugForId(workspaceId)
         if (!repoSlug || !router) return false
         const target = router.buildLocation({ to: '/repo/$repoSlug/workspace', params: { repoSlug } })
         return runOwnedPrimaryWindowNavigation({
@@ -198,8 +198,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           },
         })
       },
-      openRepoBranch(repoId, branchName, options) {
-        const repoSlug = repoSlugForId(repoId)
+      openRepoBranch(workspaceId, branchName, options) {
+        const repoSlug = workspaceSlugForId(workspaceId)
         if (!repoSlug || !router) return false
         const params = { repoSlug, branchSlug: branchSlugFromName(branchName) }
         const target = router.buildLocation({ to: '/repo/$repoSlug/branch/$branchSlug', params })
@@ -217,8 +217,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           },
         })
       },
-      openRepoBranchTab(repoId, branchName, tab, options) {
-        const repoSlug = repoSlugForId(repoId)
+      openRepoBranchTab(workspaceId, branchName, tab, options) {
+        const repoSlug = workspaceSlugForId(workspaceId)
         if (!repoSlug || !router) return false
         const params = { repoSlug, branchSlug: branchSlugFromName(branchName), tabKey: tab }
         const target = router.buildLocation({ to: '/repo/$repoSlug/branch/$branchSlug/tab/$tabKey', params })
@@ -236,8 +236,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           },
         })
       },
-      openRepoBranchTerminal(repoId, branchName, terminalSessionId, options) {
-        const repoSlug = repoSlugForId(repoId)
+      openRepoBranchTerminal(workspaceId, branchName, terminalSessionId, options) {
+        const repoSlug = workspaceSlugForId(workspaceId)
         if (!repoSlug || !router) return false
         const params = { repoSlug, branchSlug: branchSlugFromName(branchName), terminalSessionId }
         const target = router.buildLocation({
@@ -258,8 +258,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           },
         })
       },
-      openRepoWorktree(repoId, worktreePath, options) {
-        const repoSlug = repoSlugForId(repoId)
+      openRepoWorktree(workspaceId, worktreePath, options) {
+        const repoSlug = workspaceSlugForId(workspaceId)
         if (!repoSlug || !router) return false
         const params = { repoSlug, worktreeSlug: worktreeSlugFromPath(worktreePath) }
         const target = router.buildLocation({ to: '/repo/$repoSlug/worktree/$worktreeSlug', params })
@@ -277,8 +277,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           },
         })
       },
-      openRepoWorktreeTerminal(repoId, worktreePath, terminalSessionId, options) {
-        const repoSlug = repoSlugForId(repoId)
+      openRepoWorktreeTerminal(workspaceId, worktreePath, terminalSessionId, options) {
+        const repoSlug = workspaceSlugForId(workspaceId)
         if (!repoSlug || !router) return false
         const params = { repoSlug, worktreeSlug: worktreeSlugFromPath(worktreePath), terminalSessionId }
         const target = router.buildLocation({
@@ -299,8 +299,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           },
         })
       },
-      openRepoWorktreeTab(repoId, worktreePath, tab, options) {
-        const repoSlug = repoSlugForId(repoId)
+      openRepoWorktreeTab(workspaceId, worktreePath, tab, options) {
+        const repoSlug = workspaceSlugForId(workspaceId)
         if (!repoSlug || !router) return false
         const params = { repoSlug, worktreeSlug: worktreeSlugFromPath(worktreePath), tabKey: tab }
         const target = router.buildLocation({ to: '/repo/$repoSlug/worktree/$worktreeSlug/tab/$tabKey', params })
@@ -318,8 +318,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           },
         })
       },
-      async commitWorkspacePaneRoute(repoId, branchName, route, options) {
-        const repoSlug = repoSlugForId(repoId)
+      async commitWorkspacePaneRoute(workspaceId, branchName, route, options) {
+        const repoSlug = workspaceSlugForId(workspaceId)
         if (!repoSlug) return false
         const branchSlug = branchSlugFromName(branchName)
         const routePrecondition = options?.routePrecondition
@@ -446,8 +446,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           currentHref: () => router.state.location.href,
         })
       },
-      openRepoNewWorktree(repoId, options) {
-        const repoSlug = repoSlugForId(repoId)
+      openRepoNewWorktree(workspaceId, options) {
+        const repoSlug = workspaceSlugForId(workspaceId)
         const href = router?.state.location.href ?? null
         if (repoSlug && router) {
           const targetPath = `/repo/${repoSlug}/worktree/new`
@@ -473,7 +473,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           })
         }
       },
-      cancelRepoNewWorktree(repoId, options) {
+      cancelRepoNewWorktree(workspaceId, options) {
         const href = returnToFromHref(router?.state.location.href ?? null)
         if (href && router) {
           void runOwnedPrimaryWindowNavigation({
@@ -485,8 +485,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
             },
           })
         } else {
-          const repoSlug = repoSlugForId(repoId)
-          if (repoSlug) this.openRepoRoot(repoId, options)
+          const repoSlug = workspaceSlugForId(workspaceId)
+          if (repoSlug) this.openWorkspaceNavigator(workspaceId, options)
         }
       },
     }
@@ -599,9 +599,9 @@ export function workspacePaneRouteFromBranchHref(
   return undefined
 }
 
-function repoSlugForId(repoId: WorkspaceId): string | null {
-  const repo = useWorkspacesStore.getState().workspaces[repoId]
-  return repo ? repoSlugFromId(repo.id) : null
+function workspaceSlugForId(workspaceId: WorkspaceId): string | null {
+  const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
+  return workspace ? repoSlugFromId(workspace.id) : null
 }
 
 export function routeReturnSearch(

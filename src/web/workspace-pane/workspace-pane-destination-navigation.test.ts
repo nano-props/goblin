@@ -226,7 +226,7 @@ function primaryNavigationActions() {
   const store = useWorkspacesStore.getState()
   const routeNavigation = {
     openHome: vi.fn(),
-    openRepoDashboard: vi.fn(),
+    openWorkspaceDashboard: vi.fn(),
     openWorkspaceRootPane: vi.fn(),
     openRepoBranch: vi.fn(() => true),
     openRepoBranchTab: vi.fn(() => true),

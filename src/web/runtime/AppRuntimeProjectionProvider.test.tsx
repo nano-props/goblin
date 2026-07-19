@@ -146,7 +146,7 @@ describe('AppRuntimeProjectionProvider', () => {
     const repo = seedCurrentRepo()
     const result = renderInJsdom(
       <StrictMode>
-        <RuntimeProbe currentRepoId={REPO_ID} />
+        <RuntimeProbe currentWorkspaceId={REPO_ID} />
       </StrictMode>,
     )
     try {
@@ -848,13 +848,13 @@ describe('AppRuntimeProjectionProvider', () => {
   })
 })
 
-function renderRuntimeProvider(currentRepoId: WorkspaceId | null) {
-  return renderInJsdom(<RuntimeProbe currentRepoId={currentRepoId} />)
+function renderRuntimeProvider(currentWorkspaceId: WorkspaceId | null) {
+  return renderInJsdom(<RuntimeProbe currentWorkspaceId={currentWorkspaceId} />)
 }
 
-function RuntimeProbe({ currentRepoId }: { currentRepoId: WorkspaceId | null }) {
+function RuntimeProbe({ currentWorkspaceId }: { currentWorkspaceId: WorkspaceId | null }) {
   return (
-    <AppRuntimeProjectionProvider currentRepoId={currentRepoId}>
+    <AppRuntimeProjectionProvider currentWorkspaceId={currentWorkspaceId}>
       <span>probe</span>
     </AppRuntimeProjectionProvider>
   )

@@ -52,15 +52,17 @@ function createRestorableWorkspaceLifecycleActions(
         set({ restoredClientWorkspaceBaseline: options.restoredClientWorkspace ?? null })
       }
       const rankById = new Map<string, number>()
-      runtime.workspaces.forEach((repo, index) => {
-        if (!rankById.has(repo.workspaceId)) rankById.set(repo.workspaceId, index)
+      runtime.workspaces.forEach((workspace, index) => {
+        if (!rankById.has(workspace.workspaceId)) rankById.set(workspace.workspaceId, index)
       })
       await Promise.all(
-        runtime.workspaces.map((repo) =>
+        runtime.workspaces.map((workspace) =>
           updateWorkspaceRuntimeCache({
-            workspaceId: repo.workspaceId,
-            workspaceRuntimeId: repo.workspaceRuntimeId,
-            ...(repo.target ? { remoteLifecycle: { kind: 'ready' as const, attemptId: 0, target: repo.target } } : {}),
+            workspaceId: workspace.workspaceId,
+            workspaceRuntimeId: workspace.workspaceRuntimeId,
+            ...(workspace.target
+              ? { remoteLifecycle: { kind: 'ready' as const, attemptId: 0, target: workspace.target } }
+              : {}),
           }),
         ),
       )
@@ -69,22 +71,26 @@ function createRestorableWorkspaceLifecycleActions(
       for (const tabs of runtime.workspacePaneTabs) {
         writeWorkspacePaneTabsSnapshotQueryData(tabs.workspaceId, tabs.workspaceRuntimeId, tabs.snapshot)
       }
-      for (const restoredRepo of runtime.workspaces) {
-        seedRepoProjectionQueryData(restoredRepo.workspaceId, restoredRepo.workspaceRuntimeId, restoredRepo.projection)
+      for (const restoredWorkspace of runtime.workspaces) {
+        seedRepoProjectionQueryData(
+          restoredWorkspace.workspaceId,
+          restoredWorkspace.workspaceRuntimeId,
+          restoredWorkspace.projection,
+        )
         set((s) => {
           const { workspaces, workspaceOrder } = addResolvedWorkspace(
             s,
-            resolvedRepoFromRestoredRuntime(restoredRepo),
-            restoredRepo.workspaceRuntimeId,
+            resolvedWorkspaceFromRestoredRuntime(restoredWorkspace),
+            restoredWorkspace.workspaceRuntimeId,
             rankById,
           )
-          const repo = workspaces[restoredRepo.workspaceId]
+          const workspace = workspaces[restoredWorkspace.workspaceId]
           // Stub leases (projection: null) skip the post-hydration projection
           // refresh — that's the entire point of the active-only restore. The
           // lazy `useRestoreWorkspaceTabsOnView` hook fires the first refresh when
-          // the user navigates to a stub repo.
-          if (repo && isProjectedRestoredWorkspaceRuntime(restoredRepo)) {
-            initialRefreshes.push({ id: repo.id, workspaceRuntimeId: repo.workspaceRuntimeId })
+          // the user navigates to a stub workspace.
+          if (workspace && isProjectedRestoredWorkspaceRuntime(restoredWorkspace)) {
+            initialRefreshes.push({ id: workspace.id, workspaceRuntimeId: workspace.workspaceRuntimeId })
           }
           const nextRestoredWorkspaceId = restoredWorkspaceIdAfterWorkspaceHydration(
             s.restoredWorkspaceId,
@@ -105,18 +111,21 @@ function createRestorableWorkspaceLifecycleActions(
           set,
           get,
           {
-            repoRoot: restoredRepo.workspaceId,
-            workspaceRuntimeId: restoredRepo.workspaceRuntimeId,
-            projection: restoredRepo.projection,
+            repoRoot: restoredWorkspace.workspaceId,
+            workspaceRuntimeId: restoredWorkspace.workspaceRuntimeId,
+            projection: restoredWorkspace.projection,
           },
           { scope: 'repo-read-model' },
         )
-        if (isProjectedRestoredWorkspaceRuntime(restoredRepo) || workspaceGitUnavailable(restoredRepo.workspaceProbe)) {
+        if (
+          isProjectedRestoredWorkspaceRuntime(restoredWorkspace) ||
+          workspaceGitUnavailable(restoredWorkspace.workspaceProbe)
+        ) {
           applyRestoredPreferredWorkspacePaneTabs(
             set,
             get,
-            restoredRepo.workspaceId,
-            tabsSnapshotForRepo(runtime, restoredRepo.workspaceId),
+            restoredWorkspace.workspaceId,
+            tabsSnapshotForWorkspace(runtime, restoredWorkspace.workspaceId),
           )
         }
       }
@@ -132,95 +141,99 @@ function createRestorableWorkspaceLifecycleActions(
     },
 
     promoteRestoredWorkspace(result: WorkspaceTabsRestoreResult): boolean {
-      const restoredRepo = result.workspace
+      const restoredWorkspace = result.workspace
       let promoted = false
       set((s) => {
-        const current = s.workspaces[restoredRepo.workspaceId]
+        const current = s.workspaces[restoredWorkspace.workspaceId]
         if (
           !current ||
-          current.workspaceRuntimeId !== restoredRepo.workspaceRuntimeId ||
+          current.workspaceRuntimeId !== restoredWorkspace.workspaceRuntimeId ||
           current.session.projectionState !== 'stub'
         ) {
           return s
         }
         const { workspaces } = addResolvedWorkspace(
           s,
-          resolvedRepoForProjectionPromotion(restoredRepo),
-          restoredRepo.workspaceRuntimeId,
+          resolvedWorkspaceForProjectionPromotion(restoredWorkspace),
+          restoredWorkspace.workspaceRuntimeId,
         )
         promoted = true
         return workspaces === s.workspaces ? s : { workspaces }
       })
       if (!promoted) return false
 
-      if (!isProjectedRestoredWorkspaceRuntime(restoredRepo)) {
+      if (!isProjectedRestoredWorkspaceRuntime(restoredWorkspace)) {
         writeWorkspacePaneTabsSnapshotQueryData(
-          restoredRepo.workspaceId,
-          restoredRepo.workspaceRuntimeId,
+          restoredWorkspace.workspaceId,
+          restoredWorkspace.workspaceRuntimeId,
           result.snapshot,
         )
         return true
       }
-      seedRepoProjectionQueryData(restoredRepo.workspaceId, restoredRepo.workspaceRuntimeId, restoredRepo.projection)
+      seedRepoProjectionQueryData(
+        restoredWorkspace.workspaceId,
+        restoredWorkspace.workspaceRuntimeId,
+        restoredWorkspace.projection,
+      )
       writeWorkspacePaneTabsSnapshotQueryData(
-        restoredRepo.workspaceId,
-        restoredRepo.workspaceRuntimeId,
+        restoredWorkspace.workspaceId,
+        restoredWorkspace.workspaceRuntimeId,
         result.snapshot,
       )
       acceptRepoProjectionReadModel(
         set,
         get,
         {
-          repoRoot: restoredRepo.workspaceId,
-          workspaceRuntimeId: restoredRepo.workspaceRuntimeId,
-          projection: restoredRepo.projection,
+          repoRoot: restoredWorkspace.workspaceId,
+          workspaceRuntimeId: restoredWorkspace.workspaceRuntimeId,
+          projection: restoredWorkspace.projection,
         },
         { scope: 'repo-read-model' },
       )
-      applyRestoredPreferredWorkspacePaneTabs(set, get, restoredRepo.workspaceId, result.snapshot)
+      applyRestoredPreferredWorkspacePaneTabs(set, get, restoredWorkspace.workspaceId, result.snapshot)
       return true
     },
   }
 }
 
-function tabsSnapshotForRepo(runtime: WorkspaceRuntimeRestoreSnapshot, repoRoot: WorkspaceId) {
-  return runtime.workspacePaneTabs.find((entry) => entry.workspaceId === repoRoot)?.snapshot ?? null
+function tabsSnapshotForWorkspace(runtime: WorkspaceRuntimeRestoreSnapshot, workspaceId: WorkspaceId) {
+  return runtime.workspacePaneTabs.find((entry) => entry.workspaceId === workspaceId)?.snapshot ?? null
 }
 
 function applyRestoredPreferredWorkspacePaneTabs(
   set: WorkspacesSet,
   get: WorkspacesGet,
-  repoRoot: WorkspaceId,
+  workspaceId: WorkspaceId,
   snapshot: WorkspaceTabsRestoreResult['snapshot'],
 ): void {
   const state = get()
-  const repo = state.workspaces[repoRoot]
+  const workspace = state.workspaces[workspaceId]
   const restoredPreferred =
-    state.restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[repoRoot]
-  if (!repo || !restoredPreferred) return
-  const branchProjection = readRepoBranchSnapshotQueryProjection(repo)?.branches
-  const branches = branchProjection ?? (repo.capability.kind === 'filesystem' ? [] : null)
+    state.restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[workspaceId]
+  if (!workspace || !restoredPreferred) return
+  const branchProjection = readRepoBranchSnapshotQueryProjection(workspace)?.branches
+  const branches = branchProjection ?? (workspace.capability.kind === 'filesystem' ? [] : null)
   if (!branches) return
   const preferredWorkspacePaneTabByTarget = restoredPreferredWorkspacePaneTabByTarget(
-    repo.id,
+    workspace.id,
     { branches },
     restoredPreferred,
     snapshot ? workspacePaneTabsByTargetFromQueryData(snapshot) : {},
   )
   set((current) => {
-    const currentRepo = current.workspaces[repoRoot]
-    if (!currentRepo || currentRepo.workspaceRuntimeId !== repo.workspaceRuntimeId) return current
+    const currentWorkspace = current.workspaces[workspaceId]
+    if (!currentWorkspace || currentWorkspace.workspaceRuntimeId !== workspace.workspaceRuntimeId) return current
     const baseline = current.restoredClientWorkspaceBaseline
     return {
       workspaces: {
         ...current.workspaces,
-        [repoRoot]: {
-          ...currentRepo,
+        [workspaceId]: {
+          ...currentWorkspace,
           ui: {
-            ...currentRepo.ui,
+            ...currentWorkspace.ui,
             preferredWorkspacePaneTabByTarget: {
               ...preferredWorkspacePaneTabByTarget,
-              ...currentRepo.ui.preferredWorkspacePaneTabByTarget,
+              ...currentWorkspace.ui.preferredWorkspacePaneTabByTarget,
             },
           },
         },
@@ -230,7 +243,7 @@ function applyRestoredPreferredWorkspacePaneTabs(
             ...baseline,
             preferredWorkspacePaneTabByTargetByWorkspace: recordWithoutKey(
               baseline.preferredWorkspacePaneTabByTargetByWorkspace,
-              repoRoot,
+              workspaceId,
             ),
           }
         : null,
@@ -245,7 +258,7 @@ export function createWorkspaceSessionActions(set: WorkspacesSet, get: Workspace
   }
 }
 
-function resolvedRepoFromRestoredRuntime(restored: RestoredWorkspaceRuntime) {
+function resolvedWorkspaceFromRestoredRuntime(restored: RestoredWorkspaceRuntime) {
   const workspaceSettledWithoutGit =
     restored.workspaceProbe.status === 'unavailable' ||
     (restored.workspaceProbe.status === 'ready' && restored.workspaceProbe.capabilities.git.status === 'unavailable')
@@ -264,12 +277,12 @@ function resolvedRepoFromRestoredRuntime(restored: RestoredWorkspaceRuntime) {
   }
 }
 
-function resolvedRepoForProjectionPromotion(restored: RestoredWorkspaceRuntime) {
-  const resolvedRepo = resolvedRepoFromRestoredRuntime(restored)
+function resolvedWorkspaceForProjectionPromotion(restored: RestoredWorkspaceRuntime) {
+  const resolvedWorkspace = resolvedWorkspaceFromRestoredRuntime(restored)
   return {
-    id: resolvedRepo.id,
-    name: resolvedRepo.name,
-    workspaceProbe: resolvedRepo.workspaceProbe,
-    session: resolvedRepo.session,
+    id: resolvedWorkspace.id,
+    name: resolvedWorkspace.name,
+    workspaceProbe: resolvedWorkspace.workspaceProbe,
+    session: resolvedWorkspace.session,
   }
 }

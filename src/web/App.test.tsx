@@ -53,7 +53,7 @@ describe('App workspace membership skeleton', () => {
   test('renders the current repository shell when a repository is open', () => {
     seedRepoShellForTest({ id: WORKSPACE_ID })
 
-    const { container } = render(<App routeRepoView={{ kind: 'dashboard', repoId: WORKSPACE_ID }} />)
+    const { container } = render(<App routeWorkspaceView={{ kind: 'dashboard', workspaceId: WORKSPACE_ID }} />)
 
     expect(container.querySelector('[data-testid="repo-view"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="empty-repo-view"]')).toBeNull()

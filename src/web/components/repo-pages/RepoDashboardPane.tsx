@@ -31,7 +31,7 @@ import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/R
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { DirectoryOverviewContent } from '#/web/components/repo-pages/DirectoryOverviewContent.tsx'
 import { DASHBOARD_CARD_CLASS_NAME, DashboardMetricCard } from '#/web/components/repo-pages/dashboard-ui.tsx'
-import { remoteRepoTarget } from '#/web/stores/workspaces/workspace-guards.ts'
+import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
 const DASHBOARD_BRANCH_ROW_CLASS_NAME =
   'w-full px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45'
 
@@ -197,7 +197,7 @@ function DirectoryDashboard({
   const t = useT()
   const displayLocation = formatWorkspaceDisplayLocation(
     repo.id,
-    remoteRepoTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null),
+    remoteWorkspaceTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null),
   )
   return (
     <>
@@ -303,7 +303,7 @@ function DashboardHeader({
   const remoteState = dashboardRemoteState(git)
   const displayLocation = formatWorkspaceDisplayLocation(
     repo.id,
-    remoteRepoTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null),
+    remoteWorkspaceTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null),
   )
 
   return (

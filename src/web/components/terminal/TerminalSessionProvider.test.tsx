@@ -1781,7 +1781,7 @@ describe('TerminalSessionProvider', () => {
     // registration path (no RegisterHost, no probes) so the only
     // preloadTerminalFont call comes from the new useEffect in
     // TerminalSessionProvider itself.
-    const result = renderTerminalProvider(<span>probe</span>, { currentRepoId: null })
+    const result = renderTerminalProvider(<span>probe</span>, { currentWorkspaceId: null })
     try {
       expect(geometryMocks.preloadTerminalFont).toHaveBeenCalledTimes(1)
     } finally {
@@ -1792,7 +1792,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('clears the command bridge on provider unmount', async () => {
-    const result = renderTerminalProvider(<span>probe</span>, { currentRepoId: null })
+    const result = renderTerminalProvider(<span>probe</span>, { currentWorkspaceId: null })
     expect(readTerminalSessionCommandBridge()).not.toBeNull()
 
     await act(async () => {
@@ -1981,11 +1981,11 @@ async function renderProviderWithProbe(terminalWorktreeKey: string): Promise<{
   }
 }
 
-function renderTerminalProvider(children: React.ReactNode, options?: { currentRepoId?: WorkspaceId | null }) {
-  const currentRepoId = options && 'currentRepoId' in options ? options.currentRepoId : REPO_ID
+function renderTerminalProvider(children: React.ReactNode, options?: { currentWorkspaceId?: WorkspaceId | null }) {
+  const currentWorkspaceId = options && 'currentWorkspaceId' in options ? options.currentWorkspaceId : REPO_ID
   return renderInJsdom(
     <QueryClientProvider client={primaryWindowQueryClient}>
-      <AppRuntimeProjectionProvider currentRepoId={currentRepoId ?? null}>
+      <AppRuntimeProjectionProvider currentWorkspaceId={currentWorkspaceId ?? null}>
         <TerminalSessionProvider>{children}</TerminalSessionProvider>
       </AppRuntimeProjectionProvider>
     </QueryClientProvider>,

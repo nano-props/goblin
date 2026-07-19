@@ -127,8 +127,8 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     actions.activateWorkspace(REPO_ID)
 
-    expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
-    expect(navigation.openRepoRoot).not.toHaveBeenCalled()
+    expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
+    expect(navigation.openWorkspaceNavigator).not.toHaveBeenCalled()
     expect(navigation.openRepoBranch).not.toHaveBeenCalled()
   })
 
@@ -150,9 +150,9 @@ describe('createPrimaryWindowNavigationActions', () => {
 
       if (kind === 'workspace-root') {
         expect(navigation.openWorkspaceRootPane).toHaveBeenCalledWith(REPO_ID, presentationOptions())
-        expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
+        expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
       } else {
-        expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
+        expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
         expect(navigation.openWorkspaceRootPane).not.toHaveBeenCalled()
       }
     },
@@ -191,7 +191,7 @@ describe('createPrimaryWindowNavigationActions', () => {
 
       actions.activateWorkspace(REPO_ID)
 
-      expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
+      expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
       expect(navigation.openRepoBranch).not.toHaveBeenCalled()
       expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
       expect(navigation.openRepoWorktree).not.toHaveBeenCalled()
@@ -559,7 +559,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     actions.goBack(REPO_ID)
 
     expect(peekWorkspaceNavigation).not.toHaveBeenCalled()
-    expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
+    expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
     expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(branch)
   })
 
@@ -574,7 +574,7 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     actions.cycleWorkspace(1)
 
-    expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_B_ID, presentationOptions())
+    expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_B_ID, presentationOptions())
   })
 
   test('activates a repo at its current workspace history entry', () => {
@@ -601,7 +601,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       'history',
       presentationOptions(),
     )
-    expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
+    expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
   })
 
   test('does not resume a repo at its new-worktree workflow', () => {
@@ -619,7 +619,7 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     actions.activateWorkspace(REPO_B_ID)
 
-    expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_B_ID, presentationOptions())
+    expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_B_ID, presentationOptions())
     expect(navigation.openRepoNewWorktree).not.toHaveBeenCalled()
   })
 
@@ -648,7 +648,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     actions.activateWorkspace(REPO_ID)
 
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
-    expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
+    expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
     expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(entry)
   })
 
@@ -666,7 +666,7 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     actions.activateWorkspace(REPO_B_ID)
 
-    expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_B_ID, presentationOptions())
+    expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_B_ID, presentationOptions())
   })
 
   test('falls back to the dashboard when workspace-root history cannot be presented', () => {
@@ -687,7 +687,7 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     actions.activateWorkspace(workspaceId)
 
-    expect(navigation.openRepoDashboard).toHaveBeenCalledWith(workspaceId, presentationOptions())
+    expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(workspaceId, presentationOptions())
   })
 
   test('cycles to the target repo current workspace history entry', () => {
@@ -727,7 +727,7 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     actions.cycleWorkspace(-1)
 
-    expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_C_ID, presentationOptions())
+    expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_C_ID, presentationOptions())
   })
 
   test('closes the repo through the store action without navigation when it is not current', async () => {
@@ -743,7 +743,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     await actions.closeWorkspace(REPO_B_ID)
 
     expect(closeWorkspace).toHaveBeenCalledWith(REPO_B_ID)
-    expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
+    expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
   })
 
   test('closes the current repo and navigates to the next repo dashboard without history', async () => {
@@ -759,7 +759,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     await actions.closeWorkspace(REPO_B_ID)
 
     expect(closeWorkspace).toHaveBeenCalledWith(REPO_B_ID)
-    expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_C_ID, presentationOptions())
+    expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_C_ID, presentationOptions())
   })
 
   test('closes the current repo and restores the next repo workspace history entry', async () => {
@@ -818,7 +818,7 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     expect(closeWorkspace).toHaveBeenCalledWith(REPO_A_ID)
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
-    expect(navigation.openRepoDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
+    expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
     expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(entry)
   })
 
@@ -849,7 +849,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       ok: false,
       message: 'error.failed-read-repo',
     })
-    expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
+    expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
     expect(navigation.openHome).not.toHaveBeenCalled()
   })
 
@@ -1168,13 +1168,13 @@ function markRepoGitUnavailable(workspaceId: string): void {
 
 function routeNavigation(): PrimaryWindowRouteNavigation {
   return {
-    repoSlugForId: vi.fn(() => 'repo-slug'),
+    workspaceSlugForId: vi.fn(() => 'repo-slug'),
     currentWorkspacePaneRoute: () => undefined,
     openHome: vi.fn(),
     openSettings: vi.fn(),
     closeSettings: vi.fn(),
-    openRepoRoot: vi.fn(),
-    openRepoDashboard: vi.fn(),
+    openWorkspaceNavigator: vi.fn(),
+    openWorkspaceDashboard: vi.fn(),
     openWorkspaceRootPane: vi.fn((_repoId, options) => {
       options?.onCommit?.()
       return true

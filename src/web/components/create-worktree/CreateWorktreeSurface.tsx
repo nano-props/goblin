@@ -21,7 +21,7 @@ import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.t
 import { ConfirmCheckbox } from '#/web/components/ConfirmCheckbox.tsx'
 import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { remoteRepoTarget } from '#/web/stores/workspaces/workspace-guards.ts'
+import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { WorkspaceAdmissionState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { RepoOperationState } from '#/web/stores/workspaces/operations.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -100,7 +100,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
   const remoteBranches = remoteBranchesQuery.data ?? []
   const remoteBranchesLoading = remoteBranchesQuery.isLoading
 
-  const remoteTarget = remoteRepoTarget(repo.id, repo.remoteLifecycle)
+  const remoteTarget = remoteWorkspaceTarget(repo.id, repo.remoteLifecycle)
   const derived = deriveCreateWorktreeForm(
     { mode, base, branch, existingBranch, remoteRef, localBranch, worktreePath, remoteBranches },
     repo,

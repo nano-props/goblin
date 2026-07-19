@@ -105,8 +105,8 @@ export function Layout() {
 
 function AuthenticatedAppShell() {
   const routeMatches = useRouterState({ select: (s) => s.matches })
-  const activeRepoSlug = repoRouteContextFromMatches(routeMatches)?.repoSlug ?? null
-  const activeWorkspaceId = activeRepoSlug ? workspaceIdFromSlug(activeRepoSlug) : null
+  const activeWorkspaceSlug = workspaceRouteContextFromMatches(routeMatches)?.workspaceSlug ?? null
+  const activeWorkspaceId = activeWorkspaceSlug ? workspaceIdFromSlug(activeWorkspaceSlug) : null
   const bootstrap = useAuthenticatedAppBootstrap({ activeWorkspaceId })
   const bootstrapState = bootstrap.state
   const location = useRouterState({ select: (s) => s.location })
@@ -145,41 +145,42 @@ function AuthenticatedWorkspaceShell() {
   const overlays = useAppOverlays()
   const modalOpen = overlays.anyOpen
 
-  const routeContext = repoRouteContextFromMatches(routeMatches)
-  // `routedRepoId` is the canonical repo id encoded in the URL. It is the
-  // source of truth for session persistence even before repo hydration has
-  // populated `repos[routedRepoId]`.
-  const routedRepoId = routeContext ? workspaceIdFromSlug(routeContext.repoSlug) : null
-  // `hydratedRouteRepoId` means the routed repo is present in the hydrated repo store and
+  const routeContext = workspaceRouteContextFromMatches(routeMatches)
+  // The routed workspace identity remains the persistence source of truth
+  // even before the workspace projection has hydrated into the store.
+  const routedWorkspaceId = routeContext ? workspaceIdFromSlug(routeContext.workspaceSlug) : null
+  // `hydratedRouteWorkspaceId` means the routed workspace is present in the hydrated workspace store and
   // can safely drive refreshes, dialogs, and commands that need repo data.
-  const hydratedRouteRepoId = useWorkspacesStore((s) => {
-    return routedRepoId ? (s.workspaces[routedRepoId]?.id ?? null) : null
+  const hydratedRouteWorkspaceId = useWorkspacesStore((s) => {
+    return routedWorkspaceId ? (s.workspaces[routedWorkspaceId]?.id ?? null) : null
   })
-  const commandRepo = useWorkspacesStore((s) => (hydratedRouteRepoId ? s.workspaces[hydratedRouteRepoId] : undefined))
+  const commandWorkspace = useWorkspacesStore((s) =>
+    hydratedRouteWorkspaceId ? s.workspaces[hydratedRouteWorkspaceId] : undefined,
+  )
   const currentBranchName = routeContext?.kind === 'branch' ? (routeContext.branchName ?? null) : null
   const currentWorkspacePaneRoute = routeContext?.kind === 'branch' ? (routeContext.workspacePaneRoute ?? null) : null
   const commandCapabilities =
-    commandRepo?.capability.kind === 'git' || commandRepo?.capability.kind === 'filesystem'
-      ? commandRepo.capability.probe.capabilities
+    commandWorkspace?.capability.kind === 'git' || commandWorkspace?.capability.kind === 'filesystem'
+      ? commandWorkspace.capability.probe.capabilities
       : null
-  const commandWorkspace = commandRepo ? parseCanonicalWorkspaceLocator(commandRepo.id) : null
+  const commandWorkspaceLocator = commandWorkspace ? parseCanonicalWorkspaceLocator(commandWorkspace.id) : null
   const commandWorktreePath = routeContext?.kind === 'worktree' ? routeContext.worktreePath : null
   const commandBranch =
-    commandRepo && routeContext?.kind === 'branch' && routeContext.branchName
-      ? (readRepoBranchSnapshotQueryProjection(commandRepo)?.branches.find(
+    commandWorkspace && routeContext?.kind === 'branch' && routeContext.branchName
+      ? (readRepoBranchSnapshotQueryProjection(commandWorkspace)?.branches.find(
           (branch) => branch.name === routeContext.branchName,
         ) ?? null)
       : null
   const currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null =
     routeContext?.kind === 'branch' && routeContext.branchName
-      ? commandRepo && commandCapabilities && commandBranch?.worktree?.path
+      ? commandWorkspace && commandCapabilities && commandBranch?.worktree?.path
         ? {
             kind: 'git-worktree',
             workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
             filesystemTarget: {
               kind: 'git-worktree',
-              workspaceId: commandRepo.id,
-              workspaceRuntimeId: commandRepo.workspaceRuntimeId,
+              workspaceId: commandWorkspace.id,
+              workspaceRuntimeId: commandWorkspace.workspaceRuntimeId,
               rootPath: commandBranch.worktree.path,
               head: gitHead(commandBranch.name),
               capabilities: commandCapabilities,
@@ -190,28 +191,28 @@ function AuthenticatedWorkspaceShell() {
             branchName: routeContext.branchName,
             workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
           }
-      : routeContext?.kind === 'worktree' && commandRepo && commandCapabilities && commandWorktreePath
+      : routeContext?.kind === 'worktree' && commandWorkspace && commandCapabilities && commandWorktreePath
         ? {
             kind: 'git-worktree',
             workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
             filesystemTarget: {
               kind: 'git-worktree',
-              workspaceId: commandRepo.id,
-              workspaceRuntimeId: commandRepo.workspaceRuntimeId,
+              workspaceId: commandWorkspace.id,
+              workspaceRuntimeId: commandWorkspace.workspaceRuntimeId,
               rootPath: commandWorktreePath,
               head: { kind: 'detached' },
               capabilities: commandCapabilities,
             },
           }
-        : routeContext?.kind === 'workspace-root' && commandRepo && commandCapabilities && commandWorkspace
+        : routeContext?.kind === 'workspace-root' && commandWorkspace && commandCapabilities && commandWorkspaceLocator
           ? {
               kind: 'workspace-root',
               workspacePaneRoute: null,
               filesystemTarget: {
                 kind: 'workspace-root',
-                workspaceId: commandRepo.id,
-                workspaceRuntimeId: commandRepo.workspaceRuntimeId,
-                rootPath: commandWorkspace.path,
+                workspaceId: commandWorkspace.id,
+                workspaceRuntimeId: commandWorkspace.workspaceRuntimeId,
+                rootPath: commandWorkspaceLocator.path,
                 capabilities: commandCapabilities,
               },
             }
@@ -225,7 +226,7 @@ function AuthenticatedWorkspaceShell() {
   const navigation = useMemo(
     () =>
       createPrimaryWindowNavigationActions({
-        currentWorkspaceId: hydratedRouteRepoId,
+        currentWorkspaceId: hydratedRouteWorkspaceId,
         workspaceOrder,
         closeWorkspace,
         peekWorkspaceNavigation,
@@ -238,7 +239,7 @@ function AuthenticatedWorkspaceShell() {
       commitWorkspaceNavigation,
       workspaceOrder,
       routeNavigation,
-      hydratedRouteRepoId,
+      hydratedRouteWorkspaceId,
     ],
   )
 
@@ -247,8 +248,8 @@ function AuthenticatedWorkspaceShell() {
   return (
     <>
       <AuthenticatedWorkspaceSideEffects
-        routedRepoId={routedRepoId}
-        hydratedRouteRepoId={hydratedRouteRepoId}
+        routedWorkspaceId={routedWorkspaceId}
+        hydratedRouteWorkspaceId={hydratedRouteWorkspaceId}
         currentBranchName={currentBranchName}
         currentWorkspacePaneCommandTarget={currentWorkspacePaneCommandTarget}
         routeContext={workspaceNavigationRouteContext(routeContext, routeHref)}
@@ -271,7 +272,7 @@ function AuthenticatedWorkspaceShell() {
             openCreateWorktree: navigation.openCreateWorktree,
           }}
         >
-          <AppRuntimeProjectionProvider currentRepoId={hydratedRouteRepoId}>
+          <AppRuntimeProjectionProvider currentWorkspaceId={hydratedRouteWorkspaceId}>
             <div
               className="relative flex h-full flex-col"
               onDragEnter={workspaceDrop.onDragEnter}
@@ -284,7 +285,7 @@ function AuthenticatedWorkspaceShell() {
                 overlays={overlays}
                 workspaceDrop={workspaceDrop}
                 navigation={navigation}
-                hydratedRouteRepoId={hydratedRouteRepoId}
+                hydratedRouteWorkspaceId={hydratedRouteWorkspaceId}
                 currentBranchName={currentBranchName}
                 currentWorkspacePaneRoute={currentWorkspacePaneRoute}
               />
@@ -337,19 +338,24 @@ function WorkspaceSessionRestoreError({
   )
 }
 
-type RepoRouteContext =
-  | { kind: 'empty' | 'workspace-root' | 'dashboard' | 'newWorktree'; repoSlug: string }
-  | { kind: 'branch'; repoSlug: string; branchName: string; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
-  | { kind: 'worktree'; repoSlug: string; worktreePath: string; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
+type WorkspaceRouteContext =
+  | { kind: 'empty' | 'workspace-root' | 'dashboard' | 'newWorktree'; workspaceSlug: string }
+  | { kind: 'branch'; workspaceSlug: string; branchName: string; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
+  | {
+      kind: 'worktree'
+      workspaceSlug: string
+      worktreePath: string
+      workspacePaneRoute: ParsedWorkspacePaneRoute | null
+    }
 
-export function repoRouteContextFromMatches(
+export function workspaceRouteContextFromMatches(
   matches: Array<{ routeId: string; params: Record<string, string> }>,
-): RepoRouteContext | null {
+): WorkspaceRouteContext | null {
   const repoMatch = [...matches].reverse().find((match) => typeof match.params.repoSlug === 'string')
   if (!repoMatch) return null
 
-  const repoSlug = repoMatch.params.repoSlug
-  if (!repoSlug) return null
+  const workspaceSlug = repoMatch.params.repoSlug
+  if (!workspaceSlug) return null
 
   const branchSlug = repoMatch.params.branchSlug
   if (branchSlug) {
@@ -357,25 +363,25 @@ export function repoRouteContextFromMatches(
     return branchName
       ? {
           kind: 'branch',
-          repoSlug,
+          workspaceSlug,
           branchName,
           workspacePaneRoute: workspacePaneRouteFromMatches(matches),
         }
-      : { kind: 'empty', repoSlug }
+      : { kind: 'empty', workspaceSlug }
   }
 
   const worktreeSlug = repoMatch.params.worktreeSlug
   if (worktreeSlug) {
     const worktreePath = worktreePathFromSlug(worktreeSlug)
     return worktreePath
-      ? { kind: 'worktree', repoSlug, worktreePath, workspacePaneRoute: workspacePaneRouteFromMatches(matches) }
-      : { kind: 'empty', repoSlug }
+      ? { kind: 'worktree', workspaceSlug, worktreePath, workspacePaneRoute: workspacePaneRouteFromMatches(matches) }
+      : { kind: 'empty', workspaceSlug }
   }
 
-  if (repoMatch.routeId.includes('/worktree/new')) return { kind: 'newWorktree', repoSlug }
-  if (repoMatch.routeId.includes('/dashboard')) return { kind: 'dashboard', repoSlug }
-  if (repoMatch.routeId.includes('/workspace')) return { kind: 'workspace-root', repoSlug }
-  return { kind: 'empty', repoSlug }
+  if (repoMatch.routeId.includes('/worktree/new')) return { kind: 'newWorktree', workspaceSlug }
+  if (repoMatch.routeId.includes('/dashboard')) return { kind: 'dashboard', workspaceSlug }
+  if (repoMatch.routeId.includes('/workspace')) return { kind: 'workspace-root', workspaceSlug }
+  return { kind: 'empty', workspaceSlug }
 }
 
 function workspacePaneRouteFromMatches(
@@ -395,7 +401,7 @@ interface PrimaryWindowOverlaysProps {
   overlays: ReturnType<typeof useAppOverlays>
   workspaceDrop: ReturnType<typeof useWorkspaceDrop>
   navigation: PrimaryWindowNavigationActions
-  hydratedRouteRepoId: WorkspaceId | null
+  hydratedRouteWorkspaceId: WorkspaceId | null
   currentBranchName: string | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
 }
@@ -404,7 +410,7 @@ function PrimaryWindowOverlays({
   overlays,
   workspaceDrop,
   navigation,
-  hydratedRouteRepoId,
+  hydratedRouteWorkspaceId,
   currentBranchName,
   currentWorkspacePaneRoute,
 }: PrimaryWindowOverlaysProps) {
@@ -416,10 +422,10 @@ function PrimaryWindowOverlays({
         open={overlays.state.openRemoteWorkspace.open}
         onOpenChange={overlays.setOpenRemoteWorkspaceOpen}
       />
-      <BranchActionDialogHost currentRepoId={hydratedRouteRepoId} currentBranchName={currentBranchName} />
-      <FiletreeActionDialogHost currentWorkspaceId={hydratedRouteRepoId} />
+      <BranchActionDialogHost currentWorkspaceId={hydratedRouteWorkspaceId} currentBranchName={currentBranchName} />
+      <FiletreeActionDialogHost currentWorkspaceId={hydratedRouteWorkspaceId} />
       <TerminalActionDialogHost
-        currentWorkspaceId={hydratedRouteRepoId}
+        currentWorkspaceId={hydratedRouteWorkspaceId}
         currentWorkspacePaneRoute={currentWorkspacePaneRoute}
         navigation={navigation}
       />
@@ -448,8 +454,8 @@ function PrimaryWindowOverlays({
  * other subtree needs the same set of subscriptions.
  */
 function AuthenticatedWorkspaceSideEffects({
-  routedRepoId,
-  hydratedRouteRepoId,
+  routedWorkspaceId,
+  hydratedRouteWorkspaceId,
   currentBranchName,
   currentWorkspacePaneCommandTarget,
   routeContext,
@@ -463,8 +469,8 @@ function AuthenticatedWorkspaceSideEffects({
   navigateToSettingsShortcuts,
   navigateToIndex,
 }: {
-  routedRepoId: string | null
-  hydratedRouteRepoId: WorkspaceId | null
+  routedWorkspaceId: WorkspaceId | null
+  hydratedRouteWorkspaceId: WorkspaceId | null
   currentBranchName: string | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   routeContext: WorkspaceNavigationRouteContext | null
@@ -481,7 +487,7 @@ function AuthenticatedWorkspaceSideEffects({
   const workspaceShortcutsSuppressed = modalOpen || isSettingsOpen
   useClientEffectIntentRouter({
     navigation,
-    currentWorkspaceId: hydratedRouteRepoId,
+    currentWorkspaceId: hydratedRouteWorkspaceId,
     currentWorkspacePaneCommandTarget,
     closeAllOverlays,
     openWorkspacePathDialog,
@@ -494,7 +500,7 @@ function AuthenticatedWorkspaceSideEffects({
 
   useKeyboard({
     navigation,
-    currentWorkspaceId: hydratedRouteRepoId,
+    currentWorkspaceId: hydratedRouteWorkspaceId,
     currentBranchName,
     currentWorkspacePaneCommandTarget,
     onShowHelp: navigateToSettingsShortcuts,
@@ -504,9 +510,9 @@ function AuthenticatedWorkspaceSideEffects({
     openCreateWorktree: navigation.openCreateWorktree,
   })
 
-  useClientWorkspacePersistence({ routedRepoId })
+  useClientWorkspacePersistence({ routedWorkspaceId })
   useWorkspaceNavigationHistory({ routeContext })
-  useBackgroundFetch({ hydratedRouteRepoId })
+  useBackgroundFetch({ currentWorkspaceId: hydratedRouteWorkspaceId })
   useNetworkReconnect()
   useRepoProjectionQueryEffects()
   useRepoStoreInvalidationRefresh()
@@ -516,11 +522,11 @@ function AuthenticatedWorkspaceSideEffects({
 }
 
 function workspaceNavigationRouteContext(
-  routeContext: RepoRouteContext | null,
+  routeContext: WorkspaceRouteContext | null,
   routeHref: string | null,
 ): WorkspaceNavigationRouteContext | null {
   if (!routeContext) return null
-  const workspaceId = workspaceIdFromSlug(routeContext.repoSlug)
+  const workspaceId = workspaceIdFromSlug(routeContext.workspaceSlug)
   if (!workspaceId) return null
   if (routeContext.kind === 'branch') {
     return null

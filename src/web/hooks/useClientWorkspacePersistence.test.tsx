@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
-import { workspaceLocatorForPath, canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { workspaceLocatorForPath, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
@@ -43,7 +43,7 @@ describe('useClientWorkspacePersistence', () => {
       sessionPersistenceReady: true,
     })
 
-    renderInJsdom(<Harness routedRepoId={repo.id} />)
+    renderInJsdom(<Harness routedWorkspaceId={repo.id} />)
 
     expect(writePresentationMock).toHaveBeenCalledWith(
       expect.objectContaining({ restoredWorkspaceId: repo.id, zenMode: true, workspacePaneSize: 55 }),
@@ -51,6 +51,23 @@ describe('useClientWorkspacePersistence', () => {
     const saved = writePresentationMock.mock.calls[0]?.[0]
     expect(saved).not.toHaveProperty('openWorkspaceEntries')
     expect(saved).not.toHaveProperty('workspacePaneTabsByTargetByWorkspace')
+  })
+
+  test('persists the routed workspace identity before its store projection is hydrated', () => {
+    const routedWorkspaceId = workspaceIdForTest('goblin+file:///tmp/routed-workspace')
+    useWorkspacesStore.setState({
+      workspaces: {},
+      workspaceOrder: [],
+      restoredWorkspaceId: null,
+      workspaceMembershipReady: true,
+      sessionPersistenceReady: true,
+    })
+
+    renderInJsdom(<Harness routedWorkspaceId={routedWorkspaceId} />)
+
+    expect(writePresentationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ restoredWorkspaceId: routedWorkspaceId }),
+    )
   })
 
   test('persists terminal selection, preferred tab, and filetree presentation', () => {
@@ -64,8 +81,9 @@ describe('useClientWorkspacePersistence', () => {
       workspaceIdForTest('goblin+file:///tmp/repo'),
       worktreePath,
     )
-    const workspaceId = canonicalWorkspaceLocator('goblin+file:///tmp/repo')!
-    const worktreeId = workspaceLocatorForPath(workspaceId, worktreePath)!
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/repo')
+    const worktreeId = workspaceLocatorForPath(workspaceId, worktreePath)
+    if (!worktreeId) throw new Error('expected a canonical worktree locator fixture')
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
       branchSnapshots: [createBranchSnapshot('feature/worktree', { worktree: { path: worktreePath } })],
@@ -225,7 +243,7 @@ describe('useClientWorkspacePersistence', () => {
     })
     writePresentationMock.mockRejectedValueOnce(new Error('native write failed'))
 
-    renderInJsdom(<Harness routedRepoId={repo.id} />)
+    renderInJsdom(<Harness routedWorkspaceId={repo.id} />)
     await Promise.resolve()
 
     expect(writePresentationMock).toHaveBeenCalledOnce()
@@ -255,7 +273,7 @@ describe('useClientWorkspacePersistence', () => {
       )
       .mockImplementation(() => new Promise<void>(() => {}))
 
-    renderInJsdom(<Harness routedRepoId={repo.id} />)
+    renderInJsdom(<Harness routedWorkspaceId={repo.id} />)
     expect(writePresentationMock).toHaveBeenCalledOnce()
     await act(async () => {
       resolveFirstWrite()
@@ -270,7 +288,7 @@ describe('useClientWorkspacePersistence', () => {
   })
 })
 
-function Harness({ routedRepoId = null }: { routedRepoId?: string | null }) {
-  useClientWorkspacePersistence({ routedRepoId })
+function Harness({ routedWorkspaceId = null }: { routedWorkspaceId?: WorkspaceId | null }) {
+  useClientWorkspacePersistence({ routedWorkspaceId })
   return null
 }

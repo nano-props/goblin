@@ -4,14 +4,15 @@ import type {
   RestorableWorkspaceState,
   RuntimeCoherentWorkspaceState,
 } from '#/web/stores/workspaces/types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type WorkspaceRestoreStatus = 'restoring-membership' | 'restoring-runtime-state' | 'ready' | 'blocked'
 
 interface KeyboardRuntimeState {
-  repo: WorkspaceState | null
+  workspace: WorkspaceState | null
 }
 
-export function runtimeCoherentRepoProjectionStateFromStore(
+export function runtimeCoherentWorkspaceStateFromStore(
   state: Pick<WorkspacesStore, 'workspaces'>,
 ): RuntimeCoherentWorkspaceState {
   return {
@@ -40,11 +41,11 @@ export function restorableWorkspaceStateFromStore(
 
 export function keyboardRuntimeStateFromStore(
   state: Pick<WorkspacesStore, 'workspaces'>,
-  currentRepoId: string | null,
+  currentWorkspaceId: WorkspaceId | null,
 ): KeyboardRuntimeState {
-  const repo = currentRepoId ? (state.workspaces[currentRepoId] ?? null) : null
+  const workspace = currentWorkspaceId ? (state.workspaces[currentWorkspaceId] ?? null) : null
   return {
-    repo,
+    workspace,
   }
 }
 

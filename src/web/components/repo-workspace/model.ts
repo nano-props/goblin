@@ -1,6 +1,6 @@
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { dataLoadInitialLoading } from '#/web/stores/workspaces/repo-data-load-state.ts'
-import { deriveConnectivity } from '#/web/stores/workspaces/workspace-guards.ts'
+import { deriveWorkspaceConnectivity } from '#/web/stores/workspaces/workspace-guards.ts'
 import { getBranchWorktreeState, selectedBranchStatus } from '#/web/stores/workspaces/worktree-state.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
@@ -20,7 +20,7 @@ export function getRepoWorkspacePresentation(repo: WorkspaceState | undefined): 
   // the skeleton instead of the empty state. Once cached data is
   // available the projection already shows stale branches and we drop
   // the skeleton.
-  const remoteConnecting = deriveConnectivity(repo) === 'connecting'
+  const remoteConnecting = deriveWorkspaceConnectivity(repo) === 'connecting'
   const hasLoadedReadModel = repo.capability.git.dataLoads.repoReadModel.loadedAt !== null
   return {
     exists: true,
@@ -46,7 +46,7 @@ export function getCurrentRepoWorkspace(repo: RepoWorkspaceRepo) {
   const statusCount = worktreeState?.changeCount ?? currentBranchStatus.reduce((n, wt) => n + wt.entries.length, 0)
 
   // The repo workspace presentation reads the target from the lifecycle
-  // union via `remoteRepoTarget`; we don't mirror it on the
+  // union via `remoteWorkspaceTarget`; we don't mirror it on the
   // `remote` shape anymore (Phase 4 removed the legacy
   // `target` field). `repoId` is forwarded so consumers can
   // re-resolve the live lifecycle via `useWorkspacesStore` (the

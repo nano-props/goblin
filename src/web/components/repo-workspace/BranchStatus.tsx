@@ -34,7 +34,7 @@ import {
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { formatWorktreePath } from '#/web/lib/paths.ts'
-import { remoteRepoTarget } from '#/web/stores/workspaces/workspace-guards.ts'
+import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import { openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
@@ -165,7 +165,9 @@ export function BranchStatus({ detail, workspaceRuntimeId }: Props) {
   // (e.g. network reconnect) re-renders this row.
   const worktreeTarget = useWorkspacesStore((s) => {
     const repo = s.workspaces[detail.repoId]
-    return repo ? remoteRepoTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null) : null
+    return repo
+      ? remoteWorkspaceTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null)
+      : null
   })
   const openFilesTab = useMemo(
     () =>

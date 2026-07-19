@@ -1,4 +1,4 @@
-import { isRepoUnavailable, updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
+import { isWorkspaceUnavailable, updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { runExclusiveOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import {
@@ -73,7 +73,7 @@ export function createRefreshSyncHelpers(
         return null
       }
       repo = repoIfFresh(get, id, workspaceRuntimeId)
-      if (!repo || isRepoUnavailable(repo)) return null
+      if (!repo || isWorkspaceUnavailable(repo)) return null
       if (!canStartRemoteFetch(repo)) return null
     }
     try {

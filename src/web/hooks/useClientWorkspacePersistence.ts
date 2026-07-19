@@ -34,7 +34,7 @@ interface ClientWorkspacePersistenceInput {
   >[0]['filetreeInteractionByScope']
 }
 
-export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: string | null }) {
+export function useClientWorkspacePersistence({ routedWorkspaceId }: { routedWorkspaceId: WorkspaceId | null }) {
   const restoredWorkspaceId = useWorkspacesStore((s) => s.restoredWorkspaceId)
   const workspaceOrder = useWorkspacesStore((s) => s.workspaceOrder)
   const zenMode = useWorkspacesStore((s) => s.zenMode)
@@ -68,7 +68,7 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
         selectedTerminalSessionIdByTerminalWorktree,
         filetreeInteractionByScope,
       },
-      (routedRepoId ? workspaces[routedRepoId]?.id : null) ?? lastRoutedWorkspaceIdRef.current,
+      routedWorkspaceId ?? lastRoutedWorkspaceIdRef.current,
     ),
   )
 
@@ -87,9 +87,8 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
   })
 
   useLayoutEffect(() => {
-    const routedWorkspaceId = routedRepoId ? workspaces[routedRepoId]?.id : null
     if (routedWorkspaceId) lastRoutedWorkspaceIdRef.current = routedWorkspaceId
-  }, [routedRepoId, workspaces])
+  }, [routedWorkspaceId])
 
   useEffect(() => subscribeAppQuitting(flushLatestClientWorkspace), [])
 
@@ -128,7 +127,7 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
     workspaceOrder,
     restoredWorkspaceId,
     restoredClientWorkspaceBaseline,
-    routedRepoId,
+    routedWorkspaceId,
     workspacePaneSize,
     zenMode,
     selectedTerminalSessionIdByTerminalWorktree,
@@ -154,14 +153,14 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
 
 function clientWorkspaceFromPersistenceInput(
   input: ClientWorkspacePersistenceInput,
-  lastRoutedRepoId: WorkspaceId | null,
+  lastRoutedWorkspaceId: WorkspaceId | null,
 ): ClientWorkspaceState | null {
   if (!workspaceSessionPersistenceOpenFromStore(input)) return null
   return clientWorkspaceStateFromRestorableWorkspaceState({
     workspaces: input.workspaces,
     restorableWorkspaceState: restorableWorkspaceStateFromStore({
       workspaceOrder: input.workspaceOrder,
-      restoredWorkspaceId: lastRoutedRepoId ?? input.restoredWorkspaceId,
+      restoredWorkspaceId: lastRoutedWorkspaceId ?? input.restoredWorkspaceId,
       zenMode: input.zenMode,
       workspacePaneSize: input.workspacePaneSize,
       selectedTerminalSessionIdByTerminalWorktree: input.selectedTerminalSessionIdByTerminalWorktree,

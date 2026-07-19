@@ -16,11 +16,12 @@
 //   * Dialog state is keyed by (repoId, branchName) so two rows in
 //     the same repo, or two repos' branch lists, can carry their
 //     own dialog payload + checkbox state without colliding.
-//   * `closeStaleDialogs(currentRepoId, currentBranchName)` is the
+//   * `closeStaleDialogs(currentWorkspaceId, currentBranchName)` is the
 //     single cleanup hook used by the Layout-level host to clear
 //     any dialog that no longer belongs to the current workspace route.
 
 import { create } from 'zustand'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface RemoveWorktreeDialogPayload {
   branch: string
@@ -31,7 +32,7 @@ type BranchActionDialogKey =
   'pushConfirm' | 'deleteConfirm' | 'forceDeleteConfirm' | 'removeConfirm' | 'forceRemoveConfirm'
 
 export interface BranchActionDialogEntry<P> {
-  repoId: string
+  repoId: WorkspaceId
   branchName: string
   payload: P
 }
@@ -48,13 +49,13 @@ export const EMPTY_CHECKBOXES: Readonly<BranchCheckboxState> = Object.freeze({
   deleteAlsoUpstream: false,
 })
 
-export function branchCheckboxKey(repoId: string, branchName: string): string {
+export function branchCheckboxKey(repoId: WorkspaceId, branchName: string): string {
   return `${repoId}\0${branchName}`
 }
 
 export function branchCheckboxesFor(
   state: BranchActionDialogsState,
-  repoId: string,
+  repoId: WorkspaceId,
   branchName: string,
 ): BranchCheckboxState {
   return state.checkboxStateByBranch[branchCheckboxKey(repoId, branchName)] ?? EMPTY_CHECKBOXES
@@ -107,23 +108,23 @@ interface BranchActionDialogsActions {
   closeDialog: (key: BranchActionDialogKey) => void
   /**
    * Close any dialog whose (repoId, branchName) does not match
-   * `currentRepoId` / `currentBranchName`. Called by the host on
+   * `currentWorkspaceId` / `currentBranchName`. Called by the host on
    * workspace change so that a dialog opened in repo A is dismissed
    * when the user switches to repo B, and a dialog opened for a
    * non-current branch in repo A is dismissed when the user changes
    * the current route branch.
    */
-  closeStaleDialogs: (currentRepoId: string, currentBranchName: string) => void
-  setRemoveAlsoDeletes: (repoId: string, branchName: string, value: boolean) => void
-  setRemoveAlsoUpstream: (repoId: string, branchName: string, value: boolean) => void
-  setDeleteAlsoUpstream: (repoId: string, branchName: string, value: boolean) => void
+  closeStaleDialogs: (currentWorkspaceId: WorkspaceId | null, currentBranchName: string | null) => void
+  setRemoveAlsoDeletes: (repoId: WorkspaceId, branchName: string, value: boolean) => void
+  setRemoveAlsoUpstream: (repoId: WorkspaceId, branchName: string, value: boolean) => void
+  setDeleteAlsoUpstream: (repoId: WorkspaceId, branchName: string, value: boolean) => void
 }
 
 type BranchActionDialogsStore = BranchActionDialogsState & BranchActionDialogsActions
 
 function updateCheckbox(
   state: BranchActionDialogsState,
-  repoId: string,
+  repoId: WorkspaceId,
   branchName: string,
   patch: Partial<BranchCheckboxState>,
 ): Pick<BranchActionDialogsState, 'checkboxStateByBranch'> {
@@ -246,12 +247,12 @@ export const useBranchActionDialogsStore = create<BranchActionDialogsStore>()((s
       }
     }),
 
-  closeStaleDialogs: (currentRepoId, currentBranchName) =>
+  closeStaleDialogs: (currentWorkspaceId, currentBranchName) =>
     set((state) => {
       let next: Partial<BranchActionDialogsState> | null = null
       for (const key of DIALOG_KEYS) {
         const slot = state[key]
-        if (slot && (slot.repoId !== currentRepoId || slot.branchName !== currentBranchName)) {
+        if (slot && (slot.repoId !== currentWorkspaceId || slot.branchName !== currentBranchName)) {
           next ??= {}
           next[key] = null
         }

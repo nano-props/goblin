@@ -5,7 +5,7 @@ import {
   type RemoteWorkspaceConnectionLifecycle,
   type RemoteWorkspaceTarget,
 } from '#/shared/remote-workspace.ts'
-import { deriveConnectivityLog } from '#/web/logger.ts'
+import { workspaceConnectivityLog } from '#/web/logger.ts'
 import type {
   GitWorkspaceProjection,
   WorkspaceCapabilityState,
@@ -14,15 +14,16 @@ import type {
   WorkspacesStore,
 } from '#/web/stores/workspaces/types.ts'
 import { workspaceGitAvailable, workspaceGitUnavailable, type WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { emptyGitWorkspaceProjection } from '#/web/stores/workspaces/workspace-state-factory.ts'
 
 /** The sole transition boundary for authoritative workspace capability state. */
-export function acceptWorkspaceProbeState(repo: WorkspaceState, workspaceProbe: WorkspaceProbeState): void {
-  repo.capability = workspaceCapabilityAfterProbe(repo, workspaceProbe)
+export function acceptWorkspaceProbeState(workspace: WorkspaceState, workspaceProbe: WorkspaceProbeState): void {
+  workspace.capability = workspaceCapabilityAfterProbe(workspace, workspaceProbe)
 }
 
 function workspaceCapabilityAfterProbe(
-  repo: WorkspaceState,
+  workspace: WorkspaceState,
   workspaceProbe: WorkspaceProbeState,
 ): WorkspaceCapabilityState {
   if (workspaceProbe.status === 'probing') {
@@ -38,16 +39,16 @@ function workspaceCapabilityAfterProbe(
     return {
       kind: 'git',
       probe: workspaceProbe,
-      git: gitProjectionAcrossProbeTransition(repo),
+      git: gitProjectionAcrossProbeTransition(workspace),
     }
   }
   throw new Error('Workspace ready probe has an unsupported Git capability')
 }
 
-function gitProjectionAcrossProbeTransition(repo: WorkspaceState): GitWorkspaceProjection {
-  switch (repo.capability.kind) {
+function gitProjectionAcrossProbeTransition(workspace: WorkspaceState): GitWorkspaceProjection {
+  switch (workspace.capability.kind) {
     case 'git':
-      return repo.capability.git
+      return workspace.capability.git
     case 'probing':
     case 'unavailable':
     case 'filesystem':
@@ -62,42 +63,41 @@ function gitProjectionAcrossProbeTransition(repo: WorkspaceState): GitWorkspaceP
  * are not used to infer connectivity.
  *   - `connecting`:  remote workspace whose lifecycle run has not
  *     converged (placeholder / in-flight probe)
- *   - `connected`:   remote repo with a converged `ready` lifecycle;
- *     also the default for local repos
+ *   - `connected`:   remote workspace with a converged `ready` lifecycle;
+ *     also the default for local workspaces
  *   - `unreachable`: remote workspace whose last probe converged to
  *     `failed`
  */
-type RepoConnectivity = 'connecting' | 'connected' | 'unreachable'
+export type WorkspaceConnectivity = 'connecting' | 'connected' | 'unreachable'
 
-export function deriveConnectivity(repo: WorkspaceState): RepoConnectivity {
-  if (!isRemoteWorkspaceId(repo.id)) return 'connected'
-  const lifecycle = requiredRemoteWorkspaceAdmission(repo).lifecycle
+export function deriveWorkspaceConnectivity(workspace: WorkspaceState): WorkspaceConnectivity {
+  if (!isRemoteWorkspaceId(workspace.id)) return 'connected'
+  const lifecycle = requiredRemoteWorkspaceAdmission(workspace).lifecycle
   if (lifecycle) {
     if (lifecycle.kind === 'failed') return 'unreachable'
     if (lifecycle.kind === 'connecting') return 'connecting'
     return 'connected'
   }
-  // A remote repo without a lifecycle is a malformed fixture or restore.
+  // A remote workspace without a lifecycle is a malformed fixture or restore.
   // Treat it as `connecting` so the UI shows a spinner — never as a
   // silently-broken `connected` tab.
   if (import.meta.env.DEV) {
-    deriveConnectivityLog.warn(`remote repo ${repo.id} has no lifecycle; treating as connecting`)
+    workspaceConnectivityLog.warn(`remote workspace ${workspace.id} has no lifecycle; treating as connecting`)
   }
   return 'connecting'
 }
 
 /**
- * The concrete remote target for a remote repo id + lifecycle, or
- * `null` for local repos and remote repos whose lifecycle hasn't
+ * The concrete remote target for a remote workspace id + lifecycle, or
+ * `null` for local workspaces and remote workspaces whose lifecycle hasn't
  * reached a terminal state with a retained target. This helper is the
  * only sanctioned access path for a concrete remote target.
  *
  * Takes the id and the lifecycle separately so it works on
- * any subset that carries the lifecycle (e.g. `BranchActionRepo`,
- * `RepoWorkspaceRepo`).
+ * any subset that carries the lifecycle.
  */
-export function remoteRepoTarget(
-  id: string,
+export function remoteWorkspaceTarget(
+  id: WorkspaceId,
   lifecycle: RemoteWorkspaceConnectionLifecycle | null,
 ): RemoteWorkspaceTarget | null {
   if (!isRemoteWorkspaceId(id)) return null
@@ -105,19 +105,19 @@ export function remoteRepoTarget(
 }
 
 /**
- * Whether a repo is in a terminal "cannot be operated on" state:
- *   - Local repo: `availability.phase === 'unavailable'`
- *   - Remote repo: `admission.lifecycle.kind === 'failed'`
+ * Whether a workspace is in a terminal "cannot be operated on" state:
+ *   - Local workspace: `availability.phase === 'unavailable'`
+ *   - Remote workspace: `admission.lifecycle.kind === 'failed'`
  *
- * Replaces the per-call-site `repo.availability.phase === 'unavailable'`
+ * Replaces the per-call-site `workspace.availability.phase === 'unavailable'`
  * check. Callers that previously had to know whether they were
- * looking at a local or remote repo now just call this helper.
+ * looking at a local or remote workspace now just call this helper.
  */
-export function isRepoUnavailable(repo: WorkspaceState): boolean {
-  if (isRemoteWorkspaceId(repo.id)) {
-    return requiredRemoteWorkspaceAdmission(repo).lifecycle?.kind === 'failed'
+export function isWorkspaceUnavailable(workspace: WorkspaceState): boolean {
+  if (isRemoteWorkspaceId(workspace.id)) {
+    return requiredRemoteWorkspaceAdmission(workspace).lifecycle?.kind === 'failed'
   }
-  return repo.availability.phase === 'unavailable'
+  return workspace.availability.phase === 'unavailable'
 }
 
 function requiredRemoteWorkspaceAdmission(
@@ -129,21 +129,29 @@ function requiredRemoteWorkspaceAdmission(
   return workspace.admission
 }
 
-type RepoMutator = (repo: Draft<WorkspaceState>) => void
+type WorkspaceMutator = (workspace: Draft<WorkspaceState>) => void
 
-export function currentWorkspaceRuntimeId(state: Pick<WorkspacesStore, 'workspaces'>, repoRoot: string): string | null {
-  return state.workspaces[repoRoot]?.workspaceRuntimeId ?? null
+export function currentWorkspaceRuntimeId(
+  state: Pick<WorkspacesStore, 'workspaces'>,
+  workspaceId: string,
+): string | null {
+  return state.workspaces[workspaceId]?.workspaceRuntimeId ?? null
 }
 
-/** Apply `mutator` to the repo at `id` only if its workspaceRuntimeId still
+/** Apply `mutator` to the workspace at `id` only if its workspaceRuntimeId still
  *  matches the captured one. The check runs inside the functional
  *  setter so it reads the freshest store state, not the caller's
  *  pre-await snapshot. */
-export function updateIfFresh(set: WorkspacesSet, id: string, workspaceRuntimeId: string, mutator: RepoMutator): void {
+export function updateIfFresh(
+  set: WorkspacesSet,
+  id: string,
+  workspaceRuntimeId: string,
+  mutator: WorkspaceMutator,
+): void {
   set((s) => {
-    const repo = s.workspaces[id]
-    if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId) return s
-    const nextRepo = produce(repo, mutator)
-    return nextRepo === repo ? s : { ...s, workspaces: { ...s.workspaces, [id]: nextRepo } }
+    const workspace = s.workspaces[id]
+    if (!workspace || workspace.workspaceRuntimeId !== workspaceRuntimeId) return s
+    const nextWorkspace = produce(workspace, mutator)
+    return nextWorkspace === workspace ? s : { ...s, workspaces: { ...s.workspaces, [id]: nextWorkspace } }
   })
 }

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { deriveConnectivity } from '#/web/stores/workspaces/workspace-guards.ts'
+import { deriveWorkspaceConnectivity } from '#/web/stores/workspaces/workspace-guards.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { requireRemoteAdmissionForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
 
@@ -19,7 +19,7 @@ function remoteTargetFixture() {
   return target!
 }
 
-describe('deriveConnectivity', () => {
+describe('deriveWorkspaceConnectivity', () => {
   test('rejects a non-canonical workspace identity at aggregate creation', () => {
     expect(() => emptyWorkspace('/workspace', 'workspace', 'workspace-runtime-test')).toThrow(
       'Workspace state requires a canonical workspace ID',
@@ -115,51 +115,53 @@ describe('deriveConnectivity', () => {
     expect('git' in workspace.capability).toBe(false)
   })
 
-  test('local repos always read as connected', () => {
+  test('local workspaces always read as connected', () => {
     const repo = emptyWorkspace('goblin+file:///tmp/local-repo', 'local', 'repo-runtime-test')
-    expect(deriveConnectivity(repo)).toBe('connected')
+    expect(deriveWorkspaceConnectivity(repo)).toBe('connected')
   })
 
-  test('a remote repo with lifecycle=connecting reads as connecting', () => {
+  test('a remote workspace with lifecycle=connecting reads as connecting', () => {
     const repo = emptyWorkspace(REMOTE_ID, 'remote', 'repo-runtime-test')
     requireRemoteAdmissionForTest(repo).lifecycle = { kind: 'connecting' }
-    expect(deriveConnectivity(repo)).toBe('connecting')
+    expect(deriveWorkspaceConnectivity(repo)).toBe('connecting')
   })
 
-  test('a remote repo with lifecycle=ready reads as connected', () => {
+  test('a remote workspace with lifecycle=ready reads as connected', () => {
     const repo = emptyWorkspace(REMOTE_ID, 'remote', 'repo-runtime-test')
     const target = remoteTargetFixture()
     requireRemoteAdmissionForTest(repo).lifecycle = { kind: 'ready', target }
-    expect(deriveConnectivity(repo)).toBe('connected')
+    expect(deriveWorkspaceConnectivity(repo)).toBe('connected')
   })
 
-  test('a remote repo with lifecycle=failed reads as unreachable', () => {
+  test('a remote workspace with lifecycle=failed reads as unreachable', () => {
     const repo = emptyWorkspace(REMOTE_ID, 'remote', 'repo-runtime-test')
     requireRemoteAdmissionForTest(repo).lifecycle = { kind: 'failed', reason: 'unreachable' }
-    expect(deriveConnectivity(repo)).toBe('unreachable')
+    expect(deriveWorkspaceConnectivity(repo)).toBe('unreachable')
   })
 
-  test('a remote repo with lifecycle=failed but a retained target still reads as unreachable', () => {
+  test('a remote workspace with lifecycle=failed but a retained target still reads as unreachable', () => {
     const repo = emptyWorkspace(REMOTE_ID, 'remote', 'repo-runtime-test')
     const target = remoteTargetFixture()
     requireRemoteAdmissionForTest(repo).lifecycle = { kind: 'failed', reason: 'timeout', target }
-    expect(deriveConnectivity(repo)).toBe('unreachable')
+    expect(deriveWorkspaceConnectivity(repo)).toBe('unreachable')
   })
 
-  test('a remote repo with no lifecycle reads as connecting', () => {
+  test('a remote workspace with no lifecycle reads as connecting', () => {
     // A remote repo without a lifecycle is treated as `connecting`
     // rather than `connected` because its terminal state has not been
     // recorded yet. Test fixtures and persistence restores are the only
     // expected callers that can construct this shape.
     // should hit this branch.
     const repo = emptyWorkspace(REMOTE_ID, 'remote', 'repo-runtime-test')
-    expect(deriveConnectivity(repo)).toBe('connecting')
+    expect(deriveWorkspaceConnectivity(repo)).toBe('connecting')
   })
 
   test('rejects a remote identity with local transport admission', () => {
     const workspace = emptyWorkspace(REMOTE_ID, 'remote', 'workspace-runtime-test')
     workspace.admission = { kind: 'local' }
 
-    expect(() => deriveConnectivity(workspace)).toThrow('Remote workspace identity requires remote transport admission')
+    expect(() => deriveWorkspaceConnectivity(workspace)).toThrow(
+      'Remote workspace identity requires remote transport admission',
+    )
   })
 })
