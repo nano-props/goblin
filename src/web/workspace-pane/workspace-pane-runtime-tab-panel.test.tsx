@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { stubI18n } from '#/test-utils/i18n-mock.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { TerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionContextValue } from '#/web/components/terminal/types.ts'
@@ -72,7 +73,7 @@ beforeEach(() => {
     currentBranchName: 'main',
   })
   observeWorkspacePaneRouteForTest({
-    workspaceId: 'goblin+file:///repo',
+    workspaceId: workspaceIdForTest('goblin+file:///repo'),
     workspaceRuntimeId: 'repo-runtime-1',
     branchName: 'main',
     worktreePath: '/repo-worktree',

@@ -20,7 +20,6 @@ import {
 } from '#/shared/workspace-pane.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-const scope = { userId: 'user-a', workspaceId: '/repo', workspaceRuntimeId: 'runtime-a' }
 const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')
 const worktreeRoot = canonicalWorkspaceLocator('goblin+file:///repo/worktree')
 const linkedWorkspaceId = canonicalWorkspaceLocator('goblin+file:///linked')
@@ -28,6 +27,7 @@ const linkedWorktreeRoot = canonicalWorkspaceLocator('goblin+file:///linked/work
 if (!workspaceId || !worktreeRoot || !linkedWorkspaceId || !linkedWorktreeRoot) {
   throw new Error('invalid workspace locator fixture')
 }
+const scope = { userId: 'user-a', workspaceId, workspaceRuntimeId: 'runtime-a' }
 const target = { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: 'runtime-a', root: worktreeRoot }
 
 describe('workspace pane epoch overlay', () => {
@@ -78,10 +78,10 @@ describe('workspace pane epoch overlay', () => {
     overlay.registerPhysicalTarget({ ...scope, target, lease })
     overlay.registerPhysicalTarget({ ...scope, userId: 'user-b', target, lease })
 
-    expect(overlay.activeEpochs('/repo')).toHaveLength(2)
+    expect(overlay.activeEpochs(workspaceId)).toHaveLength(2)
     expect(overlay.physicalTargets(identity)).toHaveLength(2)
     overlay.closeEpoch(scope)
-    expect(overlay.activeEpochs('/repo')).toHaveLength(1)
+    expect(overlay.activeEpochs(workspaceId)).toHaveLength(1)
     expect(overlay.physicalTargets(identity)).toHaveLength(1)
   })
 
@@ -106,7 +106,7 @@ describe('workspace pane epoch overlay', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree')
     const lease = physicalWorktreeAdmissionLease(capability)
     const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-stalephysicalidentity1')
-    const linkedScope = { userId: 'user-a', workspaceId: '/linked', workspaceRuntimeId: 'runtime-linked' }
+    const linkedScope = { userId: 'user-a', workspaceId: linkedWorkspaceId, workspaceRuntimeId: 'runtime-linked' }
     const linkedTarget = {
       kind: 'git-worktree' as const,
       workspaceId: linkedWorkspaceId,
@@ -117,7 +117,7 @@ describe('workspace pane epoch overlay', () => {
     overlay.registerPhysicalTarget({ ...scope, target, lease })
     overlay.registerPhysicalTarget({ ...linkedScope, target: linkedTarget, lease })
 
-    expect(overlay.clearPhysicalIdentity('/repo', lease)).toEqual([scope])
+    expect(overlay.clearPhysicalIdentity(workspaceId, lease)).toEqual([scope])
     expect(overlay.physicalTargets(identity)).toEqual([{ ...linkedScope, target: linkedTarget }])
     expect(overlay.placementHints({ ...scope, target })).toHaveLength(1)
   })
@@ -148,7 +148,7 @@ describe('workspace pane epoch overlay', () => {
     overlay.registerPhysicalTarget({ ...scope, target, lease: first })
     overlay.registerPhysicalTarget({ ...scope, target, lease: rebound })
 
-    expect(overlay.clearPhysicalIdentity('/repo', first)).toEqual([])
+    expect(overlay.clearPhysicalIdentity(workspaceId, first)).toEqual([])
     expect(overlay.physicalTargets(rebound)).toEqual([{ ...scope, target }])
   })
 

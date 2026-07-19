@@ -1,4 +1,5 @@
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   terminalExecutionCoordinates,
   terminalExecutionPath,
@@ -46,7 +47,7 @@ export interface WorkspacePaneRuntimeTabCommandContext {
 }
 
 interface WorkspacePaneTerminalRuntimeCommandOptionsBase {
-  workspaceId: string | null
+  workspaceId: WorkspaceId | null
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   navigation: WorkspacePaneTabControllerCommitNavigation
   t?: TerminalCreateTranslator
@@ -138,7 +139,7 @@ function newTerminalRuntimeTabActionContext({
   workspacePaneRoute,
   navigation,
   t,
-}: WorkspacePaneTerminalRuntimeCommandOptions & { workspaceId: string }): WorkspacePaneRuntimeTabCommandContext {
+}: WorkspacePaneTerminalRuntimeCommandOptions & { workspaceId: WorkspaceId }): WorkspacePaneRuntimeTabCommandContext {
   return workspacePaneRuntimeTabCommandContext({
     workspaceId,
     branchName,
@@ -186,7 +187,7 @@ export async function runWorkspacePaneRuntimeNewAction(
 function showTerminalRuntimeTab(
   type: WorkspacePaneRuntimeTabType,
   sessionId: string,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   branchName: string | null,
   filesystemTarget: WorkspacePaneFilesystemTarget | null | undefined,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
@@ -212,7 +213,7 @@ function showTerminalRuntimeTab(
 function showCreatedTerminalRuntimeTab(
   type: WorkspacePaneRuntimeTabType,
   sessionId: string,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   sourceBranchName: string | null,
   presentation: TerminalPresentation,
   worktreePath: string,

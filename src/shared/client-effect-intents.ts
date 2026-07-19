@@ -2,6 +2,7 @@ import { isSettingsPage, type SettingsPage } from '#/shared/settings-pages.ts'
 import { normalizeWorkspaceSessionEntry, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import { isWorkspacePaneTabType, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type ClientEffectIntent =
   | { type: 'open-workspace-requested' }
@@ -24,7 +25,7 @@ export type ClientEffectIntent =
   | { type: 'lang-pref-set-requested'; pref: LangPref }
   | { type: 'clear-recent-workspaces-requested' }
   | { type: 'open-recent-workspace-requested'; entry: WorkspaceSessionEntry }
-  | { type: 'terminal-bell-click'; workspaceId: string; terminalSessionId?: string; terminalWorktreeKey?: string }
+  | { type: 'terminal-bell-click'; workspaceId: WorkspaceId; terminalSessionId?: string; terminalWorktreeKey?: string }
   | { type: 'external-open-enqueued' }
 
 export type ClientEffectIntentType = ClientEffectIntent['type']

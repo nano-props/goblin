@@ -1,10 +1,11 @@
 import { type ReactNode } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { ZenModeSidebarChrome } from '#/web/components/repo-layout/ZenModeSidebarChrome.tsx'
 import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 
 interface RepoWorkspaceShellBaseProps {
-  workspaceId?: string
+  workspaceId?: WorkspaceId
   compact: boolean
   zenMode: boolean
   repoWorkspaceActive: boolean

@@ -4,11 +4,12 @@ import {
   projectServerTerminalSession,
   projectTerminalStartResultForClient,
 } from '#/web/components/terminal/terminal-session-projection.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
 
-const REPO_ROOT = 'goblin+file:///repo'
+const REPO_ROOT = workspaceIdForTest('goblin+file:///example-repo')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
-const WORKTREE_PATH = '/repo'
+const WORKTREE_PATH = '/example-repo'
 const RUNTIME_TARGET = runtimeWorkspacePaneTargetForTest({
   kind: 'git-worktree' as const,
   workspaceId: REPO_ROOT,

@@ -37,6 +37,7 @@ import {
   type TerminalSessionBase,
 } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
@@ -65,7 +66,7 @@ const intentListeners = new Set<(event: any) => void>()
 const closeAllOverlays = vi.fn()
 let overlayOpen = false
 let workspaceShortcutSuppressed = false
-let currentWorkspaceId: string | null = null
+let currentWorkspaceId: WorkspaceId | null = null
 let currentBranchName: string | null = null
 let currentWorkspacePaneRoute: WorkspacePaneRoute | null = null
 let currentFilesystemTarget: WorkspacePaneFilesystemTarget | null = null

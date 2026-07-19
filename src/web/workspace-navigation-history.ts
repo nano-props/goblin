@@ -18,14 +18,14 @@ import {
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type WorkspaceNavigationRouteContext =
-  | { kind: 'empty'; workspaceId: string }
-  | { kind: 'workspace-root'; workspaceId: string }
-  | { kind: 'dashboard'; workspaceId: string }
-  | { kind: 'newWorktree'; workspaceId: string; returnTo: string | null }
-  | { kind: 'worktree'; workspaceId: string; worktreePath: string; workspacePaneRoute: WorkspacePaneRoute | null }
+  | { kind: 'empty'; workspaceId: WorkspaceId }
+  | { kind: 'workspace-root'; workspaceId: WorkspaceId }
+  | { kind: 'dashboard'; workspaceId: WorkspaceId }
+  | { kind: 'newWorktree'; workspaceId: WorkspaceId; returnTo: string | null }
+  | { kind: 'worktree'; workspaceId: WorkspaceId; worktreePath: string; workspacePaneRoute: WorkspacePaneRoute | null }
   | {
       kind: 'branch'
-      workspaceId: string
+      workspaceId: WorkspaceId
       branchName: string
       worktreePath?: string | null
       workspacePaneRoute: WorkspacePaneRoute | null
@@ -332,7 +332,10 @@ export function restoreWorkspaceNavigationEntry(
 
 export type WorkspaceNavigationRestoreResult = { kind: 'accepted' } | { kind: 'blocked' } | { kind: 'unavailable' }
 
-export function workspaceNavigationHistoryRestoreBlocked(workspaceId: string, direction: 'back' | 'forward'): boolean {
+export function workspaceNavigationHistoryRestoreBlocked(
+  workspaceId: WorkspaceId,
+  direction: 'back' | 'forward',
+): boolean {
   const history = useWorkspacesStore.getState().navigationHistoryByWorkspace[workspaceId]
   const target = direction === 'back' ? history?.backStack.at(-1) : history?.forwardStack.at(-1)
   if (!target) return false

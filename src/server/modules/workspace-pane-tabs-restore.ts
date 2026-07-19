@@ -90,7 +90,7 @@ function restorableTargetsForWorkspace(workspace: RestoredWorkspaceRuntime) {
   return [{ kind: 'workspace-root' as const }]
 }
 
-function restorableWorktreeTarget(workspaceId: string, nativePath: string): RestorableWorkspacePaneTarget | null {
+function restorableWorktreeTarget(workspaceId: WorkspaceId, nativePath: string): RestorableWorkspacePaneTarget | null {
   const workspace = parseCanonicalWorkspaceLocator(workspaceId)
   if (!workspace) return null
   const root = formatWorkspaceLocator(
@@ -102,6 +102,6 @@ function restorableWorktreeTarget(workspaceId: string, nativePath: string): Rest
   return root ? { kind: 'git-worktree', root } : null
 }
 
-export function workspaceEntry(workspace: ServerWorkspaceState, workspaceId: string) {
+export function workspaceEntry(workspace: ServerWorkspaceState, workspaceId: WorkspaceId) {
   return workspace.openWorkspaceEntries.find((entry) => workspaceSessionEntryId(entry) === workspaceId) ?? null
 }

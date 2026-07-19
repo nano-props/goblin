@@ -13,6 +13,7 @@ import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { runtimeMembershipIndexFromEntries } from '#/web/components/terminal/terminal-runtime-membership-index.ts'
 
 const workspacePaneRuntimeMocks = vi.hoisted(() => ({
   close: vi.fn(),
@@ -64,11 +65,7 @@ function makeDescriptor(terminalSessionId: string, index: number): TerminalDescr
 }
 
 function makeRuntimeMembershipIndex(workspaceRuntimeId = WORKSPACE_RUNTIME_ID): TerminalRuntimeMembershipIndex {
-  return {
-    [REPO_ROOT]: {
-      workspaceRuntimeId,
-    },
-  }
+  return runtimeMembershipIndexFromEntries([{ id: REPO_ROOT, workspaceRuntimeId }])
 }
 
 function makeServerSession(
@@ -332,11 +329,9 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
       const replacementRuntimeId = 'repo-runtime-replacement'
-      projection.setRuntimeMembershipIndex({
-        [REPO_ROOT]: {
-          workspaceRuntimeId: replacementRuntimeId,
-        },
-      })
+      projection.setRuntimeMembershipIndex(
+        runtimeMembershipIndexFromEntries([{ id: REPO_ROOT, workspaceRuntimeId: replacementRuntimeId }]),
+      )
       expect(
         projection.reconcileServerSessionsSnapshot(
           { workspaceId: REPO_ROOT, workspaceRuntimeId: replacementRuntimeId },
@@ -1760,21 +1755,21 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
 
   test('keeps an orphan exit when an unrelated repo epoch is replaced', () => {
     const projection = new TerminalSessionProjection()
-    const otherRepoRoot = '/repo-other'
-    projection.setRuntimeMembershipIndex({
-      ...makeRuntimeMembershipIndex(),
-      [otherRepoRoot]: {
-        workspaceRuntimeId: 'repo-runtime-other-1',
-      },
-    })
+    const otherRepoRoot = workspaceIdFixture('goblin+file:///repo-other')
+    projection.setRuntimeMembershipIndex(
+      runtimeMembershipIndexFromEntries([
+        { id: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        { id: otherRepoRoot, workspaceRuntimeId: 'repo-runtime-other-1' },
+      ]),
+    )
     projection.handleExit(exitFor(lineageB))
 
-    projection.setRuntimeMembershipIndex({
-      ...makeRuntimeMembershipIndex(),
-      [otherRepoRoot]: {
-        workspaceRuntimeId: 'repo-runtime-other-2',
-      },
-    })
+    projection.setRuntimeMembershipIndex(
+      runtimeMembershipIndexFromEntries([
+        { id: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        { id: otherRepoRoot, workspaceRuntimeId: 'repo-runtime-other-2' },
+      ]),
+    )
     projection.reconcileServerSessions(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       [makeServerSession(lineageB, terminalSessionId, { terminalRuntimeGeneration: 0 })],

@@ -1,6 +1,10 @@
 import { useEffect, useMemo } from 'react'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import { canonicalWorkspaceLocator, workspaceLocatorForPath } from '#/shared/workspace-locator.ts'
+import {
+  canonicalWorkspaceLocator,
+  type WorkspaceId,
+  workspaceLocatorForPath,
+} from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
@@ -18,7 +22,7 @@ export type WorkspacePaneRuntimeTabTargetSelectionByType = Partial<Record<Worksp
 export type WorkspacePaneRuntimeTabTargetKeyByType = Partial<Record<WorkspacePaneRuntimeTabType, string | null>>
 
 export interface WorkspacePaneRuntimeTabTargetInput {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   worktreePath: string | null
 }
@@ -92,7 +96,7 @@ export function workspacePaneRuntimeTabTargetKeyByType(
 }
 
 export function readWorkspacePaneRuntimeTabProviderProjections(input: {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   worktreePath: string | null
 }): WorkspacePaneRuntimeTabProviderProjection[] {
@@ -130,7 +134,7 @@ function terminalRuntimeTabTargetKey(
 }
 
 function readTerminalRuntimeTabProviderProjection(input: {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   worktreePath: string | null
 }): WorkspacePaneRuntimeTabProviderProjection {
@@ -215,7 +219,7 @@ function useSyncTerminalRuntimeTabSelection(
 }
 
 function readTerminalRuntimeProjectionState(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
 ): WorkspacePaneRuntimeProjectionState {
   const terminalProjectionHydration = useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(workspaceId)

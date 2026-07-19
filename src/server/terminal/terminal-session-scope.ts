@@ -27,7 +27,7 @@ export function terminalSessionRuntimeScope(workspaceId: WorkspaceId, workspaceR
   return `${terminalSessionScope(workspaceId)}\0${workspaceRuntimeId}`
 }
 
-export function terminalSessionWorktreePath(workspaceId: string, worktreePath: string): string {
+export function terminalSessionWorktreePath(workspaceId: WorkspaceId, worktreePath: string): string {
   const workspace = parseCanonicalWorkspaceLocator(workspaceId)
   if (!workspace) throw new Error('error.workspace-locator-malformed')
   if (worktreePath === workspaceId) return workspace.path

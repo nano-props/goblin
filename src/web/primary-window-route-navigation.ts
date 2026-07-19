@@ -1,4 +1,5 @@
 import { useRouter } from '@tanstack/react-router'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useMemo } from 'react'
 import { branchSlugFromName, repoSlugFromId, worktreeSlugFromPath } from '#/web/repo-route-slugs.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -22,56 +23,56 @@ export interface PrimaryWindowRouteNavigationOptions {
 }
 
 export interface PrimaryWindowRouteNavigation {
-  repoSlugForId: (repoId: string) => string | null
-  currentWorkspacePaneRoute: (repoId: string, branchName: string) => WorkspacePaneRouteTarget | undefined
+  repoSlugForId: (repoId: WorkspaceId) => string | null
+  currentWorkspacePaneRoute: (repoId: WorkspaceId, branchName: string) => WorkspacePaneRouteTarget | undefined
   openHome: (options?: PrimaryWindowRouteNavigationOptions) => void
   openSettings: (page: SettingsPage, options?: PrimaryWindowRouteNavigationOptions) => void
   closeSettings: (options?: PrimaryWindowRouteNavigationOptions) => void
-  openRepoRoot: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => void
-  openWorkspaceRootPane: (workspaceId: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
-  openRepoDashboard: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => void
-  openRepoBranch: (repoId: string, branchName: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
+  openRepoRoot: (repoId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => void
+  openWorkspaceRootPane: (workspaceId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => boolean
+  openRepoDashboard: (repoId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => void
+  openRepoBranch: (repoId: WorkspaceId, branchName: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
   openRepoBranchTab: (
-    repoId: string,
+    repoId: WorkspaceId,
     branchName: string,
     tab: WorkspacePaneStaticTabType,
     options?: PrimaryWindowRouteNavigationOptions,
   ) => boolean
   openRepoBranchTerminal: (
-    repoId: string,
+    repoId: WorkspaceId,
     branchName: string,
     terminalSessionId: string,
     options?: PrimaryWindowRouteNavigationOptions,
   ) => boolean
-  openRepoWorktree: (repoId: string, worktreePath: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
+  openRepoWorktree: (repoId: WorkspaceId, worktreePath: string, options?: PrimaryWindowRouteNavigationOptions) => boolean
   openRepoWorktreeTerminal?: (
-    repoId: string,
+    repoId: WorkspaceId,
     worktreePath: string,
     terminalSessionId: string,
     options?: PrimaryWindowRouteNavigationOptions,
   ) => boolean
   openRepoWorktreeTab?: (
-    repoId: string,
+    repoId: WorkspaceId,
     worktreePath: string,
     tab: WorkspacePaneStaticTabType,
     options?: PrimaryWindowRouteNavigationOptions,
   ) => boolean
   /** Operation-owned navigation that settles only after the requested route is the router's current location. */
   commitWorkspacePaneRoute?: (
-    repoId: string,
+    repoId: WorkspaceId,
     branchName: string,
     route: WorkspacePaneRouteTarget,
     options?: PrimaryWindowRouteNavigationOptions,
   ) => Promise<boolean>
   openRepoNewWorktree: (
-    repoId: string,
+    repoId: WorkspaceId,
     options?: {
       returnTo?: string | null
       presentationToken?: PrimaryWindowPresentationToken
       onCommit?: () => void
     },
   ) => void
-  cancelRepoNewWorktree: (repoId: string, options?: PrimaryWindowRouteNavigationOptions) => void
+  cancelRepoNewWorktree: (repoId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => void
 }
 
 export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation {
@@ -598,7 +599,7 @@ export function workspacePaneRouteFromBranchHref(
   return undefined
 }
 
-function repoSlugForId(repoId: string): string | null {
+function repoSlugForId(repoId: WorkspaceId): string | null {
   const repo = useWorkspacesStore.getState().workspaces[repoId]
   return repo ? repoSlugFromId(repo.id) : null
 }

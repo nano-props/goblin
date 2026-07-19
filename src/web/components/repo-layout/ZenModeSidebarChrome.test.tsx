@@ -4,10 +4,14 @@ import { useState } from 'react'
 import { userEvent } from '@testing-library/user-event'
 import { act, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { ZenModeSidebarChrome } from '#/web/components/repo-layout/ZenModeSidebarChrome.tsx'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 vi.mock('#/web/components/WorkspaceNavigationControls.tsx', () => ({
   WorkspaceNavigationControls: ({
@@ -17,7 +21,7 @@ vi.mock('#/web/components/WorkspaceNavigationControls.tsx', () => ({
   }: {
     zenRevealTriggerEnabled?: boolean
     onZenRevealTriggerEnter?: () => void
-    workspaceId?: string
+    workspaceId?: WorkspaceId
   }) => (
     <div data-testid="mock-workspace-navigation-controls" data-workspace-id={workspaceId}>
       <span data-testid="mock-zen-reveal-surface" data-zen-reveal-surface={zenRevealTriggerEnabled ? '' : undefined}>
@@ -53,7 +57,7 @@ describe('ZenModeSidebarChrome', () => {
   test('uses the zen control as the reveal trigger surface', () => {
     const { container } = renderInJsdom(
       <ZenModeSidebarChrome
-        workspaceId="/tmp/repo"
+        workspaceId={WORKSPACE_ID}
         zenModeToggleEnabled
         revealEnabled
         sidebarSize={36}
@@ -64,7 +68,7 @@ describe('ZenModeSidebarChrome', () => {
 
     const controls = screen.getByTestId('mock-workspace-navigation-controls')
     const zenSurface = screen.getByTestId('mock-zen-reveal-surface')
-    expect(controls.dataset.workspaceId).toBe('/tmp/repo')
+    expect(controls.dataset.workspaceId).toBe(WORKSPACE_ID)
     expect(controls.hasAttribute('data-zen-reveal-surface')).toBe(false)
     expect(zenSurface.hasAttribute('data-zen-reveal-surface')).toBe(true)
     expect(controls.closest('[data-title-bar-chrome-region="interactive"]')).not.toBeNull()
@@ -77,7 +81,7 @@ describe('ZenModeSidebarChrome', () => {
   test('reveals from the left-edge hit area below the draggable titlebar', () => {
     const { container } = renderInJsdom(
       <ZenModeSidebarChrome
-        workspaceId="/tmp/repo"
+        workspaceId={WORKSPACE_ID}
         zenModeToggleEnabled
         revealEnabled
         sidebarSize={36}
@@ -102,7 +106,7 @@ describe('ZenModeSidebarChrome', () => {
   test('uses a top-level drag plate for the revealed sidebar titlebar', () => {
     renderInJsdom(
       <ZenModeSidebarChrome
-        workspaceId="/tmp/repo"
+        workspaceId={WORKSPACE_ID}
         zenModeToggleEnabled
         revealEnabled
         sidebarSize={36}
@@ -128,7 +132,7 @@ describe('ZenModeSidebarChrome', () => {
   test('keeps the resize visual full-height while the hit target stays below the draggable reveal titlebar', () => {
     renderInJsdom(
       <ZenModeSidebarChrome
-        workspaceId="/tmp/repo"
+        workspaceId={WORKSPACE_ID}
         zenModeToggleEnabled
         revealEnabled
         sidebarSize={36}
@@ -160,7 +164,7 @@ describe('ZenModeSidebarChrome', () => {
     const onSelectBranch = vi.fn()
     renderInJsdom(
       <ZenModeSidebarChrome
-        workspaceId="/tmp/repo"
+        workspaceId={WORKSPACE_ID}
         zenModeToggleEnabled
         revealEnabled
         sidebarSize={36}
@@ -198,7 +202,7 @@ describe('ZenModeSidebarChrome', () => {
     const user = userEvent.setup()
     const { container } = renderInJsdom(
       <ZenModeSidebarChrome
-        workspaceId="/tmp/repo"
+        workspaceId={WORKSPACE_ID}
         zenModeToggleEnabled
         revealEnabled
         sidebarSize={36}

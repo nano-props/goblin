@@ -1,18 +1,3 @@
-import type {
-  WorkspacePaneRuntimeTabEntry,
-  WorkspacePaneRuntimeTabType,
-  WorkspacePaneStaticTabType,
-  WorkspacePaneTabEntry,
-  WorkspacePaneTabType,
-} from '#/shared/workspace-pane.ts'
-import {
-  workspacePaneTabsTargetWorktreePath,
-  type WorkspacePaneTabsTarget,
-} from '#/shared/workspace-pane-tabs-target.ts'
-import { gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
-import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
-
-export type RepoWorkspacePaneModelTarget = WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: string }
 import {
   WORKSPACE_PANE_RUNTIME_TAB_TYPES,
   isWorkspacePaneRuntimeTabEntry,
@@ -20,7 +5,19 @@ import {
   workspacePaneTabEntryIdentity,
   workspacePaneRuntimeTabIdentity,
   workspacePaneRuntimeTabSessionId,
+  type WorkspacePaneRuntimeTabEntry,
+  type WorkspacePaneRuntimeTabType,
+  type WorkspacePaneStaticTabType,
+  type WorkspacePaneTabEntry,
+  type WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
+import {
+  workspacePaneTabsTargetWorktreePath,
+  type WorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
+import { gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
+import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+
 import { resolveRenderableWorkspacePaneTab } from '#/web/lib/workspace-pane-tab.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 import type {
@@ -43,6 +40,8 @@ import {
   workspacePaneRuntimeTabTargetKeyByType,
   type WorkspacePaneRuntimeTabTargetKeyByType,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
+
+export type RepoWorkspacePaneModelTarget = WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: WorkspaceId }
 
 export type RepoWorkspaceTabKind = 'static' | 'runtime' | 'pending'
 
@@ -117,7 +116,7 @@ export type RepoWorkspaceSelection =
     }
 
 export interface RepoWorkspaceTabModel {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string | null
   worktreePath: string | null
@@ -149,7 +148,7 @@ export interface RepoWorkspaceTabModel {
 }
 
 export interface RepoWorkspaceTabModelInput {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   paneTarget: RepoWorkspacePaneModelTarget
   worktreeHead?: GitHead

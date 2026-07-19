@@ -1,4 +1,5 @@
 import { isRepoUnavailable, updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { runExclusiveOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import {
   applyFetchDataLoadError,
@@ -20,10 +21,10 @@ import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/
 export function createRefreshSyncHelpers(
   set: WorkspacesSet,
   get: WorkspacesGet,
-  options: { refreshProjectionReadModel: (id: string, workspaceRuntimeId: string) => Promise<void> },
+  options: { refreshProjectionReadModel: (id: WorkspaceId, workspaceRuntimeId: string) => Promise<void> },
 ) {
   async function runNetworkTask(
-    id: string,
+    id: WorkspaceId,
     task: (signal: AbortSignal) => Promise<ExecResult>,
     options?: { workspaceRuntimeId?: string; reason?: RepoOperationReason; priority?: number },
   ): Promise<ExecResult | null> {
@@ -62,7 +63,7 @@ export function createRefreshSyncHelpers(
     })
   }
 
-  async function attemptFetch(id: string, workspaceRuntimeId: string): Promise<ExecResult | null> {
+  async function attemptFetch(id: WorkspaceId, workspaceRuntimeId: string): Promise<ExecResult | null> {
     let repo = repoIfFresh(get, id, workspaceRuntimeId)
     if (!repo || !shouldAttemptFetch(repo, workspaceRuntimeId)) return null
     if (!canStartRemoteFetch(repo)) {
@@ -86,7 +87,7 @@ export function createRefreshSyncHelpers(
     }
   }
 
-  function finalizeSyncFetchResult(id: string, workspaceRuntimeId: string, fetchResult: ExecResult | null): void {
+  function finalizeSyncFetchResult(id: WorkspaceId, workspaceRuntimeId: string, fetchResult: ExecResult | null): void {
     if (!fetchResult) return
     if (fetchResult.ok) {
       get().clearFetchFailed(id, workspaceRuntimeId)
@@ -95,7 +96,7 @@ export function createRefreshSyncHelpers(
     if (fetchResult.message !== 'cancelled') get().setLastResult(id, fetchResult, workspaceRuntimeId)
   }
 
-  async function runManualSyncPipeline(id: string, workspaceRuntimeId: string): Promise<void> {
+  async function runManualSyncPipeline(id: WorkspaceId, workspaceRuntimeId: string): Promise<void> {
     let fetchResult: ExecResult | null = null
     const repoBeforeFetch = repoIfFresh(get, id, workspaceRuntimeId)
     if (!repoBeforeFetch) return

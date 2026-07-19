@@ -5,11 +5,12 @@ import { resolveRemoteWorkspaceTarget } from '#/server/modules/repo-source.ts'
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import { remoteWorkspaceRuntimeFailureFromCommandResult } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const DIRECTORY_OVERVIEW_TIMEOUT_MS = 30_000
 
 export async function readWorkspaceDirectoryOverview(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   options: { workspaceRuntimeId: string; signal?: AbortSignal },
 ): Promise<WorkspaceDirectoryOverview> {
   const localPath = localWorkspaceNativePath(workspaceId)

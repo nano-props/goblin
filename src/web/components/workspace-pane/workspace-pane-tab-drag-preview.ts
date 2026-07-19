@@ -6,6 +6,7 @@ import {
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface WorkspacePaneTabDragPreviewSnapshot {
   targetKey: string
@@ -14,7 +15,7 @@ interface WorkspacePaneTabDragPreviewSnapshot {
 }
 
 type WorkspacePaneTabDragPreviewTarget =
-  WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: string; branchName: null; worktreePath: null }
+  WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: WorkspaceId; branchName: null; worktreePath: null }
 
 export type WorkspacePaneTabDragPreviewInput = WorkspacePaneTabDragPreviewTarget & {
   workspaceRuntimeId: string

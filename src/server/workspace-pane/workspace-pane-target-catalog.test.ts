@@ -1,6 +1,9 @@
 import { describe, expect, test, vi } from 'vitest'
 import { WorkspacePaneTargetCatalog } from '#/server/workspace-pane/workspace-pane-target-catalog.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 
 describe('WorkspacePaneTargetCatalog', () => {
   test('captures only identity data for a Git runtime', async () => {
@@ -14,7 +17,7 @@ describe('WorkspacePaneTargetCatalog', () => {
     })
 
     await expect(
-      catalog.captureTargets('user-a', 'goblin+file:///repo', 'goblin+file:///repo\0runtime-a'),
+      catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a'),
     ).resolves.toEqual([
       {
         target: {
@@ -58,7 +61,7 @@ describe('WorkspacePaneTargetCatalog', () => {
     })
 
     await expect(
-      catalog.captureTargets('user-a', 'goblin+file:///repo', 'goblin+file:///repo\0runtime-a'),
+      catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a'),
     ).resolves.toHaveLength(1)
     expect(readIdentities).not.toHaveBeenCalled()
   })
@@ -69,7 +72,7 @@ describe('WorkspacePaneTargetCatalog', () => {
       readIdentities: async () => [{ kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'detached' } }],
     })
     await expect(
-      catalog.captureTargets('user-a', 'goblin+file:///repo', 'goblin+file:///repo\0runtime-a'),
+      catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a'),
     ).resolves.toEqual([
       {
         target: {

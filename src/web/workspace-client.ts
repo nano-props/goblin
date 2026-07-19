@@ -4,19 +4,20 @@ import type {
   WorkspaceRuntimesSnapshot,
 } from '#/shared/api-types.ts'
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { postServerJson } from '#/web/lib/server-fetch.ts'
 
 export async function refreshWorkspace(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<WorkspaceRefreshResult> {
   return await postServerJson('/api/workspace/refresh', { workspaceId, workspaceRuntimeId }, { signal })
 }
 
-export async function openWorkspaceRuntime(workspaceId: string): Promise<string> {
-  const result = await postServerJson<{ workspaceId: string; clientId: string }, { workspaceRuntimeId: string }>(
+export async function openWorkspaceRuntime(workspaceId: WorkspaceId): Promise<string> {
+  const result = await postServerJson<{ workspaceId: WorkspaceId; clientId: string }, { workspaceRuntimeId: string }>(
     '/api/workspace/runtime-open',
     { workspaceId, clientId: readOrCreateWebTerminalClientId() },
   )
@@ -31,7 +32,7 @@ export async function openWorkspaceRuntimeForInput(workspaceInput: string): Prom
 }
 
 export async function reconcileWorkspaceRuntimeMemberships(
-  workspaceIds: string[],
+  workspaceIds: WorkspaceId[],
 ): Promise<WorkspaceRuntimeMembershipReconcileResult> {
   return await postServerJson('/api/workspace/runtime-reconcile', {
     clientId: readOrCreateWebTerminalClientId(),
@@ -39,9 +40,9 @@ export async function reconcileWorkspaceRuntimeMemberships(
   })
 }
 
-export async function closeWorkspaceRuntime(workspaceId: string, workspaceRuntimeId: string): Promise<boolean> {
+export async function closeWorkspaceRuntime(workspaceId: WorkspaceId, workspaceRuntimeId: string): Promise<boolean> {
   const result = await postServerJson<
-    { workspaceId: string; workspaceRuntimeId: string; clientId: string },
+    { workspaceId: WorkspaceId; workspaceRuntimeId: string; clientId: string },
     { ok: boolean; released: boolean; runtimeClosed: boolean }
   >('/api/workspace/runtime-close', {
     workspaceId,

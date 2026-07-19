@@ -61,6 +61,7 @@ import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/wo
 import { FutureExitLedger } from '#/web/components/terminal/future-exit-ledger.ts'
 import { createTerminalWriteFailureReporter } from '#/web/components/terminal/terminal-write-failure-feedback.ts'
 import { terminalDescriptorWorktreeKey } from '#/web/components/terminal/terminal-descriptor.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   phase: 'opening',
@@ -108,9 +109,9 @@ interface ResolvedTerminalCreateOptions {
  * survive StrictMode; the singleton removes that dance entirely.
  */
 interface TerminalRuntimeBindingIdentity {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
-  worktreeId: string
+  worktreeId: WorkspaceId
   terminalSessionId: string
   terminalRuntimeSessionId: string | null
   terminalRuntimeGeneration: number | null
@@ -140,7 +141,7 @@ function terminalRealtimeEventBindingKey(event: {
   return JSON.stringify([event.terminalSessionId, event.terminalRuntimeSessionId, event.terminalRuntimeGeneration])
 }
 
-function terminalRuntimeMembershipKey(workspaceId: string, workspaceRuntimeId: string): string {
+function terminalRuntimeMembershipKey(workspaceId: WorkspaceId, workspaceRuntimeId: string): string {
   return JSON.stringify([workspaceId, workspaceRuntimeId])
 }
 
@@ -148,17 +149,17 @@ function retiredTerminalRuntimeMembershipKeys(
   previous: TerminalRuntimeMembershipIndex,
   next: TerminalRuntimeMembershipIndex,
 ): string[] {
-  return Object.entries(previous).flatMap(([workspaceId, repo]) =>
-    next[workspaceId]?.workspaceRuntimeId === repo.workspaceRuntimeId
+  return Array.from(previous).flatMap(([workspaceId, membership]) =>
+    next.get(workspaceId)?.workspaceRuntimeId === membership.workspaceRuntimeId
       ? []
-      : [terminalRuntimeMembershipKey(workspaceId, repo.workspaceRuntimeId)],
+      : [terminalRuntimeMembershipKey(workspaceId, membership.workspaceRuntimeId)],
   )
 }
 
 export class TerminalSessionProjection {
   private readonly writeFailureReporter = createTerminalWriteFailureReporter()
   private readonly onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
-  private runtimeMembershipIndex: TerminalRuntimeMembershipIndex = {}
+  private runtimeMembershipIndex: TerminalRuntimeMembershipIndex = new Map()
   private readonly sessions = new Map<string, TerminalSession>()
   private readonly terminalSessionIdByTerminalRuntimeSessionId = new Map<string, Map<number, string>>()
   private readonly terminalRuntimeBindingByTerminalSessionId = new Map<
@@ -166,7 +167,7 @@ export class TerminalSessionProjection {
     { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number }
   >()
   private readonly terminalSessionsCatalogCoverageByWorkspaceId = new Map<
-    string,
+    WorkspaceId,
     { workspaceRuntimeId: string; revision: number }
   >()
   // Client preference only: server owns session existence/control, while
@@ -194,12 +195,12 @@ export class TerminalSessionProjection {
   private readonly snapshotCache = new Map<string, TerminalSnapshot>()
   private readonly worktreeSnapshotCache = new Map<string, TerminalWorktreeSnapshot>()
   private readonly worktreeListeners = new Map<string, Set<() => void>>()
-  private readonly workspaceBellCountListeners = new Map<string, Set<() => void>>()
+  private readonly workspaceBellCountListeners = new Map<WorkspaceId, Set<() => void>>()
   // Selector publication cache only. The unread bell source of truth
   // stays in `bellState`; this stores the last count delivered to
   // workspace-level subscribers so unrelated filesystem-target events do not
   // wake the workspace picker.
-  private readonly lastPublishedWorkspaceBellCount = new Map<string, number>()
+  private readonly lastPublishedWorkspaceBellCount = new Map<WorkspaceId, number>()
   private readonly snapshotListeners = new Map<string, Set<() => void>>()
   private readonly terminalSessionIdsByTerminalWorktree = new Map<string, string[]>()
   private readonly pendingServerBellByRuntimeBindingKey = new Map<string, TerminalBellRealtimeEvent>()
@@ -455,7 +456,7 @@ export class TerminalSessionProjection {
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
   ): boolean {
-    if (this.runtimeMembershipIndex[scope.workspaceId]?.workspaceRuntimeId !== scope.workspaceRuntimeId) return false
+    if (this.runtimeMembershipIndex.get(scope.workspaceId)?.workspaceRuntimeId !== scope.workspaceRuntimeId) return false
 
     const { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees } =
       this.materializeServerSessions(scope, serverSessions, clientId)
@@ -508,7 +509,7 @@ export class TerminalSessionProjection {
     scope: WorkspaceRuntimeScope,
     revision: number,
   ): boolean {
-    if (this.runtimeMembershipIndex[scope.workspaceId]?.workspaceRuntimeId !== scope.workspaceRuntimeId) return false
+    if (this.runtimeMembershipIndex.get(scope.workspaceId)?.workspaceRuntimeId !== scope.workspaceRuntimeId) return false
     const current = this.terminalSessionsCatalogCoverageByWorkspaceId.get(scope.workspaceId)
     const coverageRevision = current?.workspaceRuntimeId === scope.workspaceRuntimeId ? current.revision : 0
     if (revision <= coverageRevision) return true
@@ -526,7 +527,7 @@ export class TerminalSessionProjection {
     serverSession: ServerTerminalSessionSummary,
     clientId: string,
   ): boolean {
-    if (this.runtimeMembershipIndex[scope.workspaceId]?.workspaceRuntimeId !== scope.workspaceRuntimeId) return false
+    if (this.runtimeMembershipIndex.get(scope.workspaceId)?.workspaceRuntimeId !== scope.workspaceRuntimeId) return false
     const current = this.terminalSessionsCatalogCoverageByWorkspaceId.get(scope.workspaceId)
     const coverageRevision = current?.workspaceRuntimeId === scope.workspaceRuntimeId ? current.revision : 0
     if (effect.kind === 'delta' && effect.revision <= coverageRevision) return false
@@ -923,7 +924,7 @@ export class TerminalSessionProjection {
     return this.subscribeToKeyedListeners(this.worktreeListeners, terminalWorktreeKey, listener)
   }
 
-  workspaceBellCount = (workspaceId: string): number => {
+  workspaceBellCount = (workspaceId: WorkspaceId): number => {
     let count = 0
     for (const session of this.sessions.values()) {
       const terminalSessionId = session.descriptor.terminalSessionId
@@ -936,7 +937,7 @@ export class TerminalSessionProjection {
     return count
   }
 
-  subscribeWorkspaceBellCount = (workspaceId: string, listener: () => void): (() => void) => {
+  subscribeWorkspaceBellCount = (workspaceId: WorkspaceId, listener: () => void): (() => void) => {
     if (!this.workspaceBellCountListeners.has(workspaceId))
       this.lastPublishedWorkspaceBellCount.set(workspaceId, this.workspaceBellCount(workspaceId))
     const unsubscribe = this.subscribeToKeyedListeners(this.workspaceBellCountListeners, workspaceId, listener)
@@ -985,7 +986,7 @@ export class TerminalSessionProjection {
     this.sessions.get(terminalSessionId)?.restart()
   }
 
-  resynchronizeConnectedViews = (workspaceId: string, workspaceRuntimeId: string): void => {
+  resynchronizeConnectedViews = (workspaceId: WorkspaceId, workspaceRuntimeId: string): void => {
     for (const session of this.sessions.values()) {
       if (
         terminalSessionCoordinates(session.descriptor).workspaceId !== workspaceId ||
@@ -1079,7 +1080,7 @@ export class TerminalSessionProjection {
       this.notifyWorktree(terminalWorktreeKey)
   }
 
-  private notifyWorkspaceBellCountIfChanged(workspaceId: string): void {
+  private notifyWorkspaceBellCountIfChanged(workspaceId: WorkspaceId): void {
     if (!this.workspaceBellCountListeners.has(workspaceId)) return
     const previous = this.lastPublishedWorkspaceBellCount.get(workspaceId) ?? 0
     const next = this.workspaceBellCount(workspaceId)
@@ -1088,7 +1089,7 @@ export class TerminalSessionProjection {
     this.notifyWorkspaceBellCount(workspaceId)
   }
 
-  private notifyWorkspaceBellCount(workspaceId: string): void {
+  private notifyWorkspaceBellCount(workspaceId: WorkspaceId): void {
     const listeners = this.workspaceBellCountListeners.get(workspaceId)
     if (!listeners) return
     for (const listener of Array.from(listeners)) {
@@ -1436,7 +1437,7 @@ export class TerminalSessionProjection {
   }
 
   private sessionBelongsToCurrentRuntimeMembership(session: TerminalSession): boolean {
-    const current = this.runtimeMembershipIndex[terminalSessionCoordinates(session.descriptor).workspaceId]
+    const current = this.runtimeMembershipIndex.get(terminalSessionCoordinates(session.descriptor).workspaceId)
     if (!current) return false
     return current.workspaceRuntimeId === terminalSessionCoordinates(session.descriptor).workspaceRuntimeId
   }

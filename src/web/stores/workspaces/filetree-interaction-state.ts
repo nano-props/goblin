@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface FiletreeInteractionSnapshot {
   readonly selectedKeys: readonly string[]
@@ -31,17 +32,19 @@ const INITIAL_STATE: FiletreeInteractionState = {
   interactionByScope: {},
 }
 
-export function filetreeInteractionScopeKey(workspaceId: string, worktreePath: string): string {
+export function filetreeInteractionScopeKey(workspaceId: WorkspaceId, worktreePath: string): string {
   return `${workspaceId}\0${worktreePath}`
 }
 
 export function parseFiletreeInteractionScopeKey(
   scopeKey: string,
-): { readonly workspaceId: string; readonly worktreePath: string } | null {
+): { readonly workspaceId: WorkspaceId; readonly worktreePath: string } | null {
   const parts = scopeKey.split('\0')
   if (parts.length !== 2) return null
-  const [workspaceId, worktreePath] = parts
-  return workspaceId && worktreePath ? { workspaceId, worktreePath } : null
+  const [workspaceIdInput, worktreePath] = parts
+  if (!workspaceIdInput || !worktreePath) return null
+  const workspaceId = canonicalWorkspaceLocator(workspaceIdInput)
+  return workspaceId ? { workspaceId, worktreePath } : null
 }
 
 export function emptyFiletreeInteractionSnapshot(): FiletreeInteractionSnapshot {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import {
   useWorkspaceNavigationHistory,
@@ -28,7 +29,7 @@ import { workspacePaneRouteKey } from '#/web/workspace-pane/workspace-pane-tab-c
 
 export interface WorkspacePaneRouteControllerInput {
   enabled?: boolean
-  workspaceId: string
+  workspaceId: WorkspaceId
   branchName: string | null
   worktreePath: string | null
   route: ParsedWorkspacePaneRouteTarget
@@ -115,7 +116,7 @@ function useReconcileWorkspacePaneRoute({
   navigation,
 }: {
   enabled: boolean
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string | null
   worktreePath: string | null
@@ -160,7 +161,7 @@ function useWorkspacePaneNavigationHistory({
   reconciliation,
 }: {
   enabled: boolean
-  workspaceId: string
+  workspaceId: WorkspaceId
   branchName: string | null
   worktreePath: string | null
   route: ParsedWorkspacePaneRouteTarget
@@ -198,7 +199,7 @@ function workspacePaneHistoryRouteContext({
   worktreePath,
   route,
 }: {
-  workspaceId: string
+  workspaceId: WorkspaceId
   branchName: string
   worktreePath: string | null
   route: WorkspacePaneRouteTarget
@@ -218,7 +219,7 @@ function applyWorkspacePaneRouteReconciliation({
   reconciliation,
   navigation,
 }: {
-  workspaceId: string
+  workspaceId: WorkspaceId
   branchName: string
   reconciliation: WorkspacePaneRouteReconciliation
   navigation: PrimaryWindowNavigationActions
@@ -238,7 +239,7 @@ function useSyncRoutedWorkspacePaneSelection({
   reconciliation,
 }: {
   enabled: boolean
-  workspaceId: string
+  workspaceId: WorkspaceId
   branchName: string | null
   worktreePath: string | null
   route: ParsedWorkspacePaneRouteTarget

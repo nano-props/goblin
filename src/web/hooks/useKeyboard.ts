@@ -41,6 +41,7 @@ import {
 import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
@@ -48,7 +49,7 @@ const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
 
 interface Options {
   navigation: PrimaryWindowNavigationActions
-  currentWorkspaceId: string | null
+  currentWorkspaceId: WorkspaceId | null
   currentBranchName?: string | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   onShowHelp: () => void

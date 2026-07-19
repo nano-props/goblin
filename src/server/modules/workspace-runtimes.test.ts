@@ -21,18 +21,11 @@ import {
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const USER_ID = 'user_repo_runtime'
-const REPO_ROOT = 'goblin+file:///workspace-runtimes/repo'
+const REPO_ROOT = workspaceIdForTest('goblin+file:///workspace-runtimes/repo')
 
 describe('workspace runtimes', () => {
   beforeEach(() => {
     clearWorkspaceRuntimesForUser(USER_ID)
-  })
-
-  test('rejects a non-canonical workspace identity at runtime admission', () => {
-    expect(() => acquireWorkspaceRuntime(USER_ID, '/workspace-runtimes/repo', 'client-a')).toThrow(
-      'workspace runtime requires a canonical workspaceId',
-    )
-    expect(listWorkspaceRuntimes(USER_ID)).toEqual([])
   })
 
   test('shares an epoch until the last client releases it', () => {
@@ -468,7 +461,7 @@ describe('workspace runtimes', () => {
   test('atomically replaces one client membership set without changing sibling clients', () => {
     const firstRuntimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-b')
-    const secondRoot = 'goblin+file:///workspace-runtimes/second'
+    const secondRoot = workspaceIdForTest('goblin+file:///workspace-runtimes/second')
 
     const reconciled = replaceWorkspaceRuntimeMembershipsForClient(USER_ID, 'client-a', [secondRoot])
 
@@ -490,8 +483,8 @@ describe('workspace runtimes', () => {
   })
 
   test('publishes close events only after the replacement snapshot is complete', () => {
-    const oldRoot = 'goblin+file:///workspace-runtimes/old'
-    const newRoot = 'goblin+file:///workspace-runtimes/new'
+    const oldRoot = workspaceIdForTest('goblin+file:///workspace-runtimes/old')
+    const newRoot = workspaceIdForTest('goblin+file:///workspace-runtimes/new')
     acquireWorkspaceRuntime(USER_ID, oldRoot, 'client-a')
     const observedSnapshots: string[][] = []
     const unsubscribe = onWorkspaceRuntimeClosed(() => {
@@ -505,9 +498,9 @@ describe('workspace runtimes', () => {
     }
   })
 
-  test('rejects an invalid declaration before changing any memberships', () => {
-    const oldRoot = 'goblin+file:///workspace-runtimes/atomic-old'
-    const newRoot = 'goblin+file:///workspace-runtimes/atomic-new'
+  test('rejects invalid declaration metadata before changing any memberships', () => {
+    const oldRoot = workspaceIdForTest('goblin+file:///workspace-runtimes/atomic-old')
+    const newRoot = workspaceIdForTest('goblin+file:///workspace-runtimes/atomic-new')
     const oldRuntimeId = acquireWorkspaceRuntime(USER_ID, oldRoot, 'client-a')
     const closed = vi.fn()
     const unsubscribe = onWorkspaceRuntimeClosed(closed)
@@ -515,8 +508,14 @@ describe('workspace runtimes', () => {
       expect(() => replaceWorkspaceRuntimeMembershipsForClient(USER_ID, '', [newRoot])).toThrow(
         'workspace runtime reconcile requires a valid clientId',
       )
-      expect(() => replaceWorkspaceRuntimeMembershipsForClient(USER_ID, 'client-a', [newRoot, ''])).toThrow(
-        'workspace runtime requires a canonical workspaceId',
+      expect(() =>
+        replaceWorkspaceRuntimeMembershipsForClient(
+          USER_ID,
+          'client-a',
+          Array.from({ length: 101 }, () => newRoot),
+        ),
+      ).toThrow(
+        'workspace runtime reconcile accepts at most 100 workspace ids',
       )
       expect(listWorkspaceRuntimes(USER_ID)).toEqual([
         expect.objectContaining({ workspaceId: oldRoot, workspaceRuntimeId: oldRuntimeId }),

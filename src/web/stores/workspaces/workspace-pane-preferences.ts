@@ -6,12 +6,12 @@ import {
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspaceUiState } from '#/web/stores/workspaces/types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export const INITIAL_WORKSPACE_PANE_TAB: WorkspacePaneTabType = 'status'
 
 interface WorkspacePaneTargetBranches {
-  workspaceId: string
+  workspaceId: WorkspaceId
   branches: ReadonlyArray<{ name: string; worktree?: { path?: string } | undefined }>
 }
 

@@ -4,6 +4,7 @@ import { fireEvent, screen } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { BranchView } from '#/web/components/branch-navigator/BranchView.tsx'
 import {
   PrimaryWindowNavigationProvider,
@@ -30,7 +31,7 @@ vi.mock('#/web/workspace-pane/workspace-pane-tab-open-action.ts', () => ({
   dispatchShowWorkspacePaneStaticTabAction: mocks.dispatchShowWorkspacePaneStaticTabAction,
 }))
 
-const REPO_ID = 'goblin+file:///tmp/goblin-branch-view-test-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/example-repo')
 const WORKTREE_PATH = '/tmp/goblin-branch-view-test-worktree'
 
 const navigation: PrimaryWindowNavigationActions = {

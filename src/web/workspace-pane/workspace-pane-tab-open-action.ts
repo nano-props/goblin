@@ -1,4 +1,5 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { currentWorkspaceRuntimeId } from '#/web/stores/workspaces/workspace-guards.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -48,7 +49,7 @@ import {
 } from '#/web/primary-window-presentation.ts'
 
 export interface OpenWorkspacePaneTargetStaticTabActionOptions {
-  workspaceId: string
+  workspaceId: WorkspaceId
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
   type: WorkspacePaneStaticTabType
@@ -127,7 +128,7 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
 }
 
 export interface OpenWorkspacePaneStaticTabActionOptions {
-  workspaceId: string
+  workspaceId: WorkspaceId
   branchName: string
   worktreePath: string | null | undefined
   type: WorkspacePaneStaticTabType
@@ -136,7 +137,7 @@ export interface OpenWorkspacePaneStaticTabActionOptions {
 }
 
 export interface ShowWorkspacePaneStaticTabActionOptions {
-  workspaceId: string | null
+  workspaceId: WorkspaceId | null
   branchName: string | null
   type: WorkspacePaneStaticTabType
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
@@ -338,7 +339,7 @@ function requestVisibleStatusRefreshOnOpen(input: ResolvedOpenWorkspacePaneStati
 
 async function commitWorkspacePaneStaticTab(
   input: {
-    workspaceId: string
+    workspaceId: WorkspaceId
     workspaceRuntimeId: string
     branchName: string
     worktreePath: string | null

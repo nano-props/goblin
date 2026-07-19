@@ -1,7 +1,8 @@
 import { create } from 'zustand'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface FiletreeTrashFilePayload {
-  readonly workspaceId: string
+  readonly workspaceId: WorkspaceId
   readonly workspaceRuntimeId: string
   readonly worktreePath: string
   readonly path: string
@@ -15,7 +16,7 @@ interface FiletreeActionDialogsState {
 interface FiletreeActionDialogsActions {
   openTrashFileConfirm: (payload: FiletreeTrashFilePayload) => void
   closeTrashFileConfirm: () => void
-  closeStaleDialogs: (currentWorkspaceId: string) => void
+  closeStaleDialogs: (currentWorkspaceId: WorkspaceId | null) => void
 }
 
 type FiletreeActionDialogsStore = FiletreeActionDialogsState & FiletreeActionDialogsActions

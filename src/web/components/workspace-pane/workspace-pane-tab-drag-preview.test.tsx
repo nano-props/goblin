@@ -3,7 +3,9 @@
 import { act } from '@testing-library/react'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, describe, expect, test } from 'vitest'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -14,7 +16,7 @@ import {
   useWorkspacePaneTabDragPreview,
 } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
 
-const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-tab-drag-preview-repo'
+const REPO_ROOT = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-drag-preview-repo')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const NEXT_WORKSPACE_RUNTIME_ID = 'repo-runtime-next'
 const BRANCH_NAME = 'feature/worktree'
@@ -185,7 +187,7 @@ describe('useWorkspacePaneTabDragPreview', () => {
 
 interface PreviewInputOverrides {
   kind?: 'workspace-root' | 'inactive'
-  workspaceId?: string
+  workspaceId?: WorkspaceId
   workspaceRuntimeId?: string
   branchName?: string | null
   worktreePath?: string | null

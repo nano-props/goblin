@@ -18,8 +18,9 @@ import {
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REPO_ID = 'goblin+file:///tmp/goblin-repo-workspace-tab-model-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-repo-workspace-tab-model-repo')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/tmp/goblin-repo-workspace-tab-model-worktree'
 const WORKTREE_KEY = formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH)
@@ -48,7 +49,7 @@ describe('repo workspace pane tab model', () => {
   })
 
   test('projects exactly the authoritative workspace tabs without resurrecting a closed tab', () => {
-    const workspaceId = 'goblin+file:///tmp/plain-workspace'
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-workspace')
     const model = createRepoWorkspaceTabModel({
       workspaceId,
       workspaceRuntimeId: 'repo-runtime-plain',
@@ -65,7 +66,7 @@ describe('repo workspace pane tab model', () => {
   })
 
   test('keeps distinct terminal identities and selects the workspace-scoped terminal projection', () => {
-    const workspaceId = 'goblin+file:///tmp/plain-workspace'
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-workspace')
     const model = createRepoWorkspaceTabModel({
       workspaceId,
       workspaceRuntimeId: 'repo-runtime-plain',
@@ -94,7 +95,7 @@ describe('repo workspace pane tab model', () => {
   })
 
   test('keeps the canonical selected terminal entry while its live view is not projected', () => {
-    const workspaceId = 'goblin+file:///tmp/plain-workspace'
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-workspace')
     const terminalSessionId = 'term-111111111111111111111'
     const model = createRepoWorkspaceTabModel({
       workspaceId,

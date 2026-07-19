@@ -37,7 +37,7 @@ import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { PhysicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
-import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const MAX_LAYOUT_CAS_RETRIES = 3
 
@@ -135,7 +135,7 @@ export interface WorkspacePaneLayoutOperation {
     },
   ): void
   indexedAdmissionLeases(scope: WorkspacePaneEpochScope): PhysicalWorktreeAdmissionLease[]
-  clearPhysicalIdentity(workspaceId: string, lease: PhysicalWorktreeAdmissionLease): WorkspacePaneEpochScope[]
+  clearPhysicalIdentity(workspaceId: WorkspaceId, lease: PhysicalWorktreeAdmissionLease): WorkspacePaneEpochScope[]
 }
 
 export class WorkspacePaneLayoutAggregate {
@@ -156,7 +156,7 @@ export class WorkspacePaneLayoutAggregate {
   }
 
   async runExclusive<T>(
-    workspaceId: string,
+    workspaceId: WorkspaceId,
     task: (operation: WorkspacePaneLayoutOperation) => Promise<T> | T,
   ): Promise<T> {
     let queue = this.operationQueuesByRepoRoot.get(workspaceId)
@@ -304,7 +304,7 @@ export class WorkspacePaneLayoutAggregate {
     return this.overlay.physicalTargets(target)
   }
 
-  activeEpochs(workspaceId: string): WorkspacePaneEpochScope[] {
+  activeEpochs(workspaceId: WorkspaceId): WorkspacePaneEpochScope[] {
     return this.overlay.activeEpochs(workspaceId)
   }
 
@@ -576,10 +576,10 @@ function durableTargetKey(
   scope: Pick<WorkspacePaneEpochScope, 'workspaceId' | 'workspaceRuntimeId'>,
   target: RestorableWorkspacePaneTarget,
 ): string {
-  const runtime = workspacePaneTabsTargetFromRestorable(scope.workspaceId, target)
-  if (!runtime) throw new Error('error.workspace-tabs-target-invalid')
   const workspaceId = canonicalWorkspaceLocator(scope.workspaceId)
   if (!workspaceId) throw new Error('error.workspace-tabs-target-invalid')
+  const runtime = workspacePaneTabsTargetFromRestorable(workspaceId, target)
+  if (!runtime) throw new Error('error.workspace-tabs-target-invalid')
   const bound =
     target.kind === 'workspace-root'
       ? { kind: 'workspace-root' as const, workspaceId, workspaceRuntimeId: scope.workspaceRuntimeId }

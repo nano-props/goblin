@@ -36,46 +36,46 @@ export interface PrimaryWindowNavigationActions {
   activateWorkspace: (workspaceId: WorkspaceId) => void
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   cycleWorkspace: (direction: 1 | -1) => void
-  selectRepoBranch: (workspaceId: string, branch: string, options?: { replace?: boolean }) => boolean
-  showRepoBranchEmptyWorkspacePane: (workspaceId: string, branch: string, options?: { replace?: boolean }) => boolean
+  selectRepoBranch: (workspaceId: WorkspaceId, branch: string, options?: { replace?: boolean }) => boolean
+  showRepoBranchEmptyWorkspacePane: (workspaceId: WorkspaceId, branch: string, options?: { replace?: boolean }) => boolean
   showRepoBranchWorkspacePaneTab: (
-    workspaceId: string,
+    workspaceId: WorkspaceId,
     branch: string,
     tab: WorkspacePaneStaticTabType,
     options?: { replace?: boolean },
   ) => boolean
   showRepoBranchTerminalSession: (
-    workspaceId: string,
+    workspaceId: WorkspaceId,
     branch: string,
     terminalSessionId: string,
     options?: { replace?: boolean },
   ) => boolean
   showRepoWorktreeTerminalSession?: (
-    workspaceId: string,
+    workspaceId: WorkspaceId,
     worktreePath: string,
     terminalSessionId: string,
     options?: PrimaryWindowPresentationNavigationOptions,
   ) => boolean
   showRepoWorktreeWorkspacePaneTab?: (
-    workspaceId: string,
+    workspaceId: WorkspaceId,
     worktreePath: string,
     tab: WorkspacePaneStaticTabType,
     options?: PrimaryWindowPresentationNavigationOptions,
   ) => boolean
   showWorkspaceRootPaneTab?: (
-    workspaceId: string,
+    workspaceId: WorkspaceId,
     presentation: WorkspaceRootPanePresentation,
     options?: PrimaryWindowPresentationNavigationOptions,
   ) => boolean
   commitWorkspacePaneRoute: (
-    workspaceId: string,
+    workspaceId: WorkspaceId,
     branch: string,
     route: WorkspacePaneRouteTarget,
     options?: PrimaryWindowPresentationNavigationOptions,
   ) => MaybePromise<boolean>
-  currentWorkspacePaneRoute: (workspaceId: string, branch: string) => WorkspacePaneRouteTarget | undefined
-  goBack: (workspaceId: string) => void
-  goForward: (workspaceId: string) => void
+  currentWorkspacePaneRoute: (workspaceId: WorkspaceId, branch: string) => WorkspacePaneRouteTarget | undefined
+  goBack: (workspaceId: WorkspaceId) => void
+  goForward: (workspaceId: WorkspaceId) => void
   openSettings: (page: SettingsPage) => void
   openCreateWorktree: () => void
 }
@@ -254,7 +254,7 @@ type WorkspacePaneRememberedRoute =
   | { kind: 'terminal'; terminalSessionId: string }
 
 function rememberWorkspacePaneRouteSelection(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   branchName: string,
   route: WorkspacePaneRememberedRoute,
 ): void {
@@ -276,7 +276,7 @@ function rememberWorkspacePaneRouteSelection(
 
 function commitWorkspacePaneRoute(
   routeNavigation: PrimaryWindowRouteNavigation,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   branchName: string,
   route: WorkspacePaneRouteTarget,
   options?: PrimaryWindowPresentationNavigationOptions,
@@ -295,7 +295,7 @@ function commitWorkspacePaneRoute(
 }
 
 function restoreWorkspacePresentationOrOpenDashboard(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   routeNavigation: PrimaryWindowRouteNavigation,
   presentationToken: PrimaryWindowPresentationToken,
   options: { onBlocked: 'stay' | 'dashboard' },

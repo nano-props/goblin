@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
   TerminalSessionContext,
@@ -10,12 +11,14 @@ import {
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
+
 function ReadSnapshot() {
   const ctx = useTerminalSessionReadContext()
   return (
     <>
       <span data-testid="count">{ctx.terminalWorktreeSnapshot('any').count}</span>
-      <span data-testid="bell">{ctx.workspaceBellCount('any')}</span>
+      <span data-testid="bell">{ctx.workspaceBellCount(WORKSPACE_ID)}</span>
     </>
   )
 }

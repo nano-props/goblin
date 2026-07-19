@@ -18,6 +18,8 @@ vi.mock(import('#/web/stores/i18n.ts'), async (importOriginal) => {
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
 import { createGitWorkspaceProbeForTest, resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -44,7 +46,7 @@ vi.mock('sonner', () => ({
   toast: toastMocks,
 }))
 
-const REPO_ID = 'goblin+file:///tmp/repo-toasts-test'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-toasts-test')
 
 beforeEach(() => {
   resetWorkspacesStore()
@@ -85,7 +87,7 @@ describe('useRepoToasts', () => {
   })
 })
 
-function Harness({ repoId }: { repoId: string }) {
+function Harness({ repoId }: { repoId: WorkspaceId }) {
   useRepoToasts(repoId)
   return null
 }

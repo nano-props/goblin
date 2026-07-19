@@ -6,6 +6,7 @@ import {
 } from '#/shared/workspace-pane.ts'
 import { runtimeWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   physicalWorktreeIdentityKey,
   type PhysicalWorktreeIdentity,
@@ -17,7 +18,7 @@ import {
 
 export interface WorkspacePaneEpochScope {
   userId: string
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
 }
 
@@ -153,7 +154,7 @@ export class WorkspacePaneEpochOverlay {
       .flatMap(([, refs]) => Array.from(refs.values()).map(cloneTargetRef))
   }
 
-  clearPhysicalIdentity(workspaceId: string, removedLease: PhysicalWorktreeAdmissionLease): WorkspacePaneEpochScope[] {
+  clearPhysicalIdentity(workspaceId: WorkspaceId, removedLease: PhysicalWorktreeAdmissionLease): WorkspacePaneEpochScope[] {
     const physicalKey = physicalWorktreeAdmissionLeaseKey(removedLease)
     const refs = [...(this.targetsByPhysicalKey.get(physicalKey)?.values() ?? [])]
     const affected: WorkspacePaneEpochScope[] = []
@@ -178,7 +179,7 @@ export class WorkspacePaneEpochOverlay {
     return [...state.physicalLeasesByTarget.values()]
   }
 
-  activeEpochs(workspaceId: string): WorkspacePaneEpochScope[] {
+  activeEpochs(workspaceId: WorkspaceId): WorkspacePaneEpochScope[] {
     return Array.from(this.epochsByRepoRoot.get(workspaceId)?.values() ?? []).map((scope) => ({ ...scope }))
   }
 
@@ -309,7 +310,9 @@ function epochKey(scope: WorkspacePaneEpochScope): string {
 function scopeFromEpochKey(key: string): WorkspacePaneEpochScope {
   const [userId, workspaceId, workspaceRuntimeId] = key.split('\0')
   if (!userId || !workspaceId || !workspaceRuntimeId) throw new Error('invalid workspace pane epoch key')
-  return { userId, workspaceId, workspaceRuntimeId }
+  const canonicalWorkspaceId = canonicalWorkspaceLocator(workspaceId)
+  if (!canonicalWorkspaceId) throw new Error('invalid workspace pane epoch key')
+  return { userId, workspaceId: canonicalWorkspaceId, workspaceRuntimeId }
 }
 
 function epochTargetKey(scope: WorkspacePaneEpochScope, targetKey: string): string {

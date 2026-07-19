@@ -1,4 +1,5 @@
 import { ArrowLeft, ArrowRight } from 'lucide-react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { ComponentProps } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { WorkspaceZenModeToggle } from '#/web/components/WorkspaceZenModeToggle.tsx'
@@ -8,7 +9,7 @@ import { useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
 
 interface WorkspaceNavigationControlsProps extends Omit<ComponentProps<'div'>, 'children'> {
-  workspaceId?: string
+  workspaceId?: WorkspaceId
   zenRevealTriggerEnabled?: boolean
   onZenRevealTriggerEnter?: () => void
 }

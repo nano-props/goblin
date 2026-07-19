@@ -17,6 +17,7 @@ import type {
   TerminalSessionHydrationInput,
   TerminalIdentityViewModel,
 } from '#/web/components/terminal/types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 type TerminalStartResult = Extract<TerminalAttachResult | TerminalRestartResult, { ok: true }>
 
@@ -60,7 +61,7 @@ export function projectCreateResultForClient(
 }
 
 export function projectServerTerminalSession(input: {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   serverSession: ServerTerminalSessionSummary
   clientId: string

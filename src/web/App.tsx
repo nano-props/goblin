@@ -1,4 +1,5 @@
 import { EmptyRepoView } from '#/web/components/EmptyRepoView.tsx'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
 import { SettingsPageScreen } from '#/web/components/SettingsPageScreen.tsx'
 import { RepoView } from '#/web/components/RepoView.tsx'
@@ -18,32 +19,32 @@ interface AppProps {
   routeSettingsPage?: SettingsPage | null
   routeRepoView?: RepoRouteView | null
   onRouteSettingsPageChange?: (page: SettingsPage | null) => void
-  onOpenRepoRoot?: (repoId: string) => void
-  onOpenWorkspaceRoot?: (workspaceId: string) => void
-  onOpenRepoDashboard?: (repoId: string) => void
-  onOpenRepoBranch?: (repoId: string, branchName: string) => void
-  onOpenRepoNewWorktree?: (repoId: string) => void
-  onCancelRepoNewWorktree?: (repoId: string) => void
-  onReplaceRepoBranch?: (repoId: string, branchName: string) => void
+  onOpenRepoRoot?: (repoId: WorkspaceId) => void
+  onOpenWorkspaceRoot?: (workspaceId: WorkspaceId) => void
+  onOpenRepoDashboard?: (repoId: WorkspaceId) => void
+  onOpenRepoBranch?: (repoId: WorkspaceId, branchName: string) => void
+  onOpenRepoNewWorktree?: (repoId: WorkspaceId) => void
+  onCancelRepoNewWorktree?: (repoId: WorkspaceId) => void
+  onReplaceRepoBranch?: (repoId: WorkspaceId, branchName: string) => void
 }
 
 export type RepoRouteView =
-  | { kind: 'empty'; repoId: string }
-  | { kind: 'workspace-root'; repoId: string }
+  | { kind: 'empty'; repoId: WorkspaceId }
+  | { kind: 'workspace-root'; repoId: WorkspaceId }
   | {
       kind: 'worktree'
-      repoId: string
+      repoId: WorkspaceId
       worktreePath: string
       workspacePaneRoute: ParsedWorkspacePaneRoute | null
     }
-  | { kind: 'dashboard'; repoId: string }
+  | { kind: 'dashboard'; repoId: WorkspaceId }
   | {
       kind: 'branch'
-      repoId: string
+      repoId: WorkspaceId
       branchName: string
       workspacePaneRoute: ParsedWorkspacePaneRoute | null
     }
-  | { kind: 'newWorktree'; repoId: string }
+  | { kind: 'newWorktree'; repoId: WorkspaceId }
 
 export type WorkspacePaneRoute =
   { kind: 'static'; tab: WorkspacePaneStaticTabType } | { kind: 'terminal'; terminalSessionId: string }

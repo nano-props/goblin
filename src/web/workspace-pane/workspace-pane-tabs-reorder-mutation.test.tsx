@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from '@testing-library/react'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushMicrotasks, renderInJsdom } from '#/test-utils/render.tsx'
@@ -23,7 +24,7 @@ import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
-const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-tabs-reorder-mutation-repo'
+const REPO_ROOT = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tabs-reorder-mutation-repo')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const NEXT_WORKSPACE_RUNTIME_ID = 'repo-runtime-next'
 const BRANCH_NAME = 'feature/worktree'

@@ -169,6 +169,7 @@ import {
   TerminalSessionProjection,
   setTerminalSessionProjectionForTests,
 } from '#/web/components/terminal/TerminalSessionProjection.ts'
+import { runtimeMembershipIndexFromEntries } from '#/web/components/terminal/terminal-runtime-membership-index.ts'
 
 function workspaceIdFixture(input: string) {
   const workspaceId = canonicalWorkspaceLocator(input)
@@ -199,11 +200,7 @@ class MockResizeObserver {
 let originalResizeObserver: typeof ResizeObserver | undefined
 
 function makeRuntimeMembershipIndex() {
-  return {
-    [REPO_ROOT]: {
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-    },
-  }
+  return runtimeMembershipIndexFromEntries([{ id: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }])
 }
 
 function terminalBase() {
@@ -609,11 +606,9 @@ describe('TerminalSessionProjection create flow', () => {
       const pending = projection.createTerminalWithAdmission(terminalBase())
       await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
 
-      projection.setRuntimeMembershipIndex({
-        [REPO_ROOT]: {
-          workspaceRuntimeId: 'repo-runtime-new',
-        },
-      })
+      projection.setRuntimeMembershipIndex(
+        runtimeMembershipIndexFromEntries([{ id: REPO_ROOT, workspaceRuntimeId: 'repo-runtime-new' }]),
+      )
       createResponse.resolve(makeCreateResult({ action: resourceDisposition }))
 
       await expect(pending).resolves.toMatchObject({
@@ -886,7 +881,7 @@ describe('TerminalSessionProjection create flow', () => {
     )
     expect(mocks.setBadgeMock).toHaveBeenLastCalledWith(1)
 
-    projection.setRuntimeMembershipIndex({})
+    projection.setRuntimeMembershipIndex(runtimeMembershipIndexFromEntries([]))
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
     expect(mocks.setBadgeMock).toHaveBeenLastCalledWith(0)
@@ -957,11 +952,9 @@ describe('TerminalSessionProjection create flow', () => {
     projection.registerHost(WORKTREE_KEY, host)
     await projection.createTerminal(terminalBase())
 
-    projection.setRuntimeMembershipIndex({
-      [REPO_ROOT]: {
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      },
-    })
+    projection.setRuntimeMembershipIndex(
+      runtimeMembershipIndexFromEntries([{ id: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }]),
+    )
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
   })

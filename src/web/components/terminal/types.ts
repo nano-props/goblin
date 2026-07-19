@@ -9,6 +9,7 @@ import type {
 import type { TerminalInput, TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
 import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 type TerminalDescriptorIdentity = {
   terminalSessionId: string
@@ -146,7 +147,7 @@ export interface TerminalRuntimeMembership {
   workspaceRuntimeId: string
 }
 
-export type TerminalRuntimeMembershipIndex = Record<string, TerminalRuntimeMembership>
+export type TerminalRuntimeMembershipIndex = ReadonlyMap<WorkspaceId, TerminalRuntimeMembership>
 
 export interface TerminalSessionSummary {
   type: 'terminal'
@@ -202,8 +203,8 @@ export interface TerminalSessionContextValue {
 export interface TerminalSessionReadContextValue {
   terminalWorktreeSnapshot: (terminalWorktreeKey: string) => TerminalWorktreeSnapshot
   subscribeTerminalWorktree: (terminalWorktreeKey: string, listener: () => void) => () => void
-  workspaceBellCount: (workspaceId: string) => number
-  subscribeWorkspaceBellCount: (workspaceId: string, listener: () => void) => () => void
+  workspaceBellCount: (workspaceId: WorkspaceId) => number
+  subscribeWorkspaceBellCount: (workspaceId: WorkspaceId, listener: () => void) => () => void
   snapshot: (terminalSessionId: string) => TerminalSnapshot
   subscribeSnapshot: (terminalSessionId: string, listener: () => void) => () => void
 }

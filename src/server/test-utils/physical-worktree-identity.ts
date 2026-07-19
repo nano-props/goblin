@@ -8,6 +8,10 @@ import type {
   PhysicalWorktreeExecutionCapability,
 } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const DEFAULT_WORKSPACE_ID = workspaceIdForTest('goblin+file:///test-workspace')
 
 export function testPhysicalWorktreeIdentity(endpoint: string): PhysicalWorktreeIdentity {
   return { kind: 'local', executionNamespaceId: 'local', endpoint: path.resolve(endpoint) }
@@ -21,7 +25,7 @@ class TestPhysicalWorktreeIdentityResolver extends PhysicalWorktreeIdentityResol
   issue(input: {
     identity: PhysicalWorktreeIdentity
     userId?: string
-    repoRoot?: string
+    repoRoot?: WorkspaceId
     workspaceRuntimeId?: string
     worktreePath?: string
     execution?: PhysicalWorktreeExecutionBinding
@@ -32,7 +36,7 @@ class TestPhysicalWorktreeIdentityResolver extends PhysicalWorktreeIdentityResol
     return this.issueCapability({
       identity: input.identity,
       userId: input.userId ?? 'test-user',
-      repoRoot: input.repoRoot ?? '/repo',
+      repoRoot: input.repoRoot ?? DEFAULT_WORKSPACE_ID,
       workspaceRuntimeId: input.workspaceRuntimeId ?? 'test-runtime',
       worktreePath: endpoint,
       execution: input.execution ?? {

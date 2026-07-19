@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClientProvider } from '@tanstack/react-query'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -16,7 +17,7 @@ import {
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
-const REPO_ID = 'goblin+file:///tmp/goblin-repo-toolbar-actions-test-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-repo-toolbar-actions-test-repo')
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()

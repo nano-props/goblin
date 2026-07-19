@@ -97,7 +97,6 @@ export function createWorkspaceRoutes(options: {
         diagnostics: authoritativeProbe.diagnostics,
       })
     }
-    assertCanonicalWorkspaceId(input.workspaceId)
     const workspaceRuntimeId = acquireWorkspaceRuntime(userId, input.workspaceId, input.clientId)
     return c.json({ ok: true as const, workspaceRuntimeId })
   })
@@ -111,7 +110,6 @@ export function createWorkspaceRoutes(options: {
   app.post('/runtime-reconcile', async (c) => {
     const userId = requireUserId(userIdFromContext(c))
     const { clientId, workspaceIds } = await parseHttpBody(WORKSPACE_PROCEDURE_SCHEMAS.runtimeReconcile, c)
-    for (const workspaceId of workspaceIds) assertCanonicalWorkspaceId(workspaceId)
     return c.json({ runtimes: replaceWorkspaceRuntimeMembershipsForClient(userId, clientId, workspaceIds) })
   })
 
@@ -137,7 +135,7 @@ function requireUserId(userId: string | null | undefined): string {
 
 function requireCurrentWorkspaceRuntime(
   userId: string | null | undefined,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
 ): string {
   const requiredUserId = requireUserId(userId)
@@ -149,12 +147,6 @@ function requireCurrentWorkspaceRuntime(
 
 function serverLocatorPlatform(): WorkspaceLocatorPlatform {
   return process.platform === 'win32' ? 'win32' : 'posix'
-}
-
-function assertCanonicalWorkspaceId(value: string): asserts value is WorkspaceId {
-  if (!parseWorkspaceLocator(value, serverLocatorPlatform())) {
-    throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-locator-malformed' })
-  }
 }
 
 function workspaceLocatorFromCommandInput(input: string, platform: WorkspaceLocatorPlatform): WorkspaceId | null {

@@ -10,6 +10,7 @@ import {
   restorableWorkspacePaneTargetKey,
   workspacePaneTabsTargetFromRestorable,
 } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface WorkspacePaneLayoutRepositorySnapshot {
   layout: WorkspacePaneDurableLayout
@@ -28,18 +29,18 @@ export type WorkspacePaneLayoutRepositoryCasOutcome =
   WorkspacePaneLayoutRepositoryCasStateOutcome | { kind: 'write-failure'; error: unknown }
 
 export interface WorkspacePaneLayoutRepositoryCasInput {
-  workspaceId: string
+  workspaceId: WorkspaceId
   expected: WorkspacePaneDurableLayout
   replacement: WorkspacePaneDurableLayout
 }
 
 export interface WorkspacePaneLayoutRepository {
-  load(workspaceId: string): Promise<WorkspacePaneLayoutRepositorySnapshot>
+  load(workspaceId: WorkspaceId): Promise<WorkspacePaneLayoutRepositorySnapshot>
   compareAndSwap(input: WorkspacePaneLayoutRepositoryCasInput): Promise<WorkspacePaneLayoutRepositoryCasOutcome>
 }
 
 export function normalizeWorkspacePaneDurableLayout(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   layout: WorkspacePaneDurableLayout,
 ): WorkspacePaneDurableLayout {
   const byTarget = new Map<string, WorkspacePaneDurableLayoutEntry>()
@@ -69,7 +70,7 @@ export function normalizeWorkspacePaneDurableLayout(
 }
 
 export function workspacePaneDurableLayoutsEqual(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   a: WorkspacePaneDurableLayout,
   b: WorkspacePaneDurableLayout,
 ): boolean {

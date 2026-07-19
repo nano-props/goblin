@@ -1,4 +1,5 @@
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RepoWorkspaceRuntimeTabStateInput } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
@@ -18,7 +19,7 @@ export interface WorkspacePaneRuntimeTabTargetProjectionInput {
 }
 
 export function readWorkspacePaneRuntimeTabTargetProjection(input: {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   worktreePath: string | null
 }): WorkspacePaneRuntimeTabTargetProjection {

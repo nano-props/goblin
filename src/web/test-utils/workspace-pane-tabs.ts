@@ -15,6 +15,7 @@ import {
   workspacePaneTabsQueryKey,
   writeWorkspacePaneTabsSnapshotQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 export function setWorkspacePaneTabsForTargetQueryData(
   input:
@@ -28,6 +29,7 @@ export function setWorkspacePaneTabsForTargetQueryData(
       },
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
+  const workspaceId = workspaceIdForTest(input.workspaceId)
   const resolvedTarget: WorkspacePaneTabsTarget & {
     workspaceRuntimeId: string
     tabs: readonly WorkspacePaneTabEntry[]
@@ -35,13 +37,13 @@ export function setWorkspacePaneTabsForTargetQueryData(
     'kind' in input
       ? input
       : {
-          ...requiredGitWorkspacePaneTabsTarget(input.workspaceId, input.branchName, input.worktreePath),
+          ...requiredGitWorkspacePaneTabsTarget(workspaceId, input.branchName, input.worktreePath),
           workspaceRuntimeId: input.workspaceRuntimeId,
           tabs: input.tabs,
         }
-  const current = currentSnapshot(input.workspaceId, input.workspaceRuntimeId, queryClient)
+  const current = currentSnapshot(workspaceId, input.workspaceRuntimeId, queryClient)
   writeWorkspacePaneTabsSnapshotQueryData(
-    input.workspaceId,
+    workspaceId,
     input.workspaceRuntimeId,
     {
       revision: current.revision,
@@ -68,9 +70,10 @@ export function replaceWorkspacePaneTabsQueryData(
   entries: readonly WorkspacePaneTabsEntry[],
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  const current = currentSnapshot(workspaceId, workspaceRuntimeId, queryClient)
+  const canonicalWorkspaceId = workspaceIdForTest(workspaceId)
+  const current = currentSnapshot(canonicalWorkspaceId, workspaceRuntimeId, queryClient)
   writeWorkspacePaneTabsSnapshotQueryData(
-    workspaceId,
+    canonicalWorkspaceId,
     workspaceRuntimeId,
     { revision: current.revision, entries: [...entries] },
     queryClient,
@@ -82,8 +85,11 @@ function currentSnapshot(
   workspaceRuntimeId: string,
   queryClient: QueryClient,
 ): WorkspacePaneTabsSnapshot {
+  const canonicalWorkspaceId = workspaceIdForTest(workspaceId)
   return (
-    queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId)) ?? {
+    queryClient.getQueryData<WorkspacePaneTabsQueryData>(
+      workspacePaneTabsQueryKey(canonicalWorkspaceId, workspaceRuntimeId),
+    ) ?? {
       revision: 0,
       entries: [],
     }
@@ -111,7 +117,13 @@ export function runtimeWorkspacePaneTargetForTest(
     | { workspaceId: string; workspaceRuntimeId: string; branchName: string; worktreePath: string },
 ) {
   const paneTarget =
-    'kind' in input ? input : requiredGitWorkspacePaneTabsTarget(input.workspaceId, input.branchName, input.worktreePath)
+    'kind' in input
+      ? input
+      : requiredGitWorkspacePaneTabsTarget(
+          workspaceIdForTest(input.workspaceId),
+          input.branchName,
+          input.worktreePath,
+        )
   const target = runtimeWorkspacePaneTarget(paneTarget, input.workspaceRuntimeId)
   if (!target) throw new Error('workspace pane test target requires a canonical target')
   return target

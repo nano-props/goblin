@@ -1,5 +1,8 @@
-import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import {
+  isWorkspacePaneStaticTabType,
+  type WorkspacePaneRuntimeTabType,
+  type WorkspacePaneTabEntry,
+} from '#/shared/workspace-pane.ts'
 import type {
   WorkspacePaneTabsEntry,
   WorkspacePaneTabsSnapshot,
@@ -8,6 +11,7 @@ import type {
 import { runtimeWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
   PhysicalWorktreeOperationPermit,
@@ -63,7 +67,7 @@ export interface WorkspacePaneRuntimeTabsProvider {
 }
 
 export interface WorkspacePaneTargetProjectionProvider {
-  captureTargets(userId: string, workspaceId: string, scope: string): Promise<readonly WorkspacePaneTargetProjection[]>
+  captureTargets(userId: string, workspaceId: WorkspaceId, scope: string): Promise<readonly WorkspacePaneTargetProjection[]>
 }
 
 export interface WorkspacePaneTabsCommandResult extends WorkspacePaneLayoutCommitResult {
@@ -183,7 +187,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
 
   async replaceTabs(input: {
     userId: string
-    workspaceId: string
+    workspaceId: WorkspaceId
     scope: string
     target: RuntimeWorkspacePaneTarget
     nativeWorktreePath: string | null
@@ -229,7 +233,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
 
   async restoreScope(input: {
     userId: string
-    workspaceId: string
+    workspaceId: WorkspaceId
     scope: string
     targets: readonly WorkspacePaneTargetProjection[]
     expectedWorkspaceEntry: WorkspaceSessionEntry
@@ -293,7 +297,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
 
   async updateTabs(input: {
     userId: string
-    workspaceId: string
+    workspaceId: WorkspaceId
     scope: string
     target: RuntimeWorkspacePaneTarget
     nativeWorktreePath: string | null
@@ -339,7 +343,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
 
   async reconcileWorktree(input: {
     userId: string
-    workspaceId: string
+    workspaceId: WorkspaceId
     scope: string
     worktreePath: string
     assertCurrent?: () => void
@@ -356,7 +360,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
 
   async reconcileWorktreeAdmitted(input: {
     userId: string
-    workspaceId: string
+    workspaceId: WorkspaceId
     scope: string
     worktreePath: string
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
@@ -379,14 +383,14 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
 
   async listWorkspaceTabs(input: {
     userId: string
-    workspaceId: string
+    workspaceId: WorkspaceId
     scope: string
     assertCurrent: () => void
   }): Promise<WorkspacePaneTabsSnapshot> {
     return await this.reconcileWorkspaceTabsProjectionBoundary(input)
   }
 
-  async snapshot(input: { userId: string; workspaceId: string; scope: string }): Promise<WorkspacePaneTabsSnapshot> {
+  async snapshot(input: { userId: string; workspaceId: WorkspaceId; scope: string }): Promise<WorkspacePaneTabsSnapshot> {
     return await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) => {
       const providers = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       const validTargets = await this.targetProjection.captureTargets(input.userId, input.workspaceId, input.scope)
@@ -433,11 +437,11 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
   }
 
   async reconcilePhysicalWorktreeAfterRemovalFailure(input: {
-    workspaceId: string
+    workspaceId: WorkspaceId
     worktreePath: string
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
     permit: PhysicalWorktreeOperationPermit
-    scopes: readonly { userId: string; workspaceId: string; scope: string; worktreePath: string }[]
+    scopes: readonly { userId: string; workspaceId: WorkspaceId; scope: string; worktreePath: string }[]
   }): Promise<void> {
     await Promise.all(
       input.scopes.map(async ({ userId, workspaceId, scope, worktreePath }) => {
@@ -475,7 +479,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
 
   private async reconcileWorkspaceTabsProjectionBoundary(input: {
     userId: string
-    workspaceId: string
+    workspaceId: WorkspaceId
     scope: string
     assertCurrent: () => void
   }): Promise<WorkspacePaneTabsSnapshot> {
@@ -583,7 +587,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
   }
 
   private async capturePhysicalWorktrees(
-    input: { userId: string; workspaceId: string; scope: string },
+    input: { userId: string; workspaceId: WorkspaceId; scope: string },
     worktreePaths: readonly string[],
   ): Promise<PhysicalWorktreeExecutionCapability[]> {
     return uniqueSortedCapabilities(
@@ -594,7 +598,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
   }
 
   private async runAggregateCommand(
-    input: { userId: string; workspaceId: string; scope: string; assertCurrent?: () => void },
+    input: { userId: string; workspaceId: WorkspaceId; scope: string; assertCurrent?: () => void },
     command: (
       layout: WorkspacePaneLayoutOperation,
       validTargets: readonly WorkspacePaneTargetProjection[],
@@ -620,7 +624,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
   }
 
   private async capturePhysicalWorktree(
-    input: { userId: string; workspaceId: string; scope: string },
+    input: { userId: string; workspaceId: WorkspaceId; scope: string },
     worktreePath: string,
   ): Promise<PhysicalWorktreeExecutionCapability> {
     const separator = input.scope.lastIndexOf('\0')
@@ -647,7 +651,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspaceRuntimeTabPlacemen
   }
 
   private async runWorkspaceTabsOperation<T>(
-    workspaceId: string,
+    workspaceId: WorkspaceId,
     task: (operation: WorkspacePaneLayoutOperation) => Promise<T> | T,
   ): Promise<T> {
     return await this.layoutAggregate.runExclusive(workspaceId, task)
@@ -813,17 +817,19 @@ function workspaceRuntimeIdFromScope(scope: string): string {
   return scope.slice(separator + 1)
 }
 
-function workspaceIdFromScope(scope: string): string {
+function workspaceIdFromScope(scope: string): WorkspaceId {
   const separator = scope.lastIndexOf('\0')
   if (separator < 1) throw new Error('invalid workspace pane runtime scope')
-  return scope.slice(0, separator)
+  const workspaceId = canonicalWorkspaceLocator(scope.slice(0, separator))
+  if (!workspaceId) throw new Error('invalid workspace pane runtime scope')
+  return workspaceId
 }
 
-function aggregateScope(userId: string, workspaceId: string, scope: string) {
+function aggregateScope(userId: string, workspaceId: WorkspaceId, scope: string) {
   return { userId, workspaceId, workspaceRuntimeId: workspaceRuntimeIdFromScope(scope) }
 }
 
-function scopeFromAggregate(scope: { workspaceId: string; workspaceRuntimeId: string }): string {
+function scopeFromAggregate(scope: { workspaceId: WorkspaceId; workspaceRuntimeId: string }): string {
   return `${scope.workspaceId}\0${scope.workspaceRuntimeId}`
 }
 

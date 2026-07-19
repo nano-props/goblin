@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   persistedFiletreeViewStateByWorktreeByWorkspaceForSession,
   restoreFiletreeViewStateFromSession,
@@ -9,15 +10,19 @@ import {
   useFiletreeInteractionStore,
 } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/example-repo')
+const CLOSED_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/closed-repo')
+const PLAIN_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/plain-workspace')
+
 describe('filetree-session-state', () => {
   beforeEach(() => {
     resetFiletreeInteractionStore()
   })
 
   test('maps file tree interaction state into session view state for open worktrees', () => {
-    const scopeKey = filetreeInteractionScopeKey('goblin+file:///tmp/repo', '/tmp/worktree')
-    const staleScopeKey = filetreeInteractionScopeKey('goblin+file:///tmp/repo', '/tmp/stale-worktree')
-    const closedRepoScopeKey = filetreeInteractionScopeKey('/tmp/closed-repo', '/tmp/worktree')
+    const scopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/tmp/worktree')
+    const staleScopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/tmp/stale-worktree')
+    const closedRepoScopeKey = filetreeInteractionScopeKey(CLOSED_WORKSPACE_ID, '/tmp/worktree')
 
     const persisted = persistedFiletreeViewStateByWorktreeByWorkspaceForSession(
       {
@@ -38,15 +43,15 @@ describe('filetree-session-state', () => {
         },
       },
       {
-        'goblin+file:///tmp/repo': {
+        [WORKSPACE_ID]: {
           branches: [{ worktree: { path: '/tmp/worktree' } }],
         },
       },
-      ['goblin+file:///tmp/repo'],
+      [WORKSPACE_ID],
     )
 
     expect(persisted).toEqual({
-      'goblin+file:///tmp/repo': {
+      [WORKSPACE_ID]: {
         'goblin+file:///tmp/worktree': {
           selectedKeys: ['src/index.ts'],
           expandedKeys: ['src', 'src/web'],
@@ -58,7 +63,7 @@ describe('filetree-session-state', () => {
 
   test('restores session view state into the file tree interaction store', () => {
     restoreFiletreeViewStateFromSession({
-      'goblin+file:///tmp/repo': {
+      [WORKSPACE_ID]: {
         'goblin+file:///tmp/worktree': {
           selectedKeys: ['src/index.ts'],
           expandedKeys: ['src', 'src/web'],
@@ -69,7 +74,7 @@ describe('filetree-session-state', () => {
 
     expect(
       useFiletreeInteractionStore.getState().interactionByScope[
-        filetreeInteractionScopeKey('goblin+file:///tmp/repo', '/tmp/worktree')
+        filetreeInteractionScopeKey(WORKSPACE_ID, '/tmp/worktree')
       ],
     ).toEqual({
       selectedKeys: ['src/index.ts'],
@@ -79,22 +84,21 @@ describe('filetree-session-state', () => {
   })
 
   test('persists the workspace-root file tree without a synthetic branch', () => {
-    const workspaceId = 'goblin+file:///tmp/plain-workspace'
     const persisted = persistedFiletreeViewStateByWorktreeByWorkspaceForSession(
       {
-        [filetreeInteractionScopeKey(workspaceId, '/tmp/plain-workspace')]: {
+        [filetreeInteractionScopeKey(PLAIN_WORKSPACE_ID, '/tmp/plain-workspace')]: {
           selectedKeys: ['README.md'],
           expandedKeys: ['src'],
           topVisibleRowIndex: 3,
         },
       },
-      { [workspaceId]: { branches: [] } },
-      [workspaceId],
+      { [PLAIN_WORKSPACE_ID]: { branches: [] } },
+      [PLAIN_WORKSPACE_ID],
     )
 
     expect(persisted).toEqual({
-      [workspaceId]: {
-        [workspaceId]: {
+      [PLAIN_WORKSPACE_ID]: {
+        [PLAIN_WORKSPACE_ID]: {
           selectedKeys: ['README.md'],
           expandedKeys: ['src'],
           topVisibleRowIndex: 3,

@@ -5,6 +5,7 @@ import { createTerminalSessionPruner } from '#/server/terminal/terminal-session-
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 vi.mock('#/system/git/worktrees.ts', () => ({
   getWorktrees: vi.fn(async () => [
@@ -14,10 +15,10 @@ vi.mock('#/system/git/worktrees.ts', () => ({
 
 const USER_ID = 'user_terminal_pruner'
 const SCOPE = 'repo-runtime-terminal-pruner'
-const REPO_ROOT = 'goblin+file:///repo'
+const REPO_ROOT = workspaceIdForTest('goblin+file:///repo')
 const LIVE_WORKTREE_PATH = '/repo/live-worktree'
 const STALE_WORKTREE_PATH = '/repo/stale-worktree'
-const REMOTE_REPO_ROOT = 'goblin+ssh://prod/srv/repo'
+const REMOTE_REPO_ROOT = workspaceIdForTest('goblin+ssh://prod/srv/repo')
 
 describe('terminal session pruner', () => {
   beforeEach(() => {

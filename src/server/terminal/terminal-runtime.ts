@@ -11,7 +11,7 @@
 
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionCoordinates, type TerminalSessionsChangedEvent } from '#/shared/terminal-types.ts'
-import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { serverLogger } from '#/server/logger.ts'
 import {
   createTerminalSessionService,
@@ -170,7 +170,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     string,
     {
       userId: string
-      workspaceId: string
+      workspaceId: WorkspaceId
       workspaceRuntimeId: string
       scope: string
       attempts: number
@@ -211,7 +211,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 
   function scheduleInvalidatedScopeRetirement(input: {
     userId: string
-    workspaceId: string
+    workspaceId: WorkspaceId
     workspaceRuntimeId: string
     scope: string
   }): void {
@@ -227,7 +227,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     key: string,
     retirement: {
       userId: string
-      workspaceId: string
+      workspaceId: WorkspaceId
       workspaceRuntimeId: string
       scope: string
       attempts: number
@@ -434,13 +434,14 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 
   const workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost = {
     async commitGitCapabilityRemoval({ userId, workspaceId, workspaceRuntimeId, assertCurrent }) {
-      const canonicalWorkspaceId = canonicalWorkspaceLocator(workspaceId)
-      if (!canonicalWorkspaceId) return { kind: 'failed-before-commit', error: new Error('invalid workspace id') }
-      const scope = terminalSessionRuntimeScope(canonicalWorkspaceId, workspaceRuntimeId)
+      const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
       let durableLayoutChanged: boolean
       try {
         assertCurrent()
-        durableLayoutChanged = await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, workspaceId)
+        durableLayoutChanged = await clearWorkspacePaneDurableLayout(
+          workspacePaneLayoutRepository,
+          workspaceId,
+        )
       } catch (error) {
         return { kind: 'failed-before-commit', error }
       }
@@ -450,7 +451,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       // queued effect cannot run until this synchronous commit returns.
       scheduleInvalidatedScopeRetirement({
         userId,
-        workspaceId: canonicalWorkspaceId,
+        workspaceId,
         workspaceRuntimeId: workspaceRuntimeId,
         scope,
       })
@@ -489,13 +490,13 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broker.broadcastToUser(userId, { type: 'sessions-changed', ...event })
   }
 
-  function publishWorkspaceTabsChanged(userId: string, workspaceId: string): void {
+  function publishWorkspaceTabsChanged(userId: string, workspaceId: WorkspaceId): void {
     broadcastWorkspacePaneTabsChanged(broker, userId, workspaceId)
   }
 
   function publishWorkspaceTabsRevision(
     userId: string,
-    workspaceId: string,
+    workspaceId: WorkspaceId,
     workspaceRuntimeId: string,
     revision: number,
   ): void {
@@ -529,7 +530,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 
 async function clearWorkspacePaneDurableLayout(
   repository: WorkspacePaneLayoutRepository,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
 ): Promise<boolean> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const current = await repository.load(workspaceId)

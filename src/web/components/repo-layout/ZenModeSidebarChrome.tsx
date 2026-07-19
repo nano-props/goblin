@@ -9,6 +9,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { WorkspaceNavigationControls } from '#/web/components/WorkspaceNavigationControls.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import {
@@ -53,13 +54,13 @@ interface ZenModeSidebarRevealProps {
 }
 
 interface ZenModeSidebarRevealTriggerProps {
-  workspaceId?: string
+  workspaceId?: WorkspaceId
   zenRevealTriggerEnabled?: boolean
   onZenRevealTriggerEnter?: () => void
 }
 
 interface ZenModeSidebarChromeProps {
-  workspaceId?: string
+  workspaceId?: WorkspaceId
   sidebarPane: ReactNode
   zenModeToggleEnabled: boolean
   revealEnabled: boolean

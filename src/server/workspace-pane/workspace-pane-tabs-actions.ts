@@ -6,9 +6,14 @@ import type {
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface WorkspacePaneTabsActionService {
-  listWorkspaceTabs(userId: string, workspaceId: string, workspaceRuntimeId: string): Promise<WorkspacePaneTabsSnapshot>
+  listWorkspaceTabs(
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+  ): Promise<WorkspacePaneTabsSnapshot>
   replaceTabs(userId: string, input: WorkspacePaneTabsReplaceInput): Promise<WorkspacePaneTabsSnapshot>
   updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabsSnapshot>
 }
@@ -16,7 +21,7 @@ export interface WorkspacePaneTabsActionService {
 export interface WorkspacePaneTabsActionDependencies {
   sessionService: WorkspacePaneTabsActionService
   isValidClientId(value: unknown): value is string
-  isCurrentWorkspaceRuntime(userId: string, workspaceId: string, workspaceRuntimeId: string): boolean
+  isCurrentWorkspaceRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean
 }
 
 export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDependencies) {
@@ -57,7 +62,7 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
     },
   }
 
-  function assertCurrentWorkspaceRuntime(userId: string, workspaceId: string, workspaceRuntimeId: string): void {
+  function assertCurrentWorkspaceRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
     if (!deps.isCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId)) {
       throw new Error('error.workspace-runtime-stale')
     }

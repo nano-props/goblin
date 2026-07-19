@@ -127,7 +127,7 @@ export interface TerminalEventSink<TUser extends string | number> {
 
 export interface TerminalPhysicalWorktreeScope<TUser extends string | number> {
   userId: TUser
-  repoRoot: string
+  repoRoot: WorkspaceId
   workspaceRuntimeId: string
   scope: string
 }

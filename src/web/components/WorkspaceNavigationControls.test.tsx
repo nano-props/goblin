@@ -10,6 +10,7 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import { resetWorkspacesStore } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/navigation-controls-repo')
 
@@ -99,7 +100,7 @@ function renderControls({
   onZenRevealTriggerEnter,
   navigation = navigationWith(),
 }: {
-  workspaceId?: string
+  workspaceId?: WorkspaceId
   zenRevealTriggerEnabled?: boolean
   onZenRevealTriggerEnter?: () => void
   navigation?: PrimaryWindowNavigationActions

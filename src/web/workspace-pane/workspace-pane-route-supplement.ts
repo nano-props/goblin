@@ -1,4 +1,5 @@
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -6,7 +7,7 @@ import { workspacePaneCommittedRuntimeTargetIsCurrent } from '#/web/workspace-pa
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface WorkspacePaneRouteSupplementTarget {
-  repoId: string
+  repoId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string
   worktreePath: string | null

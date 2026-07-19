@@ -1,8 +1,10 @@
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+
 export interface FutureExitBinding {
   terminalSessionId: string
   terminalRuntimeSessionId: string
   terminalRuntimeGeneration: number
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
 }
 

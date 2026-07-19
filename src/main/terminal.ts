@@ -16,6 +16,7 @@ import {
   TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
   TERMINAL_SET_BADGE_CHANNEL,
 } from '#/shared/ipc-channels.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 let wired = false
 
@@ -103,7 +104,7 @@ async function notifyTerminalBell(webContents: WebContents, input: TerminalNotif
 function showNotificationWithResult(
   title: string,
   body: string,
-  workspaceId: string | null,
+  workspaceId: WorkspaceId | null,
   terminalSessionId?: string,
   terminalWorktreeKey?: string,
 ): Promise<boolean> {

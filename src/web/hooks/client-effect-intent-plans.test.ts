@@ -24,6 +24,8 @@ const CURRENT_GIT_REPO = {
     diagnostics: [],
   },
 }
+const GIT_WORKSPACE_ID = CURRENT_GIT_REPO.id
+const DETACHED_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace/example-repo')
 
 const CURRENT_DIRECTORY_REPO = {
   ...CURRENT_GIT_REPO,
@@ -54,7 +56,7 @@ describe('client effect intent plans', () => {
       type: 'terminal-bell-click',
       workspaceId: repo.id,
       terminalSessionId: 'term-222222222222222222222',
-      terminalWorktreeKey: formatTerminalWorktreeKeyForPath('goblin+file:///tmp/repo', '/tmp/repo-feature'),
+      terminalWorktreeKey: formatTerminalWorktreeKeyForPath(GIT_WORKSPACE_ID, '/tmp/repo-feature'),
     })
 
     expect(plan).toEqual({
@@ -62,16 +64,16 @@ describe('client effect intent plans', () => {
       repoId: repo.id,
       branch: 'feature/test',
       terminalSessionId: 'term-222222222222222222222',
-      terminalWorktreeKey: formatTerminalWorktreeKeyForPath('goblin+file:///tmp/repo', '/tmp/repo-feature'),
+      terminalWorktreeKey: formatTerminalWorktreeKeyForPath(GIT_WORKSPACE_ID, '/tmp/repo-feature'),
     })
   })
 
   test('marks worktree terminal bell intent unavailable when the branch read model is missing', () => {
     const plan = createTerminalBellIntentPlan({ id: workspaceIdForTest('goblin+file:///tmp/repo') }, null, {
       type: 'terminal-bell-click',
-      workspaceId: 'goblin+file:///tmp/repo',
+      workspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
       terminalSessionId: 'term-222222222222222222222',
-      terminalWorktreeKey: formatTerminalWorktreeKeyForPath('goblin+file:///tmp/repo', '/tmp/repo-feature'),
+      terminalWorktreeKey: formatTerminalWorktreeKeyForPath(GIT_WORKSPACE_ID, '/tmp/repo-feature'),
     })
 
     expect(plan).toEqual({ kind: 'unavailable', reason: 'branch-read-model-unavailable' })
@@ -80,7 +82,7 @@ describe('client effect intent plans', () => {
   test('routes a detached worktree bell through its authoritative catalog entry', () => {
     const worktreePath = '/workspace/detached'
     const plan = createTerminalBellIntentPlan(
-      { id: workspaceIdForTest('goblin+file:///workspace/repo') },
+      { id: DETACHED_WORKSPACE_ID },
       {
         branches: [],
         currentBranch: 'main',
@@ -91,15 +93,15 @@ describe('client effect intent plans', () => {
       },
       {
         type: 'terminal-bell-click',
-        workspaceId: 'goblin+file:///workspace/repo',
+        workspaceId: DETACHED_WORKSPACE_ID,
         terminalSessionId: 'term-333333333333333333333',
-        terminalWorktreeKey: formatTerminalWorktreeKeyForPath('goblin+file:///workspace/repo', worktreePath),
+        terminalWorktreeKey: formatTerminalWorktreeKeyForPath(DETACHED_WORKSPACE_ID, worktreePath),
       },
     )
 
     expect(plan).toEqual({
       kind: 'show-detached-worktree-terminal',
-      repoId: 'goblin+file:///workspace/repo',
+      repoId: DETACHED_WORKSPACE_ID,
       worktreePath,
       terminalSessionId: 'term-333333333333333333333',
     })

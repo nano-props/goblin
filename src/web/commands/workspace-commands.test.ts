@@ -23,6 +23,7 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   resetTerminalActionDialogsStore,
@@ -3067,7 +3068,7 @@ test('rebases the latest queued absolute selection after an earlier route commit
   }
   observeWorkspacePaneRouteForTest({ ...target, route: { kind: 'static', tab: 'status' } })
   const showRepoBranchWorkspacePaneTab = vi.fn(
-    (workspaceId: string, branchName: string, tab: WorkspacePaneStaticTabType) => {
+    (workspaceId: WorkspaceId, branchName: string, tab: WorkspacePaneStaticTabType) => {
       useWorkspacesStore.getState().setWorkspacePaneTab(workspaceId, branchName, tab)
       return true
     },
@@ -3284,7 +3285,7 @@ test('serializes open then move through exact route commits', async () => {
   }
   observeWorkspacePaneRouteForTest({ ...target, route: { kind: 'static', tab: 'status' } })
   const showRepoBranchWorkspacePaneTab = vi.fn(
-    (workspaceId: string, branchName: string, tab: WorkspacePaneStaticTabType) => {
+    (workspaceId: WorkspaceId, branchName: string, tab: WorkspacePaneStaticTabType) => {
       useWorkspacesStore.getState().setWorkspacePaneTab(workspaceId, branchName, tab)
       return true
     },

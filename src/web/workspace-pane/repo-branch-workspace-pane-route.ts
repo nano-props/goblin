@@ -1,4 +1,5 @@
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
 import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
@@ -24,7 +25,7 @@ export type WorkspacePaneRouteResolution =
     }
   | { kind: 'route'; route: WorkspacePaneRoute | null }
 
-export function resolveWorkspacePaneRoute(repoId: string, branchName: string): WorkspacePaneRouteResolution {
+export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: string): WorkspacePaneRouteResolution {
   const state = useWorkspacesStore.getState()
   const repo = state.workspaces[repoId]
   if (!repo || repo.capability.kind !== 'git') return { kind: 'missing' }
@@ -75,7 +76,7 @@ export function openWorkspacePaneRoute(
     PrimaryWindowRouteNavigation,
     'openRepoBranch' | 'openRepoBranchTab' | 'openRepoBranchTerminal'
   >,
-  repoId: string,
+  repoId: WorkspaceId,
   branchName: string,
   options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
 ): boolean {

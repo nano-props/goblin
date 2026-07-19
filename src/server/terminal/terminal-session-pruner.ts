@@ -7,6 +7,7 @@ import {
   type TerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 import { localWorkspaceNativePath } from '#/server/modules/workspace-path.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface TerminalSessionPruneManager {
   listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
@@ -26,7 +27,7 @@ class TerminalSessionPruner {
 
   async prune(input: {
     userId: string
-    workspaceId: string
+    workspaceId: WorkspaceId
     scope: string
     assertCurrent: () => void
   }): Promise<{ pruned: number; remaining: number }> {

@@ -29,6 +29,7 @@ import { restorableWorkspacePaneTargetFromRuntime } from '#/shared/workspace-pan
 import { runtimeWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
 import { workspaceProbeStateForRuntime } from '#/server/modules/workspace-runtimes.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 type MaybePromise<T> = T | Promise<T>
 const workspacePaneRuntimeApplicationLogger = serverLogger.child({ module: 'workspace-pane-runtime-application' })
@@ -43,8 +44,8 @@ interface WorkspacePaneRuntimeApplicationDependencies {
   terminalWorktree: {
     listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
   }
-  isCurrentWorkspaceRuntime(userId: string, workspaceId: string, workspaceRuntimeId: string): boolean
-  broadcastWorkspaceTabsChanged(userId: string, workspaceId: string, workspaceRuntimeId: string, revision: number): void
+  isCurrentWorkspaceRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean
+  broadcastWorkspaceTabsChanged(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string, revision: number): void
 }
 
 /**
@@ -290,13 +291,13 @@ export class WorkspacePaneRuntimeApplication {
     return this.deps.isCurrentWorkspaceRuntime(userId, target.target.workspaceId, target.target.workspaceRuntimeId)
   }
 
-  private terminalCapabilityAvailable(userId: string, workspaceId: string, workspaceRuntimeId: string): boolean {
+  private terminalCapabilityAvailable(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean {
     return workspaceTerminalAvailable(workspaceProbeStateForRuntime(userId, workspaceId, workspaceRuntimeId))
   }
 
   private async capturePhysicalWorktree(
     userId: string,
-    target: { workspaceId: string; workspaceRuntimeId: string },
+    target: { workspaceId: WorkspaceId; workspaceRuntimeId: string },
     worktreePath: string,
   ): Promise<PhysicalWorktreeExecutionCapability> {
     const input = {

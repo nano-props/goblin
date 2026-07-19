@@ -12,7 +12,7 @@ import type {
   WorkspaceRefreshResult,
   WorkspaceSettledProbeState,
 } from '#/shared/workspace-runtime.ts'
-import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface WorkspaceRuntimeState {
   workspaceId: WorkspaceId
@@ -78,15 +78,15 @@ export interface RemoteWorkspaceTerminalCommitPlan {
   }
 }
 
-const workspaceRuntimesByUser = new Map<string, Map<string, WorkspaceRuntimeState>>()
+const workspaceRuntimesByUser = new Map<string, Map<WorkspaceId, WorkspaceRuntimeState>>()
 const workspaceRuntimeClosedListeners = new Set<(event: WorkspaceRuntimeClosedEvent) => void>()
 const workspaceRuntimeMembershipAcquiredListeners = new Set<(event: WorkspaceRuntimeMembershipAcquiredEvent) => void>()
 const workspaceRuntimeLogger = serverLogger.child({ tag: 'workspace-runtime' })
 
-function workspaceRuntimeStateByUser(userId: string): Map<string, WorkspaceRuntimeState> {
+function workspaceRuntimeStateByUser(userId: string): Map<WorkspaceId, WorkspaceRuntimeState> {
   let states = workspaceRuntimesByUser.get(userId)
   if (states) return states
-  states = new Map<string, WorkspaceRuntimeState>()
+  states = new Map<WorkspaceId, WorkspaceRuntimeState>()
   workspaceRuntimesByUser.set(userId, states)
   return states
 }
@@ -112,19 +112,13 @@ function workspaceRuntimeState(userId: string, workspaceId: WorkspaceId): Worksp
   return created
 }
 
-function requiredCanonicalWorkspaceId(workspaceId: string): WorkspaceId {
-  const canonicalWorkspaceId = canonicalWorkspaceLocator(workspaceId)
-  if (!canonicalWorkspaceId) throw new Error('workspace runtime requires a canonical workspaceId')
-  return canonicalWorkspaceId
-}
-
-export function acquireWorkspaceRuntime(userId: string, workspaceId: string, clientId: string): string {
+export function acquireWorkspaceRuntime(userId: string, workspaceId: WorkspaceId, clientId: string): string {
   return acquireWorkspaceRuntimeLease(userId, workspaceId, clientId).workspaceRuntimeId
 }
 
 export function acquireWorkspaceRuntimeLease(
   userId: string,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   clientId: string,
 ): WorkspaceRuntimeMembershipLeaseEntry {
   const lease = acquireWorkspaceRuntimeMembership(userId, workspaceId, clientId)
@@ -134,21 +128,20 @@ export function acquireWorkspaceRuntimeLease(
 
 function acquireWorkspaceRuntimeMembership(
   userId: string,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   clientId: string,
 ): WorkspaceRuntimeMembershipLeaseEntry {
-  const canonicalWorkspaceId = requiredCanonicalWorkspaceId(workspaceId)
   if (!clientId) throw new Error('workspace runtime acquire requires clientId')
-  const state = workspaceRuntimeState(userId, canonicalWorkspaceId)
+  const state = workspaceRuntimeState(userId, workspaceId)
   const workspaceRuntimeId = state.currentWorkspaceRuntimeId ?? startWorkspaceRuntimeEpoch(state)
   state.nextMembershipGeneration += 1
   state.members.set(clientId, state.nextMembershipGeneration)
-  return { workspaceId: canonicalWorkspaceId, workspaceRuntimeId, generation: state.nextMembershipGeneration }
+  return { workspaceId, workspaceRuntimeId, generation: state.nextMembershipGeneration }
 }
 
 export function releaseWorkspaceRuntime(
   userId: string,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
   clientId: string,
 ): {
@@ -272,9 +265,10 @@ export function listWorkspaceRuntimes(userId: string): WorkspaceRuntimeEntry[] {
 export function replaceWorkspaceRuntimeMembershipsForClient(
   userId: string,
   clientId: string,
-  workspaceIds: readonly string[],
+  workspaceIds: readonly WorkspaceId[],
 ): WorkspaceRuntimeEntry[] {
-  const desired = new Set(decodeWorkspaceRuntimeMembershipDeclaration(clientId, workspaceIds))
+  admitWorkspaceRuntimeMembershipDeclaration(clientId, workspaceIds)
+  const desired = new Set(workspaceIds)
   const states = workspaceRuntimesByUser.get(userId)
   const closed: WorkspaceRuntimeClosedEvent[] = []
   if (states) {
@@ -295,19 +289,25 @@ export function replaceWorkspaceRuntimeMembershipsForClient(
   return listWorkspaceRuntimes(userId)
 }
 
-function decodeWorkspaceRuntimeMembershipDeclaration(clientId: string, workspaceIds: readonly string[]): WorkspaceId[] {
+function admitWorkspaceRuntimeMembershipDeclaration(
+  clientId: string,
+  workspaceIds: readonly WorkspaceId[],
+): void {
   if (!isOpaqueId(clientId)) throw new Error('workspace runtime reconcile requires a valid clientId')
   if (workspaceIds.length > 100) throw new Error('workspace runtime reconcile accepts at most 100 workspace ids')
-  return workspaceIds.map(requiredCanonicalWorkspaceId)
 }
 
-export function isCurrentWorkspaceRuntime(userId: string, workspaceId: string, workspaceRuntimeId: string): boolean {
+export function isCurrentWorkspaceRuntime(
+  userId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+): boolean {
   return workspaceRuntimesByUser.get(userId)?.get(workspaceId)?.currentWorkspaceRuntimeId === workspaceRuntimeId
 }
 
 export function workspaceRuntimeHasGitCapability(
   userId: string,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
 ): boolean {
   const state = workspaceRuntimesByUser.get(userId)?.get(workspaceId)
@@ -321,7 +321,7 @@ export function workspaceRuntimeHasGitCapability(
 
 export function workspaceProbeStateForRuntime(
   userId: string,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
 ): WorkspaceProbeState | null {
   const state = workspaceRuntimesByUser.get(userId)?.get(workspaceId)
@@ -330,7 +330,7 @@ export function workspaceProbeStateForRuntime(
 
 export function commitWorkspaceProbeState(input: {
   userId: string
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   probe: WorkspaceSettledProbeState
 }): boolean {
@@ -343,7 +343,7 @@ export function commitWorkspaceProbeState(input: {
 
 export function commitOrReadInitialWorkspaceProbeState(input: {
   userId: string
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   probe: WorkspaceSettledProbeState
 }): WorkspaceProbeState | null {
@@ -355,7 +355,7 @@ export function commitOrReadInitialWorkspaceProbeState(input: {
 
 export async function runSerializedInitialWorkspaceProbe(input: {
   userId: string
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   probe: () => Promise<WorkspaceSettledProbeState>
   beforeCommit?: (input: { before: WorkspaceProbeState; after: WorkspaceSettledProbeState }) => Promise<void>
@@ -384,7 +384,7 @@ export async function runSerializedInitialWorkspaceProbe(input: {
 
 export async function runSerializedWorkspaceRefresh(input: {
   userId: string
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   probe: () => Promise<WorkspaceSettledProbeState>
   beforeCommit?: (input: { before: WorkspaceProbeState; after: WorkspaceSettledProbeState }) => Promise<void>
@@ -418,7 +418,7 @@ export async function runSerializedWorkspaceRefresh(input: {
 }
 
 async function runSerializedWorkspaceLifecycleOperation<T>(
-  input: { userId: string; workspaceId: string; workspaceRuntimeId: string },
+  input: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string },
   operation: (state: WorkspaceRuntimeState) => Promise<T>,
 ): Promise<T | null> {
   const state = workspaceRuntimesByUser.get(input.userId)?.get(input.workspaceId)
@@ -441,7 +441,7 @@ async function runSerializedWorkspaceLifecycleOperation<T>(
 }
 
 function releaseWorkspaceLifecycleOperation(
-  input: { userId: string; workspaceId: string; workspaceRuntimeId: string },
+  input: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string },
   state: WorkspaceRuntimeState,
 ): void {
   state.activeWorkspaceLifecycleOperations -= 1
@@ -474,7 +474,7 @@ function exposedWorkspaceProbe(state: WorkspaceRuntimeState): WorkspaceProbeStat
 
 export function isCurrentWorkspaceRuntimeMembership(
   userId: string,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
   clientId: string,
 ): boolean {

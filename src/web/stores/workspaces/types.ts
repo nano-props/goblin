@@ -297,16 +297,16 @@ interface WorkspaceLifecycleActions {
    * phase — the server starts a newer monotonic attempt.
    * Returns the new outcome, or `null` for non-remote ids.
    */
-  retryRemoteWorkspaceConnection: (id: string) => Promise<{ ok: boolean; reason?: string } | null>
+  retryRemoteWorkspaceConnection: (id: WorkspaceId) => Promise<{ ok: boolean; reason?: string } | null>
   /** Updates the selected target's workspace pane tab type. The store does not project
    *  against terminal session count, worktree presence, or opened workspace pane tabs;
    *  the UI resolves the active pane at read time so session restore preserves
    *  target-scoped user intent. */
-  setWorkspacePaneTab: (id: string, branch: string, tab: WorkspacePaneTabType | null) => void
+  setWorkspacePaneTab: (id: WorkspaceId, branch: string, tab: WorkspacePaneTabType | null) => void
   setWorkspacePaneTabForTarget: (target: WorkspacePaneTabsTarget, tab: WorkspacePaneTabType | null) => void
-  setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
-  setLastResult: (id: string, result: ExecResult, workspaceRuntimeId: string, options?: RepoResultEventOptions) => void
-  clearEvents: (id: string, eventIds: number[]) => void
+  setBranchViewMode: (id: WorkspaceId, viewMode: BranchViewMode) => void
+  setLastResult: (id: WorkspaceId, result: ExecResult, workspaceRuntimeId: string, options?: RepoResultEventOptions) => void
+  clearEvents: (id: WorkspaceId, eventIds: number[]) => void
   hydrateRestoredWorkspaceRuntime: (
     runtime: WorkspaceRuntimeRestoreSnapshot,
     options?: WorkspaceHydrationOptions,
@@ -315,19 +315,19 @@ interface WorkspaceLifecycleActions {
   /** Clear the fetchFailed flag — called by manual fetch success and
    *  by an explicit refresh, so a stale badge doesn't follow the user
    *  around forever. */
-  clearFetchFailed: (id: string, workspaceRuntimeId: string) => void
+  clearFetchFailed: (id: WorkspaceId, workspaceRuntimeId: string) => void
 }
 
 interface RepoMutationActions {
   runBranchAction: (
-    id: string,
+    id: WorkspaceId,
     action: RepoBranchAction,
     options?: RunBranchActionOptions,
   ) => Promise<ExecResult | null>
   /** Fire-and-forget submission for branch actions whose UI should close
    *  immediately and let repo activity/toasts carry completion. This only
    *  triggers submission; callers should not treat it as accepted/completed. */
-  submitBranchAction: (id: string, action: RepoBranchAction, options?: RunBranchActionOptions) => void
+  submitBranchAction: (id: WorkspaceId, action: RepoBranchAction, options?: RunBranchActionOptions) => void
 }
 
 export interface WorkspacesStore

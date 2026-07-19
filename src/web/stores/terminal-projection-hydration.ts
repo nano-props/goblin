@@ -7,6 +7,7 @@
 import { useMemo } from 'react'
 import { create } from 'zustand'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const DEFAULT_REFRESH_COOLDOWN_MS = 2000
 
@@ -25,10 +26,10 @@ interface TerminalProjectionHydrationState {
   hydrationByWorkspace: Map<string, TerminalProjectionHydrationEntry>
   /** workspaceId -> ms-since-epoch recorded by the latest successful projection hydrate. */
   refreshedAtByWorkspace: Map<string, number>
-  beginProjectionHydration: (workspaceId: string, workspaceRuntimeId: string) => void
-  markProjectionReady: (workspaceId: string, workspaceRuntimeId: string) => void
-  markProjectionFailed: (workspaceId: string, workspaceRuntimeId: string, errorMessage?: string) => void
-  shouldRefreshProjection: (workspaceId: string) => boolean
+  beginProjectionHydration: (workspaceId: WorkspaceId, workspaceRuntimeId: string) => void
+  markProjectionReady: (workspaceId: WorkspaceId, workspaceRuntimeId: string) => void
+  markProjectionFailed: (workspaceId: WorkspaceId, workspaceRuntimeId: string, errorMessage?: string) => void
+  shouldRefreshProjection: (workspaceId: WorkspaceId) => boolean
 }
 
 export const useTerminalProjectionHydrationStore = create<TerminalProjectionHydrationState>((set, get) => ({
@@ -76,14 +77,14 @@ export const useTerminalProjectionHydrationStore = create<TerminalProjectionHydr
 }))
 
 export function useTerminalProjectionHydrationPhase(
-  workspaceId: string | null | undefined,
+  workspaceId: WorkspaceId | null | undefined,
   workspaceRuntimeId: string | null | undefined,
 ): TerminalProjectionHydrationPhase {
   return useTerminalProjectionHydrationEntry(workspaceId, workspaceRuntimeId).phase
 }
 
 export function useTerminalProjectionHydrationEntry(
-  workspaceId: string | null | undefined,
+  workspaceId: WorkspaceId | null | undefined,
   workspaceRuntimeId: string | null | undefined,
 ): TerminalProjectionHydrationEntry {
   const hydrationByWorkspace = useTerminalProjectionHydrationStore((s) => s.hydrationByWorkspace)
@@ -95,7 +96,7 @@ export function useTerminalProjectionHydrationEntry(
 }
 
 export function useIsInitialTerminalProjectionHydrating(
-  workspaceId: string | null | undefined,
+  workspaceId: WorkspaceId | null | undefined,
   workspaceRuntimeId: string | null | undefined,
 ): boolean {
   const hydrationByWorkspace = useTerminalProjectionHydrationStore((s) => s.hydrationByWorkspace)

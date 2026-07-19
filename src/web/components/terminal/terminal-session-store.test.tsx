@@ -7,6 +7,7 @@
 import { useState } from 'react'
 import { describe, expect, test } from 'vitest'
 import { act } from '@testing-library/react'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   EMPTY_TERMINAL_SNAPSHOT,
@@ -32,6 +33,7 @@ import type {
 
 const WORKTREE_KEY = 'wt:1'
 const SESSION_ID = 'session:1'
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 
 function makeReadContext(overrides: Partial<TerminalWorktreeSnapshot> = {}): TerminalSessionReadContextValue {
   const snapshot: TerminalWorktreeSnapshot = {
@@ -225,7 +227,7 @@ describe('null key returns empty-derived values', () => {
 
   test('non-empty repo bell count query still requires the read provider', () => {
     function Probe() {
-      useWorkspaceTerminalBellCounts(['/repo'])
+      useWorkspaceTerminalBellCounts([WORKSPACE_ID])
       return null
     }
     expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')

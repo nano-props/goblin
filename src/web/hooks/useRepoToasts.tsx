@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { toast } from 'sonner'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -38,7 +39,7 @@ const WORKTREE_BOOTSTRAP_PATH_SUMMARY_KEYS: Record<
 const WORKTREE_BOOTSTRAP_MORE_SUFFIX_KEY = 'worktree-bootstrap.summary.more-suffix'
 const WORKTREE_BOOTSTRAP_SETUP_KEY = 'worktree-bootstrap.summary.setup'
 
-export function useRepoToasts(repoId: string) {
+export function useRepoToasts(repoId: WorkspaceId) {
   const t = useT()
   const events = useWorkspacesStore((s) => {
     const workspace = s.workspaces[repoId]

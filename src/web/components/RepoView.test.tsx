@@ -237,7 +237,7 @@ vi.mock('#/web/components/Layout.tsx', () => ({
   ),
 }))
 
-const REPO_ID = 'goblin+file:///tmp/repo-view-test'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-view-test')
 
 function filesystemWorkspaceProbe() {
   return {

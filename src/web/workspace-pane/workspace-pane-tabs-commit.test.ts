@@ -22,8 +22,9 @@ import {
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-tabs-commit-repo'
+const REPO_ROOT = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tabs-commit-repo')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const NEXT_WORKSPACE_RUNTIME_ID = 'repo-runtime-next'
 const BRANCH_NAME = 'feature/worktree'

@@ -4,6 +4,7 @@
 // in one data path.
 
 import { useMemo } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { visibleBranches } from '#/web/stores/workspaces/branch-view-mode.ts'
 import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
@@ -18,7 +19,7 @@ import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/R
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 
 interface Props {
-  repoId: string
+  repoId: WorkspaceId
   onSelectBranch?: (branch: string) => void
   currentBranchName?: string | null
   /** Run after the user picks a row. Kept optional for embedded

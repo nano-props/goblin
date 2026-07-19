@@ -6,11 +6,14 @@ import {
   workspacePaneDurableLayoutsEqual,
 } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 describe('workspace pane layout repository normalization', () => {
   test('preserves explicit empty targets and removes duplicate and invalid static entries', () => {
     expect(
-      normalizeWorkspacePaneDurableLayout('/repo', {
+      normalizeWorkspacePaneDurableLayout(WORKSPACE_ID, {
         entries: [
           { target: { kind: 'git-branch', branch: 'empty' }, tabs: [] },
           {
@@ -38,7 +41,7 @@ describe('workspace pane layout repository normalization', () => {
     }
     expect(
       workspacePaneDurableLayoutsEqual(
-        '/repo',
+        WORKSPACE_ID,
         { entries: [entry] },
         {
           entries: [{ ...entry, tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('status')] }],

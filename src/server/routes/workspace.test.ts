@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createWorkspaceRoutes } from '#/server/routes/workspace.ts'
 import { clearWorkspaceRuntimesForUser, commitWorkspaceProbeState } from '#/server/modules/workspace-runtimes.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const USER_ID = 'workspace-route-user'
-const WORKSPACE_ID = 'goblin+file:///tmp/workspace-route'
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/workspace-route')
 const CLIENT_ID = 'workspace-route-client'
 
 const mocks = vi.hoisted(() => ({
@@ -128,8 +129,8 @@ describe('workspace routes', () => {
 
   test('reconciles one client complete workspace declaration atomically', async () => {
     const app = createTestWorkspaceRoutes()
-    const oldWorkspaceId = 'goblin+file:///tmp/workspace-old'
-    const nextWorkspaceId = 'goblin+file:///tmp/workspace-next'
+    const oldWorkspaceId = workspaceIdForTest('goblin+file:///tmp/workspace-old')
+    const nextWorkspaceId = workspaceIdForTest('goblin+file:///tmp/workspace-next')
     await post(app, '/runtime-open', { workspaceId: oldWorkspaceId, clientId: CLIENT_ID })
 
     const response = await post(app, '/runtime-reconcile', {
@@ -138,6 +139,22 @@ describe('workspace routes', () => {
     })
     await expect(response.json()).resolves.toMatchObject({
       runtimes: [{ workspaceId: nextWorkspaceId, workspaceRuntimeId: expect.stringMatching(/^workspace-runtime-/) }],
+    })
+  })
+
+  test('keeps cross-platform canonical identities valid until an execution boundary', async () => {
+    const app = createTestWorkspaceRoutes()
+    const windowsWorkspaceId = workspaceIdForTest('goblin+file:///C:/workspace')
+
+    const response = await post(app, '/runtime-reconcile', {
+      clientId: CLIENT_ID,
+      workspaceIds: [windowsWorkspaceId],
+    })
+
+    await expect(response.json()).resolves.toMatchObject({
+      runtimes: [
+        { workspaceId: windowsWorkspaceId, workspaceRuntimeId: expect.stringMatching(/^workspace-runtime-/) },
+      ],
     })
   })
 

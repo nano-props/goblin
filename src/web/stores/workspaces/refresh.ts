@@ -13,6 +13,7 @@ import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import { refreshWorkspace } from '#/web/workspace-client.ts'
 import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface RepoRefreshStoreAccess {
   set: WorkspacesSet
@@ -21,7 +22,7 @@ export interface RepoRefreshStoreAccess {
 
 async function runRepoProjectionReadModelRefresh(
   store: RepoRefreshStoreAccess,
-  id: string,
+  id: WorkspaceId,
   workspaceRuntimeId: string,
 ): Promise<void> {
   updateIfFresh(store.set, id, workspaceRuntimeId, (r) => {
@@ -73,7 +74,7 @@ async function runRepoProjectionReadModelRefresh(
 
 export async function requestRepoProjectionReadModelRefresh(
   store: RepoRefreshStoreAccess,
-  id: string,
+  id: WorkspaceId,
   options?: { workspaceRuntimeId?: string },
 ): Promise<void> {
   const resolved = resolveActionWorkspaceRuntimeId(store.get, id, options?.workspaceRuntimeId)
@@ -92,7 +93,7 @@ export async function requestRepoProjectionReadModelRefresh(
  *  so there is one source of truth for post-sync cleanup. */
 export async function runManualRepoSync(
   store: RepoRefreshStoreAccess,
-  id: string,
+  id: WorkspaceId,
   options?: { workspaceRuntimeId?: string },
 ): Promise<void> {
   const resolved = resolveActionWorkspaceRuntimeId(store.get, id, options?.workspaceRuntimeId)

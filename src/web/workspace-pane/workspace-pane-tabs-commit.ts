@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
 import { goblinLog } from '#/web/logger.ts'
@@ -37,7 +38,7 @@ export interface WorkspacePaneTabsMutationSuccess {
 export interface WorkspacePaneTabsMutationFailure {
   ok: false
   operation: WorkspacePaneTabsMutationOperation
-  workspaceId: string
+  workspaceId: WorkspaceId
   branchName: string | null
   worktreePath: string | null
   message: string
@@ -95,7 +96,7 @@ const workspacePaneTabsInteractionBlocker = createWorkspacePaneTabsInteractionBl
  */
 export function reportWorkspacePaneTabsFailure(input: {
   operation: WorkspacePaneTabsMutationOperation
-  workspaceId: string
+  workspaceId: WorkspaceId
   branchName: string | null
   worktreePath: string | null
   error: unknown
@@ -186,7 +187,7 @@ async function updateWorkspacePaneTabsNow(
 }
 
 export function writeCanonicalWorkspacePaneTabsSnapshot(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
   snapshot: WorkspacePaneTabsSnapshot,
   queryClient?: QueryClient,

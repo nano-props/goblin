@@ -30,6 +30,7 @@ import {
 } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const projectionMocks = vi.hoisted(() => ({
   reconcileServerSessionsSnapshot: vi.fn(() => true),
@@ -847,11 +848,11 @@ describe('AppRuntimeProjectionProvider', () => {
   })
 })
 
-function renderRuntimeProvider(currentRepoId: string | null) {
+function renderRuntimeProvider(currentRepoId: WorkspaceId | null) {
   return renderInJsdom(<RuntimeProbe currentRepoId={currentRepoId} />)
 }
 
-function RuntimeProbe({ currentRepoId }: { currentRepoId: string | null }) {
+function RuntimeProbe({ currentRepoId }: { currentRepoId: WorkspaceId | null }) {
   return (
     <AppRuntimeProjectionProvider currentRepoId={currentRepoId}>
       <span>probe</span>

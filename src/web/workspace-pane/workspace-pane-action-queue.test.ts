@@ -11,10 +11,14 @@ import {
   workspacePaneRouteIntentPending,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
+const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 const TARGET = {
   kind: 'git-worktree' as const,
-  workspaceId: 'goblin+file:///repo',
+  workspaceId: WORKSPACE_ID,
   workspaceRuntimeId: 'repo-runtime-1',
   worktreePath: '/worktree-a',
 } as const
@@ -43,7 +47,7 @@ describe('workspace pane action queue', () => {
   test('serializes workspace-scoped actions without inventing a branch', async () => {
     const workspaceTarget = {
       kind: 'workspace-root' as const,
-      workspaceId: 'goblin+file:///workspace',
+      workspaceId: OTHER_WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-1',
     }
     const workspaceOrder: string[] = []
@@ -101,14 +105,14 @@ describe('workspace pane action queue', () => {
     expect(
       workspacePaneActionTargetKey({
         kind: 'workspace-root',
-        workspaceId: 'goblin+file:///repo',
+        workspaceId: WORKSPACE_ID,
         workspaceRuntimeId: 'runtime',
       }),
     ).toBe('goblin+file:///repo\0runtime\0workspace-root')
     expect(
       workspacePaneActionTargetKey({
         kind: 'git-branch',
-        workspaceId: 'goblin+file:///repo',
+        workspaceId: WORKSPACE_ID,
         workspaceRuntimeId: 'runtime',
         branchName: 'main',
       }),
@@ -116,7 +120,7 @@ describe('workspace pane action queue', () => {
     expect(
       workspacePaneActionTargetKey({
         kind: 'git-worktree' as const,
-        workspaceId: 'goblin+file:///repo',
+        workspaceId: WORKSPACE_ID,
         workspaceRuntimeId: 'runtime',
         worktreePath: '/repo-worktree',
       }),
@@ -124,7 +128,7 @@ describe('workspace pane action queue', () => {
   })
 
   test('keeps a detached Git worktree in its worktree queue', () => {
-    const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')
+    const workspaceId = canonicalWorkspaceLocator(WORKSPACE_ID)
     const root = canonicalWorkspaceLocator('goblin+file:///repo-detached')
     if (!workspaceId || !root) throw new Error('invalid mock filesystem target')
 

@@ -1,4 +1,5 @@
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { ExecResult } from '#/web/types.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/workspaces/branch-action-types.ts'
 
@@ -19,11 +20,11 @@ export function removeWorktreeNeedsForceConfirm(
 }
 
 export async function dispatchRepoBranchAction(
-  repoId: string,
+  repoId: WorkspaceId,
   workspaceRuntimeId: string,
   action: RepoBranchAction,
   runBranchAction: (
-    id: string,
+    id: WorkspaceId,
     action: RepoBranchAction,
     options?: RunBranchActionOptions,
   ) => Promise<ExecResult | null>,
@@ -42,11 +43,11 @@ export async function dispatchRepoBranchAction(
 }
 
 export async function dispatchRepoUiAction(
-  repoId: string,
+  repoId: WorkspaceId,
   workspaceRuntimeId: string,
   op: string,
   fn: () => Promise<ExecResult>,
-  setLastResult: (repoId: string, result: ExecResult, workspaceRuntimeId: string) => void,
+  setLastResult: (repoId: WorkspaceId, result: ExecResult, workspaceRuntimeId: string) => void,
   options?: {
     silentSuccessOps?: Set<string>
     handleResult?: (result: ExecResult) => boolean

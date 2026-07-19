@@ -1,10 +1,14 @@
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import type { WorkspacesStore } from '#/web/stores/workspaces/types.ts'
-import type { TerminalRuntimeMembershipIndex } from '#/web/components/terminal/types.ts'
+import type {
+  TerminalRuntimeMembership,
+  TerminalRuntimeMembershipIndex,
+} from '#/web/components/terminal/types.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface TerminalRuntimeMembershipEntry {
-  id: string
+  id: WorkspaceId
   workspaceRuntimeId: string
 }
 
@@ -20,11 +24,11 @@ export function useTerminalRuntimeMembershipIndex(): TerminalRuntimeMembershipIn
 export function runtimeMembershipIndexFromEntries(
   entries: readonly TerminalRuntimeMembershipEntry[],
 ): TerminalRuntimeMembershipIndex {
-  const index: TerminalRuntimeMembershipIndex = {}
+  const index = new Map<WorkspaceId, TerminalRuntimeMembership>()
   entries.forEach((repo) => {
-    index[repo.id] = {
+    index.set(repo.id, {
       workspaceRuntimeId: repo.workspaceRuntimeId,
-    }
+    })
   })
   return index
 }
@@ -34,12 +38,9 @@ export function runtimeMembershipIndexEqual(
   b: TerminalRuntimeMembershipIndex,
 ): boolean {
   if (a === b) return true
-  const aKeys = Object.keys(a)
-  const bKeys = Object.keys(b)
-  if (aKeys.length !== bKeys.length) return false
-  for (const repoRoot of aKeys) {
-    const current = a[repoRoot]
-    const next = b[repoRoot]
+  if (a.size !== b.size) return false
+  for (const [workspaceId, current] of a) {
+    const next = b.get(workspaceId)
     if (!current || !next) return false
     if (current.workspaceRuntimeId !== next.workspaceRuntimeId) return false
   }

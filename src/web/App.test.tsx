@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { App } from '#/web/App.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/example-workspace')
 
 const responsiveMocks = vi.hoisted(() => ({
   mode: 'default' as 'default' | 'compact',
@@ -48,9 +51,9 @@ describe('App workspace membership skeleton', () => {
   })
 
   test('renders the current repository shell when a repository is open', () => {
-    seedRepoShellForTest({ id: 'goblin+file:///tmp/repo' })
+    seedRepoShellForTest({ id: WORKSPACE_ID })
 
-    const { container } = render(<App routeRepoView={{ kind: 'dashboard', repoId: 'goblin+file:///tmp/repo' }} />)
+    const { container } = render(<App routeRepoView={{ kind: 'dashboard', repoId: WORKSPACE_ID }} />)
 
     expect(container.querySelector('[data-testid="repo-view"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="empty-repo-view"]')).toBeNull()

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { realpath } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
-import { parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { parseWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTargetWithConfigFingerprint } from '#/system/ssh/config.ts'
 import { resolveRemoteWorktree } from '#/system/ssh/git.ts'
@@ -29,7 +29,7 @@ import {
 
 export interface ResolvePhysicalWorktreeIdentityInput {
   userId: string
-  repoRoot: string
+  repoRoot: WorkspaceId
   workspaceRuntimeId: string
   worktreePath: string
   signal?: AbortSignal
@@ -38,7 +38,7 @@ export interface ResolvePhysicalWorktreeIdentityInput {
 interface PhysicalWorktreeRuntimeEpoch {
   key: string
   userId: string
-  repoRoot: string
+  repoRoot: WorkspaceId
   workspaceRuntimeId: string
   active: boolean
   abortController: AbortController
@@ -85,7 +85,7 @@ export class PhysicalWorktreeIdentityResolver {
   protected issueCapability(input: {
     identity: PhysicalWorktreeIdentity
     userId: string
-    repoRoot: string
+    repoRoot: WorkspaceId
     workspaceRuntimeId: string
     worktreePath: string
     execution: PhysicalWorktreeExecutionBinding
@@ -391,7 +391,7 @@ export class PhysicalWorktreeIdentityResolver {
     }
   }
 
-  private runtimeAwareRemoteRunner(input: { repoRoot: string; workspaceRuntimeId: string }): RemoteCommandRunner {
+  private runtimeAwareRemoteRunner(input: { repoRoot: WorkspaceId; workspaceRuntimeId: string }): RemoteCommandRunner {
     return async (command, target, options) => {
       const result = await this.deps.runRemoteCommand(command, target, options)
       const runtimeFailure = remoteWorkspaceRuntimeFailureFromCommandResult({
@@ -498,7 +498,7 @@ function validRemoteNamespaceFact(value: string): boolean {
   return value.length > 0 && value.length <= 256 && /^[A-Za-z0-9._:-]+$/u.test(value)
 }
 
-function runtimeKey(input: { userId: string; repoRoot: string; workspaceRuntimeId: string }): string {
+function runtimeKey(input: { userId: string; repoRoot: WorkspaceId; workspaceRuntimeId: string }): string {
   return `${input.userId}\0${input.repoRoot}\0${input.workspaceRuntimeId}`
 }
 

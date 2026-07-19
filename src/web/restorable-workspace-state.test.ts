@@ -386,13 +386,17 @@ describe('restorable-workspace-state', () => {
 })
 
 function branchTargetKey(workspaceId: string, branchName: string): string {
-  return workspacePaneTabsTargetIdentityKey({ kind: 'git-branch', workspaceId, branchName })
+  return workspacePaneTabsTargetIdentityKey({
+    kind: 'git-branch',
+    workspaceId: workspaceIdForTest(workspaceId),
+    branchName,
+  })
 }
 
 function worktreeTargetKey(workspaceId: string, branchName: string, worktreePath: string): string {
   return workspacePaneTabsTargetIdentityKey({
     kind: 'git-worktree',
-    workspaceId,
+    workspaceId: workspaceIdForTest(workspaceId),
     worktreePath,
   })
 }

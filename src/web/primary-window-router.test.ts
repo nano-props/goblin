@@ -55,6 +55,8 @@ const REPO_A_ID = workspaceIdForTest('goblin+file:///repo-a')
 const REPO_B_ID = workspaceIdForTest('goblin+file:///repo-b')
 const MISSING_REPO_ID = workspaceIdForTest('goblin+file:///missing')
 const WORKSPACE_REPO_ID = workspaceIdForTest('goblin+file:///workspace/repo')
+const ROUTE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///route-workspace')
+const DEEP_LINK_WORKSPACE_ID = workspaceIdForTest('goblin+file:///deep-link-workspace')
 
 beforeEach(() => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
@@ -110,13 +112,13 @@ describe('primary window initial route', () => {
 
 describe('repo route view derivation', () => {
   test('derives a routed repo view directly from the URL slug without store hydration', () => {
-    const repoSlug = repoSlugFromId('/deep-link/repo')
+    const repoSlug = repoSlugFromId(DEEP_LINK_WORKSPACE_ID)
 
     expect(
       repoRouteViewFromSlugChildRoute(repoSlug, { dashboard: true, branchSlug: null, newWorktree: false }),
     ).toEqual({
       kind: 'dashboard',
-      repoId: '/deep-link/repo',
+      repoId: DEEP_LINK_WORKSPACE_ID,
     })
   })
 
@@ -125,34 +127,34 @@ describe('repo route view derivation', () => {
   })
 
   test('uses the repo root as an empty route view', () => {
-    expect(repoRouteViewFromChildRoute('/repo', { dashboard: false, branchSlug: null, newWorktree: false })).toEqual({
+    expect(repoRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, { dashboard: false, branchSlug: null, newWorktree: false })).toEqual({
       kind: 'empty',
-      repoId: '/repo',
+      repoId: ROUTE_WORKSPACE_ID,
     })
   })
 
   test('maps repo child routes to stable repo route views', () => {
-    expect(repoRouteViewFromChildRoute('/repo', { dashboard: true, branchSlug: null, newWorktree: false })).toEqual({
+    expect(repoRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, { dashboard: true, branchSlug: null, newWorktree: false })).toEqual({
       kind: 'dashboard',
-      repoId: '/repo',
+      repoId: ROUTE_WORKSPACE_ID,
     })
     expect(
-      repoRouteViewFromChildRoute('/repo', {
+      repoRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, {
         dashboard: false,
         workspace: true,
         branchSlug: null,
         newWorktree: false,
       }),
-    ).toEqual({ kind: 'workspace-root', repoId: '/repo' })
-    expect(repoRouteViewFromChildRoute('/repo', { dashboard: false, branchSlug: null, newWorktree: true })).toEqual({
+    ).toEqual({ kind: 'workspace-root', repoId: ROUTE_WORKSPACE_ID })
+    expect(repoRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, { dashboard: false, branchSlug: null, newWorktree: true })).toEqual({
       kind: 'newWorktree',
-      repoId: '/repo',
+      repoId: ROUTE_WORKSPACE_ID,
     })
     expect(
-      repoRouteViewFromChildRoute('/repo', { dashboard: false, branchSlug: 'ZmVhdHVyZS9h', newWorktree: false }),
+      repoRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, { dashboard: false, branchSlug: 'ZmVhdHVyZS9h', newWorktree: false }),
     ).toEqual({
       kind: 'branch',
-      repoId: '/repo',
+      repoId: ROUTE_WORKSPACE_ID,
       branchName: 'feature/a',
       workspacePaneRoute: null,
     })
@@ -160,7 +162,7 @@ describe('repo route view derivation', () => {
 
   test('maps branch workspace pane child routes to stable route views', () => {
     expect(
-      repoRouteViewFromChildRoute('/repo', {
+      repoRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, {
         dashboard: false,
         branchSlug: 'ZmVhdHVyZS9h',
         tabKey: 'history',
@@ -168,12 +170,12 @@ describe('repo route view derivation', () => {
       }),
     ).toEqual({
       kind: 'branch',
-      repoId: '/repo',
+      repoId: ROUTE_WORKSPACE_ID,
       branchName: 'feature/a',
       workspacePaneRoute: { kind: 'static', tab: 'history' },
     })
     expect(
-      repoRouteViewFromChildRoute('/repo', {
+      repoRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, {
         dashboard: false,
         branchSlug: 'ZmVhdHVyZS9h',
         tabKey: 'not-a-tab',
@@ -181,12 +183,12 @@ describe('repo route view derivation', () => {
       }),
     ).toEqual({
       kind: 'branch',
-      repoId: '/repo',
+      repoId: ROUTE_WORKSPACE_ID,
       branchName: 'feature/a',
       workspacePaneRoute: { kind: 'invalid-static', tabKey: 'not-a-tab' },
     })
     expect(
-      repoRouteViewFromChildRoute('/repo', {
+      repoRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, {
         dashboard: false,
         branchSlug: 'ZmVhdHVyZS9h',
         terminalSessionId: 'term-111111111111111111111',
@@ -194,7 +196,7 @@ describe('repo route view derivation', () => {
       }),
     ).toEqual({
       kind: 'branch',
-      repoId: '/repo',
+      repoId: ROUTE_WORKSPACE_ID,
       branchName: 'feature/a',
       workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
     })
@@ -308,12 +310,12 @@ describe('primary window route callback facades', () => {
     const layoutCallbacks = primaryWindowLayoutRouteCallbacks(routeActions)
 
     routerCallbacks.onRouteSettingsPageChange('general')
-    routerCallbacks.onOpenRepoRoot('/repo')
-    routerCallbacks.onOpenRepoDashboard('/repo')
-    routerCallbacks.onOpenRepoBranch('/repo', 'main')
-    routerCallbacks.onOpenRepoNewWorktree('/repo')
-    routerCallbacks.onCancelRepoNewWorktree('/repo')
-    routerCallbacks.onReplaceRepoBranch('/repo', 'main')
+    routerCallbacks.onOpenRepoRoot(ROUTE_WORKSPACE_ID)
+    routerCallbacks.onOpenRepoDashboard(ROUTE_WORKSPACE_ID)
+    routerCallbacks.onOpenRepoBranch(ROUTE_WORKSPACE_ID, 'main')
+    routerCallbacks.onOpenRepoNewWorktree(ROUTE_WORKSPACE_ID)
+    routerCallbacks.onCancelRepoNewWorktree(ROUTE_WORKSPACE_ID)
+    routerCallbacks.onReplaceRepoBranch(ROUTE_WORKSPACE_ID, 'main')
     applyPrimaryWindowSettingsRouteChange(routeActions, null)
     layoutCallbacks.navigateToSettingsShortcuts()
     layoutCallbacks.navigateToIndex()
@@ -321,10 +323,10 @@ describe('primary window route callback facades', () => {
     expect(routeActions.openSettings).toHaveBeenNthCalledWith(1, 'general')
     expect(routeActions.openSettings).toHaveBeenNthCalledWith(2, 'shortcuts')
     expect(routeActions.closeSettings).toHaveBeenCalledOnce()
-    expect(routeActions.openRepoRoot).toHaveBeenCalledWith('/repo')
-    expect(routeActions.openRepoDashboard).toHaveBeenCalledWith('/repo')
-    expect(routeActions.openRepoNewWorktree).toHaveBeenCalledWith('/repo')
-    expect(routeActions.cancelRepoNewWorktree).toHaveBeenCalledWith('/repo')
+    expect(routeActions.openRepoRoot).toHaveBeenCalledWith(ROUTE_WORKSPACE_ID)
+    expect(routeActions.openRepoDashboard).toHaveBeenCalledWith(ROUTE_WORKSPACE_ID)
+    expect(routeActions.openRepoNewWorktree).toHaveBeenCalledWith(ROUTE_WORKSPACE_ID)
+    expect(routeActions.cancelRepoNewWorktree).toHaveBeenCalledWith(ROUTE_WORKSPACE_ID)
     expect(routeActions.openHome).toHaveBeenCalledOnce()
   })
 

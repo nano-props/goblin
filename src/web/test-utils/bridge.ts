@@ -300,7 +300,11 @@ function testWorkspacePaneRuntimeTabTarget(
   return 'kind' in input
     ? input
     : {
-        ...requiredGitWorkspacePaneTabsTarget(input.workspaceId, input.branchName, input.worktreePath),
+        ...requiredGitWorkspacePaneTabsTarget(
+          workspaceIdForTest(input.workspaceId),
+          input.branchName,
+          input.worktreePath,
+        ),
         workspaceRuntimeId: input.workspaceRuntimeId,
       }
 }
@@ -554,7 +558,7 @@ export function installWorkspacePaneTabsTestBridge(
         }),
       )
       const snapshot = commitServerSnapshot()
-      writeWorkspacePaneTabsSnapshotQueryData(input.workspaceId, input.workspaceRuntimeId, snapshot)
+      writeWorkspacePaneTabsSnapshotQueryData(target.workspaceId, input.workspaceRuntimeId, snapshot)
     },
     removeRuntimeTab: (input) => {
       const target = testWorkspacePaneRuntimeTabTarget(input)
@@ -1330,6 +1334,7 @@ export function seedRepoWithReadModelForTest(options: {
   remoteLifecycle?: RemoteWorkspaceConnectionLifecycle | null
   workspaceProbe?: WorkspaceProbeState
 }): WorkspaceState {
+  const workspaceId = workspaceIdForTest(options.id)
   const branchesWithSnapshotWorktreeMetadata = options.branchSnapshots ?? options.branches ?? []
   const branches = options.branches ?? stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
   const status = options.status ?? []
@@ -1340,7 +1345,7 @@ export function seedRepoWithReadModelForTest(options: {
       ? {
           [workspacePaneTabsTargetIdentityKey(
             requiredGitWorkspacePaneTabsTarget(
-              options.id,
+              workspaceId,
               currentBranchName,
               branchesWithSnapshotWorktreeMetadata.find((branch) => branch.name === currentBranchName)?.worktree
                 ?.path ?? null,
@@ -1376,7 +1381,7 @@ export function seedRepoWithReadModelForTest(options: {
     const branch = branchesWithSnapshotWorktreeMetadata.find((candidate) => candidate.name === branchName)
     if (!branch) continue
     setWorkspacePaneTabsForTargetQueryData({
-      ...requiredGitWorkspacePaneTabsTarget(options.id, branchName, branch.worktree?.path ?? null),
+      ...requiredGitWorkspacePaneTabsTarget(repo.id, branchName, branch.worktree?.path ?? null),
       workspaceRuntimeId: repo.workspaceRuntimeId,
       tabs,
     })

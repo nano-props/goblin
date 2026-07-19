@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
 import { isWorkspacePaneRuntimeTabEntry, type WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsEntry, WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
@@ -21,16 +22,16 @@ export interface WorkspacePaneTabsTargetProjection {
 }
 
 type WorkspacePaneTabsReadTarget =
-  WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: string; branchName: null; worktreePath: null }
+  WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: WorkspaceId; branchName: null; worktreePath: null }
 
 let workspacePaneTabsPersistenceVersion = 0
 const workspacePaneTabsPersistenceListeners = new Set<() => void>()
 
-export function workspacePaneTabsQueryKey(workspaceId: string, workspaceRuntimeId: string) {
+export function workspacePaneTabsQueryKey(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
   return ['workspace-pane-tabs', workspaceId, workspaceRuntimeId] as const
 }
 
-export function workspacePaneTabsQueryOptions(workspaceId: string, workspaceRuntimeId: string) {
+export function workspacePaneTabsQueryOptions(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
   return queryOptions({
     queryKey: workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
     queryFn: async () => await fetchWorkspacePaneTabsSnapshot(workspaceId, workspaceRuntimeId),
@@ -45,7 +46,7 @@ export function workspacePaneTabsQueryOptions(workspaceId: string, workspaceRunt
 }
 
 export function useWorkspacePaneTabsQuery(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
   options: { enabled?: boolean } = {},
 ) {
@@ -101,7 +102,7 @@ export function workspacePaneTabsForTargetFromQueryData(
  * revision. Returns whether the snapshot was accepted.
  */
 export function writeWorkspacePaneTabsSnapshotQueryData(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
   snapshot: WorkspacePaneTabsSnapshot | null,
   queryClient: QueryClient = primaryWindowQueryClient,
@@ -121,7 +122,7 @@ export function writeWorkspacePaneTabsSnapshotQueryData(
 }
 
 export function refreshWorkspacePaneTabs(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
@@ -131,7 +132,7 @@ export function refreshWorkspacePaneTabs(
 }
 
 export async function refreshWorkspacePaneTabsQueryData(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): Promise<void> {
@@ -139,7 +140,7 @@ export async function refreshWorkspacePaneTabsQueryData(
   writeWorkspacePaneTabsSnapshotQueryData(workspaceId, workspaceRuntimeId, snapshot, queryClient)
 }
 
-export function clearWorkspacePaneTabsProjectionState(workspaceId: string, workspaceRuntimeId: string): void {
+export function clearWorkspacePaneTabsProjectionState(workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
   primaryWindowQueryClient.removeQueries({
     queryKey: workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
     exact: true,
@@ -172,7 +173,7 @@ export function workspacePaneTabsPersistenceSnapshot(): number {
   return workspacePaneTabsPersistenceVersion
 }
 
-export function workspacePaneTabsProjectionRevision(workspaceId: string, workspaceRuntimeId: string): number | null {
+export function workspacePaneTabsProjectionRevision(workspaceId: WorkspaceId, workspaceRuntimeId: string): number | null {
   return (
     primaryWindowQueryClient.getQueryData<WorkspacePaneTabsSnapshot>(
       workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
@@ -186,7 +187,7 @@ function notifyWorkspacePaneTabsPersistenceChanged(): void {
 }
 
 async function fetchWorkspacePaneTabsSnapshot(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
 ): Promise<WorkspacePaneTabsSnapshot> {
   return normalizeWorkspacePaneTabsSnapshot(

@@ -166,7 +166,7 @@ function gitWorktreeFilesystemTarget(repo: WorkspaceState, rootPath: string, bra
 
 describe('RepoWorkspace', () => {
   test('renders a remote non-Git workspace with canonical Status, Files, and Terminal targets', async () => {
-    const workspaceId = 'goblin+ssh://example/srv/workspace'
+    const workspaceId = workspaceIdForTest('goblin+ssh://example/srv/workspace')
     const repo = seedRepoWithReadModelForTest({
       id: workspaceId,
       branches: [],
@@ -205,7 +205,7 @@ describe('RepoWorkspace', () => {
   })
 
   test('keeps the selected workspace-root pane when Git capability becomes available', async () => {
-    const workspaceId = 'goblin+ssh://example/workspace'
+    const workspaceId = workspaceIdForTest('goblin+ssh://example/workspace')
     seedRepoWithReadModelForTest({
       id: workspaceId,
       branches: [],
@@ -260,7 +260,7 @@ describe('RepoWorkspace', () => {
   })
 
   test('restores a detached worktree terminal route into the shared runtime surface', async () => {
-    const workspaceId = 'goblin+file:///workspace/repo'
+    const workspaceId = workspaceIdForTest('goblin+file:///workspace/repo')
     const worktreePath = '/workspace/detached'
     const terminalSessionId = 'term-333333333333333333333'
     const repo = seedRepoWithReadModelForTest({
@@ -308,7 +308,7 @@ describe('RepoWorkspace', () => {
 
   test('uses the shared compact workspace toolbar back action for a non-Git workspace', () => {
     responsiveMocks.compact = true
-    const workspaceId = 'goblin+file:///tmp/plain-compact-workspace'
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-compact-workspace')
     seedRepoWithReadModelForTest({
       id: workspaceId,
       branches: [],
@@ -338,7 +338,7 @@ describe('RepoWorkspace', () => {
   })
 
   test('renders directory overview data in the non-Git Status tab without a Git projection', () => {
-    const workspaceId = 'goblin+file:///tmp/plain-status-workspace'
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-status-workspace')
     seedRepoWithReadModelForTest({
       id: workspaceId,
       branches: [],
@@ -376,7 +376,7 @@ describe('RepoWorkspace', () => {
   })
 
   test('does not expose a terminal surface when the workspace capability is unavailable', () => {
-    const workspaceId = 'goblin+file:///tmp/files-only-workspace'
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/files-only-workspace')
     seedRepoWithReadModelForTest({
       id: workspaceId,
       branches: [],
@@ -404,7 +404,7 @@ describe('RepoWorkspace', () => {
   })
 
   test('selects an existing workspace-root terminal after Files without a route transition', async () => {
-    const workspaceId = 'goblin+file:///tmp/plain-terminal-workspace'
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-terminal-workspace')
     const terminalSessionId = 'term-333333333333333333333'
     const repo = seedRepoWithReadModelForTest({
       id: workspaceId,
@@ -503,7 +503,7 @@ describe('RepoWorkspace', () => {
   })
 
   test('renders the shared empty pane when every workspace-root tab is closed', () => {
-    const workspaceId = 'goblin+file:///tmp/empty-plain-workspace'
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/empty-plain-workspace')
     const repo = seedRepoWithReadModelForTest({
       id: workspaceId,
       branches: [],

@@ -1,10 +1,11 @@
 import { terminalGitWorktreePresentation, type TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitHead } from '#/shared/git-head.ts'
 import type { RuntimeWorkspacePaneTarget, WorkspaceCapabilities } from '#/shared/workspace-runtime.ts'
 import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 interface WorkspacePaneSurfaceTargetBase {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   capabilities: WorkspaceCapabilities
 }
@@ -38,7 +39,7 @@ export function workspacePaneFilesystemTerminalBase(target: WorkspacePaneFilesys
 }
 
 export function workspacePaneTerminalBaseFromCoordinates(input: {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string | null
   rootPath: string

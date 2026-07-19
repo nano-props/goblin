@@ -1,4 +1,5 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitHead } from '#/shared/git-head.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import {
@@ -58,7 +59,7 @@ import {
 import { terminalLog } from '#/web/logger.ts'
 
 export interface CloseWorkspacePaneTabActionOptions {
-  workspaceId: string | null
+  workspaceId: WorkspaceId | null
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
@@ -310,7 +311,7 @@ function terminalBaseForPaneModel(target: RepoWorkspaceTabModel): TerminalSessio
 }
 
 function openWorkspacePaneRuntimeCloseConfirm(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   request: WorkspacePaneRuntimeTabCloseConfirmRequest | null,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
   selectedIdentity: string | null,

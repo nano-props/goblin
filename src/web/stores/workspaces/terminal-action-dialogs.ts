@@ -1,9 +1,10 @@
 import { create } from 'zustand'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface TerminalCloseConfirmPayload {
-  readonly workspaceId: string
+  readonly workspaceId: WorkspaceId
   readonly targetIdentity: string
   readonly selectedIdentity: string | null
   readonly workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined

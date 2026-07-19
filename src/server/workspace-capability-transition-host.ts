@@ -1,9 +1,11 @@
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+
 export type WorkspaceCapabilityTransitionCommitResult =
   { kind: 'committed' } | { kind: 'failed-before-commit'; error: unknown }
 
 export interface WorkspaceCapabilityTransitionCommitInput {
   userId: string
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   assertCurrent: () => void
 }

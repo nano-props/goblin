@@ -19,7 +19,8 @@ import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/sha
 import { localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const LOCAL_WORKSPACE_ENTRY = localWorkspaceSessionEntry(workspaceIdForTest('goblin+file:///repo'))
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
+const LOCAL_WORKSPACE_ENTRY = localWorkspaceSessionEntry(WORKSPACE_ID)
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import {
@@ -33,7 +34,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const commitAdmission = vi.fn()
@@ -57,7 +58,7 @@ describe('workspace pane tabs coordinator queues', () => {
         await coordinator.ensureRuntimeTabForSession({
           userId: 'user-a',
           target: testRuntimeTargetProjection({
-            workspaceId: 'goblin+file:///repo',
+            workspaceId: WORKSPACE_ID,
             branchName: 'main',
             worktreePath: '/repo/worktree',
           }).target,
@@ -83,7 +84,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const commitAdmission = vi.fn()
@@ -98,7 +99,7 @@ describe('workspace pane tabs coordinator queues', () => {
       targetProjection: {
         ...testTargetProjection([
           {
-            workspaceId: 'goblin+file:///repo',
+            workspaceId: WORKSPACE_ID,
             branchName: 'feature/renamed',
             worktreePath: '/repo/worktree',
           },
@@ -112,7 +113,7 @@ describe('workspace pane tabs coordinator queues', () => {
         await coordinator.ensureRuntimeTabForSession({
           userId: 'user-a',
           target: testRuntimeTargetProjection({
-            workspaceId: 'goblin+file:///repo',
+            workspaceId: WORKSPACE_ID,
             branchName: 'feature/old',
             worktreePath: '/repo/worktree',
           }).target,
@@ -137,12 +138,12 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const aggregate = aggregateFor(memoryRepository())
     const projection = testRuntimeTargetProjection({
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: WORKSPACE_ID,
       branchName: 'main',
       worktreePath: '/repo/worktree',
     })
@@ -174,12 +175,12 @@ describe('workspace pane tabs coordinator queues', () => {
           }),
       ),
     ).rejects.toThrow('terminal admission failed')
-    expect(aggregate.activeEpochs('goblin+file:///repo')).toEqual([])
+    expect(aggregate.activeEpochs(WORKSPACE_ID)).toEqual([])
     expect(coordinator.physicalWorktreeTargets(capability.identity)).toEqual([])
     await expect(
       coordinator.listWorkspaceTabs({
         userId: 'user-a',
-        workspaceId: 'goblin+file:///repo',
+        workspaceId: WORKSPACE_ID,
         scope: 'goblin+file:///repo\0runtime-a',
         assertCurrent: () => undefined,
       }),
@@ -201,12 +202,12 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const aggregate = aggregateFor(repository)
     const projection = testRuntimeTargetProjection({
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: WORKSPACE_ID,
       branchName: 'main',
       worktreePath: '/repo/worktree',
     })
@@ -237,7 +238,7 @@ describe('workspace pane tabs coordinator queues', () => {
       ),
     ).rejects.toThrow('snapshot preparation failed')
     expect(commitAdmission).not.toHaveBeenCalled()
-    expect(aggregate.activeEpochs('goblin+file:///repo')).toEqual([])
+    expect(aggregate.activeEpochs(WORKSPACE_ID)).toEqual([])
     expect(coordinator.physicalWorktreeTargets(capability.identity)).toEqual([])
   })
 
@@ -245,10 +246,10 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
-    const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')!
+    const workspaceId = canonicalWorkspaceLocator(WORKSPACE_ID)!
     const projection: WorkspacePaneTargetProjection = {
       target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: 'runtime-a' },
       nativeWorktreePath: '/repo',
@@ -305,10 +306,10 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/detached', {
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
-    const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')!
+    const workspaceId = canonicalWorkspaceLocator(WORKSPACE_ID)!
     const root = canonicalWorkspaceLocator('goblin+file:///repo/detached')!
     const projection: WorkspacePaneTargetProjection = {
       target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId: 'runtime-a', root },
@@ -348,11 +349,11 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
       worktreePath: '/repo',
     })
-    const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')!
+    const workspaceId = canonicalWorkspaceLocator(WORKSPACE_ID)!
     const projection: WorkspacePaneTargetProjection = {
       target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: 'runtime-a' },
       nativeWorktreePath: '/repo',
@@ -409,11 +410,11 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/other', {
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const projection = testRuntimeTargetProjection({
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: WORKSPACE_ID,
       branchName: 'main',
       worktreePath: '/repo/worktree',
     })
@@ -450,11 +451,11 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-b',
     })
     const projection = testRuntimeTargetProjection({
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: WORKSPACE_ID,
       branchName: 'main',
       worktreePath: '/repo/worktree',
     })
@@ -491,12 +492,12 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const targets: TestWorkspacePaneTarget[] = [
       {
-        workspaceId: 'goblin+file:///repo',
+        workspaceId: WORKSPACE_ID,
         branchName: 'feature/current',
         worktreePath: '/repo/worktree',
       },
@@ -532,7 +533,7 @@ describe('workspace pane tabs coordinator queues', () => {
         await coordinator.ensureRuntimeTabForSession({
           userId: 'user-a',
           target: testRuntimeTargetProjection({
-            workspaceId: 'goblin+file:///repo',
+            workspaceId: WORKSPACE_ID,
             branchName: 'feature/current',
             worktreePath: '/repo/worktree',
           }).target,
@@ -558,12 +559,12 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     let targets: TestWorkspacePaneTarget[] = [
       {
-        workspaceId: 'goblin+file:///repo',
+        workspaceId: WORKSPACE_ID,
         branchName: 'feature/old',
         worktreePath: '/repo/worktree',
       },
@@ -598,7 +599,7 @@ describe('workspace pane tabs coordinator queues', () => {
         await coordinator.ensureRuntimeTabForSession({
           userId: 'user-a',
           target: testRuntimeTargetProjection({
-            workspaceId: 'goblin+file:///repo',
+            workspaceId: WORKSPACE_ID,
             branchName: 'feature/old',
             worktreePath: '/repo/worktree',
           }).target,
@@ -612,7 +613,7 @@ describe('workspace pane tabs coordinator queues', () => {
         }),
     )
     await vi.waitFor(() => expect(providerStarted).toBe(true))
-    targets = [{ workspaceId: 'goblin+file:///repo', branchName: 'feature/renamed', worktreePath: '/repo/worktree' }]
+    targets = [{ workspaceId: WORKSPACE_ID, branchName: 'feature/renamed', worktreePath: '/repo/worktree' }]
     releaseProvider()
 
     await expect(admitted).resolves.toEqual({
@@ -624,7 +625,7 @@ describe('workspace pane tabs coordinator queues', () => {
           entries: [
             {
               target: testRuntimeTargetProjection({
-                workspaceId: 'goblin+file:///repo',
+                workspaceId: WORKSPACE_ID,
                 branchName: 'feature/old',
                 worktreePath: '/repo/worktree',
               }).target,
@@ -672,15 +673,15 @@ describe('workspace pane tabs coordinator queues', () => {
     }
     const aggregate = aggregateFor(repository)
     await aggregate.runExclusive(
-      '/repo',
+      WORKSPACE_ID,
       async (operation) =>
         await operation.validateMembershipAndSnapshot({
           userId: 'user-a',
-          workspaceId: 'goblin+file:///repo',
+          workspaceId: WORKSPACE_ID,
           workspaceRuntimeId: 'runtime-a',
           validTargets: [
             testRuntimeTargetProjection({
-              workspaceId: 'goblin+file:///repo',
+              workspaceId: WORKSPACE_ID,
               branchName: 'main',
               worktreePath: null,
             }),
@@ -698,12 +699,12 @@ describe('workspace pane tabs coordinator queues', () => {
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
       targetProjection: testTargetProjection([
-        { kind: 'git-branch', workspaceId: 'goblin+file:///repo', branchName: 'main' },
+        { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'main' },
       ]),
     })
     const input = {
       userId: 'user-a',
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: WORKSPACE_ID,
       scope: 'goblin+file:///repo\0runtime-a',
       assertCurrent: () => {},
     }
@@ -714,7 +715,7 @@ describe('workspace pane tabs coordinator queues', () => {
       .updateTabs({
         ...input,
         target: testRuntimeTargetProjection({
-          workspaceId: 'goblin+file:///repo',
+          workspaceId: WORKSPACE_ID,
           branchName: 'main',
           worktreePath: null,
         }).target,
@@ -752,11 +753,11 @@ describe('workspace pane tabs coordinator queues', () => {
 
     await coordinator.restoreScope({
       userId: 'user-a',
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: WORKSPACE_ID,
       scope: 'goblin+file:///repo\0runtime-a',
       targets: [
         testRuntimeTargetProjection({
-          workspaceId: 'goblin+file:///repo',
+          workspaceId: WORKSPACE_ID,
           branchName: 'main',
           worktreePath: '/repo/worktree',
         }),
@@ -771,7 +772,7 @@ describe('workspace pane tabs coordinator queues', () => {
         scope: 'goblin+file:///repo\0runtime-a',
         workspaceRuntimeId: 'runtime-a',
         target: testRuntimeTargetProjection({
-          workspaceId: 'goblin+file:///repo',
+          workspaceId: WORKSPACE_ID,
           branchName: 'main',
           worktreePath: '/repo/worktree',
         }).target,
@@ -807,11 +808,11 @@ describe('workspace pane tabs coordinator queues', () => {
     await expect(
       coordinator.restoreScope({
         userId: 'user-a',
-        workspaceId: 'goblin+file:///repo',
+        workspaceId: WORKSPACE_ID,
         scope: 'goblin+file:///repo\0runtime-a',
         targets: [
           testRuntimeTargetProjection({
-            workspaceId: 'goblin+file:///repo',
+            workspaceId: WORKSPACE_ID,
             branchName: 'main',
             worktreePath: '/repo/worktree',
           }),
@@ -821,7 +822,7 @@ describe('workspace pane tabs coordinator queues', () => {
       }),
     ).resolves.toEqual({ kind: 'membership-conflict' })
 
-    expect(aggregate.activeEpochs('/repo')).toEqual([])
+    expect(aggregate.activeEpochs(WORKSPACE_ID)).toEqual([])
     expect(coordinator.physicalWorktreeTargets(testPhysicalWorktreeIdentity('/repo/worktree'))).toEqual([])
   })
 
@@ -829,7 +830,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     let releaseRemoval!: () => void
@@ -852,11 +853,11 @@ describe('workspace pane tabs coordinator queues', () => {
     await expect(
       coordinator.restoreScope({
         userId: 'user-a',
-        workspaceId: 'goblin+file:///repo',
+        workspaceId: WORKSPACE_ID,
         scope: 'goblin+file:///repo\0runtime-a',
         targets: [
           testRuntimeTargetProjection({
-            workspaceId: 'goblin+file:///repo',
+            workspaceId: WORKSPACE_ID,
             branchName: 'main',
             worktreePath: '/repo/worktree',
           }),
@@ -865,7 +866,7 @@ describe('workspace pane tabs coordinator queues', () => {
         assertCurrent: () => {},
       }),
     ).rejects.toThrow('error.worktree-removal-in-progress')
-    expect(aggregate.activeEpochs('/repo')).toEqual([])
+    expect(aggregate.activeEpochs(WORKSPACE_ID)).toEqual([])
     expect(coordinator.physicalWorktreeTargets(capability.identity)).toEqual([])
 
     releaseRemoval()
@@ -876,7 +877,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     let releaseFinalSample!: () => void
@@ -903,7 +904,7 @@ describe('workspace pane tabs coordinator queues', () => {
                 {
                   sessionId: 'term-physicalphysicalphy1',
                   target: testRuntimeTargetProjection({
-                    workspaceId: 'goblin+file:///repo',
+                    workspaceId: WORKSPACE_ID,
                     branchName: 'main',
                     worktreePath: '/repo/worktree',
                   }).target,
@@ -921,7 +922,7 @@ describe('workspace pane tabs coordinator queues', () => {
     })
     const list = coordinator.listWorkspaceTabs({
       userId: 'user-a',
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: WORKSPACE_ID,
       scope: 'goblin+file:///repo\0runtime-a',
       assertCurrent: () => {},
     })
@@ -950,12 +951,12 @@ describe('workspace pane tabs coordinator queues', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capabilityA = testPhysicalWorktreeExecutionCapability('/repo/worktree-a', {
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     const capabilityC = testPhysicalWorktreeExecutionCapability('/repo/worktree-c', {
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
     })
     let releaseStableSample!: () => void
@@ -981,7 +982,7 @@ describe('workspace pane tabs coordinator queues', () => {
                 {
                   sessionId: 'term-worktreeaaaaaaaaa1',
                   target: testRuntimeTargetProjection({
-                    workspaceId: 'goblin+file:///repo',
+                    workspaceId: WORKSPACE_ID,
                     branchName: 'a',
                     worktreePath: '/repo/worktree-a',
                   }).target,
@@ -993,7 +994,7 @@ describe('workspace pane tabs coordinator queues', () => {
                       {
                         sessionId: 'term-worktreeccccccccc1',
                         target: testRuntimeTargetProjection({
-                          workspaceId: 'goblin+file:///repo',
+                          workspaceId: WORKSPACE_ID,
                           branchName: 'c',
                           worktreePath: '/repo/worktree-c',
                         }).target,
@@ -1016,7 +1017,7 @@ describe('workspace pane tabs coordinator queues', () => {
 
     const list = coordinator.listWorkspaceTabs({
       userId: 'user-a',
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: WORKSPACE_ID,
       scope: 'goblin+file:///repo\0runtime-a',
       assertCurrent: () => {},
     })
@@ -1041,7 +1042,7 @@ describe('workspace pane tabs coordinator queues', () => {
         scope: 'goblin+file:///repo\0runtime-a',
         workspaceRuntimeId: 'runtime-a',
         target: testRuntimeTargetProjection({
-          workspaceId: 'goblin+file:///repo',
+          workspaceId: WORKSPACE_ID,
           branchName: 'c',
           worktreePath: '/repo/worktree-c',
         }).target,
@@ -1064,7 +1065,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = issueTestPhysicalWorktreeExecutionCapability({
       identity: testPhysicalWorktreeIdentity('/repo/worktree-x'),
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
       worktreePath: '/repo/worktree-x',
       validateExecution: async () => {
@@ -1086,7 +1087,7 @@ describe('workspace pane tabs coordinator queues', () => {
                     {
                       sessionId: 'term-worktreexxxxxxxxx1',
                       target: testRuntimeTargetProjection({
-                        workspaceId: 'goblin+file:///repo',
+                        workspaceId: WORKSPACE_ID,
                         branchName: 'x',
                         worktreePath: '/repo/worktree-x',
                       }).target,
@@ -1110,7 +1111,7 @@ describe('workspace pane tabs coordinator queues', () => {
     })
     const input = {
       userId: 'user-a',
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: WORKSPACE_ID,
       scope: 'goblin+file:///repo\0runtime-a',
       assertCurrent: () => {},
     }
@@ -1142,7 +1143,7 @@ describe('workspace pane tabs coordinator queues', () => {
     const capability = issueTestPhysicalWorktreeExecutionCapability({
       identity: testPhysicalWorktreeIdentity('/repo/worktree-x'),
       userId: 'user-a',
-      repoRoot: 'goblin+file:///repo',
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'runtime-a',
       worktreePath: '/repo/worktree-x',
       validateExecution: async () => {
@@ -1164,7 +1165,7 @@ describe('workspace pane tabs coordinator queues', () => {
                     {
                       sessionId: 'term-worktreexxxxxxxxx1',
                       target: testRuntimeTargetProjection({
-                        workspaceId: 'goblin+file:///repo',
+                        workspaceId: WORKSPACE_ID,
                         branchName: 'x',
                         worktreePath: '/repo/worktree-x',
                       }).target,
@@ -1188,7 +1189,7 @@ describe('workspace pane tabs coordinator queues', () => {
     })
     const listInput = {
       userId: 'user-a',
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: WORKSPACE_ID,
       scope: 'goblin+file:///repo\0runtime-a',
       assertCurrent: () => {},
     }
@@ -1255,7 +1256,7 @@ describe('workspace pane tabs coordinator queues', () => {
                 {
                   sessionId: 'term-worktreexxxxxxxxx1',
                   target: testRuntimeTargetProjection({
-                    workspaceId: 'goblin+file:///repo',
+                    workspaceId: WORKSPACE_ID,
                     branchName: 'x',
                     worktreePath: '/repo/worktree-alias',
                   }).target,
@@ -1275,7 +1276,7 @@ describe('workspace pane tabs coordinator queues', () => {
     })
     const input = {
       userId: 'user-a',
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: WORKSPACE_ID,
       scope: 'goblin+file:///repo\0runtime-a',
       assertCurrent: () => {},
     }

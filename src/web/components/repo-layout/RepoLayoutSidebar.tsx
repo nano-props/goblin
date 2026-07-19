@@ -164,7 +164,7 @@ function RepoShellBranchHeader({
   title,
   gitAvailable,
 }: {
-  workspaceId: string
+  workspaceId: WorkspaceId
   title: string
   gitAvailable: boolean
 }) {

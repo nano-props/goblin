@@ -1,4 +1,5 @@
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { terminalWorkspacePaneTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
@@ -43,7 +44,7 @@ export function resetWorkspacePaneDestinationPresentationForTest(): void {
 }
 
 export async function dispatchWorkspacePaneDestinationRoute(input: {
-  repoId: string
+  repoId: WorkspaceId
   branchName: string
   route: WorkspacePaneRouteTarget
   navigation: WorkspacePaneDestinationNavigation

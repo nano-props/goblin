@@ -11,8 +11,9 @@ import {
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
-import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type * as RemoteWorkspaceFailureSettlement from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const failRemoteWorkspaceRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
 vi.mock('#/server/modules/remote-workspace-runtime-failure-settlement.ts', async (importActual) => {
@@ -20,13 +21,10 @@ vi.mock('#/server/modules/remote-workspace-runtime-failure-settlement.ts', async
   return { ...actual, failRemoteWorkspaceRuntimeIfNeeded: failRemoteWorkspaceRuntimeIfNeededMock }
 })
 
-const workspaceId = canonicalWorkspaceLocator('goblin+file:///repo')
-const worktreeRoot = canonicalWorkspaceLocator('goblin+file:///repo/worktree')
-const linkedWorkspaceId = canonicalWorkspaceLocator('goblin+file:///linked-repo')
-const linkedWorktreeRoot = canonicalWorkspaceLocator('goblin+file:///linked/worktree')
-if (!workspaceId || !worktreeRoot || !linkedWorkspaceId || !linkedWorktreeRoot) {
-  throw new Error('invalid workspace locator fixture')
-}
+const workspaceId = workspaceIdForTest('goblin+file:///repo')
+const worktreeRoot = workspaceIdForTest('goblin+file:///repo/worktree')
+const linkedWorkspaceId = workspaceIdForTest('goblin+file:///linked-repo')
+const linkedWorktreeRoot = workspaceIdForTest('goblin+file:///linked/worktree')
 const target = {
   repoRoot: workspaceId,
   workspaceRuntimeId: 'repo-runtime-test',
@@ -105,14 +103,14 @@ describe('WorktreeRemovalApplication', () => {
     const affectedScopes = [
       {
         userId: 'user-a',
-        repoRoot: 'goblin+file:///repo',
+        repoRoot: workspaceId,
         workspaceRuntimeId: 'runtime-a',
         scope: 'goblin+file:///repo\0runtime-a',
         worktreePath: '/repo/worktree',
       },
       {
         userId: 'user-b',
-        repoRoot: 'goblin+file:///repo',
+        repoRoot: workspaceId,
         workspaceRuntimeId: 'runtime-b',
         scope: 'goblin+file:///repo\0runtime-b',
         worktreePath: '/repo/worktree',
@@ -376,27 +374,34 @@ describe('WorktreeRemovalApplication', () => {
   })
 })
 
+interface TestTerminalScope {
+  userId: string
+  repoRoot: WorkspaceId
+  workspaceRuntimeId: string
+  scope: string
+}
+
 function createApplication(
   options: {
     operations?: ReturnType<typeof createPhysicalWorktreeOperationCoordinator>
     physicalWorktrees?: typeof testPhysicalWorktrees
-    terminalScopes?: Array<{ userId: string; repoRoot: string; workspaceRuntimeId: string; scope: string }>
+    terminalScopes?: TestTerminalScope[]
     terminalQuiescence?:
-      | { ok: true; scopes: Array<{ userId: string; repoRoot: string; workspaceRuntimeId: string; scope: string }> }
+      | { ok: true; scopes: TestTerminalScope[] }
       | {
           ok: false
-          scopes: Array<{ userId: string; repoRoot: string; workspaceRuntimeId: string; scope: string }>
+          scopes: TestTerminalScope[]
           message: string
         }
     closeSessionsForPhysicalWorktree?: (
       identity: PhysicalWorktreeIdentity,
-    ) => Promise<Array<{ userId: string; repoRoot: string; workspaceRuntimeId: string; scope: string }>>
+    ) => Promise<TestTerminalScope[]>
     reconcilePhysicalWorktreeAfterRemovalFailure?: () => Promise<void>
     retireTarget?: (...args: never[]) => Promise<void>
     physicalWorktreeTargets?: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']>
     clearPhysicalWorktreeIndex?: WorkspacePaneTabsCoordinator['clearPhysicalWorktreeIndex']
-    broadcastWorkspaceTabsChanged?: (userId: string, repoRoot: string) => void
-    broadcastSessionsChanged?: (userId: string, repoRoot: string, workspaceRuntimeId: string) => void
+    broadcastWorkspaceTabsChanged?: (userId: string, repoRoot: WorkspaceId) => void
+    broadcastSessionsChanged?: (userId: string, repoRoot: WorkspaceId, workspaceRuntimeId: string) => void
   } = {},
 ) {
   return createWorktreeRemovalApplication({

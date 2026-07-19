@@ -2,12 +2,15 @@
 
 import { act, cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { FiletreeActionDialogHost } from '#/web/components/FiletreeActionDialogHost.tsx'
 import {
   resetFiletreeActionDialogsStore,
   useFiletreeActionDialogsStore,
 } from '#/web/stores/workspaces/filetree-action-dialogs.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 
 const dialogProps = vi.hoisted(() => ({
   latest: { open: false, title: '', message: null as unknown },
@@ -40,11 +43,11 @@ afterEach(() => {
 
 describe('FiletreeActionDialogHost', () => {
   test('retains the file path message while the close animation runs after store state is cleared', () => {
-    renderInJsdom(<FiletreeActionDialogHost currentWorkspaceId="/workspace" />)
+    renderInJsdom(<FiletreeActionDialogHost currentWorkspaceId={WORKSPACE_ID} />)
 
     act(() => {
       useFiletreeActionDialogsStore.getState().openTrashFileConfirm({
-        workspaceId: '/workspace',
+        workspaceId: WORKSPACE_ID,
         workspaceRuntimeId: 'repo-runtime-filetree-action-test',
         worktreePath: '/repo-worktree',
         path: 'src/example.ts',

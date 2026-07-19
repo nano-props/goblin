@@ -16,10 +16,10 @@ import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { runShowWorkspacePaneTabCommand, runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
 import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
-import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface WorkspaceRootNavigatorProps {
-  workspaceId: string
+  workspaceId: WorkspaceId
   selected: boolean
   onSelect?: () => void
 }

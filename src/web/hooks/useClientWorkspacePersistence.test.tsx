@@ -7,6 +7,7 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { workspaceLocatorForPath, canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { useFiletreeInteractionStore } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -56,10 +57,13 @@ describe('useClientWorkspacePersistence', () => {
     const worktreePath = '/tmp/repo-worktree'
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-worktree',
-      workspaceId: 'goblin+file:///tmp/repo',
+      workspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
       worktreePath,
     })
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath('goblin+file:///tmp/repo', worktreePath)
+    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(
+      workspaceIdForTest('goblin+file:///tmp/repo'),
+      worktreePath,
+    )
     const workspaceId = canonicalWorkspaceLocator('goblin+file:///tmp/repo')!
     const worktreeId = workspaceLocatorForPath(workspaceId, worktreePath)!
     const repo = seedRepoWithReadModelForTest({

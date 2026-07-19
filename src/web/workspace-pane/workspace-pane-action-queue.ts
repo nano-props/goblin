@@ -1,13 +1,13 @@
 import PQueue from 'p-queue'
-import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 export type WorkspacePaneActionTarget =
-  | { kind: 'workspace-root'; workspaceId: string; workspaceRuntimeId: string }
-  | { kind: 'git-branch'; workspaceId: string; workspaceRuntimeId: string; branchName: string }
-  | { kind: 'git-worktree'; workspaceId: string; workspaceRuntimeId: string; worktreePath: string }
+  | { kind: 'workspace-root'; workspaceId: WorkspaceId; workspaceRuntimeId: string }
+  | { kind: 'git-branch'; workspaceId: WorkspaceId; workspaceRuntimeId: string; branchName: string }
+  | { kind: 'git-worktree'; workspaceId: WorkspaceId; workspaceRuntimeId: string; worktreePath: string }
 
 export function workspacePaneActionTargetFromCoordinates(coordinates: {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string | null
   worktreePath: string | null

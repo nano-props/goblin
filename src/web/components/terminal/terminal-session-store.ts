@@ -19,6 +19,7 @@ import type {
 } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 /**
  * Subscribe to a derived field of a single worktree's snapshot. The selector
@@ -88,7 +89,7 @@ export function useTerminalWorktreeBellCount(terminalWorktreeKey: string | null)
   return useTerminalWorktreeField(terminalWorktreeKey, (s) => s.bellCount)
 }
 
-export function useWorkspaceTerminalBellCounts(workspaceIds: readonly string[]): Record<string, number> {
+export function useWorkspaceTerminalBellCounts(workspaceIds: readonly WorkspaceId[]): Record<string, number> {
   const { workspaceBellCount, subscribeWorkspaceBellCount } = useTerminalSessionReadContext()
   const subscribe = useCallback(
     (listener: () => void) => {
@@ -156,21 +157,23 @@ export function useTerminalSessionSummaries(terminalWorktreeKey: string | null):
   return useTerminalWorktreeField(terminalWorktreeKey, (s) => s.sessions)
 }
 
-export function useTerminalWorkspaceProjectionPhase(workspaceId: string | null): TerminalProjectionHydrationPhase {
+export function useTerminalWorkspaceProjectionPhase(workspaceId: WorkspaceId | null): TerminalProjectionHydrationPhase {
   const workspaceRuntimeId = useWorkspacesStore((s) =>
     workspaceId ? s.workspaces[workspaceId]?.workspaceRuntimeId : undefined,
   )
   return useTerminalProjectionHydrationPhase(workspaceId, workspaceRuntimeId)
 }
 
-export function useTerminalWorkspaceProjectionHydrationEntry(workspaceId: string | null): TerminalProjectionHydrationEntry {
+export function useTerminalWorkspaceProjectionHydrationEntry(
+  workspaceId: WorkspaceId | null,
+): TerminalProjectionHydrationEntry {
   const workspaceRuntimeId = useWorkspacesStore((s) =>
     workspaceId ? s.workspaces[workspaceId]?.workspaceRuntimeId : undefined,
   )
   return useTerminalProjectionHydrationEntry(workspaceId, workspaceRuntimeId)
 }
 
-export function useTerminalWorkspaceProjectionReady(workspaceId: string | null): boolean {
+export function useTerminalWorkspaceProjectionReady(workspaceId: WorkspaceId | null): boolean {
   return useTerminalWorkspaceProjectionPhase(workspaceId) === 'ready'
 }
 

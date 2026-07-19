@@ -5,9 +5,10 @@ import { trashRepositoryFile } from '#/web/filetree-client.ts'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useFiletreeActionDialogsStore } from '#/web/stores/workspaces/filetree-action-dialogs.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface Props {
-  readonly currentWorkspaceId: string | null
+  readonly currentWorkspaceId: WorkspaceId | null
 }
 
 export function FiletreeActionDialogHost({ currentWorkspaceId }: Props) {
@@ -18,7 +19,7 @@ export function FiletreeActionDialogHost({ currentWorkspaceId }: Props) {
   const displayTrashFileConfirm = useLastNonNull(trashFileConfirm)
 
   useEffect(() => {
-    closeStaleDialogs(currentWorkspaceId ?? '')
+    closeStaleDialogs(currentWorkspaceId)
   }, [currentWorkspaceId, closeStaleDialogs])
 
   return (

@@ -33,14 +33,14 @@ export type TerminalBellIntentPlan =
   | { kind: 'unavailable'; reason: 'branch-read-model-unavailable' }
   | {
       kind: 'show-worktree-terminal'
-      repoId: string
+      repoId: WorkspaceId
       branch: string
       terminalSessionId: string
       terminalWorktreeKey: string
     }
   | {
       kind: 'show-detached-worktree-terminal'
-      repoId: string
+      repoId: WorkspaceId
       worktreePath: string
       terminalSessionId: string
     }
@@ -61,19 +61,19 @@ export type WorkspaceIntentPlan =
   | { kind: 'open-clone-repo' }
   | { kind: 'open-remote-workspace' }
   | { kind: 'create-worktree' }
-  | { kind: 'new-terminal-tab'; workspaceId: string; target: WorkspacePaneCommandTarget }
-  | { kind: 'close-workspace-pane-tab-or-window'; workspaceId: string; target: WorkspacePaneCommandTarget }
+  | { kind: 'new-terminal-tab'; workspaceId: WorkspaceId; target: WorkspacePaneCommandTarget }
+  | { kind: 'close-workspace-pane-tab-or-window'; workspaceId: WorkspaceId; target: WorkspacePaneCommandTarget }
   | { kind: 'close-workspace'; workspaceId: WorkspaceId }
   | { kind: 'close-window' }
   | { kind: 'cycle-workspace'; direction: 1 | -1 }
-  | { kind: 'refresh-repo'; repoId: string; workspaceRuntimeId: string }
+  | { kind: 'refresh-repo'; repoId: WorkspaceId; workspaceRuntimeId: string }
   | {
       kind: 'show-workspace-pane-tab'
-      workspaceId: string
+      workspaceId: WorkspaceId
       target: WorkspacePaneCommandTarget
       tab: WorkspacePaneTabType
     }
-  | { kind: 'terminal-primary-action'; workspaceId: string; target: WorkspacePaneCommandTarget }
+  | { kind: 'terminal-primary-action'; workspaceId: WorkspaceId; target: WorkspacePaneCommandTarget }
   | { kind: 'toggle-zen-mode' }
 
 export type ExternalOpenDrainKickPlan = { kind: 'ignore' } | { kind: 'schedule-rerun' } | { kind: 'start-drain' }

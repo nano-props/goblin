@@ -4,6 +4,7 @@ import type {
   WorkspacePaneTabEntry,
 } from '#/shared/workspace-pane.ts'
 import type { RestorableWorkspacePaneTarget, RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export const WORKSPACE_PANE_TABS_SOCKET_ACTIONS = {
   list: 'workspace-pane-tabs.list',
@@ -28,13 +29,13 @@ export const WORKSPACE_PANE_TABS_REALTIME_EVENTS = {
 export interface WorkspacePaneTabsInvalidatedRealtimeMessage {
   type: typeof WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed
   change: 'invalidation'
-  workspaceId: string
+  workspaceId: WorkspaceId
 }
 
 export interface WorkspacePaneTabsRevisionRealtimeMessage {
   type: typeof WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed
   change: 'revision'
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   revision: number
 }
@@ -45,13 +46,13 @@ export type WorkspacePaneTabsChangedRealtimeMessage =
 export type WorkspacePaneTabsRealtimeMessage = WorkspacePaneTabsChangedRealtimeMessage
 
 export function workspacePaneTabsInvalidatedRealtimeMessage(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
 ): WorkspacePaneTabsInvalidatedRealtimeMessage {
   return { type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed, change: 'invalidation', workspaceId }
 }
 
 export function workspacePaneTabsRevisionRealtimeMessage(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
   revision: number,
 ): WorkspacePaneTabsRevisionRealtimeMessage {
@@ -65,7 +66,7 @@ export function workspacePaneTabsRevisionRealtimeMessage(
 }
 
 export interface WorkspacePaneTabsListInput {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
 }
 

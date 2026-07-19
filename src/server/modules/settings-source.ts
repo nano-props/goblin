@@ -182,7 +182,10 @@ function normalizeWorkspacePaneTabsByTargetByWorkspace(
   return normalized
 }
 
-function safeRestorableWorkspacePaneTarget(workspaceId: string, targetKey: string): RestorableWorkspacePaneTarget | null {
+function safeRestorableWorkspacePaneTarget(
+  workspaceId: WorkspaceId,
+  targetKey: string,
+): RestorableWorkspacePaneTarget | null {
   const parsed = parseRestorableWorkspacePaneTargetKey(targetKey)
   if (!parsed) return null
   if (parsed.kind === 'git-branch') return isSafeBranchName(parsed.branch) ? parsed : null
@@ -547,7 +550,7 @@ function sameWorkspaceEntries(a: WorkspaceSessionEntry[], b: WorkspaceSessionEnt
 
 function workspacePaneLayoutFromWorkspace(
   workspace: ServerWorkspaceState,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
 ): WorkspacePaneDurableLayout {
   const entries: WorkspacePaneDurableLayout['entries'] = []
   for (const [targetKey, tabs] of Object.entries(workspace.workspacePaneTabsByTargetByWorkspace[workspaceId] ?? {})) {
@@ -620,7 +623,7 @@ async function mutateWorkspacePaneSettings<T>(
 
 function workspacePaneLayoutMutation(
   data: UserSettingsData,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   currentLayout: WorkspacePaneDurableLayout,
   requestedLayout: WorkspacePaneDurableLayout,
 ): UserSettingsMutation<WorkspacePaneLayoutRepositoryCasOutcome> {

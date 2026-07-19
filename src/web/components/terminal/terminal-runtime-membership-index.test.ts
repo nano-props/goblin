@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   runtimeMembershipIndexFromEntries,
   type TerminalRuntimeMembershipEntry,
 } from '#/web/components/terminal/terminal-runtime-membership-index.ts'
 
-const REPO_ID = 'goblin+file:///tmp/terminal-runtime-membership-index-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/example-workspace')
 
 describe('terminal repo index', () => {
   test('projects open runtime membership without loading Git data', () => {
@@ -17,6 +18,6 @@ describe('terminal repo index', () => {
 
     const index = runtimeMembershipIndexFromEntries(entries)
 
-    expect(index).toEqual({ [REPO_ID]: { workspaceRuntimeId: 'repo-runtime-terminal-index' } })
+    expect(index).toEqual(new Map([[REPO_ID, { workspaceRuntimeId: 'repo-runtime-terminal-index' }]]))
   })
 })

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   workspacePaneCommandCoordinates,
   type WorkspacePaneCommandTarget,
@@ -6,7 +7,7 @@ import {
 
 const filesystemTarget = {
   kind: 'git-worktree' as const,
-  workspaceId: 'goblin+file:///tmp/command-target-repo',
+  workspaceId: workspaceIdForTest('goblin+file:///tmp/command-target-repo'),
   workspaceRuntimeId: 'repo-runtime-command-target',
   rootPath: '/tmp/command-target-worktree',
   head: { kind: 'branch' as const, branchName: 'feature/example' },

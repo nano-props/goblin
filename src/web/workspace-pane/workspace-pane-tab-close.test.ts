@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   type WorkspacePaneTabEntry,
   workspacePaneRuntimeTabEntry,
@@ -33,7 +34,7 @@ import {
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 
-const REPO_ID = 'goblin+file:///tmp/workspace-pane-tab-close-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-close-repo')
 const BRANCH_NAME = 'feature/worktree-close'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-close-worktree'
 const WORKTREE_PANE_TARGET = {

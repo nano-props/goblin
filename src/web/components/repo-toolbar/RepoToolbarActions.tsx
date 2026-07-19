@@ -1,4 +1,5 @@
 import { useContext } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useShallow } from 'zustand/react/shallow'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { GitBranchPlus, LayoutDashboard } from 'lucide-react'
@@ -17,7 +18,7 @@ import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 
 interface Props {
-  repoId: string
+  repoId: WorkspaceId
 }
 
 interface CreateWorktreeRowActionProps extends Props {
@@ -107,7 +108,7 @@ export function CreateWorktreeRowAction({
   )
 }
 
-function useCreateWorktreeTrigger(repoId: string) {
+function useCreateWorktreeTrigger(repoId: WorkspaceId) {
   const overlayActions = useContext(LayoutOverlayActions)
   const repoShell = useStoreWithEqualityFn(
     useWorkspacesStore,

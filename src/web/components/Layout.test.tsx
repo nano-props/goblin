@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import type { ReactNode } from 'react'
+import type * as ReactModule from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from '@testing-library/react'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx'
 import { Layout, authenticatedAppShellMode } from '#/web/Layout.tsx'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
@@ -10,10 +12,13 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useWorkspaceTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
+import type * as TerminalSessionContextModule from '#/web/components/terminal/terminal-session-context.ts'
+import type * as WorkspaceNavigationHistoryModule from '#/web/workspace-navigation-history.ts'
 
 const restoringWorkspaceState: AuthenticatedAppBootstrapState = { status: 'restoring-workspace' }
 const readyState: AuthenticatedAppBootstrapState = { status: 'ready' }
 const failedState: AuthenticatedAppBootstrapState = { status: 'failed', message: 'restore failed' }
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 const layoutRouterMock = vi.hoisted(() => ({
   pathname: '/settings/general',
   href: '/settings/general',
@@ -53,7 +58,7 @@ vi.mock('#/web/hooks/useSettingsWriteErrorToast.ts', () => ({
 }))
 
 vi.mock('#/web/workspace-navigation-history.ts', async () => {
-  const actual = await vi.importActual<typeof import('#/web/workspace-navigation-history.ts')>(
+  const actual = await vi.importActual<typeof WorkspaceNavigationHistoryModule>(
     '#/web/workspace-navigation-history.ts',
   )
   return {
@@ -63,8 +68,8 @@ vi.mock('#/web/workspace-navigation-history.ts', async () => {
 })
 
 vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
-  const React = await vi.importActual<typeof import('react')>('react')
-  const context = await vi.importActual<typeof import('#/web/components/terminal/terminal-session-context.ts')>(
+  const React = await vi.importActual<typeof ReactModule>('react')
+  const context = await vi.importActual<typeof TerminalSessionContextModule>(
     '#/web/components/terminal/terminal-session-context.ts',
   )
   const readContext: TerminalSessionReadContextValue = {
@@ -137,8 +142,8 @@ beforeEach(() => {
 })
 
 function SettingsRetainedOutletTerminalConsumer() {
-  const bellCounts = useWorkspaceTerminalBellCounts(['repo-a'])
-  return <span data-testid="settings-retained-terminal-consumer">{bellCounts['repo-a']}</span>
+  const bellCounts = useWorkspaceTerminalBellCounts([WORKSPACE_ID])
+  return <span data-testid="settings-retained-terminal-consumer">{bellCounts[WORKSPACE_ID]}</span>
 }
 
 describe('Layout shell providers', () => {

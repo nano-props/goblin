@@ -16,11 +16,11 @@ import {
 } from '#/web/runtime/runtime-projection-scope.ts'
 import { reconcileOpenWorkspaceRuntimeMemberships } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import { TerminalProjectionRecoveryCoordinator } from '#/web/runtime/terminal-projection-recovery.ts'
-import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface AppRuntimeProjectionProviderProps {
   children: ReactNode
-  currentRepoId: string | null
+  currentRepoId: WorkspaceId | null
 }
 
 const WORKSPACE_TABS_REFRESH_LANE = 'workspace-tabs-refresh'
@@ -248,7 +248,7 @@ function currentScopeForRepo(
   return workspaceRuntimeId ? registry.scopeFor({ workspaceId: workspaceId, workspaceRuntimeId }) : null
 }
 
-function workspaceRuntimeIdForRoot(workspaceId: string): string | null {
+function workspaceRuntimeIdForRoot(workspaceId: WorkspaceId): string | null {
   return useWorkspacesStore.getState().workspaces[workspaceId]?.workspaceRuntimeId ?? null
 }
 

@@ -10,6 +10,7 @@ import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 let tmp: string | null = null
 let previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
@@ -19,7 +20,7 @@ const REPO_C = workspaceIdForTest('goblin+file:///repo-c')
 
 async function writeWorkspacePaneLayout(
   source: { serverWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository },
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   replacement: WorkspacePaneDurableLayout,
 ): Promise<void> {
   const current = await source.serverWorkspacePaneLayoutRepository.load(workspaceId)

@@ -8,7 +8,11 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { WorkspacePaneTabsChangedRealtimeMessage } from '#/shared/workspace-pane-tabs.ts'
 import type { TerminalExecutionTarget } from '#/shared/terminal-types.ts'
-import { canonicalWorkspaceLocator, parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import {
+  canonicalWorkspaceLocator,
+  parseCanonicalWorkspaceLocator,
+  type WorkspaceId,
+} from '#/shared/workspace-locator.ts'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
 import { setTerminalSessionProjectionForTests } from '#/web/components/terminal/TerminalSessionProjection.ts'
@@ -1977,7 +1981,7 @@ async function renderProviderWithProbe(terminalWorktreeKey: string): Promise<{
   }
 }
 
-function renderTerminalProvider(children: React.ReactNode, options?: { currentRepoId?: string | null }) {
+function renderTerminalProvider(children: React.ReactNode, options?: { currentRepoId?: WorkspaceId | null }) {
   const currentRepoId = options && 'currentRepoId' in options ? options.currentRepoId : REPO_ID
   return renderInJsdom(
     <QueryClientProvider client={primaryWindowQueryClient}>

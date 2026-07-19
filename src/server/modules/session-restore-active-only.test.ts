@@ -420,7 +420,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
   test('restores the workspace scope for non-active Git stubs without eagerly validating Git targets', async () => {
     const staleTargetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      workspaceId: 'goblin+file:///repo-stub',
+      workspaceId: STUB_WORKSPACE_ID,
       branchName: 'feature',
     })
     const workspace: ServerWorkspaceState = {

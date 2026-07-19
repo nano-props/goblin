@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspacePaneTabsEntry, WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
@@ -27,22 +28,17 @@ vi.mock('#/web/workspace-pane/workspace-pane-tabs-client.ts', () => ({
   },
 }))
 
-const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-tabs-query-repo'
+const REPO_ROOT = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tabs-query-repo')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 
 beforeEach(() => {
   vi.mocked(workspacePaneTabsClient.list).mockReset()
 })
 
-test('test target construction rejects legacy raw workspace ids', () => {
-  expect(() =>
-    runtimeWorkspacePaneTargetForTest({
-      kind: 'git-worktree' as const,
-      workspaceId: '/tmp/legacy-workspace-id',
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      worktreePath: '/tmp/legacy-workspace-id',
-    }),
-  ).toThrow('workspace pane test target requires a canonical target')
+test('test workspace identity construction rejects legacy raw workspace ids', () => {
+  expect(() => workspaceIdForTest('/tmp/legacy-workspace-id')).toThrow(
+    'invalid test workspace id: /tmp/legacy-workspace-id',
+  )
 })
 
 describe('workspace pane tabs revisioned query cache', () => {

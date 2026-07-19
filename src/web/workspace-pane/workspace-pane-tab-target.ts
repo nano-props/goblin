@@ -3,6 +3,7 @@ import {
   repoWorkspaceTabModelBlocksTabInteraction,
   type RepoWorkspaceTabModel,
 } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -37,7 +38,7 @@ export interface WorkspacePaneTabTargetOptions {
 export const workspacePanePreferenceTargetOptions: WorkspacePaneTabTargetOptions = { workspacePaneRoute: undefined }
 
 export interface WorkspacePaneDestinationTargetLease {
-  repoId: string
+  repoId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string
   worktreePath: string | null
@@ -49,7 +50,7 @@ export type WorkspacePaneDestinationTargetResolution =
   { kind: 'ready'; lease: WorkspacePaneDestinationTargetLease } | { kind: 'missing' }
 
 export function resolveWorkspacePaneDestinationTarget(
-  repoId: string,
+  repoId: WorkspaceId,
   branchName: string,
 ): WorkspacePaneDestinationTargetResolution {
   const repo = useWorkspacesStore.getState().workspaces[repoId]
@@ -70,7 +71,7 @@ export function resolveWorkspacePaneDestinationTarget(
 }
 
 export function resolveWorkspacePaneDestinationTargetLease(
-  repoId: string,
+  repoId: WorkspaceId,
   branchName: string,
 ): WorkspacePaneDestinationTargetLease | null {
   const resolution = resolveWorkspacePaneDestinationTarget(repoId, branchName)
@@ -98,7 +99,7 @@ export function workspacePaneCommittedRuntimeTargetIsCurrent(target: WorkspacePa
 }
 
 export function workspacePaneTabTargetForBranch(
-  repoId: string,
+  repoId: WorkspaceId,
   branchName: string,
   options: WorkspacePaneTabTargetOptions,
 ): RepoWorkspaceTabModel | null {
@@ -107,7 +108,7 @@ export function workspacePaneTabTargetForBranch(
 }
 
 export function workspacePaneTabTargetForCreatedRuntime(
-  repoId: string,
+  repoId: WorkspaceId,
   canonicalBranch: string,
   worktreePath: string,
   options: WorkspacePaneTabTargetOptions,
@@ -117,7 +118,7 @@ export function workspacePaneTabTargetForCreatedRuntime(
 }
 
 export function workspacePaneTabTargetForWorkspace(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   options: WorkspacePaneTabTargetOptions = workspacePanePreferenceTargetOptions,
 ): RepoWorkspaceTabModel | null {
   const resolution = resolveWorkspacePaneTabTarget(workspaceId, null, workspaceId, options)
@@ -125,7 +126,7 @@ export function workspacePaneTabTargetForWorkspace(
 }
 
 function resolveWorkspacePaneTabTarget(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   branchName: string | null,
   worktreePath: string | null,
   options: WorkspacePaneTabTargetOptions,
@@ -217,7 +218,7 @@ export function workspacePaneTabTargetForPaneTarget(
 }
 
 export function workspacePaneTabInteractionBlockedForBranch(
-  repoId: string,
+  repoId: WorkspaceId,
   branchName: string,
   options: WorkspacePaneTabTargetOptions,
 ): boolean {
@@ -226,7 +227,7 @@ export function workspacePaneTabInteractionBlockedForBranch(
   return resolution.kind === 'ready' ? workspacePaneTabTargetBlocksInteraction(resolution.target) : false
 }
 
-export function workspacePaneRouteNavigationBlockedForBranch(repoId: string, branchName: string): boolean {
+export function workspacePaneRouteNavigationBlockedForBranch(repoId: WorkspaceId, branchName: string): boolean {
   const state = useWorkspacesStore.getState()
   const repo = state.workspaces[repoId]
   if (!repo || repo.capability.kind !== 'git') return false
@@ -249,7 +250,7 @@ export function workspacePaneRouteNavigationBlockedForBranch(repoId: string, bra
 }
 
 export function resolveWorkspacePaneTabTargetForBranch(
-  repoId: string,
+  repoId: WorkspaceId,
   branchName: string,
   options: WorkspacePaneTabTargetOptions,
 ): WorkspacePaneTabTargetResolution {

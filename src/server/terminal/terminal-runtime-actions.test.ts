@@ -120,7 +120,7 @@ function makeActions(
 }
 
 function syncCurrentWorkspaceRuntime(): void {
-  WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, CLIENT_ID)
+  WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_ID, WORKSPACE_ID, CLIENT_ID)
 }
 
 describe('terminal-runtime-actions close broadcast', () => {
@@ -148,7 +148,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const provider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: USER_ID,
-      repoRoot: REPO_ROOT,
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     await expect(
@@ -180,7 +180,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const provider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: USER_ID,
-      repoRoot: REPO_ROOT,
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
     await expect(
@@ -214,7 +214,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     const provider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: USER_ID,
-      repoRoot: REPO_ROOT,
+      repoRoot: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-stale',
     })
     await expect(

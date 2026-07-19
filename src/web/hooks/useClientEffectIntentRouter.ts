@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useShallow } from 'zustand/react/shallow'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { onClientLocalEventType } from '#/web/local-events.ts'
@@ -20,7 +21,7 @@ import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-
 
 interface ClientEffectIntentRouterOptions {
   navigation: PrimaryWindowNavigationActions
-  currentWorkspaceId: string | null
+  currentWorkspaceId: WorkspaceId | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   closeAllOverlays: () => void
   openWorkspacePathDialog: () => void

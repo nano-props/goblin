@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useShallow } from 'zustand/react/shallow'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { isRepoUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
@@ -44,16 +45,16 @@ function EmptyRepoWorkspacePane({ trafficLightOffset }: { trafficLightOffset: bo
 }
 
 interface Props {
-  workspaceId: string
+  workspaceId: WorkspaceId
   routeView?: RepoRouteView | null
   onOpenSettings?: () => void
-  onOpenRepoRoot?: (workspaceId: string) => void
-  onOpenWorkspaceRoot?: (workspaceId: string) => void
-  onOpenRepoDashboard?: (workspaceId: string) => void
-  onOpenRepoBranch?: (workspaceId: string, branchName: string) => void
-  onOpenRepoNewWorktree?: (workspaceId: string) => void
-  onCancelRepoNewWorktree?: (workspaceId: string) => void
-  onReplaceRepoBranch?: (workspaceId: string, branchName: string) => void
+  onOpenRepoRoot?: (workspaceId: WorkspaceId) => void
+  onOpenWorkspaceRoot?: (workspaceId: WorkspaceId) => void
+  onOpenRepoDashboard?: (workspaceId: WorkspaceId) => void
+  onOpenRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
+  onOpenRepoNewWorktree?: (workspaceId: WorkspaceId) => void
+  onCancelRepoNewWorktree?: (workspaceId: WorkspaceId) => void
+  onReplaceRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
 }
 
 export function RepoView({
@@ -347,7 +348,7 @@ function GitWorkspaceEffects({
   workspaceId,
   children,
 }: {
-  workspaceId: string
+  workspaceId: WorkspaceId
   children: (projectionRestore: RepoProjectionRestoreController) => ReactNode
 }) {
   useRepoToasts(workspaceId)
@@ -355,7 +356,7 @@ function GitWorkspaceEffects({
   return children(projectionRestore)
 }
 
-function RoutedRepoNotFound({ workspaceId }: { workspaceId: string }) {
+function RoutedRepoNotFound({ workspaceId }: { workspaceId: WorkspaceId }) {
   const t = useT()
   const displayLocation = formatWorkspaceDisplayLocation(workspaceId)
   return (

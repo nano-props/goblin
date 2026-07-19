@@ -9,6 +9,7 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import {
   type WorkspacePaneStaticTabType,
@@ -803,7 +804,7 @@ function preferredWorkspacePaneTab(branchName = 'feature/worktree') {
     : null
 }
 
-function openerScopeKey(workspaceId: string, branchName: string, worktreePath: string | null): string {
+function openerScopeKey(workspaceId: WorkspaceId, branchName: string, worktreePath: string | null): string {
   const target =
     worktreePath === null
       ? { kind: 'git-branch' as const, workspaceId, branchName }

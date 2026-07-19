@@ -8,7 +8,7 @@ import {
   workspacePaneTabsTargetFromRuntime,
   workspacePaneTabsTargetIdentityKey,
 } from '#/shared/workspace-pane-tabs-target.ts'
-import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('restorable workspace pane targets', () => {
   it('does not duplicate workspace identity or runtime identity in persisted keys', () => {
@@ -17,7 +17,7 @@ describe('restorable workspace pane targets', () => {
   })
 
   it('stores worktree roots as canonical locators and binds them to native runtime paths', () => {
-    const workspaceId = 'goblin+ssh://server/srv/app'
+    const workspaceId = workspaceIdForTest('goblin+ssh://server/srv/app')
     const runtime = {
       kind: 'git-worktree' as const,
       workspaceId: workspaceId,
@@ -42,7 +42,7 @@ describe('restorable workspace pane targets', () => {
   it('uses strict canonical identities for client target keys', () => {
     const key = workspacePaneTabsTargetIdentityKey({
       kind: 'git-worktree',
-      workspaceId: 'goblin+ssh://server/srv/app',
+      workspaceId: workspaceIdForTest('goblin+ssh://server/srv/app'),
       worktreePath: '/srv/app-feature',
     })
     expect(key).toBe('goblin+ssh://server/srv/app\0worktree\0goblin+ssh://server/srv/app-feature')
@@ -64,10 +64,10 @@ describe('restorable workspace pane targets', () => {
   it('decodes canonical Windows worktree locators without consulting the browser platform', () => {
     const target = {
       kind: 'git-worktree' as const,
-      root: canonicalWorkspaceLocator('goblin+file:///C:/repo/worktree')!,
+      root: workspaceIdForTest('goblin+file:///C:/repo/worktree'),
     }
     expect(parseRestorableWorkspacePaneTargetKey(restorableWorkspacePaneTargetKey(target))).toEqual(target)
-    expect(workspacePaneTabsTargetFromRestorable('goblin+file:///C:/repo', target)).toEqual({
+    expect(workspacePaneTabsTargetFromRestorable(workspaceIdForTest('goblin+file:///C:/repo'), target)).toEqual({
       kind: 'git-worktree',
       workspaceId: 'goblin+file:///C:/repo',
       worktreePath: 'C:\\repo\\worktree',
@@ -79,17 +79,17 @@ describe('restorable workspace pane targets', () => {
     expect(
       workspacePaneTabsTargetFromRuntime({
         kind: 'git-worktree',
-        workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
+        workspaceId: workspaceIdForTest('goblin+file:///repo'),
         workspaceRuntimeId,
-        root: canonicalWorkspaceLocator('goblin+ssh://server/repo/worktree')!,
+        root: workspaceIdForTest('goblin+ssh://server/repo/worktree'),
       }),
     ).toBeNull()
     expect(
       workspacePaneTabsTargetFromRuntime({
         kind: 'git-worktree',
-        workspaceId: canonicalWorkspaceLocator('goblin+ssh://server-a/repo')!,
+        workspaceId: workspaceIdForTest('goblin+ssh://server-a/repo'),
         workspaceRuntimeId,
-        root: canonicalWorkspaceLocator('goblin+ssh://server-b/repo/worktree')!,
+        root: workspaceIdForTest('goblin+ssh://server-b/repo/worktree'),
       }),
     ).toBeNull()
   })

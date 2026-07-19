@@ -1,4 +1,5 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
@@ -26,7 +27,7 @@ import {
 } from '#/web/primary-window-presentation.ts'
 
 export interface SelectWorkspacePaneTabByIndexActionOptions {
-  workspaceId: string | null
+  workspaceId: WorkspaceId | null
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
@@ -35,7 +36,7 @@ export interface SelectWorkspacePaneTabByIndexActionOptions {
 }
 
 export interface MoveWorkspacePaneTabActionOptions {
-  workspaceId: string | null
+  workspaceId: WorkspaceId | null
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
@@ -44,7 +45,7 @@ export interface MoveWorkspacePaneTabActionOptions {
 }
 
 export interface SelectWorkspacePaneTabByIdentityActionOptions {
-  workspaceId: string | null
+  workspaceId: WorkspaceId | null
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
@@ -55,7 +56,7 @@ export interface SelectWorkspacePaneTabByIdentityActionOptions {
 }
 
 export interface ShowWorkspacePaneTerminalRouteActionOptions {
-  workspaceId: string | null
+  workspaceId: WorkspaceId | null
   branchName: string | null
   terminalSessionId: string
   navigation: PrimaryWindowNavigationActions
@@ -174,7 +175,7 @@ function queuedWorkspacePaneTargetMatches(queued: RepoWorkspaceTabModel, current
 }
 
 function workspacePaneTabActionCoordinatorTarget(input: {
-  workspaceId: string | null
+  workspaceId: WorkspaceId | null
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   paneTarget: WorkspacePaneTabsTarget
   worktreeHead?: GitHead
@@ -185,7 +186,7 @@ function workspacePaneTabActionCoordinatorTarget(input: {
 
 function resolveSelectableWorkspacePaneTarget(
   input: {
-    workspaceId: string | null
+    workspaceId: WorkspaceId | null
     paneTarget: WorkspacePaneTabsTarget
     worktreeHead?: GitHead
   },

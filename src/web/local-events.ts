@@ -1,7 +1,9 @@
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+
 export interface ClientLocalEventMap {
   'terminal-bell-click': {
     type: 'terminal-bell-click'
-    workspaceId: string
+    workspaceId: WorkspaceId
     terminalSessionId?: string
     terminalWorktreeKey?: string
   }

@@ -8,9 +8,10 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface WorkspacePaneNavigationObservation {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string
   worktreePath: string | null
@@ -70,7 +71,11 @@ export function observedWorkspacePaneRouteCommitForTest(
   } = {},
 ): PrimaryWindowNavigationActions['commitWorkspacePaneRoute'] {
   const observeAcceptedRoute = options.observeAcceptedRoute ?? (() => {})
-  const observeCommittedRoute = (repoId: string, branchName: string, route: ParsedWorkspacePaneRoute | null): void => {
+  const observeCommittedRoute = (
+    repoId: WorkspaceId,
+    branchName: string,
+    route: ParsedWorkspacePaneRoute | null,
+  ): void => {
     const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute: route })
     if (!target?.branchName) return
     const observation = {
@@ -140,7 +145,7 @@ export function observedWorkspacePaneRouteCommitForTest(
 }
 
 export function observedWorkspacePaneRouteForTarget(
-  repoId: string,
+  repoId: WorkspaceId,
   branchName: string,
 ): WorkspacePaneRouteTarget | undefined {
   const target = workspacePaneTabTargetForBranch(repoId, branchName, workspacePanePreferenceTargetOptions)

@@ -19,6 +19,7 @@ import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import { HEARTBEAT_DEADLINE_MS, HEARTBEAT_INTERVAL_MS } from '#/server/terminal/terminal-realtime-broker.ts'
@@ -74,7 +75,7 @@ function workspacePaneWorktreeTarget(workspaceRuntimeId: string) {
   }
 }
 
-function commitTerminalReadyProbe(userId: string, workspaceId: string, workspaceRuntimeId: string): void {
+function commitTerminalReadyProbe(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
   const committed = commitWorkspaceProbeState({
     userId,
     workspaceId,
@@ -127,7 +128,7 @@ vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', asyn
   const original =
     await importOriginal<typeof import('#/server/worktree-removal/physical-worktree-identity-resolver.ts')>()
   class RuntimeTestPhysicalWorktreeResolver extends original.PhysicalWorktreeIdentityResolver {
-    issue(input: { userId: string; repoRoot: string; workspaceRuntimeId: string; worktreePath: string }) {
+    issue(input: { userId: string; repoRoot: WorkspaceId; workspaceRuntimeId: string; worktreePath: string }) {
       const remote = input.repoRoot.startsWith('goblin+ssh://')
       return this.issueCapability({
         ...input,
@@ -169,7 +170,7 @@ vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', asyn
     ...original,
     createPhysicalWorktreeIdentityResolver: () => ({
       capture: vi.fn(
-        async (input: { userId: string; repoRoot: string; workspaceRuntimeId: string; worktreePath: string }) =>
+        async (input: { userId: string; repoRoot: WorkspaceId; workspaceRuntimeId: string; worktreePath: string }) =>
           resolver.issue(input),
       ),
       dispose: vi.fn(),
@@ -297,13 +298,14 @@ function buildRuntime(
     },
   })
   WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_a')
-  SSH_WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_1, 'goblin+ssh://prod/srv/repo', 'client_a')
+  const sshWorkspaceId = workspaceIdForTest('goblin+ssh://prod/srv/repo')
+  SSH_WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_1, sshWorkspaceId, 'client_a')
   USER_2_WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_2, REPO_ROOT, 'client_b')
-  const user2SshWorkspaceRuntimeId = acquireWorkspaceRuntime(USER_2, 'goblin+ssh://prod/srv/repo', 'client_b')
+  const user2SshWorkspaceRuntimeId = acquireWorkspaceRuntime(USER_2, sshWorkspaceId, 'client_b')
   commitTerminalReadyProbe(USER_1, REPO_ROOT, WORKSPACE_RUNTIME_ID)
-  commitTerminalReadyProbe(USER_1, 'goblin+ssh://prod/srv/repo', SSH_WORKSPACE_RUNTIME_ID)
+  commitTerminalReadyProbe(USER_1, sshWorkspaceId, SSH_WORKSPACE_RUNTIME_ID)
   commitTerminalReadyProbe(USER_2, REPO_ROOT, USER_2_WORKSPACE_RUNTIME_ID)
-  commitTerminalReadyProbe(USER_2, 'goblin+ssh://prod/srv/repo', user2SshWorkspaceRuntimeId)
+  commitTerminalReadyProbe(USER_2, sshWorkspaceId, user2SshWorkspaceRuntimeId)
   createTerminalApplications.set(runtime.host, runtime.workspacePaneRuntimeHost)
   const shutdown = () => {
     if (!activeRuntimeShutdowns.delete(shutdown)) return

@@ -4,6 +4,7 @@ import {
   type RepoOperationContext,
   type RepoOperationTarget,
 } from '#/web/stores/workspaces/operation-runner.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { RepoOperationCancelledError } from '#/web/stores/workspaces/operation-cancellation.ts'
 import type { RepoBranchActionReason, RepoOperationReason } from '#/web/stores/workspaces/operations.ts'
 import { isRepoUnavailable, updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
@@ -142,13 +143,13 @@ function evaluateRepoBranchActionSchedule(repo: WorkspaceState, action: RepoBran
   })
 }
 
-function throwIfStale(get: WorkspacesGet, id: string, workspaceRuntimeId: string): void {
+function throwIfStale(get: WorkspacesGet, id: WorkspaceId, workspaceRuntimeId: string): void {
   if (get().workspaces[id]?.workspaceRuntimeId !== workspaceRuntimeId) throw new RepoOperationCancelledError()
 }
 
 function settleNetworkFetchDataLoadState(
   set: WorkspacesSet,
-  id: string,
+  id: WorkspaceId,
   workspaceRuntimeId: string,
   ownsFetchDataLoad: boolean,
   result: ExecResult | { ok: false; message: string },
@@ -198,7 +199,7 @@ function requiresProjectionRefreshBeforeCompletion(action: RepoBranchAction, res
 }
 
 function waitForBranchActionIdle(
-  id: string,
+  id: WorkspaceId,
   keys: Parameters<typeof waitForRepoOperationsIdle>[1],
   signal: AbortSignal,
   timeoutMs = BRANCH_ACTION_WAIT_TIMEOUT_MS,
@@ -260,7 +261,7 @@ function runBranchActionIpc(
 
 export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
   return {
-    submitBranchAction(id: string, action: RepoBranchAction, options?: RunBranchActionOptions): void {
+    submitBranchAction(id: WorkspaceId, action: RepoBranchAction, options?: RunBranchActionOptions): void {
       const repo = get().workspaces[id]
       const workspaceRuntimeId = options?.workspaceRuntimeId ?? repo?.workspaceRuntimeId
       if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId || !isGitWorkspace(repo)) return
@@ -268,7 +269,7 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
     },
 
     async runBranchAction(
-      id: string,
+      id: WorkspaceId,
       action: RepoBranchAction,
       options?: RunBranchActionOptions,
     ): Promise<ExecResult | null> {

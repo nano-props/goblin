@@ -24,16 +24,18 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const SOURCE_ROUTE = { kind: 'static' as const, tab: 'files' as const }
 const TARGET_ROUTE = { kind: 'static' as const, tab: 'status' as const }
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 
 describe('workspace pane tab controller transactions', () => {
   beforeEach(() => {
     primaryWindowQueryClient.clear()
     resetWorkspacesStore()
     seedRepoWithReadModelForTest({
-      id: 'goblin+file:///repo',
+      id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-1',
       branches: [createRepoBranch('feature/a', { worktree: { path: '/worktree-a' } })],
       currentBranchName: 'feature/a',
@@ -46,7 +48,7 @@ describe('workspace pane tab controller transactions', () => {
     await expect(
       commitWorkspacePaneExactTargetRoute(workspacePaneTarget(), SOURCE_ROUTE, TARGET_ROUTE, committingNavigation()),
     ).resolves.toBe(true)
-    expect(setWorkspacePaneTab).toHaveBeenCalledWith('goblin+file:///repo', 'feature/a', 'status')
+    expect(setWorkspacePaneTab).toHaveBeenCalledWith(WORKSPACE_ID, 'feature/a', 'status')
   })
 
   test('passes the observed route as a compare-and-set precondition', async () => {
@@ -58,7 +60,7 @@ describe('workspace pane tab controller transactions', () => {
       }),
     ).resolves.toBe(false)
     expect(commitWorkspacePaneRoute).toHaveBeenCalledWith(
-      'goblin+file:///repo',
+      WORKSPACE_ID,
       'feature/a',
       TARGET_ROUTE,
       expect.objectContaining({ routePrecondition: { kind: 'exact-route', route: SOURCE_ROUTE } }),
@@ -77,7 +79,7 @@ describe('workspace pane tab controller transactions', () => {
       }),
     ).resolves.toBe(true)
     expect(commitWorkspacePaneRoute).toHaveBeenCalledWith(
-      'goblin+file:///repo',
+      WORKSPACE_ID,
       'feature/a',
       TARGET_ROUTE,
       expect.objectContaining({ routePrecondition: { kind: 'current-workspace-target' } }),
@@ -89,7 +91,7 @@ describe('workspace pane tab controller transactions', () => {
       useWorkspacesStore
         .getState()
         .setWorkspacePaneTabForTarget(
-          { kind: 'workspace-root', workspaceId: 'goblin+file:///repo' },
+          { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
           presentation.kind === 'terminal' ? 'terminal' : presentation.tab,
         )
       options?.onCommit?.()
@@ -103,7 +105,7 @@ describe('workspace pane tab controller transactions', () => {
           ...workspacePaneTarget(),
           branchName: null,
           worktreePath: '/repo',
-          paneTarget: { kind: 'workspace-root', workspaceId: 'goblin+file:///repo' },
+          paneTarget: { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
         },
         staticTab('files'),
         navigation,
@@ -112,16 +114,16 @@ describe('workspace pane tab controller transactions', () => {
 
     expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
     expect(showWorkspaceRootPaneTab).toHaveBeenCalledWith(
-      'goblin+file:///repo',
+      WORKSPACE_ID,
       { kind: 'static', tab: 'files' },
       expect.objectContaining({ presentationToken: expect.any(Object) }),
     )
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'workspace-root',
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: WORKSPACE_ID,
     })
     expect(
-      useWorkspacesStore.getState().workspaces['goblin+file:///repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey],
+      useWorkspacesStore.getState().workspaces[WORKSPACE_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey],
     ).toBe('files')
   })
 
@@ -134,7 +136,7 @@ describe('workspace pane tab controller transactions', () => {
       branchName: null,
       paneTarget: {
         kind: 'git-worktree' as const,
-        workspaceId: 'goblin+file:///repo',
+        workspaceId: WORKSPACE_ID,
         worktreePath: '/worktree-a',
       },
       tabEntries: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
@@ -158,13 +160,13 @@ describe('workspace pane tab controller transactions', () => {
     await expect(
       commitWorkspacePaneCommittedRuntimeTargetRoute(
         {
-          workspaceId: 'goblin+file:///repo',
+          workspaceId: WORKSPACE_ID,
           workspaceRuntimeId: 'repo-runtime-1',
           branchName: 'feature/renamed',
           worktreePath: '/worktree-a',
           paneTarget: {
             kind: 'git-worktree',
-            workspaceId: 'goblin+file:///repo',
+            workspaceId: WORKSPACE_ID,
             worktreePath: '/worktree-a',
           },
         },
@@ -174,18 +176,18 @@ describe('workspace pane tab controller transactions', () => {
     ).resolves.toBe(true)
 
     expect(navigation.commitWorkspacePaneRoute).toHaveBeenCalledWith(
-      'goblin+file:///repo',
+      WORKSPACE_ID,
       'feature/renamed',
       { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
       expect.any(Object),
     )
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-worktree' as const,
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: WORKSPACE_ID,
       worktreePath: '/worktree-a',
     })
     expect(
-      useWorkspacesStore.getState().workspaces['goblin+file:///repo']?.ui.preferredWorkspacePaneTabByTarget[targetKey],
+      useWorkspacesStore.getState().workspaces[WORKSPACE_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey],
     ).toBe('terminal')
   })
 
@@ -206,7 +208,7 @@ describe('workspace pane tab controller transactions', () => {
     useWorkspacesStore.setState((state) => ({
       workspaces: {
         ...state.workspaces,
-        'goblin+file:///repo': { ...state.workspaces['goblin+file:///repo']!, workspaceRuntimeId: 'repo-runtime-2' },
+        [WORKSPACE_ID]: { ...state.workspaces[WORKSPACE_ID]!, workspaceRuntimeId: 'repo-runtime-2' },
       },
     }))
     commit.resolve(true)
@@ -237,7 +239,7 @@ describe('workspace pane tab controller transactions', () => {
       TARGET_ROUTE,
       navigation,
     )
-    const repo = useWorkspacesStore.getState().workspaces['goblin+file:///repo']!
+    const repo = useWorkspacesStore.getState().workspaces[WORKSPACE_ID]!
     seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('feature/a', { worktree: { path: '/worktree-b' } })],
       currentBranch: 'feature/a',
@@ -262,11 +264,11 @@ describe('workspace pane tab controller transactions', () => {
 
 function workspacePaneTarget(): RepoWorkspaceTabModel {
   return {
-    workspaceId: 'goblin+file:///repo',
+    workspaceId: WORKSPACE_ID,
     workspaceRuntimeId: 'repo-runtime-1',
     branchName: 'feature/a',
     worktreePath: '/worktree-a',
-    paneTarget: { kind: 'git-worktree', workspaceId: 'goblin+file:///repo', worktreePath: '/worktree-a' },
+    paneTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/worktree-a' },
   } as RepoWorkspaceTabModel
 }
 

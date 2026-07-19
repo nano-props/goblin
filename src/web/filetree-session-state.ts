@@ -10,6 +10,7 @@ import {
   parseCanonicalWorkspaceLocator,
   workspaceLocatorForPath,
   workspaceLocatorsShareTransport,
+  type WorkspaceId,
 } from '#/shared/workspace-locator.ts'
 
 interface WorkspaceFilesystemRootsProjection {
@@ -31,8 +32,7 @@ export function persistedFiletreeViewStateByWorktreeByWorkspaceForSession(
     const viewState = sessionViewStateFromInteractionSnapshot(snapshot)
     if (!hasRestorableFiletreeViewState(viewState)) continue
     byWorkspace[scope.workspaceId] ??= {}
-    const workspaceId = canonicalWorkspaceLocator(scope.workspaceId)
-    const worktreeId = workspaceId ? workspaceLocatorForPath(workspaceId, scope.worktreePath) : null
+    const worktreeId = workspaceLocatorForPath(scope.workspaceId, scope.worktreePath)
     if (!worktreeId) continue
     byWorkspace[scope.workspaceId][worktreeId] = viewState
   }
@@ -51,8 +51,9 @@ function interactionByScopeFromSessionViewState(
   filetreeViewStateByWorktreeByWorkspace: ClientWorkspaceState['filetreeViewStateByWorktreeByWorkspace'],
 ): Record<string, FiletreeInteractionSnapshot> {
   const interactionByScope: Record<string, FiletreeInteractionSnapshot> = {}
-  for (const [workspaceId, byWorktree] of Object.entries(filetreeViewStateByWorktreeByWorkspace)) {
-    if (!workspaceId || workspaceId.includes('\0')) continue
+  for (const [workspaceIdInput, byWorktree] of Object.entries(filetreeViewStateByWorktreeByWorkspace)) {
+    const workspaceId = canonicalWorkspaceLocator(workspaceIdInput)
+    if (!workspaceId) continue
     for (const [worktreeId, viewState] of Object.entries(byWorktree)) {
       if (!workspaceLocatorsShareTransport(workspaceId, worktreeId)) continue
       const worktreePath = parseCanonicalWorkspaceLocator(worktreeId)?.path
@@ -80,7 +81,7 @@ function hasRestorableFiletreeViewState(viewState: FiletreeSessionViewState): bo
 }
 
 function knownFilesystemRootPaths(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspace: WorkspaceFilesystemRootsProjection,
 ): ReadonlySet<string> {
   const workspaceRoot = parseCanonicalWorkspaceLocator(workspaceId)?.path

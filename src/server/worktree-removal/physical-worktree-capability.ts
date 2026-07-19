@@ -6,10 +6,11 @@ import {
   type PhysicalWorktreeIdentity,
 } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { resolveRemoteTargetWithConfigFingerprint } from '#/system/ssh/config.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface PhysicalWorktreeExecutionInput {
   userId: string
-  repoRoot: string
+  repoRoot: WorkspaceId
   workspaceRuntimeId: string
   worktreePath: string
 }

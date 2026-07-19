@@ -22,7 +22,8 @@ import {
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
 
-const LOCAL_WORKSPACE_ENTRY = localWorkspaceSessionEntry(workspaceIdForTest('goblin+file:///repo'))
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
+const LOCAL_WORKSPACE_ENTRY = localWorkspaceSessionEntry(WORKSPACE_ID)
 import {
   issueTestPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeExecutionCapability,
@@ -31,9 +32,9 @@ import {
 import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-const scope = { userId: 'user-a', workspaceId: 'goblin+file:///repo', workspaceRuntimeId: 'runtime-a' }
+const scope = { userId: 'user-a', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-a' }
 const target = { branchName: 'feature/worktree', worktreePath: '/repo/worktree' }
-const workspaceId = canonicalWorkspaceLocator(scope.workspaceId)
+const workspaceId = canonicalWorkspaceLocator(WORKSPACE_ID)
 const worktreeRoot = canonicalWorkspaceLocator('goblin+file:///repo/worktree')
 if (!workspaceId || !worktreeRoot) throw new Error('invalid workspace locator fixture')
 const canonicalWorkspaceId = workspaceId
@@ -764,7 +765,7 @@ describe('workspace pane layout aggregate', () => {
         providerSnapshots: [],
       }),
     ).resolves.toEqual({ kind: 'membership-conflict' })
-    expect(aggregate.activeEpochs('/repo')).toEqual([])
+    expect(aggregate.activeEpochs(WORKSPACE_ID)).toEqual([])
   })
 
   test('rechecks runtime currentness after the restore transaction before committing epoch state', async () => {
@@ -789,7 +790,7 @@ describe('workspace pane layout aggregate', () => {
         },
       }),
     ).rejects.toThrow('error.workspace-runtime-stale')
-    expect(aggregate.activeEpochs('/repo')).toEqual([])
+    expect(aggregate.activeEpochs(WORKSPACE_ID)).toEqual([])
   })
 
   test('does not degrade when restore transaction fails before producing an outcome', async () => {
@@ -810,7 +811,7 @@ describe('workspace pane layout aggregate', () => {
         providerSnapshots: [],
       }),
     ).rejects.toBe(failure)
-    expect(aggregate.activeEpochs('/repo')).toEqual([])
+    expect(aggregate.activeEpochs(WORKSPACE_ID)).toEqual([])
   })
 
   test('uses current provider branch metadata for a live worktree target', async () => {

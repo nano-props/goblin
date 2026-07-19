@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   type WorkspacePaneRuntimeTabTargetProjection,
   type WorkspacePaneRuntimeTabTargetSelectionByType,
@@ -12,7 +13,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
 export interface UseWorkspacePaneRuntimeTabTargetProjectionInput {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   worktreePath: string | null
 }

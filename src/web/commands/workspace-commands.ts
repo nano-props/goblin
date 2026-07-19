@@ -24,6 +24,7 @@ import {
   workspacePaneTabTargetForWorkspace,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   workspacePaneCommandCoordinates,
@@ -37,28 +38,28 @@ import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/worksp
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
 interface ShowWorkspacePaneTabCommandOptions {
-  workspaceId: string | null
+  workspaceId: WorkspaceId | null
   target: WorkspacePaneCommandTarget
   tab: WorkspacePaneTabType
   navigation: PrimaryWindowNavigationActions
 }
 
 interface TerminalPrimaryActionCommandOptions {
-  workspaceId: string | null
+  workspaceId: WorkspaceId | null
   target: WorkspacePaneCommandTarget
   navigation: PrimaryWindowNavigationActions
   t?: TerminalCreateTranslator
 }
 
 interface NewTerminalTabCommandOptions {
-  workspaceId: string | null
+  workspaceId: WorkspaceId | null
   target: WorkspacePaneCommandTarget
   navigation: PrimaryWindowNavigationActions
   t?: TerminalCreateTranslator
 }
 
 interface WorkspacePaneTabCommandTargetOptions {
-  workspaceId: string | null
+  workspaceId: WorkspaceId | null
   target: WorkspacePaneCommandTarget
   navigation: PrimaryWindowNavigationActions
   targetIdentity?: string
@@ -72,7 +73,7 @@ interface CloseWorkspacePaneTabCommandOptions extends WorkspacePaneTabCommandTar
 }
 
 interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions {
-  workspaceId: string | null
+  workspaceId: WorkspaceId | null
   workspacePaneRoute: WorkspacePaneCommandRoute
   navigation: PrimaryWindowNavigationActions
   targetIdentity?: string
@@ -92,14 +93,14 @@ type CloseWorkspaceSurfaceIntent =
   | { kind: 'noop' }
 
 interface SelectWorkspacePaneTabByIndexCommandOptions {
-  workspaceId: string | null
+  workspaceId: WorkspaceId | null
   target: WorkspacePaneCommandTarget
   tabIndex: number
   navigation: PrimaryWindowNavigationActions
 }
 
 interface MoveWorkspacePaneTabCommandOptions {
-  workspaceId: string | null
+  workspaceId: WorkspaceId | null
   target: WorkspacePaneCommandTarget
   direction: 1 | -1
   navigation: PrimaryWindowNavigationActions

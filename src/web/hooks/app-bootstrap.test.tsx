@@ -143,7 +143,7 @@ describe('app bootstrap hooks', () => {
       'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-222222222222222222222',
     })
     expect(useFiletreeInteractionStore.getState().interactionByScope).toMatchObject({
-      [filetreeInteractionScopeKey('goblin+file:///tmp/repo', '/tmp/worktree')]: {
+      [filetreeInteractionScopeKey(workspaceIdForTest('goblin+file:///tmp/repo'), '/tmp/worktree')]: {
         selectedKeys: ['src/index.ts'],
         expandedKeys: ['src'],
         topVisibleRowIndex: 140,
@@ -632,5 +632,9 @@ function defaultExternalAppsSnapshot() {
 }
 
 function branchTargetKey(workspaceId: string, branchName: string): string {
-  return workspacePaneTabsTargetIdentityKey({ kind: 'git-branch', workspaceId: workspaceId, branchName })
+  return workspacePaneTabsTargetIdentityKey({
+    kind: 'git-branch',
+    workspaceId: workspaceIdForTest(workspaceId),
+    branchName,
+  })
 }

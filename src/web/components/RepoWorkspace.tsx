@@ -46,6 +46,7 @@ import { gitHead, type GitHead } from '#/shared/git-head.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { StatusList } from '#/web/components/StatusList.tsx'
 import type { WorktreeStatus } from '#/web/types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type RepoWorkspacePaneRouteContext =
   | { kind: 'workspace-root' }
@@ -54,7 +55,7 @@ export type RepoWorkspacePaneRouteContext =
   | { kind: 'inactive' }
 
 interface Props {
-  workspaceId: string
+  workspaceId: WorkspaceId
   currentBranchName?: string | null
   workspacePaneRouteContext: RepoWorkspacePaneRouteContext
   shortcutsEnabled?: boolean

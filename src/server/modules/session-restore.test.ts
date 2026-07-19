@@ -9,6 +9,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const LOCAL_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 const NESTED_WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo/src')
+const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///other')
 const REMOTE_WORKSPACE_ID = workspaceIdForTest('goblin+ssh://prod/srv/repo')
 
 const mocks = vi.hoisted(() => ({
@@ -115,7 +116,7 @@ describe('restoreServerWorkspace', () => {
   test('restores server-owned workspace tabs only after strict validation succeeds', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: LOCAL_WORKSPACE_ID,
       branchName: 'main',
     })
     const workspace: ServerWorkspaceState = {
@@ -147,7 +148,7 @@ describe('restoreServerWorkspace', () => {
 
     expect(result.status).toBe('restored')
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: LOCAL_WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       expectedWorkspaceEntry: { kind: 'local', id: 'goblin+file:///repo' },
       targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
@@ -214,7 +215,7 @@ describe('restoreServerWorkspace', () => {
   test('validates and projects workspace tabs into a canonical snapshot', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: LOCAL_WORKSPACE_ID,
       branchName: 'main',
     })
     const workspace: ServerWorkspaceState = {
@@ -247,7 +248,7 @@ describe('restoreServerWorkspace', () => {
     expect(result.status).toBe('repaired')
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: LOCAL_WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       expectedWorkspaceEntry: { kind: 'local', id: 'goblin+file:///repo' },
       targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
@@ -383,7 +384,7 @@ describe('restoreServerWorkspace', () => {
   test('releases opened runtimes when workspace tab commit fails unexpectedly', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: LOCAL_WORKSPACE_ID,
       branchName: 'main',
     })
     const workspace: ServerWorkspaceState = {
@@ -415,7 +416,7 @@ describe('restoreServerWorkspace', () => {
     ).rejects.toBe(commitError)
 
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: LOCAL_WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       generation: 1,
     })
@@ -424,7 +425,7 @@ describe('restoreServerWorkspace', () => {
   test('releases opened runtimes and skips tab commits when aborted after projection restore', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: LOCAL_WORKSPACE_ID,
       branchName: 'main',
     })
     const workspace: ServerWorkspaceState = {
@@ -472,7 +473,7 @@ describe('restoreServerWorkspace', () => {
 
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: LOCAL_WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       generation: 1,
     })
@@ -526,7 +527,7 @@ describe('restoreServerWorkspace', () => {
   test('releases opened runtimes when workspace repair persistence fails', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: LOCAL_WORKSPACE_ID,
       branchName: 'missing',
     })
     const workspace: ServerWorkspaceState = {
@@ -558,7 +559,7 @@ describe('restoreServerWorkspace', () => {
     ).rejects.toBe(persistError)
 
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: LOCAL_WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       generation: 1,
     })
@@ -567,12 +568,12 @@ describe('restoreServerWorkspace', () => {
   test('uses concurrently repaired repo tabs without overwriting them', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      workspaceId: 'goblin+file:///repo',
+      workspaceId: LOCAL_WORKSPACE_ID,
       branchName: 'missing',
     })
     const otherTargetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-branch',
-      workspaceId: 'goblin+file:///other',
+      workspaceId: OTHER_WORKSPACE_ID,
       branchName: 'main',
     })
     const invalidWorkspace: ServerWorkspaceState = {

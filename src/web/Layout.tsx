@@ -43,7 +43,6 @@ import { useT } from '#/web/stores/i18n.ts'
 import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
 import {
   branchNameFromSlug,
-  repoIdFromSlug,
   workspaceIdFromSlug,
   worktreePathFromSlug,
 } from '#/web/repo-route-slugs.ts'
@@ -62,7 +61,7 @@ import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import { gitHead } from '#/shared/git-head.ts'
 
 const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapResult>({
@@ -150,7 +149,7 @@ function AuthenticatedWorkspaceShell() {
   // `routedRepoId` is the canonical repo id encoded in the URL. It is the
   // source of truth for session persistence even before repo hydration has
   // populated `repos[routedRepoId]`.
-  const routedRepoId = routeContext ? repoIdFromSlug(routeContext.repoSlug) : null
+  const routedRepoId = routeContext ? workspaceIdFromSlug(routeContext.repoSlug) : null
   // `hydratedRouteRepoId` means the routed repo is present in the hydrated repo store and
   // can safely drive refreshes, dialogs, and commands that need repo data.
   const hydratedRouteRepoId = useWorkspacesStore((s) => {
@@ -396,7 +395,7 @@ interface PrimaryWindowOverlaysProps {
   overlays: ReturnType<typeof useAppOverlays>
   workspaceDrop: ReturnType<typeof useWorkspaceDrop>
   navigation: PrimaryWindowNavigationActions
-  hydratedRouteRepoId: string | null
+  hydratedRouteRepoId: WorkspaceId | null
   currentBranchName: string | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
 }
@@ -465,7 +464,7 @@ function AuthenticatedWorkspaceSideEffects({
   navigateToIndex,
 }: {
   routedRepoId: string | null
-  hydratedRouteRepoId: string | null
+  hydratedRouteRepoId: WorkspaceId | null
   currentBranchName: string | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   routeContext: WorkspaceNavigationRouteContext | null
@@ -521,7 +520,7 @@ function workspaceNavigationRouteContext(
   routeHref: string | null,
 ): WorkspaceNavigationRouteContext | null {
   if (!routeContext) return null
-  const workspaceId = repoIdFromSlug(routeContext.repoSlug)
+  const workspaceId = workspaceIdFromSlug(routeContext.repoSlug)
   if (!workspaceId) return null
   if (routeContext.kind === 'branch') {
     return null

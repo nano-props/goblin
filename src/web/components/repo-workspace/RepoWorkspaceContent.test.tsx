@@ -4,6 +4,8 @@ import type { ComponentProps } from 'react'
 import { act, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
 import { FiletreeTab } from '#/web/components/repo-workspace/panels.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
@@ -85,7 +87,7 @@ vi.mock('#/web/filetree-client.ts', () => ({
   getRepositoryTree: filetreeClientMocks.getRepositoryTree,
   getRepositoryFileViewer: filetreeClientMocks.getRepositoryFileViewer,
 }))
-const REPO_ID = 'goblin+file:///tmp/goblin-repo-workspace-content-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-repo-workspace-content-repo')
 
 type RepoWorkspaceContentHarnessProps = Omit<ComponentProps<typeof RepoWorkspaceContent>, 'workspacePaneTabModel'> & {
   workspacePaneRouteMode?: 'preference-route' | 'bare-branch'
@@ -166,7 +168,7 @@ function repoWorkspaceRepo(repo: WorkspaceState): RepoWorkspaceRepo {
   }
 }
 
-function preferenceBackedWorkspacePaneTabModel(repoId: string, branchName: string) {
+function preferenceBackedWorkspacePaneTabModel(repoId: WorkspaceId, branchName: string) {
   const model = workspacePaneTabTargetForBranch(repoId, branchName, workspacePanePreferenceTargetOptions)
   if (!model) throw new Error('missing preference-backed workspace pane tab model')
   return model
@@ -1285,7 +1287,7 @@ describe('RepoWorkspaceContent', () => {
   })
 
   test('opens a workspace-root file through the shared filesystem terminal flow', async () => {
-    const workspaceId = 'goblin+file:///Users/example/Workspace/sample-project'
+    const workspaceId = workspaceIdForTest('goblin+file:///Users/example/Workspace/sample-project')
     const repo = seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
     filetreeClientMocks.getRepositoryTree.mockResolvedValueOnce({
       nodes: [
@@ -1379,7 +1381,7 @@ describe('RepoWorkspaceContent', () => {
   })
 
   test('does not expose terminal-open or trash actions without filesystem capabilities', async () => {
-    const workspaceId = 'goblin+file:///tmp/read-only-filetree-workspace'
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/read-only-filetree-workspace')
     const repo = seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
     filetreeClientMocks.getRepositoryTree.mockResolvedValueOnce({
       nodes: [

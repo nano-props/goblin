@@ -3,6 +3,7 @@ import {
   terminalExecutionPath,
   type TerminalPresentation,
 } from '#/shared/terminal-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
@@ -16,7 +17,7 @@ import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
 export interface WorkspacePaneRuntimeTabCommandContextInput {
-  workspaceId: string
+  workspaceId: WorkspaceId
   branchName: string | null
   filesystemTarget: WorkspacePaneFilesystemTarget | null
   workspacePaneRoute: WorkspacePaneCommandRoute

@@ -10,8 +10,9 @@ import {
   reconcileWorkspacePaneRoute,
   workspacePaneRouteHistoryResolution,
 } from '#/web/components/repo-workspace/workspace-pane-route-reconciliation.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REPO_ID = 'goblin+file:///tmp/goblin-route-reconciliation-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-route-reconciliation-repo')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/tmp/goblin-route-reconciliation-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`

@@ -10,19 +10,19 @@ import {
 
 export interface GitBranchWorkspacePaneTabsTarget {
   kind: 'git-branch'
-  workspaceId: string
+  workspaceId: WorkspaceId
   branchName: string
 }
 
 export interface GitWorktreeWorkspacePaneTabsTarget {
   kind: 'git-worktree'
-  workspaceId: string
+  workspaceId: WorkspaceId
   worktreePath: string
 }
 
 export interface RootWorkspacePaneTabsTarget {
   kind: 'workspace-root'
-  workspaceId: string
+  workspaceId: WorkspaceId
 }
 
 export type WorkspacePaneTabsTarget =
@@ -38,18 +38,15 @@ export function workspacePaneTabsTargetWorktreePath(target: WorkspacePaneTabsTar
 }
 
 export function gitWorktreeWorkspacePaneTabsTarget(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   worktreePath: string,
 ): GitWorktreeWorkspacePaneTabsTarget | null {
-  const canonicalWorkspaceId = canonicalWorkspaceLocator(workspaceId)
-  const worktreeId = canonicalWorkspaceId ? workspaceLocatorForPath(canonicalWorkspaceId, worktreePath) : null
-  return canonicalWorkspaceId && worktreeId
-    ? { kind: 'git-worktree', workspaceId: canonicalWorkspaceId, worktreePath }
-    : null
+  const worktreeId = workspaceLocatorForPath(workspaceId, worktreePath)
+  return worktreeId ? { kind: 'git-worktree', workspaceId, worktreePath } : null
 }
 
 export function gitWorkspacePaneTabsTarget(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   branchName: string,
   worktreePath: string | null,
 ): GitBranchWorkspacePaneTabsTarget | GitWorktreeWorkspacePaneTabsTarget | null {
@@ -60,7 +57,7 @@ export function gitWorkspacePaneTabsTarget(
 }
 
 export function requiredGitWorkspacePaneTabsTarget(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   branchName: string,
   worktreePath: string | null,
 ): GitBranchWorkspacePaneTabsTarget | GitWorktreeWorkspacePaneTabsTarget {
@@ -72,16 +69,16 @@ export function requiredGitWorkspacePaneTabsTarget(
 export type WorkspacePaneTabsTargetIdentity =
   | {
       kind: 'workspace-root'
-      workspaceId: string
+      workspaceId: WorkspaceId
     }
   | {
       kind: 'branch'
-      workspaceId: string
+      workspaceId: WorkspaceId
       branchName: string
     }
   | {
       kind: 'worktree'
-      workspaceId: string
+      workspaceId: WorkspaceId
       worktreeId: WorkspaceId
     }
 
@@ -96,15 +93,14 @@ export function workspacePaneTabsTargetIdentityKey(target: WorkspacePaneTabsTarg
 }
 
 function worktreeTargetIdentity(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   worktreePath: string,
 ): Extract<WorkspacePaneTabsTargetIdentity, { kind: 'worktree' }> {
-  const canonicalWorkspaceId = canonicalWorkspaceLocator(workspaceId)
-  const worktreeId = canonicalWorkspaceId ? workspaceLocatorForPath(canonicalWorkspaceId, worktreePath) : null
-  if (!canonicalWorkspaceId || !worktreeId) {
+  const worktreeId = workspaceLocatorForPath(workspaceId, worktreePath)
+  if (!worktreeId) {
     throw new Error('workspace pane target requires canonical workspace coordinates')
   }
-  return { kind: 'worktree', workspaceId: canonicalWorkspaceId, worktreeId }
+  return { kind: 'worktree', workspaceId, worktreeId }
 }
 
 export function workspacePaneTabsTargetIdentityKeyFromIdentity(target: WorkspacePaneTabsTargetIdentity): string {
@@ -193,7 +189,7 @@ export function restorableWorkspacePaneTarget(target: WorkspacePaneTabsTarget): 
 }
 
 export function workspacePaneTabsTargetFromRestorable(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   target: RestorableWorkspacePaneTarget,
 ): WorkspacePaneTabsTarget | null {
   if (target.kind === 'workspace-root') {
@@ -228,8 +224,8 @@ export function runtimeWorkspacePaneTarget(
   target: WorkspacePaneTabsTarget,
   workspaceRuntimeId: string,
 ): RuntimeWorkspacePaneTarget | null {
-  const workspaceId = canonicalWorkspaceLocator(target.workspaceId)
-  if (!workspaceId || !workspaceRuntimeId) return null
+  const workspaceId = target.workspaceId
+  if (!workspaceRuntimeId) return null
   if (target.kind === 'workspace-root') return { kind: 'workspace-root', workspaceId, workspaceRuntimeId }
   if (target.kind === 'git-branch') {
     return target.branchName ? { kind: 'git-branch', workspaceId, workspaceRuntimeId, branch: target.branchName } : null

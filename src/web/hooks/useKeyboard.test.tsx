@@ -4,6 +4,7 @@ import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toast } from 'sonner'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 
@@ -36,9 +37,10 @@ import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/sha
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
-const REPO_ID = 'goblin+file:///tmp/keyboard-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/keyboard-repo')
 const REPO_PATH = '/tmp/keyboard-repo'
 const WORKTREE_PATH = '/tmp/keyboard-worktree'
 const WORKTREE_KEY = formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH)
@@ -49,7 +51,7 @@ const FILESYSTEM_CAPABILITIES = {
 } as const
 
 interface HookHostOptions {
-  currentWorkspaceId: string | null
+  currentWorkspaceId: WorkspaceId | null
   currentBranchName: string | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   isWorkspaceShortcutSuppressed: () => boolean

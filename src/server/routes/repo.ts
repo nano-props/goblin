@@ -33,6 +33,7 @@ import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import { isCurrentWorkspaceRuntime, workspaceRuntimeHasGitCapability } from '#/server/modules/workspace-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { IpcError, type RepoLogResponse } from '#/shared/api-types.ts'
 import { isRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { settleRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
@@ -86,14 +87,14 @@ export function createRepoRoutes(options: {
   }
   function assertCurrentWorkspaceRuntimeForRead(
     userId: string | null | undefined,
-    repoRoot: string,
+    repoRoot: WorkspaceId,
     workspaceRuntimeId: string,
   ): asserts userId is string {
     if (!userId || !isCurrentWorkspaceRuntime(userId, repoRoot, workspaceRuntimeId)) {
       throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
     }
   }
-  function assertGitCapability(userId: string, repoRoot: string, workspaceRuntimeId: string): void {
+  function assertGitCapability(userId: string, repoRoot: WorkspaceId, workspaceRuntimeId: string): void {
     if (!workspaceRuntimeHasGitCapability(userId, repoRoot, workspaceRuntimeId)) {
       throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-git-unavailable' })
     }

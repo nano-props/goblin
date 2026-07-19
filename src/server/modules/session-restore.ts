@@ -369,7 +369,7 @@ async function openRemoteWorkspace(
 
 function remoteCapabilityTransitionOptions(
   input: RestoreServerWorkspaceInput,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
 ) {
   return {
@@ -388,7 +388,7 @@ function remoteCapabilityTransitionOptions(
 
 async function commitGitCapabilityRemoval(
   input: RestoreServerWorkspaceInput,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
 ): Promise<void> {
   await commitGitCapabilityRemovalOrThrow(input.workspaceCapabilityTransitionHost, {
@@ -405,7 +405,7 @@ async function commitGitCapabilityRemoval(
 
 async function withAcquiredWorkspaceRuntimeLease<T>(
   input: RestoreServerWorkspaceInput,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   open: (lease: WorkspaceRuntimeMembershipLeaseEntry) => Promise<T>,
 ): Promise<T> {
   const lease = acquireWorkspaceRuntimeLease(input.userId, workspaceId, input.clientId)
@@ -426,7 +426,11 @@ interface OpenedWorkspaceRuntimeInput {
   lease: WorkspaceRuntimeMembershipLeaseEntry
 }
 
-function requiredWorkspaceProbe(userId: string, workspaceId: string, workspaceRuntimeId: string): WorkspaceProbeState {
+function requiredWorkspaceProbe(
+  userId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+): WorkspaceProbeState {
   const probe = workspaceProbeStateForRuntime(userId, workspaceId, workspaceRuntimeId)
   if (!probe) throw new Error('workspace runtime was superseded during restore')
   return probe

@@ -3,15 +3,17 @@ import { act } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useWorkspacePaneVisibleStatusRefresh } from '#/web/components/repo-workspace/use-workspace-pane-visible-status-refresh.ts'
 import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/workspaces/repo-refresh-actions.ts'
+import type * as RepoRefreshActionsModule from '#/web/stores/workspaces/repo-refresh-actions.ts'
 
 vi.mock('#/web/stores/workspaces/repo-refresh-actions.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#/web/stores/workspaces/repo-refresh-actions.ts')>()
+  const actual = await importOriginal<typeof RepoRefreshActionsModule>()
   return { ...actual, requestVisibleWorkspaceStatusRefresh: vi.fn(() => true) }
 })
 
-const REPO_ID = 'goblin+file:///tmp/visible-status-refresh-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/example-workspace')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-visible-status-refresh'
 
 function Harness({

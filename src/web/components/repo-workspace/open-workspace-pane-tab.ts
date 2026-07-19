@@ -1,4 +1,5 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import {
   dispatchOpenWorkspacePaneStaticTabAction,
@@ -7,7 +8,7 @@ import {
 import type { WorkspacePaneTabControllerCommitNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 
 export async function openWorkspacePaneTab(input: {
-  workspaceId: string
+  workspaceId: WorkspaceId
   branchName: string
   worktreePath: string | null | undefined
   type: WorkspacePaneStaticTabType

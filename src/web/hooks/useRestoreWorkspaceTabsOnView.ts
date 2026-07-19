@@ -25,7 +25,7 @@ interface TargetPromotionViewState {
 
 const IDLE_PROMOTION_VIEW_STATE: WorkspaceProjectionPromotionViewState = { phase: 'idle' }
 
-export function useRestoreWorkspaceTabsOnView({ workspaceId }: { workspaceId: string | null }) {
+export function useRestoreWorkspaceTabsOnView({ workspaceId }: { workspaceId: WorkspaceId | null }) {
   const target = useWorkspacesStore(
     useShallow((state): LazyRestoreTarget | null => {
       if (!workspaceId) return null

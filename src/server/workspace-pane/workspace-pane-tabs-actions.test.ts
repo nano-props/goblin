@@ -12,8 +12,9 @@ import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const CLIENT_ID = 'client_workspace_pane_tabs_actions'
 const USER_ID = 'user_workspace_pane_tabs_actions'
-const REPO_ROOT = 'goblin+file:///repo'
 const WORKSPACE_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/repo' }, 'posix')!
+const OTHER_WORKSPACE_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/other' }, 'posix')!
+const REPO_ROOT = WORKSPACE_ID
 let WORKSPACE_RUNTIME_ID = ''
 
 function syncCurrentWorkspaceRuntime(): void {
@@ -114,14 +115,14 @@ describe('workspace-pane-tabs-actions', () => {
     expect(sessionService.updateTabs).toHaveBeenCalledOnce()
   })
 
-  test('rejects invalid replaceTabs input without emitting', async () => {
+  test('rejects a replaceTabs input whose target belongs to another workspace', async () => {
     clearWorkspaceRuntimesForUser(USER_ID)
     syncCurrentWorkspaceRuntime()
     const { actions, sessionService } = makeActions()
 
     await expect(
       actions.replaceTabs(CLIENT_ID, USER_ID, {
-        workspaceId: '',
+        workspaceId: OTHER_WORKSPACE_ID,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         target: runtimeTarget(),
         tabs: [workspacePaneStaticTabEntry('status')],

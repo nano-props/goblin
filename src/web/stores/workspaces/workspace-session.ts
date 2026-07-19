@@ -183,14 +183,14 @@ function createRestorableWorkspaceLifecycleActions(
   }
 }
 
-function tabsSnapshotForRepo(runtime: WorkspaceRuntimeRestoreSnapshot, repoRoot: string) {
+function tabsSnapshotForRepo(runtime: WorkspaceRuntimeRestoreSnapshot, repoRoot: WorkspaceId) {
   return runtime.workspacePaneTabs.find((entry) => entry.workspaceId === repoRoot)?.snapshot ?? null
 }
 
 function applyRestoredPreferredWorkspacePaneTabs(
   set: WorkspacesSet,
   get: WorkspacesGet,
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   snapshot: WorkspaceTabsRestoreResult['snapshot'],
 ): void {
   const state = get()
@@ -202,7 +202,7 @@ function applyRestoredPreferredWorkspacePaneTabs(
   const branches = branchProjection ?? (repo.capability.kind === 'filesystem' ? [] : null)
   if (!branches) return
   const preferredWorkspacePaneTabByTarget = restoredPreferredWorkspacePaneTabByTarget(
-    repoRoot,
+    repo.id,
     { branches },
     restoredPreferred,
     snapshot ? workspacePaneTabsByTargetFromQueryData(snapshot) : {},

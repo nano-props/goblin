@@ -11,7 +11,7 @@ import { serverLogger } from '#/server/logger.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
-import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const worktreeRemovalLogger = serverLogger.child({ module: 'worktree-removal-application' })
 
@@ -23,9 +23,9 @@ interface WorktreeRemovalApplicationDependencies {
     WorkspacePaneTabsCoordinator,
     'physicalWorktreeTargets' | 'reconcilePhysicalWorktreeAfterRemovalFailure' | 'clearPhysicalWorktreeIndex'
   >
-  isCurrentWorkspaceRuntime(userId: string, repoRoot: string, workspaceRuntimeId: string): boolean
-  broadcastSessionsChanged(userId: string, workspaceId: string, workspaceRuntimeId: string): void
-  broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
+  isCurrentWorkspaceRuntime(userId: string, repoRoot: WorkspaceId, workspaceRuntimeId: string): boolean
+  broadcastSessionsChanged(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): void
+  broadcastWorkspaceTabsChanged(userId: string, repoRoot: WorkspaceId): void
 }
 
 export class WorktreeRemovalApplication {
@@ -38,7 +38,7 @@ export class WorktreeRemovalApplication {
   async removeWorktree(
     userId: string,
     input: {
-      repoRoot: string
+      repoRoot: WorkspaceId
       workspaceRuntimeId: string
       worktreePath: string
       branchName: string
@@ -73,7 +73,7 @@ export class WorktreeRemovalApplication {
           signal.throwIfAborted()
           let affectedScopes: Array<{
             userId: string
-            repoRoot: string
+            repoRoot: WorkspaceId
             workspaceRuntimeId: string
             scope: string
             worktreePath: string
@@ -141,12 +141,12 @@ export class WorktreeRemovalApplication {
     }
   }
 
-  private isCurrentRuntime(userId: string, input: { repoRoot: string; workspaceRuntimeId: string }): boolean {
+  private isCurrentRuntime(userId: string, input: { repoRoot: WorkspaceId; workspaceRuntimeId: string }): boolean {
     return this.deps.isCurrentWorkspaceRuntime(userId, input.repoRoot, input.workspaceRuntimeId)
   }
 
   private async quiesce(
-    repoRoot: string,
+    repoRoot: WorkspaceId,
     worktreePath: string,
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
   ): Promise<
@@ -154,7 +154,7 @@ export class WorktreeRemovalApplication {
         ok: true
         scopes: Array<{
           userId: string
-          repoRoot: string
+          repoRoot: WorkspaceId
           workspaceRuntimeId: string
           scope: string
           worktreePath: string
@@ -164,7 +164,7 @@ export class WorktreeRemovalApplication {
         ok: false
         scopes: Array<{
           userId: string
-          repoRoot: string
+          repoRoot: WorkspaceId
           workspaceRuntimeId: string
           scope: string
           worktreePath: string
@@ -188,7 +188,7 @@ export class WorktreeRemovalApplication {
   }
 
   private broadcast(
-    scopes: readonly { userId: string; repoRoot: string; workspaceRuntimeId: string; scope: string }[],
+    scopes: readonly { userId: string; repoRoot: WorkspaceId; workspaceRuntimeId: string; scope: string }[],
   ): void {
     const targets = new Map(
       scopes.map(({ userId, repoRoot, workspaceRuntimeId, scope }) => [
@@ -203,13 +203,13 @@ export class WorktreeRemovalApplication {
   }
 
   private async reconcileAfterFailure(
-    repoRoot: string,
+    repoRoot: WorkspaceId,
     worktreePath: string,
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,
     scopes: readonly {
       userId: string
-      repoRoot: string
+      repoRoot: WorkspaceId
       workspaceRuntimeId: string
       scope: string
       worktreePath: string
@@ -221,9 +221,9 @@ export class WorktreeRemovalApplication {
         worktreePath,
         physicalWorktreeCapability,
         permit,
-        scopes: scopes.map(({ userId, repoRoot: workspaceId, scope, worktreePath }) => ({
+        scopes: scopes.map(({ userId, repoRoot, scope, worktreePath }) => ({
           userId,
-          workspaceId,
+          workspaceId: repoRoot,
           scope,
           worktreePath,
         })),
@@ -255,12 +255,12 @@ export function createWorktreeRemovalApplication(
 function uniqueScopes(
   scopes: readonly {
     userId: string
-    repoRoot: string
+    repoRoot: WorkspaceId
     workspaceRuntimeId: string
     scope: string
     worktreePath: string
   }[],
-): Array<{ userId: string; repoRoot: string; workspaceRuntimeId: string; scope: string; worktreePath: string }> {
+): Array<{ userId: string; repoRoot: WorkspaceId; workspaceRuntimeId: string; scope: string; worktreePath: string }> {
   return Array.from(
     new Map(
       scopes.map((item) => [`${item.userId}\0${item.scope}\0${item.repoRoot}\0${item.worktreePath}`, item]),

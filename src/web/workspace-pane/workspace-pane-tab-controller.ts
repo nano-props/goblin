@@ -1,4 +1,5 @@
 import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   isWorkspacePaneRuntimeTabEntry,
   workspacePaneTabEntryIdentity,
@@ -35,7 +36,7 @@ import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 export type WorkspacePaneTabControllerRoute = WorkspacePaneRouteTarget
 export interface WorkspacePaneControllerTarget {
-  workspaceId: string
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string | null
   worktreePath: string | null
@@ -211,7 +212,7 @@ export function commitWorkspacePaneControllerCloseBackTarget(
 }
 
 export function showWorkspacePaneControllerRoute(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   branchName: string,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerOptionalShowNavigation,
@@ -231,7 +232,7 @@ export function showWorkspacePaneControllerRoute(
 }
 
 export async function commitWorkspacePaneControllerRoute(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   branchName: string,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,

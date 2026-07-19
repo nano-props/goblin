@@ -53,8 +53,8 @@ interface TerminalSessionServiceOptions {
   isValidTerminalSessionId(value: unknown): value is string
   manager: TerminalSessionServiceManager
   workspaceTabsCoordinator: WorkspacePaneTabsCoordinator
-  broadcastWorkspaceTabsChanged(userId: string, workspaceId: string): void
-  isCurrentWorkspaceRuntime(userId: string, workspaceId: string, workspaceRuntimeId: string): boolean
+  broadcastWorkspaceTabsChanged(userId: string, workspaceId: WorkspaceId): void
+  isCurrentWorkspaceRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean
   gCommand?: TerminalSessionEnsurerOptions['gCommand']
 }
 
@@ -169,7 +169,7 @@ class TerminalSessionService {
   async restoreTabs(
     userId: string,
     input: {
-      workspaceId: string
+      workspaceId: WorkspaceId
       workspaceRuntimeId: string
       targets: RestorableWorkspacePaneTarget[]
       expectedWorkspaceEntry: WorkspaceSessionEntry

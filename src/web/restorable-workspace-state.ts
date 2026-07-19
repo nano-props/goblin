@@ -26,7 +26,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
 interface ClientWorkspaceRepoProjection {
-  id: string
+  id: WorkspaceId
   ui: Pick<WorkspacesStore['workspaces'][string]['ui'], 'preferredWorkspacePaneTabByTarget'>
   branches: RepoBranchSnapshotData['branches']
 }
@@ -90,7 +90,7 @@ export function clientWorkspaceStateFromRestorableWorkspaceState(input: {
 
 function clientWorkspaceRepoProjections(
   workspaces: WorkspacesStore['workspaces'],
-  workspaceOrder: readonly string[],
+  workspaceOrder: readonly WorkspaceId[],
 ): ClientWorkspaceRepoProjectionMap {
   const projectedRepos: ClientWorkspaceRepoProjectionMap = {}
   for (const id of workspaceOrder) {
@@ -113,7 +113,7 @@ function clientWorkspaceRepoProjections(
 
 function workspacePaneTabsByTargetByWorkspaceFromQueryCache(
   workspaces: Record<string, Pick<WorkspacesStore['workspaces'][string], 'workspaceRuntimeId' | 'session'> | undefined>,
-  workspaceOrder: readonly string[],
+  workspaceOrder: readonly WorkspaceId[],
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
   const byRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
   for (const id of workspaceOrder) {
@@ -134,7 +134,7 @@ function clientWorkspaceWithStubBaseline(
   clientWorkspace: ClientWorkspaceState,
   baseline: ClientWorkspaceState | null | undefined,
   workspaces: WorkspacesStore['workspaces'],
-  workspaceOrder: readonly string[],
+  workspaceOrder: readonly WorkspaceId[],
 ): ClientWorkspaceState {
   if (!baseline) return clientWorkspace
   const stubRepoIds = new Set(workspaceOrder.filter((id) => workspaces[id]?.session.projectionState === 'stub'))
@@ -200,7 +200,7 @@ function preferredWorkspacePaneTabsForClientWorkspace(
     string,
     (ClientWorkspaceRepoTargetProjection & Required<Pick<ClientWorkspaceRepoTargetProjection, 'ui'>>) | undefined
   >,
-  workspaceOrder: readonly string[],
+  workspaceOrder: readonly WorkspaceId[],
   workspacePaneTabsByTargetByWorkspace: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
 ): Record<string, Record<string, WorkspacePaneSessionTabType | null>> {
   const byRepo: Record<string, Record<string, WorkspacePaneSessionTabType | null>> = {}
@@ -230,7 +230,7 @@ function preferredWorkspacePaneTabsForClientWorkspace(
 }
 
 export function restoredPreferredWorkspacePaneTabByTarget(
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   repo: ClientWorkspaceRepoTargetProjection,
   preferredByTarget: Record<string, WorkspacePaneSessionTabType | null> | undefined,
   workspacePaneTabsByTarget: Record<string, WorkspacePaneTabEntry[]>,
@@ -247,7 +247,7 @@ export function restoredPreferredWorkspacePaneTabByTarget(
 
 function workspacePaneTabsTargetKeyBelongsToRepo(
   targetKey: string,
-  workspaceId: string,
+  workspaceId: WorkspaceId,
   repo: ClientWorkspaceRepoTargetProjection,
 ) {
   const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
