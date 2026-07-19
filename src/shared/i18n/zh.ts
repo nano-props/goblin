@@ -490,6 +490,8 @@ export const zh: Record<DictKey, string> = {
   // ---- Errors / banners --------------------------------------------------
   'error.workspace-git-unavailable': '此工作区无法使用 Git 功能',
   'error.workspace-operation-failed': '工作区操作失败',
+  'error.workspace-open-failed': '打开工作区失败',
+  'error.workspace-close-failed': '关闭工作区失败',
   'error.failed-read-repo': '读取仓库失败',
   'error.ssh-config-changed': 'SSH 配置已变更',
   'error.git-not-found': '未找到 Git',

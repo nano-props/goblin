@@ -316,7 +316,7 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     expect(useWorkspacesStore.getState().workspaces[repo.id]).toBeDefined()
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('error.failed-read-repo'))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('error.workspace-close-failed'))
   })
 
   test('zen mode menu action toggles the zen mode state', async () => {

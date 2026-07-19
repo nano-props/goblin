@@ -906,7 +906,7 @@ async function openLocalWorkspace(
         err: membership.error,
       })
       await releaseUncommittedWorkspaceRuntime(workspace.id, workspaceRuntimeId)
-      return { ...opened, reason: 'error.failed-read-repo', workspace: null, workspaceRuntimeId: null }
+      return { ...opened, reason: 'error.workspace-open-failed', workspace: null, workspaceRuntimeId: null }
     }
     set((state) => {
       const { workspaces, workspaceOrder, changed } = addResolvedWorkspace(state, workspace, workspaceRuntimeId)
@@ -920,7 +920,7 @@ async function openLocalWorkspace(
     return opened
   })
   if (!resolved.workspace || !resolved.workspaceRuntimeId) {
-    return { ok: false, message: resolved.reason ?? 'error.repo-git-unavailable' }
+    return { ok: false, message: resolved.reason ?? 'error.workspace-open-failed' }
   }
   if (initialRefreshRef.current) refreshInitialWorkspaceState(set, get, initialRefreshRef.current)
   const recentEntry = resolved.workspace.target
@@ -966,13 +966,13 @@ async function openRemoteWorkspace(
     }
     return { workspaceRuntimeId }
   })
-  if (!prepared) return { ok: false, message: 'error.failed-read-repo' }
+  if (!prepared) return { ok: false, message: 'error.workspace-open-failed' }
 
   const outcome = await runRemoteWorkspaceConnection(set, get, entry.id, {
     workspaceRuntimeId: prepared.workspaceRuntimeId,
   })
   if (get().workspaces[entry.id]?.workspaceRuntimeId !== prepared.workspaceRuntimeId) {
-    return { ok: false, message: 'error.failed-read-repo' }
+    return { ok: false, message: 'error.workspace-open-failed' }
   }
   const recentEntry = outcome?.kind === 'ready' ? remoteWorkspaceSessionEntry(outcome.target) : entry
   return { ok: true, workspaceId: entry.id, postOpenEffects: recordRecentWorkspacePostOpen(recentEntry) }
@@ -984,12 +984,12 @@ async function closeWorkspaceMembership(
   workspaceId: WorkspaceId,
 ): Promise<CloseWorkspaceResult> {
   const workspace = get().workspaces[workspaceId]
-  if (!workspace) return { ok: false, message: 'error.failed-read-repo' }
+  if (!workspace) return { ok: false, message: 'error.workspace-close-failed' }
   const workspaceRuntimeId = workspace.workspaceRuntimeId
   const membership = await removeWorkspaceMembershipResult(workspaceId)
   if (!membership.ok) {
     workspacesLog.warn('failed to remove workspace from server session', { workspaceId, err: membership.error })
-    return { ok: false, message: 'error.failed-read-repo' }
+    return { ok: false, message: 'error.workspace-close-failed' }
   }
   if (workspace.capability.kind === 'git') disposeRepoOperationScheduler(workspaceId)
   set((state) => removeWorkspaceFromSessionState(state, workspaceId))

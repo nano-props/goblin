@@ -511,6 +511,8 @@ export const ja: Record<DictKey, string> = {
   // ---- Errors / banners --------------------------------------------------
   'error.workspace-git-unavailable': 'このワークスペースでは Git 機能を利用できません',
   'error.workspace-operation-failed': 'ワークスペースの操作に失敗しました',
+  'error.workspace-open-failed': 'ワークスペースを開けませんでした',
+  'error.workspace-close-failed': 'ワークスペースを閉じられませんでした',
   'error.failed-read-repo': 'リポジトリの読み込みに失敗しました',
   'error.ssh-config-changed': 'SSH 設定が変更されました',
   'error.git-not-found': 'Git が見つかりません',

@@ -147,7 +147,7 @@ describe('repo lifecycle', () => {
 
     await expect(useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)).resolves.toEqual({
       ok: false,
-      message: 'error.failed-read-repo',
+      message: 'error.workspace-open-failed',
     })
     expect(useWorkspacesStore.getState().workspaces[REPO_A]).toBeUndefined()
     expect(useWorkspacesStore.getState().workspaceOrder).not.toContain(REPO_A)
@@ -164,7 +164,7 @@ describe('repo lifecycle', () => {
 
     await expect(useWorkspacesStore.getState().closeWorkspace(REPO_A)).resolves.toEqual({
       ok: false,
-      message: 'error.failed-read-repo',
+      message: 'error.workspace-close-failed',
     })
 
     expect(useWorkspacesStore.getState().workspaces[REPO_A]?.workspaceRuntimeId).toBe(workspaceRuntimeId)
@@ -487,7 +487,7 @@ describe('repo lifecycle', () => {
       lifecycle: { kind: 'ready', attemptId: 1, target: target! },
     })
 
-    await expect(opening).resolves.toEqual({ ok: false, message: 'error.failed-read-repo' })
+    await expect(opening).resolves.toEqual({ ok: false, message: 'error.workspace-open-failed' })
     expect(calls.workspaceEntries).toEqual([])
     expect(useWorkspacesStore.getState().workspaces[target!.id]).toBeUndefined()
   })

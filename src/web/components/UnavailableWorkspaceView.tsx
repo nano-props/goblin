@@ -29,10 +29,10 @@ export function UnavailableWorkspaceView({ workspace }: Props) {
   const reason = isRemote
     ? workspace.admission.kind === 'remote' && workspace.admission.lifecycle?.kind === 'failed'
       ? workspace.admission.lifecycle.reason
-      : 'error.failed-read-repo'
+      : 'error.workspace-operation-failed'
     : workspace.availability.phase === 'unavailable'
       ? workspace.availability.reason
-      : 'error.failed-read-repo'
+      : 'error.workspace-operation-failed'
   if (!isUnavailable) {
     // Defensive: this view is only mounted when the workspace is unavailable,
     // but a stale render after a state

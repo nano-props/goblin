@@ -502,6 +502,8 @@ export const ko: Record<DictKey, string> = {
   // ---- Errors / banners --------------------------------------------------
   'error.workspace-git-unavailable': '이 작업 공간에서는 Git 기능을 사용할 수 없습니다',
   'error.workspace-operation-failed': '작업 공간 작업에 실패했습니다',
+  'error.workspace-open-failed': '작업 공간을 열지 못했습니다',
+  'error.workspace-close-failed': '작업 공간을 닫지 못했습니다',
   'error.failed-read-repo': '리포지토리 읽기 실패',
   'error.ssh-config-changed': 'SSH 설정이 변경됨',
   'error.git-not-found': 'Git을 찾을 수 없습니다',
