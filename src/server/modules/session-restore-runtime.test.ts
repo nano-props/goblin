@@ -13,7 +13,6 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const mocks = vi.hoisted(() => ({
   getServerWorkspaceState: vi.fn(),
-  probeRepo: vi.fn(),
   readRepoProjection: vi.fn(),
   runRemoteWorkspaceLifecycleWrite: vi.fn(),
 }))
@@ -32,7 +31,6 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
-  probeRepo: mocks.probeRepo,
   readRepoProjection: mocks.readRepoProjection,
 }))
 
@@ -51,7 +49,6 @@ describe('session restore runtime ownership', () => {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ kind: 'local', id: REPO_ROOT }],
     })
-    mocks.probeRepo.mockResolvedValue({ ok: true, root: REPO_ROOT, name: 'repo' })
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
   })
 

@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
   getServerWorkspaceState: vi.fn(),
   compareAndReplaceServerWorkspaceEntries: vi.fn(),
   confirmServerWorkspaceEntry: vi.fn(),
-  probeRepo: vi.fn(),
+  probeWorkspace: vi.fn(),
   readRepoProjection: vi.fn(),
   runRemoteWorkspaceLifecycleWrite: vi.fn(),
   workspaceProbes: new Map<string, unknown>(),
@@ -70,9 +70,7 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
 }))
 
 vi.mock('#/server/modules/workspace-probe.ts', () => ({
-  probeWorkspace: vi.fn(async (workspaceId: string) =>
-    workspaceProbeFromLegacy(workspaceId, await mocks.probeRepo(workspaceId)),
-  ),
+  probeWorkspace: mocks.probeWorkspace,
 }))
 
 vi.mock('#/server/modules/remote-workspace-lifecycle-write-paths.ts', () => ({
@@ -89,7 +87,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       generation: 1,
     }))
     mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(true)
-    mocks.probeRepo.mockImplementation(async (workspaceId: string) => ({ ok: true, root: workspaceId, name: 'repo' }))
+    mocks.probeWorkspace.mockResolvedValue(gitProbe())
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       repoId: 'goblin+ssh://prod/srv/repo',
@@ -141,10 +139,14 @@ describe('restoreServerWorkspace — active-only restore', () => {
     })
 
     expect(result.status).toBe('restored')
-    // All local repos are probed for canonical identity; only the active repo is projected.
-    expect(mocks.probeRepo).toHaveBeenCalledTimes(2)
-    expect(mocks.probeRepo).toHaveBeenCalledWith('goblin+file:///repo-active')
-    expect(mocks.probeRepo).toHaveBeenCalledWith('goblin+file:///repo-stub')
+    // Every local Workspace is capability-probed; only the active Git Workspace is projected.
+    expect(mocks.probeWorkspace).toHaveBeenCalledTimes(2)
+    expect(mocks.probeWorkspace).toHaveBeenCalledWith('goblin+file:///repo-active', expect.any(String), {
+      signal: undefined,
+    })
+    expect(mocks.probeWorkspace).toHaveBeenCalledWith('goblin+file:///repo-stub', expect.any(String), {
+      signal: undefined,
+    })
     expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
     const repos = result.runtime.workspaces
     const active = repos.find((r) => r.workspaceId === 'goblin+file:///repo-active')!
@@ -309,15 +311,19 @@ describe('restoreServerWorkspace — active-only restore', () => {
       workspacePaneTabsHost,
     })
 
-    expect(mocks.probeRepo).toHaveBeenCalledTimes(2)
-    expect(mocks.probeRepo).toHaveBeenCalledWith('goblin+file:///repo-a')
-    expect(mocks.probeRepo).toHaveBeenCalledWith('goblin+file:///repo-b')
+    expect(mocks.probeWorkspace).toHaveBeenCalledTimes(2)
+    expect(mocks.probeWorkspace).toHaveBeenCalledWith('goblin+file:///repo-a', expect.any(String), {
+      signal: undefined,
+    })
+    expect(mocks.probeWorkspace).toHaveBeenCalledWith('goblin+file:///repo-b', expect.any(String), {
+      signal: undefined,
+    })
     expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
     expect(result.runtime.workspaces.find((r) => r.workspaceId === 'goblin+file:///repo-a')?.projection).toBeNull()
     expect(result.runtime.workspaces.find((r) => r.workspaceId === 'goblin+file:///repo-b')?.projection).not.toBeNull()
   })
 
-  test('rebuilds when a non-active local entry is not canonical', async () => {
+  test('restores a non-active nested directory as a plain Workspace', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [
@@ -326,11 +332,9 @@ describe('restoreServerWorkspace — active-only restore', () => {
       ],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.probeRepo.mockImplementation(async (workspaceId: string) => ({
-      ok: true,
-      root: workspaceId === 'goblin+file:///repo-stub/src' ? '/repo-stub' : workspaceId,
-      name: 'repo',
-    }))
+    mocks.probeWorkspace.mockImplementation(async (workspaceId: string) =>
+      workspaceId === NESTED_STUB_WORKSPACE_ID ? plainWorkspaceProbe() : gitProbe(),
+    )
     const workspacePaneTabsHost = {
       restoreTabs: vi.fn(async () => ({
         kind: 'restored' as const,
@@ -368,7 +372,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
   })
 
-  test('non-active remote repos are probed and retain their display name', async () => {
+  test('non-active remote Workspaces are probed and retain their display name', async () => {
     const remoteEntry = {
       kind: 'remote' as const,
       id: REMOTE_WORKSPACE_ID,
@@ -502,19 +506,9 @@ function gitProbe() {
   }
 }
 
-function workspaceProbeFromLegacy(workspaceId: string, result: { ok: boolean; root?: string; name?: string }) {
-  const reportedRoot = result.root?.startsWith('goblin+')
-    ? result.root
-    : result.root
-      ? `goblin+file://${result.root}`
-      : null
-  return result.ok
-    ? reportedRoot && reportedRoot !== workspaceId
-      ? {
-          ...gitProbe(),
-          name: result.name ?? 'repo',
-          capabilities: { ...gitProbe().capabilities, git: { status: 'unavailable' as const } },
-        }
-      : { ...gitProbe(), name: result.name ?? 'repo' }
-    : { status: 'unavailable' as const, reason: 'error.workspace-transport-unavailable' as const }
+function plainWorkspaceProbe() {
+  return {
+    ...gitProbe(),
+    capabilities: { ...gitProbe().capabilities, git: { status: 'unavailable' as const } },
+  }
 }

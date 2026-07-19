@@ -18,7 +18,6 @@ const mocks = vi.hoisted(() => ({
   getServerWorkspaceState: vi.fn(),
   compareAndReplaceServerWorkspaceEntries: vi.fn(),
   confirmServerWorkspaceEntry: vi.fn(),
-  probeRepo: vi.fn(),
   readRepoProjection: vi.fn(),
   runRemoteWorkspaceLifecycleWrite: vi.fn(),
   workspaceProbeStateForRuntime: vi.fn(),
@@ -91,7 +90,6 @@ describe('restoreWorkspaceTabs', () => {
     mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(true)
     mocks.workspaceProbeStateForRuntime.mockReturnValue(gitProbe())
     mocks.probeWorkspace.mockResolvedValue(gitProbe())
-    mocks.probeRepo.mockImplementation(async (workspaceId: string) => ({ ok: true, root: workspaceId, name: 'repo' }))
     mocks.readRepoProjection.mockResolvedValue({
       snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: '/repo' } }] },
       status: [],
@@ -149,7 +147,7 @@ describe('restoreWorkspaceTabs', () => {
     })
     expect(result.workspace.projection).not.toBeNull()
     expect(result.snapshot).toEqual({ revision: 5, entries: [] })
-    expect(mocks.probeRepo).not.toHaveBeenCalled()
+    expect(mocks.probeWorkspace).not.toHaveBeenCalled()
     expect(mocks.acquireWorkspaceRuntimeLease).not.toHaveBeenCalled()
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
@@ -328,7 +326,7 @@ describe('restoreWorkspaceTabs', () => {
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
-    expect(mocks.probeRepo).not.toHaveBeenCalled()
+    expect(mocks.probeWorkspace).not.toHaveBeenCalled()
   })
 
   test('rejects lazy restore when the repo is absent from server workspace membership', async () => {

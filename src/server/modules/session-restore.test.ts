@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
   getServerWorkspaceState: vi.fn(),
   compareAndReplaceServerWorkspaceEntries: vi.fn(),
   confirmServerWorkspaceEntry: vi.fn(),
-  probeRepo: vi.fn(),
+  probeWorkspace: vi.fn(),
   readRepoProjection: vi.fn(),
   runRemoteWorkspaceLifecycleWrite: vi.fn(),
   workspaceProbes: new Map<string, unknown>(),
@@ -67,9 +67,7 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
 }))
 
 vi.mock('#/server/modules/workspace-probe.ts', () => ({
-  probeWorkspace: vi.fn(async (workspaceId: string) =>
-    workspaceProbeFromLegacy(workspaceId, await mocks.probeRepo(workspaceId)),
-  ),
+  probeWorkspace: mocks.probeWorkspace,
 }))
 
 vi.mock('#/server/modules/remote-workspace-lifecycle-write-paths.ts', () => ({
@@ -86,7 +84,7 @@ describe('restoreServerWorkspace', () => {
       generation: 1,
     }))
     mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(true)
-    mocks.probeRepo.mockResolvedValue({ ok: true, root: '/repo', name: 'repo' })
+    mocks.probeWorkspace.mockResolvedValue(gitProbe())
     mocks.readRepoProjection.mockResolvedValue({
       snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: '/repo' } }] },
       status: [],
@@ -173,13 +171,13 @@ describe('restoreServerWorkspace', () => {
     })
   })
 
-  test('repairs instead of migrating non-canonical local workspace entries', async () => {
+  test('restores a nested directory as a plain Workspace without migrating its identity', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ kind: 'local', id: NESTED_WORKSPACE_ID }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.probeRepo.mockResolvedValue({ ok: true, root: '/repo', name: 'repo' })
+    mocks.probeWorkspace.mockResolvedValue(plainWorkspaceProbe())
     const workspacePaneTabsHost = {
       restoreTabs: vi.fn(async () => ({
         kind: 'restored' as const,
@@ -262,7 +260,7 @@ describe('restoreServerWorkspace', () => {
     ])
   })
 
-  test('keeps a canonical active local repo as a stub when projection is temporarily unavailable', async () => {
+  test('keeps an active Git Workspace as a stub when projection is temporarily unavailable', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],
@@ -308,7 +306,7 @@ describe('restoreServerWorkspace', () => {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [entry],
     })
-    mocks.probeRepo.mockResolvedValue({ ok: false, message: 'error.path-permission-denied' })
+    mocks.probeWorkspace.mockResolvedValue({ status: 'unavailable', reason: 'error.workspace-permission-denied' })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
@@ -631,22 +629,9 @@ function gitProbe() {
   }
 }
 
-function workspaceProbeFromLegacy(
-  workspaceId: string,
-  result: { ok: boolean; root?: string; name?: string; message?: string },
-) {
-  const reportedRoot = result.root?.startsWith('goblin+')
-    ? result.root
-    : result.root
-      ? `goblin+file://${result.root}`
-      : null
-  return result.ok
-    ? reportedRoot && reportedRoot !== workspaceId
-      ? {
-          ...gitProbe(),
-          name: result.name ?? 'repo',
-          capabilities: { ...gitProbe().capabilities, git: { status: 'unavailable' as const } },
-        }
-      : { ...gitProbe(), name: result.name ?? 'repo' }
-    : { status: 'unavailable' as const, reason: 'error.workspace-transport-unavailable' as const }
+function plainWorkspaceProbe() {
+  return {
+    ...gitProbe(),
+    capabilities: { ...gitProbe().capabilities, git: { status: 'unavailable' as const } },
+  }
 }
