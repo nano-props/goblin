@@ -306,7 +306,7 @@ describe('restoreWorkspaceTabs', () => {
     })
   })
 
-  test('throws repo-runtime-stale when clientId/workspaceRuntimeId does not match the active lease', async () => {
+  test('throws workspace-runtime-stale when clientId/workspaceRuntimeId does not match the active lease', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ kind: 'local', id: LOCAL_WORKSPACE_ID }],

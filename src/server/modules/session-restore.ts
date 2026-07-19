@@ -342,7 +342,7 @@ async function openRemoteWorkspace(
     if (!projection.snapshot) {
       return {
         kind: 'opened',
-          opened: stubWorkspace({
+        opened: stubWorkspace({
           entry,
           workspaceId: lease.workspaceId,
           name: lifecycle.name,
@@ -354,7 +354,7 @@ async function openRemoteWorkspace(
     }
     return {
       kind: 'opened',
-        opened: projectedWorkspace({
+      opened: projectedWorkspace({
         entry,
         workspaceId: lease.workspaceId,
         name: lifecycle.name,
@@ -470,10 +470,6 @@ function activeWorkspaceIdForOpened(
     : null
   if (activeWorkspace) return activeWorkspace.workspaceId
   return opened[0]?.workspaceId ?? null
-}
-
-function openedWorkspaceByRoot<T extends RestoredWorkspaceRuntime>(opened: T[]): Map<WorkspaceId, T> {
-  return new Map(opened.map((workspace) => [workspace.workspaceId, workspace]))
 }
 
 function runtimeSnapshotFromOpened(

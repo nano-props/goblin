@@ -398,7 +398,7 @@ function requireCurrentWorkspaceRuntimeMembership(
   workspaceRuntimeId: string,
 ): void {
   if (!isCurrentWorkspaceRuntimeMembership(userId, workspaceId, workspaceRuntimeId, clientId)) {
-    throw new IpcError({ code: 'BAD_REQUEST', message: 'error.repo-runtime-stale' })
+    throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
   }
 }
 

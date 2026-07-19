@@ -691,6 +691,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
 
     expect(localOnly.status).toBe(400)
     expect(stale.status).toBe(400)
+    await expect(stale.json()).resolves.toMatchObject({ message: 'error.workspace-runtime-stale' })
     expect(mocks.commitBackgroundSyncRegistration).not.toHaveBeenCalled()
   })
 
