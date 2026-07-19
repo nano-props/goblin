@@ -8,6 +8,7 @@ import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { formatTranslatableReason, shouldOfferSshSettings, unavailableBodyKey } from '#/web/lib/remote-diagnostics.ts'
 import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
+import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
 import { isWorkspaceUnavailable, remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -82,10 +83,7 @@ export function UnavailableWorkspaceView({ workspace }: Props) {
                     { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
                     workspace.id,
                     { workspaceRuntimeId: workspace.workspaceRuntimeId },
-                  ).then((outcome) => {
-                    if (!outcome.ok && !('cancelled' in outcome))
-                      toast.error(formatTranslatableReason(t, outcome.message))
-                  })
+                  ).then((outcome) => presentWorkspaceRefreshOutcome(outcome, t))
                 }}
               >
                 <RefreshCw />

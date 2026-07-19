@@ -293,6 +293,54 @@ describe('remote fetch timestamps', () => {
     expect(useWorkspacesStore.getState().workspaces[REPO_ID]).toBeUndefined()
   })
 
+  test('closing a plain Workspace cancels Git work created by a concurrent capability promotion', async () => {
+    const workspaceRuntimeId = 'workspace-runtime-promoted-while-closing'
+    const workspace = emptyWorkspace(REPO_ID, 'plain-workspace', workspaceRuntimeId)
+    acceptWorkspaceProbeState(workspace, {
+      status: 'ready',
+      name: 'plain-workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [],
+    })
+    useWorkspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
+    const removeMembership = Promise.withResolvers<{
+      openWorkspaceEntries: []
+      workspacePaneTabsByTargetByWorkspace: {}
+    }>()
+    const removeWorkspaceEntry = vi.fn(() => removeMembership.promise)
+    ipcHandlers['settings.removeWorkspaceEntry'] = removeWorkspaceEntry
+    ipcHandlers['workspace.refresh'] = () => ({
+      kind: 'committed',
+      probe: {
+        status: 'ready',
+        name: 'plain-workspace',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        },
+        diagnostics: [],
+      },
+    })
+    const projectionResponse = Promise.withResolvers<WorkspaceRuntimeProjection>()
+    const projection = vi.fn(() => projectionResponse.promise)
+    ipcHandlers['repo.projection'] = projection
+
+    const closing = useWorkspacesStore.getState().closeWorkspace(REPO_ID)
+    await vi.waitFor(() => expect(removeWorkspaceEntry).toHaveBeenCalledOnce())
+    const refresh = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    await vi.waitFor(() => expect(projection).toHaveBeenCalledOnce())
+
+    removeMembership.resolve({ openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} })
+    await expect(closing).resolves.toEqual({ ok: true })
+    await expect(refresh).resolves.toEqual({ ok: true })
+    expect(useWorkspacesStore.getState().workspaces[REPO_ID]).toBeUndefined()
+  })
+
   test('repo read-model projection refresh treats query projection branches as existing data while loading', async () => {
     const workspaceRuntimeId = seedRepo([])
     seedRepoReadModelQueryData(

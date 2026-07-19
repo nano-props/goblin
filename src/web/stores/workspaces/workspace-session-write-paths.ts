@@ -995,7 +995,7 @@ async function closeWorkspaceMembership(
     return { ok: false, message: 'error.workspace-close-failed' }
   }
   cancelWorkspaceCapabilityRefreshes(workspaceId, workspaceRuntimeId)
-  if (workspace.capability.kind === 'git') disposeRepoOperationScheduler(workspaceId)
+  disposeRepoOperationScheduler(workspaceId)
   set((state) => removeWorkspaceFromSessionState(state, workspaceId))
   try {
     await closeWorkspaceRuntimeWithCache(workspace.id, workspaceRuntimeId)

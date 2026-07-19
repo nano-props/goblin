@@ -7,6 +7,7 @@ import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { Tip } from '#/web/components/Tip.tsx'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
 import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
+import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
 import type { RepoActivity, RepoActivityProjectionRepo, RepoCompletion } from '#/web/components/repo-activity/model.ts'
 import {
   getRepoActivity,
@@ -156,14 +157,14 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
   const lang = useI18nStore((s) => s.lang)
   const label = t('action.refresh')
 
-  function handleSync() {
+  async function handleSync(): Promise<void> {
     const workspaceRuntimeId = repo.workspaceRuntimeId
-    // Fire-and-forget so AsyncButton's internal pending state does not fight
-    // the external manualSyncBusy prop. The visual loading state is owned by
-    // the operation, not the click promise.
-    void runManualWorkspaceRefresh({ get: useWorkspacesStore.getState, set: useWorkspacesStore.setState }, repo.id, {
-      workspaceRuntimeId,
-    })
+    const outcome = await runManualWorkspaceRefresh(
+      { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
+      repo.id,
+      { workspaceRuntimeId },
+    )
+    presentWorkspaceRefreshOutcome(outcome, t)
   }
 
   const fetchTooltipKey = repo.remote.hasRemotes === false ? 'action.fetch-local-title' : 'action.fetch-title'
@@ -188,7 +189,7 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
         size="icon-lg"
         disabled={manualSyncBusy}
         loading={manualSyncBusy}
-        onClick={handleSync}
+        onClick={() => void handleSync()}
         aria-label={label}
       >
         {({ busy }) => (

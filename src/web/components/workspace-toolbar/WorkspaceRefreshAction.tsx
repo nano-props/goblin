@@ -1,13 +1,12 @@
 import { RefreshCw } from 'lucide-react'
 import { useState } from 'react'
-import { toast } from 'sonner'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
-import { formatTranslatableReason } from '#/web/lib/remote-diagnostics.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
 
 export function WorkspaceRefreshAction({ workspaceId }: { workspaceId: WorkspaceId }) {
   const t = useT()
@@ -23,9 +22,7 @@ export function WorkspaceRefreshAction({ workspaceId }: { workspaceId: Workspace
         workspaceId,
         { workspaceRuntimeId },
       )
-      if (!outcome.ok && !('cancelled' in outcome)) {
-        toast.error(formatTranslatableReason(t, outcome.message))
-      }
+      presentWorkspaceRefreshOutcome(outcome, t)
     } finally {
       setRefreshing(false)
     }
