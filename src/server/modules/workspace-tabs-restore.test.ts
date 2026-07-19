@@ -473,7 +473,7 @@ describe('restoreWorkspaceTabs', () => {
     })
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
-      lifecycle: { kind: 'ready', target: remoteEntry.ref },
+      lifecycle: { kind: 'ready', attemptId: 3, target: remoteEntry.ref },
       name: 'repo',
     })
     mocks.workspaceProbeStateForRuntime.mockReturnValue(gitProbe())
@@ -490,7 +490,11 @@ describe('restoreWorkspaceTabs', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.workspace).toMatchObject({ workspaceId: remoteEntry.id, target: remoteEntry.ref, projection: null })
+    expect(result.workspace).toMatchObject({
+      workspaceId: remoteEntry.id,
+      remoteLifecycle: { kind: 'ready', attemptId: 3, target: remoteEntry.ref },
+      projection: null,
+    })
     expect(result.snapshot).toBeNull()
     expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
   })
@@ -507,22 +511,31 @@ describe('restoreWorkspaceTabs', () => {
     })
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
-      lifecycle: { kind: 'failed', reason: 'unreachable' },
+      lifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable' },
       name: 'repo',
+    })
+    mocks.workspaceProbeStateForRuntime.mockReturnValue({
+      status: 'unavailable',
+      reason: 'error.workspace-transport-unavailable',
     })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
-    await expect(
-      restoreWorkspaceTabs({
-        workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
-        userId: 'user-test',
-        clientId: 'client_test000000000000',
-        workspaceId: remoteEntry.id,
-        workspaceRuntimeId: 'repo-runtime-test',
-        workspacePaneTabsHost,
-      }),
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
+    const result = await restoreWorkspaceTabs({
+      workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      workspaceId: remoteEntry.id,
+      workspaceRuntimeId: 'repo-runtime-test',
+      workspacePaneTabsHost,
+    })
+    expect(result.workspace).toMatchObject({
+      workspaceId: remoteEntry.id,
+      workspaceProbe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
+      remoteLifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable' },
+      projection: null,
+    })
+    expect(result.snapshot).toBeNull()
     expect(mocks.acquireWorkspaceRuntimeLease).not.toHaveBeenCalled()
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
   })

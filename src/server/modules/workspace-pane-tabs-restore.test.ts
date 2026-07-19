@@ -19,6 +19,7 @@ describe('workspace pane layout restore admission', () => {
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: 'workspace-runtime-test',
       name: 'workspace',
+      remoteLifecycle: null,
       workspaceProbe: {
         status: 'ready' as const,
         name: 'workspace',

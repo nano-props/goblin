@@ -573,7 +573,16 @@ function restoredRuntimeForWorkspace(
   const restoredWorkspace = restoredWorkspaceId ? workspaceIdForTest(restoredWorkspaceId) : null
   return {
     workspaces: serverWorkspace.openWorkspaceEntries.map((entry) => ({
-      entry,
+      ...(entry.kind === 'remote'
+        ? {
+            entry,
+            remoteLifecycle: {
+              kind: 'ready' as const,
+              attemptId: 1,
+              target: { ...entry.ref, host: 'example.test', user: 'developer', port: 22 },
+            },
+          }
+        : { entry, remoteLifecycle: null }),
       workspaceId: workspaceIdForTest(entry.id),
       workspaceRuntimeId: `repo-runtime-${entry.id}`,
       name: entry.id.split('/').pop() || entry.id,

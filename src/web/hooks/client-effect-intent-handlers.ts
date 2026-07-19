@@ -4,6 +4,7 @@ import { isTerminalFocused } from '#/web/terminal-focus.ts'
 import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { clearRecentWorkspaceHistory } from '#/web/settings-actions.ts'
@@ -144,6 +145,7 @@ export async function handleWorkspaceClientIntent(
     currentWorkspaceId: currentWorkspace?.id ?? null,
     currentWorkspaceRuntimeId: currentWorkspace?.workspaceRuntimeId ?? null,
     currentWorkspaceCapability: currentWorkspace?.capability ?? null,
+    currentWorkspaceCanExecute: currentWorkspace ? workspaceCanExecute(currentWorkspace) : false,
     currentWorkspacePaneCommandTarget: deps.currentWorkspacePaneCommandTarget,
   })
   if (!plan) return false

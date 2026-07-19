@@ -11,8 +11,7 @@ import type { WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
 import { requireRemoteAdmissionForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
-import { markRemoteLifecycleReady } from '#/web/stores/workspaces/availability.ts'
-import { addResolvedWorkspace, addUnavailableWorkspace } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
+import { addResolvedWorkspace } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import {
@@ -27,34 +26,6 @@ import {
 beforeEach(resetLifecycleTest)
 
 describe('repo lifecycle', () => {
-  test('does not carry Git capability authority into a replacement runtime that is unavailable', () => {
-    const workspaceId = REPO_A
-    const workspace = emptyWorkspace(workspaceId, 'Example workspace', 'workspace-runtime-old')
-    acceptWorkspaceProbeState(workspace, {
-      status: 'ready',
-      name: 'Example workspace',
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: true },
-        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
-      },
-      diagnostics: [],
-    })
-
-    const result = addUnavailableWorkspace(
-      { workspaces: { [workspaceId]: workspace }, repoSnapshotCache: {}, workspaceOrder: [workspaceId] },
-      workspaceId,
-      'Workspace is unavailable',
-      'workspace-runtime-new',
-    )
-
-    expect(result.workspaces[workspaceId]).toMatchObject({
-      workspaceRuntimeId: 'workspace-runtime-new',
-      availability: { phase: 'unavailable', reason: 'Workspace is unavailable' },
-      capability: { kind: 'probing', probe: { status: 'probing' } },
-    })
-  })
-
   test('accepts a capability change for an unchanged ready remote target', () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
@@ -77,7 +48,8 @@ describe('repo lifecycle', () => {
       },
       diagnostics: [],
     })
-    markRemoteLifecycleReady(workspace, target)
+    if (workspace.admission.kind !== 'remote') throw new Error('expected remote admission')
+    workspace.admission.lifecycle = { kind: 'ready', target }
     const workspaceId = workspaceIdForTest(target.id)
 
     const result = addResolvedWorkspace(

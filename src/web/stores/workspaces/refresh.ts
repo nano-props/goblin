@@ -1,6 +1,5 @@
 import { appendRepoEvent, errorEvent } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
-import { isWorkspaceUnavailableReason, markWorkspaceUnavailable } from '#/web/stores/workspaces/availability.ts'
 import { runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { resolveActionWorkspaceRuntimeId } from '#/web/stores/workspaces/refresh-state.ts'
 import { cancelDataLoad, finishDataLoadError, startDataLoad } from '#/web/stores/workspaces/repo-data-load-state.ts'
@@ -54,7 +53,6 @@ async function runRepoProjectionReadModelRefresh(
       updateIfFresh(store.set, id, workspaceRuntimeId, (r) => {
         if (!isGitWorkspace(r)) return
         const git = gitWorkspaceProjection(r)
-        if (isWorkspaceUnavailableReason(message)) markWorkspaceUnavailable(r, message)
         if (ownsReadModelLoad) finishDataLoadError(git.dataLoads.repoReadModel, message)
         git.events = appendRepoEvent(git.events, errorEvent(message))
       })

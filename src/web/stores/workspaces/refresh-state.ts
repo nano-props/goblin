@@ -1,5 +1,4 @@
-import { markWorkspaceAvailable } from '#/web/stores/workspaces/availability.ts'
-import { isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
+import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
   cancelDataLoad,
   finishDataLoadError,
@@ -31,7 +30,6 @@ export function applyRepoSnapshotShellState(r: WorkspaceState, snap: RepoSnapsho
       git.remote.fetchError = null
     }
   }
-  markWorkspaceAvailable(r)
   git.projection.source = 'fresh'
   git.projection.savedAt = null
   finishDataLoadSuccess(git.dataLoads.repoReadModel, loadedAt)
@@ -43,7 +41,7 @@ export function shouldAttemptFetch(repo: WorkspaceState | null | undefined, work
     repo.workspaceRuntimeId === workspaceRuntimeId &&
     isGitWorkspace(repo) &&
     gitWorkspaceProjection(repo).remote.hasRemotes === true &&
-    !isWorkspaceUnavailable(repo)
+    workspaceCanExecute(repo)
   )
 }
 

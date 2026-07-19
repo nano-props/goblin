@@ -59,8 +59,8 @@ function gitProjectionAcrossProbeTransition(workspace: WorkspaceState): GitWorks
 /**
  * Live SSH liveness state for remote workspaces. Derived — never stored —
  * from `isRemoteWorkspaceId(id)` + `admission.lifecycle.kind`. The lifecycle
- * union is the single source of truth; availability and target presence
- * are not used to infer connectivity.
+ * union is the single source of truth; capability and target presence are not
+ * used to infer connectivity.
  *   - `connecting`:  remote workspace whose lifecycle run has not
  *     converged (placeholder / in-flight probe)
  *   - `connected`:   remote workspace with a converged `ready` lifecycle;
@@ -104,20 +104,25 @@ export function remoteWorkspaceTarget(
   return remoteWorkspaceConnectionTarget(lifecycle)
 }
 
-/**
- * Whether a workspace is in a terminal "cannot be operated on" state:
- *   - Local workspace: `availability.phase === 'unavailable'`
- *   - Remote workspace: `admission.lifecycle.kind === 'failed'`
- *
- * Replaces the per-call-site `workspace.availability.phase === 'unavailable'`
- * check. Callers that previously had to know whether they were
- * looking at a local or remote workspace now just call this helper.
- */
-export function isWorkspaceUnavailable(workspace: WorkspaceState): boolean {
-  if (isRemoteWorkspaceId(workspace.id)) {
-    return requiredRemoteWorkspaceAdmission(workspace).lifecycle?.kind === 'failed'
+/** Derive operational failure from its authoritative transport or capability owner. */
+export function workspaceOperationalFailureReason(workspace: WorkspaceState): string | null {
+  if (workspace.admission.kind === 'remote' && workspace.admission.lifecycle?.kind === 'failed') {
+    return workspace.admission.lifecycle.reason
   }
-  return workspace.availability.phase === 'unavailable'
+  if (workspace.capability.kind === 'unavailable') {
+    return workspace.capability.probe.reason
+  }
+  return null
+}
+
+export function isWorkspaceUnavailable(workspace: WorkspaceState): boolean {
+  return workspaceOperationalFailureReason(workspace) !== null
+}
+
+/** Whether the current runtime has admitted operations against this workspace. */
+export function workspaceCanExecute(workspace: WorkspaceState): boolean {
+  if (workspace.capability.kind !== 'filesystem' && workspace.capability.kind !== 'git') return false
+  return workspace.admission.kind === 'local' || workspace.admission.lifecycle?.kind === 'ready'
 }
 
 function requiredRemoteWorkspaceAdmission(

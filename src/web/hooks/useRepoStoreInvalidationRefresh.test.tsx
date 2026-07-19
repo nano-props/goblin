@@ -6,21 +6,29 @@ import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalid
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { repoDataQueryKey } from '#/web/repo-data-query.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 const listeners = new Set<(event: any) => void>()
+function workspace() {
+  const value = emptyWorkspace(WORKSPACE_ID, 'workspace', 'repo-runtime-test-7')
+  acceptWorkspaceProbeState(value, {
+    status: 'ready',
+    name: 'workspace',
+    capabilities: {
+      files: { read: true, write: true },
+      terminal: { available: true },
+      git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+    },
+    diagnostics: [],
+  })
+  return value
+}
 const storeState = {
   workspaces: {
-    [WORKSPACE_ID]: {
-      id: WORKSPACE_ID,
-      availability: { phase: 'available' },
-      workspaceRuntimeId: 'repo-runtime-test-7',
-      dataLoads: {
-        repoReadModel: { phase: 'idle', loadedAt: 0, stale: false, error: null },
-        fetch: { phase: 'idle', loadedAt: 0, stale: false, error: null },
-      },
-    },
+    [WORKSPACE_ID]: workspace(),
   },
 }
 
@@ -49,15 +57,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
     listeners.clear()
     primaryWindowQueryClient.clear()
-    storeState.workspaces[WORKSPACE_ID] = {
-      id: WORKSPACE_ID,
-      availability: { phase: 'available' },
-      workspaceRuntimeId: 'repo-runtime-test-7',
-      dataLoads: {
-        repoReadModel: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
-        fetch: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
-      },
-    }
+    storeState.workspaces[WORKSPACE_ID] = workspace()
   })
 
   afterEach(() => {

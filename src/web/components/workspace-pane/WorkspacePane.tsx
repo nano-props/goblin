@@ -28,7 +28,6 @@ import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.ts
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { useGitWorkspacePaneRouteController } from '#/web/components/repo-workspace/git-workspace-pane-route-controller.ts'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import { isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { GitWorkspaceProjection, WorkspaceCapabilityState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -75,7 +74,6 @@ interface WorkspacePaneShell {
   id: WorkspaceState['id']
   workspaceRuntimeId: string
   ui: Pick<WorkspaceState['ui'], 'preferredWorkspacePaneTabByTarget'> & { currentBranchName: string | null }
-  unavailable: boolean
   capability: WorkspaceCapabilityState
   admission: WorkspaceState['admission']
 }
@@ -96,7 +94,6 @@ function workspacePaneShellEqual(a: WorkspacePaneShell | undefined, b: Workspace
       a.workspaceRuntimeId === b.workspaceRuntimeId &&
       a.ui.currentBranchName === b.ui.currentBranchName &&
       a.ui.preferredWorkspacePaneTabByTarget === b.ui.preferredWorkspacePaneTabByTarget &&
-      a.unavailable === b.unavailable &&
       a.capability === b.capability &&
       a.admission === b.admission)
   )
@@ -124,7 +121,6 @@ export function WorkspacePane({
               currentBranchName: currentBranch,
               preferredWorkspacePaneTabByTarget: workspace.ui.preferredWorkspacePaneTabByTarget,
             },
-            unavailable: isWorkspaceUnavailable(workspace),
             capability: workspace.capability,
             admission: workspace.admission,
           }
@@ -217,7 +213,6 @@ function gitWorkspacePaneShell(
     id: workspace.id,
     workspaceRuntimeId: workspace.workspaceRuntimeId,
     ui: workspace.ui,
-    unavailable: workspace.unavailable,
     probe: capability.probe,
     operations: { branchAction: git.operations.branchAction },
     remote: git.remote,
@@ -569,7 +564,6 @@ function GitWorkspacePaneSurface({
     workspaceRuntimeId: repo.workspaceRuntimeId,
     branchName: workspacePaneTabModel.branchName,
     renderedTab: workspacePaneTabModel.renderedTab,
-    unavailable: repo.unavailable,
   })
   useGitWorkspacePaneRouteController({
     enabled: workspacePaneRouteContext.kind === 'routed',

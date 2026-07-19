@@ -35,6 +35,8 @@ import type {
   RemoteConnectionInput,
   RemoteDiagnosticsResult,
   RemotePathSuggestionsInput,
+  LocalWorkspaceSessionEntry,
+  RemoteWorkspaceSessionEntry,
   WorkspaceSessionEntry,
   RemoteWorkspaceTarget,
   RemoteWorkspaceRuntimeLifecycle,
@@ -144,19 +146,24 @@ export interface WorkspaceRuntimeMembershipReconcileResult {
 }
 
 interface RestoredWorkspaceRuntimeBase {
-  entry: WorkspaceSessionEntry
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
   name: string
   workspaceProbe: WorkspaceProbeState
-  target?: RemoteWorkspaceTarget
 }
 
-export interface ProjectedRestoredWorkspaceRuntime extends RestoredWorkspaceRuntimeBase {
+type RestoredWorkspaceTransport =
+  | { entry: LocalWorkspaceSessionEntry; remoteLifecycle: null }
+  | {
+      entry: RemoteWorkspaceSessionEntry
+      remoteLifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
+    }
+
+export type ProjectedRestoredWorkspaceRuntime = RestoredWorkspaceRuntimeBase & RestoredWorkspaceTransport & {
   projection: WorkspaceRuntimeProjection
 }
 
-export interface StubRestoredWorkspaceRuntime extends RestoredWorkspaceRuntimeBase {
+export type StubRestoredWorkspaceRuntime = RestoredWorkspaceRuntimeBase & RestoredWorkspaceTransport & {
   // Stub leases have a validated runtime identity but no projection. They are
   // projected lazily when the user navigates to the workspace.
   projection: null

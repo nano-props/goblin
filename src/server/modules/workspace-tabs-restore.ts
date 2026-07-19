@@ -87,16 +87,28 @@ async function projectWorkspace(
       input.signal,
     )
     assertCurrentWorkspaceRuntimeMembership(input)
-    if (lifecycle.kind !== 'settled' || lifecycle.lifecycle.kind !== 'ready') return null
+    if (lifecycle.kind !== 'settled') return null
     const workspaceProbe = workspaceProbeStateForRuntime(input.userId, entry.id, input.workspaceRuntimeId)
-    if (!workspaceProbe || workspaceProbe.status !== 'ready') return null
+    if (!workspaceProbe) return null
+    if (lifecycle.lifecycle.kind === 'failed') {
+      return {
+        entry,
+        workspaceId: entry.id,
+        workspaceRuntimeId: input.workspaceRuntimeId,
+        name: lifecycle.name,
+        remoteLifecycle: lifecycle.lifecycle,
+        workspaceProbe,
+        projection: null,
+      }
+    }
+    if (workspaceProbe.status !== 'ready') return null
     if (workspaceProbe.capabilities.git.status === 'unavailable') {
       return {
         entry,
         workspaceId: entry.id,
         workspaceRuntimeId: input.workspaceRuntimeId,
         name: lifecycle.name,
-        target: lifecycle.lifecycle.target,
+        remoteLifecycle: lifecycle.lifecycle,
         workspaceProbe,
         projection: null,
       }
@@ -113,7 +125,7 @@ async function projectWorkspace(
         workspaceId: entry.id,
         workspaceRuntimeId: input.workspaceRuntimeId,
         name: lifecycle.name,
-        target: lifecycle.lifecycle.target,
+        remoteLifecycle: lifecycle.lifecycle,
         workspaceProbe,
         projection: null,
       }
@@ -123,7 +135,7 @@ async function projectWorkspace(
       workspaceId: entry.id,
       workspaceRuntimeId: input.workspaceRuntimeId,
       name: lifecycle.name,
-      target: lifecycle.lifecycle.target,
+      remoteLifecycle: lifecycle.lifecycle,
       workspaceProbe,
       projection,
     }
@@ -159,6 +171,7 @@ async function projectWorkspace(
       workspaceId: entry.id,
       workspaceRuntimeId: input.workspaceRuntimeId,
       name: probe.name ?? workspaceDisplayName(entry.id),
+      remoteLifecycle: null,
       workspaceProbe: probe,
       projection: null,
     }
@@ -175,6 +188,7 @@ async function projectWorkspace(
       workspaceId: entry.id,
       workspaceRuntimeId: input.workspaceRuntimeId,
       name: probe.name ?? workspaceDisplayName(entry.id),
+      remoteLifecycle: null,
       workspaceProbe: probe,
       projection: null,
     }
@@ -184,6 +198,7 @@ async function projectWorkspace(
     workspaceId: entry.id,
     workspaceRuntimeId: input.workspaceRuntimeId,
     name: probe.name ?? workspaceDisplayName(entry.id),
+    remoteLifecycle: null,
     workspaceProbe: probe,
     projection,
   }

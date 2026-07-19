@@ -32,7 +32,6 @@ export function emptyWorkspace(id: string, name: string, workspaceRuntimeId: str
       entry: isRemoteWorkspaceId(workspaceId) ? null : localWorkspaceSessionEntry(workspaceId),
       projectionState: 'projected',
     },
-    availability: { phase: 'available' },
     admission: isRemoteWorkspaceId(workspaceId)
       ? { kind: 'remote', lifecycle: null, lifecycleAttemptId: null }
       : { kind: 'local' },

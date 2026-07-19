@@ -89,6 +89,7 @@ interface WorkspaceIntentPlanContext {
   currentWorkspaceId: WorkspaceId | null
   currentWorkspaceRuntimeId: string | null
   currentWorkspaceCapability: Pick<WorkspaceState['capability'], 'kind' | 'probe'> | null
+  currentWorkspaceCanExecute: boolean
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
 }
 
@@ -172,6 +173,7 @@ export function createWorkspaceIntentPlan(
     case 'create-worktree-requested':
       if (
         context.workspaceShortcutSuppressed ||
+        !context.currentWorkspaceCanExecute ||
         !context.currentWorkspaceId ||
         context.currentWorkspaceCapability?.kind !== 'git' ||
         !workspaceWorktreesAvailable(context.currentWorkspaceCapability.probe)
@@ -183,6 +185,7 @@ export function createWorkspaceIntentPlan(
     case 'terminal-new-tab-requested':
       if (
         !context.currentWorkspaceId ||
+        !context.currentWorkspaceCanExecute ||
         !context.currentWorkspacePaneCommandTarget ||
         !workspaceTerminalAvailable(context.currentWorkspaceCapability?.probe)
       )
@@ -231,6 +234,7 @@ export function createWorkspaceIntentPlan(
     case 'terminal-primary-action-requested':
       if (
         context.workspaceShortcutSuppressed ||
+        !context.currentWorkspaceCanExecute ||
         !context.currentWorkspaceId ||
         !context.currentWorkspacePaneCommandTarget ||
         !workspaceTerminalAvailable(context.currentWorkspaceCapability?.probe)

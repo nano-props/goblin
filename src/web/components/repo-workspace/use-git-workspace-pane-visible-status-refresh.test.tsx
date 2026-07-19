@@ -19,18 +19,15 @@ const WORKSPACE_RUNTIME_ID = 'repo-runtime-visible-status-refresh'
 function Harness({
   branchName = 'main',
   renderedTab = 'status',
-  unavailable = false,
 }: {
   branchName?: string | null
   renderedTab?: WorkspacePaneTabType | null
-  unavailable?: boolean
 }) {
   useGitWorkspacePaneVisibleStatusRefresh({
     workspaceId: REPO_ID,
     workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     branchName,
     renderedTab,
-    unavailable,
   })
   return null
 }
@@ -92,25 +89,6 @@ describe('useGitWorkspacePaneVisibleStatusRefresh', () => {
       root.render(<Harness branchName="feature/a" renderedTab="status" />)
     })
 
-    expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledWith(
-      expect.any(Object),
-      REPO_ID,
-      WORKSPACE_RUNTIME_ID,
-      'feature/a',
-    )
-  })
-
-  test('waits until the repo is available before recording the visible target', async () => {
-    await act(async () => {
-      root.render(<Harness branchName="feature/a" renderedTab="status" unavailable />)
-    })
-    expect(requestVisibleWorkspaceStatusRefresh).not.toHaveBeenCalled()
-
-    await act(async () => {
-      root.render(<Harness branchName="feature/a" renderedTab="status" unavailable={false} />)
-    })
-
-    expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledOnce()
     expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledWith(
       expect.any(Object),
       REPO_ID,

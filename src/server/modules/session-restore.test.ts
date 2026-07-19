@@ -343,7 +343,7 @@ describe('restoreServerWorkspace', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
       kind: 'settled',
-      lifecycle: { kind: 'failed', reason: 'unreachable' },
+      lifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable' },
       name: 'repo',
     })
     mocks.workspaceProbes.set(remoteEntry.id, {
@@ -371,12 +371,12 @@ describe('restoreServerWorkspace', () => {
 
     expect(result.status).toBe('restored')
     expect(result.openWorkspaceEntries).toEqual(workspace.openWorkspaceEntries)
-    expect(result.runtime.workspaces).toEqual([expect.not.objectContaining({ target: expect.anything() })])
     expect(result.runtime.workspaces[0]).toMatchObject({
       workspaceId: remoteEntry.id,
       workspaceRuntimeId: 'repo-runtime-test',
       projection: null,
       workspaceProbe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
+      remoteLifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable' },
     })
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
   })

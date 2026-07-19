@@ -1,5 +1,4 @@
 import PQueue from 'p-queue'
-import { omit } from 'es-toolkit'
 import {
   isProjectedRestoredWorkspaceRuntime,
   type ProjectedRestoredWorkspaceRuntime,
@@ -12,8 +11,9 @@ import {
 import {
   workspaceSessionEntryId,
   sameWorkspaceSessionEntry,
+  type LocalWorkspaceSessionEntry,
   type RemoteWorkspaceSessionEntry,
-  type RemoteWorkspaceTarget,
+  type RemoteWorkspaceRuntimeLifecycle,
   type WorkspaceSessionEntry,
 } from '#/shared/remote-workspace.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
@@ -248,6 +248,7 @@ async function openWorkspaceRuntime(
           workspaceId: lease.workspaceId,
           name,
           workspaceProbe: authoritativeProbe,
+          remoteLifecycle: null,
           lease,
         }),
       }
@@ -265,6 +266,7 @@ async function openWorkspaceRuntime(
           workspaceId: lease.workspaceId,
           name,
           workspaceProbe: authoritativeProbe,
+          remoteLifecycle: null,
           lease,
         }),
       }
@@ -276,6 +278,7 @@ async function openWorkspaceRuntime(
         workspaceId: lease.workspaceId,
         name,
         workspaceProbe: authoritativeProbe,
+        remoteLifecycle: null,
         projection,
         lease,
       }),
@@ -310,6 +313,7 @@ async function openRemoteWorkspace(
             workspaceId: lease.workspaceId,
             name: lifecycle.name,
             workspaceProbe: requiredWorkspaceProbe(input.userId, entry.id, lease.workspaceRuntimeId),
+            remoteLifecycle: lifecycle.lifecycle,
             lease,
           }),
         }
@@ -328,8 +332,8 @@ async function openRemoteWorkspace(
           entry,
           workspaceId: lease.workspaceId,
           name: lifecycle.name,
-          target: lifecycle.lifecycle.target,
           workspaceProbe,
+          remoteLifecycle: lifecycle.lifecycle,
           lease,
         }),
       }
@@ -346,8 +350,8 @@ async function openRemoteWorkspace(
           entry,
           workspaceId: lease.workspaceId,
           name: lifecycle.name,
-          target: lifecycle.lifecycle.target,
           workspaceProbe,
+          remoteLifecycle: lifecycle.lifecycle,
           lease,
         }),
       }
@@ -358,8 +362,8 @@ async function openRemoteWorkspace(
         entry,
         workspaceId: lease.workspaceId,
         name: lifecycle.name,
-        target: lifecycle.lifecycle.target,
         workspaceProbe,
+        remoteLifecycle: lifecycle.lifecycle,
         projection,
         lease,
       }),
@@ -417,14 +421,21 @@ async function withAcquiredWorkspaceRuntimeLease<T>(
   }
 }
 
-interface OpenedWorkspaceRuntimeInput {
-  entry: WorkspaceSessionEntry
+interface OpenedWorkspaceRuntimeInputBase {
   workspaceId: WorkspaceId
   name: string
-  target?: RemoteWorkspaceTarget
   workspaceProbe: WorkspaceProbeState
   lease: WorkspaceRuntimeMembershipLeaseEntry
 }
+
+type OpenedWorkspaceRuntimeInput = OpenedWorkspaceRuntimeInputBase &
+  (
+    | { entry: LocalWorkspaceSessionEntry; remoteLifecycle: null }
+    | {
+        entry: RemoteWorkspaceSessionEntry
+        remoteLifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
+      }
+  )
 
 function requiredWorkspaceProbe(
   userId: string,
@@ -482,7 +493,11 @@ function runtimeSnapshotFromOpened(
   }>,
 ): WorkspaceRuntimeRestoreSnapshot {
   return {
-    workspaces: opened.map((workspace) => omit(workspace, ['lease'])),
+    workspaces: opened.map((workspace) => {
+      const { lease, ...restored } = workspace
+      void lease
+      return restored
+    }),
     workspacePaneTabs,
     restoredWorkspaceId,
   }

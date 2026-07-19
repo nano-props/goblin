@@ -30,11 +30,7 @@ import { parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import { acceptRemoteWorkspaceLifecycleSnapshot } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
-import {
-  markWorkspaceUnavailable,
-  markRemoteLifecycleFailed,
-  markRemoteLifecycleReady,
-} from '#/web/stores/workspaces/availability.ts'
+import { markRemoteLifecycleReady } from '#/web/stores/workspaces/remote-workspace-admission.ts'
 import type {
   CloseWorkspaceResult,
   OpenWorkspacePostOpenError,
@@ -535,8 +531,8 @@ async function recordRecentWorkspacePostOpen(workspace: WorkspaceSessionEntry): 
 /** Build a fresh workspace by layering the restorable Git cache on top of an
  *  empty shell. `nameHints` is consulted in workspaceOrder; the first non-empty
  *  hint wins, then the cached name, then the last path segment of the
- *  id. The caller mutates lifecycle / availability fields before
- *  returning it from `upsertWorkspace.create`. */
+ *  id. The caller may settle admission before returning it from
+ *  `upsertWorkspace.create`. */
 function buildNewWorkspace(
   s: Pick<WorkspacesStore, 'repoSnapshotCache'>,
   id: WorkspaceId,
@@ -591,7 +587,7 @@ function capabilityAcrossRuntimeTransition(
 
 /** Upsert a workspace by id, centralising the "if it exists, mutate; if
  *  not, create + insert" pattern shared by addResolvedWorkspace,
- *  addUnavailableWorkspace, and insertPlaceholderWorkspace.
+ *  addResolvedWorkspace and insertPlaceholderWorkspace.
  *  - `create` runs when the id is new and returns the new workspace.
  *  - `update`, when provided, runs against the existing workspace and
  *    returns the updated state, or `null` to signal "no change". The
@@ -646,7 +642,7 @@ export function addResolvedWorkspace(
       // (emptyWorkspace's default). Remote resolves with a target settle
       // to 'ready'. The `addResolvedWorkspace` write path is only ever
       // reached for a remote entry with a target — the failure
-      // branch in workspace runtime resolution calls addUnavailableWorkspace instead.
+      // branch in workspace runtime resolution retains the unavailable probe instead.
       if (resolvedWorkspace.workspaceProbe) {
         acceptWorkspaceProbeState(workspace, resolvedWorkspace.workspaceProbe)
       }
@@ -732,83 +728,12 @@ export function addResolvedWorkspace(
 }
 
 /**
- * Mark a workspace as unavailable. Two paths:
- *   - If the workspace isn't in the store yet, insert it (e.g. ensureWorkspaceOpen
- *     got a probe failure back). Uses the restorable cache for any cached
- *     name/branches, then flips availability.
- *   - If a placeholder (from insertPlaceholderWorkspace) is already there, promote
- *     it in place. Capability authority is retained only while the runtime epoch
- *     is unchanged; a replacement runtime starts from probing before availability
- *     and transport admission settle.
- *     (The derived connectivity naturally reads as 'unreachable' once
- *     availability is unavailable.)
- */
-export function addUnavailableWorkspace(
-  s: Pick<WorkspacesStore, 'workspaces' | 'repoSnapshotCache' | 'workspaceOrder'>,
-  id: WorkspaceId,
-  reason: string,
-  workspaceRuntimeId: string,
-  target?: RemoteWorkspaceTarget,
-  rankById?: ReadonlyMap<string, number>,
-): Pick<WorkspacesStore, 'workspaces' | 'workspaceOrder'> & { changed: boolean; id: WorkspaceId } {
-  return upsertWorkspace(s, id, {
-    rankById,
-    create: () => {
-      const workspace = buildNewWorkspace(s, id, [target?.displayName], workspaceRuntimeId)
-      workspace.session = {
-        entry: target ? remoteWorkspaceSessionEntry(target) : workspace.session.entry,
-        projectionState: 'projected',
-      }
-      // New workspace: write the failed lifecycle (with last-known target
-      // if the probe got far enough to resolve one).
-      if (workspace.admission.kind === 'remote') markRemoteLifecycleFailed(workspace, reason, target)
-      else markWorkspaceUnavailable(workspace, reason)
-      return workspace
-    },
-    update: (existing) => {
-      const runtimeChanged = existing.workspaceRuntimeId !== workspaceRuntimeId
-      // Existing workspace: refresh the failed lifecycle with the new
-      // reason. Preserve the last-known target if the new failure
-      // didn't pin down a fresh one — the user can still see the
-      // remote locator on the failed workspace. The remote slice MUST
-      // be a fresh object — zustand's middleware freezes the
-      // state tree, and markRemoteLifecycleFailed mutates the
-      // passed workspace's remote.
-      const retainedTarget =
-        target ??
-        (existing.admission.kind === 'remote' ? remoteWorkspaceConnectionTarget(existing.admission.lifecycle) : null) ??
-        undefined
-      const next: WorkspaceState = {
-        ...existing,
-        workspaceRuntimeId: runtimeChanged ? workspaceRuntimeId : existing.workspaceRuntimeId,
-        capability: capabilityAcrossRuntimeTransition(existing, workspaceRuntimeId),
-        session: {
-          entry: target ? remoteWorkspaceSessionEntry(target) : existing.session.entry,
-          projectionState: 'projected',
-        },
-        admission:
-          existing.admission.kind === 'remote'
-            ? {
-                kind: 'remote',
-                lifecycle: existing.admission.lifecycle,
-                lifecycleAttemptId: existing.admission.lifecycleAttemptId,
-              }
-            : existing.admission,
-      }
-      if (next.admission.kind === 'remote') markRemoteLifecycleFailed(next, reason, retainedTarget)
-      else markWorkspaceUnavailable(next, reason)
-      return next
-    },
-  })
-}
-
-/**
  * Insert a placeholder workspace for a session entry whose probe is still in
  * flight. The placeholder paints the cached branch projection (if any)
  * immediately; the derived connectivity naturally reads as 'connecting'
  * because no remote target has been resolved yet. The probe resolution
  * then promotes it to 'connected' or 'unreachable' via addResolvedWorkspace /
- * addUnavailableWorkspace. No-op if the workspace is already in the store (so
+ * the authoritative runtime projection. No-op if the workspace is already in the store (so
  * calling this twice for the same entry is safe).
  *
  * Note: the ref only carries alias/remotePath; host/user/port require
@@ -833,16 +758,8 @@ export function insertPlaceholderWorkspace(
         entry,
         projectionState: 'projected',
       }
-      // Placeholders exist only to occupy the workspace switcher slot during a
-      // remote-workspace lifecycle run. For a local placeholder the
-      // lifecycle stays null (local workspaces don't have one); for a
-      // remote placeholder we mark `connecting` so deriveWorkspaceConnectivity
-      // can show the spinner until addResolvedWorkspace /
-      // addUnavailableWorkspace replaces it.
-      // A remote shell with no accepted server lifecycle renders as pending;
-      // only the runtime projection may publish `connecting`.
-      // 'refreshing' so the cached branches render with a stale indicator
-      // (dataLoadInitialLoading would hide them).
+      // A remote shell with no accepted server lifecycle derives as connecting;
+      // only the authoritative runtime projection may settle that lifecycle.
       return workspace
     },
   })

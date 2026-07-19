@@ -9,6 +9,8 @@ import {
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type * as WorktreeStatusRefresh from '#/web/stores/workspaces/worktree-status-refresh.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
@@ -18,18 +20,25 @@ vi.mock('#/web/stores/workspaces/worktree-status-refresh.ts', async (importOrigi
 })
 
 function repoRefreshStoreAccess(workspaceRuntimeId = 'repo-runtime-test-9', unavailable = false) {
-  const get: WorkspacesGet = () =>
-    ({
-      workspaces: {
-        [WORKSPACE_ID]: {
-          id: WORKSPACE_ID,
-          workspaceRuntimeId,
-          availability: unavailable
-            ? { phase: 'unavailable', reason: 'offline', checkedAt: 1 }
-            : { phase: 'available' },
-        },
+  const workspace = emptyWorkspace(WORKSPACE_ID, 'workspace', workspaceRuntimeId)
+  if (unavailable) {
+    acceptWorkspaceProbeState(workspace, {
+      status: 'unavailable',
+      reason: 'error.workspace-path-not-found',
+    })
+  } else {
+    acceptWorkspaceProbeState(workspace, {
+      status: 'ready',
+      name: 'workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
       },
-    }) as unknown as ReturnType<WorkspacesGet>
+      diagnostics: [],
+    })
+  }
+  const get = (() => ({ workspaces: { [WORKSPACE_ID]: workspace } })) as WorkspacesGet
   return { get, set: vi.fn() as unknown as WorkspacesSet }
 }
 

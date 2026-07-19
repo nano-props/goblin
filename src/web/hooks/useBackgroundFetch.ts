@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { setBackgroundSyncRepos } from '#/web/repo-client.ts'
-import { isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
+import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { WorkspaceState, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useFetchSettings } from '#/web/runtime-settings-fetch.ts'
@@ -12,7 +12,7 @@ import { goblinLog } from '#/web/logger.ts'
 function isBackgroundSyncEligible(repo: WorkspaceState | null | undefined): repo is WorkspaceState {
   return (
     !!repo &&
-    !isWorkspaceUnavailable(repo) &&
+    workspaceCanExecute(repo) &&
     repo.capability.kind === 'git' &&
     repo.capability.git.remote.hasRemotes === true
   )

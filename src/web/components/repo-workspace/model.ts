@@ -10,7 +10,6 @@ export interface GitWorkspacePaneProjection extends BranchActionRepo {
   branchModel: RepoBranchReadModelData
   probe: Extract<WorkspaceState['capability'], { kind: 'git' }>['probe']
   ui: Pick<WorkspaceState['ui'], 'preferredWorkspacePaneTabByTarget'> & { currentBranchName: string | null }
-  unavailable: boolean
 }
 
 export function getCurrentGitWorkspacePane(workspace: GitWorkspacePaneProjection) {

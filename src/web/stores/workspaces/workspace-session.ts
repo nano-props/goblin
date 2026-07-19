@@ -26,6 +26,7 @@ import { restoredPreferredWorkspacePaneTabByTarget } from '#/web/restorable-work
 import { recordWithoutKey } from '#/shared/record.ts'
 import { workspaceGitUnavailable } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { acceptRemoteWorkspaceRuntimeProjection } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 
 interface InitialWorkspaceRefresh {
   id: WorkspaceId
@@ -60,9 +61,7 @@ function createRestorableWorkspaceLifecycleActions(
           updateWorkspaceRuntimeCache({
             workspaceId: workspace.workspaceId,
             workspaceRuntimeId: workspace.workspaceRuntimeId,
-            ...(workspace.target
-              ? { remoteLifecycle: { kind: 'ready' as const, attemptId: 0, target: workspace.target } }
-              : {}),
+            ...(workspace.entry.kind === 'remote' ? { remoteLifecycle: workspace.remoteLifecycle } : {}),
           }),
         ),
       )
@@ -72,11 +71,21 @@ function createRestorableWorkspaceLifecycleActions(
         writeWorkspacePaneTabsSnapshotQueryData(tabs.workspaceId, tabs.workspaceRuntimeId, tabs.snapshot)
       }
       for (const restoredWorkspace of runtime.workspaces) {
-        seedRepoProjectionQueryData(
-          restoredWorkspace.workspaceId,
-          restoredWorkspace.workspaceRuntimeId,
-          restoredWorkspace.projection,
-        )
+        const hasCurrentRemoteRuntime =
+          restoredWorkspace.entry.kind === 'remote' &&
+          get().workspaces[restoredWorkspace.workspaceId]?.workspaceRuntimeId === restoredWorkspace.workspaceRuntimeId
+        if (
+          hasCurrentRemoteRuntime &&
+          restoredWorkspace.entry.kind === 'remote' &&
+          !acceptRemoteWorkspaceRuntimeProjection(set, get, {
+            workspaceId: restoredWorkspace.workspaceId,
+            workspaceRuntimeId: restoredWorkspace.workspaceRuntimeId,
+            remoteLifecycle: restoredWorkspace.remoteLifecycle,
+            workspaceProbe: restoredWorkspace.workspaceProbe,
+          })
+        ) {
+          continue
+        }
         set((s) => {
           const { workspaces, workspaceOrder } = addResolvedWorkspace(
             s,
@@ -107,6 +116,23 @@ function createRestorableWorkspaceLifecycleActions(
             return s
           return { workspaces, workspaceOrder, restoredWorkspaceId: nextRestoredWorkspaceId }
         })
+        if (
+          restoredWorkspace.entry.kind === 'remote' &&
+          !hasCurrentRemoteRuntime &&
+          !acceptRemoteWorkspaceRuntimeProjection(set, get, {
+            workspaceId: restoredWorkspace.workspaceId,
+            workspaceRuntimeId: restoredWorkspace.workspaceRuntimeId,
+            remoteLifecycle: restoredWorkspace.remoteLifecycle,
+            workspaceProbe: restoredWorkspace.workspaceProbe,
+          })
+        ) {
+          continue
+        }
+        seedRepoProjectionQueryData(
+          restoredWorkspace.workspaceId,
+          restoredWorkspace.workspaceRuntimeId,
+          restoredWorkspace.projection,
+        )
         acceptRepoProjectionReadModel(
           set,
           get,
@@ -142,6 +168,25 @@ function createRestorableWorkspaceLifecycleActions(
 
     promoteRestoredWorkspace(result: WorkspaceTabsRestoreResult): boolean {
       const restoredWorkspace = result.workspace
+      const current = get().workspaces[restoredWorkspace.workspaceId]
+      if (
+        !current ||
+        current.workspaceRuntimeId !== restoredWorkspace.workspaceRuntimeId ||
+        current.session.projectionState !== 'stub'
+      ) {
+        return false
+      }
+      if (
+        restoredWorkspace.entry.kind === 'remote' &&
+        !acceptRemoteWorkspaceRuntimeProjection(set, get, {
+          workspaceId: restoredWorkspace.workspaceId,
+          workspaceRuntimeId: restoredWorkspace.workspaceRuntimeId,
+          remoteLifecycle: restoredWorkspace.remoteLifecycle,
+          workspaceProbe: restoredWorkspace.workspaceProbe,
+        })
+      ) {
+        return false
+      }
       let promoted = false
       set((s) => {
         const current = s.workspaces[restoredWorkspace.workspaceId]
@@ -154,7 +199,7 @@ function createRestorableWorkspaceLifecycleActions(
         }
         const { workspaces } = addResolvedWorkspace(
           s,
-          resolvedWorkspaceForProjectionPromotion(restoredWorkspace),
+          resolvedWorkspaceFromRestoredRuntime(restoredWorkspace),
           restoredWorkspace.workspaceRuntimeId,
         )
         promoted = true
@@ -261,27 +306,20 @@ function resolvedWorkspaceFromRestoredRuntime(restored: RestoredWorkspaceRuntime
   const workspaceSettledWithoutGit =
     restored.workspaceProbe.status === 'unavailable' ||
     (restored.workspaceProbe.status === 'ready' && restored.workspaceProbe.capabilities.git.status === 'unavailable')
+  const session = {
+    entry: restored.entry,
+    projectionState:
+      isProjectedRestoredWorkspaceRuntime(restored) || workspaceSettledWithoutGit
+        ? ('projected' as const)
+        : ('stub' as const),
+  }
+  if (restored.entry.kind === 'remote') {
+    return { id: restored.workspaceId, name: restored.name, session }
+  }
   return {
     id: restored.workspaceId,
     name: restored.name,
     workspaceProbe: restored.workspaceProbe,
-    ...(restored.target ? { target: restored.target } : {}),
-    session: {
-      entry: restored.entry,
-      projectionState:
-        isProjectedRestoredWorkspaceRuntime(restored) || workspaceSettledWithoutGit
-          ? ('projected' as const)
-          : ('stub' as const),
-    },
-  }
-}
-
-function resolvedWorkspaceForProjectionPromotion(restored: RestoredWorkspaceRuntime) {
-  const resolvedWorkspace = resolvedWorkspaceFromRestoredRuntime(restored)
-  return {
-    id: resolvedWorkspace.id,
-    name: resolvedWorkspace.name,
-    workspaceProbe: resolvedWorkspace.workspaceProbe,
-    session: resolvedWorkspace.session,
+    session,
   }
 }

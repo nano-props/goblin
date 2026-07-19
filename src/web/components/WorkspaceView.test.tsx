@@ -1134,18 +1134,18 @@ describe('WorkspaceView workspace navigation', () => {
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
   })
 
-  test('large-screen unavailable repo keeps the repo shell chrome available', () => {
+  test('large-screen unavailable Workspace keeps capability-neutral shell chrome available', () => {
     setRepoUnavailable(REPO_ID)
     const { container } = render(branchWorkspaceView())
 
     expect(workspaceLayout(container)?.dataset.mode).toBe('split')
     expect(container.querySelector('[data-testid="workspace-picker"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="create-worktree-row-action"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="create-worktree-row-action"]')).toBeNull()
     expect(container.querySelector('button[aria-label="app-chrome.settings"]')).not.toBeNull()
     expect(document.body.textContent).toContain('workspace-unavailable.title')
   })
 
-  test('large-screen focused unavailable repo with current branch keeps floating sidebar reveal available', () => {
+  test('large-screen focused unavailable Workspace keeps floating sidebar reveal available', () => {
     useWorkspacesStore.getState().setZenMode(true)
     setRepoUnavailable(REPO_ID)
 
@@ -1344,7 +1344,10 @@ function setRepoUnavailable(repoId: string) {
     workspaces: {
       [repoId]: {
         ...repo,
-        availability: { phase: 'unavailable' as const, reason: 'error.failed-read-repo', checkedAt: 0 },
+        capability: {
+          kind: 'unavailable',
+          probe: { status: 'unavailable', reason: 'error.workspace-path-not-found' },
+        },
       },
     },
   })

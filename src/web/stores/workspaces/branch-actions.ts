@@ -7,7 +7,11 @@ import {
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { RepoOperationCancelledError } from '#/web/stores/workspaces/operation-cancellation.ts'
 import type { RepoBranchActionReason, RepoOperationReason } from '#/web/stores/workspaces/operations.ts'
-import { isWorkspaceUnavailable, updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
+import {
+  updateIfFresh,
+  workspaceCanExecute,
+  workspaceOperationalFailureReason,
+} from '#/web/stores/workspaces/workspace-guards.ts'
 import {
   repoOperation,
   repoLocalBranchActionScheduleGuard,
@@ -279,20 +283,9 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
       if (repoBefore.workspaceRuntimeId !== workspaceRuntimeId) return null
       const network = isNetworkBranchAction(action)
       const branchOperation = repoOperation(id, 'branchAction')
-      if (isWorkspaceUnavailable(repoBefore)) {
-        // Per the lifecycle union: local repos carry their
-        // failure reason in `availability.reason`; remote repos
-        // carry it in `admission.lifecycle.reason` (or 'unknown'
-        // before Phase 3 had a chance to settle it). Either way,
-        // we won't run branch actions on a failed repo.
-        const reason =
-          repoBefore.admission.kind === 'remote' && repoBefore.admission.lifecycle?.kind === 'failed'
-            ? repoBefore.admission.lifecycle.reason
-            : repoBefore.availability.phase === 'unavailable'
-              ? repoBefore.availability.reason
-              : 'error.failed-read-repo'
-        return { ok: false, message: reason }
-      }
+      const operationalFailureReason = workspaceOperationalFailureReason(repoBefore)
+      if (operationalFailureReason) return { ok: false, message: operationalFailureReason }
+      if (!workspaceCanExecute(repoBefore)) return { ok: false, message: 'cancelled' }
       if (branchOperation.phase === 'running' || branchOperation.phase === 'queued') {
         // A queued pull/push can be replaced by the latest network branch action; running work cannot.
         if (!network || branchOperation.phase !== 'queued') return { ok: false, message: 'cancelled' }

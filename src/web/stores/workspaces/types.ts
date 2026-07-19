@@ -128,8 +128,6 @@ export interface WorkspaceSessionState {
   projectionState: WorkspaceSessionProjectionState
 }
 
-type WorkspaceAvailabilityState = { phase: 'available' } | { phase: 'unavailable'; reason: string; checkedAt: number }
-
 export interface RepoSnapshotCacheEntry {
   savedAt: number
   name: string
@@ -148,7 +146,6 @@ export interface WorkspaceState {
   workspaceRuntimeId: string
   ui: WorkspaceUiState
   session: WorkspaceSessionState
-  availability: WorkspaceAvailabilityState
   admission: WorkspaceAdmissionState
   capability: WorkspaceCapabilityState
 }

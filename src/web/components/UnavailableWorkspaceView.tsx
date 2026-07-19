@@ -9,7 +9,7 @@ import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { formatTranslatableReason, shouldOfferSshSettings, unavailableBodyKey } from '#/web/lib/remote-diagnostics.ts'
 import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
-import { isWorkspaceUnavailable, remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
+import { remoteWorkspaceTarget, workspaceOperationalFailureReason } from '#/web/stores/workspaces/workspace-guards.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
@@ -20,26 +20,15 @@ interface Props {
 export function UnavailableWorkspaceView({ workspace }: Props) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
-  // Phase 4 invariant: the `availability.phase` mirror is a
-  // legacy hint for the refresh-pipeline guards, NOT the
-  // authoritative source. The lifecycle union is. Gate on
-  // `isWorkspaceUnavailable` (which dispatches by workspace kind) and
-  // read the reason from the field that owns it for each kind.
-  const isUnavailable = isWorkspaceUnavailable(workspace)
+  const failureReason = workspaceOperationalFailureReason(workspace)
   const isRemote = isRemoteWorkspaceId(workspace.id)
-  const reason = isRemote
-    ? workspace.admission.kind === 'remote' && workspace.admission.lifecycle?.kind === 'failed'
-      ? workspace.admission.lifecycle.reason
-      : 'error.workspace-operation-failed'
-    : workspace.availability.phase === 'unavailable'
-      ? workspace.availability.reason
-      : 'error.workspace-operation-failed'
-  if (!isUnavailable) {
+  if (!failureReason) {
     // Defensive: this view is only mounted when the workspace is unavailable,
     // but a stale render after a state
     // transition shouldn't render an empty body.
     return null
   }
+  const reason = failureReason
   const bodyKey = unavailableBodyKey(isRemote, reason)
   const canOpenSshSettings = isRemote && shouldOfferSshSettings(reason)
 

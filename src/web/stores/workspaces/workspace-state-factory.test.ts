@@ -1,7 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { deriveWorkspaceConnectivity } from '#/web/stores/workspaces/workspace-guards.ts'
+import {
+  deriveWorkspaceConnectivity,
+  workspaceCanExecute,
+  workspaceOperationalFailureReason,
+} from '#/web/stores/workspaces/workspace-guards.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { requireRemoteAdmissionForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
 
@@ -120,10 +124,31 @@ describe('deriveWorkspaceConnectivity', () => {
     expect(deriveWorkspaceConnectivity(repo)).toBe('connected')
   })
 
+  test('derives a local operational failure from the capability probe', () => {
+    const workspace = emptyWorkspace('goblin+file:///workspace', 'workspace', 'workspace-runtime-test')
+    acceptWorkspaceProbeState(workspace, {
+      status: 'unavailable',
+      reason: 'error.workspace-path-not-found',
+    })
+
+    expect(workspaceOperationalFailureReason(workspace)).toBe('error.workspace-path-not-found')
+  })
+
   test('a remote workspace with lifecycle=connecting reads as connecting', () => {
     const repo = emptyWorkspace(REMOTE_ID, 'remote', 'repo-runtime-test')
+    acceptWorkspaceProbeState(repo, {
+      status: 'ready',
+      name: 'workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
+      diagnostics: [],
+    })
     requireRemoteAdmissionForTest(repo).lifecycle = { kind: 'connecting' }
     expect(deriveWorkspaceConnectivity(repo)).toBe('connecting')
+    expect(workspaceCanExecute(repo)).toBe(false)
   })
 
   test('a remote workspace with lifecycle=ready reads as connected', () => {
@@ -131,12 +156,35 @@ describe('deriveWorkspaceConnectivity', () => {
     const target = remoteTargetFixture()
     requireRemoteAdmissionForTest(repo).lifecycle = { kind: 'ready', target }
     expect(deriveWorkspaceConnectivity(repo)).toBe('connected')
+    acceptWorkspaceProbeState(repo, {
+      status: 'ready',
+      name: 'workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [],
+    })
+    expect(workspaceCanExecute(repo)).toBe(true)
   })
 
   test('a remote workspace with lifecycle=failed reads as unreachable', () => {
     const repo = emptyWorkspace(REMOTE_ID, 'remote', 'repo-runtime-test')
     requireRemoteAdmissionForTest(repo).lifecycle = { kind: 'failed', reason: 'unreachable' }
     expect(deriveWorkspaceConnectivity(repo)).toBe('unreachable')
+    expect(workspaceOperationalFailureReason(repo)).toBe('unreachable')
+  })
+
+  test('remote admission failure takes precedence over a capability probe failure', () => {
+    const workspace = emptyWorkspace(REMOTE_ID, 'remote', 'workspace-runtime-test')
+    acceptWorkspaceProbeState(workspace, {
+      status: 'unavailable',
+      reason: 'error.workspace-transport-unavailable',
+    })
+    requireRemoteAdmissionForTest(workspace).lifecycle = { kind: 'failed', reason: 'timeout' }
+
+    expect(workspaceOperationalFailureReason(workspace)).toBe('timeout')
   })
 
   test('a remote workspace with lifecycle=failed but a retained target still reads as unreachable', () => {

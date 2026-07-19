@@ -30,7 +30,7 @@ interface Props {
 
 const COMPLETION_VISIBLE_MS = 1500
 
-type RepoActivityControlRepo = Pick<WorkspaceState, 'id' | 'workspaceRuntimeId' | 'availability'> &
+type RepoActivityControlRepo = Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'> &
   Pick<GitWorkspaceProjection, 'dataLoads' | 'projection' | 'remote'> &
   RepoActivityProjectionRepo
 
@@ -58,7 +58,6 @@ function repoActivityControlRepoEqual(
       a.workspaceRuntimeId === b.workspaceRuntimeId &&
       a.dataLoads === b.dataLoads &&
       a.branchAction === b.branchAction &&
-      a.availability === b.availability &&
       a.projection === b.projection &&
       a.remote === b.remote)
   )
@@ -75,7 +74,6 @@ export function RepoActivityControl({ repoId }: Props) {
             workspaceRuntimeId: repo.workspaceRuntimeId,
             dataLoads: repo.capability.git.dataLoads,
             branchAction: repo.capability.git.operations.branchAction,
-            availability: repo.availability,
             projection: repo.capability.git.projection,
             remote: repo.capability.git.remote,
           }

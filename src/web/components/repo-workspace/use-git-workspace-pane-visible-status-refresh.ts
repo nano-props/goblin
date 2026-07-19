@@ -10,13 +10,11 @@ export function useGitWorkspacePaneVisibleStatusRefresh({
   workspaceRuntimeId,
   branchName,
   renderedTab,
-  unavailable,
 }: {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string | null
   renderedTab: WorkspacePaneTabType | null
-  unavailable: boolean
 }): void {
   const lastRequestedKeyRef = useRef<string | null>(null)
 
@@ -28,7 +26,6 @@ export function useGitWorkspacePaneVisibleStatusRefresh({
     }
     const key = [workspaceId, workspaceRuntimeId, branchName, renderedTab].join('\0')
     if (key === lastRequestedKeyRef.current) return
-    if (unavailable) return
     if (
       requestVisibleWorkspaceStatusRefresh(
         { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
@@ -39,5 +36,5 @@ export function useGitWorkspacePaneVisibleStatusRefresh({
     ) {
       lastRequestedKeyRef.current = key
     }
-  }, [branchName, renderedTab, workspaceId, workspaceRuntimeId, unavailable])
+  }, [branchName, renderedTab, workspaceId, workspaceRuntimeId])
 }

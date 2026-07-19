@@ -170,7 +170,6 @@ function gitWorkspacePaneProjection(repo: WorkspaceState): GitWorkspacePaneProje
     ui: { ...repo.ui, currentBranchName },
     branchAction: repo.capability.git.operations.branchAction,
     branchModel,
-    unavailable: false,
     probe: repo.capability.probe,
     remote: repo.capability.git.remote,
     remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,

@@ -15,7 +15,6 @@ describe('backgroundSyncTargetsFromStore', () => {
     const repo = createRepo({
       id: REMOTE_WORKSPACE_ID,
       remote: { hasRemotes: true, hasGitHubRemote: true },
-      availability: { phase: 'available' },
     })
     if (repo.capability.kind !== 'git') throw new Error('expected Git capability')
     repo.capability.git.dataLoads.repoReadModel.phase = 'refreshing'
@@ -30,12 +29,11 @@ describe('backgroundSyncTargetsFromStore', () => {
     const localOnly = createRepo({
       id: LOCAL_WORKSPACE_ID,
       remote: { hasRemotes: false, hasGitHubRemote: false },
-      availability: { phase: 'available' },
     })
     const unavailable = createRepo({
       id: UNAVAILABLE_WORKSPACE_ID,
       remote: { hasRemotes: true, hasGitHubRemote: true },
-      availability: { phase: 'unavailable', reason: 'error.failed-read-repo', checkedAt: Date.now() },
+      unavailableReason: 'error.workspace-path-not-found',
     })
 
     expect(
@@ -78,12 +76,12 @@ describe('backgroundSyncTargetsFromStore', () => {
 function createRepo(input: {
   id: WorkspaceId
   remote: { hasRemotes: boolean; hasGitHubRemote: boolean }
-  availability: WorkspaceState['availability']
+  unavailableReason?: 'error.workspace-path-not-found'
 }): WorkspaceState {
-  const repo = emptyWorkspace(input.id, 'repo', 'workspace-runtime-test')
-  const readyRepo: WorkspaceState = {
-    ...repo,
-    availability: input.availability,
+  const readyRepo = emptyWorkspace(input.id, 'repo', 'workspace-runtime-test')
+  if (input.unavailableReason) {
+    acceptWorkspaceProbeState(readyRepo, { status: 'unavailable', reason: input.unavailableReason })
+    return readyRepo
   }
   acceptWorkspaceProbeState(readyRepo, {
     status: 'ready',

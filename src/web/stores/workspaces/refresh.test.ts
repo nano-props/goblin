@@ -844,7 +844,7 @@ describe('projection refresh request ordering', () => {
 
     expect(projectionCalls).toBe(1)
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(repo?.availability).toEqual({ phase: 'available' })
+    expect(repo?.capability.kind).toBe('git')
     expect(requireGitWorkspaceForTest(repo).capability.git.dataLoads.repoReadModel.error).toBe(
       'error.workspace-git-unavailable',
     )
@@ -895,7 +895,7 @@ describe('projection refresh request ordering', () => {
   })
 
   test.each(['status-first', 'projection-first'] as const)(
-    'status availability errors do not race projection ownership when %s completes',
+    'status errors stay query-local when %s completes',
     async (completionOrder) => {
       const workspaceRuntimeId = seedRepo([branch('old')])
       let resolveProjection!: (projection: WorkspaceRuntimeProjection) => void
@@ -940,7 +940,7 @@ describe('projection refresh request ordering', () => {
       }
       await refresh
 
-      expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.availability).toEqual({ phase: 'available' })
+      expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.capability.kind).toBe('git')
       expect(
         primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.error,
       ).toEqual(
@@ -952,7 +952,7 @@ describe('projection refresh request ordering', () => {
     },
   )
 
-  test('standalone status availability errors remain query-local', async () => {
+  test('standalone status errors remain query-local', async () => {
     const workspaceRuntimeId = seedRepo([branch('main')])
     ipcHandlers['repo.worktreeStatus'] = async () => {
       throw new Error('error.workspace-git-unavailable')
@@ -960,7 +960,7 @@ describe('projection refresh request ordering', () => {
 
     await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
 
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.availability).toEqual({ phase: 'available' })
+    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.capability.kind).toBe('git')
     expect(
       primaryWindowQueryClient.getQueryState(repoWorktreeStatusQueryKey(REPO_ID, workspaceRuntimeId))?.error,
     ).toEqual(
@@ -969,21 +969,6 @@ describe('projection refresh request ordering', () => {
         cause: expect.objectContaining({ message: 'error.workspace-git-unavailable' }),
       }),
     )
-  })
-
-  test('repo read-model projection refresh restores an unavailable repo when the path is a git repo again', async () => {
-    const workspaceRuntimeId = seedRepo([branch('old')])
-    updateRepoForTest((repo) => {
-      repo.availability = { phase: 'unavailable', reason: 'error.path-not-found', checkedAt: Date.now() }
-    })
-    ipcHandlers['repo.projection'] = async () => repoProjection({ branches: [branch('main')], current: 'main' })
-
-    await requestRepoProjectionReadModelRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
-
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(repo?.availability).toEqual({ phase: 'available' })
-    expect(repoBranchNames()).toEqual(['main'])
-    expect(requireGitWorkspaceForTest(repo).capability.git.dataLoads.repoReadModel.error).toBeNull()
   })
 
   test('repo read-model projection refresh writes the server snapshot result into repo data query cache', async () => {
@@ -1291,7 +1276,7 @@ describe('projection refresh request ordering', () => {
     await refresh
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
-    expect(repo.availability.phase).toBe('available')
+    expect(repo.capability.kind).toBe('git')
     expect(cachedRepoStatus(workspaceRuntimeId)).toEqual([])
   })
 
@@ -1306,7 +1291,10 @@ describe('projection refresh request ordering', () => {
     await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, 'repo-runtime-stale')
     await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
     updateRepoForTest((repo) => {
-      repo.availability = { phase: 'unavailable', reason: 'error.path-not-found', checkedAt: 1 }
+      acceptWorkspaceProbeState(repo, {
+        status: 'unavailable',
+        reason: 'error.workspace-path-not-found',
+      })
     })
     await refreshRepoWorktreeStatus(refreshStoreAccess, REPO_ID, workspaceRuntimeId)
 

@@ -200,7 +200,10 @@ describe('workspace routes', () => {
   })
 
   test('does not mint a runtime when command-input probing fails', async () => {
-    mocks.probeLocalWorkspace.mockResolvedValue({ status: 'unavailable', reason: 'error.path-not-found' })
+    mocks.probeLocalWorkspace.mockResolvedValue({
+      status: 'unavailable',
+      reason: 'error.workspace-path-not-found',
+    })
     const app = createTestWorkspaceRoutes()
     const response = await post(app, '/runtime-open', {
       workspaceInput: '/tmp/missing-workspace',
@@ -210,7 +213,7 @@ describe('workspace routes', () => {
     await expect(response.json()).resolves.toEqual({
       ok: false,
       input: '/tmp/missing-workspace',
-      reason: 'error.path-not-found',
+      reason: 'error.workspace-path-not-found',
     })
     await expect((await post(app, '/runtime-list', {})).json()).resolves.toEqual({ runtimes: [] })
   })

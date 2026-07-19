@@ -42,6 +42,7 @@ import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
@@ -198,7 +199,8 @@ export function useKeyboard({
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
           if (!paneTarget) return
           const workspace = workspaceId ? useWorkspacesStore.getState().workspaces[workspaceId] : null
-          if (!workspaceTerminalAvailable(workspace?.capability.probe)) return
+          if (!workspace || !workspaceCanExecute(workspace) || !workspaceTerminalAvailable(workspace.capability.probe))
+            return
           e.preventDefault()
           // Cmd+T is a generic entry → new terminal appends to the end.
           void runNewTerminalTabCommand({
@@ -212,7 +214,13 @@ export function useKeyboard({
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
           e.preventDefault()
           const repo = workspaceId ? useWorkspacesStore.getState().workspaces[workspaceId] : null
-          if (!repo || repo.capability.kind !== 'git' || !workspaceWorktreesAvailable(repo.capability.probe)) return
+          if (
+            !repo ||
+            !workspaceCanExecute(repo) ||
+            repo.capability.kind !== 'git' ||
+            !workspaceWorktreesAvailable(repo.capability.probe)
+          )
+            return
           const branchAction = projectBranchActionOperation(
             repo.capability.git.operations.branchAction,
             getRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId)?.operations,

@@ -55,6 +55,7 @@ describe('repo session hydration', () => {
             workspaceId: REPO_A,
             workspaceRuntimeId: 'repo-runtime-server-a',
             name: 'directory-a',
+            remoteLifecycle: null,
             workspaceProbe: DIRECTORY_WORKSPACE_PROBE,
             projection: null,
           },
@@ -112,6 +113,7 @@ describe('repo session hydration', () => {
             workspaceId: REPO_A,
             workspaceRuntimeId: 'repo-runtime-server-a',
             name: 'server-a',
+            remoteLifecycle: null,
             workspaceProbe: GIT_WORKSPACE_PROBE,
             projection: {
               snapshot: { branches: [branchSnapshot('main')], current: 'main' },
@@ -180,6 +182,7 @@ describe('repo session hydration', () => {
           workspaceId: REPO_A,
           workspaceRuntimeId: 'repo-runtime-server-a',
           name: 'server-a',
+          remoteLifecycle: null,
           workspaceProbe: GIT_WORKSPACE_PROBE,
           projection: {
             snapshot: { branches: [branchSnapshot('server-main')], current: 'server-main' },
@@ -211,7 +214,11 @@ describe('repo session hydration', () => {
     expect(primaryWindowQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())).toEqual({
       runtimes: [
         { workspaceId: REPO_B, workspaceRuntimeId: 'repo-runtime-other-window', workspaceProbe: { status: 'probing' } },
-        { workspaceId: REPO_A, workspaceRuntimeId: 'repo-runtime-server-a', workspaceProbe: { status: 'probing' } },
+        {
+          workspaceId: REPO_A,
+          workspaceRuntimeId: 'repo-runtime-server-a',
+          workspaceProbe: { status: 'probing' },
+        },
       ],
     })
     expect(
@@ -254,6 +261,7 @@ describe('repo session hydration', () => {
           workspaceId: REPO_A,
           workspaceRuntimeId: 'repo-runtime-server-a',
           name: 'server-a',
+          remoteLifecycle: null,
           workspaceProbe: GIT_WORKSPACE_PROBE,
           projection: null,
         },
@@ -278,6 +286,7 @@ describe('repo session hydration', () => {
           workspaceId: REPO_A,
           workspaceRuntimeId: 'repo-runtime-server-a',
           name: 'server-a',
+          remoteLifecycle: null,
           workspaceProbe: GIT_WORKSPACE_PROBE,
           projection: null,
         },
@@ -300,6 +309,7 @@ describe('repo session hydration', () => {
           workspaceId: REPO_A,
           workspaceRuntimeId: 'repo-runtime-server-a',
           name: 'server-a',
+          remoteLifecycle: null,
           workspaceProbe: GIT_WORKSPACE_PROBE,
           projection,
         },
@@ -332,6 +342,7 @@ describe('repo session hydration', () => {
             workspaceId: REPO_A,
             workspaceRuntimeId: 'repo-runtime-server-a',
             name: 'server-a',
+            remoteLifecycle: null,
             workspaceProbe: GIT_WORKSPACE_PROBE,
             projection: null,
           },
@@ -353,6 +364,7 @@ describe('repo session hydration', () => {
         workspaceId: REPO_A,
         workspaceRuntimeId: 'repo-runtime-server-a',
         name: 'server-a',
+        remoteLifecycle: null,
         workspaceProbe: GIT_WORKSPACE_PROBE,
         projection: {
           snapshot: { branches: [branchSnapshot('main')], current: 'main' },
@@ -396,6 +408,7 @@ describe('repo session hydration', () => {
           workspaceId: REPO_A,
           workspaceRuntimeId: 'repo-runtime-old',
           name: 'server-a',
+          remoteLifecycle: null,
           workspaceProbe: GIT_WORKSPACE_PROBE,
           projection: null,
         },
@@ -409,6 +422,7 @@ describe('repo session hydration', () => {
         workspaceId: REPO_A,
         workspaceRuntimeId: 'repo-runtime-old',
         name: 'server-a',
+        remoteLifecycle: null,
         workspaceProbe: GIT_WORKSPACE_PROBE,
         projection: {
           snapshot: { branches: [branchSnapshot('main')], current: 'main' },
@@ -436,7 +450,50 @@ describe('repo session hydration', () => {
     expect(useWorkspacesStore.getState().workspaceOrder).toEqual([])
   })
 
-  test('does not overwrite a newer remote lifecycle while promoting projection state', async () => {
+  test('restores the authoritative failed remote lifecycle', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.test',
+      user: 'developer',
+      port: 22,
+      remotePath: '/workspace',
+    })!
+    const entry = remoteWorkspaceSessionEntry(target)
+    const workspaceId = workspaceIdForTest(entry.id)
+
+    await useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime({
+      workspaces: [
+        {
+          entry,
+          workspaceId,
+          workspaceRuntimeId: 'workspace-runtime-remote',
+          name: 'workspace',
+          remoteLifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable', target },
+          workspaceProbe: {
+            status: 'unavailable',
+            reason: 'error.workspace-transport-unavailable',
+          },
+          projection: null,
+        },
+      ],
+      workspacePaneTabs: [],
+      restoredWorkspaceId: workspaceId,
+    })
+
+    expect(useWorkspacesStore.getState().workspaces[workspaceId]).toMatchObject({
+      capability: {
+        kind: 'unavailable',
+        probe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
+      },
+      admission: {
+        kind: 'remote',
+        lifecycleAttemptId: 4,
+        lifecycle: { kind: 'failed', reason: 'unreachable', target },
+      },
+    })
+  })
+
+  test('rejects a stale remote lifecycle and probe as one promotion projection', async () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
       host: 'example.test',
@@ -454,6 +511,7 @@ describe('repo session hydration', () => {
           workspaceId,
           workspaceRuntimeId,
           name: 'repo',
+          remoteLifecycle: { kind: 'ready', attemptId: 1, target },
           workspaceProbe: GIT_WORKSPACE_PROBE,
           projection: null,
         },
@@ -465,7 +523,7 @@ describe('repo session hydration', () => {
       acceptRemoteWorkspaceLifecycleProjection(useWorkspacesStore.setState, useWorkspacesStore.getState, {
         workspaceId,
         workspaceRuntimeId,
-        remoteLifecycle: { kind: 'failed', attemptId: 5, reason: 'unreachable', target },
+        remoteLifecycle: { kind: 'ready', attemptId: 5, target },
       }),
     ).toBe(true)
 
@@ -476,25 +534,23 @@ describe('repo session hydration', () => {
           workspaceId,
           workspaceRuntimeId,
           name: 'repo',
-          target,
-          workspaceProbe: GIT_WORKSPACE_PROBE,
-          projection: {
-            snapshot: { branches: [branchSnapshot('main')], current: 'main' },
-            pullRequests: null,
-            operations: { operations: [], loadedAt: 0 },
-            requested: { branch: null, pullRequestMode: 'full' },
-            loadedAt: 10,
+          remoteLifecycle: { kind: 'failed', attemptId: 1, reason: 'unreachable', target },
+          workspaceProbe: {
+            status: 'unavailable',
+            reason: 'error.workspace-transport-unavailable',
           },
+          projection: null,
         },
         snapshot: null,
       }),
-    ).toBe(true)
+    ).toBe(false)
 
-    expect(useWorkspacesStore.getState().workspaces[entry.id]?.session.projectionState).toBe('projected')
+    expect(useWorkspacesStore.getState().workspaces[entry.id]?.session.projectionState).toBe('stub')
+    expect(useWorkspacesStore.getState().workspaces[entry.id]?.capability.kind).toBe('git')
     expect(useWorkspacesStore.getState().workspaces[entry.id]?.admission).toMatchObject({
       kind: 'remote',
       lifecycleAttemptId: 5,
-      lifecycle: { kind: 'failed', reason: 'unreachable', target },
+      lifecycle: { kind: 'ready', target },
     })
   })
 })
