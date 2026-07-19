@@ -1,9 +1,9 @@
 import { CancelledError } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { emptyWorkspace, replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { refreshStatusLog, terminalLog } from '#/web/logger.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { requestRepoProjectionReadModelRefresh, runManualRepoSync } from '#/web/stores/workspaces/refresh.ts'
+import { requestRepoProjectionReadModelRefresh, runManualWorkspaceRefresh } from '#/web/stores/workspaces/refresh.ts'
 import {
   branch,
   REPO_ID,
@@ -87,6 +87,72 @@ function createWorktreeAction(): TestCreateWorktreeAction {
 }
 
 describe('remote fetch timestamps', () => {
+  test('refreshes a plain Workspace and projects Git only after capability promotion', async () => {
+    const workspaceRuntimeId = 'workspace-runtime-plain-refresh'
+    const workspace = emptyWorkspace(REPO_ID, 'plain-workspace', workspaceRuntimeId)
+    acceptWorkspaceProbeState(workspace, {
+      status: 'ready',
+      name: 'plain-workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [],
+    })
+    useWorkspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
+    const projection = vi.fn(async () => repoProjection({ branches: [branch('main')], current: 'main' }))
+    ipcHandlers['workspace.refresh'] = () => ({
+      kind: 'committed',
+      probe: {
+        status: 'ready',
+        name: 'plain-workspace',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        },
+        diagnostics: [],
+      },
+    })
+    ipcHandlers['repo.projection'] = projection
+
+    await runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+
+    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.capability.kind).toBe('git')
+    expect(projection).toHaveBeenCalledOnce()
+  })
+
+  test('coalesces concurrent explicit refreshes for the same Workspace runtime', async () => {
+    const workspaceRuntimeId = 'workspace-runtime-coalesced-refresh'
+    const workspace = emptyWorkspace(REPO_ID, 'plain-workspace', workspaceRuntimeId)
+    acceptWorkspaceProbeState(workspace, {
+      status: 'ready',
+      name: 'plain-workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [],
+    })
+    useWorkspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
+    const response = Promise.withResolvers<{
+      kind: 'committed'
+      probe: typeof workspace.capability.probe
+    }>()
+    const refresh = vi.fn(() => response.promise)
+    ipcHandlers['workspace.refresh'] = refresh
+
+    const first = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    const second = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce())
+    response.resolve({ kind: 'committed', probe: workspace.capability.probe })
+
+    await Promise.all([first, second])
+    expect(refresh).toHaveBeenCalledOnce()
+  })
+
   test('commits a non-Git capability transition without changing the runtime or reading Git state', async () => {
     const workspaceRuntimeId = seedRepo([branch('main')])
     const fetch = vi.fn()
@@ -107,7 +173,7 @@ describe('remote fetch timestamps', () => {
       },
     })
 
-    await runManualRepoSync(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    await runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(repo?.workspaceRuntimeId).toBe(workspaceRuntimeId)
@@ -152,7 +218,7 @@ describe('remote fetch timestamps', () => {
       },
     })
 
-    await runManualRepoSync(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    await runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
     expect(useWorkspacesStore.getState().workspaces[REPO_ID]!.capability.probe).toBe(before)
     expect(fetch).not.toHaveBeenCalled()
@@ -220,7 +286,7 @@ describe('remote fetch timestamps', () => {
       return { workspaceRuntimeId, status: [], loadedAt: Date.now() }
     }
 
-    await runManualRepoSync(refreshStoreAccess, REPO_ID, {
+    await runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, {
       workspaceRuntimeId: useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
     })
 
@@ -233,7 +299,7 @@ describe('remote fetch timestamps', () => {
     const workspaceRuntimeId = seedRepo([branch('feature/a')])
     const before = Date.now()
 
-    await runManualRepoSync(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    await runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
     expect(
       requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.dataLoads.fetch
@@ -254,7 +320,7 @@ describe('remote fetch timestamps', () => {
         current: 'feature/reopened',
       })
 
-    const work = runManualRepoSync(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    const work = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
     await vi.waitFor(() => {
       expect(resolveFetch).toEqual(expect.any(Function))
     })
@@ -276,7 +342,7 @@ describe('remote fetch timestamps', () => {
         resolveNetwork = resolve
       })
 
-    const work = runManualRepoSync(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    const work = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
     await vi.waitFor(() => {
       expect(resolveNetwork).toEqual(expect.any(Function))
@@ -303,7 +369,7 @@ describe('remote fetch timestamps', () => {
       return repoProjection({ branches: [branch('feature/a')], current: 'feature/a' })
     }
 
-    await runManualRepoSync(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    await runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(requireGitWorkspaceForTest(repo).capability.git.events.at(-1)).toMatchObject({
@@ -328,7 +394,7 @@ describe('remote fetch timestamps', () => {
       return repoProjection({ branches: [branch('feature/a'), branch('feature/b')], current: 'feature/a' })
     }
 
-    await runManualRepoSync(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    await runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(fetchCount).toBe(1)
@@ -342,7 +408,9 @@ describe('remote fetch timestamps', () => {
       throw new Error('network down')
     }
 
-    await expect(runManualRepoSync(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })).resolves.toBeUndefined()
+    await expect(
+      runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId }),
+    ).resolves.toBeUndefined()
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(requireGitWorkspaceForTest(repo).capability.git.events.at(-1)).toMatchObject({
@@ -1412,7 +1480,10 @@ describe('projection refresh request ordering', () => {
       repo && projection
         ? preferredWorkspacePaneTabForTarget(
             repo.ui,
-            workspacePaneTabsTargetForRepoBranch({ workspaceId: repo.id, branches: projection.branches }, 'feature/new'),
+            workspacePaneTabsTargetForRepoBranch(
+              { workspaceId: repo.id, branches: projection.branches },
+              'feature/new',
+            ),
           )
         : null,
     ).toBe('terminal')

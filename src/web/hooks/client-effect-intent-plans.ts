@@ -22,7 +22,7 @@ type ClientWorkspaceIntent = Extract<
   | { type: 'workspace-pane-close-tab-or-window-requested' }
   | { type: 'close-workspace-requested' }
   | { type: 'cycle-workspace-requested' }
-  | { type: 'repo-refresh-requested' }
+  | { type: 'workspace-refresh-requested' }
   | { type: 'show-workspace-pane-tab-requested' }
   | { type: 'terminal-primary-action-requested' }
   | { type: 'workspace-zen-mode-toggle-requested' }
@@ -66,7 +66,7 @@ export type WorkspaceIntentPlan =
   | { kind: 'close-workspace'; workspaceId: WorkspaceId }
   | { kind: 'close-window' }
   | { kind: 'cycle-workspace'; direction: 1 | -1 }
-  | { kind: 'refresh-repo'; repoId: WorkspaceId; workspaceRuntimeId: string }
+  | { kind: 'refresh-workspace'; workspaceId: WorkspaceId; workspaceRuntimeId: string }
   | {
       kind: 'show-workspace-pane-tab'
       workspaceId: WorkspaceId
@@ -201,18 +201,18 @@ export function createWorkspaceIntentPlan(
       return context.workspaceShortcutSuppressed
         ? { kind: 'noop' }
         : { kind: 'cycle-workspace', direction: event.direction }
-    case 'repo-refresh-requested':
+    case 'workspace-refresh-requested':
       if (
         context.workspaceShortcutSuppressed ||
         context.terminalFocused ||
         !context.currentWorkspaceId ||
         !context.currentWorkspaceRuntimeId ||
-        context.currentWorkspaceCapability?.kind !== 'git'
+        !context.currentWorkspaceCapability
       )
         return { kind: 'noop' }
       return {
-        kind: 'refresh-repo',
-        repoId: context.currentWorkspaceId,
+        kind: 'refresh-workspace',
+        workspaceId: context.currentWorkspaceId,
         workspaceRuntimeId: context.currentWorkspaceRuntimeId,
       }
     case 'show-workspace-pane-tab-requested':
@@ -268,7 +268,7 @@ function isClientWorkspaceIntent(event: ClientEffectIntent): event is ClientWork
     event.type === 'workspace-pane-close-tab-or-window-requested' ||
     event.type === 'close-workspace-requested' ||
     event.type === 'cycle-workspace-requested' ||
-    event.type === 'repo-refresh-requested' ||
+    event.type === 'workspace-refresh-requested' ||
     event.type === 'show-workspace-pane-tab-requested' ||
     event.type === 'terminal-primary-action-requested' ||
     event.type === 'workspace-zen-mode-toggle-requested'

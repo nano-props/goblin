@@ -242,7 +242,7 @@ describe('client effect intent plans', () => {
 
   test('creates a refresh plan from the current workspace runtime id', () => {
     const plan = createWorkspaceIntentPlan(
-      { type: 'repo-refresh-requested' },
+      { type: 'workspace-refresh-requested' },
       {
         overlayBlocked: false,
         workspaceShortcutSuppressed: false,
@@ -256,9 +256,30 @@ describe('client effect intent plans', () => {
     )
 
     expect(plan).toEqual({
-      kind: 'refresh-repo',
-      repoId: 'goblin+file:///tmp/repo',
+      kind: 'refresh-workspace',
+      workspaceId: 'goblin+file:///tmp/repo',
       workspaceRuntimeId: 'repo-runtime-test-7',
+    })
+  })
+
+  test('creates a refresh plan for a plain Workspace', () => {
+    const plan = createWorkspaceIntentPlan(
+      { type: 'workspace-refresh-requested' },
+      {
+        overlayBlocked: false,
+        workspaceShortcutSuppressed: false,
+        terminalFocused: false,
+        currentWorkspaceId: CURRENT_DIRECTORY_REPO.id,
+        currentWorkspaceRuntimeId: CURRENT_DIRECTORY_REPO.workspaceRuntimeId,
+        currentWorkspaceCapability: { kind: 'filesystem', probe: CURRENT_DIRECTORY_REPO.workspaceProbe },
+        currentWorkspacePaneCommandTarget: null,
+      },
+    )
+
+    expect(plan).toEqual({
+      kind: 'refresh-workspace',
+      workspaceId: CURRENT_DIRECTORY_REPO.id,
+      workspaceRuntimeId: CURRENT_DIRECTORY_REPO.workspaceRuntimeId,
     })
   })
 

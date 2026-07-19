@@ -6,7 +6,7 @@ import type { GitWorkspaceProjection, WorkspaceState } from '#/web/stores/worksp
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { Tip } from '#/web/components/Tip.tsx'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
-import { runManualRepoSync } from '#/web/stores/workspaces/refresh.ts'
+import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/refresh.ts'
 import type { RepoActivity, RepoActivityProjectionRepo, RepoCompletion } from '#/web/components/repo-activity/model.ts'
 import {
   getRepoActivity,
@@ -161,7 +161,7 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
     // Fire-and-forget so AsyncButton's internal pending state does not fight
     // the external manualSyncBusy prop. The visual loading state is owned by
     // the operation, not the click promise.
-    void runManualRepoSync({ get: useWorkspacesStore.getState, set: useWorkspacesStore.setState }, repo.id, {
+    void runManualWorkspaceRefresh({ get: useWorkspacesStore.getState, set: useWorkspacesStore.setState }, repo.id, {
       workspaceRuntimeId,
     })
   }

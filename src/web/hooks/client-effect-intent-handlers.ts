@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
-import { runManualRepoSync } from '#/web/stores/workspaces/refresh.ts'
+import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
@@ -205,10 +205,14 @@ export async function handleWorkspaceClientIntent(
     case 'cycle-workspace':
       deps.navigation.cycleWorkspace(plan.direction)
       return true
-    case 'refresh-repo':
-      await runManualRepoSync({ get: useWorkspacesStore.getState, set: useWorkspacesStore.setState }, plan.repoId, {
-        workspaceRuntimeId: plan.workspaceRuntimeId,
-      })
+    case 'refresh-workspace':
+      await runManualWorkspaceRefresh(
+        { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
+        plan.workspaceId,
+        {
+          workspaceRuntimeId: plan.workspaceRuntimeId,
+        },
+      )
       return true
     case 'show-workspace-pane-tab':
       if (plan.tab === 'terminal') {

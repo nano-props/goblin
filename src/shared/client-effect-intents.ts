@@ -15,7 +15,7 @@ export type ClientEffectIntent =
   | { type: 'workspace-pane-close-tab-or-window-requested' }
   | { type: 'close-workspace-requested' }
   | { type: 'cycle-workspace-requested'; direction: 1 | -1 }
-  | { type: 'repo-refresh-requested' }
+  | { type: 'workspace-refresh-requested' }
   | { type: 'show-workspace-pane-tab-requested'; tab: WorkspacePaneTabType }
   | { type: 'terminal-primary-action-requested' }
   | { type: 'workspace-zen-mode-toggle-requested' }
@@ -42,7 +42,7 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
     case 'terminal-new-tab-requested':
     case 'workspace-pane-close-tab-or-window-requested':
     case 'close-workspace-requested':
-    case 'repo-refresh-requested':
+    case 'workspace-refresh-requested':
     case 'terminal-primary-action-requested':
     case 'workspace-zen-mode-toggle-requested':
     case 'layout-reset-requested':

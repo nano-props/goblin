@@ -5,7 +5,7 @@ import {
   nextRepoOperationId,
   repoOperation,
 } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
-import { requestRepoProjectionReadModelRefresh, runManualRepoSync } from '#/web/stores/workspaces/refresh.ts'
+import { requestRepoProjectionReadModelRefresh, runManualWorkspaceRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { getBranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
@@ -341,7 +341,7 @@ describe('runBranchAction', () => {
         repoProjection({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
     })
 
-    const syncWork = runManualRepoSync(refreshStoreAccess, REPO_ID)
+    const syncWork = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID)
     await flushAsyncWork()
     const result = await useWorkspacesStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
 
@@ -820,12 +820,10 @@ describe('runBranchAction', () => {
       'repo.createWorktree': async () => ({ ok: false, message: 'error.invalid-path' }),
     })
 
-    await useWorkspacesStore
-      .getState()
-      .runBranchAction(REPO_ID, createWorktreeAction(), {
-        workspaceRuntimeId: 'repo-runtime-test',
-        refreshOnError: false,
-      })
+    await useWorkspacesStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), {
+      workspaceRuntimeId: 'repo-runtime-test',
+      refreshOnError: false,
+    })
 
     expect(
       requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.events.at(-1),
@@ -873,12 +871,10 @@ describe('runBranchAction', () => {
       'repo.createWorktree': async () => result,
     })
 
-    await useWorkspacesStore
-      .getState()
-      .runBranchAction(REPO_ID, createWorktreeAction(), {
-        workspaceRuntimeId: 'repo-runtime-test',
-        refreshOnError: false,
-      })
+    await useWorkspacesStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), {
+      workspaceRuntimeId: 'repo-runtime-test',
+      refreshOnError: false,
+    })
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(requireGitWorkspaceForTest(repo).capability.git.ui.branchViewMode).toBe('worktrees')

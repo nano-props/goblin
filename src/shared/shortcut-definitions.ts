@@ -225,7 +225,7 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
   clientMenuCommand(
     'view-refresh',
     'menu.view.refresh',
-    { type: 'repo-refresh-requested' },
+    { type: 'workspace-refresh-requested' },
     {
       helpLabelKey: 'help.row.refresh',
       accelerator: 'CmdOrCtrl+U',
