@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { useWorkspacePaneVisibleStatusRefresh } from '#/web/components/repo-workspace/use-workspace-pane-visible-status-refresh.ts'
+import { useGitWorkspacePaneVisibleStatusRefresh } from '#/web/components/repo-workspace/use-git-workspace-pane-visible-status-refresh.ts'
 import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/workspaces/repo-refresh-actions.ts'
 import type * as RepoRefreshActionsModule from '#/web/stores/workspaces/repo-refresh-actions.ts'
 
@@ -25,7 +25,7 @@ function Harness({
   renderedTab?: WorkspacePaneTabType | null
   unavailable?: boolean
 }) {
-  useWorkspacePaneVisibleStatusRefresh({
+  useGitWorkspacePaneVisibleStatusRefresh({
     workspaceId: REPO_ID,
     workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     branchName,
@@ -35,7 +35,7 @@ function Harness({
   return null
 }
 
-describe('useWorkspacePaneVisibleStatusRefresh', () => {
+describe('useGitWorkspacePaneVisibleStatusRefresh', () => {
   let container: HTMLDivElement
   let root: Root
 

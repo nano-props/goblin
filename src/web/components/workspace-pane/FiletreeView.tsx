@@ -1,4 +1,4 @@
-// Read-only file tree view for the worktree-scoped file tree
+// Read-only file tree view for a filesystem-scoped Workspace Pane target
 // (docs/filetree.md).
 
 import {
@@ -22,7 +22,7 @@ import { EmptyState } from '#/web/components/Layout.tsx'
 import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
 import { focusRingInset } from '#/web/components/ui/focus.ts'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import { buildFiletreeCollection, type FiletreeRow } from '#/web/components/repo-workspace/filetree-collection.ts'
+import { buildFiletreeCollection, type FiletreeRow } from '#/web/components/workspace-pane/filetree-collection.ts'
 import { useRestoreTopVisibleRowIndex } from '#/web/hooks/useRestoreTopVisibleRowIndex.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -52,8 +52,6 @@ const FILE_TREE_I18N_KEYS = {
   ariaLabel: 'filetree.aria-label',
   empty: 'filetree.empty',
   loading: 'filetree.loading',
-  noWorktreeTitle: 'filetree.no-worktree-title',
-  noWorktreeBody: 'filetree.no-worktree-body',
   truncated: 'filetree.truncated',
   error: 'filetree.error',
   open: 'app-chrome.open',
@@ -527,17 +525,4 @@ function FiletreeActionMenu({
 
 function topVisibleRowIndexFromViewport(viewport: HTMLElement): number {
   return Math.max(0, Math.floor(viewport.scrollTop / FILETREE_ROW_HEIGHT))
-}
-
-// Render an empty body with no worktree via a dedicated helper so
-// callers can compose the no-worktree case.
-export function FiletreeNoWorktreeView(): ReactNode {
-  const t = useT()
-  return (
-    <EmptyState
-      icon={<FolderTree size={16} />}
-      title={t(FILE_TREE_I18N_KEYS.noWorktreeTitle)}
-      body={t(FILE_TREE_I18N_KEYS.noWorktreeBody)}
-    />
-  )
 }

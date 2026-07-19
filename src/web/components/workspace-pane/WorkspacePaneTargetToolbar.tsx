@@ -22,7 +22,7 @@ import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-
 import {
   workspacePaneTabEntryForItem,
   workspacePaneTabItems,
-} from '#/web/components/repo-workspace/workspace-pane-tab-items.ts'
+} from '#/web/components/workspace-pane/workspace-pane-tab-items.ts'
 import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'

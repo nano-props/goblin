@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/repo-workspace/file-read-command.ts'
+import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/workspace-pane/file-read-command.ts'
 
 describe('absoluteFilePathForTerminal', () => {
   test('joins POSIX worktree paths with POSIX separators', () => {

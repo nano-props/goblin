@@ -30,7 +30,7 @@ import {
   StatusRow,
   StatusRows,
   type Tone,
-} from '#/web/components/repo-workspace/status-ui.tsx'
+} from '#/web/components/workspace-pane/status-ui.tsx'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { formatWorktreePath } from '#/web/lib/paths.ts'

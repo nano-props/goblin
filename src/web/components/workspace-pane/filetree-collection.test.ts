@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { buildFiletreeCollection } from '#/web/components/repo-workspace/filetree-collection.ts'
+import { buildFiletreeCollection } from '#/web/components/workspace-pane/filetree-collection.ts'
 import type { LazyWorkspaceFilesystemTreeAggregate } from '#/web/workspace-filesystem-lazy-state.ts'
 import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
 

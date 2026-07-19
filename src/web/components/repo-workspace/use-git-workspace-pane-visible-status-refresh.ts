@@ -5,7 +5,7 @@ import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/workspaces/re
 import { workspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-export function useWorkspacePaneVisibleStatusRefresh({
+export function useGitWorkspacePaneVisibleStatusRefresh({
   workspaceId,
   workspaceRuntimeId,
   branchName,

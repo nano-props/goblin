@@ -15,7 +15,7 @@ import {
   useGitWorkspacePaneTabModel,
   type WorkspacePaneRuntimeContext,
 } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
-import { useWorkspacePaneVisibleStatusRefresh } from '#/web/components/repo-workspace/use-workspace-pane-visible-status-refresh.ts'
+import { useGitWorkspacePaneVisibleStatusRefresh } from '#/web/components/repo-workspace/use-git-workspace-pane-visible-status-refresh.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
@@ -35,12 +35,12 @@ import { isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards
 import type { GitWorkspaceProjection, WorkspaceCapabilityState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { FiletreeTab } from '#/web/components/repo-workspace/panels.tsx'
+import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { WorkspacePaneTargetToolbar } from '#/web/components/workspace-pane/WorkspacePaneTargetToolbar.tsx'
-import { WorkspaceDirectoryStatus } from '#/web/components/repo-workspace/WorkspaceDirectoryStatus.tsx'
+import { WorkspaceDirectoryStatus } from '#/web/components/workspace-pane/WorkspaceDirectoryStatus.tsx'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import type { WorkspaceReadyProbeState } from '#/shared/workspace-runtime.ts'
 import { gitHead, type GitHead } from '#/shared/git-head.ts'
@@ -327,7 +327,7 @@ function GitWorktreeFilesystemPaneReady({
         </WorkspacePanePanelFrame>
       ) : model.selection?.tab === 'files' ? (
         <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} label={t('tab.files')}>
-          <FiletreeTab target={surfaceTarget} />
+          <WorkspaceFilesystemTabPanel target={surfaceTarget} />
         </WorkspacePanePanelFrame>
       ) : model.selection?.tab === 'terminal' && runtimeTarget ? (
         renderWorkspacePaneRuntimeTabPanel({
@@ -518,7 +518,7 @@ function WorkspaceRootPane({
         </WorkspacePanePanelFrame>
       ) : activePanel === 'files' ? (
         <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} label={t('tab.files')}>
-          <FiletreeTab
+          <WorkspaceFilesystemTabPanel
             target={{
               kind: 'workspace-root',
               workspaceId: workspace.id,
@@ -570,7 +570,7 @@ function GitWorkspacePaneSurface({
   const workspacePaneRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : undefined
   const routeControllerRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : null
   const workspacePaneTabModel = useGitWorkspacePaneTabModel(repo, detail, workspacePaneRoute)
-  useWorkspacePaneVisibleStatusRefresh({
+  useGitWorkspacePaneVisibleStatusRefresh({
     workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
     branchName: workspacePaneTabModel.branchName,

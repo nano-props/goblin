@@ -19,7 +19,7 @@ import {
   StatusChip,
   StatusRow,
   type Tone,
-} from '#/web/components/repo-workspace/status-ui.tsx'
+} from '#/web/components/workspace-pane/status-ui.tsx'
 import type { PullRequestInfo } from '#/shared/git-types.ts'
 import type { Lang } from '#/shared/api-types.ts'
 type TFn = (key: string, params?: Record<string, string | number>) => string

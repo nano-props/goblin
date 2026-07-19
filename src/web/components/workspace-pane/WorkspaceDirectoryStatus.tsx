@@ -1,6 +1,6 @@
 import { File, Folder, HardDrive } from 'lucide-react'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
-import { StatusChip, StatusRow, StatusRows } from '#/web/components/repo-workspace/status-ui.tsx'
+import { StatusChip, StatusRow, StatusRows } from '#/web/components/workspace-pane/status-ui.tsx'
 import { formatByteSize } from '#/web/lib/format-byte-size.ts'
 import { useT } from '#/web/stores/i18n.ts'
 

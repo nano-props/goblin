@@ -5,7 +5,7 @@ import type {
   CurrentGitWorkspacePanePresentation,
   GitWorkspacePaneProjection,
 } from '#/web/components/repo-workspace/model.ts'
-import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/WorkspaceOpenExternallyMenu.tsx'
+import { GitWorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/GitWorkspaceOpenExternallyMenu.tsx'
 import { WorkspacePaneTargetToolbar } from '#/web/components/workspace-pane/WorkspacePaneTargetToolbar.tsx'
 import type { WorkspacePaneSurfaceTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { gitHead } from '#/shared/git-head.ts'
@@ -75,7 +75,9 @@ export function GitWorkspacePaneToolbar({
       trafficLightOffset={trafficLightOffset}
       onBackToNavigator={onBackToBranchNavigator}
       trailingActions={
-        branchActions ? <WorkspaceOpenExternallyMenu repo={repo} branch={branch} branchActions={branchActions} /> : null
+        branchActions ? (
+          <GitWorkspaceOpenExternallyMenu repo={repo} branch={branch} branchActions={branchActions} />
+        ) : null
       }
     />
   )

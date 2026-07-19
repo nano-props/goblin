@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { GitWorkspacePaneToolbar } from '#/web/components/repo-workspace/GitWorkspacePaneToolbar.tsx'
-import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/WorkspaceOpenExternallyMenu.tsx'
+import { GitWorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/GitWorkspaceOpenExternallyMenu.tsx'
 import {
   getCurrentGitWorkspacePanePresentation as buildGitWorkspacePanePresentation,
   type GitWorkspacePaneProjection,
@@ -493,7 +493,7 @@ describe('GitWorkspacePaneToolbar', () => {
           },
         ])}
       >
-        <WorkspaceOpenExternallyMenu
+        <GitWorkspaceOpenExternallyMenu
           repo={gitWorkspacePaneProjection(repo)}
           branch={createBranchSnapshot('feature/worktree', { worktree: { path: WORKTREE_PATH } })}
           branchActions={branchActions}
@@ -514,7 +514,7 @@ describe('GitWorkspacePaneToolbar', () => {
           },
         ])}
       >
-        <WorkspaceOpenExternallyMenu
+        <GitWorkspaceOpenExternallyMenu
           repo={gitWorkspacePaneProjection(repo)}
           branch={createBranchSnapshot('feature/worktree', { worktree: { path: nextWorktreePath } })}
           branchActions={branchActions}
@@ -1705,7 +1705,7 @@ function mockRecentAppPostFetch(
 /**
  * Build a fresh `QueryClient` whose settings snapshot cache already
  * contains the given `workspaceSettings`. Used by the worktree-scope test
- * which renders `WorkspaceOpenExternallyMenu` directly (it doesn't go
+ * which renders `GitWorkspaceOpenExternallyMenu` directly (it doesn't go
  * through `renderToolbar`).
  */
 function seededQueryClientWithWorkspaceSettings(workspaceSettings: WorkspaceSettingsEntry[]): QueryClient {

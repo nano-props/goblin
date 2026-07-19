@@ -4,7 +4,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { WorkspacePane } from '#/web/components/WorkspacePane.tsx'
+import { WorkspacePane } from '#/web/components/workspace-pane/WorkspacePane.tsx'
 import {
   EMPTY_TERMINAL_SNAPSHOT,
   EMPTY_TERMINAL_WORKTREE_SNAPSHOT,

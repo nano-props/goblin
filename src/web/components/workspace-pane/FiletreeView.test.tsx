@@ -5,7 +5,7 @@ import { userEvent } from '@testing-library/user-event'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import type { Key } from 'react-aria-components'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
+import { FiletreeView } from '#/web/components/workspace-pane/FiletreeView.tsx'
 import type { WorkspaceFilesystemNode, WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
 
 vi.mock('#/web/stores/i18n.ts', () => ({
@@ -180,12 +180,6 @@ describe('FiletreeView', () => {
     expect(container?.querySelector('[data-filetree=""]')).not.toBeNull()
     expect(container?.querySelectorAll('[role="treeitem"]').length).toBe(0)
     expect(container?.textContent).toMatch(/filetree\.empty/)
-  })
-
-  test('renders the no-worktree placeholder via the dedicated helper', () => {
-    renderResult = renderInJsdom(<FiletreeNoWorktreeView />)
-    container = renderResult.container
-    expect(container.textContent).toMatch(/filetree\.no-worktree/)
   })
 
   test('renders error state when error is set', () => {

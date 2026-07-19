@@ -1,7 +1,7 @@
 import { useMemo, type ComponentProps } from 'react'
 import { throttle } from 'es-toolkit'
 import { openRepoUrl } from '#/web/repo-client.ts'
-import { StatusLink, type Tone } from '#/web/components/repo-workspace/status-ui.tsx'
+import { StatusLink, type Tone } from '#/web/components/workspace-pane/status-ui.tsx'
 
 type CommitHashLinkProps = Omit<ComponentProps<'button'>, 'type' | 'children' | 'onClick'> & {
   repoId: string

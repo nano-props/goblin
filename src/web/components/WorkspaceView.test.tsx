@@ -57,7 +57,7 @@ vi.mock('#/web/components/BranchNavigator.tsx', () => ({
   ),
 }))
 
-vi.mock('#/web/components/WorkspacePane.tsx', () => ({
+vi.mock('#/web/components/workspace-pane/WorkspacePane.tsx', () => ({
   WorkspacePane: ({
     currentBranchName,
     workspacePaneRouteContext,

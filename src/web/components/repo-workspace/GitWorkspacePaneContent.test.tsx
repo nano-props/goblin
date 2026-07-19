@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
-import { FiletreeTab } from '#/web/components/repo-workspace/panels.tsx'
+import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import {
   getCurrentGitWorkspacePanePresentation as buildGitWorkspacePanePresentation,
@@ -1382,7 +1382,7 @@ describe('GitWorkspacePaneContent', () => {
       <QueryClientProvider client={primaryWindowQueryClient}>
         <PrimaryWindowNavigationProvider value={navigationWith({})}>
           <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
-            <FiletreeTab
+            <WorkspaceFilesystemTabPanel
               target={{
                 kind: 'workspace-root',
                 workspaceId,
@@ -1451,7 +1451,7 @@ describe('GitWorkspacePaneContent', () => {
       <QueryClientProvider client={primaryWindowQueryClient}>
         <PrimaryWindowNavigationProvider value={navigationWith({})}>
           <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
-            <FiletreeTab
+            <WorkspaceFilesystemTabPanel
               target={{
                 kind: 'workspace-root',
                 workspaceId,

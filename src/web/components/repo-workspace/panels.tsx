@@ -1,50 +1,29 @@
 import { FolderTree } from 'lucide-react'
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { Key } from 'react-aria-components'
-import { toast } from 'sonner'
+import type { ReactNode } from 'react'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
 import { useRepoLogQuery } from '#/web/repo-data-query.ts'
 import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
-import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
-import { useWorkspaceFilesystemTree } from '#/web/hooks/useWorkspaceFilesystemTree.ts'
-import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
+import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
 import type {
   CurrentGitWorkspacePanePresentation,
   GitWorkspacePaneProjection,
 } from '#/web/components/repo-workspace/model.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import { isWorkspacePaneRuntimeTabType, workspacePaneStaticTabId } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type {
   WorkspacePaneRuntimeTabStateByType,
   WorkspacePaneSelection,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
-import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
-import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
-import { useFiletreeActionDialogsStore } from '#/web/stores/workspaces/filetree-action-dialogs.ts'
-import {
-  emptyFiletreeInteractionSnapshot,
-  filetreeInteractionScopeKey,
-  useFiletreeInteractionStore,
-} from '#/web/stores/workspaces/filetree-interaction-state.ts'
-import { getWorkspaceFileViewer } from '#/web/workspace-filesystem-client.ts'
-import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/repo-workspace/file-read-command.ts'
 import { HistoryCommitGraph, HistoryCommitGraphSkeleton } from '#/web/components/repo-workspace/HistoryCommitGraph.tsx'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { terminalGitWorktreePresentation } from '#/shared/terminal-types.ts'
 import { gitHead } from '#/shared/git-head.ts'
-import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import {
-  workspacePaneFilesystemRuntimeTarget,
-  workspacePaneFilesystemTerminalBase,
-} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import { showCreatedWorkspacePaneFilesystemTerminal } from '#/web/workspace-pane/workspace-pane-filesystem-terminal.ts'
 
 const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
@@ -164,7 +143,7 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
   }
   return (
     <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} {...panelLabel}>
-      <FiletreeTab
+      <WorkspaceFilesystemTabPanel
         target={{
           kind: 'git-worktree',
           workspaceId: repo.id,
@@ -178,195 +157,15 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
   )
 }
 
-export function FiletreeTab({ target }: { target: WorkspacePaneFilesystemTarget }) {
-  const workspaceId = target.workspaceId
-  const workspaceRuntimeId = target.workspaceRuntimeId
-  const worktreePath = target.rootPath
-  const executionTarget = useMemo(
-    () => workspacePaneFilesystemRuntimeTarget(target),
-    [workspaceId, workspaceRuntimeId, target.kind, worktreePath],
-  )
-  if (!executionTarget) throw new Error('filesystem target is invalid')
+function FiletreeNoWorktreeView() {
   const t = useT()
-  const navigation = usePrimaryWindowNavigation()
-  const { createTerminalWithAdmission } = useTerminalSessionContext()
-  const openTrashFileConfirm = useFiletreeActionDialogsStore((s) => s.openTrashFileConfirm)
-  const interactionScopeKey = useMemo(
-    () => filetreeInteractionScopeKey(workspaceId, worktreePath),
-    [workspaceId, worktreePath],
-  )
-  const selectedKeyList = useFiletreeInteractionStore(
-    (s) => s.interactionByScope[interactionScopeKey]?.selectedKeys ?? emptyFiletreeInteractionSnapshot().selectedKeys,
-  )
-  const expandedKeyList = useFiletreeInteractionStore(
-    (s) => s.interactionByScope[interactionScopeKey]?.expandedKeys ?? emptyFiletreeInteractionSnapshot().expandedKeys,
-  )
-  const result = useWorkspaceFilesystemTree({ target: executionTarget, expandedKeys: expandedKeyList })
-  const setSelectedKeys = useFiletreeInteractionStore((s) => s.setSelectedKeys)
-  const setExpandedKey = useFiletreeInteractionStore((s) => s.setExpandedKey)
-  const setTopVisibleRowIndex = useFiletreeInteractionStore((s) => s.setTopVisibleRowIndex)
-  const pruneKeys = useFiletreeInteractionStore((s) => s.pruneKeys)
-  const initialTopVisibleRowIndex = useMemo(
-    () => useFiletreeInteractionStore.getState().interactionByScope[interactionScopeKey]?.topVisibleRowIndex ?? 0,
-    [interactionScopeKey],
-  )
-  const {
-    pendingKeys: pendingOpeningFileKeys,
-    beginPending: beginOpeningFile,
-    endPending: endOpeningFile,
-  } = usePendingKeySet()
-  const openingFileKeyPrefix = useMemo(() => `${interactionScopeKey}\0`, [interactionScopeKey])
-  const openingFileKeys = useMemo(() => {
-    const keys = new Set<string>()
-    for (const key of pendingOpeningFileKeys) {
-      if (key.startsWith(openingFileKeyPrefix)) keys.add(key.slice(openingFileKeyPrefix.length))
-    }
-    return keys
-  }, [openingFileKeyPrefix, pendingOpeningFileKeys])
-  const selectedKeys = useMemo(() => new Set<Key>(selectedKeyList), [selectedKeyList])
-  const expandedKeys = useMemo(() => new Set<Key>(expandedKeyList), [expandedKeyList])
-  const scrollRestoreReady = useMemo(
-    () => expandedKeyList.every((key) => result.loadedPrefixes.has(key) || result.errorKeys.has(key)),
-    [expandedKeyList, result.errorKeys, result.loadedPrefixes],
-  )
-  const handleSelectedKeysChange = useCallback(
-    (keys: Set<Key>) => {
-      setSelectedKeys(interactionScopeKey, stringKeysFromReactAriaKeys(keys))
-    },
-    [interactionScopeKey, setSelectedKeys],
-  )
-  const handleDirectoryRowToggle = useCallback(
-    (key: string, expanded: boolean) => {
-      setExpandedKey(interactionScopeKey, key, expanded)
-      if (expanded) {
-        void result.loadChildren(key).catch((err) => {
-          toast.error(t(err instanceof Error ? err.message : 'error.failed-read-repo'))
-        })
-      }
-    },
-    [interactionScopeKey, result.loadChildren, setExpandedKey, t],
-  )
-  const handlePruneKeys = useCallback(
-    (validKeys: ReadonlySet<string>) => {
-      pruneKeys(interactionScopeKey, validKeys, result.loadedPrefixes)
-    },
-    [interactionScopeKey, pruneKeys, result.loadedPrefixes],
-  )
-  const handleTopVisibleRowIndexChange = useCallback(
-    (topVisibleRowIndex: number) => {
-      setTopVisibleRowIndex(interactionScopeKey, topVisibleRowIndex)
-    },
-    [interactionScopeKey, setTopVisibleRowIndex],
-  )
-
-  const openFileInTerminal = useCallback(
-    async (node: WorkspaceFilesystemNode) => {
-      if (node.kind !== 'file') return
-      const openingFileKey = `${openingFileKeyPrefix}${node.id}`
-      if (!beginOpeningFile(openingFileKey)) return
-      try {
-        const openerIdentity = workspacePaneStaticTabId('files')
-        const base = workspacePaneFilesystemTerminalBase(target)
-        if (!base) throw new Error('error.workspace-tabs-target-invalid')
-        await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-          base,
-          createTerminal: createTerminalWithAdmission,
-          openerIdentity,
-          showCreatedTerminalTab: (terminalSessionId, canonicalBranch) =>
-            showCreatedWorkspacePaneFilesystemTerminal(target, terminalSessionId, canonicalBranch, navigation),
-          insertAfterIdentity: openerIdentity,
-          options: {
-            resolveStartupShellCommand: async () => {
-              const viewerResult = await getWorkspaceFileViewer(executionTarget, {})
-              return fileReadCommand(viewerResult, absoluteFilePathForTerminal(viewerResult.executionRoot, node.path))
-            },
-          },
-          t,
-          logMessage: 'filetree open file terminal create failed',
-        })
-      } finally {
-        endOpeningFile(openingFileKey)
-      }
-    },
-    [
-      beginOpeningFile,
-      createTerminalWithAdmission,
-      endOpeningFile,
-      openingFileKeyPrefix,
-      navigation,
-      workspaceId,
-      workspaceRuntimeId,
-      t,
-      worktreePath,
-      executionTarget,
-      target,
-    ],
-  )
-
-  const requestTrashFile = useCallback(
-    (node: WorkspaceFilesystemNode) => {
-      if (node.kind !== 'file') return
-      openTrashFileConfirm({ target: executionTarget, path: node.path, name: node.name })
-    },
-    [executionTarget, openTrashFileConfirm],
-  )
-
   return (
-    <FiletreeView
-      tree={result.tree}
-      loading={result.loading}
-      loadingKeys={result.loadingKeys}
-      openingFileKeys={openingFileKeys}
-      error={result.error}
-      selectedKeys={selectedKeys}
-      expandedKeys={expandedKeys}
-      onSelectedKeysChange={handleSelectedKeysChange}
-      onDirectoryRowToggle={handleDirectoryRowToggle}
-      onPruneKeys={handlePruneKeys}
-      initialTopVisibleRowIndex={initialTopVisibleRowIndex}
-      scrollRestoreKey={interactionScopeKey}
-      scrollRestoreReady={scrollRestoreReady}
-      onTopVisibleRowIndexChange={handleTopVisibleRowIndexChange}
-      onOpenFile={
-        target.capabilities.terminal.available
-          ? (node) => {
-              void openFileInTerminal(node).catch((err) => {
-                toast.error(t(err instanceof Error ? err.message : 'error.terminal-create-failed'))
-              })
-            }
-          : undefined
-      }
-      onRequestTrashFile={target.capabilities.files.write ? requestTrashFile : undefined}
+    <EmptyState
+      icon={<FolderTree size={16} />}
+      title={t('filetree.no-worktree-title')}
+      body={t('filetree.no-worktree-body')}
     />
   )
-}
-
-function stringKeysFromReactAriaKeys(keys: ReadonlySet<Key>): string[] {
-  return Array.from(keys).filter((key): key is string => typeof key === 'string')
-}
-
-function usePendingKeySet() {
-  const pendingKeysRef = useRef<ReadonlySet<string>>(new Set())
-  const [pendingKeys, setPendingKeys] = useState<ReadonlySet<string>>(() => new Set())
-
-  const beginPending = useCallback((key: string): boolean => {
-    if (pendingKeysRef.current.has(key)) return false
-    const next = new Set(pendingKeysRef.current)
-    next.add(key)
-    pendingKeysRef.current = next
-    setPendingKeys(next)
-    return true
-  }, [])
-
-  const endPending = useCallback((key: string): void => {
-    if (!pendingKeysRef.current.has(key)) return
-    const next = new Set(pendingKeysRef.current)
-    next.delete(key)
-    pendingKeysRef.current = next
-    setPendingKeys(next)
-  }, [])
-
-  return { pendingKeys, beginPending, endPending }
 }
 
 function BranchHistoryTab({

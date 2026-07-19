@@ -27,7 +27,7 @@ interface Props {
   branchActions: BranchActions
 }
 
-export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Props) {
+export function GitWorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Props) {
   const t = useT()
   const [open, setOpen] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
