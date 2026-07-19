@@ -152,7 +152,6 @@ export const REPO_PROCEDURE_SCHEMAS = {
     worktreePath: v.string(),
   }),
   backgroundSyncRepos: v.object({ repoIds: StringArray }),
-  abort: CwdInput,
   probe: CwdInput,
   log: v.object({
     cwd: WorkspaceIdSchema,

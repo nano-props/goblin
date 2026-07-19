@@ -14,7 +14,6 @@ import { getRepositoryTree } from '#/server/modules/repo-tree.ts'
 import { canonicalRuntimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-validators.ts'
 import { trashRepositoryFile } from '#/server/modules/repo-tree-trash.ts'
 import {
-  abortRepoOperation,
   cloneRepo,
   createRepoWorktree,
   deleteRepoBranch,
@@ -439,10 +438,6 @@ export function createRepoRoutes(options: {
         'background-sync-repos',
       ),
     )
-  })
-  app.post('/abort', async (c) => {
-    const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.abort, c)
-    return c.json(await jsonOr(async () => abortRepoOperation(cwd), false, 'abort'))
   })
   return app
 }

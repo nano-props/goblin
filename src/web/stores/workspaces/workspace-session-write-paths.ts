@@ -9,7 +9,7 @@ import {
 } from '#/web/stores/workspaces/persistence.ts'
 import { disposeRepoOperationScheduler } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
-import { abortRepoOperation, probeRepo } from '#/web/repo-client.ts'
+import { probeRepo } from '#/web/repo-client.ts'
 import {
   closeWorkspaceRuntime,
   openWorkspaceRuntime,
@@ -1034,8 +1034,7 @@ async function closeWorkspaceMembership(
     workspacesLog.warn('failed to remove workspace from server session', { workspaceId, err: membership.error })
     return { ok: false, message: 'error.failed-read-repo' }
   }
-  disposeRepoOperationScheduler(workspaceId)
-  void abortRepoOperation(workspaceId).catch(() => {})
+  if (workspace.capability.kind === 'git') disposeRepoOperationScheduler(workspaceId)
   set((state) => removeWorkspaceFromSessionState(state, workspaceId))
   try {
     await closeWorkspaceRuntimeWithCache(workspace.id, workspaceRuntimeId)

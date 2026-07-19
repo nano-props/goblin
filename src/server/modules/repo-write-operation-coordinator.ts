@@ -412,19 +412,6 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
   )
 }
 
-export async function abortRepoWriteNetworkOperation(
-  repoId: string,
-  options: { signal?: AbortSignal } = {},
-): Promise<boolean> {
-  const boundaryKey = await resolveRepoWriteBoundaryKey(repoId, options.signal)
-  registerRepoWriteOperationBoundaryRepoId(boundaryKey, repoId)
-  const active = repoWriteOperationRuntimesByBoundary.get(boundaryKey)?.activeNetworkOperation
-  if (!active) return false
-  active.operation.requestCancel('user-cancel')
-  active.ctrl.abort()
-  return true
-}
-
 export async function listRepoWriteOperationsForRepo(
   repoId: string | undefined,
   options: { includeSettled?: boolean; workspaceRuntimeId?: string; signal?: AbortSignal } = {},

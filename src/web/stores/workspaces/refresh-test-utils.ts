@@ -62,7 +62,6 @@ export function resetRefreshTest(): void {
   for (const key of Object.keys(ipcHandlers)) delete ipcHandlers[key]
   resetWorkspacesStore()
   installGoblinTestBridge(ipcHandlers)
-  ipcHandlers['repo.abort'] = async () => false
   ipcHandlers['repo.fetch'] = async () => ({ ok: true, message: 'ok' })
   ipcHandlers['settings.removeWorkspaceEntry'] = async () => ({
     openWorkspaceEntries: [],

@@ -283,10 +283,7 @@ describe('main repo ipc cancellation', () => {
       { path: 'goblin+file:///repo', branch: 'main', isBare: false, isPrimary: true },
     ])
     vi.mocked(getUpstream).mockResolvedValue(null)
-    vi.mocked(isAncestor).mockImplementation(async () => {
-      await invokeIpc('repo.abort', { cwd: 'goblin+file:///repo' })
-      return false
-    })
+    vi.mocked(isAncestor).mockResolvedValue(false)
     vi.mocked(resolveRemovableWorktree).mockReturnValue({
       ok: true,
       target: { path: '/repo-feature', branch: 'feature/cancel', isBare: false, isPrimary: false, isDirty: false },

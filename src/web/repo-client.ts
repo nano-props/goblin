@@ -135,10 +135,6 @@ export async function getRepoOperations(
   )
 }
 
-export async function abortRepoOperation(cwd: string): Promise<boolean> {
-  return await postServerJson('/api/repo/abort', { cwd })
-}
-
 export async function fetchRepo(
   cwd: string,
   workspaceRuntimeId: string,

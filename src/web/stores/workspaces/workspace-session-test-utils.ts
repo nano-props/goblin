@@ -40,7 +40,6 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       status: [],
       loadedAt: Date.now(),
     }),
-    'repo.abort': async () => undefined,
     'remote.resolveTarget': ({ alias, remotePath }: { alias: string; remotePath: string }) => {
       calls.resolveTarget.push({ alias, remotePath })
       return {

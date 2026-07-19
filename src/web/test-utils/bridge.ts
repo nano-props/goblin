@@ -1275,7 +1275,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
                 },
               }
         }
-        if (url.pathname === '/api/repo/abort') return call('repo.abort', body)
         throw new Error(`Unhandled fetch URL: ${url.pathname}`)
       })()
       const abortError = () => {

@@ -170,6 +170,25 @@ describe('repo lifecycle', () => {
     expect(useWorkspacesStore.getState().workspaceOrder).toContain(REPO_A)
   })
 
+  test('closing a filesystem workspace does not enter the Git operation lifecycle', async () => {
+    installGoblin()
+    const workspace = emptyWorkspace(REPO_A, 'Example workspace', 'workspace-runtime-filesystem')
+    acceptWorkspaceProbeState(workspace, {
+      status: 'ready',
+      name: 'Example workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [],
+    })
+    useWorkspacesStore.setState({ workspaces: { [REPO_A]: workspace }, workspaceOrder: [REPO_A] })
+
+    await expect(useWorkspacesStore.getState().closeWorkspace(REPO_A)).resolves.toEqual({ ok: true })
+    expect(useWorkspacesStore.getState().workspaces[REPO_A]).toBeUndefined()
+  })
+
   test('serializes close after an in-flight open for the same repo', async () => {
     const releaseAdd = Promise.withResolvers<void>()
     const workspaceEntries: string[] = []

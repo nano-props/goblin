@@ -17,7 +17,6 @@ import {
 } from '#/server/modules/repo-source.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import {
-  abortRepoWriteNetworkOperation,
   enqueueRepoWriteOperation,
   type RepoWriteOperationContext,
 } from '#/server/modules/repo-write-operation-coordinator.ts'
@@ -603,9 +602,4 @@ export async function openRepoEditor(
 export async function openRepoInFinder(workspaceId: WorkspaceId, worktreePath: string): Promise<ExecResult> {
   if (isRemoteWorkspaceId(workspaceId)) return { ok: false, message: 'error.invalid-path' }
   return await openInFinder(resolveWorkspaceScopedPath(workspaceId, worktreePath) ?? worktreePath)
-}
-
-export async function abortRepoOperation(cwd: string): Promise<boolean> {
-  if (!isValidWorkspaceLocatorInput(cwd)) return false
-  return await abortRepoWriteNetworkOperation(cwd)
 }

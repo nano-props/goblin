@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
-  abortRepoWriteNetworkOperation,
   enqueueRepoWriteOperation,
   listRepoWriteOperationsForRepo,
   repoWriteOperationCoordinatorStatsForTests,
@@ -254,50 +253,6 @@ describe('repo write operation coordinator', () => {
         kind: 'fetch',
         phase: 'done',
         error: null,
-      },
-    ])
-  })
-
-  test('cancels the active network operation for the resolved write boundary', async () => {
-    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (repoId: string) =>
-      repoId === '/tmp/repo' || repoId === '/tmp/repo-linked' ? '/tmp/repo/.git' : repoId,
-    )
-    const work = enqueueRepoWriteOperation(
-      '/tmp/repo',
-      undefined,
-      { repoId: '/tmp/repo', kind: 'pull', source: 'user' },
-      (_operation, context) => async () =>
-        await context.runNetworkOperation(
-          (signal) =>
-            new Promise<{ ok: false; message: string }>((resolve) => {
-              signal.addEventListener('abort', () => resolve({ ok: false, message: 'cancelled' }))
-            }),
-        ),
-    )
-
-    await vi.waitFor(async () => {
-      await expect(listRepoWriteOperationsForRepo('/tmp/repo')).resolves.toMatchObject([
-        {
-          kind: 'pull',
-          phase: 'running',
-        },
-      ])
-    })
-    await expect(abortRepoWriteNetworkOperation('/tmp/repo-linked')).resolves.toBe(true)
-
-    await expect(work).resolves.toEqual({ ok: false, message: 'cancelled' })
-    await expect(listRepoWriteOperationsForRepo('/tmp/repo', { includeSettled: true })).resolves.toMatchObject([
-      {
-        kind: 'pull',
-        phase: 'failed',
-        cancellation: {
-          underlyingRequested: true,
-          reason: 'user-cancel',
-        },
-        error: {
-          message: 'cancelled',
-          reason: 'user-cancel',
-        },
       },
     ])
   })

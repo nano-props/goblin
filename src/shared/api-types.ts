@@ -318,7 +318,7 @@ export type RepoServerOperationKind =
   'fetch' | 'clone' | 'pull' | 'push' | 'create-worktree' | 'delete-branch' | 'remove-worktree' | 'network'
 export type RepoServerOperationSource = NetworkOpKind | 'system'
 export type RepoOperationCancellationReason =
-  'caller-abort' | 'user-cancel' | 'request-watchdog-timeout' | 'git-timeout' | 'network-op-superseded'
+  'caller-abort' | 'request-watchdog-timeout' | 'git-timeout' | 'network-op-superseded'
 export type RepoOperationFailureReason = RepoOperationCancellationReason
 
 export interface RepoServerOperationTarget {
@@ -475,7 +475,6 @@ export interface AppIpcHandlers {
     }) => Promise<ExecResult>
     push: (input: { cwd: string; workspaceRuntimeId: string; branch: string }) => Promise<ExecResult>
     fetch: (input: { cwd: string; workspaceRuntimeId: string }) => Promise<ExecResult>
-    abort: (input: { cwd: string }) => Promise<boolean>
     openUrl: (input: { cwd: string; workspaceRuntimeId: string; target: RepoUrlTarget }) => Promise<ExecResult>
     openTerminal: (input: {
       workspaceId: WorkspaceId
