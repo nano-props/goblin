@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
+import { dispatchOpenWorkspacePaneStaticTabAction as openWorkspacePaneTab } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   createBranchSnapshot,

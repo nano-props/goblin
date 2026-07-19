@@ -142,7 +142,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import { dispatchMoveWorkspacePaneTabAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
-import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
+import { dispatchOpenWorkspacePaneStaticTabAction as openWorkspacePaneTab } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import {
   observedWorkspacePaneRouteForTarget,
