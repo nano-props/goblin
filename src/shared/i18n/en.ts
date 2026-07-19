@@ -63,7 +63,7 @@ export const en = {
   'menu.view.history': 'History',
   'menu.view.changes': 'Changes',
   'menu.view.terminal': 'Terminal',
-  'menu.view.refresh': 'Sync Repository',
+  'menu.view.refresh': 'Refresh Workspace',
   'menu.view.reload-page': 'Reload Page',
   'menu.view.toggle-full-screen': 'Toggle Full Screen',
   'menu.view.toggle-dev-tools': 'Toggle Developer Tools',
@@ -174,29 +174,29 @@ export const en = {
   'workspace-picker.open-remote-home-unavailable': 'Could not resolve the remote home directory',
   'workspace-picker.tooltip.last-sync-label': 'Last synced',
   'workspace-picker.connecting-title': 'Connecting to SSH…',
-  'repo-unavailable.title': 'Workspace unavailable',
-  'repo-unavailable.body': 'Goblin cannot read this workspace. Restore the folder and its access, then retry.',
-  'repo-unavailable.remote-body':
+  'workspace-unavailable.title': 'Workspace unavailable',
+  'workspace-unavailable.body': 'Goblin cannot read this workspace. Restore the folder and its access, then retry.',
+  'workspace-unavailable.remote-body':
     'Goblin could not reconnect to this SSH workspace. Verify the SSH alias, network access, and remote path, then retry.',
-  'repo-unavailable.remote-connect-failed':
+  'workspace-unavailable.remote-connect-failed':
     'Goblin could not establish a usable SSH session for this workspace. Verify authentication, host reachability, and host key trust, then retry.',
-  'repo-unavailable.remote-config-changed':
+  'workspace-unavailable.remote-config-changed':
     'The saved SSH alias can no longer be resolved from your current SSH config. Review the alias and reconnect.',
-  'repo-unavailable.remote-home-unavailable':
+  'workspace-unavailable.remote-home-unavailable':
     'Goblin could not resolve the remote home directory for this SSH target. Check the login shell and SSH config, then retry.',
-  'repo-unavailable.remote-path-missing':
+  'workspace-unavailable.remote-path-missing':
     'Goblin connected to the SSH target, but the saved remote path no longer exists. Update the remote path and reconnect.',
-  'repo-unavailable.remote-not-a-repo':
+  'workspace-unavailable.remote-not-a-repo':
     'Goblin connected to the SSH target, but the saved workspace path is unavailable. Check the path or reconnect to a different workspace.',
-  'repo-unavailable.path': 'Path',
-  'repo-unavailable.reason': 'Reason',
-  'repo-unavailable.retry': 'Check again',
-  'repo-unavailable.close': 'Close workspace',
+  'workspace-unavailable.path': 'Path',
+  'workspace-unavailable.reason': 'Reason',
+  'workspace-unavailable.retry': 'Check again',
+  'workspace-unavailable.close': 'Close workspace',
 
   // ---- Empty state --------------------------------------------------------
   'empty.title': 'No workspace open',
   'empty.body': 'Choose a workspace from the sidebar, or drop a folder here.',
-  'repo-route.not-found-title': 'Workspace not found',
+  'workspace-route.not-found-title': 'Workspace not found',
 
   // ---- Drag and drop ------------------------------------------------------
   'drop.title': 'Drop to open workspace',
@@ -205,7 +205,7 @@ export const en = {
   'workspace-picker.recent-save-failed': 'Workspace opened, but recent history was not updated',
 
   // ---- Workspace pane tabs -----------------------------------------------
-  'repo.dashboard': 'Dashboard',
+  'workspace.dashboard': 'Dashboard',
   'dashboard.loading': 'Loading dashboard...',
   'dashboard.directory.files': 'Files',
   'dashboard.directory.folders': 'Folders',
@@ -752,7 +752,7 @@ export const en = {
   'help.row.close-workspace': 'Close current workspace',
   'help.row.close-workspace-tab-or-window': 'Close workspace tab or window',
   'help.row.close-window': 'Close window',
-  'help.row.refresh': 'Sync Repository',
+  'help.row.refresh': 'Refresh Workspace',
   'help.row.reload-page': 'Reload Page',
   'help.row.settings': 'Settings',
   'help.row.this-help': 'This help',

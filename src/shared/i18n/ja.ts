@@ -60,7 +60,7 @@ export const ja: Record<DictKey, string> = {
   'menu.view.history': '履歴',
   'menu.view.changes': '変更',
   'menu.view.terminal': 'ターミナル',
-  'menu.view.refresh': 'リポジトリを同期',
+  'menu.view.refresh': 'ワークスペースを更新',
   'menu.view.reload-page': 'ページを再読み込み',
   'menu.view.toggle-full-screen': 'フルスクリーンを切り替え',
   'menu.view.toggle-dev-tools': '開発者ツールを切替',
@@ -171,30 +171,30 @@ export const ja: Record<DictKey, string> = {
   'workspace-picker.open-remote-home-unavailable': 'リモートのホームディレクトリを解決できませんでした',
   'workspace-picker.tooltip.last-sync-label': '最終同期',
   'workspace-picker.connecting-title': 'SSH に接続中…',
-  'repo-unavailable.title': 'ワークスペースを利用できません',
-  'repo-unavailable.body':
+  'workspace-unavailable.title': 'ワークスペースを利用できません',
+  'workspace-unavailable.body':
     'Goblin はこのワークスペースを読み取れません。フォルダとアクセス権を復元してから再試行してください。',
-  'repo-unavailable.remote-body':
+  'workspace-unavailable.remote-body':
     'Goblin はこの SSH ワークスペースに再接続できませんでした。SSH エイリアス、ネットワーク接続、リモートパスを確認してから再試行してください。',
-  'repo-unavailable.remote-connect-failed':
+  'workspace-unavailable.remote-connect-failed':
     'Goblin はこのリポジトリに使える SSH セッションを確立できませんでした。認証、ホストへの到達性、ホストキーの信頼設定を確認してから再試行してください。',
-  'repo-unavailable.remote-config-changed':
+  'workspace-unavailable.remote-config-changed':
     '保存済みの SSH エイリアスを現在の SSH 設定から解決できなくなりました。エイリアス設定を確認してから再接続してください。',
-  'repo-unavailable.remote-home-unavailable':
+  'workspace-unavailable.remote-home-unavailable':
     'Goblin はこの SSH 接続先のホームディレクトリを解決できませんでした。ログインシェルと SSH 設定を確認してから再試行してください。',
-  'repo-unavailable.remote-path-missing':
+  'workspace-unavailable.remote-path-missing':
     'Goblin は SSH 接続先には到達できましたが、保存済みのリモートパスが存在しなくなっています。リモートパスを更新してから再接続してください。',
-  'repo-unavailable.remote-not-a-repo':
+  'workspace-unavailable.remote-not-a-repo':
     'Goblin は SSH 接続先には到達できましたが、保存済みのワークスペースパスを利用できません。パスを確認するか、別のワークスペースに再接続してください。',
-  'repo-unavailable.path': 'パス',
-  'repo-unavailable.reason': '理由',
-  'repo-unavailable.retry': '再確認',
-  'repo-unavailable.close': 'ワークスペースを閉じる',
+  'workspace-unavailable.path': 'パス',
+  'workspace-unavailable.reason': '理由',
+  'workspace-unavailable.retry': '再確認',
+  'workspace-unavailable.close': 'ワークスペースを閉じる',
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': 'ワークスペースが開かれていません',
   'empty.body': 'サイドバーからワークスペースを選択するか、フォルダをドラッグしてください。',
-  'repo-route.not-found-title': 'ワークスペースが見つかりません',
+  'workspace-route.not-found-title': 'ワークスペースが見つかりません',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': 'ドロップしてワークスペースを開く',
@@ -203,7 +203,7 @@ export const ja: Record<DictKey, string> = {
   'workspace-picker.recent-save-failed': 'ワークスペースは開きましたが、最近使った項目は更新されませんでした',
 
   // ---- Workspace pane tabs ------------------------------------------------
-  'repo.dashboard': 'ダッシュボード',
+  'workspace.dashboard': 'ダッシュボード',
   'dashboard.loading': 'ダッシュボードを読み込み中...',
   'dashboard.directory.files': 'ファイル',
   'dashboard.directory.folders': 'フォルダ',
@@ -745,7 +745,7 @@ export const ja: Record<DictKey, string> = {
   'help.row.close-workspace': '現在のワークスペースを閉じる',
   'help.row.close-workspace-tab-or-window': 'ワークスペースタブまたはウィンドウを閉じる',
   'help.row.close-window': 'ウィンドウを閉じる',
-  'help.row.refresh': 'リポジトリを同期',
+  'help.row.refresh': 'ワークスペースを更新',
   'help.row.reload-page': 'ページを再読み込み',
   'help.row.settings': '設定',
   'help.row.this-help': 'このヘルプ',

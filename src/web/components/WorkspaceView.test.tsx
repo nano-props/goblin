@@ -365,7 +365,7 @@ describe('WorkspaceView workspace navigation', () => {
     )
 
     expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).not.toBeNull()
-    expect(container.textContent).not.toContain('repo-route.not-found-title')
+    expect(container.textContent).not.toContain('workspace-route.not-found-title')
   })
 
   test('shows an explicit not-found state after membership restore settles without the routed repo', () => {
@@ -376,7 +376,7 @@ describe('WorkspaceView workspace navigation', () => {
       <WorkspaceView workspaceId={REPO_ID} routeView={{ kind: 'dashboard', workspaceId: REPO_ID }} />,
     )
 
-    expect(container.textContent).toContain('repo-route.not-found-title')
+    expect(container.textContent).toContain('workspace-route.not-found-title')
     expect(container.textContent).toContain('/tmp/repo-view-test')
     expect(container.textContent).not.toContain('goblin+file://')
   })
@@ -389,14 +389,14 @@ describe('WorkspaceView workspace navigation', () => {
     )
 
     expect(result.container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).not.toBeNull()
-    expect(result.container.textContent).not.toContain('repo-route.not-found-title')
+    expect(result.container.textContent).not.toContain('workspace-route.not-found-title')
 
     act(() => {
       useWorkspacesStore.setState({ workspaceMembershipReady: true })
     })
 
     expect(result.container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).toBeNull()
-    expect(result.container.textContent).toContain('repo-route.not-found-title')
+    expect(result.container.textContent).toContain('workspace-route.not-found-title')
   })
 
   test('keeps a restore stub on the skeleton without mounting repo data surfaces', () => {
@@ -1135,7 +1135,7 @@ describe('WorkspaceView workspace navigation', () => {
     expect(container.querySelector('[data-testid="workspace-picker"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="create-worktree-row-action"]')).not.toBeNull()
     expect(container.querySelector('button[aria-label="app-chrome.settings"]')).not.toBeNull()
-    expect(document.body.textContent).toContain('repo-unavailable.title')
+    expect(document.body.textContent).toContain('workspace-unavailable.title')
   })
 
   test('large-screen focused unavailable repo with current branch keeps floating sidebar reveal available', () => {

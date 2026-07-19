@@ -6,7 +6,7 @@ import type { GitWorkspaceProjection, WorkspaceState } from '#/web/stores/worksp
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { Tip } from '#/web/components/Tip.tsx'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
-import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/refresh.ts'
+import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import type { RepoActivity, RepoActivityProjectionRepo, RepoCompletion } from '#/web/components/repo-activity/model.ts'
 import {
   getRepoActivity,

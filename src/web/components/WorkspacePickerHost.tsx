@@ -116,7 +116,7 @@ export function WorkspacePickerHost({
         openRemoteShortcut: shortcutsDisabled ? null : '⌘⇧R',
         clone: t('workspace-picker.clone'),
         cloneShortcut: shortcutsDisabled ? null : '⌘⇧O',
-        unavailable: t('repo-unavailable.title'),
+        unavailable: t('workspace-unavailable.title'),
       }}
       onActivate={navigation.activateWorkspace}
       onClose={(workspaceId) => void handleClose(workspaceId)}

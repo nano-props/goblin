@@ -125,7 +125,7 @@ export function WorkspaceDashboardPane({
   return (
     <WorkspacePagePane
       icon={LayoutDashboard}
-      label={t('repo.dashboard')}
+      label={t('workspace.dashboard')}
       compact={compact}
       trafficLightOffset={trafficLightOffset}
       onBack={onBack}

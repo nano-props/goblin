@@ -5,7 +5,8 @@ import {
   nextRepoOperationId,
   repoOperation,
 } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
-import { requestRepoProjectionReadModelRefresh, runManualWorkspaceRefresh } from '#/web/stores/workspaces/refresh.ts'
+import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
+import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { getBranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'

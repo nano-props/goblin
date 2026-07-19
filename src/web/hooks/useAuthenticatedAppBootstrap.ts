@@ -200,16 +200,16 @@ function blockSessionPersistenceAfterRestoreFailure(message: string): void {
 function composeRestoredClientWorkspace(
   openWorkspaceEntries: WorkspaceSessionEntry[],
   presentation: ClientWorkspaceState,
-  serverRestoredRepoId: WorkspaceId | null,
+  serverRestoredWorkspaceId: WorkspaceId | null,
 ): ClientWorkspaceState {
-  const openRepoIds = new Set(openWorkspaceEntries.map(workspaceSessionEntryId))
+  const openWorkspaceIds = new Set(openWorkspaceEntries.map(workspaceSessionEntryId))
   const presentationWorkspaceId = presentation.restoredWorkspaceId
   return {
     ...presentation,
     restoredWorkspaceId:
-      presentationWorkspaceId && openRepoIds.has(presentationWorkspaceId)
+      presentationWorkspaceId && openWorkspaceIds.has(presentationWorkspaceId)
         ? presentationWorkspaceId
-        : serverRestoredRepoId,
+        : serverRestoredWorkspaceId,
   }
 }
 

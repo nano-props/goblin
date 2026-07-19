@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { emptyWorkspace, replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { refreshStatusLog, terminalLog } from '#/web/logger.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { requestRepoProjectionReadModelRefresh, runManualWorkspaceRefresh } from '#/web/stores/workspaces/refresh.ts'
+import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
+import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import {
   branch,
   REPO_ID,
@@ -33,6 +34,7 @@ import {
 } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
+import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
@@ -137,20 +139,32 @@ describe('remote fetch timestamps', () => {
       diagnostics: [],
     })
     useWorkspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
-    const response = Promise.withResolvers<{
-      kind: 'committed'
-      probe: typeof workspace.capability.probe
-    }>()
+    const response = Promise.withResolvers<WorkspaceRefreshResult>()
     const refresh = vi.fn(() => response.promise)
+    const projection = vi.fn(async () => repoProjection({ branches: [branch('main')], current: 'main' }))
     ipcHandlers['workspace.refresh'] = refresh
+    ipcHandlers['repo.projection'] = projection
 
     const first = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
     const second = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
     await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce())
-    response.resolve({ kind: 'committed', probe: workspace.capability.probe })
+    response.resolve({
+      kind: 'committed',
+      probe: {
+        status: 'ready',
+        name: 'plain-workspace',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        },
+        diagnostics: [],
+      },
+    })
 
     await Promise.all([first, second])
     expect(refresh).toHaveBeenCalledOnce()
+    expect(projection).toHaveBeenCalledOnce()
   })
 
   test('commits a non-Git capability transition without changing the runtime or reading Git state', async () => {
@@ -218,11 +232,65 @@ describe('remote fetch timestamps', () => {
       },
     })
 
-    await runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    await expect(runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })).resolves.toEqual({
+      ok: false,
+      message: 'git timed out',
+    })
 
     expect(useWorkspacesStore.getState().workspaces[REPO_ID]!.capability.probe).toBe(before)
     expect(fetch).not.toHaveBeenCalled()
     expect(projection).not.toHaveBeenCalled()
+  })
+
+  test('returns transport failures for a plain Workspace without creating Git state', async () => {
+    const workspaceRuntimeId = 'workspace-runtime-plain-failed-refresh'
+    const workspace = emptyWorkspace(REPO_ID, 'plain-workspace', workspaceRuntimeId)
+    acceptWorkspaceProbeState(workspace, {
+      status: 'ready',
+      name: 'plain-workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [],
+    })
+    useWorkspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
+    ipcHandlers['workspace.refresh'] = () => {
+      throw new Error('workspace transport unavailable')
+    }
+
+    await expect(runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })).resolves.toEqual({
+      ok: false,
+      message: 'workspace transport unavailable',
+    })
+    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.capability.kind).toBe('filesystem')
+  })
+
+  test('closing a plain Workspace cancels its in-flight capability refresh', async () => {
+    const workspaceRuntimeId = 'workspace-runtime-plain-closing'
+    const workspace = emptyWorkspace(REPO_ID, 'plain-workspace', workspaceRuntimeId)
+    acceptWorkspaceProbeState(workspace, {
+      status: 'ready',
+      name: 'plain-workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [],
+    })
+    useWorkspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
+    const response = Promise.withResolvers<WorkspaceRefreshResult>()
+    const refreshRequest = vi.fn(() => response.promise)
+    ipcHandlers['workspace.refresh'] = refreshRequest
+
+    const refresh = runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
+    await vi.waitFor(() => expect(refreshRequest).toHaveBeenCalledOnce())
+    await expect(useWorkspacesStore.getState().closeWorkspace(REPO_ID)).resolves.toEqual({ ok: true })
+
+    await expect(refresh).resolves.toEqual({ ok: false, cancelled: true })
+    expect(useWorkspacesStore.getState().workspaces[REPO_ID]).toBeUndefined()
   })
 
   test('repo read-model projection refresh treats query projection branches as existing data while loading', async () => {
@@ -408,9 +476,9 @@ describe('remote fetch timestamps', () => {
       throw new Error('network down')
     }
 
-    await expect(
-      runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId }),
-    ).resolves.toBeUndefined()
+    await expect(runManualWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })).resolves.toEqual({
+      ok: true,
+    })
 
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
     expect(requireGitWorkspaceForTest(repo).capability.git.events.at(-1)).toMatchObject({

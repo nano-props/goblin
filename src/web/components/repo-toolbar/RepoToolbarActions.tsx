@@ -44,12 +44,12 @@ export function DashboardRowAction({ selected = false, onOpenDashboard }: Dashbo
   return (
     <SidebarRowButton
       onClick={() => onOpenDashboard?.()}
-      aria-label={t('repo.dashboard')}
+      aria-label={t('workspace.dashboard')}
       size="dense"
       selected={selected}
       leading={<LayoutDashboard size={16} />}
     >
-      {t('repo.dashboard')}
+      {t('workspace.dashboard')}
     </SidebarRowButton>
   )
 }

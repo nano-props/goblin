@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
-import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/refresh.ts'
+import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
@@ -206,14 +206,15 @@ export async function handleWorkspaceClientIntent(
       deps.navigation.cycleWorkspace(plan.direction)
       return true
     case 'refresh-workspace':
-      await runManualWorkspaceRefresh(
+      const refreshOutcome = await runManualWorkspaceRefresh(
         { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
         plan.workspaceId,
         {
           workspaceRuntimeId: plan.workspaceRuntimeId,
         },
       )
-      return true
+      if (!refreshOutcome.ok && !('cancelled' in refreshOutcome)) toast.error(deps.t(refreshOutcome.message))
+      return refreshOutcome.ok
     case 'show-workspace-pane-tab':
       if (plan.tab === 'terminal') {
         return await runTerminalPrimaryActionCommand({

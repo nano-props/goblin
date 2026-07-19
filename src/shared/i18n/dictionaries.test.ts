@@ -57,11 +57,11 @@ describe('i18n dictionaries', () => {
     const workspaceKeys = [
       'workspace-picker.workspaces',
       'workspace-picker.placeholder',
-      'repo-unavailable.title',
-      'repo-unavailable.body',
-      'repo-unavailable.close',
+      'workspace-unavailable.title',
+      'workspace-unavailable.body',
+      'workspace-unavailable.close',
       'empty.body',
-      'repo-route.not-found-title',
+      'workspace-route.not-found-title',
       'drop.body',
       'workspace-picker.recent-save-failed',
     ] as const satisfies readonly DictKey[]

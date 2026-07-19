@@ -38,7 +38,7 @@ export function WorkspaceProjectionFailureView({
               </Button>
               <Button type="button" variant="ghost" onClick={() => void handleClose()}>
                 <X />
-                {t('repo-unavailable.close')}
+                {t('workspace-unavailable.close')}
               </Button>
             </div>
           </div>

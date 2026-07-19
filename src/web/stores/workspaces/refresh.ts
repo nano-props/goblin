@@ -1,9 +1,8 @@
 import { appendRepoEvent, errorEvent } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { acceptWorkspaceProbeState, updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
+import { updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
 import { isWorkspaceUnavailableReason, markWorkspaceUnavailable } from '#/web/stores/workspaces/availability.ts'
-import { runExclusiveOperation, runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
+import { runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { resolveActionWorkspaceRuntimeId } from '#/web/stores/workspaces/refresh-state.ts'
-import { createRefreshSyncHelpers } from '#/web/stores/workspaces/refresh-sync.ts'
 import { cancelDataLoad, finishDataLoadError, startDataLoad } from '#/web/stores/workspaces/repo-data-load-state.ts'
 import { refreshRepoProjectionReadModel } from '#/web/repo-data-query.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
@@ -11,17 +10,13 @@ import { acceptRepoProjectionReadModel } from '#/web/stores/workspaces/projectio
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
-import { refreshWorkspace } from '#/web/workspace-client.ts'
 import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
 
 export interface RepoRefreshStoreAccess {
   set: WorkspacesSet
   get: WorkspacesGet
 }
-
-const manualWorkspaceRefreshes = new Map<string, Promise<void>>()
 
 async function runRepoProjectionReadModelRefresh(
   store: RepoRefreshStoreAccess,
@@ -87,93 +82,4 @@ export async function requestRepoProjectionReadModelRefresh(
     runRepoProjectionReadModelRefresh(store, id, workspaceRuntimeId),
     refreshRepoWorktreeStatus(store, id, workspaceRuntimeId),
   ])
-}
-
-/** Unified sync pipeline — local and remote repos follow the same path.
- *  1) Attempt a best-effort fetch when remotes are configured.
- *  2) Always refresh the server runtime projection afterwards.
- *  Bookkeeping (setLastResult, clearFetchFailed) is handled inline
- *  so there is one source of truth for post-sync cleanup. */
-export async function runManualWorkspaceRefresh(
-  store: RepoRefreshStoreAccess,
-  id: WorkspaceId,
-  options?: { workspaceRuntimeId?: string },
-): Promise<void> {
-  const workspace = store.get().workspaces[id]
-  if (!workspace) return
-  const workspaceRuntimeId = options?.workspaceRuntimeId ?? workspace.workspaceRuntimeId
-  if (workspace.workspaceRuntimeId !== workspaceRuntimeId) return
-  const key = `${id}\0${workspaceRuntimeId}`
-  const existing = manualWorkspaceRefreshes.get(key)
-  if (existing) return await existing
-  const refresh = runManualWorkspaceRefreshOnce(store, id, workspaceRuntimeId)
-  manualWorkspaceRefreshes.set(key, refresh)
-  try {
-    await refresh
-  } finally {
-    if (manualWorkspaceRefreshes.get(key) === refresh) manualWorkspaceRefreshes.delete(key)
-  }
-}
-
-async function runManualWorkspaceRefreshOnce(
-  store: RepoRefreshStoreAccess,
-  id: WorkspaceId,
-  workspaceRuntimeId: string,
-): Promise<void> {
-  let refreshed: WorkspaceRefreshResult
-  try {
-    refreshed = await refreshWorkspace(id, workspaceRuntimeId)
-  } catch (error) {
-    recordWorkspaceRefreshError(store, id, workspaceRuntimeId, error instanceof Error ? error.message : String(error))
-    return
-  }
-  if (refreshed.kind === 'stale-runtime') {
-    recordWorkspaceRefreshError(store, id, workspaceRuntimeId, 'error.workspace-runtime-stale')
-    return
-  }
-  if (refreshed.kind === 'failed') {
-    const diagnostic = refreshed.probe.status === 'ready' ? refreshed.probe.diagnostics[0]?.message : undefined
-    recordWorkspaceRefreshError(store, id, workspaceRuntimeId, diagnostic ?? 'error.workspace-operation-failed')
-    return
-  }
-  updateIfFresh(store.set, id, workspaceRuntimeId, (workspace) => {
-    acceptWorkspaceProbeState(workspace, refreshed.probe)
-  })
-  const resolved = resolveActionWorkspaceRuntimeId(store.get, id, workspaceRuntimeId)
-  if (!resolved || !isGitWorkspace(resolved.repo)) return
-  const { runManualSyncPipeline } = createRefreshSyncHelpers(store.set, store.get, {
-    refreshProjectionReadModel: async (repoId, nextWorkspaceRuntimeId) => {
-      await requestRepoProjectionReadModelRefresh(store, repoId, { workspaceRuntimeId: nextWorkspaceRuntimeId })
-    },
-  })
-  await runExclusiveOperation({
-    set: store.set,
-    get: store.get,
-    id,
-    workspaceRuntimeId,
-    lane: 'read',
-    priority: 100,
-    targets: [{ key: 'manualRefresh', reason: 'manual-refresh' }],
-    task: async () => await runManualSyncPipeline(id, workspaceRuntimeId),
-    onError: (message) => {
-      updateIfFresh(store.set, id, workspaceRuntimeId, (repo) => {
-        if (!isGitWorkspace(repo)) return
-        const git = gitWorkspaceProjection(repo)
-        git.events = appendRepoEvent(git.events, errorEvent(message))
-      })
-    },
-  })
-}
-
-function recordWorkspaceRefreshError(
-  store: RepoRefreshStoreAccess,
-  id: WorkspaceId,
-  workspaceRuntimeId: string,
-  message: string,
-): void {
-  updateIfFresh(store.set, id, workspaceRuntimeId, (workspace) => {
-    if (!isGitWorkspace(workspace)) return
-    const git = gitWorkspaceProjection(workspace)
-    git.events = appendRepoEvent(git.events, errorEvent(message))
-  })
 }

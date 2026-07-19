@@ -252,7 +252,7 @@ function GitWorktreeFilesystemPane({
     return <EmptyState title={t('dashboard.directory.read-failed')} />
   }
   if (!target || !worktree) {
-    return <EmptyState title={t('repo-route.not-found-title')} />
+    return <EmptyState title={t('workspace-route.not-found-title')} />
   }
   return (
     <GitWorktreeFilesystemPaneReady

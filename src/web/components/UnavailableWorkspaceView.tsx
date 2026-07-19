@@ -7,7 +7,7 @@ import { PanelInset } from '#/web/components/ui/panel.tsx'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { formatTranslatableReason, shouldOfferSshSettings, unavailableBodyKey } from '#/web/lib/remote-diagnostics.ts'
-import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/refresh.ts'
+import { runManualWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { isWorkspaceUnavailable, remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -51,13 +51,13 @@ export function UnavailableWorkspaceView({ workspace }: Props) {
     <section className="flex min-w-0 flex-1 flex-col">
       <EmptyState
         icon={<AlertCircle size={18} />}
-        title={t('repo-unavailable.title')}
+        title={t('workspace-unavailable.title')}
         body={
           <div className="space-y-3">
             <div>{t(bodyKey)}</div>
             <PanelInset tone="muted" size="lg" className="mx-auto max-w-md text-left">
               <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                {t('repo-unavailable.path')}
+                {t('workspace-unavailable.path')}
               </div>
               <div className="mt-1 break-all font-mono text-[11px] text-foreground">
                 {formatWorkspaceDisplayLocation(
@@ -69,7 +69,7 @@ export function UnavailableWorkspaceView({ workspace }: Props) {
                 )}
               </div>
               <div className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                {t('repo-unavailable.reason')}
+                {t('workspace-unavailable.reason')}
               </div>
               <div className="mt-1 break-words text-xs text-warning">{formatTranslatableReason(t, reason)}</div>
             </PanelInset>
@@ -77,16 +77,19 @@ export function UnavailableWorkspaceView({ workspace }: Props) {
               <Button
                 type="button"
                 variant="default"
-                onClick={() =>
+                onClick={() => {
                   void runManualWorkspaceRefresh(
                     { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
                     workspace.id,
                     { workspaceRuntimeId: workspace.workspaceRuntimeId },
-                  )
-                }
+                  ).then((outcome) => {
+                    if (!outcome.ok && !('cancelled' in outcome))
+                      toast.error(formatTranslatableReason(t, outcome.message))
+                  })
+                }}
               >
                 <RefreshCw />
-                {t('repo-unavailable.retry')}
+                {t('workspace-unavailable.retry')}
               </Button>
               {canOpenSshSettings && (
                 <Button type="button" variant="outline" onClick={() => navigation.openSettings('ssh')}>
@@ -96,7 +99,7 @@ export function UnavailableWorkspaceView({ workspace }: Props) {
               )}
               <Button type="button" variant="ghost" onClick={() => void handleClose()}>
                 <X />
-                {t('repo-unavailable.close')}
+                {t('workspace-unavailable.close')}
               </Button>
             </div>
           </div>

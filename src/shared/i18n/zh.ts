@@ -54,7 +54,7 @@ export const zh: Record<DictKey, string> = {
   'menu.view.history': '历史',
   'menu.view.changes': '变更',
   'menu.view.terminal': '终端',
-  'menu.view.refresh': '同步仓库',
+  'menu.view.refresh': '刷新工作区',
   'menu.view.reload-page': '重新加载页面',
   'menu.view.toggle-full-screen': '切换全屏',
   'menu.view.toggle-dev-tools': '切换开发者工具',
@@ -159,27 +159,29 @@ export const zh: Record<DictKey, string> = {
   'workspace-picker.open-remote-home-unavailable': '无法解析远程主目录',
   'workspace-picker.tooltip.last-sync-label': '上次同步',
   'workspace-picker.connecting-title': '正在连接 SSH…',
-  'repo-unavailable.title': '工作区不可用',
-  'repo-unavailable.body': 'Goblin 无法读取这个工作区。请恢复文件夹及其访问权限后重试。',
-  'repo-unavailable.remote-body': 'Goblin 无法重新连接这个 SSH 工作区。请检查 SSH 别名、网络连通性和远端路径后再试。',
-  'repo-unavailable.remote-connect-failed':
+  'workspace-unavailable.title': '工作区不可用',
+  'workspace-unavailable.body': 'Goblin 无法读取这个工作区。请恢复文件夹及其访问权限后重试。',
+  'workspace-unavailable.remote-body':
+    'Goblin 无法重新连接这个 SSH 工作区。请检查 SSH 别名、网络连通性和远端路径后再试。',
+  'workspace-unavailable.remote-connect-failed':
     'Goblin 无法建立可用的 SSH 会话。请检查认证、主机连通性和主机密钥信任后再试。',
-  'repo-unavailable.remote-config-changed': '已保存的 SSH 别名无法再从当前 SSH 配置中解析。请检查别名设置后重新连接。',
-  'repo-unavailable.remote-home-unavailable':
+  'workspace-unavailable.remote-config-changed':
+    '已保存的 SSH 别名无法再从当前 SSH 配置中解析。请检查别名设置后重新连接。',
+  'workspace-unavailable.remote-home-unavailable':
     'Goblin 无法解析这个 SSH 目标的远端主目录。请检查登录 shell 和 SSH 配置后再试。',
-  'repo-unavailable.remote-path-missing':
+  'workspace-unavailable.remote-path-missing':
     'Goblin 已连接到 SSH 目标，但保存的远端路径已不存在。请更新远端路径后重新连接。',
-  'repo-unavailable.remote-not-a-repo':
+  'workspace-unavailable.remote-not-a-repo':
     'Goblin 已连接到 SSH 目标，但保存的工作区路径不可用。请检查路径或重新连接到其他工作区。',
-  'repo-unavailable.path': '路径',
-  'repo-unavailable.reason': '原因',
-  'repo-unavailable.retry': '重新检测',
-  'repo-unavailable.close': '关闭工作区',
+  'workspace-unavailable.path': '路径',
+  'workspace-unavailable.reason': '原因',
+  'workspace-unavailable.retry': '重新检测',
+  'workspace-unavailable.close': '关闭工作区',
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': '未打开工作区',
   'empty.body': '从边栏选择工作区，或拖入文件夹。',
-  'repo-route.not-found-title': '未找到工作区',
+  'workspace-route.not-found-title': '未找到工作区',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': '松手打开工作区',
@@ -188,7 +190,7 @@ export const zh: Record<DictKey, string> = {
   'workspace-picker.recent-save-failed': '工作区已打开，但最近记录未更新',
 
   // ---- Workspace pane tabs ------------------------------------------------
-  'repo.dashboard': '仪表盘',
+  'workspace.dashboard': '仪表盘',
   'dashboard.loading': '正在加载仪表盘...',
   'dashboard.directory.files': '文件',
   'dashboard.directory.folders': '文件夹',
@@ -716,7 +718,7 @@ export const zh: Record<DictKey, string> = {
   'help.row.close-workspace': '关闭当前工作区',
   'help.row.close-workspace-tab-or-window': '关闭工作区标签页或窗口',
   'help.row.close-window': '关闭窗口',
-  'help.row.refresh': '同步仓库',
+  'help.row.refresh': '刷新工作区',
   'help.row.reload-page': '重新加载页面',
   'help.row.settings': '设置',
   'help.row.this-help': '当前帮助',

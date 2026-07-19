@@ -8,6 +8,7 @@ import {
   seedRepoProjectionQueryFromCacheEntry,
 } from '#/web/stores/workspaces/persistence.ts'
 import { disposeRepoOperationScheduler } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
+import { cancelWorkspaceCapabilityRefreshes } from '#/web/workspace-capability-refresh.ts'
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/workspaces/refresh.ts'
 import {
   closeWorkspaceRuntime,
@@ -274,6 +275,7 @@ async function reconcileCapturedWorkspaceRuntimeMemberships(
   })
 
   for (const changed of changedTargets) {
+    cancelWorkspaceCapabilityRefreshes(changed.workspaceId, changed.previousWorkspaceRuntimeId)
     disposeRepoOperationScheduler(changed.workspaceId)
     clearWorkspacePaneTabsProjectionState(changed.workspaceId, changed.previousWorkspaceRuntimeId)
     primaryWindowQueryClient.removeQueries({
@@ -463,6 +465,7 @@ async function rollbackNewWorkspace(
   workspaceRuntimeId: string,
 ): Promise<void> {
   if (get().workspaces[workspaceId]?.workspaceRuntimeId !== workspaceRuntimeId) return
+  cancelWorkspaceCapabilityRefreshes(workspaceId, workspaceRuntimeId)
   disposeRepoOperationScheduler(workspaceId)
   set((state) =>
     state.workspaces[workspaceId]?.workspaceRuntimeId === workspaceRuntimeId
@@ -991,6 +994,7 @@ async function closeWorkspaceMembership(
     workspacesLog.warn('failed to remove workspace from server session', { workspaceId, err: membership.error })
     return { ok: false, message: 'error.workspace-close-failed' }
   }
+  cancelWorkspaceCapabilityRefreshes(workspaceId, workspaceRuntimeId)
   if (workspace.capability.kind === 'git') disposeRepoOperationScheduler(workspaceId)
   set((state) => removeWorkspaceFromSessionState(state, workspaceId))
   try {

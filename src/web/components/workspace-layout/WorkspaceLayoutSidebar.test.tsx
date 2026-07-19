@@ -124,7 +124,8 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(container.querySelector('[data-testid="workspace-root-navigator"]')).not.toBeNull()
     expect(container.textContent).toContain('workspace.navigation-title')
     expect(container.textContent).not.toContain('tab.branches')
-    expect(container.textContent).toContain('repo.dashboard')
+    expect(container.textContent).toContain('workspace.dashboard')
+    expect(container.querySelector('button[aria-label="menu.view.refresh"]')).not.toBeNull()
     expect(container.querySelector('button[aria-label="app-chrome.settings"]')).not.toBeNull()
 
     const workspaceRow = container.querySelector('[data-testid="workspace-root-row"]')

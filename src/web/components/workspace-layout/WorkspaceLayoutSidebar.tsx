@@ -9,6 +9,7 @@ import {
   DashboardRowAction,
   RepoSyncAction,
 } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
+import { WorkspaceRefreshAction } from '#/web/components/workspace-toolbar/WorkspaceRefreshAction.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
@@ -177,7 +178,7 @@ function WorkspaceShellNavigatorHeader({
       <div className="flex h-8 min-w-0 items-center gap-2 px-3">
         <div className="min-w-0 flex-1 truncate text-[13px] font-semibold text-muted-foreground">{title}</div>
         {gitAvailable ? <BranchFilterAction repoId={workspaceId} /> : null}
-        {gitAvailable ? <RepoSyncAction repoId={workspaceId} /> : null}
+        {gitAvailable ? <RepoSyncAction repoId={workspaceId} /> : <WorkspaceRefreshAction workspaceId={workspaceId} />}
       </div>
     </div>
   )

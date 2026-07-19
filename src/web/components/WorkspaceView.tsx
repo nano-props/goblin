@@ -365,7 +365,7 @@ function RoutedWorkspaceNotFound({ workspaceId }: { workspaceId: WorkspaceId }) 
     <section className="flex min-h-0 flex-1 flex-col bg-background">
       <div className="flex flex-1 items-center justify-center p-6 text-center">
         <div className="flex max-w-sm flex-col gap-2">
-          <h1 className="text-sm font-medium text-foreground">{t('repo-route.not-found-title')}</h1>
+          <h1 className="text-sm font-medium text-foreground">{t('workspace-route.not-found-title')}</h1>
           <p className="break-all text-sm text-muted-foreground">{displayLocation}</p>
         </div>
       </div>

@@ -55,7 +55,7 @@ export const ko: Record<DictKey, string> = {
   'menu.view.history': '기록',
   'menu.view.changes': '변경 사항',
   'menu.view.terminal': '터미널',
-  'menu.view.refresh': '리포지토리 동기화',
+  'menu.view.refresh': '워크스페이스 새로 고침',
   'menu.view.reload-page': '페이지 새로 고침',
   'menu.view.toggle-full-screen': '전체 화면 전환',
   'menu.view.toggle-dev-tools': '개발자 도구',
@@ -164,29 +164,30 @@ export const ko: Record<DictKey, string> = {
   'workspace-picker.open-remote-home-unavailable': '원격 홈 디렉터리를 확인할 수 없습니다',
   'workspace-picker.tooltip.last-sync-label': '마지막 동기화',
   'workspace-picker.connecting-title': 'SSH에 연결 중…',
-  'repo-unavailable.title': '워크스페이스를 사용할 수 없음',
-  'repo-unavailable.body': 'Goblin 이 이 워크스페이스를 읽을 수 없습니다. 폴더와 접근 권한을 복원한 뒤 재시도하세요.',
-  'repo-unavailable.remote-body':
+  'workspace-unavailable.title': '워크스페이스를 사용할 수 없음',
+  'workspace-unavailable.body':
+    'Goblin 이 이 워크스페이스를 읽을 수 없습니다. 폴더와 접근 권한을 복원한 뒤 재시도하세요.',
+  'workspace-unavailable.remote-body':
     'Goblin 이 이 SSH 워크스페이스에 다시 연결하지 못했습니다. SSH 별칭, 네트워크 연결, 원격 경로를 확인한 뒤 다시 시도하세요.',
-  'repo-unavailable.remote-connect-failed':
+  'workspace-unavailable.remote-connect-failed':
     'Goblin 이 이 리포지토리에 사용할 수 있는 SSH 세션을 만들지 못했습니다. 인증, 호스트 연결 상태, 호스트 키 신뢰를 확인한 뒤 다시 시도하세요.',
-  'repo-unavailable.remote-config-changed':
+  'workspace-unavailable.remote-config-changed':
     '저장된 SSH 별칭을 현재 SSH 설정에서 더 이상 해석할 수 없습니다. 별칭 설정을 확인한 뒤 다시 연결하세요.',
-  'repo-unavailable.remote-home-unavailable':
+  'workspace-unavailable.remote-home-unavailable':
     'Goblin 이 이 SSH 대상의 원격 홈 디렉터리를 확인하지 못했습니다. 로그인 셸과 SSH 설정을 확인한 뒤 다시 시도하세요.',
-  'repo-unavailable.remote-path-missing':
+  'workspace-unavailable.remote-path-missing':
     'Goblin 이 SSH 대상에는 연결했지만 저장된 원격 경로가 더 이상 존재하지 않습니다. 원격 경로를 수정한 뒤 다시 연결하세요.',
-  'repo-unavailable.remote-not-a-repo':
+  'workspace-unavailable.remote-not-a-repo':
     'Goblin 이 SSH 대상에는 연결했지만 저장된 작업 공간 경로를 사용할 수 없습니다. 경로를 확인하거나 다른 작업 공간에 다시 연결하세요.',
-  'repo-unavailable.path': '경로',
-  'repo-unavailable.reason': '이유',
-  'repo-unavailable.retry': '다시 확인',
-  'repo-unavailable.close': '작업 공간 닫기',
+  'workspace-unavailable.path': '경로',
+  'workspace-unavailable.reason': '이유',
+  'workspace-unavailable.retry': '다시 확인',
+  'workspace-unavailable.close': '작업 공간 닫기',
 
   // ---- Empty state -------------------------------------------------------
   'empty.title': '열린 작업 공간이 없습니다',
   'empty.body': '사이드바에서 작업 공간을 선택하거나 폴더를 이 창으로 드래그하세요.',
-  'repo-route.not-found-title': '작업 공간을 찾을 수 없음',
+  'workspace-route.not-found-title': '작업 공간을 찾을 수 없음',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': '놓아서 작업 공간 열기',
@@ -195,7 +196,7 @@ export const ko: Record<DictKey, string> = {
   'workspace-picker.recent-save-failed': '작업 공간은 열렸지만 최근 기록은 업데이트되지 않았습니다',
 
   // ---- Workspace pane tabs ------------------------------------------------
-  'repo.dashboard': '대시보드',
+  'workspace.dashboard': '대시보드',
   'dashboard.loading': '대시보드 로딩 중...',
   'dashboard.directory.files': '파일',
   'dashboard.directory.folders': '폴더',
@@ -736,7 +737,7 @@ export const ko: Record<DictKey, string> = {
   'help.row.close-workspace': '현재 워크스페이스 닫기',
   'help.row.close-workspace-tab-or-window': '워크스페이스 탭 또는 창 닫기',
   'help.row.close-window': '창 닫기',
-  'help.row.refresh': '리포지토리 동기화',
+  'help.row.refresh': '워크스페이스 새로 고침',
   'help.row.reload-page': '페이지 새로 고침',
   'help.row.settings': '설정',
   'help.row.this-help': '이 도움말',
