@@ -3,6 +3,7 @@
 import { act } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import type * as WorkspaceSessionWritePaths from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type {
@@ -44,7 +45,7 @@ vi.mock('#/web/components/terminal/use-terminal-session-projection.ts', () => ({
 }))
 
 vi.mock('#/web/stores/workspaces/workspace-session-write-paths.ts', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('#/web/stores/workspaces/workspace-session-write-paths.ts')>()),
+  ...(await importOriginal<typeof WorkspaceSessionWritePaths>()),
   reconcileOpenWorkspaceRuntimeMemberships: projectionMocks.reconcileOpenWorkspaceRuntimeMemberships,
 }))
 
@@ -59,7 +60,9 @@ let workspaceTabsChangedHandler: ((message: WorkspacePaneTabsChangedRealtimeMess
 let recoveredHandler: ((clientId: string) => void) | null = null
 const kickReconnectMock = vi.fn(() => {})
 const recoverSessionsMock =
-  vi.fn<(...args: Array<{ workspaceId: typeof REPO_ID; workspaceRuntimeId: string }>) => Promise<TerminalSessionsSnapshot>>()
+  vi.fn<
+    (...args: Array<{ workspaceId: typeof REPO_ID; workspaceRuntimeId: string }>) => Promise<TerminalSessionsSnapshot>
+  >()
 const listWorkspaceTabsMock = vi.fn<(...args: Array<{ workspaceId: string }>) => Promise<WorkspacePaneTabsEntry[]>>()
 
 describe('AppRuntimeProjectionProvider', () => {
@@ -167,9 +170,9 @@ describe('AppRuntimeProjectionProvider', () => {
     const result = renderRuntimeProvider(REPO_ID)
     try {
       expect(recoverSessionsMock).not.toHaveBeenCalled()
-      expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.workspaceRuntimeId).not.toBe(
-        repo.workspaceRuntimeId,
-      )
+      expect(
+        useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.workspaceRuntimeId,
+      ).not.toBe(repo.workspaceRuntimeId)
 
       await act(async () => {
         useWorkspacesStore.setState({ workspaceMembershipReady: true })

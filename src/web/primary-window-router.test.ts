@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { createElement, Fragment, type ReactNode } from 'react'
 import { Outlet } from '@tanstack/react-router'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import type * as LayoutModule from '#/web/Layout.tsx'
 
 const appMocks = vi.hoisted(() => ({ render: vi.fn() }))
 
@@ -32,7 +33,7 @@ vi.mock('#/web/App.tsx', () => ({
 }))
 
 vi.mock('#/web/Layout.tsx', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#/web/Layout.tsx')>()
+  const actual = await importOriginal<typeof LayoutModule>()
   return {
     ...actual,
     Layout: () => createElement(Outlet),

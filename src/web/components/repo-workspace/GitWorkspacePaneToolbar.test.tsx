@@ -5,6 +5,7 @@ import type { ComponentProps } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type * as WorkspaceExternalAppClient from '#/web/workspace-external-app-client.ts'
 import { workspaceExternalAppRecentKey, workspaceExternalAppTargetForWorktree } from '#/shared/workspace-settings.ts'
 import { GitWorkspacePaneToolbar } from '#/web/components/repo-workspace/GitWorkspacePaneToolbar.tsx'
 import { GitWorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/GitWorkspaceOpenExternallyMenu.tsx'
@@ -108,9 +109,7 @@ vi.mock('#/web/app-shell-client.ts', () => ({
 }))
 
 vi.mock('#/web/workspace-external-app-client.ts', async () => {
-  const actual = (await vi.importActual(
-    '#/web/workspace-external-app-client.ts',
-  )) as typeof import('#/web/workspace-external-app-client.ts')
+  const actual = (await vi.importActual('#/web/workspace-external-app-client.ts')) as typeof WorkspaceExternalAppClient
   return {
     ...actual,
     openWorkspaceInFinder: workspaceExternalAppMocks.openWorkspaceInFinder,

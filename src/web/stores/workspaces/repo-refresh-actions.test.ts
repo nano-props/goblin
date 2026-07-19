@@ -8,11 +8,12 @@ import {
 } from '#/web/stores/workspaces/repo-refresh-actions.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type * as WorktreeStatusRefresh from '#/web/stores/workspaces/worktree-status-refresh.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 
 vi.mock('#/web/stores/workspaces/worktree-status-refresh.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#/web/stores/workspaces/worktree-status-refresh.ts')>()
+  const actual = await importOriginal<typeof WorktreeStatusRefresh>()
   return { ...actual, refreshRepoWorktreeStatus: vi.fn(async () => {}) }
 })
 
@@ -67,11 +68,7 @@ describe('repo refresh actions', () => {
     const store = repoRefreshStoreAccess()
     const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
 
-    await handleRepoInvalidationRefresh(
-      store,
-      { repoId: WORKSPACE_ID, query: 'repo-snapshot' },
-      'repo-runtime-test-9',
-    )
+    await handleRepoInvalidationRefresh(store, { repoId: WORKSPACE_ID, query: 'repo-snapshot' }, 'repo-runtime-test-9')
 
     expect(refreshRepoWorktreeStatus).not.toHaveBeenCalled()
     expect(invalidateSpy).toHaveBeenCalledWith(

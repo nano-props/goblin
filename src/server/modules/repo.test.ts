@@ -3,6 +3,7 @@ import type { PullRequestInfo } from '#/shared/git-types.ts'
 import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type * as RepoWritePaths from '#/server/modules/repo-write-paths.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo')
 const LINKED_REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-linked')
@@ -840,17 +841,11 @@ describe('cloneRepo cancellation', () => {
 
 describe('repo mutation invalidation publishing', () => {
   test.each([
-    [
-      'pullRepoBranch',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.pullRepoBranch(REPO_ID, 'feature/a'),
-    ],
-    [
-      'pushRepoBranch',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.pushRepoBranch(REPO_ID, 'feature/a'),
-    ],
+    ['pullRepoBranch', async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a')],
+    ['pushRepoBranch', async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a')],
     [
       'createRepoWorktree',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
+      async (repo: typeof RepoWritePaths) =>
         repo.createRepoWorktree(REPO_ID, {
           worktreePath: '/tmp/repo-worktree',
           mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
@@ -1385,14 +1380,8 @@ describe('repo mutation invalidation publishing', () => {
   })
 
   test.each([
-    [
-      'pullRepoBranch',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.pullRepoBranch(REPO_ID, 'feature/a'),
-    ],
-    [
-      'pushRepoBranch',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.pushRepoBranch(REPO_ID, 'feature/a'),
-    ],
+    ['pullRepoBranch', async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a')],
+    ['pushRepoBranch', async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a')],
   ])('%s records the network mutation in the repo write coordinator', async (name, run) => {
     const repo = await import('#/server/modules/repo-write-paths.ts')
     const { listRepoWriteOperationsForRepo } = await import('#/server/modules/repo-write-operation-coordinator.ts')
@@ -1435,17 +1424,17 @@ describe('repo mutation invalidation publishing', () => {
     [
       'pullRepoBranch',
       () => mocks.pullBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: pull failed' }),
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.pullRepoBranch(REPO_ID, 'feature/a'),
+      async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a'),
     ],
     [
       'pushRepoBranch',
       () => mocks.pushBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: push failed' }),
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.pushRepoBranch(REPO_ID, 'feature/a'),
+      async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a'),
     ],
     [
       'createRepoWorktree',
       () => mocks.createWorktree.mockResolvedValueOnce({ ok: false, message: 'fatal: worktree failed' }),
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
+      async (repo: typeof RepoWritePaths) =>
         repo.createRepoWorktree(REPO_ID, {
           worktreePath: '/tmp/repo-worktree',
           mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
@@ -1656,19 +1645,9 @@ describe('repo mutation invalidation publishing', () => {
   })
 
   test.each([
-    [
-      'pullRepoBranch',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.pullRepoBranch(REPO_ID, 'feature/a'),
-    ],
-    [
-      'pushRepoBranch',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) => repo.pushRepoBranch(REPO_ID, 'feature/a'),
-    ],
-    [
-      'deleteRepoBranch',
-      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
-        repo.deleteRepoBranch(REPO_ID, 'feature/a'),
-    ],
+    ['pullRepoBranch', async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a')],
+    ['pushRepoBranch', async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a')],
+    ['deleteRepoBranch', async (repo: typeof RepoWritePaths) => repo.deleteRepoBranch(REPO_ID, 'feature/a')],
   ])('%s publishes sibling worktree snapshot invalidations after success', async (_name, run) => {
     mocks.getWorktrees.mockResolvedValue([
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },

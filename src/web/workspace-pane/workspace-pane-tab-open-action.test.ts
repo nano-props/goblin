@@ -37,9 +37,10 @@ import {
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
 import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/workspaces/repo-refresh-actions.ts'
+import type * as RepoRefreshActions from '#/web/stores/workspaces/repo-refresh-actions.ts'
 
 vi.mock('#/web/stores/workspaces/repo-refresh-actions.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#/web/stores/workspaces/repo-refresh-actions.ts')>()
+  const actual = await importOriginal<typeof RepoRefreshActions>()
   return { ...actual, requestVisibleWorkspaceStatusRefresh: vi.fn(() => true) }
 })
 
