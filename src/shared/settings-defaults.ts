@@ -30,7 +30,7 @@ export function defaultClientWorkspaceState(): ClientWorkspaceState {
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionIdByTerminalFilesystemTarget: {},
     preferredWorkspacePaneTabByTargetByWorkspace: {},
-    filetreeViewStateByWorktreeByWorkspace: {},
+    filetreeViewStateByFilesystemTargetByWorkspace: {},
   }
 }
 

@@ -234,7 +234,6 @@ export const en = {
   'dashboard.checks-failing': '{count} failing check(s)',
   'tab.branches': 'Branches',
   'workspace.navigation-title': 'Workspace',
-  'tab.repo-workspace': 'Repo workspace',
   'tab.status': 'Status',
   'tab.changes': 'Changes',
   'tab.changes-with-count': 'Changes · {count}',

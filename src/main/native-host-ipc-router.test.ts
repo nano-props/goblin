@@ -318,7 +318,7 @@ describe('main repo ipc cancellation', () => {
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalFilesystemTarget: {},
       preferredWorkspacePaneTabByTargetByWorkspace: {},
-      filetreeViewStateByWorktreeByWorkspace: {},
+      filetreeViewStateByFilesystemTargetByWorkspace: {},
     }
     readNativeClientWorkspaceStateMock.mockResolvedValue({ kind: 'loaded', state: workspace })
 
@@ -337,7 +337,7 @@ describe('main repo ipc cancellation', () => {
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalFilesystemTarget: {},
       preferredWorkspacePaneTabByTargetByWorkspace: {},
-      filetreeViewStateByWorktreeByWorkspace: {},
+      filetreeViewStateByFilesystemTargetByWorkspace: {},
     })
 
     expect(result).toMatchObject({

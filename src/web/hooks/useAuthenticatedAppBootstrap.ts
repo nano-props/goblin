@@ -163,14 +163,14 @@ async function restoreBootSession(
 }
 
 function applyRestoredClientWorkspace(clientWorkspace: ClientWorkspaceState): void {
-  // Apply layout prefs before repo probing finishes so the first
+  // Apply layout prefs before workspace restoration finishes so the first
   // restored paint uses the saved geometry. Client workspace persistence
   // still waits for workspaceMembershipReady, so this cannot overwrite the
   // persisted client workspace with a partially hydrated one.
   const normalizedLayout = normalizeWorkspaceSessionLayoutState(clientWorkspace)
   const restoredWorkspaceState = restoreRestorableWorkspaceStateFromClientWorkspace(clientWorkspace)
   const { applySessionLayoutState, applySessionSelectedTerminalState } = useWorkspacesStore.getState()
-  restoreFiletreeViewStateFromSession(clientWorkspace.filetreeViewStateByWorktreeByWorkspace)
+  restoreFiletreeViewStateFromSession(clientWorkspace.filetreeViewStateByFilesystemTargetByWorkspace)
   applySessionLayoutState(normalizedLayout)
   applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalFilesystemTarget)
 }

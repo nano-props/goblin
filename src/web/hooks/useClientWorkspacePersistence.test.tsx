@@ -117,7 +117,7 @@ describe('useClientWorkspacePersistence', () => {
           [terminalFilesystemTargetKey]: 'term-111111111111111111111',
         },
         preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///tmp/repo': { [targetKey]: 'history' } },
-        filetreeViewStateByWorktreeByWorkspace: {
+        filetreeViewStateByFilesystemTargetByWorkspace: {
           'goblin+file:///tmp/repo': {
             [worktreeId]: {
               selectedKeys: ['src/index.ts'],

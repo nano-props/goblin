@@ -432,8 +432,8 @@ function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string): Partia
           s.restoredClientWorkspaceBaseline.preferredWorkspacePaneTabByTargetByWorkspace,
           id,
         ),
-        filetreeViewStateByWorktreeByWorkspace: recordWithoutKey(
-          s.restoredClientWorkspaceBaseline.filetreeViewStateByWorktreeByWorkspace,
+        filetreeViewStateByFilesystemTargetByWorkspace: recordWithoutKey(
+          s.restoredClientWorkspaceBaseline.filetreeViewStateByFilesystemTargetByWorkspace,
           id,
         ),
         selectedTerminalSessionIdByTerminalFilesystemTarget: Object.fromEntries(

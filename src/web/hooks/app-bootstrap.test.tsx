@@ -110,7 +110,7 @@ describe('app bootstrap hooks', () => {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-222222222222222222222',
         },
         preferredWorkspacePaneTabByTargetByWorkspace: {},
-        filetreeViewStateByWorktreeByWorkspace: {
+        filetreeViewStateByFilesystemTargetByWorkspace: {
           'goblin+file:///tmp/repo': {
             'goblin+file:///tmp/worktree': {
               selectedKeys: ['src/index.ts'],
@@ -189,7 +189,7 @@ describe('app bootstrap hooks', () => {
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalFilesystemTarget: {},
         preferredWorkspacePaneTabByTargetByWorkspace: {},
-        filetreeViewStateByWorktreeByWorkspace: {},
+        filetreeViewStateByFilesystemTargetByWorkspace: {},
       },
     )
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
@@ -229,7 +229,7 @@ describe('app bootstrap hooks', () => {
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalFilesystemTarget: {},
         preferredWorkspacePaneTabByTargetByWorkspace: {},
-        filetreeViewStateByWorktreeByWorkspace: {},
+        filetreeViewStateByFilesystemTargetByWorkspace: {},
       },
     )
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
@@ -267,7 +267,7 @@ describe('app bootstrap hooks', () => {
             [branchTargetKey('goblin+file:///tmp/repo', 'main')]: 'files' as const,
           },
         },
-        filetreeViewStateByWorktreeByWorkspace: {},
+        filetreeViewStateByFilesystemTargetByWorkspace: {},
       },
     )
     const rebuiltSession = workspaceRestoreFixture(persistedSession.serverWorkspace, {
@@ -318,7 +318,7 @@ describe('app bootstrap hooks', () => {
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalFilesystemTarget: {},
         preferredWorkspacePaneTabByTargetByWorkspace: {},
-        filetreeViewStateByWorktreeByWorkspace: {},
+        filetreeViewStateByFilesystemTargetByWorkspace: {},
       },
     )
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
@@ -424,7 +424,7 @@ describe('app bootstrap hooks', () => {
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalFilesystemTarget: {},
         preferredWorkspacePaneTabByTargetByWorkspace: {},
-        filetreeViewStateByWorktreeByWorkspace: {},
+        filetreeViewStateByFilesystemTargetByWorkspace: {},
       },
     )
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())

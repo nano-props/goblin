@@ -53,7 +53,7 @@ describe('restorable-workspace-state', () => {
         'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-222222222222222222222',
       },
       preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///tmp/repo': { [targetKey]: 'terminal' } },
-      filetreeViewStateByWorktreeByWorkspace: {},
+      filetreeViewStateByFilesystemTargetByWorkspace: {},
     })
   })
 
@@ -103,7 +103,7 @@ describe('restorable-workspace-state', () => {
       preferredWorkspacePaneTabByTargetByWorkspace: {
         [workspace.id]: { [workspaceRootTargetKey]: 'files' },
       },
-      filetreeViewStateByWorktreeByWorkspace: {},
+      filetreeViewStateByFilesystemTargetByWorkspace: {},
     })
   })
 
@@ -148,7 +148,7 @@ describe('restorable-workspace-state', () => {
           preferredWorkspacePaneTabByTargetByWorkspace: {
             [stubRepo.id]: { [stubTargetKey]: 'files' },
           },
-          filetreeViewStateByWorktreeByWorkspace: {
+          filetreeViewStateByFilesystemTargetByWorkspace: {
             [stubRepo.id]: {
               'goblin+file:///tmp/stub-worktree': {
                 selectedKeys: ['src/index.ts'],
@@ -171,7 +171,7 @@ describe('restorable-workspace-state', () => {
         [activeRepo.id]: { [activeTargetKey]: 'status' },
         [stubRepo.id]: { [stubTargetKey]: 'files' },
       },
-      filetreeViewStateByWorktreeByWorkspace: {
+      filetreeViewStateByFilesystemTargetByWorkspace: {
         [stubRepo.id]: {
           'goblin+file:///tmp/stub-worktree': {
             selectedKeys: ['src/index.ts'],
@@ -277,7 +277,7 @@ describe('restorable-workspace-state', () => {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-111111111111111111111',
         },
         preferredWorkspacePaneTabByTargetByWorkspace: {},
-        filetreeViewStateByWorktreeByWorkspace: {},
+        filetreeViewStateByFilesystemTargetByWorkspace: {},
       }),
     ).toEqual({
       restoredWorkspaceId: 'goblin+file:///tmp/repo',
@@ -372,7 +372,7 @@ describe('restorable-workspace-state', () => {
         },
       }),
     ).toMatchObject({
-      filetreeViewStateByWorktreeByWorkspace: {
+      filetreeViewStateByFilesystemTargetByWorkspace: {
         'goblin+file:///tmp/repo': {
           'goblin+file:///tmp/worktree': {
             selectedKeys: ['src/index.ts'],

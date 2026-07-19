@@ -11,7 +11,7 @@ import { parseWorkspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import { parseTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import type { RestorableWorkspaceState, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
-import { persistedFiletreeViewStateByWorktreeByWorkspaceForSession } from '#/web/filetree-session-state.ts'
+import { persistedFiletreeViewStateByFilesystemTargetByWorkspaceForSession } from '#/web/filetree-session-state.ts'
 import type { FiletreeInteractionSnapshot } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
@@ -81,7 +81,7 @@ export function clientWorkspaceStateFromRestorableWorkspaceState(input: {
       restorableWorkspaceState.workspaceOrder,
       workspacePaneTabsByTargetByWorkspace,
     ),
-    filetreeViewStateByWorktreeByWorkspace: persistedFiletreeViewStateByWorktreeByWorkspaceForSession(
+    filetreeViewStateByFilesystemTargetByWorkspace: persistedFiletreeViewStateByFilesystemTargetByWorkspaceForSession(
       input.filetreeInteractionByScope ?? {},
       restorationProjections,
       restorableWorkspaceState.workspaceOrder,
@@ -158,9 +158,9 @@ function clientWorkspaceWithStubBaseline(
       baseline.preferredWorkspacePaneTabByTargetByWorkspace,
       stubWorkspaceIds,
     ),
-    filetreeViewStateByWorktreeByWorkspace: mergeBaselineWorkspaceMap(
-      clientWorkspace.filetreeViewStateByWorktreeByWorkspace,
-      baseline.filetreeViewStateByWorktreeByWorkspace,
+    filetreeViewStateByFilesystemTargetByWorkspace: mergeBaselineWorkspaceMap(
+      clientWorkspace.filetreeViewStateByFilesystemTargetByWorkspace,
+      baseline.filetreeViewStateByFilesystemTargetByWorkspace,
       stubWorkspaceIds,
     ),
   }

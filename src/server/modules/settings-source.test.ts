@@ -695,7 +695,7 @@ test('normalizer drops malformed workspace external app recent entries on load',
         {
           workspaceId: REPO_A,
           workspaceExternalAppRecent: {
-            byWorktree: { '/legacy/native/path': 'terminal:ghostty' },
+            byFilesystemTarget: { '/legacy/native/path': 'terminal:ghostty' },
             byTarget: {
               [externalAppTargetKey('/repo-a/worktree-x')]: 'editor:vscode',
               // Unknown item id (not in WORKSPACE_EXTERNAL_APP_IDS) —

@@ -110,7 +110,7 @@ export interface ClientWorkspaceState {
   /** Per-workspace, per-target pane tab preference that session restore can make renderable. */
   preferredWorkspacePaneTabByTargetByWorkspace: Record<string, Record<string, WorkspacePaneSessionTabType | null>>
   /** Per-workspace, per-filesystem-target file tree view state. */
-  filetreeViewStateByWorktreeByWorkspace: Record<string, Record<string, FiletreeSessionViewState>>
+  filetreeViewStateByFilesystemTargetByWorkspace: Record<string, Record<string, FiletreeSessionViewState>>
 }
 
 export type NativeClientWorkspaceReadResult = { kind: 'missing' } | { kind: 'loaded'; state: unknown }

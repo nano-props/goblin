@@ -47,7 +47,7 @@ describe('client workspace persistence', () => {
       preferredWorkspacePaneTabByTargetByWorkspace: {
         'goblin+file:///repo-a': { 'goblin+file:///repo-a\0workspace-root': 'history' },
       },
-      filetreeViewStateByWorktreeByWorkspace: {
+      filetreeViewStateByFilesystemTargetByWorkspace: {
         'goblin+file:///repo-a': {
           'goblin+file:///worktree': { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 7 },
         },
@@ -76,7 +76,7 @@ describe('client workspace persistence', () => {
         preferredWorkspacePaneTabByTargetByWorkspace: {
           [workspaceId]: { [rootTargetKey]: 'files' },
         },
-        filetreeViewStateByWorktreeByWorkspace: {
+        filetreeViewStateByFilesystemTargetByWorkspace: {
           [workspaceId]: {
             [worktreeId]: { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 2 },
           },
@@ -86,7 +86,7 @@ describe('client workspace persistence', () => {
       restoredWorkspaceId: workspaceId,
       selectedTerminalSessionIdByTerminalFilesystemTarget: { [terminalKey]: 'terminal-session-test' },
       preferredWorkspacePaneTabByTargetByWorkspace: { [workspaceId]: { [rootTargetKey]: 'files' } },
-      filetreeViewStateByWorktreeByWorkspace: {
+      filetreeViewStateByFilesystemTargetByWorkspace: {
         [workspaceId]: {
           [worktreeId]: { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 2 },
         },
@@ -103,7 +103,7 @@ describe('client workspace persistence', () => {
         workspacePaneSize: Number.NaN,
         selectedTerminalSessionIdByTerminalFilesystemTarget: { broken: 12 },
         preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///repo-a': { target: 'unknown' } },
-        filetreeViewStateByWorktreeByWorkspace: [],
+        filetreeViewStateByFilesystemTargetByWorkspace: [],
       }),
     )
 
@@ -113,7 +113,7 @@ describe('client workspace persistence', () => {
       workspacePaneSize: 70,
       selectedTerminalSessionIdByTerminalFilesystemTarget: {},
       preferredWorkspacePaneTabByTargetByWorkspace: {},
-      filetreeViewStateByWorktreeByWorkspace: {},
+      filetreeViewStateByFilesystemTargetByWorkspace: {},
     })
   })
 
@@ -130,7 +130,7 @@ describe('client workspace persistence', () => {
             'goblin+file:///repo-a\0worktree\0/worktree': 'files',
           },
         },
-        filetreeViewStateByWorktreeByWorkspace: {
+        filetreeViewStateByFilesystemTargetByWorkspace: {
           'goblin+file:///repo-a': {
             '/worktree': { selectedKeys: ['README.md'], expandedKeys: [], topVisibleRowIndex: 0 },
             'goblin+ssh://dev/worktree': {
@@ -144,7 +144,7 @@ describe('client workspace persistence', () => {
     ).toMatchObject({
       selectedTerminalSessionIdByTerminalFilesystemTarget: {},
       preferredWorkspacePaneTabByTargetByWorkspace: {},
-      filetreeViewStateByWorktreeByWorkspace: {},
+      filetreeViewStateByFilesystemTargetByWorkspace: {},
     })
   })
 
@@ -156,5 +156,21 @@ describe('client workspace persistence', () => {
         },
       }),
     ).toMatchObject({ selectedTerminalSessionIdByTerminalFilesystemTarget: {} })
+  })
+
+  test('does not restore the retired worktree-only file tree state field', () => {
+    expect(
+      normalizeClientWorkspaceState({
+        filetreeViewStateByWorktreeByWorkspace: {
+          'goblin+file:///workspace': {
+            'goblin+file:///workspace': {
+              selectedKeys: ['README.md'],
+              expandedKeys: [],
+              topVisibleRowIndex: 0,
+            },
+          },
+        },
+      }),
+    ).toMatchObject({ filetreeViewStateByFilesystemTargetByWorkspace: {} })
   })
 })

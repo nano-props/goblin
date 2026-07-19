@@ -229,7 +229,10 @@ const ClientWorkspaceStateSchema = v.object({
     v.string(),
     v.record(v.string(), v.nullable(v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
   ),
-  filetreeViewStateByWorktreeByWorkspace: v.record(v.string(), v.record(v.string(), FiletreeSessionViewStateSchema)),
+  filetreeViewStateByFilesystemTargetByWorkspace: v.record(
+    v.string(),
+    v.record(v.string(), FiletreeSessionViewStateSchema),
+  ),
 })
 
 // Shared shape for the GitHub CLI state endpoints (`/api/settings/github-cli`

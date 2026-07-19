@@ -19,13 +19,13 @@ interface ClientWorkspaceFilesystemTargetsProjection {
   }
 }
 
-export function persistedFiletreeViewStateByWorktreeByWorkspaceForSession(
+export function persistedFiletreeViewStateByFilesystemTargetByWorkspaceForSession(
   interactionByScope: Readonly<Record<string, FiletreeInteractionSnapshot>>,
   workspaces: Record<string, ClientWorkspaceFilesystemTargetsProjection | undefined>,
   workspaceOrder: readonly string[],
-): ClientWorkspaceState['filetreeViewStateByWorktreeByWorkspace'] {
+): ClientWorkspaceState['filetreeViewStateByFilesystemTargetByWorkspace'] {
   const openWorkspaceIds = new Set(workspaceOrder)
-  const byWorkspace: ClientWorkspaceState['filetreeViewStateByWorktreeByWorkspace'] = {}
+  const byWorkspace: ClientWorkspaceState['filetreeViewStateByFilesystemTargetByWorkspace'] = {}
   for (const [scopeKey, snapshot] of Object.entries(interactionByScope)) {
     const scope = parseFiletreeInteractionScopeKey(scopeKey)
     if (!scope || !openWorkspaceIds.has(scope.workspaceId)) continue
@@ -34,33 +34,33 @@ export function persistedFiletreeViewStateByWorktreeByWorkspaceForSession(
     const viewState = sessionViewStateFromInteractionSnapshot(snapshot)
     if (!hasRestorableFiletreeViewState(viewState)) continue
     byWorkspace[scope.workspaceId] ??= {}
-    const worktreeId = workspaceLocatorForPath(scope.workspaceId, scope.rootPath)
-    if (!worktreeId) continue
-    byWorkspace[scope.workspaceId][worktreeId] = viewState
+    const filesystemTargetId = workspaceLocatorForPath(scope.workspaceId, scope.rootPath)
+    if (!filesystemTargetId) continue
+    byWorkspace[scope.workspaceId][filesystemTargetId] = viewState
   }
   return byWorkspace
 }
 
 export function restoreFiletreeViewStateFromSession(
-  filetreeViewStateByWorktreeByWorkspace: ClientWorkspaceState['filetreeViewStateByWorktreeByWorkspace'],
+  filetreeViewStateByFilesystemTargetByWorkspace: ClientWorkspaceState['filetreeViewStateByFilesystemTargetByWorkspace'],
 ): void {
   useFiletreeInteractionStore
     .getState()
-    .restoreViewState(interactionByScopeFromSessionViewState(filetreeViewStateByWorktreeByWorkspace))
+    .restoreViewState(interactionByScopeFromSessionViewState(filetreeViewStateByFilesystemTargetByWorkspace))
 }
 
 function interactionByScopeFromSessionViewState(
-  filetreeViewStateByWorktreeByWorkspace: ClientWorkspaceState['filetreeViewStateByWorktreeByWorkspace'],
+  filetreeViewStateByFilesystemTargetByWorkspace: ClientWorkspaceState['filetreeViewStateByFilesystemTargetByWorkspace'],
 ): Record<string, FiletreeInteractionSnapshot> {
   const interactionByScope: Record<string, FiletreeInteractionSnapshot> = {}
-  for (const [workspaceIdInput, byWorktree] of Object.entries(filetreeViewStateByWorktreeByWorkspace)) {
+  for (const [workspaceIdInput, byFilesystemTarget] of Object.entries(filetreeViewStateByFilesystemTargetByWorkspace)) {
     const workspaceId = canonicalWorkspaceLocator(workspaceIdInput)
     if (!workspaceId) continue
-    for (const [worktreeId, viewState] of Object.entries(byWorktree)) {
-      if (!workspaceLocatorsShareTransport(workspaceId, worktreeId)) continue
-      const worktreePath = parseCanonicalWorkspaceLocator(worktreeId)?.path
-      if (!worktreePath) continue
-      interactionByScope[filetreeInteractionScopeKey(workspaceId, worktreePath)] = {
+    for (const [filesystemTargetId, viewState] of Object.entries(byFilesystemTarget)) {
+      if (!workspaceLocatorsShareTransport(workspaceId, filesystemTargetId)) continue
+      const filesystemTargetPath = parseCanonicalWorkspaceLocator(filesystemTargetId)?.path
+      if (!filesystemTargetPath) continue
+      interactionByScope[filetreeInteractionScopeKey(workspaceId, filesystemTargetPath)] = {
         selectedKeys: viewState.selectedKeys,
         expandedKeys: viewState.expandedKeys,
         topVisibleRowIndex: viewState.topVisibleRowIndex,

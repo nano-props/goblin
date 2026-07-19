@@ -232,7 +232,6 @@ export const ja: Record<DictKey, string> = {
   'dashboard.checks-failing': '{count} 件のチェック失敗',
   'tab.branches': 'ブランチ',
   'workspace.navigation-title': 'ワークスペース',
-  'tab.repo-workspace': 'リポジトリワークスペース',
   'tab.status': 'ステータス',
   'tab.changes': '変更',
   'tab.changes-with-count': '変更 · {count}件',

@@ -219,7 +219,6 @@ export const zh: Record<DictKey, string> = {
   'dashboard.checks-failing': '{count} 个检查失败',
   'tab.branches': '分支',
   'workspace.navigation-title': '工作区',
-  'tab.repo-workspace': '仓库工作区',
   'tab.status': '状态',
   'tab.changes': '变更',
   'tab.changes-with-count': '变更 · {count}个',

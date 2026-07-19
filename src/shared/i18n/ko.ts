@@ -225,7 +225,6 @@ export const ko: Record<DictKey, string> = {
   'dashboard.checks-failing': '실패한 체크 {count}개',
   'tab.branches': '브랜치',
   'workspace.navigation-title': '워크스페이스',
-  'tab.repo-workspace': '리포지토리 작업 공간',
   'tab.status': '상태',
   'tab.changes': '변경',
   'tab.changes-with-count': '변경 · {count}개',
