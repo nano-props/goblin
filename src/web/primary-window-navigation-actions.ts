@@ -37,7 +37,11 @@ export interface PrimaryWindowNavigationActions {
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   cycleWorkspace: (direction: 1 | -1) => void
   selectRepoBranch: (workspaceId: WorkspaceId, branch: string, options?: { replace?: boolean }) => boolean
-  showRepoBranchEmptyWorkspacePane: (workspaceId: WorkspaceId, branch: string, options?: { replace?: boolean }) => boolean
+  showRepoBranchEmptyWorkspacePane: (
+    workspaceId: WorkspaceId,
+    branch: string,
+    options?: { replace?: boolean },
+  ) => boolean
   showRepoBranchWorkspacePaneTab: (
     workspaceId: WorkspaceId,
     branch: string,
@@ -193,7 +197,7 @@ export function createPrimaryWindowNavigationActions({
     },
     showWorkspaceRootPaneTab(workspaceId, presentation, options) {
       const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
-      return routeNavigation.openWorkspaceRootPane(workspaceId, {
+      const navigationOptions = {
         ...options,
         presentationToken: token,
         onCommit: () => {
@@ -211,7 +215,10 @@ export function createPrimaryWindowNavigationActions({
           )
           options?.onCommit?.()
         },
-      })
+      }
+      return presentation.kind === 'terminal'
+        ? routeNavigation.openWorkspaceRootTerminal(workspaceId, presentation.terminalSessionId, navigationOptions)
+        : routeNavigation.openWorkspaceRootTab(workspaceId, presentation.tab, navigationOptions)
     },
     commitWorkspacePaneRoute(workspaceId, branch, route, options) {
       return commitWorkspacePaneRoute(routeNavigation, workspaceId, branch, route, options)

@@ -1,7 +1,8 @@
 import { useEffect, useMemo } from 'react'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import { canonicalWorkspaceLocator, type WorkspaceId, workspaceLocatorForPath } from '#/shared/workspace-locator.ts'
+import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
   useTerminalWorkspaceProjectionHydrationEntry,
@@ -20,7 +21,7 @@ export type WorkspacePaneRuntimeTabTargetKeyByType = Partial<Record<WorkspacePan
 export interface WorkspacePaneRuntimeTabTargetInput {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
-  worktreePath: string | null
+  filesystemTarget: WorkspacePaneFilesystemExecutionTarget | null
 }
 
 export interface WorkspacePaneRuntimeTabProviderProjection {
@@ -38,7 +39,7 @@ interface WorkspacePaneRuntimeTabSelectionSyncInput {
 
 export interface WorkspacePaneRuntimeTabProjectionProvider {
   type: WorkspacePaneRuntimeTabType
-  targetKey: (input: Pick<WorkspacePaneRuntimeTabTargetInput, 'workspaceId' | 'worktreePath'>) => string | null
+  targetKey: (input: WorkspacePaneRuntimeTabTargetInput) => string | null
   readProjection: (input: WorkspacePaneRuntimeTabTargetInput) => WorkspacePaneRuntimeTabProviderProjection
   useProjection: (input: WorkspacePaneRuntimeTabTargetInput) => WorkspacePaneRuntimeTabProviderProjection
   useSyncSelection: (
@@ -78,24 +79,22 @@ export function workspacePaneRuntimeTabProjectionProvider(
 
 export function workspacePaneRuntimeTabTargetKeyForType(
   type: WorkspacePaneRuntimeTabType,
-  input: Pick<WorkspacePaneRuntimeTabTargetInput, 'workspaceId' | 'worktreePath'>,
+  input: WorkspacePaneRuntimeTabTargetInput,
 ): string | null {
   return workspacePaneRuntimeTabProjectionProvider(type).targetKey(input)
 }
 
 export function workspacePaneRuntimeTabTargetKeyByType(
-  input: Pick<WorkspacePaneRuntimeTabTargetInput, 'workspaceId' | 'worktreePath'>,
+  input: WorkspacePaneRuntimeTabTargetInput,
 ): WorkspacePaneRuntimeTabTargetKeyByType {
   return Object.fromEntries(
     workspacePaneRuntimeTabProjectionProviders().map((provider) => [provider.type, provider.targetKey(input)]),
   ) as WorkspacePaneRuntimeTabTargetKeyByType
 }
 
-export function readWorkspacePaneRuntimeTabProviderProjections(input: {
-  workspaceId: WorkspaceId
-  workspaceRuntimeId: string
-  worktreePath: string | null
-}): WorkspacePaneRuntimeTabProviderProjection[] {
+export function readWorkspacePaneRuntimeTabProviderProjections(
+  input: WorkspacePaneRuntimeTabTargetInput,
+): WorkspacePaneRuntimeTabProviderProjection[] {
   return workspacePaneRuntimeTabProjectionProviders().map((provider) => provider.readProjection(input))
 }
 
@@ -118,22 +117,19 @@ export function useSyncWorkspacePaneRuntimeTabProviderSelection(
   workspacePaneRuntimeTabProjectionProvider('terminal').useSyncSelection(input, selectedSessionIdByRuntimeType)
 }
 
-function terminalRuntimeTabTargetKey(
-  input: Pick<WorkspacePaneRuntimeTabTargetInput, 'workspaceId' | 'worktreePath'>,
-): string | null {
+function terminalRuntimeTabTargetKey(input: WorkspacePaneRuntimeTabTargetInput): string | null {
   const workspaceId = canonicalWorkspaceLocator(input.workspaceId)
-  const worktreeId =
-    input.worktreePath && workspaceId
-      ? (canonicalWorkspaceLocator(input.worktreePath) ?? workspaceLocatorForPath(workspaceId, input.worktreePath))
-      : null
+  const target = input.filesystemTarget
+  if (!target || target.workspaceId !== input.workspaceId || target.workspaceRuntimeId !== input.workspaceRuntimeId) {
+    return null
+  }
+  const worktreeId = canonicalWorkspaceLocator(target.kind === 'workspace-root' ? target.workspaceId : target.root)
   return workspaceId && worktreeId ? formatTerminalWorktreeKey(workspaceId, worktreeId) : null
 }
 
-function readTerminalRuntimeTabProviderProjection(input: {
-  workspaceId: WorkspaceId
-  workspaceRuntimeId: string
-  worktreePath: string | null
-}): WorkspacePaneRuntimeTabProviderProjection {
+function readTerminalRuntimeTabProviderProjection(
+  input: WorkspacePaneRuntimeTabTargetInput,
+): WorkspacePaneRuntimeTabProviderProjection {
   const targetKey = terminalRuntimeTabTargetKey(input)
   const snapshot = targetKey ? (readTerminalSessionCommandBridge()?.terminalWorktreeSnapshot(targetKey) ?? null) : null
   const selectedSessionId = targetKey ? readTerminalSelectedSessionId(targetKey) : null
@@ -156,12 +152,11 @@ function readTerminalSelectedSessionId(terminalWorktreeKey: string): string | nu
   return useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] ?? null
 }
 
-function useTerminalRuntimeTabProviderProjection({
-  workspaceId,
-  workspaceRuntimeId,
-  worktreePath,
-}: WorkspacePaneRuntimeTabTargetInput): WorkspacePaneRuntimeTabProviderProjection {
-  const targetKey = terminalRuntimeTabTargetKey({ workspaceId, worktreePath })
+function useTerminalRuntimeTabProviderProjection(
+  input: WorkspacePaneRuntimeTabTargetInput,
+): WorkspacePaneRuntimeTabProviderProjection {
+  const { workspaceId, workspaceRuntimeId } = input
+  const targetKey = terminalRuntimeTabTargetKey(input)
   const terminalSessionSummaries = useTerminalSessionSummaries(targetKey)
   const terminalCreatePending = useTerminalWorktreeCreatePending(targetKey)
   const terminalProjectionHydration = useTerminalWorkspaceProjectionHydrationEntry(workspaceId)

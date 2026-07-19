@@ -1,5 +1,6 @@
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspacePaneRuntimeTabStateInput } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
@@ -21,7 +22,7 @@ export interface WorkspacePaneRuntimeTabTargetProjectionInput {
 export function readWorkspacePaneRuntimeTabTargetProjection(input: {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
-  worktreePath: string | null
+  filesystemTarget: WorkspacePaneFilesystemExecutionTarget | null
 }): WorkspacePaneRuntimeTabTargetProjection {
   return workspacePaneRuntimeTabTargetProjection({
     providers: readWorkspacePaneRuntimeTabProviderProjections(input),

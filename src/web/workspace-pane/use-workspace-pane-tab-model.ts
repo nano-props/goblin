@@ -25,6 +25,10 @@ import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs
 import type { GitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { GitHead } from '#/shared/git-head.ts'
+import {
+  gitWorktreeFilesystemExecutionTarget,
+  workspaceRootFilesystemExecutionTarget,
+} from '#/shared/workspace-runtime.ts'
 
 export interface WorkspacePaneModelWorkspace {
   id: WorkspaceId
@@ -60,7 +64,9 @@ export function useGitWorkspacePaneTabModelInput(
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: gitWorkspace.id,
     workspaceRuntimeId: gitWorkspace.workspaceRuntimeId,
-    worktreePath,
+    filesystemTarget: worktreePath
+      ? gitWorktreeFilesystemExecutionTarget(gitWorkspace.id, gitWorkspace.workspaceRuntimeId, worktreePath)
+      : null,
   })
   const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(gitWorkspace.id, gitWorkspace.workspaceRuntimeId)
   const requestedSessionIdByRuntimeType = useMemo(
@@ -124,11 +130,15 @@ export function useGitWorkspacePaneTabModelInput(
   return input
 }
 
-export function useWorkspaceRootTabModel(workspace: WorkspacePaneModelWorkspace): WorkspacePaneTabModel {
+export function useWorkspaceRootTabModel(
+  workspace: WorkspacePaneModelWorkspace,
+  requestedTab: WorkspacePaneTabType | null = null,
+  requestedSessionId: string | null = null,
+): WorkspacePaneTabModel {
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: workspace.id,
     workspaceRuntimeId: workspace.workspaceRuntimeId,
-    worktreePath: workspace.id,
+    filesystemTarget: workspaceRootFilesystemExecutionTarget(workspace.id, workspace.workspaceRuntimeId),
   })
   const tabsQuery = useWorkspacePaneTabsQuery(workspace.id, workspace.workspaceRuntimeId)
   const target = useMemo(() => ({ kind: 'workspace-root' as const, workspaceId: workspace.id }), [workspace.id])
@@ -136,8 +146,11 @@ export function useWorkspaceRootTabModel(workspace: WorkspacePaneModelWorkspace)
     () => workspacePaneTabsForTargetFromQueryData(tabsQuery.data ?? { revision: 0, entries: [] }, target),
     [tabsQuery.data, target],
   )
-  const preferredTab =
-    tabEntries.length > 0 ? (preferredWorkspacePaneTabForTarget(workspace.ui, target) ?? tabEntries[0]!.type) : null
+  const preferredTab = requestedTab
+    ? requestedTab
+    : tabEntries.length > 0
+      ? (preferredWorkspacePaneTabForTarget(workspace.ui, target) ?? tabEntries[0]!.type)
+      : null
   const input = useMemo<WorkspacePaneTabModelInput>(
     () => ({
       workspaceId: workspace.id,
@@ -148,9 +161,11 @@ export function useWorkspaceRootTabModel(workspace: WorkspacePaneModelWorkspace)
       tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(tabsQuery.status),
       runtimeTabViews: runtimeProjection.runtimeTabViews,
       runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
+      requestedSessionIdByRuntimeType: requestedSessionId ? { terminal: requestedSessionId } : undefined,
     }),
     [
       preferredTab,
+      requestedSessionId,
       workspace.id,
       workspace.workspaceRuntimeId,
       runtimeProjection.runtimeTabStateByType,
@@ -174,7 +189,11 @@ export function useGitWorktreeWorkspacePaneTabModel(
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: target.workspaceId,
     workspaceRuntimeId: workspaceRuntime.workspaceRuntimeId,
-    worktreePath: target.worktreePath,
+    filesystemTarget: gitWorktreeFilesystemExecutionTarget(
+      target.workspaceId,
+      workspaceRuntime.workspaceRuntimeId,
+      target.worktreePath,
+    ),
   })
   const tabsQuery = useWorkspacePaneTabsQuery(target.workspaceId, workspaceRuntime.workspaceRuntimeId)
   const tabEntries = useMemo(

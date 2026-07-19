@@ -30,6 +30,16 @@ export interface PrimaryWindowRouteNavigation {
   closeSettings: (options?: PrimaryWindowRouteNavigationOptions) => void
   openWorkspaceNavigator: (workspaceId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => void
   openWorkspaceRootPane: (workspaceId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => boolean
+  openWorkspaceRootTab: (
+    workspaceId: WorkspaceId,
+    tab: WorkspacePaneStaticTabType,
+    options?: PrimaryWindowRouteNavigationOptions,
+  ) => boolean
+  openWorkspaceRootTerminal: (
+    workspaceId: WorkspaceId,
+    terminalSessionId: string,
+    options?: PrimaryWindowRouteNavigationOptions,
+  ) => boolean
   openWorkspaceDashboard: (workspaceId: WorkspaceId, options?: PrimaryWindowRouteNavigationOptions) => void
   openRepoBranch: (
     workspaceId: WorkspaceId,
@@ -201,6 +211,49 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
             await router.navigate({
               to: '/workspace/$workspaceSlug/root',
               params: { workspaceSlug },
+              state: (state) => primaryWindowNavigationState(state, navigationId),
+            })
+          },
+        })
+      },
+      openWorkspaceRootTab(workspaceId, tab, options) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
+        if (!workspaceSlug || !router) return false
+        const params = { workspaceSlug, tabKey: tab }
+        const target = router.buildLocation({ to: '/workspace/$workspaceSlug/root/tab/$tabKey', params })
+        return runOwnedPrimaryWindowNavigation({
+          token: options?.presentationToken,
+          commitEffect: options?.onCommit,
+          targetHref: target.href,
+          currentHref: () => router.state.location.href,
+          navigate: async (navigationId) => {
+            await router.navigate({
+              to: '/workspace/$workspaceSlug/root/tab/$tabKey',
+              params,
+              replace: options?.replace,
+              state: (state) => primaryWindowNavigationState(state, navigationId),
+            })
+          },
+        })
+      },
+      openWorkspaceRootTerminal(workspaceId, terminalSessionId, options) {
+        const workspaceSlug = workspaceSlugForId(workspaceId)
+        if (!workspaceSlug || !router) return false
+        const params = { workspaceSlug, terminalSessionId }
+        const target = router.buildLocation({
+          to: '/workspace/$workspaceSlug/root/terminal/$terminalSessionId',
+          params,
+        })
+        return runOwnedPrimaryWindowNavigation({
+          token: options?.presentationToken,
+          commitEffect: options?.onCommit,
+          targetHref: target.href,
+          currentHref: () => router.state.location.href,
+          navigate: async (navigationId) => {
+            await router.navigate({
+              to: '/workspace/$workspaceSlug/root/terminal/$terminalSessionId',
+              params,
+              replace: options?.replace,
               state: (state) => primaryWindowNavigationState(state, navigationId),
             })
           },

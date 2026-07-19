@@ -87,6 +87,13 @@ export function workspacePaneFilesystemExecutionPath(target: WorkspacePaneFilesy
   return locator.path
 }
 
+export function workspaceRootFilesystemExecutionTarget(
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+): WorkspacePaneFilesystemExecutionTarget {
+  return { kind: 'workspace-root', workspaceId, workspaceRuntimeId }
+}
+
 export function gitWorktreeFilesystemExecutionTarget(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,

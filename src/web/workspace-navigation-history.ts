@@ -19,7 +19,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type WorkspaceNavigationRouteContext =
   | { kind: 'empty'; workspaceId: WorkspaceId }
-  | { kind: 'workspace-root'; workspaceId: WorkspaceId }
+  | { kind: 'workspace-root'; workspaceId: WorkspaceId; workspacePaneRoute: WorkspacePaneRoute | null }
   | { kind: 'dashboard'; workspaceId: WorkspaceId }
   | { kind: 'newWorktree'; workspaceId: WorkspaceId; returnTo: string | null }
   | { kind: 'worktree'; workspaceId: WorkspaceId; worktreePath: string; workspacePaneRoute: WorkspacePaneRoute | null }
@@ -136,7 +136,13 @@ function useWorkspaceNavigationHistoryEntry(
 }
 
 type WorkspaceNavigationHistoryRouteSnapshot =
-  | { workspaceId: WorkspaceId; kind: 'empty' | 'workspace-root' | 'dashboard' }
+  | { workspaceId: WorkspaceId; kind: 'empty' | 'dashboard' }
+  | {
+      workspaceId: WorkspaceId
+      kind: 'workspace-root'
+      workspacePaneTab: WorkspacePaneTabType | null
+      terminalSessionId: string | null
+    }
   | { workspaceId: WorkspaceId; kind: 'newWorktree'; returnTo: string | null }
   | {
       workspaceId: WorkspaceId
@@ -165,7 +171,20 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
     case 'empty':
       return { workspaceId, kind: 'empty' }
     case 'workspace-root':
-      return { workspaceId, kind: 'workspace-root' }
+      return {
+        workspaceId,
+        kind: 'workspace-root',
+        workspacePaneTab:
+          routeContext.workspacePaneRoute?.kind === 'terminal'
+            ? 'terminal'
+            : routeContext.workspacePaneRoute?.kind === 'static'
+              ? routeContext.workspacePaneRoute.tab
+              : null,
+        terminalSessionId:
+          routeContext.workspacePaneRoute?.kind === 'terminal'
+            ? routeContext.workspacePaneRoute.terminalSessionId
+            : null,
+      }
     case 'dashboard':
       return { workspaceId, kind: 'dashboard' }
     case 'newWorktree':
@@ -207,9 +226,17 @@ function workspaceNavigationHistoryEntryFromSnapshot(
   if (!snapshot) return null
   switch (snapshot.kind) {
     case 'empty':
-    case 'workspace-root':
     case 'dashboard':
       return { workspaceId: snapshot.workspaceId, route: { kind: snapshot.kind } }
+    case 'workspace-root':
+      return {
+        workspaceId: snapshot.workspaceId,
+        route: {
+          kind: 'workspace-root',
+          workspacePaneTab: snapshot.workspacePaneTab,
+          terminalSessionId: snapshot.terminalSessionId,
+        },
+      }
     case 'newWorktree':
       return { workspaceId: snapshot.workspaceId, route: { kind: 'newWorktree', returnTo: snapshot.returnTo } }
     case 'worktree':
@@ -251,6 +278,9 @@ function workspaceNavigationHistoryRouteSnapshotEqual(
       a.terminalSessionId === b.terminalSessionId
     )
   }
+  if (a.kind === 'workspace-root' && b.kind === 'workspace-root') {
+    return a.workspacePaneTab === b.workspacePaneTab && a.terminalSessionId === b.terminalSessionId
+  }
   if (a.kind !== 'branch' || b.kind !== 'branch') return true
   return (
     a.branchName === b.branchName &&
@@ -271,6 +301,16 @@ export function restoreWorkspaceNavigationEntry(
       routeNavigation.openWorkspaceNavigator(entry.workspaceId, options)
       return { kind: 'accepted' }
     case 'workspace-root':
+      if (entry.route.workspacePaneTab === 'terminal' && entry.route.terminalSessionId) {
+        return routeNavigation.openWorkspaceRootTerminal(entry.workspaceId, entry.route.terminalSessionId, options)
+          ? { kind: 'accepted' }
+          : { kind: 'unavailable' }
+      }
+      if (entry.route.workspacePaneTab && entry.route.workspacePaneTab !== 'terminal') {
+        return routeNavigation.openWorkspaceRootTab(entry.workspaceId, entry.route.workspacePaneTab, options)
+          ? { kind: 'accepted' }
+          : { kind: 'unavailable' }
+      }
       return routeNavigation.openWorkspaceRootPane(entry.workspaceId, options)
         ? { kind: 'accepted' }
         : { kind: 'unavailable' }

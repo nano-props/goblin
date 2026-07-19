@@ -30,7 +30,7 @@ interface AppProps {
 
 export type WorkspaceRouteView =
   | { kind: 'empty'; workspaceId: WorkspaceId }
-  | { kind: 'workspace-root'; workspaceId: WorkspaceId }
+  | { kind: 'workspace-root'; workspaceId: WorkspaceId; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
   | {
       kind: 'worktree'
       workspaceId: WorkspaceId

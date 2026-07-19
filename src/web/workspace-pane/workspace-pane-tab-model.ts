@@ -37,6 +37,10 @@ import {
 } from '#/web/workspace-pane/tab-providers.ts'
 import { workspacePaneRuntimeTabTargetKey } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-key.ts'
 import {
+  gitWorktreeFilesystemExecutionTarget,
+  workspaceRootFilesystemExecutionTarget,
+} from '#/shared/workspace-runtime.ts'
+import {
   workspacePaneRuntimeTabTargetKeyByType,
   type WorkspacePaneRuntimeTabTargetKeyByType,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
@@ -169,6 +173,16 @@ export interface WorkspacePaneTabModelInput {
 
 export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): WorkspacePaneTabModel {
   const worktreePath = paneTargetFilesystemPath(input.paneTarget)
+  const filesystemTarget =
+    input.paneTarget.kind === 'workspace-root'
+      ? workspaceRootFilesystemExecutionTarget(input.workspaceId, input.workspaceRuntimeId)
+      : input.paneTarget.kind === 'git-worktree'
+        ? gitWorktreeFilesystemExecutionTarget(
+            input.workspaceId,
+            input.workspaceRuntimeId,
+            input.paneTarget.worktreePath,
+          )
+        : null
   const branchName = paneTargetPresentationBranch(input.paneTarget, input.worktreeHead)
   const normalizedTabEntries =
     input.paneTarget.kind === 'inactive'
@@ -182,9 +196,14 @@ export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): 
       : normalizedTabEntries
   const runtimeTabTargetKeyByType = workspacePaneRuntimeTabTargetKeyByType({
     workspaceId: input.workspaceId,
-    worktreePath,
+    workspaceRuntimeId: input.workspaceRuntimeId,
+    filesystemTarget,
   })
-  const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ workspaceId: input.workspaceId, worktreePath })
+  const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({
+    workspaceId: input.workspaceId,
+    workspaceRuntimeId: input.workspaceRuntimeId,
+    filesystemTarget,
+  })
   const hasWorktree = !!worktreePath
   const runtimeTabStateByType = runtimeTabStateByTypeFromInput(input)
   const runtimeViews = input.runtimeTabViews.filter((view) => !!runtimeTabTargetKeyByType[view.type])

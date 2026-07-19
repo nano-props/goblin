@@ -58,6 +58,16 @@ const workspaceRootRoute = createRoute({
   path: 'root',
 })
 
+const workspaceRootTabRoute = createRoute({
+  getParentRoute: () => workspaceRootRoute,
+  path: 'tab/$tabKey',
+})
+
+const workspaceRootTerminalRoute = createRoute({
+  getParentRoute: () => workspaceRootRoute,
+  path: 'terminal/$terminalSessionId',
+})
+
 const gitBranchRoute = createRoute({
   getParentRoute: () => workspaceRoute,
   path: 'branch/$branchSlug',
@@ -145,6 +155,8 @@ function WorkspaceRoute() {
   const { workspaceSlug } = workspaceRoute.useParams()
   const dashboardMatch = useMatch({ from: workspaceDashboardRoute.id, shouldThrow: false })
   const workspaceMatch = useMatch({ from: workspaceRootRoute.id, shouldThrow: false })
+  const workspaceTabMatch = useMatch({ from: workspaceRootTabRoute.id, shouldThrow: false })
+  const workspaceTerminalMatch = useMatch({ from: workspaceRootTerminalRoute.id, shouldThrow: false })
   const branchMatch = useMatch({ from: gitBranchRoute.id, shouldThrow: false })
   const branchTabMatch = useMatch({ from: gitBranchTabRoute.id, shouldThrow: false })
   const branchTerminalMatch = useMatch({ from: gitBranchTerminalRoute.id, shouldThrow: false })
@@ -164,6 +176,8 @@ function WorkspaceRoute() {
   const routeWorkspaceView = workspaceRouteViewFromSlugChildRoute(workspaceSlug, {
     dashboard: !!dashboardMatch,
     workspace: !!workspaceMatch,
+    workspaceTabKey: workspaceTabMatch?.params.tabKey ?? null,
+    workspaceTerminalSessionId: workspaceTerminalMatch?.params.terminalSessionId ?? null,
     branchSlug: branchMatch?.params.branchSlug ?? null,
     tabKey: branchTabMatch?.params.tabKey ?? null,
     terminalSessionId: branchTerminalMatch?.params.terminalSessionId ?? null,
@@ -184,6 +198,8 @@ export function workspaceRouteViewFromSlugChildRoute(
   childRoute: {
     dashboard: boolean
     workspace?: boolean
+    workspaceTabKey?: string | null
+    workspaceTerminalSessionId?: string | null
     branchSlug: string | null
     tabKey?: string | null
     terminalSessionId?: string | null
@@ -202,6 +218,8 @@ export function workspaceRouteViewFromChildRoute(
   childRoute: {
     dashboard: boolean
     workspace?: boolean
+    workspaceTabKey?: string | null
+    workspaceTerminalSessionId?: string | null
     branchSlug: string | null
     tabKey?: string | null
     terminalSessionId?: string | null
@@ -252,7 +270,19 @@ export function workspaceRouteViewFromChildRoute(
   }
   if (childRoute.newWorktree) return { kind: 'newWorktree', workspaceId }
   if (childRoute.dashboard) return { kind: 'dashboard', workspaceId }
-  if (childRoute.workspace) return { kind: 'workspace-root', workspaceId }
+  if (childRoute.workspace) {
+    return {
+      kind: 'workspace-root',
+      workspaceId,
+      workspacePaneRoute: childRoute.workspaceTerminalSessionId
+        ? { kind: 'terminal', terminalSessionId: childRoute.workspaceTerminalSessionId }
+        : childRoute.workspaceTabKey
+          ? isWorkspacePaneStaticTabType(childRoute.workspaceTabKey)
+            ? { kind: 'static', tab: childRoute.workspaceTabKey }
+            : { kind: 'invalid-static', tabKey: childRoute.workspaceTabKey }
+          : null,
+    }
+  }
   return { kind: 'empty', workspaceId }
 }
 
@@ -302,7 +332,7 @@ const primaryWindowRouteTree = rootRoute.addChildren([
     indexRoute,
     workspaceRoute.addChildren([
       workspaceDashboardRoute,
-      workspaceRootRoute,
+      workspaceRootRoute.addChildren([workspaceRootTabRoute, workspaceRootTerminalRoute]),
       gitBranchRoute.addChildren([gitBranchIndexRoute, gitBranchTabRoute, gitBranchTerminalRoute]),
       gitWorktreeRoute.addChildren([gitWorktreeTerminalRoute, gitWorktreeTabRoute]),
       gitWorktreeNewRoute,

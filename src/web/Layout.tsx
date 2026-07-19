@@ -160,7 +160,10 @@ function AuthenticatedWorkspaceShell() {
     hydratedRouteWorkspaceId ? s.workspaces[hydratedRouteWorkspaceId] : undefined,
   )
   const currentBranchName = routeContext?.kind === 'branch' ? (routeContext.branchName ?? null) : null
-  const currentWorkspacePaneRoute = routeContext?.kind === 'branch' ? (routeContext.workspacePaneRoute ?? null) : null
+  const currentWorkspacePaneRoute =
+    routeContext?.kind === 'branch' || routeContext?.kind === 'workspace-root'
+      ? (routeContext.workspacePaneRoute ?? null)
+      : null
   const commandCapabilities =
     commandWorkspace?.capability.kind === 'git' || commandWorkspace?.capability.kind === 'filesystem'
       ? commandWorkspace.capability.probe.capabilities
@@ -206,7 +209,7 @@ function AuthenticatedWorkspaceShell() {
         : routeContext?.kind === 'workspace-root' && commandWorkspace && commandCapabilities
           ? {
               kind: 'workspace-root',
-              workspacePaneRoute: null,
+              workspacePaneRoute: routeContext.workspacePaneRoute ?? null,
               filesystemTarget: workspaceRootPaneFilesystemTarget({
                 workspaceId: commandWorkspace.id,
                 workspaceRuntimeId: commandWorkspace.workspaceRuntimeId,
@@ -337,7 +340,8 @@ function WorkspaceSessionRestoreError({
 }
 
 type WorkspaceRouteContext =
-  | { kind: 'empty' | 'workspace-root' | 'dashboard' | 'newWorktree'; workspaceSlug: string }
+  | { kind: 'empty' | 'dashboard' | 'newWorktree'; workspaceSlug: string }
+  | { kind: 'workspace-root'; workspaceSlug: string; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
   | { kind: 'branch'; workspaceSlug: string; branchName: string; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
   | {
       kind: 'worktree'
@@ -378,7 +382,9 @@ export function workspaceRouteContextFromMatches(
 
   if (workspaceMatch.routeId.includes('/worktree/new')) return { kind: 'newWorktree', workspaceSlug }
   if (workspaceMatch.routeId.includes('/dashboard')) return { kind: 'dashboard', workspaceSlug }
-  if (workspaceMatch.routeId.includes('/root')) return { kind: 'workspace-root', workspaceSlug }
+  if (workspaceMatch.routeId.includes('/root')) {
+    return { kind: 'workspace-root', workspaceSlug, workspacePaneRoute: workspacePaneRouteFromMatches(matches) }
+  }
   return { kind: 'empty', workspaceSlug }
 }
 
@@ -545,6 +551,14 @@ function workspaceNavigationRouteContext(
   }
   if (routeContext.kind === 'newWorktree') {
     return { kind: 'newWorktree', workspaceId, returnTo: returnToFromHref(routeHref) }
+  }
+  if (routeContext.kind === 'workspace-root') {
+    return {
+      kind: 'workspace-root',
+      workspaceId,
+      workspacePaneRoute:
+        routeContext.workspacePaneRoute?.kind === 'invalid-static' ? null : (routeContext.workspacePaneRoute ?? null),
+    }
   }
   return { kind: routeContext.kind, workspaceId }
 }

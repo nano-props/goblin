@@ -11,6 +11,7 @@ import { workspacePaneRuntimeTabProjectionProviders } from '#/web/workspace-pane
 import { WORKSPACE_PANE_RUNTIME_TAB_TYPES } from '#/shared/workspace-pane.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///repo')
 const WORKTREE_PATH = '/repo-worktree'
@@ -101,7 +102,7 @@ describe('workspace pane runtime tab target projection', () => {
     const projection = readWorkspacePaneRuntimeTabTargetProjection({
       workspaceId: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-1',
-      worktreePath: WORKTREE_PATH,
+      filesystemTarget: gitWorktreeFilesystemExecutionTarget(REPO_ID, 'repo-runtime-1', WORKTREE_PATH),
     })
 
     expect(terminalWorktreeSnapshot).toHaveBeenCalledWith(terminalWorktreeKey)
@@ -137,15 +138,48 @@ describe('workspace pane runtime tab target projection', () => {
     const projection = readWorkspacePaneRuntimeTabTargetProjection({
       workspaceId: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-1',
-      worktreePath: WORKTREE_PATH,
+      filesystemTarget: gitWorktreeFilesystemExecutionTarget(REPO_ID, 'repo-runtime-1', WORKTREE_PATH),
     })
 
     expect(projection.runtimeTabStateByType.terminal.selectedSessionId).toBe('term-222222222222222222222')
   })
 
   test('formats the current runtime target key', () => {
-    expect(workspacePaneRuntimeTabTargetKey({ workspaceId: REPO_ID, worktreePath: WORKTREE_PATH })).toBe(WORKTREE_KEY)
-    expect(workspacePaneRuntimeTabTargetKey({ workspaceId: REPO_ID, worktreePath: null })).toBeNull()
+    expect(
+      workspacePaneRuntimeTabTargetKey({
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: 'repo-runtime-1',
+        filesystemTarget: gitWorktreeFilesystemExecutionTarget(REPO_ID, 'repo-runtime-1', WORKTREE_PATH),
+      }),
+    ).toBe(WORKTREE_KEY)
+    expect(
+      workspacePaneRuntimeTabTargetKey({
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: 'repo-runtime-1',
+        filesystemTarget: { kind: 'workspace-root', workspaceId: REPO_ID, workspaceRuntimeId: 'repo-runtime-1' },
+      }),
+    ).toBe(formatTerminalWorktreeKeyForPath(REPO_ID, REPO_ID))
+    expect(
+      workspacePaneRuntimeTabTargetKey({
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: 'repo-runtime-1',
+        filesystemTarget: null,
+      }),
+    ).toBeNull()
+  })
+
+  test('rejects a filesystem target owned by a different runtime', () => {
+    expect(
+      workspacePaneRuntimeTabTargetKey({
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: 'repo-runtime-current',
+        filesystemTarget: {
+          kind: 'workspace-root',
+          workspaceId: REPO_ID,
+          workspaceRuntimeId: 'repo-runtime-stale',
+        },
+      }),
+    ).toBeNull()
   })
 })
 

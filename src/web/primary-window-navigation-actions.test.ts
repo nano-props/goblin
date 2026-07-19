@@ -51,8 +51,9 @@ describe('createPrimaryWindowNavigationActions', () => {
     })
 
     expect(actions.showWorkspaceRootPaneTab?.(REPO_ID, { kind: 'static', tab: 'files' })).toBe(true)
-    expect(navigation.openWorkspaceRootPane).toHaveBeenCalledWith(
+    expect(navigation.openWorkspaceRootTab).toHaveBeenCalledWith(
       REPO_ID,
+      'files',
       expect.objectContaining({ presentationToken: expect.any(Object), onCommit: expect.any(Function) }),
     )
     expect(
@@ -77,7 +78,7 @@ describe('createPrimaryWindowNavigationActions', () => {
         .getState()
         .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
       const navigation = routeNavigation()
-      vi.mocked(navigation.openWorkspaceRootPane).mockImplementation((_repoId, options) => {
+      vi.mocked(navigation.openWorkspaceRootTerminal).mockImplementation((_repoId, _sessionId, options) => {
         if (accepted && commit) options?.onCommit?.()
         return accepted
       })
@@ -139,7 +140,10 @@ describe('createPrimaryWindowNavigationActions', () => {
     (kind) => {
       seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
       markRepoGitUnavailable(REPO_ID)
-      useWorkspacesStore.getState().recordWorkspaceNavigation({ workspaceId: REPO_ID, route: { kind } })
+      useWorkspacesStore.getState().recordWorkspaceNavigation({
+        workspaceId: REPO_ID,
+        route: kind === 'workspace-root' ? { kind, workspacePaneTab: null, terminalSessionId: null } : { kind },
+      })
       const navigation = routeNavigation()
       const actions = createPrimaryWindowNavigationActions({
         currentWorkspaceId: OTHER_WORKSPACE_ID,
@@ -157,6 +161,40 @@ describe('createPrimaryWindowNavigationActions', () => {
         expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
         expect(navigation.openWorkspaceRootPane).not.toHaveBeenCalled()
       }
+    },
+  )
+
+  test.each([['files', null] as const, ['terminal', 'term-111111111111111111111'] as const])(
+    'restores the workspace-root %s presentation when switching workspaces',
+    (tab, terminalSessionId) => {
+      seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+      markRepoGitUnavailable(REPO_ID)
+      useWorkspacesStore.getState().recordWorkspaceNavigation({
+        workspaceId: REPO_ID,
+        route: { kind: 'workspace-root', workspacePaneTab: tab, terminalSessionId },
+      })
+      const navigation = routeNavigation()
+      const actions = createPrimaryWindowNavigationActions({
+        currentWorkspaceId: OTHER_WORKSPACE_ID,
+        workspaceOrder: [OTHER_WORKSPACE_ID, REPO_ID],
+        closeWorkspace: vi.fn(),
+        routeNavigation: navigation,
+      })
+
+      actions.activateWorkspace(REPO_ID)
+
+      if (tab === 'terminal') {
+        expect(navigation.openWorkspaceRootTerminal).toHaveBeenCalledWith(
+          REPO_ID,
+          terminalSessionId,
+          presentationOptions(),
+        )
+        expect(navigation.openWorkspaceRootTab).not.toHaveBeenCalled()
+      } else {
+        expect(navigation.openWorkspaceRootTab).toHaveBeenCalledWith(REPO_ID, tab, presentationOptions())
+        expect(navigation.openWorkspaceRootTerminal).not.toHaveBeenCalled()
+      }
+      expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
     },
   )
 
@@ -676,7 +714,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     const currentWorkspaceId = workspaceIdForTest('goblin+file:///tmp/workspace-a')
     useWorkspacesStore.getState().recordWorkspaceNavigation({
       workspaceId: workspaceId,
-      route: { kind: 'workspace-root' },
+      route: { kind: 'workspace-root', workspacePaneTab: null, terminalSessionId: null },
     })
     const navigation = routeNavigation()
     vi.mocked(navigation.openWorkspaceRootPane).mockReturnValue(false)
@@ -1178,6 +1216,14 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
     openWorkspaceNavigator: vi.fn(),
     openWorkspaceDashboard: vi.fn(),
     openWorkspaceRootPane: vi.fn((_repoId, options) => {
+      options?.onCommit?.()
+      return true
+    }),
+    openWorkspaceRootTab: vi.fn((_workspaceId, _tab, options) => {
+      options?.onCommit?.()
+      return true
+    }),
+    openWorkspaceRootTerminal: vi.fn((_workspaceId, _terminalSessionId, options) => {
       options?.onCommit?.()
       return true
     }),

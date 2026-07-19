@@ -136,17 +136,16 @@ function WorkspaceMenuContent({
                       selected={selected}
                       onClick={() => onSelectWorkspace(workspace.id)}
                       aria-current={selected ? 'true' : undefined}
-                      leading={
-                        selected ? (
-                          <Check size={13} aria-hidden />
-                        ) : (
-                          <WorkspaceIcon size={13} className="text-muted-foreground" aria-hidden />
-                        )
-                      }
+                      leading={<WorkspaceIcon size={13} className="text-muted-foreground" aria-hidden />}
                       contentClassName="whitespace-normal"
                       trailing={
-                        (workspace.terminalBellCount ?? 0) > 0 ? (
-                          <TerminalBellBadge count={workspace.terminalBellCount ?? 0} />
+                        selected || (workspace.terminalBellCount ?? 0) > 0 ? (
+                          <div className="flex items-center gap-1.5">
+                            {(workspace.terminalBellCount ?? 0) > 0 ? (
+                              <TerminalBellBadge count={workspace.terminalBellCount ?? 0} />
+                            ) : null}
+                            {selected ? <Check size={13} aria-hidden /> : null}
+                          </div>
                         ) : null
                       }
                     >

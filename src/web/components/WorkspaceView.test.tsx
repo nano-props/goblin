@@ -66,7 +66,9 @@ vi.mock('#/web/components/workspace-pane/WorkspacePane.tsx', () => ({
   }: {
     currentBranchName?: string | null
     workspacePaneRouteContext?:
-      { kind: 'workspace-root' } | { kind: 'routed'; route: { kind: string } | null } | { kind: 'inactive' }
+      | { kind: 'workspace-root'; route: { kind: string } | null }
+      | { kind: 'routed'; route: { kind: string } | null }
+      | { kind: 'inactive' }
     shortcutsEnabled?: boolean
     toolbarTrafficLightOffset?: boolean
   }) => (
@@ -76,6 +78,8 @@ vi.mock('#/web/components/workspace-pane/WorkspacePane.tsx', () => ({
       data-workspace-pane-route-kind={
         workspacePaneRouteContext?.kind === 'routed'
           ? (workspacePaneRouteContext.route?.kind ?? 'bare')
+          : workspacePaneRouteContext?.kind === 'workspace-root'
+            ? (workspacePaneRouteContext.route?.kind ?? 'workspace-root')
           : (workspacePaneRouteContext?.kind ?? 'inactive')
       }
       data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
@@ -299,7 +303,10 @@ describe('WorkspaceView workspace navigation', () => {
     setWorkspaceProbeForTest(REPO_ID, filesystemWorkspaceProbe())
 
     const { container } = render(
-      <WorkspaceView workspaceId={REPO_ID} routeView={{ kind: 'workspace-root', workspaceId: REPO_ID }} />,
+      <WorkspaceView
+        workspaceId={REPO_ID}
+        routeView={{ kind: 'workspace-root', workspaceId: REPO_ID, workspacePaneRoute: null }}
+      />,
     )
 
     expect(workspacePane(container)?.dataset.currentBranchName).toBe('')

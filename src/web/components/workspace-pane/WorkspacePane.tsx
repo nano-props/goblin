@@ -51,7 +51,7 @@ import type { WorktreeStatus } from '#/web/types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type WorkspacePaneRouteContext =
-  | { kind: 'workspace-root' }
+  | { kind: 'workspace-root'; route: ParsedWorkspacePaneRoute | null }
   | { kind: 'git-worktree'; worktreePath: string; route: ParsedWorkspacePaneRoute | null }
   | { kind: 'routed'; route: ParsedWorkspacePaneRoute | null }
   | { kind: 'inactive' }
@@ -187,6 +187,7 @@ function WorkspacePaneLoaded(props: {
           probe: props.workspaceShell.capability.probe,
         }}
         workspacePaneId={props.workspacePaneId}
+        route={props.workspacePaneRouteContext.kind === 'workspace-root' ? props.workspacePaneRouteContext.route : null}
         toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
         onBackToNavigator={props.onBackToBranchNavigator}
       />
@@ -462,16 +463,20 @@ function GitWorkspacePaneLoaded({
 function WorkspaceRootPane({
   workspace,
   workspacePaneId,
+  route,
   toolbarTrafficLightOffset,
   onBackToNavigator,
 }: {
   workspace: FilesystemWorkspacePaneProjection
   workspacePaneId: string
+  route: ParsedWorkspacePaneRoute | null
   toolbarTrafficLightOffset: boolean
   onBackToNavigator?: () => void
 }) {
   const t = useT()
-  const model = useWorkspaceRootTabModel(workspace)
+  const requestedTab = route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
+  const requestedSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
+  const model = useWorkspaceRootTabModel(workspace, requestedTab, requestedSessionId)
   const target = { kind: 'workspace-root' as const, workspaceId: workspace.id }
   const runtimeTarget = runtimeWorkspacePaneTarget(target, workspace.workspaceRuntimeId)
   const terminalAvailable = workspace.probe.capabilities.terminal.available
@@ -496,7 +501,7 @@ function WorkspaceRootPane({
         target={surfaceTarget}
         model={model}
         workspacePaneId={workspacePaneId}
-        workspacePaneRoute={undefined}
+        workspacePaneRoute={route}
         statusCount={0}
         trafficLightOffset={toolbarTrafficLightOffset}
         onBackToNavigator={onBackToNavigator}

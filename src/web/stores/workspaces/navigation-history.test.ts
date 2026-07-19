@@ -254,7 +254,7 @@ function newWorktreeEntry(returnTo: string | null): WorkspaceNavigationHistoryEn
 }
 
 function workspaceEntry(): WorkspaceNavigationHistoryEntry {
-  return { workspaceId: REPO_ID, route: { kind: 'workspace-root' } }
+  return { workspaceId: REPO_ID, route: { kind: 'workspace-root', workspacePaneTab: null, terminalSessionId: null } }
 }
 
 function branchEntry({

@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import {
   type WorkspacePaneRuntimeTabTargetProjection,
   type WorkspacePaneRuntimeTabTargetSelectionByType,
@@ -15,7 +16,7 @@ import {
 export interface UseWorkspacePaneRuntimeTabTargetProjectionInput {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
-  worktreePath: string | null
+  filesystemTarget: WorkspacePaneFilesystemExecutionTarget | null
 }
 
 export interface WorkspacePaneRuntimeTabTargetProjectionHookResult extends WorkspacePaneRuntimeTabTargetProjection {
@@ -27,18 +28,15 @@ export interface WorkspacePaneRuntimeTabTargetProjectionHookResult extends Works
 export function useWorkspacePaneRuntimeTabTargetProjection({
   workspaceId,
   workspaceRuntimeId,
-  worktreePath,
+  filesystemTarget,
 }: UseWorkspacePaneRuntimeTabTargetProjectionInput): WorkspacePaneRuntimeTabTargetProjectionHookResult {
-  const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ workspaceId, worktreePath })
-  const runtimeTabTargetKeyByType = useMemo(
-    () => workspacePaneRuntimeTabTargetKeyByType({ workspaceId, worktreePath }),
-    [workspaceId, worktreePath],
+  const input = useMemo(
+    () => ({ workspaceId, workspaceRuntimeId, filesystemTarget }),
+    [filesystemTarget, workspaceId, workspaceRuntimeId],
   )
-  const providerProjections = useWorkspacePaneRuntimeTabProviderProjections({
-    workspaceId,
-    workspaceRuntimeId,
-    worktreePath,
-  })
+  const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey(input)
+  const runtimeTabTargetKeyByType = useMemo(() => workspacePaneRuntimeTabTargetKeyByType(input), [input])
+  const providerProjections = useWorkspacePaneRuntimeTabProviderProjections(input)
 
   const selectedSessionIdByRuntimeType = useMemo<WorkspacePaneRuntimeTabTargetSelectionByType>(
     () =>

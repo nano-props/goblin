@@ -15,7 +15,7 @@ import {
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { workspacePaneTabsTargetWorktreePath } from '#/shared/workspace-pane-tabs-target.ts'
+import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 
 export type WorkspacePaneRouteResolution =
   | { kind: 'missing' }
@@ -49,7 +49,10 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
-    worktreePath: workspacePaneTabsTargetWorktreePath(target),
+    filesystemTarget:
+      target.kind === 'git-worktree'
+        ? gitWorktreeFilesystemExecutionTarget(repo.id, repo.workspaceRuntimeId, target.worktreePath)
+        : null,
   })
   const model = createWorkspacePaneTabModel({
     workspaceId: repo.id,

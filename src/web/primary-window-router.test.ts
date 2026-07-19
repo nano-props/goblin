@@ -170,7 +170,33 @@ describe('workspace route view derivation', () => {
         branchSlug: null,
         newWorktree: false,
       }),
-    ).toEqual({ kind: 'workspace-root', workspaceId: ROUTE_WORKSPACE_ID })
+    ).toEqual({ kind: 'workspace-root', workspaceId: ROUTE_WORKSPACE_ID, workspacePaneRoute: null })
+    expect(
+      workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, {
+        dashboard: false,
+        workspace: true,
+        workspaceTabKey: 'files',
+        branchSlug: null,
+        newWorktree: false,
+      }),
+    ).toEqual({
+      kind: 'workspace-root',
+      workspaceId: ROUTE_WORKSPACE_ID,
+      workspacePaneRoute: { kind: 'static', tab: 'files' },
+    })
+    expect(
+      workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, {
+        dashboard: false,
+        workspace: true,
+        workspaceTerminalSessionId: 'term-111111111111111111111',
+        branchSlug: null,
+        newWorktree: false,
+      }),
+    ).toEqual({
+      kind: 'workspace-root',
+      workspaceId: ROUTE_WORKSPACE_ID,
+      workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+    })
     expect(
       workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, { dashboard: false, branchSlug: null, newWorktree: true }),
     ).toEqual({

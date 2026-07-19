@@ -183,7 +183,7 @@ export interface RestorableWorkspaceState {
 
 export type WorkspaceNavigationHistoryRoute =
   | { kind: 'empty' }
-  | { kind: 'workspace-root' }
+  | { kind: 'workspace-root'; workspacePaneTab: WorkspacePaneTabType | null; terminalSessionId: string | null }
   | { kind: 'dashboard' }
   | { kind: 'newWorktree'; returnTo: string | null }
   | {

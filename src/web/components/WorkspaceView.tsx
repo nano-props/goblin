@@ -291,7 +291,7 @@ export function WorkspaceView({
               <WorkspacePane
                 workspaceId={workspaceId}
                 currentBranchName={null}
-                workspacePaneRouteContext={{ kind: 'workspace-root' }}
+                workspacePaneRouteContext={{ kind: 'workspace-root', route: routeView.workspacePaneRoute }}
                 shortcutsEnabled={!compact || singlePane === 'workspace'}
                 toolbarTrafficLightOffset={workspaceTrafficLightOffset}
                 onBackToBranchNavigator={() => onOpenWorkspaceNavigator?.(workspace.id)}

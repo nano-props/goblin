@@ -17,6 +17,10 @@ import {
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { GitHead } from '#/shared/git-head.ts'
+import {
+  gitWorktreeFilesystemExecutionTarget,
+  workspaceRootFilesystemExecutionTarget,
+} from '#/shared/workspace-runtime.ts'
 
 export type WorkspacePaneTabTargetResolution =
   | { kind: 'ready'; target: WorkspacePaneTabModel }
@@ -138,7 +142,12 @@ function resolveWorkspacePaneTabTarget(
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: workspaceId,
     workspaceRuntimeId: workspace.workspaceRuntimeId,
-    worktreePath,
+    filesystemTarget:
+      branchName === null
+        ? workspaceRootFilesystemExecutionTarget(workspaceId, workspace.workspaceRuntimeId)
+        : worktreePath
+          ? gitWorktreeFilesystemExecutionTarget(workspaceId, workspace.workspaceRuntimeId, worktreePath)
+          : null,
   })
   const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget(
     branchName === null
@@ -195,7 +204,12 @@ export function workspacePaneTabTargetForPaneTarget(
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: workspace.id,
     workspaceRuntimeId: workspace.workspaceRuntimeId,
-    worktreePath,
+    filesystemTarget:
+      paneTarget.kind === 'workspace-root'
+        ? workspaceRootFilesystemExecutionTarget(workspace.id, workspace.workspaceRuntimeId)
+        : paneTarget.kind === 'git-worktree'
+          ? gitWorktreeFilesystemExecutionTarget(workspace.id, workspace.workspaceRuntimeId, paneTarget.worktreePath)
+          : null,
   })
   const tabsProjection = readWorkspacePaneTabsProjectionForTarget({
     ...paneTarget,
@@ -245,7 +259,9 @@ export function workspacePaneRouteNavigationBlockedForBranch(workspaceId: Worksp
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: workspace.id,
     workspaceRuntimeId: workspace.workspaceRuntimeId,
-    worktreePath: branch.worktree?.path ?? null,
+    filesystemTarget: branch.worktree?.path
+      ? gitWorktreeFilesystemExecutionTarget(workspace.id, workspace.workspaceRuntimeId, branch.worktree.path)
+      : null,
   })
   return Object.values(runtimeProjection.runtimeTabStateByType).some((state) => state.createPending)
 }

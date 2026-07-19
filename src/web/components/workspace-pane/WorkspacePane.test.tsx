@@ -221,7 +221,7 @@ describe('WorkspacePane', () => {
               <WorkspacePane
                 workspaceId={workspaceId}
                 currentBranchName={null}
-                workspacePaneRouteContext={{ kind: 'workspace-root' }}
+                workspacePaneRouteContext={{ kind: 'workspace-root', route: null }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -375,6 +375,35 @@ describe('WorkspacePane', () => {
     expect(screen.getByText('2.0 KB')).toBeTruthy()
   })
 
+  test('uses the workspace-root route as presentation authority over the saved preference', () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-routed-workspace')
+    seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branches: [],
+      currentBranchName: null,
+      workspaceProbe: directoryWorkspaceProbe('plain-routed-workspace'),
+    })
+    useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigation}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <WorkspacePane
+                workspaceId={workspaceId}
+                workspacePaneRouteContext={{ kind: 'workspace-root', route: { kind: 'static', tab: 'files' } }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByRole('tab', { name: 'tab.files' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tab', { name: 'tab.status' }).getAttribute('aria-selected')).toBe('false')
+  })
+
   test('does not expose a terminal surface when the workspace capability is unavailable', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/files-only-workspace')
     seedRepoWithReadModelForTest({
@@ -467,7 +496,10 @@ describe('WorkspacePane', () => {
         <PrimaryWindowNavigationProvider value={workspaceNavigation}>
           <TerminalSessionContext value={workspaceTerminalCommands}>
             <TerminalSessionReadContext value={workspaceTerminalReadContext}>
-              <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'workspace-root' }} />
+              <WorkspacePane
+                workspaceId={workspaceId}
+                workspacePaneRouteContext={{ kind: 'workspace-root', route: null }}
+              />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -1913,6 +1945,8 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
     openWorkspaceNavigator: vi.fn(),
     openWorkspaceDashboard: vi.fn(),
     openWorkspaceRootPane: vi.fn(),
+    openWorkspaceRootTab: vi.fn(),
+    openWorkspaceRootTerminal: vi.fn(),
     openRepoBranch: vi.fn((_repoId, _branchName, options) => {
       options?.onCommit?.()
       return true
