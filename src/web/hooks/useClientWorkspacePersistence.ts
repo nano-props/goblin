@@ -28,7 +28,7 @@ interface ClientWorkspacePersistenceInput {
   restoredWorkspaceId: WorkspaceId | null
   zenMode: boolean
   workspacePaneSize: number
-  selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
+  selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>
   filetreeInteractionByScope: Parameters<
     typeof clientWorkspaceStateFromRestorableWorkspaceState
   >[0]['filetreeInteractionByScope']
@@ -39,8 +39,8 @@ export function useClientWorkspacePersistence({ routedWorkspaceId }: { routedWor
   const workspaceOrder = useWorkspacesStore((s) => s.workspaceOrder)
   const zenMode = useWorkspacesStore((s) => s.zenMode)
   const workspacePaneSize = useWorkspacesStore((s) => s.workspacePaneSize)
-  const selectedTerminalSessionIdByTerminalWorktree = useWorkspacesStore(
-    (s) => s.selectedTerminalSessionIdByTerminalWorktree,
+  const selectedTerminalSessionIdByTerminalFilesystemTarget = useWorkspacesStore(
+    (s) => s.selectedTerminalSessionIdByTerminalFilesystemTarget,
   )
   const workspaceMembershipReady = useWorkspacesStore((s) => s.workspaceMembershipReady)
   const sessionPersistenceReady = useWorkspacesStore((s) => s.sessionPersistenceReady)
@@ -65,7 +65,7 @@ export function useClientWorkspacePersistence({ routedWorkspaceId }: { routedWor
         restoredWorkspaceId,
         zenMode,
         workspacePaneSize,
-        selectedTerminalSessionIdByTerminalWorktree,
+        selectedTerminalSessionIdByTerminalFilesystemTarget,
         filetreeInteractionByScope,
       },
       routedWorkspaceId ?? lastRoutedWorkspaceIdRef.current,
@@ -130,7 +130,7 @@ export function useClientWorkspacePersistence({ routedWorkspaceId }: { routedWor
     routedWorkspaceId,
     workspacePaneSize,
     zenMode,
-    selectedTerminalSessionIdByTerminalWorktree,
+    selectedTerminalSessionIdByTerminalFilesystemTarget,
     workspaces,
     workspacePaneTabsVersion,
     filetreeInteractionByScope,
@@ -163,7 +163,7 @@ function clientWorkspaceFromPersistenceInput(
       restoredWorkspaceId: lastRoutedWorkspaceId ?? input.restoredWorkspaceId,
       zenMode: input.zenMode,
       workspacePaneSize: input.workspacePaneSize,
-      selectedTerminalSessionIdByTerminalWorktree: input.selectedTerminalSessionIdByTerminalWorktree,
+      selectedTerminalSessionIdByTerminalFilesystemTarget: input.selectedTerminalSessionIdByTerminalFilesystemTarget,
     }),
     filetreeInteractionByScope: input.filetreeInteractionByScope,
     restoredClientWorkspaceBaseline: input.restoredClientWorkspaceBaseline,

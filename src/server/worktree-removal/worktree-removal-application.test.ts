@@ -393,9 +393,7 @@ function createApplication(
           scopes: TestTerminalScope[]
           message: string
         }
-    closeSessionsForPhysicalWorktree?: (
-      identity: PhysicalWorktreeIdentity,
-    ) => Promise<TestTerminalScope[]>
+    closeSessionsForPhysicalWorktree?: (identity: PhysicalWorktreeIdentity) => Promise<TestTerminalScope[]>
     reconcilePhysicalWorktreeAfterRemovalFailure?: () => Promise<void>
     retireTarget?: (...args: never[]) => Promise<void>
     physicalWorktreeTargets?: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']>
@@ -407,7 +405,7 @@ function createApplication(
   return createWorktreeRemovalApplication({
     worktreeOperations: options.operations ?? createPhysicalWorktreeOperationCoordinator(),
     physicalWorktrees: options.physicalWorktrees ?? testPhysicalWorktrees,
-    terminalWorktree: {
+    terminalSessions: {
       closeSessionsForPhysicalWorktree: async (capability) => ({
         ...(options.terminalQuiescence ?? {
           ok: true as const,

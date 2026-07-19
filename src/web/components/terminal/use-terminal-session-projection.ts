@@ -9,7 +9,7 @@ export function useTerminalSessionProjection(): TerminalSessionProjection {
   const setSelectedTerminal = useWorkspacesStore((s) => s.setSelectedTerminal)
   const [projection] = useState(() =>
     getTerminalSessionProjection({
-      onSelectedWorktreeChange: setSelectedTerminal,
+      onSelectedFilesystemTargetChange: setSelectedTerminal,
     }),
   )
   return projection

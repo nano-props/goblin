@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
@@ -7,7 +7,7 @@ import { readTerminalSessionCommandBridge } from '#/web/components/terminal/term
 import {
   useTerminalWorkspaceProjectionHydrationEntry,
   useTerminalSessionSummaries,
-  useTerminalWorktreeCreatePending,
+  useTerminalFilesystemTargetCreatePending,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
@@ -123,15 +123,17 @@ function terminalRuntimeTabTargetKey(input: WorkspacePaneRuntimeTabTargetInput):
   if (!target || target.workspaceId !== input.workspaceId || target.workspaceRuntimeId !== input.workspaceRuntimeId) {
     return null
   }
-  const worktreeId = canonicalWorkspaceLocator(target.kind === 'workspace-root' ? target.workspaceId : target.root)
-  return workspaceId && worktreeId ? formatTerminalWorktreeKey(workspaceId, worktreeId) : null
+  const executionRootId = canonicalWorkspaceLocator(target.kind === 'workspace-root' ? target.workspaceId : target.root)
+  return workspaceId && executionRootId ? formatTerminalFilesystemTargetKey(workspaceId, executionRootId) : null
 }
 
 function readTerminalRuntimeTabProviderProjection(
   input: WorkspacePaneRuntimeTabTargetInput,
 ): WorkspacePaneRuntimeTabProviderProjection {
   const targetKey = terminalRuntimeTabTargetKey(input)
-  const snapshot = targetKey ? (readTerminalSessionCommandBridge()?.terminalWorktreeSnapshot(targetKey) ?? null) : null
+  const snapshot = targetKey
+    ? (readTerminalSessionCommandBridge()?.terminalFilesystemTargetSnapshot(targetKey) ?? null)
+    : null
   const selectedSessionId = targetKey ? readTerminalSelectedSessionId(targetKey) : null
   const projectionState = readTerminalRuntimeProjectionState(input.workspaceId, input.workspaceRuntimeId)
   return {
@@ -148,8 +150,11 @@ function readTerminalRuntimeTabProviderProjection(
   }
 }
 
-function readTerminalSelectedSessionId(terminalWorktreeKey: string): string | null {
-  return useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] ?? null
+function readTerminalSelectedSessionId(terminalFilesystemTargetKey: string): string | null {
+  return (
+    useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey] ??
+    null
+  )
 }
 
 function useTerminalRuntimeTabProviderProjection(
@@ -158,10 +163,10 @@ function useTerminalRuntimeTabProviderProjection(
   const { workspaceId, workspaceRuntimeId } = input
   const targetKey = terminalRuntimeTabTargetKey(input)
   const terminalSessionSummaries = useTerminalSessionSummaries(targetKey)
-  const terminalCreatePending = useTerminalWorktreeCreatePending(targetKey)
+  const terminalCreatePending = useTerminalFilesystemTargetCreatePending(targetKey)
   const terminalProjectionHydration = useTerminalWorkspaceProjectionHydrationEntry(workspaceId)
   const selectedTerminalSessionId = useWorkspacesStore((s) =>
-    targetKey ? s.selectedTerminalSessionIdByTerminalWorktree[targetKey] : undefined,
+    targetKey ? s.selectedTerminalSessionIdByTerminalFilesystemTarget[targetKey] : undefined,
   )
 
   return useMemo(() => {
@@ -200,13 +205,13 @@ function useSyncTerminalRuntimeTabSelection(
   const setSelectedTerminal = useWorkspacesStore((s) => s.setSelectedTerminal)
   const activeTerminalSessionId = input.activeSessionIdByRuntimeType.terminal ?? null
   const selectedTerminalSessionId = selectedSessionIdByRuntimeType.terminal ?? undefined
-  const terminalTargetKey = input.runtimeTabTargetKeyByType.terminal ?? null
+  const terminalFilesystemTargetKey = input.runtimeTabTargetKeyByType.terminal ?? null
 
   useEffect(() => {
-    if (!terminalTargetKey || !activeTerminalSessionId) return
+    if (!terminalFilesystemTargetKey || !activeTerminalSessionId) return
     if (activeTerminalSessionId === selectedTerminalSessionId) return
-    setSelectedTerminal(terminalTargetKey, activeTerminalSessionId)
-  }, [activeTerminalSessionId, selectedTerminalSessionId, setSelectedTerminal, terminalTargetKey])
+    setSelectedTerminal(terminalFilesystemTargetKey, activeTerminalSessionId)
+  }, [activeTerminalSessionId, selectedTerminalSessionId, setSelectedTerminal, terminalFilesystemTargetKey])
 }
 
 function readTerminalRuntimeProjectionState(

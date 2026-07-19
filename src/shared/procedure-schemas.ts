@@ -224,7 +224,7 @@ const ClientWorkspaceStateSchema = v.object({
   restoredWorkspaceId: v.nullable(WorkspaceIdSchema),
   zenMode: v.boolean(),
   workspacePaneSize: v.number(),
-  selectedTerminalSessionIdByTerminalWorktree: v.record(v.string(), v.string()),
+  selectedTerminalSessionIdByTerminalFilesystemTarget: v.record(v.string(), v.string()),
   preferredWorkspacePaneTabByTargetByWorkspace: v.record(
     v.string(),
     v.record(v.string(), v.nullable(v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),

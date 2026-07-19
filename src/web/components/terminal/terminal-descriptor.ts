@@ -1,6 +1,6 @@
 import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
 import { terminalExecutionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 
 export function terminalDescriptor(
   base: TerminalSessionBase,
@@ -20,7 +20,7 @@ export function terminalDescriptor(
   throw new Error('terminal target and presentation disagree')
 }
 
-export function terminalDescriptorWorktreeKey(descriptor: TerminalDescriptor): string {
+export function terminalDescriptorFilesystemTargetKey(descriptor: TerminalDescriptor): string {
   const coordinates = terminalExecutionCoordinates(descriptor.target)
-  return formatTerminalWorktreeKey(coordinates.workspaceId, coordinates.worktreeId)
+  return formatTerminalFilesystemTargetKey(coordinates.workspaceId, coordinates.executionRootId)
 }

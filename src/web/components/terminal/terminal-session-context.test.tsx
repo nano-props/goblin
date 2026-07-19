@@ -3,7 +3,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
-  EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
+  EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
   TerminalSessionContext,
   TerminalSessionReadContext,
   useTerminalSessionContext,
@@ -17,7 +17,7 @@ function ReadSnapshot() {
   const ctx = useTerminalSessionReadContext()
   return (
     <>
-      <span data-testid="count">{ctx.terminalWorktreeSnapshot('any').count}</span>
+      <span data-testid="count">{ctx.terminalFilesystemTargetSnapshot('any').count}</span>
       <span data-testid="bell">{ctx.workspaceBellCount(WORKSPACE_ID)}</span>
     </>
   )
@@ -82,8 +82,8 @@ describe('useTerminalSessionReadContext', () => {
 
   test('returns the provider value when present', () => {
     const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => ({ ...EMPTY_TERMINAL_WORKTREE_SNAPSHOT, count: 7 }),
-      subscribeTerminalWorktree: () => () => {},
+      terminalFilesystemTargetSnapshot: () => ({ ...EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT, count: 7 }),
+      subscribeTerminalFilesystemTarget: () => () => {},
       workspaceBellCount: () => 3,
       subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),

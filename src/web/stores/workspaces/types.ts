@@ -174,8 +174,8 @@ export interface RestorableWorkspaceState {
   /** Large-screen Zen Mode restored from ClientWorkspaceState. Compact UI is stronger and always shows one pane at a time. */
   zenMode: boolean
   workspacePaneSize: number
-  /** Per worktree terminal selection restored from ClientWorkspaceState.selectedTerminalSessionIdByTerminalWorktree. */
-  selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
+  /** Per-filesystem-target terminal selection restored from ClientWorkspaceState. */
+  selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>
 }
 
 export type WorkspaceNavigationHistoryRoute =
@@ -193,7 +193,7 @@ export type WorkspaceNavigationHistoryRoute =
       kind: 'branch'
       branchName: string
       workspacePaneTab: WorkspacePaneTabType | null
-      terminalWorktreeKey: string | null
+      terminalFilesystemTargetKey: string | null
       terminalSessionId: string | null
     }
 
@@ -273,12 +273,14 @@ interface LocalWorkspaceActions {
 
 interface RestorableWorkspaceActions {
   applySessionLayoutState: (layout: Pick<ClientWorkspaceState, 'zenMode' | 'workspacePaneSize'>) => void
-  applySessionSelectedTerminalState: (selectedTerminalSessionIdByTerminalWorktree: Record<string, string>) => void
+  applySessionSelectedTerminalState: (
+    selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>,
+  ) => void
   setZenMode: (enabled: boolean) => void
   toggleZenMode: () => void
   setWorkspacePaneSize: (size: number) => void
   resetLayout: () => void
-  setSelectedTerminal: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
+  setSelectedTerminal: (terminalFilesystemTargetKey: string, terminalSessionId: string | null) => void
 }
 
 interface WorkspaceLifecycleActions {

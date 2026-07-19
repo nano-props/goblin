@@ -95,26 +95,26 @@ Terminal terminology has hard boundaries:
 - `terminalSessionId` is the persistent identity for a terminal business
   session. Terminal workspace-pane runtime tabs store this value as
   `runtimeSessionId`.
-- `terminalWorktreeKey` is only the repo/worktree grouping key.
+- `terminalFilesystemTargetKey` is the runtime-neutral Workspace/execution-root grouping key.
 - `tabId` is for fixed static workspace-pane tabs.
 - control ownership is described as `controller`, `viewer`, `unowned`, or `controller role`.
 
 Canonical terminal terms:
 
-| Concept                     | Canonical                                     | Deprecated                                       |
-| --------------------------- | --------------------------------------------- | ------------------------------------------------ |
-| Server-side business object | `TerminalSession`                             | `TerminalSlot`                                   |
-| Server state owner          | `TerminalSessionManager`                      | `TerminalSlotManager`                            |
-| Client singleton projection | `TerminalSessionProjection`                   | `TerminalSlotRegistry`                           |
-| Per-session client view     | `TerminalSessionView`                         | `TerminalSlotView`                               |
-| Per-session client state    | `TerminalSessionState`                        | `TerminalSlotState`                              |
-| Per-session client runtime  | `TerminalSessionRuntime`                      | `TerminalSlotRuntime`                            |
-| Workspace pane projection   | `WorkspacePaneLayoutAggregate`                | `WorkspacePaneTabsRuntime`, provider-owned layout |
-| Terminal session identity   | `terminalSessionId`                           | old composite terminal identity names            |
-| Runtime workspace tab id    | `runtimeSessionId`                            | terminal-specific tab entry id fields            |
-| Terminal worktree grouping  | `terminalWorktreeKey` / `TerminalWorktreeKey` | old workspace-pane identity names                |
-| Session lifecycle event     | `session-closed`                              | `slot-closed`                                    |
-| Session id validator        | `isValidTerminalSessionId`                    | `isValidSlotId`                                  |
+| Concept                      | Canonical                                                     | Deprecated                                        |
+| ---------------------------- | ------------------------------------------------------------- | ------------------------------------------------- |
+| Server-side business object  | `TerminalSession`                                             | `TerminalSlot`                                    |
+| Server state owner           | `TerminalSessionManager`                                      | `TerminalSlotManager`                             |
+| Client singleton projection  | `TerminalSessionProjection`                                   | `TerminalSlotRegistry`                            |
+| Per-session client view      | `TerminalSessionView`                                         | `TerminalSlotView`                                |
+| Per-session client state     | `TerminalSessionState`                                        | `TerminalSlotState`                               |
+| Per-session client runtime   | `TerminalSessionRuntime`                                      | `TerminalSlotRuntime`                             |
+| Workspace pane projection    | `WorkspacePaneLayoutAggregate`                                | `WorkspacePaneTabsRuntime`, provider-owned layout |
+| Terminal session identity    | `terminalSessionId`                                           | old composite terminal identity names             |
+| Runtime workspace tab id     | `runtimeSessionId`                                            | terminal-specific tab entry id fields             |
+| Terminal filesystem grouping | `terminalFilesystemTargetKey` / `TerminalFilesystemTargetKey` | worktree-only terminal grouping names             |
+| Session lifecycle event      | `session-closed`                                              | `slot-closed`                                     |
+| Session id validator         | `isValidTerminalSessionId`                                    | `isValidSlotId`                                   |
 
 Naming consequences:
 
@@ -124,7 +124,8 @@ Naming consequences:
 - If you mean a runtime Workspace Pane tab entry, use `runtimeSessionId`.
 - If you mean the terminal business session represented by a terminal runtime
   tab, use `terminalSessionId`.
-- If you mean the repo/worktree grouping bucket for terminal tabs, use `terminalWorktreeKey`.
+- If you mean the runtime-neutral grouping bucket for terminal tabs, use `terminalFilesystemTargetKey`.
+- If you mean the runtime-scoped execution authority, use `TerminalExecutionTarget`; it also carries `workspaceRuntimeId`.
 
 ### Repo / workspace
 
@@ -143,7 +144,7 @@ Canonical examples:
 | Status read                 | `getRepoStatus`                       | `getRepositoryStatus`                            |
 | Log read                    | `getRepoLog`                          | `getRepositoryLog`                               |
 | Bulk read                   | `RepoBulkReadResult` / `readRepoBulk` | `RepositoryComposite` / `getRepositoryComposite` |
-| Operation scheduler         | `RepoOperationScheduler`              | `WorkspaceRuntime`                                    |
+| Operation scheduler         | `RepoOperationScheduler`              | `WorkspaceRuntime`                               |
 | Operation lane              | `RepoOperationLane`                   | `RepoTaskLane`, `RepoLane`                       |
 | Data load state             | `RepoDataLoadState`                   | `RepoResourcesState`                             |
 | Right-pane surface          | `RepoWorkspace`                       | `branch-workspace/`                              |

@@ -654,7 +654,7 @@ export function resetWorkspacesStore(): void {
     restoredClientWorkspaceBaseline: null,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
-    selectedTerminalSessionIdByTerminalWorktree: {},
+    selectedTerminalSessionIdByTerminalFilesystemTarget: {},
     tabOpenerIdentityByScope: {},
     navigationHistoryByWorkspace: {},
   })

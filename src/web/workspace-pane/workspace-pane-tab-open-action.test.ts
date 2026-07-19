@@ -29,7 +29,7 @@ import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-p
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
+import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import {
   observeWorkspacePaneRouteForTest,
   observedWorkspacePaneRouteCommitForTest,
@@ -340,7 +340,7 @@ describe('openWorkspacePaneTab', () => {
     const updateWorkspaceTabs = vi.fn(async () => [workspacePaneStaticTabEntry('status')])
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshot({ createPending: true }),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshot({ createPending: true }),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
     })
@@ -851,9 +851,9 @@ function navigationWithStoreActions(
   }
 }
 
-function worktreeSnapshot(input: { createPending: boolean }): TerminalWorktreeSnapshot {
+function worktreeSnapshot(input: { createPending: boolean }): TerminalFilesystemTargetSnapshot {
   return {
-    terminalWorktreeKey: WORKTREE_KEY,
+    terminalFilesystemTargetKey: WORKTREE_KEY,
     selectedDescriptor: null,
     sessions: [],
     count: 0,

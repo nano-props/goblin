@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from 'vitest'
-import { buildTerminalWorktreeSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
+import { buildTerminalFilesystemTargetSnapshot } from '#/web/components/terminal/terminal-session-filesystem-target-snapshot.ts'
 import type { TerminalSessionLike, TerminalDescriptor, TerminalSnapshot } from '#/web/components/terminal/types.ts'
 import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
-import { terminalDescriptorWorktreeKey } from '#/web/components/terminal/terminal-descriptor.ts'
+import { terminalDescriptorFilesystemTargetKey } from '#/web/components/terminal/terminal-descriptor.ts'
 
 function makeDescriptor(terminalSessionId: string, index: number): TerminalDescriptor {
   return terminalDescriptorForTest({
@@ -47,7 +47,7 @@ function makeSession(
   }
 }
 
-describe('terminal session worktree snapshot helper', () => {
+describe('terminal session filesystem target snapshot helper', () => {
   test('builds summaries and populates snapshot cache lazily', () => {
     const descriptor = makeDescriptor('term-111111111111111111111', 1)
     const session = makeSession(descriptor, {
@@ -58,8 +58,8 @@ describe('terminal session worktree snapshot helper', () => {
     })
     const cache = new Map<string, TerminalSnapshot>()
 
-    const snapshot = buildTerminalWorktreeSnapshot({
-      terminalWorktreeKey: terminalDescriptorWorktreeKey(descriptor),
+    const snapshot = buildTerminalFilesystemTargetSnapshot({
+      terminalFilesystemTargetKey: terminalDescriptorFilesystemTargetKey(descriptor),
       selectedDescriptor: descriptor,
       createPending: false,
       sessions: [session],
@@ -71,7 +71,7 @@ describe('terminal session worktree snapshot helper', () => {
     })
 
     expect(snapshot).toEqual({
-      terminalWorktreeKey: terminalDescriptorWorktreeKey(descriptor),
+      terminalFilesystemTargetKey: terminalDescriptorFilesystemTargetKey(descriptor),
       selectedDescriptor: descriptor,
       sessions: [
         expect.objectContaining({
@@ -91,8 +91,8 @@ describe('terminal session worktree snapshot helper', () => {
     })
     expect(session.snapshotSpy).toHaveBeenCalledTimes(1)
 
-    buildTerminalWorktreeSnapshot({
-      terminalWorktreeKey: terminalDescriptorWorktreeKey(descriptor),
+    buildTerminalFilesystemTargetSnapshot({
+      terminalFilesystemTargetKey: terminalDescriptorFilesystemTargetKey(descriptor),
       selectedDescriptor: descriptor,
       createPending: false,
       sessions: [session],

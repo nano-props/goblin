@@ -5,15 +5,15 @@ import {
 import type { TerminalClientSnapshot, TerminalDescriptor } from '#/web/components/terminal/types.ts'
 
 export function captureTerminalHostGeometry(input: {
-  terminalWorktreeKey: string
-  hostByWorktree: ReadonlyMap<string, HTMLElement>
-  startupGeometryHintByWorktree: Map<string, { cols: number; rows: number }>
+  terminalFilesystemTargetKey: string
+  hostByFilesystemTarget: ReadonlyMap<string, HTMLElement>
+  startupGeometryHintByFilesystemTarget: Map<string, { cols: number; rows: number }>
 }): { cols: number; rows: number } | null {
-  const host = input.hostByWorktree.get(input.terminalWorktreeKey)
+  const host = input.hostByFilesystemTarget.get(input.terminalFilesystemTargetKey)
   if (!host?.isConnected) return null
   const geometry = estimateManagedTerminalGeometry(host)
   if (!geometry) return null
-  input.startupGeometryHintByWorktree.set(input.terminalWorktreeKey, geometry)
+  input.startupGeometryHintByFilesystemTarget.set(input.terminalFilesystemTargetKey, geometry)
   return geometry
 }
 
@@ -24,9 +24,9 @@ export function captureTerminalHostGeometry(input: {
  * a default. The live xterm view becomes geometry authority after attach.
  */
 export function resolveTerminalStartupGeometryHint(input: {
-  terminalWorktreeKey: string
-  hostByWorktree: ReadonlyMap<string, HTMLElement>
-  startupGeometryHintByWorktree: Map<string, { cols: number; rows: number }>
+  terminalFilesystemTargetKey: string
+  hostByFilesystemTarget: ReadonlyMap<string, HTMLElement>
+  startupGeometryHintByFilesystemTarget: Map<string, { cols: number; rows: number }>
   selectedDescriptor: TerminalDescriptor | null
   getAttachmentSnapshot: (terminalSessionId: string) => TerminalClientSnapshot | null | undefined
 }): { cols: number; rows: number } | null {
@@ -36,11 +36,11 @@ export function resolveTerminalStartupGeometryHint(input: {
     const attachment = input.getAttachmentSnapshot(input.selectedDescriptor.terminalSessionId)
     if (attachment?.canonicalCols && attachment.canonicalRows) {
       const geometry = { cols: attachment.canonicalCols, rows: attachment.canonicalRows }
-      input.startupGeometryHintByWorktree.set(input.terminalWorktreeKey, geometry)
+      input.startupGeometryHintByFilesystemTarget.set(input.terminalFilesystemTargetKey, geometry)
       return geometry
     }
   }
-  return input.startupGeometryHintByWorktree.get(input.terminalWorktreeKey) ?? null
+  return input.startupGeometryHintByFilesystemTarget.get(input.terminalFilesystemTargetKey) ?? null
 }
 
 /**

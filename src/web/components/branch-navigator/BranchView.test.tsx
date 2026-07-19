@@ -51,8 +51,8 @@ const navigation: PrimaryWindowNavigationActions = {
 }
 
 const terminalReadContext: TerminalSessionReadContextValue = {
-  terminalWorktreeSnapshot: () => ({
-    terminalWorktreeKey: '',
+  terminalFilesystemTargetSnapshot: () => ({
+    terminalFilesystemTargetKey: '',
     selectedDescriptor: null,
     sessions: [],
     count: 0,
@@ -60,7 +60,7 @@ const terminalReadContext: TerminalSessionReadContextValue = {
     outputActiveCount: 0,
     createPending: false,
   }),
-  subscribeTerminalWorktree: () => () => {},
+  subscribeTerminalFilesystemTarget: () => () => {},
   workspaceBellCount: () => 0,
   subscribeWorkspaceBellCount: () => () => {},
   snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),

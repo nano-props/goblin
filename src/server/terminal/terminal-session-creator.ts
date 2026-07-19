@@ -55,9 +55,9 @@ class TerminalSessionCreator {
     const signal = input.signal
     const coordinates = terminalExecutionCoordinates(input.request.target)
     const sessionScope = terminalSessionRuntimeScope(coordinates.workspaceId, coordinates.workspaceRuntimeId)
-    const worktreeId = coordinates.worktreeId
-    return await this.options.createCoordinator.runInWorktreeQueue(
-      { userId: input.userId, scope: sessionScope, worktreeId },
+    const executionRootId = coordinates.executionRootId
+    return await this.options.createCoordinator.runInFilesystemTargetQueue(
+      { userId: input.userId, scope: sessionScope, executionRootId },
       async () => {
         if (signal.aborted) return { ok: false, message: 'error.workspace-runtime-stale' }
         if (
@@ -66,7 +66,7 @@ class TerminalSessionCreator {
           return { ok: false, message: 'error.workspace-runtime-stale' }
         }
         const createResult = await this.options.createCoordinator.withSessionIdAllocation(
-          { userId: input.userId, scope: sessionScope, worktreeId, kind: input.request.kind },
+          { userId: input.userId, scope: sessionScope, executionRootId, kind: input.request.kind },
           async ({ terminalSessionId }) =>
             await this.options.ensureOrRestore(
               input.clientId,

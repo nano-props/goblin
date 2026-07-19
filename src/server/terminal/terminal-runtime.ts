@@ -304,14 +304,14 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     worktreeOperations,
     physicalWorktrees,
     terminal: { ...terminalCreateProvider, close: actions.close },
-    terminalWorktree: manager,
+    terminalSessions: manager,
     isCurrentWorkspaceRuntime,
     broadcastWorkspaceTabsChanged: publishWorkspaceTabsRevision,
   })
   const worktreeRemovalApplication = createWorktreeRemovalApplication({
     worktreeOperations,
     physicalWorktrees,
-    terminalWorktree: manager,
+    terminalSessions: manager,
     workspaceTabs: workspaceTabsCoordinator,
     isCurrentWorkspaceRuntime,
     broadcastSessionsChanged(userId, workspaceId, workspaceRuntimeId) {
@@ -438,10 +438,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       let durableLayoutChanged: boolean
       try {
         assertCurrent()
-        durableLayoutChanged = await clearWorkspacePaneDurableLayout(
-          workspacePaneLayoutRepository,
-          workspaceId,
-        )
+        durableLayoutChanged = await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, workspaceId)
       } catch (error) {
         return { kind: 'failed-before-commit', error }
       }
@@ -521,7 +518,12 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       })
       .catch((err) => {
         terminalRuntimeLogger.warn(
-          { userId, terminalRuntimeSessionId: session.terminalRuntimeSessionId, workspaceId: coordinates.workspaceId, err },
+          {
+            userId,
+            terminalRuntimeSessionId: session.terminalRuntimeSessionId,
+            workspaceId: coordinates.workspaceId,
+            err,
+          },
           'failed to reconcile workspace tabs after terminal session close',
         )
       })

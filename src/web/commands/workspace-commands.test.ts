@@ -38,7 +38,7 @@ import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspa
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import type { TerminalCreateOptions, TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
+import type { TerminalCreateOptions, TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import {
@@ -131,7 +131,10 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
-import { formatTerminalWorktreeKey, formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import {
+  formatTerminalFilesystemTargetKey,
+  formatTerminalFilesystemTargetKeyForPath,
+} from '#/shared/terminal-filesystem-target-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
@@ -170,7 +173,7 @@ const WORKTREE_PANE_TARGET = {
   worktreePath: WORKTREE_PATH,
   head: { kind: 'branch' as const, branchName: 'feature/worktree' },
 }
-const WORKTREE_KEY = formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH)
+const WORKTREE_KEY = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
 let workspacePaneTabsTestBridge: ReturnType<typeof installWorkspacePaneTabsTestBridge>
 
 beforeEach(() => {
@@ -199,8 +202,8 @@ describe('workspace commands', () => {
       workspacePaneTabsByBranch: { 'feature/worktree': [] },
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => ({
-        terminalWorktreeKey: WORKTREE_KEY,
+      terminalFilesystemTargetSnapshot: () => ({
+        terminalFilesystemTargetKey: WORKTREE_KEY,
         selectedDescriptor: null,
         sessions: [],
         count: 0,
@@ -235,8 +238,8 @@ describe('workspace commands', () => {
       workspacePaneTabsByBranch: { 'feature/worktree': [staticEntry('status')] },
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => ({
-        terminalWorktreeKey: WORKTREE_KEY,
+      terminalFilesystemTargetSnapshot: () => ({
+        terminalFilesystemTargetKey: WORKTREE_KEY,
         selectedDescriptor: null,
         sessions: [],
         count: 0,
@@ -271,8 +274,8 @@ describe('workspace commands', () => {
       workspacePaneTabsByBranch: { 'feature/worktree': [] },
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => ({
-        terminalWorktreeKey: WORKTREE_KEY,
+      terminalFilesystemTargetSnapshot: () => ({
+        terminalFilesystemTargetKey: WORKTREE_KEY,
         selectedDescriptor: null,
         sessions: [],
         count: 0,
@@ -337,8 +340,8 @@ describe('workspace commands', () => {
       workspacePaneTabsByBranch: { 'feature/worktree': [] },
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => ({
-        terminalWorktreeKey: WORKTREE_KEY,
+      terminalFilesystemTargetSnapshot: () => ({
+        terminalFilesystemTargetKey: WORKTREE_KEY,
         selectedDescriptor: null,
         sessions: [],
         count: 0,
@@ -372,8 +375,8 @@ describe('workspace commands', () => {
       workspacePaneTabsByBranch: { 'feature/no-worktree': [staticEntry('status')] },
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => ({
-        terminalWorktreeKey: WORKTREE_KEY,
+      terminalFilesystemTargetSnapshot: () => ({
+        terminalFilesystemTargetKey: WORKTREE_KEY,
         selectedDescriptor: null,
         sessions: [],
         count: 0,
@@ -408,8 +411,8 @@ describe('workspace commands', () => {
       workspacePaneTabsByBranch: { 'feature/no-worktree': [staticEntry('status')] },
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => ({
-        terminalWorktreeKey: WORKTREE_KEY,
+      terminalFilesystemTargetSnapshot: () => ({
+        terminalFilesystemTargetKey: WORKTREE_KEY,
         selectedDescriptor: null,
         sessions: [],
         count: 0,
@@ -456,8 +459,8 @@ describe('workspace commands', () => {
       return terminalSessionId
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => ({
-        terminalWorktreeKey: WORKTREE_KEY,
+      terminalFilesystemTargetSnapshot: () => ({
+        terminalFilesystemTargetKey: WORKTREE_KEY,
         selectedDescriptor: null,
         sessions: [],
         count: 0,
@@ -500,14 +503,14 @@ describe('workspace commands', () => {
     const createTerminal = vi.fn(async () => 'terminal-new')
     const selectTerminal = vi.fn()
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => ({
-        terminalWorktreeKey: WORKTREE_KEY,
+      terminalFilesystemTargetSnapshot: () => ({
+        terminalFilesystemTargetKey: WORKTREE_KEY,
         selectedDescriptor: null,
         sessions: [
           {
             type: 'terminal',
             terminalSessionId: 'term-111111111111111111111',
-            terminalWorktreeKey: WORKTREE_KEY,
+            terminalFilesystemTargetKey: WORKTREE_KEY,
             index: 1,
             title: 'terminal 1',
             phase: 'open',
@@ -518,7 +521,7 @@ describe('workspace commands', () => {
           {
             type: 'terminal',
             terminalSessionId: 'term-222222222222222222222',
-            terminalWorktreeKey: WORKTREE_KEY,
+            terminalFilesystemTargetKey: WORKTREE_KEY,
             index: 2,
             title: 'terminal 2',
             phase: 'open',
@@ -581,7 +584,7 @@ describe('workspace commands', () => {
     })
     const showRepoBranchTerminalSession = vi.fn(() => true)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotForSessions(visibleSessionIds),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotForSessions(visibleSessionIds),
       createTerminal,
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -629,7 +632,7 @@ describe('workspace commands', () => {
     })
     const createTerminal = createTerminalWithProjection(async () => 'term-222222222222222222222')
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal,
       selectTerminal: vi.fn(),
     })
@@ -649,7 +652,7 @@ describe('workspace commands', () => {
       'feature/worktree',
       'term-222222222222222222222',
     )
-    expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe(
+    expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[WORKTREE_KEY]).toBe(
       'term-222222222222222222222',
     )
     // Cmd+T / File → New Terminal Tab is a generic entry — no insertion
@@ -681,7 +684,7 @@ describe('workspace commands', () => {
       return Promise.resolve(true)
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotForSessions(visibleSessionIds),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotForSessions(visibleSessionIds),
       createTerminal,
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -763,7 +766,7 @@ describe('workspace commands', () => {
       return Promise.resolve(true)
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotForSessions(visibleSessionIds),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotForSessions(visibleSessionIds),
       createTerminal,
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -889,7 +892,7 @@ describe('workspace commands', () => {
     })
     const createTerminal = vi.fn(async () => 'term-111111111111111111111')
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
+      terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal,
       selectTerminal: vi.fn(),
     })
@@ -919,7 +922,7 @@ describe('workspace commands', () => {
       throw new Error('Terminal socket open timed out')
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
+      terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal,
       selectTerminal: vi.fn(),
     })
@@ -955,7 +958,7 @@ describe('workspace commands', () => {
       throw new Error('terminal create request canceled')
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
+      terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal,
       selectTerminal: vi.fn(),
     })
@@ -989,7 +992,7 @@ describe('workspace commands', () => {
     const { promise, resolve } = Promise.withResolvers<string>()
     const createTerminal = createTerminalWithProjection(() => promise)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal,
       selectTerminal: vi.fn(),
     })
@@ -1014,7 +1017,7 @@ describe('workspace commands', () => {
       terminalEntry('term-222222222222222222222'),
     ])
     expect(preferredWorkspacePaneTab('feature/worktree')).toBe('terminal')
-    expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe(
+    expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[WORKTREE_KEY]).toBe(
       'term-222222222222222222222',
     )
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
@@ -1039,7 +1042,7 @@ describe('workspace commands', () => {
       createSingleFlightTerminalWithProjection(async () => await firstCreate.promise)
     const showRepoBranchTerminalSession = vi.fn(() => true)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: isCreatePending() }),
+      terminalFilesystemTargetSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: isCreatePending() }),
       createTerminal,
       createTerminalWithAdmission,
       selectTerminal: vi.fn(),
@@ -1132,7 +1135,7 @@ describe('workspace commands', () => {
       return !createPending()
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: createPending() }),
+      terminalFilesystemTargetSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: createPending() }),
       createTerminal,
       createTerminalWithAdmission,
       selectTerminal: vi.fn(),
@@ -1221,7 +1224,7 @@ describe('workspace commands', () => {
       throw new Error('error.workspace-runtime-stale')
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
+      terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal,
       selectTerminal: vi.fn(),
     })
@@ -1281,7 +1284,7 @@ describe('workspace commands', () => {
     })
     const closeWindow = vi.fn()
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
+      terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -1313,7 +1316,7 @@ describe('workspace commands', () => {
     const closeTerminalByDescriptor = vi.fn(async () => true)
     const closeWindow = vi.fn()
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -1348,7 +1351,7 @@ describe('workspace commands', () => {
     const closeTerminalByDescriptor = vi.fn(async () => true)
     const closeWindow = vi.fn()
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -1387,7 +1390,7 @@ describe('workspace commands', () => {
     })
     const closeTerminalByDescriptor = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -1426,7 +1429,7 @@ describe('workspace commands', () => {
     })
     const closeTerminalByDescriptor = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -1489,7 +1492,7 @@ describe('workspace commands', () => {
     })
     const closeTerminalByDescriptor = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -1561,7 +1564,7 @@ describe('workspace commands', () => {
     })
     const closeTerminalByDescriptor = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -1626,7 +1629,7 @@ describe('workspace commands', () => {
     })
     const showRepoBranchTerminalSession = vi.fn(() => true)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -1687,7 +1690,7 @@ describe('workspace commands', () => {
     })
     const closeWindow = vi.fn()
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotForSessions(visibleSessionIds),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotForSessions(visibleSessionIds),
       createTerminal: vi.fn(async () => 'term-333333333333333333333'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -1739,7 +1742,7 @@ describe('workspace commands', () => {
     const closeTerminalByDescriptor = vi.fn(async () => true)
     const closeWindow = vi.fn()
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithSecondTerminalSelected(),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithSecondTerminalSelected(),
       createTerminal: vi.fn(async () => 'term-333333333333333333333'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -1772,7 +1775,7 @@ describe('workspace commands', () => {
     const closeWindow = vi.fn()
     const showRepoBranchTerminalSession = vi.fn(() => true)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -2152,7 +2155,7 @@ describe('workspace commands', () => {
     const showRepoBranchTerminalSession = vi.fn(() => true)
     const navigation = navigationWith({ showRepoBranchTerminalSession })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
+      terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal,
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -2247,7 +2250,7 @@ describe('workspace commands', () => {
     const showRepoBranchTerminalSession = vi.fn(() => true)
     const selectTerminal = vi.fn()
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal,
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -2296,7 +2299,7 @@ describe('workspace commands', () => {
     })
     const showRepoBranchTerminalSession = vi.fn(() => true)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -2344,7 +2347,7 @@ describe('workspace commands', () => {
     })
     const showRepoBranchTerminalSession = vi.fn(() => true)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotForSessions(visibleSessionIds),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotForSessions(visibleSessionIds),
       createTerminal,
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -2410,7 +2413,7 @@ describe('workspace commands', () => {
     })
     const showRepoBranchTerminalSession = vi.fn(() => true)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotForSessions(visibleSessionIds),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotForSessions(visibleSessionIds),
       createTerminal,
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -2509,7 +2512,7 @@ describe('workspace commands', () => {
     const closeTerminalByDescriptor = vi.fn(async () => true)
     const closeWindow = vi.fn()
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
+      terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -2610,7 +2613,7 @@ describe('workspace commands', () => {
     })
     const closeWindow = vi.fn()
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
+      terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -2642,7 +2645,7 @@ describe('workspace commands', () => {
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const closeWindow = vi.fn()
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: true }),
+      terminalFilesystemTargetSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: true }),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -2678,7 +2681,7 @@ describe('workspace commands', () => {
     const closeWindow = vi.fn()
     const closeTerminalByDescriptor = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
+      terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal: vi.fn(async () => terminalSessionId),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -2708,7 +2711,7 @@ describe('workspace commands', () => {
     })
     const closeWindow = vi.fn()
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
+      terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -2750,7 +2753,7 @@ describe('workspace commands', () => {
     })
     const showRepoBranchTerminalSession = vi.fn(() => true)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal,
     })
@@ -2799,7 +2802,7 @@ describe('workspace commands', () => {
     })
     const showRepoBranchTerminalSession = vi.fn(() => true)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: true }),
+      terminalFilesystemTargetSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: true }),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
     })
@@ -2838,7 +2841,7 @@ describe('workspace commands', () => {
       return true
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal(),
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal(),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal,
     })
@@ -3014,7 +3017,10 @@ function recordCreatedTerminalSelection(base: TerminalSessionBase, terminalSessi
   const coordinates = terminalSessionCoordinates(base)
   useWorkspacesStore
     .getState()
-    .setSelectedTerminal(formatTerminalWorktreeKey(coordinates.workspaceId, coordinates.worktreeId), terminalSessionId)
+    .setSelectedTerminal(
+      formatTerminalFilesystemTargetKey(coordinates.workspaceId, coordinates.executionRootId),
+      terminalSessionId,
+    )
   const branchName = terminalPresentationBranch(base.presentation)
   if (!branchName) return
   workspacePaneTabsTestBridge.addRuntimeTab({
@@ -3358,9 +3364,9 @@ function navigationWith(
   return navigation
 }
 
-function worktreeSnapshotWithTerminal(options: { processName?: string } = {}): TerminalWorktreeSnapshot {
+function worktreeSnapshotWithTerminal(options: { processName?: string } = {}): TerminalFilesystemTargetSnapshot {
   return {
-    terminalWorktreeKey: WORKTREE_KEY,
+    terminalFilesystemTargetKey: WORKTREE_KEY,
     selectedDescriptor: {
       terminalSessionId: 'term-111111111111111111111',
       index: 1,
@@ -3370,7 +3376,7 @@ function worktreeSnapshotWithTerminal(options: { processName?: string } = {}): T
       {
         type: 'terminal',
         terminalSessionId: 'term-111111111111111111111',
-        terminalWorktreeKey: WORKTREE_KEY,
+        terminalFilesystemTargetKey: WORKTREE_KEY,
         index: 1,
         title: 'terminal 1',
         fullTitle: 'terminal 1',
@@ -3388,9 +3394,9 @@ function worktreeSnapshotWithTerminal(options: { processName?: string } = {}): T
   }
 }
 
-function emptyWorktreeSnapshot(): TerminalWorktreeSnapshot {
+function emptyWorktreeSnapshot(): TerminalFilesystemTargetSnapshot {
   return {
-    terminalWorktreeKey: WORKTREE_KEY,
+    terminalFilesystemTargetKey: WORKTREE_KEY,
     selectedDescriptor: null,
     sessions: [],
     count: 0,
@@ -3400,12 +3406,13 @@ function emptyWorktreeSnapshot(): TerminalWorktreeSnapshot {
   }
 }
 
-function worktreeSnapshotForSessions(terminalSessionIds: string[]): TerminalWorktreeSnapshot {
-  const selectedKey = useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY] ?? null
+function worktreeSnapshotForSessions(terminalSessionIds: string[]): TerminalFilesystemTargetSnapshot {
+  const selectedKey =
+    useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[WORKTREE_KEY] ?? null
   const sessions = terminalSessionIds.map((terminalSessionId, index) => ({
     type: 'terminal' as const,
     terminalSessionId: terminalSessionId,
-    terminalWorktreeKey: WORKTREE_KEY,
+    terminalFilesystemTargetKey: WORKTREE_KEY,
     index: index + 1,
     title: `terminal ${index + 1}`,
     phase: 'open' as const,
@@ -3415,7 +3422,7 @@ function worktreeSnapshotForSessions(terminalSessionIds: string[]): TerminalWork
   }))
   const selectedSession = sessions.find((session) => session.terminalSessionId === selectedKey) ?? null
   return {
-    terminalWorktreeKey: WORKTREE_KEY,
+    terminalFilesystemTargetKey: WORKTREE_KEY,
     selectedDescriptor: selectedSession
       ? {
           terminalSessionId: selectedSession.terminalSessionId,
@@ -3431,9 +3438,9 @@ function worktreeSnapshotForSessions(terminalSessionIds: string[]): TerminalWork
   }
 }
 
-function worktreeSnapshotWithSecondTerminalSelected(): TerminalWorktreeSnapshot {
+function worktreeSnapshotWithSecondTerminalSelected(): TerminalFilesystemTargetSnapshot {
   return {
-    terminalWorktreeKey: WORKTREE_KEY,
+    terminalFilesystemTargetKey: WORKTREE_KEY,
     selectedDescriptor: {
       terminalSessionId: 'term-222222222222222222222',
       index: 2,
@@ -3443,7 +3450,7 @@ function worktreeSnapshotWithSecondTerminalSelected(): TerminalWorktreeSnapshot 
       {
         type: 'terminal',
         terminalSessionId: 'term-111111111111111111111',
-        terminalWorktreeKey: WORKTREE_KEY,
+        terminalFilesystemTargetKey: WORKTREE_KEY,
         index: 1,
         title: 'terminal 1',
         phase: 'open',
@@ -3454,7 +3461,7 @@ function worktreeSnapshotWithSecondTerminalSelected(): TerminalWorktreeSnapshot 
       {
         type: 'terminal',
         terminalSessionId: 'term-222222222222222222222',
-        terminalWorktreeKey: WORKTREE_KEY,
+        terminalFilesystemTargetKey: WORKTREE_KEY,
         index: 2,
         title: 'terminal 2',
         phase: 'open',

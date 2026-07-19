@@ -71,8 +71,8 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
     '#/web/components/terminal/terminal-session-context.ts',
   )
   const readContext: TerminalSessionReadContextValue = {
-    terminalWorktreeSnapshot: () => ({
-      terminalWorktreeKey: '',
+    terminalFilesystemTargetSnapshot: () => ({
+      terminalFilesystemTargetKey: '',
       selectedDescriptor: null,
       sessions: [],
       count: 0,
@@ -80,7 +80,7 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
       outputActiveCount: 0,
       createPending: false,
     }),
-    subscribeTerminalWorktree: () => () => {},
+    subscribeTerminalFilesystemTarget: () => () => {},
     workspaceBellCount: () => 4,
     subscribeWorkspaceBellCount: () => () => {},
     snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),

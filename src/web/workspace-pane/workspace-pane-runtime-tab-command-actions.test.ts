@@ -158,8 +158,8 @@ describe('workspace pane runtime tab command actions', () => {
     const selectTerminal = vi.fn()
     const showTerminalSession = vi.fn(() => true)
     const bridge: TerminalSessionCommandBridge = {
-      terminalWorktreeSnapshot: () => ({
-        terminalWorktreeKey: '/repo\0/repo-worktree',
+      terminalFilesystemTargetSnapshot: () => ({
+        terminalFilesystemTargetKey: '/repo\0/repo-worktree',
         selectedDescriptor: null,
         sessions: [
           terminalSession('term-111111111111111111111', true),
@@ -219,8 +219,8 @@ describe('workspace pane runtime tab command actions', () => {
     const selectTerminal = vi.fn()
     const showTerminalSession = vi.fn(() => true)
     const bridge: TerminalSessionCommandBridge = {
-      terminalWorktreeSnapshot: () => ({
-        terminalWorktreeKey: '/repo\0/repo-worktree',
+      terminalFilesystemTargetSnapshot: () => ({
+        terminalFilesystemTargetKey: '/repo\0/repo-worktree',
         selectedDescriptor: null,
         sessions,
         count: sessions.length,
@@ -260,8 +260,8 @@ describe('workspace pane runtime tab command actions', () => {
     const createTerminal = vi.fn(async () => 'created-session')
     const showTerminalSession = vi.fn(() => true)
     const bridge: TerminalSessionCommandBridge = {
-      terminalWorktreeSnapshot: () => ({
-        terminalWorktreeKey: '/repo\0/repo-worktree',
+      terminalFilesystemTargetSnapshot: () => ({
+        terminalFilesystemTargetKey: '/repo\0/repo-worktree',
         selectedDescriptor: null,
         sessions: [],
         count: 0,
@@ -301,8 +301,8 @@ describe('workspace pane runtime tab command actions', () => {
     }))
     const showTerminalSession = vi.fn(() => true)
     const bridge: TerminalSessionCommandBridge = {
-      terminalWorktreeSnapshot: () => ({
-        terminalWorktreeKey: '/repo\0/repo-worktree',
+      terminalFilesystemTargetSnapshot: () => ({
+        terminalFilesystemTargetKey: '/repo\0/repo-worktree',
         selectedDescriptor: null,
         sessions: [],
         count: 0,
@@ -369,7 +369,7 @@ function terminalSession(terminalSessionId: string, selected: boolean) {
   return {
     type: 'terminal' as const,
     terminalSessionId,
-    terminalWorktreeKey: '/repo\0/repo-worktree',
+    terminalFilesystemTargetKey: '/repo\0/repo-worktree',
     index: terminalSessionId === 'term-111111111111111111111' ? 1 : 2,
     title: terminalSessionId,
     fullTitle: terminalSessionId,

@@ -25,7 +25,7 @@ const closeTarget = terminalBase
 const terminalView: WorkspacePaneTerminalTabSummary = {
   type: 'terminal',
   terminalSessionId: 'term-111111111111111111111',
-  terminalWorktreeKey: 'repo\0worktree',
+  terminalFilesystemTargetKey: 'repo\0worktree',
   index: 1,
   title: 'Terminal 1',
   fullTitle: 'Terminal 1',

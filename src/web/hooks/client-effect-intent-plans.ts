@@ -1,4 +1,4 @@
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { terminalExecutionCoordinates } from '#/shared/terminal-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
@@ -38,7 +38,7 @@ export type TerminalBellIntentPlan =
       workspaceId: WorkspaceId
       branch: string
       terminalSessionId: string
-      terminalWorktreeKey: string
+      terminalFilesystemTargetKey: string
     }
   | {
       kind: 'show-detached-worktree-terminal'
@@ -125,7 +125,10 @@ export function createTerminalBellIntentPlan(
         workspaceId: workspace.id,
         branch: head.branchName,
         terminalSessionId: event.terminalSessionId,
-        terminalWorktreeKey: formatTerminalWorktreeKey(coordinates.workspaceId, coordinates.worktreeId),
+        terminalFilesystemTargetKey: formatTerminalFilesystemTargetKey(
+          coordinates.workspaceId,
+          coordinates.executionRootId,
+        ),
       }
     }
     return {

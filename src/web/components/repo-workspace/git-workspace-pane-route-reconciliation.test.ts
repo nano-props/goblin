@@ -346,7 +346,7 @@ function terminalView(terminalSessionId: string): WorkspacePaneTabSummary {
   return {
     type: 'terminal',
     terminalSessionId,
-    terminalWorktreeKey: WORKTREE_KEY,
+    terminalFilesystemTargetKey: WORKTREE_KEY,
     index: 1,
     title: terminalSessionId,
     phase: 'open',

@@ -712,7 +712,7 @@ describe('TerminalSessionManager fresh stream boundary', () => {
     })
     if (!prepared.ok) throw new Error(prepared.message)
 
-    expect(manager.primaryTerminalSessionIdForWorktree(USER_ID, SCOPE, WORKSPACE_ID)).toBeNull()
+    expect(manager.primaryTerminalSessionIdForFilesystemTarget(USER_ID, SCOPE, WORKSPACE_ID)).toBeNull()
 
     await expect(manager.closeSessionForUser(USER_ID, prepared.terminalRuntimeSessionId)).resolves.toBe(false)
     if (prepared.admission.kind === 'prepared') prepared.admission.abort()
@@ -778,7 +778,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     })
     const [openingSession] = await manager.listSessionsForUser(USER_ID, SCOPE)
     expect(openingSession).toBeDefined()
-    expect(manager.primaryTerminalSessionIdForWorktree(USER_ID, SCOPE, WORKSPACE_ID)).toBe(TERMINAL_SESSION_ID)
+    expect(manager.primaryTerminalSessionIdForFilesystemTarget(USER_ID, SCOPE, WORKSPACE_ID)).toBe(TERMINAL_SESSION_ID)
     const close = manager.closeSessionForUser(USER_ID, openingSession!.terminalRuntimeSessionId)
 
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_late_spawn_123456'))
@@ -786,7 +786,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     await expect(close).resolves.toBe(true)
     await expect(pending).resolves.toEqual({ ok: false, message: 'error.unavailable' })
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
-    expect(manager.primaryTerminalSessionIdForWorktree(USER_ID, SCOPE, WORKSPACE_ID)).toBeNull()
+    expect(manager.primaryTerminalSessionIdForFilesystemTarget(USER_ID, SCOPE, WORKSPACE_ID)).toBeNull()
     expect(supervisor.killed).toEqual(['pty_late_spawn_123456'])
   })
 
@@ -795,11 +795,11 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const onSessionClosed = vi.fn()
     const manager = createManager(supervisor, { onSessionClosed })
     const created = await createSession(manager, supervisor)
-    expect(manager.primaryTerminalSessionIdForWorktree(USER_ID, SCOPE, WORKSPACE_ID)).toBe(TERMINAL_SESSION_ID)
+    expect(manager.primaryTerminalSessionIdForFilesystemTarget(USER_ID, SCOPE, WORKSPACE_ID)).toBe(TERMINAL_SESSION_ID)
 
     manager.commitWorkspaceRuntimeSessionInvalidation(USER_ID, SCOPE).publishEffects()
 
-    expect(manager.primaryTerminalSessionIdForWorktree(USER_ID, SCOPE, WORKSPACE_ID)).toBeNull()
+    expect(manager.primaryTerminalSessionIdForFilesystemTarget(USER_ID, SCOPE, WORKSPACE_ID)).toBeNull()
 
     expect(onSessionClosed).toHaveBeenCalledWith(
       USER_ID,

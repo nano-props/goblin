@@ -106,7 +106,7 @@ describe('app bootstrap hooks', () => {
         restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
         zenMode: false,
         workspacePaneSize: 45,
-        selectedTerminalSessionIdByTerminalWorktree: {
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-222222222222222222222',
         },
         preferredWorkspacePaneTabByTargetByWorkspace: {},
@@ -139,7 +139,7 @@ describe('app bootstrap hooks', () => {
     const state = useWorkspacesStore.getState()
     expect(state.zenMode).toBe(false)
     expect(state.workspacePaneSize).toBe(45)
-    expect(state.selectedTerminalSessionIdByTerminalWorktree).toEqual({
+    expect(state.selectedTerminalSessionIdByTerminalFilesystemTarget).toEqual({
       'goblin+file:///tmp/repo\0goblin+file:///tmp/worktree': 'term-222222222222222222222',
     })
     expect(useFiletreeInteractionStore.getState().interactionByScope).toMatchObject({
@@ -187,7 +187,7 @@ describe('app bootstrap hooks', () => {
         restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
         zenMode: true,
         workspacePaneSize: 55,
-        selectedTerminalSessionIdByTerminalWorktree: {},
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {},
         preferredWorkspacePaneTabByTargetByWorkspace: {},
         filetreeViewStateByWorktreeByWorkspace: {},
       },
@@ -227,7 +227,7 @@ describe('app bootstrap hooks', () => {
         restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
         zenMode: true,
         workspacePaneSize: 55,
-        selectedTerminalSessionIdByTerminalWorktree: {},
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {},
         preferredWorkspacePaneTabByTargetByWorkspace: {},
         filetreeViewStateByWorktreeByWorkspace: {},
       },
@@ -261,7 +261,7 @@ describe('app bootstrap hooks', () => {
         restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
         zenMode: true,
         workspacePaneSize: 55,
-        selectedTerminalSessionIdByTerminalWorktree: {},
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {},
         preferredWorkspacePaneTabByTargetByWorkspace: {
           'goblin+file:///tmp/repo': {
             [branchTargetKey('goblin+file:///tmp/repo', 'main')]: 'files' as const,
@@ -316,7 +316,7 @@ describe('app bootstrap hooks', () => {
         restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/missing-repo'),
         zenMode: true,
         workspacePaneSize: 55,
-        selectedTerminalSessionIdByTerminalWorktree: {},
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {},
         preferredWorkspacePaneTabByTargetByWorkspace: {},
         filetreeViewStateByWorktreeByWorkspace: {},
       },
@@ -422,7 +422,7 @@ describe('app bootstrap hooks', () => {
         restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
         zenMode: true,
         workspacePaneSize: 55,
-        selectedTerminalSessionIdByTerminalWorktree: {},
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {},
         preferredWorkspacePaneTabByTargetByWorkspace: {},
         filetreeViewStateByWorktreeByWorkspace: {},
       },

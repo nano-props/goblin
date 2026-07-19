@@ -8,7 +8,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
@@ -38,7 +38,7 @@ import {
 } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
+import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
@@ -500,10 +500,10 @@ describe('useClientEffectIntentRouter', () => {
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(repo.id, repo.workspaceRuntimeId)
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(repo.id, '/tmp/repo-worktree')
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(repo.id, '/tmp/repo-worktree')
     let visibleSessionIds = ['term-111111111111111111111']
     let workspacePaneTabsTestBridge!: ReturnType<typeof installWorkspacePaneTabsTestBridge>
-    useWorkspacesStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-111111111111111111111')
+    useWorkspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, 'term-111111111111111111111')
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-222222222222222222222'
       const coordinates = terminalSessionCoordinates(base)
@@ -517,7 +517,7 @@ describe('useClientEffectIntentRouter', () => {
         worktreePath: terminalExecutionPath(base.target),
         terminalSessionId,
       })
-      useWorkspacesStore.getState().setSelectedTerminal(terminalWorktreeKey, terminalSessionId)
+      useWorkspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, terminalSessionId)
       return terminalSessionId
     })
     const closeTerminalByDescriptor = vi.fn((terminalSessionId: string) => {
@@ -525,7 +525,8 @@ describe('useClientEffectIntentRouter', () => {
       return Promise.resolve(true)
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(terminalWorktreeKey, visibleSessionIds),
+      terminalFilesystemTargetSnapshot: () =>
+        terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey, visibleSessionIds),
       createTerminal,
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
@@ -706,16 +707,17 @@ function HookHost() {
   return null
 }
 
-function terminalWorktreeSnapshot(
-  terminalWorktreeKey: string,
+function terminalFilesystemTargetSnapshot(
+  terminalFilesystemTargetKey: string,
   terminalSessionIds: readonly string[],
-): TerminalWorktreeSnapshot {
+): TerminalFilesystemTargetSnapshot {
   const selectedKey =
-    useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] ?? null
+    useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey] ??
+    null
   const sessions = terminalSessionIds.map((terminalSessionId, index) => ({
     type: 'terminal' as const,
     terminalSessionId,
-    terminalWorktreeKey,
+    terminalFilesystemTargetKey,
     index: index + 1,
     title: `terminal ${index + 1}`,
     phase: 'open' as const,
@@ -725,7 +727,7 @@ function terminalWorktreeSnapshot(
   }))
   const selectedSession = sessions.find((session) => session.terminalSessionId === selectedKey) ?? null
   return {
-    terminalWorktreeKey,
+    terminalFilesystemTargetKey,
     selectedDescriptor: selectedSession
       ? {
           terminalSessionId: selectedSession.terminalSessionId,

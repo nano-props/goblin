@@ -1,4 +1,4 @@
-import { terminalSessionUserWorktreeKey } from '#/shared/terminal-session-keys.ts'
+import { terminalSessionUserFilesystemTargetKey } from '#/shared/terminal-session-keys.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface TerminalDirectoryEntry<TUser extends string | number> {
@@ -6,7 +6,7 @@ export interface TerminalDirectoryEntry<TUser extends string | number> {
   readonly userId: TUser
   readonly scope: string
   readonly terminalSessionId: string
-  readonly worktreeId: WorkspaceId
+  readonly executionRootId: WorkspaceId
 }
 
 export interface TerminalDirectoryReservation<TUser extends string | number> {
@@ -14,7 +14,7 @@ export interface TerminalDirectoryReservation<TUser extends string | number> {
   readonly userId: TUser
   readonly scope: string
   readonly terminalSessionId: string
-  readonly worktreeId: WorkspaceId
+  readonly executionRootId: WorkspaceId
 }
 
 export class TerminalDirectory<TUser extends string | number, TEntry extends TerminalDirectoryEntry<TUser>> {
@@ -22,7 +22,7 @@ export class TerminalDirectory<TUser extends string | number, TEntry extends Ter
   private readonly runtimeIdByUserSession = new Map<string, string>()
   private readonly reservationsByRuntimeId = new Map<string, TerminalDirectoryReservation<TUser>>()
   private readonly reservedRuntimeIdByUserSession = new Map<string, string>()
-  private readonly runtimeIdsByUserWorktree = new Map<string, Set<string>>()
+  private readonly runtimeIdsByUserFilesystemTarget = new Map<string, Set<string>>()
   private readonly catalogRevisionByScope = new Map<string, number>()
 
   private publish(entry: TEntry): void {
@@ -31,11 +31,11 @@ export class TerminalDirectory<TUser extends string | number, TEntry extends Ter
     if (this.runtimeIdByUserSession.has(durableKey)) throw new Error('terminal directory durable identity conflict')
     this.entriesByRuntimeId.set(entry.id, entry)
     this.runtimeIdByUserSession.set(durableKey, entry.id)
-    const worktreeKey = terminalSessionUserWorktreeKey(entry)
-    let runtimeIds = this.runtimeIdsByUserWorktree.get(worktreeKey)
+    const filesystemTargetKey = terminalSessionUserFilesystemTargetKey(entry)
+    let runtimeIds = this.runtimeIdsByUserFilesystemTarget.get(filesystemTargetKey)
     if (!runtimeIds) {
       runtimeIds = new Set()
-      this.runtimeIdsByUserWorktree.set(worktreeKey, runtimeIds)
+      this.runtimeIdsByUserFilesystemTarget.set(filesystemTargetKey, runtimeIds)
     }
     runtimeIds.add(entry.id)
     this.advanceCatalogRevision(entry.userId, entry.scope)
@@ -90,8 +90,10 @@ export class TerminalDirectory<TUser extends string | number, TEntry extends Ter
     return runtimeId ? this.entriesByRuntimeId.get(runtimeId) : undefined
   }
 
-  primaryForWorktree(userId: TUser, scope: string, worktreeId: WorkspaceId): TEntry | undefined {
-    const runtimeIds = this.runtimeIdsByUserWorktree.get(terminalSessionUserWorktreeKey({ userId, scope, worktreeId }))
+  primaryForFilesystemTarget(userId: TUser, scope: string, executionRootId: WorkspaceId): TEntry | undefined {
+    const runtimeIds = this.runtimeIdsByUserFilesystemTarget.get(
+      terminalSessionUserFilesystemTargetKey({ userId, scope, executionRootId }),
+    )
     const runtimeId = runtimeIds?.values().next().value
     return runtimeId ? this.entriesByRuntimeId.get(runtimeId) : undefined
   }
@@ -101,10 +103,10 @@ export class TerminalDirectory<TUser extends string | number, TEntry extends Ter
     this.entriesByRuntimeId.delete(entry.id)
     const durableKey = this.userSessionKey(entry.userId, entry.terminalSessionId)
     if (this.runtimeIdByUserSession.get(durableKey) === entry.id) this.runtimeIdByUserSession.delete(durableKey)
-    const worktreeKey = terminalSessionUserWorktreeKey(entry)
-    const runtimeIds = this.runtimeIdsByUserWorktree.get(worktreeKey)
+    const filesystemTargetKey = terminalSessionUserFilesystemTargetKey(entry)
+    const runtimeIds = this.runtimeIdsByUserFilesystemTarget.get(filesystemTargetKey)
     runtimeIds?.delete(entry.id)
-    if (runtimeIds?.size === 0) this.runtimeIdsByUserWorktree.delete(worktreeKey)
+    if (runtimeIds?.size === 0) this.runtimeIdsByUserFilesystemTarget.delete(filesystemTargetKey)
     this.advanceCatalogRevision(entry.userId, entry.scope)
     return true
   }
@@ -165,6 +167,6 @@ function reservationMatchesEntry<TUser extends string | number>(
     entry.userId === identity.userId &&
     entry.scope === identity.scope &&
     entry.terminalSessionId === identity.terminalSessionId &&
-    entry.worktreeId === identity.worktreeId
+    entry.executionRootId === identity.executionRootId
   )
 }

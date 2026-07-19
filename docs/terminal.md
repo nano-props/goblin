@@ -233,8 +233,8 @@ Terminal creation has three architecture layers:
   and exact route commit for the created `terminalSessionId`.
 
 While `TerminalSessionProjection` reports `createPending` for a
-`terminalWorktreeKey`, ordinary user-driven workspace-pane navigation for that
-repo/branch/worktree should fast-fail at the operation entry point:
+`terminalFilesystemTargetKey`, ordinary user-driven workspace-pane navigation for that
+filesystem target should fast-fail at the operation entry point:
 tab switching, terminal selection, tab closing, shortcuts, history restore,
 notification jumps, and static-tab opens should not enqueue competing
 navigation. A command-owned route commit is different: it is the committed
@@ -349,7 +349,7 @@ The terminal system relies on these identity/grouping scopes:
 - **userId**: the server-side terminal user derived from the authenticated access token. Session visibility, lifecycle cleanup, and realtime fanout are partitioned by this id.
 - **clientId**: the logical client for one browser tab or Electron client. It validates and routes requests and is also the code-level controller identity (`TerminalController.clientId`).
 - **terminalSessionId**: the server-allocated persistent identity for one terminal business session. Terminal workspace-pane runtime tabs store this value as their generic `runtimeSessionId`.
-- **terminalWorktreeKey**: the repo/worktree grouping key produced by `formatTerminalWorktreeKey(repoRoot, worktreePath)`. It is used for per-worktree selection, tab-strip grouping, bell/activity summaries, and materialization callbacks. It is not a terminal identity.
+- **terminalFilesystemTargetKey**: the runtime-neutral grouping key produced by `formatTerminalFilesystemTargetKey(workspaceId, executionRootId)`. It is used for per-filesystem-target selection, tab-strip grouping, bell/activity summaries, and materialization callbacks. It does not contain `workspaceRuntimeId` and is not a terminal identity or execution authority.
 - **terminalRuntimeSessionId**: the server-owned runtime lookup id used by attach,
   write, resize, restart, close, and realtime messages. It is not a
   guarantee that a live OS PTY handle exists at that instant; `phase`
@@ -359,7 +359,7 @@ The terminal system relies on these identity/grouping scopes:
   changing `terminalSessionId`.
 - **terminal attachment**: the conceptual relationship between a `clientId` and a terminal session. There is intentionally no separate `attachmentId` field, and none is planned. One client should have at most one Terminal View for a given `terminalSessionId`; cross-client viewing/control is modeled with `clientId`, controller/viewer state, and explicit takeover.
 
-This means terminal identity is not encoded from repo/worktree strings. Repo and worktree location travel as explicit fields on session summaries and as `terminalWorktreeKey` only where a grouped lookup is needed.
+This means terminal identity is not encoded from filesystem locations. Runtime-scoped execution travels as `TerminalExecutionTarget`; `terminalFilesystemTargetKey` is used only where a runtime-neutral grouped lookup is needed.
 
 This identity model is the basis for reconnect, mirror mode, controller handoff, and multi-window coherence.
 
@@ -558,11 +558,11 @@ The terminal feature uses all three app state classes:
 
 ### Restorable state
 
-- preferred selected terminal per worktree
+- preferred selected terminal per filesystem target
 
 Terminal selection is intentionally a client preference, not runtime-coherent
 terminal truth. The server owns which sessions exist and who controls them;
-each client may remember which terminal it prefers to show for a worktree.
+each client may remember which terminal it prefers to show for a filesystem target.
 
 The server should own runtime-coherent terminal truth.
 The client may cache and project it, but should not invent parallel business truth.

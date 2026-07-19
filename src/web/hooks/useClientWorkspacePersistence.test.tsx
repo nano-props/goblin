@@ -4,7 +4,7 @@ import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { workspaceLocatorForPath, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -77,7 +77,7 @@ describe('useClientWorkspacePersistence', () => {
       workspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
       worktreePath,
     })
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(
       workspaceIdForTest('goblin+file:///tmp/repo'),
       worktreePath,
     )
@@ -95,8 +95,8 @@ describe('useClientWorkspacePersistence', () => {
       workspaces: { [repo.id]: repo },
       workspaceOrder: [repo.id],
       restoredWorkspaceId: repo.id,
-      selectedTerminalSessionIdByTerminalWorktree: {
-        [terminalWorktreeKey]: 'term-111111111111111111111',
+      selectedTerminalSessionIdByTerminalFilesystemTarget: {
+        [terminalFilesystemTargetKey]: 'term-111111111111111111111',
       },
       workspaceMembershipReady: true,
       sessionPersistenceReady: true,
@@ -113,8 +113,8 @@ describe('useClientWorkspacePersistence', () => {
 
     expect(writePresentationMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        selectedTerminalSessionIdByTerminalWorktree: {
-          [terminalWorktreeKey]: 'term-111111111111111111111',
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {
+          [terminalFilesystemTargetKey]: 'term-111111111111111111111',
         },
         preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///tmp/repo': { [targetKey]: 'history' } },
         filetreeViewStateByWorktreeByWorkspace: {
@@ -166,12 +166,12 @@ describe('useClientWorkspacePersistence', () => {
 
     act(() => {
       useWorkspacesStore.setState({
-        selectedTerminalSessionIdByTerminalWorktree: {
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-111111111111111111111',
         },
       })
       useWorkspacesStore.setState({
-        selectedTerminalSessionIdByTerminalWorktree: {
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-222222222222222222222',
         },
       })
@@ -183,7 +183,7 @@ describe('useClientWorkspacePersistence', () => {
     expect(writePresentationMock).toHaveBeenCalledOnce()
     expect(writePresentationMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        selectedTerminalSessionIdByTerminalWorktree: {
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-222222222222222222222',
         },
       }),
@@ -209,7 +209,7 @@ describe('useClientWorkspacePersistence', () => {
 
     act(() => {
       useWorkspacesStore.setState({
-        selectedTerminalSessionIdByTerminalWorktree: {
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-333333333333333333333',
         },
       })
@@ -221,7 +221,7 @@ describe('useClientWorkspacePersistence', () => {
     expect(writePresentationMock).toHaveBeenCalledOnce()
     expect(writePresentationMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        selectedTerminalSessionIdByTerminalWorktree: {
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-333333333333333333333',
         },
       }),

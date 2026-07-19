@@ -7,7 +7,7 @@ import {
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
@@ -72,7 +72,7 @@ describe('client effect intent plans', () => {
       workspaceId: repo.id,
       branch: 'feature/test',
       terminalSessionId: 'term-222222222222222222222',
-      terminalWorktreeKey: formatTerminalWorktreeKeyForPath(GIT_WORKSPACE_ID, '/tmp/repo-feature'),
+      terminalFilesystemTargetKey: formatTerminalFilesystemTargetKeyForPath(GIT_WORKSPACE_ID, '/tmp/repo-feature'),
     })
   })
 

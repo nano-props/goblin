@@ -240,7 +240,7 @@ function entry(kind: 'dashboard' | 'newWorktree' | 'branch', branchName?: string
         kind,
         branchName: branchName ?? 'feature/test',
         workspacePaneTab: null,
-        terminalWorktreeKey: null,
+        terminalFilesystemTargetKey: null,
         terminalSessionId: null,
       },
     }
@@ -270,7 +270,7 @@ function branchEntry({
       kind: 'branch',
       branchName: 'feature/a',
       workspacePaneTab: tab,
-      terminalWorktreeKey: 'goblin+file:///tmp/repo\0goblin+file:///tmp/repo-worktree',
+      terminalFilesystemTargetKey: 'goblin+file:///tmp/repo\0goblin+file:///tmp/repo-worktree',
       terminalSessionId,
     },
   }

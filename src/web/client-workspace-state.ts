@@ -10,7 +10,7 @@ import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.
 import { sessionLog } from '#/web/logger.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { invokeNativeIpcPath } from '#/web/native-host-client.ts'
-import { parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { parseTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import {
   canonicalWorkspaceLocator,
   toSafeCanonicalWorkspaceId,
@@ -63,8 +63,8 @@ export function normalizeClientWorkspaceState(value: unknown): ClientWorkspaceSt
   return {
     restoredWorkspaceId: toSafeCanonicalWorkspaceId(raw.restoredWorkspaceId),
     ...layout,
-    selectedTerminalSessionIdByTerminalWorktree: normalizeSelectedTerminals(
-      raw.selectedTerminalSessionIdByTerminalWorktree,
+    selectedTerminalSessionIdByTerminalFilesystemTarget: normalizeSelectedTerminals(
+      raw.selectedTerminalSessionIdByTerminalFilesystemTarget,
     ),
     preferredWorkspacePaneTabByTargetByWorkspace: normalizePreferredTabs(
       raw.preferredWorkspacePaneTabByTargetByWorkspace,
@@ -77,7 +77,7 @@ function normalizeSelectedTerminals(value: unknown): Record<string, string> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const result: Record<string, string> = {}
   for (const [key, sessionId] of Object.entries(value)) {
-    const parsed = parseTerminalWorktreeKey(key)
+    const parsed = parseTerminalFilesystemTargetKey(key)
     if (!parsed) continue
     if (typeof sessionId !== 'string' || !sessionId) continue
     result[key] = sessionId
@@ -111,7 +111,8 @@ function normalizeFiletreeState(value: unknown): ClientWorkspaceState['filetreeV
   const result: ClientWorkspaceState['filetreeViewStateByWorktreeByWorkspace'] = {}
   for (const [workspaceId, rawByWorktree] of Object.entries(value)) {
     const safeWorkspaceId = toSafeCanonicalWorkspaceId(workspaceId)
-    if (!safeWorkspaceId || !rawByWorktree || typeof rawByWorktree !== 'object' || Array.isArray(rawByWorktree)) continue
+    if (!safeWorkspaceId || !rawByWorktree || typeof rawByWorktree !== 'object' || Array.isArray(rawByWorktree))
+      continue
     const byWorktree: Record<string, FiletreeSessionViewState> = {}
     for (const [worktreeId, rawSnapshot] of Object.entries(rawByWorktree)) {
       const snapshot = normalizeFiletreeSnapshot(rawSnapshot)

@@ -1,7 +1,7 @@
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
-import { terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
+import { terminalSessionExecutionPath } from '#/server/terminal/terminal-session-scope.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
@@ -18,7 +18,7 @@ const worktreeRemovalLogger = serverLogger.child({ module: 'worktree-removal-app
 interface WorktreeRemovalApplicationDependencies {
   worktreeOperations: PhysicalWorktreeOperationCoordinator
   physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
-  terminalWorktree: Pick<TerminalSessionManager<string>, 'closeSessionsForPhysicalWorktree'>
+  terminalSessions: Pick<TerminalSessionManager<string>, 'closeSessionsForPhysicalWorktree'>
   workspaceTabs: Pick<
     WorkspacePaneTabsCoordinator,
     'physicalWorktreeTargets' | 'reconcilePhysicalWorktreeAfterRemovalFailure' | 'clearPhysicalWorktreeIndex'
@@ -52,7 +52,7 @@ export class WorktreeRemovalApplication {
     },
   ): Promise<ExecResult> {
     if (!this.isCurrentRuntime(userId, input)) return { ok: false, message: 'error.workspace-runtime-stale' }
-    const worktreePath = terminalSessionWorktreePath(input.repoRoot, input.worktreePath)
+    const worktreePath = terminalSessionExecutionPath(input.repoRoot, input.worktreePath)
     let physicalCapability: PhysicalWorktreeExecutionCapability
     try {
       physicalCapability = await this.deps.physicalWorktrees.capture({
@@ -173,7 +173,7 @@ export class WorktreeRemovalApplication {
       }
   > {
     const targets = this.deps.workspaceTabs.physicalWorktreeTargets(physicalWorktreeCapability)
-    const terminal = await this.deps.terminalWorktree.closeSessionsForPhysicalWorktree(physicalWorktreeCapability)
+    const terminal = await this.deps.terminalSessions.closeSessionsForPhysicalWorktree(physicalWorktreeCapability)
     const scopes = uniqueScopes([
       ...terminal.scopes.map(({ workspaceId, ...item }) => ({ ...item, repoRoot: workspaceId, worktreePath })),
       ...targets.map(({ userId, scope, target }) => ({

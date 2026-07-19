@@ -70,7 +70,7 @@ describe('settings-client', () => {
             restoredWorkspaceId: null,
             zenMode: true,
             workspacePaneSize: 50,
-            selectedTerminalSessionIdByTerminalWorktree: {},
+            selectedTerminalSessionIdByTerminalFilesystemTarget: {},
             workspacePaneTabsByTargetByWorkspace: {},
           },
           recentWorkspaces: [],

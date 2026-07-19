@@ -86,7 +86,7 @@ interface TerminalSessionView<TUser extends string | number> extends TerminalPty
   scope: string
   presentation: TerminalPresentation | null
   terminalSessionId: string
-  readonly worktreeId: WorkspaceId
+  readonly executionRootId: WorkspaceId
   target: TerminalExecutionTarget
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   ptyBinding: TerminalPtyBinding<TerminalSessionView<TUser>>
@@ -257,7 +257,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       scope,
       presentation: null,
       terminalSessionId: input.terminalSessionId,
-      worktreeId: coordinates.worktreeId,
+      executionRootId: coordinates.executionRootId,
       target: input.target,
       physicalWorktreeCapability: input.physicalWorktreeCapability,
       cwd,
@@ -285,7 +285,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       userId,
       scope,
       terminalSessionId: input.terminalSessionId,
-      worktreeId: coordinates.worktreeId,
+      executionRootId: coordinates.executionRootId,
     })
     if (!reservation) return { ok: false, message: 'error.unavailable' }
     let committedEffect: ReturnType<typeof attachTerminalClient> | null = null
@@ -834,8 +834,12 @@ export class TerminalSessionManager<TUser extends string | number> {
     return this.directory.entriesForScope(userId, scope).map((session) => this.sessionSummary(session))
   }
 
-  primaryTerminalSessionIdForWorktree(userId: TUser, scope: string, worktreeId: WorkspaceId): string | null {
-    return this.directory.primaryForWorktree(userId, scope, worktreeId)?.terminalSessionId ?? null
+  primaryTerminalSessionIdForFilesystemTarget(
+    userId: TUser,
+    scope: string,
+    executionRootId: WorkspaceId,
+  ): string | null {
+    return this.directory.primaryForFilesystemTarget(userId, scope, executionRootId)?.terminalSessionId ?? null
   }
 
   terminalSessionsSnapshotForUser(userId: TUser, scope: string): TerminalSessionsSnapshot {
@@ -1308,6 +1312,6 @@ function sameTerminalScope<TUser extends string | number>(
   return (
     current.workspaceId === requested.workspaceId &&
     current.workspaceRuntimeId === requested.workspaceRuntimeId &&
-    current.worktreeId === requested.worktreeId
+    current.executionRootId === requested.executionRootId
   )
 }

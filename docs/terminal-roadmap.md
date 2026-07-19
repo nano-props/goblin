@@ -115,7 +115,7 @@ validation and repo-runtime guard wiring. The previously inline
 responsibilities are split into focused server modules:
 
 - `terminal-session-creator.ts` owns create orchestration
-- `terminal-session-create-coordinator.ts` owns per-worktree create queueing and terminal session id allocation
+- `terminal-session-create-coordinator.ts` owns per-filesystem-target create queueing and terminal session id allocation
 - `terminal-session-ensurer.ts` owns local/remote session ensure input construction
 - `terminal-session-pruner.ts` owns removed-worktree session pruning
 - workspace-pane runtime tab modules own workspace tab operation queueing,

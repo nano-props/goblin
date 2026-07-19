@@ -26,7 +26,7 @@ import {
 import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacesLog } from '#/web/logger.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { parseTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import { acceptRemoteWorkspaceLifecycleSnapshot } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
@@ -404,14 +404,17 @@ function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string): Partia
   const workspace = s.workspaces[id]
   if (!workspace) return s
   const workspaces = { ...s.workspaces }
-  const selectedTerminalSessionIdByTerminalWorktree = { ...s.selectedTerminalSessionIdByTerminalWorktree }
+  const selectedTerminalSessionIdByTerminalFilesystemTarget = {
+    ...s.selectedTerminalSessionIdByTerminalFilesystemTarget,
+  }
   const tabOpenerIdentityByScope = { ...s.tabOpenerIdentityByScope }
   const navigationHistoryByWorkspace = { ...s.navigationHistoryByWorkspace }
   delete workspaces[id]
   delete navigationHistoryByWorkspace[id]
-  for (const terminalWorktreeKey of Object.keys(selectedTerminalSessionIdByTerminalWorktree)) {
-    const target = parseTerminalWorktreeKey(terminalWorktreeKey)
-    if (target?.workspaceId === id) delete selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
+  for (const terminalFilesystemTargetKey of Object.keys(selectedTerminalSessionIdByTerminalFilesystemTarget)) {
+    const target = parseTerminalFilesystemTargetKey(terminalFilesystemTargetKey)
+    if (target?.workspaceId === id)
+      delete selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey]
   }
   for (const scopeKey of Object.keys(tabOpenerIdentityByScope)) {
     if (scopeKey.startsWith(`${id}\0`)) delete tabOpenerIdentityByScope[scopeKey]
@@ -433,10 +436,10 @@ function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string): Partia
           s.restoredClientWorkspaceBaseline.filetreeViewStateByWorktreeByWorkspace,
           id,
         ),
-        selectedTerminalSessionIdByTerminalWorktree: Object.fromEntries(
-          Object.entries(s.restoredClientWorkspaceBaseline.selectedTerminalSessionIdByTerminalWorktree).filter(
+        selectedTerminalSessionIdByTerminalFilesystemTarget: Object.fromEntries(
+          Object.entries(s.restoredClientWorkspaceBaseline.selectedTerminalSessionIdByTerminalFilesystemTarget).filter(
             ([key]) => {
-              const target = parseTerminalWorktreeKey(key)
+              const target = parseTerminalFilesystemTargetKey(key)
               return target?.workspaceId !== id
             },
           ),
@@ -445,7 +448,7 @@ function removeWorkspaceFromSessionState(s: WorkspacesStore, id: string): Partia
     : null
   return {
     workspaces,
-    selectedTerminalSessionIdByTerminalWorktree,
+    selectedTerminalSessionIdByTerminalFilesystemTarget,
     tabOpenerIdentityByScope,
     navigationHistoryByWorkspace,
     workspaceOrder,

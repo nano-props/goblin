@@ -3,7 +3,7 @@ import { createPrimaryWindowNavigationActions as createPrimaryWindowNavigationAc
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import { createRepoBranch, resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
+import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type {
   WorkspaceNavigationHistoryEntry,
@@ -17,7 +17,7 @@ import {
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { emptyWorkspace, replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -32,7 +32,7 @@ const BRANCH_NAME = 'feature/create-pending'
 const presentationOptions = (options: { replace?: boolean; returnTo?: string | null } = {}) =>
   expect.objectContaining({ ...options, presentationToken: expect.any(Object) })
 const WORKTREE_PATH = '/tmp/navigation-actions-worktree'
-const WORKTREE_KEY = formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH)
+const WORKTREE_KEY = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
 
 beforeEach(() => {
   resetWorkspacesStore()
@@ -72,7 +72,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     'keeps workspace terminal selection and preference atomic when presentation is %s',
     (_state, accepted, commit) => {
       const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
-      const terminalKey = formatTerminalWorktreeKeyForPath(REPO_ID, REPO_ID)
+      const terminalKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, REPO_ID)
       useWorkspacesStore.getState().setSelectedTerminal(terminalKey, 'term-111111111111111111111')
       useWorkspacesStore
         .getState()
@@ -95,7 +95,7 @@ describe('createPrimaryWindowNavigationActions', () => {
           terminalSessionId: 'term-222222222222222222222',
         }),
       ).toBe(accepted)
-      expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalKey]).toBe(
+      expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalKey]).toBe(
         commit ? 'term-222222222222222222222' : 'term-111111111111111111111',
       )
       expect(
@@ -203,7 +203,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       kind: 'branch',
       branchName: 'feature/stale',
       workspacePaneTab: null,
-      terminalWorktreeKey: null,
+      terminalFilesystemTargetKey: null,
       terminalSessionId: null,
     },
     {
@@ -457,7 +457,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       presentationOptions(),
     )
     expect(preferredWorkspacePaneTab()).toBe('terminal')
-    expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe(
+    expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[WORKTREE_KEY]).toBe(
       'term-111111111111111111111',
     )
   })
@@ -470,7 +470,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       preferredWorkspacePaneTab: 'status',
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => createPendingWorktreeSnapshot(),
+      terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
     })
@@ -497,7 +497,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       preferredWorkspacePaneTab: 'status',
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => createPendingWorktreeSnapshot(),
+      terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
     })
@@ -572,14 +572,14 @@ describe('createPrimaryWindowNavigationActions', () => {
         kind: 'branch',
         branchName: BRANCH_NAME,
         workspacePaneTab: 'status',
-        terminalWorktreeKey: WORKTREE_KEY,
+        terminalFilesystemTargetKey: WORKTREE_KEY,
         terminalSessionId: null,
       },
     } satisfies WorkspaceNavigationHistoryEntry
     useWorkspacesStore.getState().recordWorkspaceNavigation(dashboard)
     useWorkspacesStore.getState().recordWorkspaceNavigation(branch)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => createPendingWorktreeSnapshot(),
+      terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
     })
@@ -673,7 +673,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     const entry = branchHistoryEntry(REPO_ID, BRANCH_NAME, 'status')
     useWorkspacesStore.getState().recordWorkspaceNavigation(entry)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => createPendingWorktreeSnapshot(),
+      terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
     })
@@ -841,7 +841,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     const entry = branchHistoryEntry(REPO_ID, BRANCH_NAME, 'status')
     useWorkspacesStore.getState().recordWorkspaceNavigation(entry)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => createPendingWorktreeSnapshot(),
+      terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
     })
@@ -943,7 +943,7 @@ describe('createPrimaryWindowNavigationActions', () => {
         kind: 'branch' as const,
         branchName: 'feature/test',
         workspacePaneTab: null,
-        terminalWorktreeKey: null,
+        terminalFilesystemTargetKey: null,
         terminalSessionId: null,
       },
     }
@@ -1018,7 +1018,7 @@ describe('createPrimaryWindowNavigationActions', () => {
         kind: 'branch',
         branchName: BRANCH_NAME,
         workspacePaneTab: null,
-        terminalWorktreeKey: null,
+        terminalFilesystemTargetKey: null,
         terminalSessionId: null,
       },
     } satisfies WorkspaceNavigationHistoryEntry
@@ -1055,7 +1055,7 @@ describe('createPrimaryWindowNavigationActions', () => {
         kind: 'branch' as const,
         branchName: 'feature/test',
         workspacePaneTab: 'terminal' as const,
-        terminalWorktreeKey: 'goblin+file:///tmp/repo-a\0goblin+file:///tmp/worktree',
+        terminalFilesystemTargetKey: 'goblin+file:///tmp/repo-a\0goblin+file:///tmp/worktree',
         terminalSessionId: null,
       },
     }
@@ -1145,7 +1145,7 @@ function branchHistoryEntry(
       kind: 'branch',
       branchName,
       workspacePaneTab,
-      terminalWorktreeKey: null,
+      terminalFilesystemTargetKey: null,
       terminalSessionId: null,
     },
   }
@@ -1248,9 +1248,9 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
   }
 }
 
-function createPendingWorktreeSnapshot(): TerminalWorktreeSnapshot {
+function createPendingWorktreeSnapshot(): TerminalFilesystemTargetSnapshot {
   return {
-    terminalWorktreeKey: WORKTREE_KEY,
+    terminalFilesystemTargetKey: WORKTREE_KEY,
     selectedDescriptor: null,
     sessions: [],
     count: 0,

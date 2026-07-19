@@ -106,7 +106,7 @@ export interface ClientWorkspaceState {
   restoredWorkspaceId: WorkspaceId | null
   zenMode: boolean
   workspacePaneSize: number
-  selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
+  selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>
   /** Per-workspace, per-target pane tab preference that session restore can make renderable. */
   preferredWorkspacePaneTabByTargetByWorkspace: Record<string, Record<string, WorkspacePaneSessionTabType | null>>
   /** Per-workspace, per-filesystem-target file tree view state. */
@@ -166,13 +166,15 @@ export type GitProjectedRestoredWorkspaceRuntime = Omit<RestoredWorkspaceRuntime
     gitProjection: GitWorkspaceRuntimeProjection
   }
 
-export type RestoredWorkspaceRuntimeWithoutGitProjection = RestoredWorkspaceRuntimeBase & RestoredWorkspaceTransport & {
-  // Git may be conclusively unavailable or its projection may be deferred.
-  // Workspace session projection state is derived separately from the probe.
-  gitProjection: null
-}
+export type RestoredWorkspaceRuntimeWithoutGitProjection = RestoredWorkspaceRuntimeBase &
+  RestoredWorkspaceTransport & {
+    // Git may be conclusively unavailable or its projection may be deferred.
+    // Workspace session projection state is derived separately from the probe.
+    gitProjection: null
+  }
 
-export type RestoredWorkspaceRuntime = GitProjectedRestoredWorkspaceRuntime | RestoredWorkspaceRuntimeWithoutGitProjection
+export type RestoredWorkspaceRuntime =
+  GitProjectedRestoredWorkspaceRuntime | RestoredWorkspaceRuntimeWithoutGitProjection
 
 export function hasRestoredWorkspaceGitProjection(
   workspace: RestoredWorkspaceRuntime,

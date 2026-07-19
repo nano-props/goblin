@@ -16,46 +16,46 @@ function requiredWorkspaceLocator(input: string) {
 
 describe('terminal session create coordinator', () => {
   test('reuses an existing worktree session for primary creates', async () => {
-    const primaryTerminalSessionIdForWorktree = vi.fn(() => 'term-existingexisting00001')
+    const primaryTerminalSessionIdForFilesystemTarget = vi.fn(() => 'term-existingexisting00001')
     const createSessionId = vi.fn(() => 'term-newnewnewnewnewnewnew')
     const coordinator = createTerminalSessionCreateCoordinator({
       manager: {
-        primaryTerminalSessionIdForWorktree,
+        primaryTerminalSessionIdForFilesystemTarget,
       },
       createSessionId,
     })
 
     await expect(
       coordinator.withSessionIdAllocation(
-        { userId: USER_ID, scope: SCOPE, worktreeId: WORKTREE_ROOT, kind: 'primary' },
+        { userId: USER_ID, scope: SCOPE, executionRootId: WORKTREE_ROOT, kind: 'primary' },
         async ({ terminalSessionId }) => terminalSessionId,
       ),
     ).resolves.toBe('term-existingexisting00001')
     expect(createSessionId).not.toHaveBeenCalled()
-    expect(primaryTerminalSessionIdForWorktree).toHaveBeenCalledOnce()
-    expect(primaryTerminalSessionIdForWorktree).toHaveBeenCalledWith(USER_ID, SCOPE, WORKTREE_ROOT)
+    expect(primaryTerminalSessionIdForFilesystemTarget).toHaveBeenCalledOnce()
+    expect(primaryTerminalSessionIdForFilesystemTarget).toHaveBeenCalledWith(USER_ID, SCOPE, WORKTREE_ROOT)
   })
 
   test('allocates an additional durable id without consulting the primary index', async () => {
-    const primaryTerminalSessionIdForWorktree = vi.fn(() => 'term-existingexisting00001')
+    const primaryTerminalSessionIdForFilesystemTarget = vi.fn(() => 'term-existingexisting00001')
     const coordinator = createTerminalSessionCreateCoordinator({
-      manager: { primaryTerminalSessionIdForWorktree },
+      manager: { primaryTerminalSessionIdForFilesystemTarget },
       createSessionId: () => 'term-additionaladditional01',
     })
 
     await expect(
       coordinator.withSessionIdAllocation(
-        { userId: USER_ID, scope: SCOPE, worktreeId: WORKTREE_ROOT, kind: 'additional' },
+        { userId: USER_ID, scope: SCOPE, executionRootId: WORKTREE_ROOT, kind: 'additional' },
         async ({ terminalSessionId }) => terminalSessionId,
       ),
     ).resolves.toBe('term-additionaladditional01')
-    expect(primaryTerminalSessionIdForWorktree).not.toHaveBeenCalled()
+    expect(primaryTerminalSessionIdForFilesystemTarget).not.toHaveBeenCalled()
   })
 
   test('serializes creates for the same user scope and worktree', async () => {
     const coordinator = createTerminalSessionCreateCoordinator({
       manager: {
-        primaryTerminalSessionIdForWorktree: vi.fn(() => null),
+        primaryTerminalSessionIdForFilesystemTarget: vi.fn(() => null),
       },
       createSessionId: () => 'term-unusedunusedunused001',
     })
@@ -68,8 +68,8 @@ describe('terminal session create coordinator', () => {
     const firstTaskStarted = new Promise<void>((resolve) => {
       markFirstTaskStarted = resolve
     })
-    const firstTask = coordinator.runInWorktreeQueue(
-      { userId: USER_ID, scope: SCOPE, worktreeId: WORKTREE_ROOT },
+    const firstTask = coordinator.runInFilesystemTargetQueue(
+      { userId: USER_ID, scope: SCOPE, executionRootId: WORKTREE_ROOT },
       async () => {
         events.push('first-start')
         markFirstTaskStarted()
@@ -79,8 +79,8 @@ describe('terminal session create coordinator', () => {
     )
 
     await firstTaskStarted
-    const secondTask = coordinator.runInWorktreeQueue(
-      { userId: USER_ID, scope: SCOPE, worktreeId: WORKTREE_ROOT },
+    const secondTask = coordinator.runInFilesystemTargetQueue(
+      { userId: USER_ID, scope: SCOPE, executionRootId: WORKTREE_ROOT },
       async () => {
         events.push('second-start')
       },
@@ -97,7 +97,7 @@ describe('terminal session create coordinator', () => {
   test('allows creates for different worktrees to run independently', async () => {
     const coordinator = createTerminalSessionCreateCoordinator({
       manager: {
-        primaryTerminalSessionIdForWorktree: vi.fn(() => null),
+        primaryTerminalSessionIdForFilesystemTarget: vi.fn(() => null),
       },
       createSessionId: () => 'term-unusedunusedunused001',
     })
@@ -110,8 +110,8 @@ describe('terminal session create coordinator', () => {
     const firstTaskStarted = new Promise<void>((resolve) => {
       markFirstTaskStarted = resolve
     })
-    const firstTask = coordinator.runInWorktreeQueue(
-      { userId: USER_ID, scope: SCOPE, worktreeId: WORKTREE_ROOT },
+    const firstTask = coordinator.runInFilesystemTargetQueue(
+      { userId: USER_ID, scope: SCOPE, executionRootId: WORKTREE_ROOT },
       async () => {
         events.push('first-start')
         markFirstTaskStarted()
@@ -121,8 +121,12 @@ describe('terminal session create coordinator', () => {
     )
 
     await firstTaskStarted
-    await coordinator.runInWorktreeQueue(
-      { userId: USER_ID, scope: SCOPE, worktreeId: requiredWorkspaceLocator('goblin+file:///repo/other-worktree') },
+    await coordinator.runInFilesystemTargetQueue(
+      {
+        userId: USER_ID,
+        scope: SCOPE,
+        executionRootId: requiredWorkspaceLocator('goblin+file:///repo/other-worktree'),
+      },
       async () => {
         events.push('second-start')
       },

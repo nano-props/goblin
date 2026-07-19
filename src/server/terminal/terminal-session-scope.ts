@@ -27,14 +27,14 @@ export function terminalSessionRuntimeScope(workspaceId: WorkspaceId, workspaceR
   return `${terminalSessionScope(workspaceId)}\0${workspaceRuntimeId}`
 }
 
-export function terminalSessionWorktreePath(workspaceId: WorkspaceId, worktreePath: string): string {
+export function terminalSessionExecutionPath(workspaceId: WorkspaceId, executionPath: string): string {
   const workspace = parseCanonicalWorkspaceLocator(workspaceId)
   if (!workspace) throw new Error('error.workspace-locator-malformed')
-  if (worktreePath === workspaceId) return workspace.path
-  return workspace.transport === 'ssh' ? worktreePath : path.resolve(worktreePath)
+  if (executionPath === workspaceId) return workspace.path
+  return workspace.transport === 'ssh' ? executionPath : path.resolve(executionPath)
 }
 
-export function terminalSessionTargetWorktreePath(target: RuntimeWorkspacePaneTarget): string | null {
+export function terminalSessionTargetExecutionPath(target: RuntimeWorkspacePaneTarget): string | null {
   if (target.kind === 'git-branch') return null
   const expected = parseCanonicalWorkspaceLocator(target.kind === 'workspace-root' ? target.workspaceId : target.root)
   if (!expected) return null

@@ -1,4 +1,4 @@
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   terminalExecutionCoordinates,
@@ -265,14 +265,17 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
   if (!terminal.bridge) return false
   const { base, bridge } = terminal
   const coordinates = terminalExecutionCoordinates(base.target)
-  const terminalWorktreeKey = formatTerminalWorktreeKey(coordinates.workspaceId, coordinates.worktreeId)
-  const worktree = bridge.terminalWorktreeSnapshot(terminalWorktreeKey)
+  const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKey(
+    coordinates.workspaceId,
+    coordinates.executionRootId,
+  )
+  const worktree = bridge.terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey)
   if (worktree.createPending) return true
   if (worktree.count > 0) {
     const target = terminalCoordinatorTarget(base)
     if (!target) return false
     return await runWorkspacePaneAction(target, async () => {
-      const nextWorktree = bridge.terminalWorktreeSnapshot(terminalWorktreeKey)
+      const nextWorktree = bridge.terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey)
       if (nextWorktree.createPending) return true
       const firstSession = nextWorktree.sessions[0]
       return firstSession ? await terminal.showTerminalSession(firstSession.terminalSessionId) : false

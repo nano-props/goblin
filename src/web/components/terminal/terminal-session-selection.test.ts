@@ -26,7 +26,7 @@ describe('terminal session selection helper', () => {
 
     expect(
       resolveSelectedTerminalSessionId({
-        terminalWorktreeKey: 'repo\0wt',
+        terminalFilesystemTargetKey: 'repo\0wt',
         preferredSessionId: 'term-333333333333333333333',
         currentSessionId: 'term-222222222222222222222',
         controllerSessionId: 'term-111111111111111111111',
@@ -37,7 +37,7 @@ describe('terminal session selection helper', () => {
 
     expect(
       resolveSelectedTerminalSessionId({
-        terminalWorktreeKey: 'repo\0wt',
+        terminalFilesystemTargetKey: 'repo\0wt',
         preferredSessionId: 'missing',
         currentSessionId: 'term-222222222222222222222',
         controllerSessionId: 'term-111111111111111111111',
@@ -48,7 +48,7 @@ describe('terminal session selection helper', () => {
 
     expect(
       resolveSelectedTerminalSessionId({
-        terminalWorktreeKey: 'repo\0wt',
+        terminalFilesystemTargetKey: 'repo\0wt',
         preferredSessionId: null,
         currentSessionId: null,
         controllerSessionId: 'term-111111111111111111111',
@@ -59,7 +59,7 @@ describe('terminal session selection helper', () => {
 
     expect(
       resolveSelectedTerminalSessionId({
-        terminalWorktreeKey: 'repo\0wt',
+        terminalFilesystemTargetKey: 'repo\0wt',
         preferredSessionId: null,
         currentSessionId: null,
         controllerSessionId: null,

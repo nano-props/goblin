@@ -27,7 +27,7 @@ export function restorableWorkspaceStateFromStore(
     | 'restoredWorkspaceId'
     | 'zenMode'
     | 'workspacePaneSize'
-    | 'selectedTerminalSessionIdByTerminalWorktree'
+    | 'selectedTerminalSessionIdByTerminalFilesystemTarget'
   >,
 ): RestorableWorkspaceState {
   return {
@@ -35,7 +35,7 @@ export function restorableWorkspaceStateFromStore(
     restoredWorkspaceId: state.restoredWorkspaceId,
     zenMode: state.zenMode,
     workspacePaneSize: state.workspacePaneSize,
-    selectedTerminalSessionIdByTerminalWorktree: state.selectedTerminalSessionIdByTerminalWorktree,
+    selectedTerminalSessionIdByTerminalFilesystemTarget: state.selectedTerminalSessionIdByTerminalFilesystemTarget,
   }
 }
 

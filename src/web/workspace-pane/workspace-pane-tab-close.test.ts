@@ -32,7 +32,7 @@ import {
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-close-repo')
 const BRANCH_NAME = 'feature/worktree-close'
@@ -164,7 +164,7 @@ test('sends a detached worktree close to the server without requiring a branch',
       ],
     },
   })
-  const terminalWorktreeKey = `${REPO_ID}\0${WORKTREE_PATH}`
+  const terminalFilesystemTargetKey = `${REPO_ID}\0${WORKTREE_PATH}`
   const runtimeTarget = runtimeWorkspacePaneTargetForTest({
     kind: 'git-worktree' as const,
     workspaceId: REPO_ID,
@@ -175,11 +175,11 @@ test('sends a detached worktree close to the server without requiring a branch',
     throw new Error('server close failed')
   })
   setTerminalSessionCommandBridgeForTest({
-    terminalWorktreeSnapshot: () => ({
-      terminalWorktreeKey,
+    terminalFilesystemTargetSnapshot: () => ({
+      terminalFilesystemTargetKey,
       selectedDescriptor: {
         terminalSessionId,
-        terminalWorktreeKey,
+        terminalFilesystemTargetKey,
         index: 1,
         target: runtimeTarget,
         presentation: { kind: 'git-worktree' as const, head: { kind: 'detached' as const } },
@@ -188,7 +188,7 @@ test('sends a detached worktree close to the server without requiring a branch',
         {
           type: 'terminal',
           terminalSessionId,
-          terminalWorktreeKey,
+          terminalFilesystemTargetKey,
           index: 1,
           title: 'terminal 1',
           phase: 'open',
@@ -242,15 +242,17 @@ test('confirmed workspace terminal close selects Files without inventing a branc
     tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
   })
   useWorkspacesStore.getState().setWorkspacePaneTabForTarget(targetInput, 'terminal')
-  useWorkspacesStore.getState().setSelectedTerminal(formatTerminalWorktreeKey(REPO_ID, REPO_ID), terminalSessionId)
-  const terminalWorktreeKey = `${REPO_ID}\0${REPO_ID}`
+  useWorkspacesStore
+    .getState()
+    .setSelectedTerminal(formatTerminalFilesystemTargetKey(REPO_ID, REPO_ID), terminalSessionId)
+  const terminalFilesystemTargetKey = `${REPO_ID}\0${REPO_ID}`
   const closeTerminalByDescriptor = vi.fn(async () => true)
   setTerminalSessionCommandBridgeForTest({
-    terminalWorktreeSnapshot: () => ({
-      terminalWorktreeKey,
+    terminalFilesystemTargetSnapshot: () => ({
+      terminalFilesystemTargetKey,
       selectedDescriptor: {
         terminalSessionId,
-        terminalWorktreeKey,
+        terminalFilesystemTargetKey,
         index: 1,
         target: runtimeTarget,
         presentation: { kind: 'workspace-root' },
@@ -259,7 +261,7 @@ test('confirmed workspace terminal close selects Files without inventing a branc
         {
           type: 'terminal',
           terminalSessionId,
-          terminalWorktreeKey,
+          terminalFilesystemTargetKey,
           index: 1,
           title: 'node',
           phase: 'open',
@@ -282,8 +284,8 @@ test('confirmed workspace terminal close selects Files without inventing a branc
     'terminal',
   )
   expect(
-    useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[
-      formatTerminalWorktreeKey(REPO_ID, REPO_ID)
+    useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[
+      formatTerminalFilesystemTargetKey(REPO_ID, REPO_ID)
     ],
   ).toBe(terminalSessionId)
   const navigation = navigationWith({

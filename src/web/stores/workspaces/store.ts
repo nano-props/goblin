@@ -105,7 +105,7 @@ export const useWorkspacesStore = create<WorkspacesStore>()(
       restoredWorkspaceId: null,
       zenMode: DEFAULT_ZEN_MODE,
       workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
-      selectedTerminalSessionIdByTerminalWorktree: {},
+      selectedTerminalSessionIdByTerminalFilesystemTarget: {},
 
       // Local client-only state.
       workspaceMembershipReady: false,

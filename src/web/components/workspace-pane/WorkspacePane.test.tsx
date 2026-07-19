@@ -8,14 +8,14 @@ import { WorkspacePane } from '#/web/components/workspace-pane/WorkspacePane.tsx
 import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
   EMPTY_TERMINAL_SNAPSHOT,
-  EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
+  EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
   TerminalSessionContext,
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
-  TerminalWorktreeSnapshot,
+  TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
 import {
   terminalExecutionPath,
@@ -49,7 +49,7 @@ import {
 import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { nextWorkspacePaneTabEntryAfterClose } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   createTerminalWithAdmissionForContextTest,
@@ -79,8 +79,8 @@ const presentationOptions = (options: { replace?: boolean } = {}) =>
   expect.objectContaining({ ...options, presentationToken: expect.any(Object) })
 
 const terminalReadContext: TerminalSessionReadContextValue = {
-  terminalWorktreeSnapshot: () => EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
-  subscribeTerminalWorktree: () => () => {},
+  terminalFilesystemTargetSnapshot: () => EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
+  subscribeTerminalFilesystemTarget: () => () => {},
   workspaceBellCount: () => 0,
   subscribeWorkspaceBellCount: () => () => {},
   snapshot: () => EMPTY_TERMINAL_SNAPSHOT,
@@ -280,13 +280,15 @@ describe('WorkspacePane', () => {
       workspaceRuntimeId: repo.workspaceRuntimeId,
       tabs: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
     })
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(workspaceId, worktreePath)
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(workspaceId, worktreePath)
 
     render(
       <QueryClientProvider client={primaryWindowQueryClient}>
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContextWithSession(terminalWorktreeKey, terminalSessionId)}>
+            <TerminalSessionReadContext
+              value={terminalReadContextWithSession(terminalFilesystemTargetKey, terminalSessionId)}
+            >
               <WorkspacePane
                 workspaceId={workspaceId}
                 currentBranchName={null}
@@ -450,7 +452,7 @@ describe('WorkspacePane', () => {
     useWorkspacesStore
       .getState()
       .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: workspaceId }, 'files')
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(workspaceId, workspaceId)
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(workspaceId, workspaceId)
     const closeTerminalByDescriptor = vi.fn(async () => {
       setWorkspacePaneTabsForTargetQueryData({
         kind: 'workspace-root',
@@ -464,9 +466,9 @@ describe('WorkspacePane', () => {
       ...terminalCommandContext,
       closeTerminalByDescriptor,
     })
-    const workspaceTerminalReadContext = terminalReadContextWithSession(terminalWorktreeKey, terminalSessionId)
+    const workspaceTerminalReadContext = terminalReadContextWithSession(terminalFilesystemTargetKey, terminalSessionId)
     const resetTerminalCommandBridge = setTerminalSessionCommandBridgeForTest({
-      terminalWorktreeSnapshot: workspaceTerminalReadContext.terminalWorktreeSnapshot,
+      terminalFilesystemTargetSnapshot: workspaceTerminalReadContext.terminalFilesystemTargetSnapshot,
       createTerminal: terminalCommandContext.createTerminal,
       selectTerminal: terminalCommandContext.selectTerminal,
       closeTerminalByDescriptor,
@@ -474,7 +476,7 @@ describe('WorkspacePane', () => {
     const showWorkspaceRootPaneTab = vi.fn<NonNullable<PrimaryWindowNavigationActions['showWorkspaceRootPaneTab']>>(
       (_repoId, presentation, options) => {
         if (presentation.kind === 'terminal') {
-          useWorkspacesStore.getState().setSelectedTerminal(terminalWorktreeKey, presentation.terminalSessionId)
+          useWorkspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, presentation.terminalSessionId)
         }
         useWorkspacesStore
           .getState()
@@ -513,9 +515,9 @@ describe('WorkspacePane', () => {
     expect(showWorkspaceRootPaneTab).toHaveBeenCalled()
 
     await waitFor(() => expect(screen.getByRole('tabpanel', { name: 'tab.terminal' })).toBeTruthy())
-    expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).toBe(
-      terminalSessionId,
-    )
+    expect(
+      useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey],
+    ).toBe(terminalSessionId)
 
     const terminalChrome = document.querySelector(
       `[data-workspace-pane-tab-tooltip-id="terminal:${terminalSessionId}"]`,
@@ -839,14 +841,14 @@ describe('WorkspacePane', () => {
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const statusEntry = {
       workspaceId: REPO_ID,
       route: {
         kind: 'branch' as const,
         branchName: 'feature/a',
         workspacePaneTab: 'status' as const,
-        terminalWorktreeKey,
+        terminalFilesystemTargetKey,
         terminalSessionId: null,
       },
     }
@@ -856,18 +858,23 @@ describe('WorkspacePane', () => {
         kind: 'branch' as const,
         branchName: 'feature/a',
         workspacePaneTab: 'terminal' as const,
-        terminalWorktreeKey,
+        terminalFilesystemTargetKey,
         terminalSessionId: 'term-111111111111111111111',
       },
     }
     let terminalCreated = false
     const terminalListeners = new Set<() => void>()
-    const createdTerminalReadContext = terminalReadContextWithSession(terminalWorktreeKey, 'term-111111111111111111111')
+    const createdTerminalReadContext = terminalReadContextWithSession(
+      terminalFilesystemTargetKey,
+      'term-111111111111111111111',
+    )
     const readContext: TerminalSessionReadContextValue = {
       ...terminalReadContext,
-      terminalWorktreeSnapshot: (key) =>
-        terminalCreated ? createdTerminalReadContext.terminalWorktreeSnapshot(key) : EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
-      subscribeTerminalWorktree: (_key, listener) => {
+      terminalFilesystemTargetSnapshot: (key) =>
+        terminalCreated
+          ? createdTerminalReadContext.terminalFilesystemTargetSnapshot(key)
+          : EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
+      subscribeTerminalFilesystemTarget: (_key, listener) => {
         terminalListeners.add(listener)
         return () => terminalListeners.delete(listener)
       },
@@ -886,7 +893,7 @@ describe('WorkspacePane', () => {
       })
       terminalCreated = true
       for (const listener of terminalListeners) listener()
-      useWorkspacesStore.getState().setSelectedTerminal(terminalWorktreeKey, terminalSessionId)
+      useWorkspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, terminalSessionId)
       return terminalSessionId
     })
     const route = routeNavigation()
@@ -935,7 +942,7 @@ describe('WorkspacePane', () => {
     rerender(
       workspace(
         { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
-        terminalReadContextWithSession(terminalWorktreeKey, 'term-111111111111111111111'),
+        terminalReadContextWithSession(terminalFilesystemTargetKey, 'term-111111111111111111111'),
       ),
     )
 
@@ -967,8 +974,8 @@ describe('WorkspacePane', () => {
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
-    const readContext = terminalReadContextWithSession(terminalWorktreeKey, 'term-111111111111111111111')
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
+    const readContext = terminalReadContextWithSession(terminalFilesystemTargetKey, 'term-111111111111111111111')
     const route = routeNavigation()
     const expectedCurrentEntry = {
       workspaceId: REPO_ID,
@@ -976,7 +983,7 @@ describe('WorkspacePane', () => {
         kind: 'branch' as const,
         branchName,
         workspacePaneTab: null,
-        terminalWorktreeKey,
+        terminalFilesystemTargetKey,
         terminalSessionId: null,
       },
     }
@@ -1032,8 +1039,8 @@ describe('WorkspacePane', () => {
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
-    useWorkspacesStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-111111111111111111111')
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
+    useWorkspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, 'term-111111111111111111111')
     const route = routeNavigation()
 
     render(
@@ -1041,7 +1048,7 @@ describe('WorkspacePane', () => {
         <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext
-              value={terminalReadContextWithSessions(terminalWorktreeKey, [
+              value={terminalReadContextWithSessions(terminalFilesystemTargetKey, [
                 'term-111111111111111111111',
                 'term-222222222222222222222',
               ])}
@@ -1061,9 +1068,9 @@ describe('WorkspacePane', () => {
     )
 
     await waitFor(() => {
-      expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).toBe(
-        'term-222222222222222222222',
-      )
+      expect(
+        useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey],
+      ).toBe('term-222222222222222222222')
     })
     expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
   })
@@ -1083,8 +1090,8 @@ describe('WorkspacePane', () => {
         ],
       },
     })
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
-    useWorkspacesStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-222222222222222222222')
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
+    useWorkspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, 'term-222222222222222222222')
     const route = routeNavigation()
 
     render(
@@ -1092,7 +1099,7 @@ describe('WorkspacePane', () => {
         <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext
-              value={terminalReadContextWithSessions(terminalWorktreeKey, [
+              value={terminalReadContextWithSessions(terminalFilesystemTargetKey, [
                 'term-111111111111111111111',
                 'term-222222222222222222222',
               ])}
@@ -1117,9 +1124,9 @@ describe('WorkspacePane', () => {
 
     expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
     expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]).toBeUndefined()
-    expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).toBe(
-      'term-222222222222222222222',
-    )
+    expect(
+      useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey],
+    ).toBe('term-222222222222222222222')
   })
 
   test('preserves existing app history when canonicalizing a stale terminal route from another page', async () => {
@@ -1139,7 +1146,7 @@ describe('WorkspacePane', () => {
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     useWorkspacesStore.getState().recordWorkspaceNavigation({ workspaceId: REPO_ID, route: { kind: 'dashboard' } })
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const route = routeNavigation()
 
     render(
@@ -1147,7 +1154,7 @@ describe('WorkspacePane', () => {
         <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext
-              value={terminalReadContextWithSession(terminalWorktreeKey, 'term-111111111111111111111')}
+              value={terminalReadContextWithSession(terminalFilesystemTargetKey, 'term-111111111111111111111')}
             >
               <WorkspacePane
                 workspaceId={REPO_ID}
@@ -1173,7 +1180,7 @@ describe('WorkspacePane', () => {
             kind: 'branch',
             branchName,
             workspacePaneTab: null,
-            terminalWorktreeKey,
+            terminalFilesystemTargetKey,
             terminalSessionId: null,
           },
         },
@@ -1199,10 +1206,10 @@ describe('WorkspacePane', () => {
         ],
       },
     })
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
-    useWorkspacesStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-222222222222222222222')
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
+    useWorkspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, 'term-222222222222222222222')
     const readContext = terminalReadContextWithSessions(
-      terminalWorktreeKey,
+      terminalFilesystemTargetKey,
       ['term-111111111111111111111', 'term-222222222222222222222'],
       'term-222222222222222222222',
     )
@@ -1233,9 +1240,9 @@ describe('WorkspacePane', () => {
 
     expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
     expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]).toBeUndefined()
-    expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).toBe(
-      'term-222222222222222222222',
-    )
+    expect(
+      useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey],
+    ).toBe('term-222222222222222222222')
   })
 
   test('does not reconcile a stale terminal route while terminal creation is pending', async () => {
@@ -1254,7 +1261,7 @@ describe('WorkspacePane', () => {
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const route = routeNavigation()
 
     render(
@@ -1263,7 +1270,7 @@ describe('WorkspacePane', () => {
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext
               value={terminalReadContextWithSessions(
-                terminalWorktreeKey,
+                terminalFilesystemTargetKey,
                 ['term-111111111111111111111'],
                 'term-111111111111111111111',
                 {
@@ -1596,7 +1603,7 @@ describe('WorkspacePane', () => {
         kind: 'branch' as const,
         branchName,
         workspacePaneTab: 'files' as const,
-        terminalWorktreeKey: formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath),
+        terminalFilesystemTargetKey: formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath),
         terminalSessionId: null,
       },
     }
@@ -1730,7 +1737,7 @@ describe('WorkspacePane', () => {
             kind: 'branch',
             branchName,
             workspacePaneTab: null,
-            terminalWorktreeKey: null,
+            terminalFilesystemTargetKey: null,
             terminalSessionId: null,
           },
         },
@@ -1779,7 +1786,7 @@ describe('WorkspacePane', () => {
             kind: 'branch',
             branchName,
             workspacePaneTab: null,
-            terminalWorktreeKey: null,
+            terminalFilesystemTargetKey: null,
             terminalSessionId: null,
           },
         },
@@ -1880,25 +1887,25 @@ function scrollViewport(container: HTMLElement): HTMLDivElement {
 }
 
 function terminalReadContextWithSession(
-  terminalWorktreeKey: string,
+  terminalFilesystemTargetKey: string,
   terminalSessionId: string,
 ): TerminalSessionReadContextValue {
-  return terminalReadContextWithSessions(terminalWorktreeKey, [terminalSessionId], terminalSessionId)
+  return terminalReadContextWithSessions(terminalFilesystemTargetKey, [terminalSessionId], terminalSessionId)
 }
 
 function terminalReadContextWithSessions(
-  terminalWorktreeKey: string,
+  terminalFilesystemTargetKey: string,
   terminalSessionIds: readonly string[],
   selectedTerminalSessionId: string | null = terminalSessionIds[0] ?? null,
   options: { createPending?: boolean } = {},
 ): TerminalSessionReadContextValue {
-  const snapshot: TerminalWorktreeSnapshot = {
-    terminalWorktreeKey,
+  const snapshot: TerminalFilesystemTargetSnapshot = {
+    terminalFilesystemTargetKey,
     selectedDescriptor: null,
     sessions: terminalSessionIds.map((terminalSessionId, index) => ({
       type: 'terminal',
       terminalSessionId,
-      terminalWorktreeKey,
+      terminalFilesystemTargetKey,
       index: index + 1,
       title: terminalSessionId,
       phase: 'open',
@@ -1913,7 +1920,8 @@ function terminalReadContextWithSessions(
   }
   return {
     ...terminalReadContext,
-    terminalWorktreeSnapshot: (key) => (key === terminalWorktreeKey ? snapshot : EMPTY_TERMINAL_WORKTREE_SNAPSHOT),
+    terminalFilesystemTargetSnapshot: (key) =>
+      key === terminalFilesystemTargetKey ? snapshot : EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
   }
 }
 

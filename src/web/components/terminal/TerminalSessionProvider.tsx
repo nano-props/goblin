@@ -20,8 +20,8 @@ interface TerminalSessionProviderProps {
 
 export function TerminalSessionProvider({ children }: TerminalSessionProviderProps) {
   const runtimeMembershipIndex = useTerminalRuntimeMembershipIndex()
-  const selectedTerminalSessionIdByTerminalWorktree = useWorkspacesStore(
-    (s) => s.selectedTerminalSessionIdByTerminalWorktree,
+  const selectedTerminalSessionIdByTerminalFilesystemTarget = useWorkspacesStore(
+    (s) => s.selectedTerminalSessionIdByTerminalFilesystemTarget,
   )
 
   // T1.1: prewarm the terminal font at app startup. The provider lives at
@@ -39,8 +39,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // Projection state sync
   useEffect(() => {
     projection.setRuntimeMembershipIndex(runtimeMembershipIndex)
-    projection.setPreferredSelectedTerminalSessionIds(selectedTerminalSessionIdByTerminalWorktree)
-  }, [projection, runtimeMembershipIndex, selectedTerminalSessionIdByTerminalWorktree])
+    projection.setPreferredSelectedTerminalSessionIds(selectedTerminalSessionIdByTerminalFilesystemTarget)
+  }, [projection, runtimeMembershipIndex, selectedTerminalSessionIdByTerminalFilesystemTarget])
 
   // Projection event wiring (singleton lifecycle, see terminal-roadmap.md P1.7).
   // The projection is client-level; we only subscribe / unsubscribe client
@@ -76,7 +76,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     })
 
     const disposeCommandBridge = setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: projection.terminalWorktreeSnapshot,
+      terminalFilesystemTargetSnapshot: projection.terminalFilesystemTargetSnapshot,
       createTerminal: projection.createTerminal,
       createTerminalWithAdmission: projection.createTerminalWithAdmission,
       selectTerminal: projection.selectTerminal,
@@ -121,8 +121,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   )
   const readValue = useMemo<TerminalSessionReadContextValue>(
     () => ({
-      terminalWorktreeSnapshot: projection.terminalWorktreeSnapshot,
-      subscribeTerminalWorktree: projection.subscribeTerminalWorktree,
+      terminalFilesystemTargetSnapshot: projection.terminalFilesystemTargetSnapshot,
+      subscribeTerminalFilesystemTarget: projection.subscribeTerminalFilesystemTarget,
       workspaceBellCount: projection.workspaceBellCount,
       subscribeWorkspaceBellCount: projection.subscribeWorkspaceBellCount,
       snapshot: projection.snapshot,

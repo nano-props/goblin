@@ -151,7 +151,7 @@ export type TerminalRuntimeMembershipIndex = ReadonlyMap<WorkspaceId, TerminalRu
 
 export interface TerminalSessionSummary {
   type: 'terminal'
-  terminalWorktreeKey: string
+  terminalFilesystemTargetKey: string
   terminalSessionId: string
   index: number
   title: string
@@ -164,8 +164,8 @@ export interface TerminalSessionSummary {
   hasRecentOutput: boolean
 }
 
-export interface TerminalWorktreeSnapshot {
-  terminalWorktreeKey: string
+export interface TerminalFilesystemTargetSnapshot {
+  terminalFilesystemTargetKey: string
   selectedDescriptor: TerminalDescriptor | null
   sessions: TerminalSessionSummary[]
   count: number
@@ -181,9 +181,9 @@ export interface TerminalSessionContextValue {
     options?: TerminalCreateOptions,
     placement?: WorkspacePaneRuntimeTabPlacement,
   ) => Promise<TerminalCreateAdmissionResult>
-  registerHost: (terminalWorktreeKey: string, host: HTMLElement) => void
-  unregisterHost: (terminalWorktreeKey: string, host: HTMLElement) => void
-  selectTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void
+  registerHost: (terminalFilesystemTargetKey: string, host: HTMLElement) => void
+  unregisterHost: (terminalFilesystemTargetKey: string, host: HTMLElement) => void
+  selectTerminal: (terminalFilesystemTargetKey: string, terminalSessionId: string) => void
   scrollToBottom: (terminalSessionId: string) => void
   scrollLines: (terminalSessionId: string, amount: number) => void
   clearBell: (terminalSessionId: string) => boolean
@@ -201,8 +201,8 @@ export interface TerminalSessionContextValue {
 }
 
 export interface TerminalSessionReadContextValue {
-  terminalWorktreeSnapshot: (terminalWorktreeKey: string) => TerminalWorktreeSnapshot
-  subscribeTerminalWorktree: (terminalWorktreeKey: string, listener: () => void) => () => void
+  terminalFilesystemTargetSnapshot: (terminalFilesystemTargetKey: string) => TerminalFilesystemTargetSnapshot
+  subscribeTerminalFilesystemTarget: (terminalFilesystemTargetKey: string, listener: () => void) => () => void
   workspaceBellCount: (workspaceId: WorkspaceId) => number
   subscribeWorkspaceBellCount: (workspaceId: WorkspaceId, listener: () => void) => () => void
   snapshot: (terminalSessionId: string) => TerminalSnapshot

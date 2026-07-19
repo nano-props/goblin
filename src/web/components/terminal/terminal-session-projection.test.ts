@@ -47,7 +47,7 @@ describe('terminal session projection helpers', () => {
         target: RUNTIME_TARGET,
         presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
       },
-      terminalWorktreeKey: `${REPO_ROOT}\0${REPO_ROOT}`,
+      terminalFilesystemTargetKey: `${REPO_ROOT}\0${REPO_ROOT}`,
       hydrateInput: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,

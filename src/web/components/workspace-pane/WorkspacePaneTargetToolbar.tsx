@@ -24,7 +24,7 @@ import {
   workspacePaneTabItems,
 } from '#/web/components/workspace-pane/workspace-pane-tab-items.ts'
 import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
-import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspacePaneSurfaceTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
@@ -101,7 +101,10 @@ export function WorkspacePaneTargetToolbar({
       if (target.kind === 'workspace-root') {
         if (presentation.kind !== 'workspace-root') return false
         const state = useWorkspacesStore.getState()
-        state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootId), sessionId)
+        state.setSelectedTerminal(
+          formatTerminalFilesystemTargetKeyForPath(target.workspaceId, target.rootId),
+          sessionId,
+        )
         state.setWorkspacePaneTabForTarget(persistenceTarget, 'terminal')
         return true
       }
@@ -117,7 +120,10 @@ export function WorkspacePaneTargetToolbar({
       if (type !== 'terminal') return false
       if (target.kind === 'workspace-root') {
         const state = useWorkspacesStore.getState()
-        state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootId), sessionId)
+        state.setSelectedTerminal(
+          formatTerminalFilesystemTargetKeyForPath(target.workspaceId, target.rootId),
+          sessionId,
+        )
         state.setWorkspacePaneTabForTarget(persistenceTarget, 'terminal')
         return true
       }
@@ -125,7 +131,7 @@ export function WorkspacePaneTargetToolbar({
       const targetBranch = gitHeadBranch(target.head)
       if (targetBranch) return navigation.showRepoBranchTerminalSession(target.workspaceId, targetBranch, sessionId)
       const state = useWorkspacesStore.getState()
-      state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootId), sessionId)
+      state.setSelectedTerminal(formatTerminalFilesystemTargetKeyForPath(target.workspaceId, target.rootId), sessionId)
       state.setWorkspacePaneTabForTarget(persistenceTarget, 'terminal')
       return true
     },

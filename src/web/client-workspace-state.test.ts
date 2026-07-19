@@ -41,7 +41,7 @@ describe('client workspace persistence', () => {
       restoredWorkspaceId: 'goblin+file:///repo-a',
       zenMode: true,
       workspacePaneSize: 52,
-      selectedTerminalSessionIdByTerminalWorktree: {
+      selectedTerminalSessionIdByTerminalFilesystemTarget: {
         'goblin+file:///repo-a\0goblin+file:///worktree': 'term-111',
       },
       preferredWorkspacePaneTabByTargetByWorkspace: {
@@ -72,7 +72,7 @@ describe('client workspace persistence', () => {
     expect(
       normalizeClientWorkspaceState({
         restoredWorkspaceId: workspaceId,
-        selectedTerminalSessionIdByTerminalWorktree: { [terminalKey]: 'terminal-session-test' },
+        selectedTerminalSessionIdByTerminalFilesystemTarget: { [terminalKey]: 'terminal-session-test' },
         preferredWorkspacePaneTabByTargetByWorkspace: {
           [workspaceId]: { [rootTargetKey]: 'files' },
         },
@@ -84,7 +84,7 @@ describe('client workspace persistence', () => {
       }),
     ).toMatchObject({
       restoredWorkspaceId: workspaceId,
-      selectedTerminalSessionIdByTerminalWorktree: { [terminalKey]: 'terminal-session-test' },
+      selectedTerminalSessionIdByTerminalFilesystemTarget: { [terminalKey]: 'terminal-session-test' },
       preferredWorkspacePaneTabByTargetByWorkspace: { [workspaceId]: { [rootTargetKey]: 'files' } },
       filetreeViewStateByWorktreeByWorkspace: {
         [workspaceId]: {
@@ -101,7 +101,7 @@ describe('client workspace persistence', () => {
         restoredWorkspaceId: '',
         zenMode: 'yes',
         workspacePaneSize: Number.NaN,
-        selectedTerminalSessionIdByTerminalWorktree: { broken: 12 },
+        selectedTerminalSessionIdByTerminalFilesystemTarget: { broken: 12 },
         preferredWorkspacePaneTabByTargetByWorkspace: { 'goblin+file:///repo-a': { target: 'unknown' } },
         filetreeViewStateByWorktreeByWorkspace: [],
       }),
@@ -111,7 +111,7 @@ describe('client workspace persistence', () => {
       restoredWorkspaceId: null,
       zenMode: false,
       workspacePaneSize: 70,
-      selectedTerminalSessionIdByTerminalWorktree: {},
+      selectedTerminalSessionIdByTerminalFilesystemTarget: {},
       preferredWorkspacePaneTabByTargetByWorkspace: {},
       filetreeViewStateByWorktreeByWorkspace: {},
     })
@@ -120,7 +120,7 @@ describe('client workspace persistence', () => {
   test('drops legacy raw-path and cross-transport persisted identities', () => {
     expect(
       normalizeClientWorkspaceState({
-        selectedTerminalSessionIdByTerminalWorktree: {
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {
           'goblin+file:///repo-a\0/worktree': 'term-legacy',
           'goblin+file:///repo-a\0goblin+ssh://dev/worktree': 'term-cross-transport',
         },
@@ -142,9 +142,19 @@ describe('client workspace persistence', () => {
         },
       }),
     ).toMatchObject({
-      selectedTerminalSessionIdByTerminalWorktree: {},
+      selectedTerminalSessionIdByTerminalFilesystemTarget: {},
       preferredWorkspacePaneTabByTargetByWorkspace: {},
       filetreeViewStateByWorktreeByWorkspace: {},
     })
+  })
+
+  test('does not restore the retired worktree-only terminal selection field', () => {
+    expect(
+      normalizeClientWorkspaceState({
+        selectedTerminalSessionIdByTerminalWorktree: {
+          'goblin+file:///workspace\0goblin+file:///workspace': 'term-legacy',
+        },
+      }),
+    ).toMatchObject({ selectedTerminalSessionIdByTerminalFilesystemTarget: {} })
   })
 })

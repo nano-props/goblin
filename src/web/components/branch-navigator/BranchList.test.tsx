@@ -27,8 +27,8 @@ vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
 }))
 
 vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
-  useTerminalWorktreeOutputActive: () => false,
-  useTerminalWorktreeBellCount: () => 0,
+  useTerminalFilesystemTargetOutputActive: () => false,
+  useTerminalFilesystemTargetBellCount: () => 0,
 }))
 
 afterEach(() => {

@@ -25,13 +25,13 @@ import {
   TerminalSessionReadContext,
   useTerminalSessionReadContext,
   EMPTY_TERMINAL_SNAPSHOT,
-  EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
+  EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionSummary,
   TerminalSessionReadContextValue,
-  TerminalWorktreeSnapshot,
+  TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
 import {
   createBranchSnapshot,
@@ -51,7 +51,7 @@ import {
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { observedWorkspacePaneRouteCommitForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import {
   workspacePanePreferenceTargetOptions,
@@ -134,18 +134,18 @@ function useHarnessWorkspacePaneRoute(
   )
   const readContext = useTerminalSessionReadContext()
   if (preferredTab === 'terminal') {
-    const terminalWorktreeKey = branch?.worktree?.path
-      ? formatTerminalWorktreeKeyForPath(props.repo.id, branch.worktree.path)
+    const terminalFilesystemTargetKey = branch?.worktree?.path
+      ? formatTerminalFilesystemTargetKeyForPath(props.repo.id, branch.worktree.path)
       : null
-    const terminalWorktreeSnapshot = terminalWorktreeKey
-      ? readContext.terminalWorktreeSnapshot(terminalWorktreeKey)
+    const terminalFilesystemTargetSnapshot = terminalFilesystemTargetKey
+      ? readContext.terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey)
       : null
     return {
       kind: 'terminal',
       terminalSessionId:
-        terminalWorktreeSnapshot?.selectedDescriptor?.terminalSessionId ??
-        terminalWorktreeSnapshot?.sessions.find((session) => session.selected)?.terminalSessionId ??
-        terminalWorktreeSnapshot?.sessions[0]?.terminalSessionId ??
+        terminalFilesystemTargetSnapshot?.selectedDescriptor?.terminalSessionId ??
+        terminalFilesystemTargetSnapshot?.sessions.find((session) => session.selected)?.terminalSessionId ??
+        terminalFilesystemTargetSnapshot?.sessions[0]?.terminalSessionId ??
         'pending-terminal',
     }
   }
@@ -1000,7 +1000,7 @@ describe('GitWorkspacePaneContent', () => {
 
   test('mounts the terminal session while terminal creation is pending with no sessions', () => {
     const worktreePath = '/tmp/terminal-pending-worktree'
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/terminal-pending', { worktree: { path: worktreePath } })],
@@ -1011,14 +1011,14 @@ describe('GitWorkspacePaneContent', () => {
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     const registerHost = vi.fn()
-    const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
+    const terminalFilesystemTargetSnapshot: TerminalFilesystemTargetSnapshot = {
       ...emptyWorktreeSnapshot,
-      terminalWorktreeKey,
+      terminalFilesystemTargetKey,
       createPending: true,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
-      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
+      terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot,
     }
 
     const { container } = renderInJsdom(
@@ -1040,12 +1040,12 @@ describe('GitWorkspacePaneContent', () => {
     expect(container.querySelector('.goblin-terminal-session__host')).not.toBeNull()
     expect(container.textContent).toContain('terminal.opening')
     expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
-    expect(registerHost).toHaveBeenCalledWith(terminalWorktreeKey, expect.any(HTMLDivElement))
+    expect(registerHost).toHaveBeenCalledWith(terminalFilesystemTargetKey, expect.any(HTMLDivElement))
   })
 
   test('mounts the terminal session while terminal creation is pending after every tab was closed', () => {
     const worktreePath = '/tmp/terminal-pending-empty-strip-worktree'
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const branchName = 'feature/terminal-pending-empty-strip'
     const seededRepo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -1058,14 +1058,14 @@ describe('GitWorkspacePaneContent', () => {
     const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     const registerHost = vi.fn()
-    const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
+    const terminalFilesystemTargetSnapshot: TerminalFilesystemTargetSnapshot = {
       ...emptyWorktreeSnapshot,
-      terminalWorktreeKey,
+      terminalFilesystemTargetKey,
       createPending: true,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
-      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
+      terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot,
     }
 
     renderInJsdom(
@@ -1082,12 +1082,12 @@ describe('GitWorkspacePaneContent', () => {
 
     expect(screen.getByRole('tabpanel').id).toBe('workspace-terminal-panel')
     expect(screen.queryByText('workspace-pane-tabs.empty')).toBeNull()
-    expect(registerHost).toHaveBeenCalledWith(terminalWorktreeKey, expect.any(HTMLDivElement))
+    expect(registerHost).toHaveBeenCalledWith(terminalFilesystemTargetKey, expect.any(HTMLDivElement))
   })
 
   test('renders terminal loading without a create CTA while initial terminal sync is unresolved', () => {
     const worktreePath = '/tmp/terminal-loading-worktree'
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/terminal-loading', { worktree: { path: worktreePath } })],
@@ -1098,14 +1098,14 @@ describe('GitWorkspacePaneContent', () => {
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     const createTerminal = vi.fn(async () => 'term-111111111111111111111')
     const registerHost = vi.fn()
-    const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
+    const terminalFilesystemTargetSnapshot: TerminalFilesystemTargetSnapshot = {
       ...emptyWorktreeSnapshot,
-      terminalWorktreeKey,
+      terminalFilesystemTargetKey,
       createPending: false,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
-      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
+      terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot,
     }
 
     const { container } = renderInJsdom(
@@ -1128,12 +1128,12 @@ describe('GitWorkspacePaneContent', () => {
     expect(container.textContent).not.toContain('terminal.new')
     expect(container.querySelector('.goblin-terminal-session__empty-cta')).toBeNull()
     expect(createTerminal).not.toHaveBeenCalled()
-    expect(registerHost).toHaveBeenCalledWith(terminalWorktreeKey, expect.any(HTMLDivElement))
+    expect(registerHost).toHaveBeenCalledWith(terminalFilesystemTargetKey, expect.any(HTMLDivElement))
   })
 
   test('labels terminal panels from the mixed tab list, not runtime session list', () => {
     const worktreePath = '/tmp/terminal-reordered-worktree'
-    const terminalWorktreeKey = formatTerminalWorktreeKeyForPath(REPO_ID, worktreePath)
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/terminal-reordered', { worktree: { path: worktreePath } })],
@@ -1150,18 +1150,18 @@ describe('GitWorkspacePaneContent', () => {
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     const registerHost = vi.fn()
-    const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
+    const terminalFilesystemTargetSnapshot: TerminalFilesystemTargetSnapshot = {
       ...emptyWorktreeSnapshot,
-      terminalWorktreeKey,
+      terminalFilesystemTargetKey,
       sessions: [
-        terminalSession('term-111111111111111111111', 1, false, terminalWorktreeKey),
-        terminalSession('term-222222222222222222222', 2, true, terminalWorktreeKey),
+        terminalSession('term-111111111111111111111', 1, false, terminalFilesystemTargetKey),
+        terminalSession('term-222222222222222222222', 2, true, terminalFilesystemTargetKey),
       ],
       count: 2,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
-      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
+      terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot,
     }
 
     const { container } = renderInJsdom(
@@ -1179,7 +1179,7 @@ describe('GitWorkspacePaneContent', () => {
     expect(container.querySelector('#workspace-terminal-panel')?.getAttribute('aria-labelledby')).toBe(
       'workspace-workspace-pane-tab',
     )
-    expect(registerHost).toHaveBeenCalledWith(terminalWorktreeKey, expect.any(HTMLDivElement))
+    expect(registerHost).toHaveBeenCalledWith(terminalFilesystemTargetKey, expect.any(HTMLDivElement))
   })
 
   test('opens a file by creating a terminal with a startup shell command instead of writing to an opening PTY', async () => {
@@ -1641,12 +1641,12 @@ describe('GitWorkspacePaneContent', () => {
   })
 })
 
-const emptyWorktreeSnapshot = EMPTY_TERMINAL_WORKTREE_SNAPSHOT
+const emptyWorktreeSnapshot = EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT
 const emptyTerminalSnapshot = EMPTY_TERMINAL_SNAPSHOT
 
 const emptyTerminalReadContext: TerminalSessionReadContextValue = {
-  terminalWorktreeSnapshot: () => emptyWorktreeSnapshot,
-  subscribeTerminalWorktree: () => () => {},
+  terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot,
+  subscribeTerminalFilesystemTarget: () => () => {},
   workspaceBellCount: () => 0,
   subscribeWorkspaceBellCount: () => () => {},
   snapshot: () => emptyTerminalSnapshot,
@@ -1727,12 +1727,12 @@ function terminalSession(
   terminalSessionId: string,
   index: number,
   selected: boolean,
-  terminalWorktreeKey: string,
+  terminalFilesystemTargetKey: string,
 ): TerminalSessionSummary {
   return {
     type: 'terminal',
     terminalSessionId,
-    terminalWorktreeKey,
+    terminalFilesystemTargetKey,
     index,
     title: terminalSessionId,
     phase: 'open',

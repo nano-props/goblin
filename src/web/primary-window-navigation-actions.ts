@@ -13,7 +13,7 @@ import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspa
 import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import {
   beginPrimaryWindowPresentation,
   primaryWindowPresentationIsCurrent,
@@ -205,7 +205,7 @@ export function createPrimaryWindowNavigationActions({
           if (!state.workspaces[workspaceId]) return
           if (presentation.kind === 'terminal') {
             state.setSelectedTerminal(
-              formatTerminalWorktreeKeyForPath(workspaceId, workspaceId),
+              formatTerminalFilesystemTargetKeyForPath(workspaceId, workspaceId),
               presentation.terminalSessionId,
             )
           }
@@ -278,7 +278,10 @@ function rememberWorkspacePaneRouteSelection(
   if (route.kind !== 'terminal') return
   const worktreePath = branch.worktree?.path ?? null
   if (!worktreePath) return
-  state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(workspaceId, worktreePath), route.terminalSessionId)
+  state.setSelectedTerminal(
+    formatTerminalFilesystemTargetKeyForPath(workspaceId, worktreePath),
+    route.terminalSessionId,
+  )
 }
 
 function commitWorkspacePaneRoute(

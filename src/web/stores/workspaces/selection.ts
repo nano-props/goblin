@@ -62,22 +62,27 @@ function createRestorableWorkspaceActions(set: WorkspacesSet): RestorableWorkspa
       })
     },
 
-    applySessionSelectedTerminalState(selectedTerminalSessionIdByTerminalWorktree: Record<string, string>) {
-      // One-shot boot/session restore of per-worktree terminal selection. This
+    applySessionSelectedTerminalState(selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>) {
+      // One-shot boot/session restore of per-filesystem-target terminal selection. This
       // seeds client state; later selection changes remain client-owned.
       set((s) => {
-        const current = s.selectedTerminalSessionIdByTerminalWorktree
+        const current = s.selectedTerminalSessionIdByTerminalFilesystemTarget
         const currentEntries = Object.entries(current)
-        const nextEntries = Object.entries(selectedTerminalSessionIdByTerminalWorktree)
+        const nextEntries = Object.entries(selectedTerminalSessionIdByTerminalFilesystemTarget)
         if (
           currentEntries.length === nextEntries.length &&
           nextEntries.every(
-            ([terminalWorktreeKey, terminalSessionId]) => current[terminalWorktreeKey] === terminalSessionId,
+            ([terminalFilesystemTargetKey, terminalSessionId]) =>
+              current[terminalFilesystemTargetKey] === terminalSessionId,
           )
         ) {
           return s
         }
-        return { selectedTerminalSessionIdByTerminalWorktree: { ...selectedTerminalSessionIdByTerminalWorktree } }
+        return {
+          selectedTerminalSessionIdByTerminalFilesystemTarget: {
+            ...selectedTerminalSessionIdByTerminalFilesystemTarget,
+          },
+        }
       })
     },
 
@@ -108,22 +113,24 @@ function createRestorableWorkspaceActions(set: WorkspacesSet): RestorableWorkspa
       })
     },
 
-    setSelectedTerminal(terminalWorktreeKey: string, terminalSessionId: string | null) {
+    setSelectedTerminal(terminalFilesystemTargetKey: string, terminalSessionId: string | null) {
       set((s) => {
-        const current = s.selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
+        const current = s.selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey]
         if (terminalSessionId) {
           if (current === terminalSessionId) return s
           return {
-            selectedTerminalSessionIdByTerminalWorktree: {
-              ...s.selectedTerminalSessionIdByTerminalWorktree,
-              [terminalWorktreeKey]: terminalSessionId,
+            selectedTerminalSessionIdByTerminalFilesystemTarget: {
+              ...s.selectedTerminalSessionIdByTerminalFilesystemTarget,
+              [terminalFilesystemTargetKey]: terminalSessionId,
             },
           }
         }
         if (current === undefined) return s
-        const selectedTerminalSessionIdByTerminalWorktree = { ...s.selectedTerminalSessionIdByTerminalWorktree }
-        delete selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
-        return { selectedTerminalSessionIdByTerminalWorktree }
+        const selectedTerminalSessionIdByTerminalFilesystemTarget = {
+          ...s.selectedTerminalSessionIdByTerminalFilesystemTarget,
+        }
+        delete selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey]
+        return { selectedTerminalSessionIdByTerminalFilesystemTarget }
       })
     },
   }

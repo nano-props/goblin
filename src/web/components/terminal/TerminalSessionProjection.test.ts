@@ -7,7 +7,7 @@ import {
   setTerminalSessionProjectionForTests,
 } from '#/web/components/terminal/TerminalSessionProjection.ts'
 import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import type { TerminalDescriptor, TerminalRuntimeMembershipIndex } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import { terminalClient } from '#/web/terminal.ts'
@@ -40,7 +40,7 @@ const REPO_ROOT = workspaceIdFixture('goblin+file:///repo')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/repo'
 const BRANCH = 'main'
-const WORKTREE_KEY = formatTerminalWorktreeKey(REPO_ROOT, REPO_ROOT)
+const WORKTREE_KEY = formatTerminalFilesystemTargetKey(REPO_ROOT, REPO_ROOT)
 const WORKSPACE_ID = requiredWorkspaceLocator(REPO_ROOT)
 const RUNTIME_TARGET = {
   kind: 'git-worktree' as const,
@@ -117,7 +117,7 @@ function successfulRuntimeCloseSnapshot(
 
 describe('TerminalSessionProjection', () => {
   let projection: TerminalSessionProjection
-  let selectedChanges: Array<{ terminalWorktreeKey: string; terminalSessionId: string | null }>
+  let selectedChanges: Array<{ terminalFilesystemTargetKey: string; terminalSessionId: string | null }>
 
   beforeEach(() => {
     resetWorkspacesStore()
@@ -126,8 +126,8 @@ describe('TerminalSessionProjection', () => {
     workspacePaneRuntimeMocks.refreshTabs.mockReset()
     workspacePaneRuntimeMocks.refreshTabs.mockResolvedValue(undefined)
     selectedChanges = []
-    projection = new TerminalSessionProjection((terminalWorktreeKey, terminalSessionId) =>
-      selectedChanges.push({ terminalWorktreeKey, terminalSessionId }),
+    projection = new TerminalSessionProjection((terminalFilesystemTargetKey, terminalSessionId) =>
+      selectedChanges.push({ terminalFilesystemTargetKey, terminalSessionId }),
     )
     // Install into the singleton session so any code that reaches the
     // projection via `getTerminalSessionProjection()` (e.g., a Provider
@@ -161,7 +161,7 @@ describe('TerminalSessionProjection', () => {
     )
 
     expect(reconciled).toBe(false)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
   describe('versioned terminal session snapshots', () => {
@@ -185,7 +185,7 @@ describe('TerminalSessionProjection', () => {
           'client_local',
         ),
       ).toBe(false)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
     })
 
     test('accepts equal revisions for metadata refresh and higher revisions for removal', () => {
@@ -215,7 +215,7 @@ describe('TerminalSessionProjection', () => {
           'client_local',
         ),
       ).toBe(true)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]).toMatchObject({
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]).toMatchObject({
         processName: 'node',
         originalTitle: 'build',
       })
@@ -223,7 +223,7 @@ describe('TerminalSessionProjection', () => {
       expect(projection.reconcileServerSessionsSnapshot(scope, { revision: 3, sessions: [] }, 'client_local')).toBe(
         true,
       )
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
     test('keeps an active exit terminal across repeated same-revision snapshots until authoritative absence', () => {
@@ -244,11 +244,11 @@ describe('TerminalSessionProjection', () => {
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       })
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
 
       expect(projection.reconcileServerSessionsSnapshot(scope, snapshot, 'client_local')).toBe(true)
       expect(projection.reconcileServerSessionsSnapshot(scope, snapshot, 'client_local')).toBe(true)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
       expect((projection as any).futureExitOrphans.size()).toBe(1)
 
       projection.reconcileServerSessionsSnapshot(scope, { revision: 11, sessions: [] }, 'client_local')
@@ -266,11 +266,11 @@ describe('TerminalSessionProjection', () => {
         (projection as any).applyServerSessionEffect(scope, { kind: 'delta', revision: 3 }, sessionA, 'client_local'),
       ).toBe(true)
       expect(projection.terminalSessionsCatalogCoverageRevision(scope)).toBe(1)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
 
       projection.reconcileServerSessionsSnapshot(scope, { revision: 3, sessions: [sessionA, sessionB] }, 'client_local')
       expect(projection.terminalSessionsCatalogCoverageRevision(scope)).toBe(3)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(2)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(2)
     })
 
     test('advances catalog coverage for one continuous origin delta but not across a gap', () => {
@@ -314,7 +314,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
       expect((projection as any).sessions.get(terminalSessionId).currentRuntimeBinding()).toEqual({
         terminalRuntimeSessionId,
         terminalRuntimeGeneration: 2,
@@ -368,8 +368,8 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      const terminalWorktreeSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
-      const terminalSessionId = terminalWorktreeSnapshot.sessions[0]!.terminalSessionId
+      const terminalFilesystemTargetSnapshot = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY)
+      const terminalSessionId = terminalFilesystemTargetSnapshot.sessions[0]!.terminalSessionId
       const session = (projection as any).sessions.get(terminalSessionId)
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
 
@@ -406,7 +406,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const session = (projection as any).sessions.get(terminalSessionId)
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
 
@@ -431,7 +431,7 @@ describe('TerminalSessionProjection', () => {
       })
 
       expect(handleOutputSpy).toHaveBeenCalledTimes(2)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).outputActiveCount).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).outputActiveCount).toBe(0)
     })
 
     test('does not mark stale output payloads as terminal output activity', () => {
@@ -442,7 +442,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const session = (projection as any).sessions.get(terminalSessionId)
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
 
@@ -457,7 +457,7 @@ describe('TerminalSessionProjection', () => {
       })
 
       expect(handleOutputSpy).not.toHaveBeenCalled()
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).outputActiveCount).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).outputActiveCount).toBe(0)
     })
 
     test('dispatches title changes by terminalRuntimeSessionId index', () => {
@@ -468,7 +468,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const session = (projection as any).sessions.get(terminalSessionId)
       const handleServerTitleSpy = vi.spyOn(session, 'handleServerTitle')
 
@@ -505,7 +505,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const session = (projection as any).sessions.get(terminalSessionId)
       const handleServerTitleSpy = vi.spyOn(session, 'handleServerTitle')
       ;(projection as any).terminalSessionIdByTerminalRuntimeSessionId.delete('pty_session_a_aaaaaaaaa')
@@ -528,7 +528,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const session = (projection as any).sessions.get(terminalSessionId)
       const handleServerTitleSpy = vi.spyOn(session, 'handleServerTitle')
 
@@ -550,7 +550,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const session = (projection as any).sessions.get(terminalSessionId)
       const handleExitSpy = vi.spyOn(session, 'handleExit').mockReturnValue(true)
 
@@ -588,7 +588,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const session = (projection as any).sessions.get(terminalSessionId)
       const handleOutputSpy = vi.spyOn(session, 'handleOutput')
       const handleIdentitySpy = vi.spyOn(session, 'handleIdentity')
@@ -640,7 +640,7 @@ describe('TerminalSessionProjection', () => {
   })
 
   describe('notify granularity', () => {
-    test('notifySession invalidates worktree cache', () => {
+    test('notifySession invalidates filesystem target cache', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       projection.reconcileServerSessions(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -649,14 +649,14 @@ describe('TerminalSessionProjection', () => {
       )
 
       const listener = vi.fn()
-      const unsubscribe = projection.subscribeTerminalWorktree(WORKTREE_KEY, listener)
+      const unsubscribe = projection.subscribeTerminalFilesystemTarget(WORKTREE_KEY, listener)
 
       // Prime the cache
-      projection.terminalWorktreeSnapshot(WORKTREE_KEY)
+      projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY)
       listener.mockClear()
 
       // Simulate metadata change via internal notifySession
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       ;(projection as any).notifySession(terminalSessionId)
 
       expect(listener).toHaveBeenCalledTimes(1)
@@ -674,11 +674,11 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      const snapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
+      const snapshot = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY)
       expect(snapshot.count).toBe(1)
       expect(snapshot.sessions[0]!.terminalSessionId).toBe('term-111111111111111111111')
       expect(selectedChanges).toContainEqual({
-        terminalWorktreeKey: WORKTREE_KEY,
+        terminalFilesystemTargetKey: WORKTREE_KEY,
         terminalSessionId: snapshot.sessions[0]!.terminalSessionId,
       })
     })
@@ -686,7 +686,7 @@ describe('TerminalSessionProjection', () => {
     test('removes local sessions absent from the authoritative catalog', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       ;(projection as any).ensureSession(makeDescriptor('term-111111111111111111111', 1))
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
 
       projection.reconcileServerSessions(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -694,7 +694,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
     test('closeTerminalByDescriptor resolves after server terminal resources close', async () => {
@@ -704,7 +704,7 @@ describe('TerminalSessionProjection', () => {
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
       )
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
       workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
 
@@ -720,8 +720,8 @@ describe('TerminalSessionProjection', () => {
         })
       await Promise.resolve()
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
         terminalSessionId,
       )
       expect(settled).toBe(false)
@@ -729,7 +729,7 @@ describe('TerminalSessionProjection', () => {
       serverClose.resolve(successfulRuntimeCloseSnapshot())
       await expect(closePromise).resolves.toBe(true)
       expect(settled).toBe(true)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
     test('keeps command-closing sessions visible when server reconciliation removes them before close settles', async () => {
@@ -739,7 +739,7 @@ describe('TerminalSessionProjection', () => {
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
       )
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
       workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
 
@@ -750,7 +750,7 @@ describe('TerminalSessionProjection', () => {
       await Promise.resolve()
 
       expect(
-        projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),
+        projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),
       ).toEqual([terminalSessionId])
 
       projection.reconcileServerSessions(
@@ -760,12 +760,12 @@ describe('TerminalSessionProjection', () => {
       )
 
       expect(
-        projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),
+        projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),
       ).toEqual([terminalSessionId])
 
       serverClose.resolve(successfulRuntimeCloseSnapshot())
       await expect(closePromise).resolves.toBe(true)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
     test('keeps command-closing sessions visible when a session-closed event arrives before close settles', async () => {
@@ -775,7 +775,7 @@ describe('TerminalSessionProjection', () => {
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
       )
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
       workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
 
@@ -792,12 +792,12 @@ describe('TerminalSessionProjection', () => {
       })
 
       expect(
-        projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((summary) => summary.terminalSessionId),
+        projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.map((summary) => summary.terminalSessionId),
       ).toEqual([terminalSessionId])
 
       serverClose.resolve(successfulRuntimeCloseSnapshot())
       await expect(closePromise).resolves.toBe(true)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
     test('ignores a stale session-closed event after the durable terminal rebinds', () => {
@@ -814,13 +814,13 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
       })
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
       projection.handleSessionClosed({
         terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
       })
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
     test('uses the durable candidate for an exact close when the runtime reverse index is missing', () => {
@@ -838,7 +838,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'term-111111111111111111111',
       })
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
     test('keeps an unknown runtime bell when a stale runtime close arrives', () => {
@@ -863,7 +863,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]?.hasBell).toBe(true)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]?.hasBell).toBe(true)
     })
 
     test('clears an unknown runtime bell when its exact runtime close arrives', () => {
@@ -888,7 +888,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]?.hasBell).toBe(false)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]?.hasBell).toBe(false)
     })
 
     test('keeps a rebound runtime when an older command close settles', async () => {
@@ -915,7 +915,7 @@ describe('TerminalSessionProjection', () => {
       serverClose.resolve(successfulRuntimeCloseSnapshot(terminalSessionId, 'pty_session_1_aaaaaaaaa'))
 
       await expect(close).resolves.toBe(true)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
       expect((projection as any).sessions.get(terminalSessionId)?.currentTerminalRuntimeSessionId()).toBe(
         'pty_session_2_aaaaaaaaa',
       )
@@ -961,11 +961,11 @@ describe('TerminalSessionProjection', () => {
       expect(workspacePaneRuntimeMocks.close).toHaveBeenCalledTimes(2)
       firstServerClose.resolve(successfulRuntimeCloseSnapshot(terminalSessionId, 'pty_session_1_aaaaaaaaa'))
       await expect(firstClose).resolves.toBe(true)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
 
       secondServerClose.resolve(successfulRuntimeCloseSnapshot(terminalSessionId, 'pty_session_2_aaaaaaaaa'))
       await expect(secondClose).resolves.toBe(true)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
     test('closeTerminalByDescriptor selects an adjacent terminal after server close settles', async () => {
@@ -981,7 +981,7 @@ describe('TerminalSessionProjection', () => {
       )
 
       const activeSessionId = projection
-        .terminalWorktreeSnapshot(WORKTREE_KEY)
+        .terminalFilesystemTargetSnapshot(WORKTREE_KEY)
         .sessions.find((session) => session.terminalSessionId === 'term-222222222222222222222')?.terminalSessionId
       if (!activeSessionId) throw new Error('missing term-222222222222222222222')
       projection.selectTerminal(WORKTREE_KEY, activeSessionId)
@@ -994,7 +994,7 @@ describe('TerminalSessionProjection', () => {
       })
       await Promise.resolve()
 
-      const closingSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
+      const closingSnapshot = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY)
       expect(closingSnapshot.sessions.map((item) => item.terminalSessionId)).toEqual([
         'term-111111111111111111111',
         'term-222222222222222222222',
@@ -1004,7 +1004,7 @@ describe('TerminalSessionProjection', () => {
 
       serverClose.resolve(successfulRuntimeCloseSnapshot(activeSessionId, 'pty_session_2_aaaaaaaaa'))
       await expect(closePromise).resolves.toBe(true)
-      const closedSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
+      const closedSnapshot = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY)
       expect(closedSnapshot.sessions.map((item) => item.terminalSessionId)).toEqual([
         'term-111111111111111111111',
         'term-333333333333333333333',
@@ -1034,7 +1034,7 @@ describe('TerminalSessionProjection', () => {
       ).resolves.toBe(true)
 
       expect(
-        projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),
+        projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),
       ).toEqual(['term-222222222222222222222'])
     })
 
@@ -1056,7 +1056,7 @@ describe('TerminalSessionProjection', () => {
         }),
       ).resolves.toBe(true)
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
     })
 
     test('closeTerminalByDescriptor deduplicates repeated closes for the same terminal session', async () => {
@@ -1066,7 +1066,7 @@ describe('TerminalSessionProjection', () => {
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
       )
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
       workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
 
@@ -1081,12 +1081,12 @@ describe('TerminalSessionProjection', () => {
       await Promise.resolve()
 
       expect(workspacePaneRuntimeMocks.close).toHaveBeenCalledTimes(1)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
 
       serverClose.resolve(successfulRuntimeCloseSnapshot())
       await expect(firstClose).resolves.toBe(true)
       await expect(secondClose).resolves.toBe(true)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
     test('closeTerminalByDescriptor keeps the session when server resource close fails', async () => {
@@ -1096,7 +1096,7 @@ describe('TerminalSessionProjection', () => {
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
       )
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const session = (projection as any).sessions.get(terminalSessionId)
       const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
       workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
@@ -1108,14 +1108,14 @@ describe('TerminalSessionProjection', () => {
       })
       await Promise.resolve()
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
 
       const expectation = expect(closePromise).resolves.toBe(false)
       serverClose.reject(new Error('close failed'))
       await expectation
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
         'term-111111111111111111111',
       )
       expect(dispose).not.toHaveBeenCalled()
@@ -1128,7 +1128,7 @@ describe('TerminalSessionProjection', () => {
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
       )
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       workspacePaneRuntimeMocks.refreshTabs.mockRejectedValueOnce(new Error('projection unavailable'))
 
       await expect(
@@ -1138,7 +1138,7 @@ describe('TerminalSessionProjection', () => {
         }),
       ).resolves.toBe(true)
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
       expect(workspacePaneRuntimeMocks.refreshTabs).toHaveBeenCalledWith(REPO_ROOT, WORKSPACE_RUNTIME_ID)
     })
 
@@ -1159,7 +1159,7 @@ describe('TerminalSessionProjection', () => {
         }),
       ).resolves.toBe(true)
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
       refresh.resolve()
     })
 
@@ -1170,7 +1170,7 @@ describe('TerminalSessionProjection', () => {
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
       )
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       workspacePaneRuntimeMocks.close.mockResolvedValueOnce({
         ok: false,
         runtimeType: 'terminal',
@@ -1185,7 +1185,7 @@ describe('TerminalSessionProjection', () => {
       ).resolves.toBe(false)
 
       expect(workspacePaneRuntimeMocks.close).toHaveBeenCalledOnce()
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
     })
 
     test('preserves current selection and falls back to controller when current is lost', () => {
@@ -1197,7 +1197,7 @@ describe('TerminalSessionProjection', () => {
         [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
       )
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
         'term-111111111111111111111',
       )
 
@@ -1211,7 +1211,7 @@ describe('TerminalSessionProjection', () => {
         ],
         'client_local',
       )
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
         'term-222222222222222222222',
       )
     })
@@ -1229,7 +1229,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      const snapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
+      const snapshot = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY)
       const activeSessionId = snapshot.sessions.find(
         (session) => session.terminalSessionId === 'term-222222222222222222222',
       )?.terminalSessionId
@@ -1238,12 +1238,12 @@ describe('TerminalSessionProjection', () => {
       projection.selectTerminal(WORKTREE_KEY, activeSessionId)
       ;(projection as any).removeSession(activeSessionId, { dispose: false })
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
         'term-111111111111111111111',
       )
     })
 
-    test('invalidates cached worktree snapshot when the server session list changes', () => {
+    test('invalidates cached filesystem target snapshot when the server session list changes', () => {
       projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
       projection.reconcileServerSessions(
         { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -1254,7 +1254,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      const firstSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
+      const firstSnapshot = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY)
       expect(firstSnapshot.sessions.map((session) => session.terminalSessionId)).toEqual([
         'term-111111111111111111111',
         'term-222222222222222222222',
@@ -1269,7 +1269,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      const secondSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
+      const secondSnapshot = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY)
       expect(secondSnapshot.sessions.map((session) => session.terminalSessionId)).toEqual([
         'term-222222222222222222222',
         'term-111111111111111111111',
@@ -1286,7 +1286,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const session = (projection as any).sessions.get(terminalSessionId)
 
       // reconcile pre-populates the cache; clear it to test the caching path
@@ -1307,7 +1307,7 @@ describe('TerminalSessionProjection', () => {
         'client_local',
       )
 
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const terminalSessionId = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const s1 = projection.snapshot(terminalSessionId)
 
       // metadata notify forces cache refresh
@@ -1323,10 +1323,10 @@ describe('TerminalSessionProjection', () => {
       // `projection`. The getter must return that exact instance, not
       // construct a new one.
       const first = getTerminalSessionProjection({
-        onSelectedWorktreeChange: () => {},
+        onSelectedFilesystemTargetChange: () => {},
       })
       const second = getTerminalSessionProjection({
-        onSelectedWorktreeChange: () => {},
+        onSelectedFilesystemTargetChange: () => {},
       })
       expect(first).toBe(second)
       expect(first).toBe(projection)
@@ -1336,7 +1336,7 @@ describe('TerminalSessionProjection', () => {
       const original = projection
       setTerminalSessionProjectionForTests(null)
       const fresh = getTerminalSessionProjection({
-        onSelectedWorktreeChange: () => {},
+        onSelectedFilesystemTargetChange: () => {},
       })
       expect(fresh).not.toBe(original)
       // Re-install for `afterEach` cleanup.
@@ -1345,14 +1345,14 @@ describe('TerminalSessionProjection', () => {
 
     test('destroy clears the singleton session when destroying the installed instance', () => {
       const original = getTerminalSessionProjection({
-        onSelectedWorktreeChange: () => {},
+        onSelectedFilesystemTargetChange: () => {},
       })
       expect(original).toBe(projection)
 
       original.destroy()
 
       const fresh = getTerminalSessionProjection({
-        onSelectedWorktreeChange: () => {},
+        onSelectedFilesystemTargetChange: () => {},
       })
       expect(fresh).not.toBe(original)
       fresh.destroy()
@@ -1375,7 +1375,7 @@ describe('TerminalSessionProjection', () => {
       // Synthesize a remount: re-fetch the singleton via the
       // getter (the Provider's mount effect does exactly this).
       const after = getTerminalSessionProjection({
-        onSelectedWorktreeChange: () => {},
+        onSelectedFilesystemTargetChange: () => {},
       })
       expect(after).toBe(projection)
       // The session we injected is still in the projection's map —
@@ -1411,7 +1411,7 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     })
 
-    expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+    expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
     localProjection.destroy()
   })
 
@@ -1437,7 +1437,7 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       'client_local',
     )
 
-    expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).bellCount).toBe(1)
+    expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).bellCount).toBe(1)
     expect((localProjection as any).pendingServerBellByRuntimeBindingKey.size).toBe(0)
     localProjection.destroy()
   })
@@ -1463,7 +1463,7 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       'client_local',
     )
 
-    expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     localProjection.destroy()
   })
 
@@ -1491,7 +1491,7 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       'client_local',
     )
 
-    expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     localProjection.destroy()
   })
 
@@ -1521,7 +1521,7 @@ describe('TerminalSessionProjection runtime binding activation races', () => {
       'client_local',
     )
 
-    expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     localProjection.destroy()
   })
 })
@@ -1548,7 +1548,7 @@ describe('TerminalSessionProjection direct runtime activation barrier', () => {
       canonicalTitle: null,
     }
     localProjection.handleServerBell({ ...bellBase, terminalRuntimeGeneration: 2 })
-    expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).bellCount).toBe(0)
+    expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).bellCount).toBe(0)
 
     session.hydrate({
       terminalRuntimeSessionId: 'pty_direct_activation_aaaa',
@@ -1566,7 +1566,7 @@ describe('TerminalSessionProjection direct runtime activation barrier', () => {
       outputEra: 0,
     })
 
-    expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).bellCount).toBe(1)
+    expect(localProjection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).bellCount).toBe(1)
     expect((localProjection as any).pendingServerBellByRuntimeBindingKey.size).toBe(0)
     localProjection.destroy()
   })
@@ -1618,7 +1618,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       outputEra: 0,
     })
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     projection.destroy()
   })
 
@@ -1662,7 +1662,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       'client_local',
     )
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     projection.destroy()
   })
 
@@ -1686,7 +1686,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       outputEra: 0,
     })
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
     expect((projection as any).futureExitOrphans.blocksActivation(exitFor(lineageB))).toBe(true)
     projection.destroy()
   })
@@ -1707,7 +1707,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       'client_local',
     )
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     projection.destroy()
   })
 
@@ -1720,14 +1720,14 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 2 })],
       'client_local',
     )
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
 
     projection.reconcileServerSessions(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 3 })],
       'client_local',
     )
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     projection.destroy()
   })
 
@@ -1749,7 +1749,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       'client_local',
     )
     expect((projection as any).futureExitOrphans.size()).toBe(1)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     projection.destroy()
   })
 
@@ -1776,7 +1776,7 @@ describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
       'client_local',
     )
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     projection.destroy()
   })
 })

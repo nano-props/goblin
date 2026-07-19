@@ -172,7 +172,7 @@ function applyRestoredClientWorkspace(clientWorkspace: ClientWorkspaceState): vo
   const { applySessionLayoutState, applySessionSelectedTerminalState } = useWorkspacesStore.getState()
   restoreFiletreeViewStateFromSession(clientWorkspace.filetreeViewStateByWorktreeByWorkspace)
   applySessionLayoutState(normalizedLayout)
-  applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalWorktree)
+  applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalFilesystemTarget)
 }
 
 async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {

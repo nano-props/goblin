@@ -28,7 +28,7 @@ export function defaultClientWorkspaceState(): ClientWorkspaceState {
     restoredWorkspaceId: null,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
-    selectedTerminalSessionIdByTerminalWorktree: {},
+    selectedTerminalSessionIdByTerminalFilesystemTarget: {},
     preferredWorkspacePaneTabByTargetByWorkspace: {},
     filetreeViewStateByWorktreeByWorkspace: {},
   }

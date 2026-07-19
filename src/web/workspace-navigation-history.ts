@@ -6,7 +6,7 @@ import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-na
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { isWorkspacePaneStaticTabType, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/workspaces/navigation-history-entry.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
@@ -156,7 +156,7 @@ type WorkspaceNavigationHistoryRouteSnapshot =
       kind: 'branch'
       branchName: string
       workspacePaneTab: WorkspacePaneTabType | null
-      terminalWorktreeKey: string | null
+      terminalFilesystemTargetKey: string | null
       terminalSessionId: string | null
     }
 
@@ -204,7 +204,9 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
       const branchModel = repo?.capability.kind === 'git' ? readRepoBranchSnapshotQueryProjection(repo) : null
       const branch = branchModel?.branches.find((candidate) => candidate.name === routeContext.branchName)
       const worktreePath = routeContext.worktreePath ?? branch?.worktree?.path ?? null
-      const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKeyForPath(workspaceId, worktreePath) : null
+      const terminalFilesystemTargetKey = worktreePath
+        ? formatTerminalFilesystemTargetKeyForPath(workspaceId, worktreePath)
+        : null
       const route = routeContext.workspacePaneRoute
       const workspacePaneTab: WorkspacePaneTabType | null =
         route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
@@ -213,7 +215,7 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
         kind: 'branch',
         branchName: routeContext.branchName,
         workspacePaneTab,
-        terminalWorktreeKey,
+        terminalFilesystemTargetKey,
         terminalSessionId: route?.kind === 'terminal' ? route.terminalSessionId : null,
       }
     }
@@ -256,7 +258,7 @@ function workspaceNavigationHistoryEntryFromSnapshot(
           kind: 'branch',
           branchName: snapshot.branchName,
           workspacePaneTab: snapshot.workspacePaneTab,
-          terminalWorktreeKey: snapshot.terminalWorktreeKey,
+          terminalFilesystemTargetKey: snapshot.terminalFilesystemTargetKey,
           terminalSessionId: snapshot.terminalSessionId,
         },
       }
@@ -285,7 +287,7 @@ function workspaceNavigationHistoryRouteSnapshotEqual(
   return (
     a.branchName === b.branchName &&
     a.workspacePaneTab === b.workspacePaneTab &&
-    a.terminalWorktreeKey === b.terminalWorktreeKey &&
+    a.terminalFilesystemTargetKey === b.terminalFilesystemTargetKey &&
     a.terminalSessionId === b.terminalSessionId
   )
 }

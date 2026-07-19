@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react'
 import {
   EMPTY_TERMINAL_SNAPSHOT,
-  EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
+  EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
   useTerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import {
@@ -15,14 +15,14 @@ import type {
   TerminalSnapshot,
   TerminalDescriptor,
   TerminalSessionSummary,
-  TerminalWorktreeSnapshot,
+  TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 /**
- * Subscribe to a derived field of a single worktree's snapshot. The selector
+ * Subscribe to a derived field of a single filesystem target's snapshot. The selector
  * is captured via a ref so callers can pass an inline function without
  * `useCallback`, while `subscribe` / `getSnapshot` stay referentially stable
  * (required by `useSyncExternalStore`).
@@ -31,9 +31,9 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
  * the subscribe/getSnapshot plumbing, and so tests can verify the
  * latest-ref pattern in isolation.
  */
-export function useTerminalWorktreeField<T>(
-  terminalWorktreeKey: string | null,
-  selector: (snapshot: TerminalWorktreeSnapshot) => T,
+export function useTerminalFilesystemTargetField<T>(
+  terminalFilesystemTargetKey: string | null,
+  selector: (snapshot: TerminalFilesystemTargetSnapshot) => T,
 ): T {
   const ctx = useTerminalSessionReadContext()
   const selectorRef = useRef(selector)
@@ -41,21 +41,23 @@ export function useTerminalWorktreeField<T>(
 
   const subscribe = useCallback(
     (listener: () => void): (() => void) =>
-      terminalWorktreeKey ? ctx.subscribeTerminalWorktree(terminalWorktreeKey, listener) : () => {},
-    [ctx, terminalWorktreeKey],
+      terminalFilesystemTargetKey
+        ? ctx.subscribeTerminalFilesystemTarget(terminalFilesystemTargetKey, listener)
+        : () => {},
+    [ctx, terminalFilesystemTargetKey],
   )
   const getSnapshot = useCallback((): T => {
-    const snap = terminalWorktreeKey
-      ? ctx.terminalWorktreeSnapshot(terminalWorktreeKey)
-      : EMPTY_TERMINAL_WORKTREE_SNAPSHOT
+    const snap = terminalFilesystemTargetKey
+      ? ctx.terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey)
+      : EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT
     return selectorRef.current(snap)
-  }, [ctx, terminalWorktreeKey])
+  }, [ctx, terminalFilesystemTargetKey])
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
 /**
  * Subscribe to a derived field of a single session's snapshot. Same
- * selectorRef pattern as `useTerminalWorktreeField`.
+ * selectorRef pattern as `useTerminalFilesystemTargetField`.
  */
 export function useTerminalSessionField<T>(
   terminalSessionId: string | null,
@@ -77,16 +79,16 @@ export function useTerminalSessionField<T>(
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
-export function useTerminalWorktreeCount(terminalWorktreeKey: string | null): number {
-  return useTerminalWorktreeField(terminalWorktreeKey, (s) => s.count)
+export function useTerminalFilesystemTargetCount(terminalFilesystemTargetKey: string | null): number {
+  return useTerminalFilesystemTargetField(terminalFilesystemTargetKey, (s) => s.count)
 }
 
-export function useTerminalWorktreeCreatePending(terminalWorktreeKey: string | null): boolean {
-  return useTerminalWorktreeField(terminalWorktreeKey, (s) => s.createPending)
+export function useTerminalFilesystemTargetCreatePending(terminalFilesystemTargetKey: string | null): boolean {
+  return useTerminalFilesystemTargetField(terminalFilesystemTargetKey, (s) => s.createPending)
 }
 
-export function useTerminalWorktreeBellCount(terminalWorktreeKey: string | null): number {
-  return useTerminalWorktreeField(terminalWorktreeKey, (s) => s.bellCount)
+export function useTerminalFilesystemTargetBellCount(terminalFilesystemTargetKey: string | null): number {
+  return useTerminalFilesystemTargetField(terminalFilesystemTargetKey, (s) => s.bellCount)
 }
 
 export function useWorkspaceTerminalBellCounts(workspaceIds: readonly WorkspaceId[]): Record<string, number> {
@@ -112,49 +114,53 @@ export function useWorkspaceTerminalBellCounts(workspaceIds: readonly WorkspaceI
   }, [snapshot])
 }
 
-export function useTerminalWorktreeOutputActive(terminalWorktreeKey: string | null): boolean {
-  return useTerminalWorktreeField(terminalWorktreeKey, (s) => s.outputActiveCount > 0)
+export function useTerminalFilesystemTargetOutputActive(terminalFilesystemTargetKey: string | null): boolean {
+  return useTerminalFilesystemTargetField(terminalFilesystemTargetKey, (s) => s.outputActiveCount > 0)
 }
 
-export function useTerminalWorktreeSelectedDescriptor(terminalWorktreeKey: string | null): TerminalDescriptor | null {
-  return useTerminalWorktreeField(terminalWorktreeKey, (s) => s.selectedDescriptor)
+export function useTerminalFilesystemTargetSelectedDescriptor(
+  terminalFilesystemTargetKey: string | null,
+): TerminalDescriptor | null {
+  return useTerminalFilesystemTargetField(terminalFilesystemTargetKey, (s) => s.selectedDescriptor)
 }
 
 const MISSING_TERMINAL_DESCRIPTOR_SNAPSHOT = ''
 
-export function useTerminalWorktreeSessionDescriptor({
-  terminalWorktreeKey,
+export function useTerminalFilesystemTargetSessionDescriptor({
+  terminalFilesystemTargetKey,
   terminalSessionId,
   base,
 }: {
-  terminalWorktreeKey: string | null
+  terminalFilesystemTargetKey: string | null
   terminalSessionId: string | null
   base: TerminalSessionBase
 }): TerminalDescriptor | null {
-  const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
+  const { terminalFilesystemTargetSnapshot, subscribeTerminalFilesystemTarget } = useTerminalSessionReadContext()
   const subscribe = useCallback(
     (listener: () => void) =>
-      terminalWorktreeKey && terminalSessionId ? subscribeTerminalWorktree(terminalWorktreeKey, listener) : () => {},
-    [terminalSessionId, terminalWorktreeKey, subscribeTerminalWorktree],
+      terminalFilesystemTargetKey && terminalSessionId
+        ? subscribeTerminalFilesystemTarget(terminalFilesystemTargetKey, listener)
+        : () => {},
+    [terminalSessionId, terminalFilesystemTargetKey, subscribeTerminalFilesystemTarget],
   )
   const getSnapshot = useCallback(() => {
-    if (!terminalWorktreeKey || !terminalSessionId) return MISSING_TERMINAL_DESCRIPTOR_SNAPSHOT
-    const session = terminalWorktreeSnapshot(terminalWorktreeKey).sessions.find(
+    if (!terminalFilesystemTargetKey || !terminalSessionId) return MISSING_TERMINAL_DESCRIPTOR_SNAPSHOT
+    const session = terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey).sessions.find(
       (candidate) => candidate.terminalSessionId === terminalSessionId,
     )
     return session ? `${session.terminalSessionId}\0${session.index}` : MISSING_TERMINAL_DESCRIPTOR_SNAPSHOT
-  }, [terminalSessionId, terminalWorktreeKey, terminalWorktreeSnapshot])
+  }, [terminalSessionId, terminalFilesystemTargetKey, terminalFilesystemTargetSnapshot])
   const descriptorSnapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   return useMemo(() => {
-    if (!terminalWorktreeKey || !descriptorSnapshot) return null
+    if (!terminalFilesystemTargetKey || !descriptorSnapshot) return null
     const [snapshotTerminalSessionId, indexText] = descriptorSnapshot.split('\0')
     if (!snapshotTerminalSessionId) return null
     return terminalDescriptor(base, snapshotTerminalSessionId, Number(indexText) || 0)
-  }, [base, descriptorSnapshot, terminalWorktreeKey])
+  }, [base, descriptorSnapshot, terminalFilesystemTargetKey])
 }
 
-export function useTerminalSessionSummaries(terminalWorktreeKey: string | null): TerminalSessionSummary[] {
-  return useTerminalWorktreeField(terminalWorktreeKey, (s) => s.sessions)
+export function useTerminalSessionSummaries(terminalFilesystemTargetKey: string | null): TerminalSessionSummary[] {
+  return useTerminalFilesystemTargetField(terminalFilesystemTargetKey, (s) => s.sessions)
 }
 
 export function useTerminalWorkspaceProjectionPhase(workspaceId: WorkspaceId | null): TerminalProjectionHydrationPhase {

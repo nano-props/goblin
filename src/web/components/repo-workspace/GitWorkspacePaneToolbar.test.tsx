@@ -14,7 +14,7 @@ import {
   type GitWorkspacePaneProjection,
 } from '#/web/components/repo-workspace/model.ts'
 import { useGitWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
-import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import {
@@ -37,7 +37,7 @@ import type {
   TerminalSessionReadContextValue,
   TerminalSessionSummary,
   TerminalDescriptor,
-  TerminalWorktreeSnapshot,
+  TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
 import {
   PrimaryWindowNavigationProvider,
@@ -1382,7 +1382,7 @@ function renderToolbar(options: {
   const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
     type: 'terminal',
     terminalSessionId: `term-${String(index + 1).repeat(21)}`,
-    terminalWorktreeKey: formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH),
+    terminalFilesystemTargetKey: formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH),
     index: index + 1,
     title: `term-${index + 1}`,
     fullTitle: `full-term-${index + 1}`,
@@ -1406,8 +1406,8 @@ function renderToolbar(options: {
         presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: branchName } },
       }
     : null
-  const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
-    terminalWorktreeKey: formatTerminalWorktreeKeyForPath(REPO_ID, WORKTREE_PATH),
+  const terminalFilesystemTargetSnapshot: TerminalFilesystemTargetSnapshot = {
+    terminalFilesystemTargetKey: formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH),
     selectedDescriptor,
     sessions,
     count: options.terminalCount,
@@ -1417,8 +1417,8 @@ function renderToolbar(options: {
   }
   const terminalSnapshot = EMPTY_TERMINAL_SNAPSHOT
   const readContext: TerminalSessionReadContextValue = {
-    terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
-    subscribeTerminalWorktree: () => () => {},
+    terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot,
+    subscribeTerminalFilesystemTarget: () => () => {},
     workspaceBellCount: () => 0,
     subscribeWorkspaceBellCount: () => () => {},
     snapshot: () => terminalSnapshot,
@@ -1464,7 +1464,7 @@ function renderToolbar(options: {
     focusTerminal: vi.fn(),
   })
   setTerminalSessionCommandBridge({
-    terminalWorktreeSnapshot: readContext.terminalWorktreeSnapshot,
+    terminalFilesystemTargetSnapshot: readContext.terminalFilesystemTargetSnapshot,
     createTerminal,
     selectTerminal,
     closeTerminalByDescriptor,

@@ -77,7 +77,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture },
-      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntime: () => true,
@@ -99,7 +99,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture },
-      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: vi.fn(), close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntime: () => true,
@@ -141,7 +141,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture: async () => testPhysicalWorktreeExecutionCapability(request.worktreePath) },
-      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntime: () => true,
@@ -170,7 +170,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture },
-      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession },
       isCurrentWorkspaceRuntime: () => true,
@@ -227,7 +227,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
-      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminalSessions: { listSessionsForUser: async () => [] },
       terminal: {
         createAdmitted: async () => ({ ok: false, message: 'error.terminal-create-failed' }),
         close: () => false,
@@ -258,7 +258,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture },
-      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntime: () => true,
@@ -288,7 +288,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       physicalWorktrees: {
         capture: async () => testPhysicalWorktreeExecutionCapability('/repo'),
       },
-      terminalWorktree: {
+      terminalSessions: {
         listSessionsForUser: async () => [
           {
             ...terminalSession('term-workspaceworkspace001', 'pty_workspace_aaaaaaaa'),
@@ -330,7 +330,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
           throw failure
         },
       },
-      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession },
       isCurrentWorkspaceRuntime: () => true,
@@ -366,7 +366,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture: async () => capability },
-      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession },
       isCurrentWorkspaceRuntime: () => true,
@@ -411,7 +411,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       const application = createWorkspacePaneRuntimeApplication({
         worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
         physicalWorktrees: testPhysicalWorktrees,
-        terminalWorktree: { listSessionsForUser: async () => [] },
+        terminalSessions: { listSessionsForUser: async () => [] },
         terminal: { createAdmitted: create, close },
         workspaceTabsCoordinator: { ensureRuntimeTabForSession },
         isCurrentWorkspaceRuntime,
@@ -440,7 +440,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
-      terminalWorktree: { listSessionsForUser: listSessions },
+      terminalSessions: { listSessionsForUser: listSessions },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntime: () => true,
@@ -476,7 +476,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
-      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntime: () => true,
@@ -528,7 +528,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       physicalWorktrees: {
         capture: async () => testPhysicalWorktreeExecutionCapability('/repo'),
       },
-      terminalWorktree: { listSessionsForUser: async () => [session] },
+      terminalSessions: { listSessionsForUser: async () => [session] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntime: () => true,
@@ -569,7 +569,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       physicalWorktrees: {
         capture: async () => testPhysicalWorktreeExecutionCapability(request.worktreePath),
       },
-      terminalWorktree: { listSessionsForUser: async () => [session] },
+      terminalSessions: { listSessionsForUser: async () => [session] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntime: () => true,
@@ -591,7 +591,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
-      terminalWorktree: { listSessionsForUser: async () => [session] },
+      terminalSessions: { listSessionsForUser: async () => [session] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close: async () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntime: () => true,
@@ -616,7 +616,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
-      terminalWorktree: { listSessionsForUser: listSessions },
+      terminalSessions: { listSessionsForUser: listSessions },
       terminal: {
         createAdmitted: async () => await createResult.promise,
         close: () => true,
@@ -656,7 +656,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations,
       physicalWorktrees: testPhysicalWorktrees,
-      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close },
       workspaceTabsCoordinator: {
         ensureRuntimeTabForSession: async (input: {
@@ -700,7 +700,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations,
       physicalWorktrees: { capture: async () => physicalWorktreeCapability },
-      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: vi.fn() },
       isCurrentWorkspaceRuntime: () => true,
@@ -726,7 +726,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
-      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: async () => runtime, close },
       workspaceTabsCoordinator: {
         ensureRuntimeTabForSession: async () => {
@@ -754,7 +754,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
-      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: async () => runtime, close: () => false },
       workspaceTabsCoordinator: {
         ensureRuntimeTabForSession: async () => {
@@ -780,7 +780,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
-      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: async () => runtime, close: () => false },
       workspaceTabsCoordinator: { ensureRuntimeTabForSession: async () => ({ kind: 'target-stale' }) },
       isCurrentWorkspaceRuntime: () => true,
@@ -806,7 +806,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
-      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: async () => runtime, close },
       workspaceTabsCoordinator: {
         ensureRuntimeTabForSession: async (input: { commitAdmission: (canonicalBranch: string) => void }) => {

@@ -10,7 +10,7 @@ import {
   type TerminalSessionSummary as ServerTerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import type {
   TerminalDescriptor,
   TerminalSessionHydrationInput,
@@ -27,7 +27,7 @@ export type TerminalStartResultWithController = TerminalStartResult & {
 
 export interface ProjectedServerTerminalSession {
   descriptor: TerminalDescriptor
-  terminalWorktreeKey: string
+  terminalFilesystemTargetKey: string
   hydrateInput: TerminalSessionHydrationInput
   controlsTerminal: boolean
 }
@@ -74,11 +74,14 @@ export function projectServerTerminalSession(input: {
     input.serverSession.terminalSessionId,
     input.index,
   )
-  const terminalWorktree = formatTerminalWorktreeKey(coordinates.workspaceId, coordinates.worktreeId)
+  const terminalFilesystemTarget = formatTerminalFilesystemTargetKey(
+    coordinates.workspaceId,
+    coordinates.executionRootId,
+  )
   const controller = resolveTerminalController(input.serverSession.controller, input.clientId)
   return {
     descriptor,
-    terminalWorktreeKey: terminalWorktree,
+    terminalFilesystemTargetKey: terminalFilesystemTarget,
     hydrateInput: {
       terminalRuntimeSessionId: input.serverSession.terminalRuntimeSessionId,
       terminalRuntimeGeneration: input.serverSession.terminalRuntimeGeneration,

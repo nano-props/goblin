@@ -31,7 +31,7 @@ export function workspaceNavigationHistoryEntryEqual(
         b.route.kind === 'branch' &&
         a.route.branchName === b.route.branchName &&
         a.route.workspacePaneTab === b.route.workspacePaneTab &&
-        a.route.terminalWorktreeKey === b.route.terminalWorktreeKey &&
+        a.route.terminalFilesystemTargetKey === b.route.terminalFilesystemTargetKey &&
         a.route.terminalSessionId === b.route.terminalSessionId
       )
   }

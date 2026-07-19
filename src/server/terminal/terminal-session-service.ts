@@ -14,7 +14,7 @@ import type {
 } from '#/shared/workspace-pane-tabs.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
-import { terminalSessionRuntimeScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
+import { terminalSessionRuntimeScope, terminalSessionExecutionPath } from '#/server/terminal/terminal-session-scope.ts'
 import {
   isValidWorkspacePaneTabsOperation,
   type WorkspacePaneTabsCoordinator,
@@ -22,7 +22,11 @@ import {
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { restorableWorkspacePaneTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import { bindWorkspacePaneTarget, type RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import { canonicalWorkspaceLocator, parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+import {
+  canonicalWorkspaceLocator,
+  parseCanonicalWorkspaceLocator,
+  type WorkspaceId,
+} from '#/shared/workspace-locator.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspacePaneTabsRestoreResult } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
@@ -45,7 +49,11 @@ interface TerminalSessionServiceManager extends TerminalSessionEnsureManager {
   listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
   terminalSessionsSnapshotForUser(userId: string, scope: string): TerminalSessionsSnapshot
   requestSessionRetirement(terminalRuntimeSessionId: string): Promise<boolean>
-  primaryTerminalSessionIdForWorktree(userId: string, scope: string, worktreeId: WorkspaceId): string | null
+  primaryTerminalSessionIdForFilesystemTarget(
+    userId: string,
+    scope: string,
+    executionRootId: WorkspaceId,
+  ): string | null
 }
 
 interface TerminalSessionServiceOptions {
@@ -97,9 +105,9 @@ class TerminalSessionService {
   ): Promise<TerminalSessionEnsureResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
     const coordinates = terminalExecutionCoordinates(input.target)
-    const worktreePath = terminalExecutionPath(input.target)
+    const executionPath = terminalExecutionPath(input.target)
     if (!isValidWorkspaceLocatorInput(coordinates.workspaceId)) return { ok: false, message: 'error.invalid-arguments' }
-    if (!isValidCwd(worktreePath)) return { ok: false, message: 'error.invalid-arguments' }
+    if (!isValidCwd(executionPath)) return { ok: false, message: 'error.invalid-arguments' }
 
     const terminalSessionId = input.terminalSessionId ?? createTerminalSessionId()
     const cols = input.cols ?? 80
@@ -142,25 +150,26 @@ class TerminalSessionService {
   }
 
   async replaceTabs(userId: string, input: WorkspacePaneTabsReplaceInput): Promise<WorkspacePaneTabsSnapshot> {
-    const nativeWorktreePath = nativeWorktreePathForRuntimeTarget(input.target)
+    const nativeExecutionPath = nativeExecutionPathForRuntimeTarget(input.target)
     if (
-      nativeWorktreePath === undefined ||
+      nativeExecutionPath === undefined ||
       input.workspaceId !== input.target.workspaceId ||
       input.workspaceRuntimeId !== input.target.workspaceRuntimeId
     ) {
       return emptyWorkspacePaneTabsSnapshot()
     }
     const scope = terminalSessionRuntimeScope(input.target.workspaceId, input.workspaceRuntimeId)
-    const worktreePath =
-      nativeWorktreePath === null ? null : terminalSessionWorktreePath(input.workspaceId, nativeWorktreePath)
+    const executionPath =
+      nativeExecutionPath === null ? null : terminalSessionExecutionPath(input.workspaceId, nativeExecutionPath)
     const result = await this.workspaceTabsCoordinator.replaceTabs({
       userId,
       workspaceId: input.workspaceId,
       scope,
       target: input.target,
-      nativeWorktreePath: worktreePath,
+      nativeWorktreePath: executionPath,
       tabs: input.tabs,
-      assertCurrent: () => this.assertCurrentWorkspaceRuntime(userId, input.target.workspaceId, input.workspaceRuntimeId),
+      assertCurrent: () =>
+        this.assertCurrentWorkspaceRuntime(userId, input.target.workspaceId, input.workspaceRuntimeId),
     })
     this.broadcastDurableLayoutChange(input.target.workspaceId, result.affectedUserIds)
     return result.snapshot
@@ -186,15 +195,15 @@ class TerminalSessionService {
       workspaceId,
       scope,
       targets: input.targets.flatMap((restorable) => {
-        const nativePath = nativeWorktreePathForRestorableTarget(workspaceId, restorable)
-        if (nativePath === undefined) return []
+        const nativeExecutionPath = nativeExecutionPathForRestorableTarget(workspaceId, restorable)
+        if (nativeExecutionPath === undefined) return []
         return [
           {
             target: bindWorkspacePaneTarget(restorable, workspaceId, input.workspaceRuntimeId),
             nativeWorktreePath:
-              nativePath === null || nativePath === workspaceId
-                ? nativePath
-                : terminalSessionWorktreePath(workspaceId, nativePath),
+              nativeExecutionPath === null || nativeExecutionPath === workspaceId
+                ? nativeExecutionPath
+                : terminalSessionExecutionPath(workspaceId, nativeExecutionPath),
             canonicalBranch: restorable.kind === 'git-branch' ? restorable.branch : null,
           },
         ]
@@ -208,9 +217,9 @@ class TerminalSessionService {
   }
 
   async updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabsSnapshot> {
-    const nativeWorktreePath = nativeWorktreePathForRuntimeTarget(input.target)
+    const nativeExecutionPath = nativeExecutionPathForRuntimeTarget(input.target)
     if (
-      nativeWorktreePath === undefined ||
+      nativeExecutionPath === undefined ||
       input.workspaceId !== input.target.workspaceId ||
       input.workspaceRuntimeId !== input.target.workspaceRuntimeId
     ) {
@@ -218,16 +227,17 @@ class TerminalSessionService {
     }
     if (!isValidWorkspacePaneTabsOperation(input.operation)) return emptyWorkspacePaneTabsSnapshot()
     const scope = terminalSessionRuntimeScope(input.target.workspaceId, input.workspaceRuntimeId)
-    const worktreePath =
-      nativeWorktreePath === null ? null : terminalSessionWorktreePath(input.workspaceId, nativeWorktreePath)
+    const executionPath =
+      nativeExecutionPath === null ? null : terminalSessionExecutionPath(input.workspaceId, nativeExecutionPath)
     const result = await this.workspaceTabsCoordinator.updateTabs({
       userId,
       workspaceId: input.workspaceId,
       scope,
       target: input.target,
-      nativeWorktreePath: worktreePath,
+      nativeWorktreePath: executionPath,
       operation: input.operation,
-      assertCurrent: () => this.assertCurrentWorkspaceRuntime(userId, input.target.workspaceId, input.workspaceRuntimeId),
+      assertCurrent: () =>
+        this.assertCurrentWorkspaceRuntime(userId, input.target.workspaceId, input.workspaceRuntimeId),
     })
     this.broadcastDurableLayoutChange(input.target.workspaceId, result.affectedUserIds)
     return result.snapshot
@@ -259,7 +269,11 @@ class TerminalSessionService {
     })
   }
 
-  async listSessions(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): Promise<TerminalSessionSummary[]> {
+  async listSessions(
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+  ): Promise<TerminalSessionSummary[]> {
     if (!isValidWorkspaceLocatorInput(workspaceId)) return []
     return await this.options.manager.listSessionsForUser(
       userId,
@@ -334,7 +348,7 @@ function emptyWorkspacePaneTabsSnapshot(): WorkspacePaneTabsSnapshot {
   return { revision: 0, entries: [] }
 }
 
-function nativeWorktreePathForRuntimeTarget(
+function nativeExecutionPathForRuntimeTarget(
   target: WorkspacePaneTabsReplaceInput['target'],
 ): string | null | undefined {
   if (!restorableWorkspacePaneTargetFromRuntime(target)) return undefined
@@ -343,7 +357,7 @@ function nativeWorktreePathForRuntimeTarget(
   return parseCanonicalWorkspaceLocator(target.root)?.path
 }
 
-function nativeWorktreePathForRestorableTarget(
+function nativeExecutionPathForRestorableTarget(
   workspaceId: WorkspacePaneTabsReplaceInput['target']['workspaceId'],
   target: RestorableWorkspacePaneTarget,
 ): string | null | undefined {

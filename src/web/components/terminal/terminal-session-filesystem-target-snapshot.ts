@@ -3,12 +3,12 @@ import type {
   TerminalSessionLike,
   TerminalSessionSummary,
   TerminalSnapshot,
-  TerminalWorktreeSnapshot,
+  TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
 
-export function buildTerminalWorktreeSnapshot(input: {
-  terminalWorktreeKey: string
-  selectedDescriptor: TerminalWorktreeSnapshot['selectedDescriptor']
+export function buildTerminalFilesystemTargetSnapshot(input: {
+  terminalFilesystemTargetKey: string
+  selectedDescriptor: TerminalFilesystemTargetSnapshot['selectedDescriptor']
   createPending: boolean
   sessions: TerminalSessionLike[]
   selectedTerminalSessionId: string | null
@@ -16,12 +16,12 @@ export function buildTerminalWorktreeSnapshot(input: {
   cacheSnapshot: (terminalSessionId: string, snapshot: TerminalSnapshot) => void
   hasBell: (terminalSessionId: string) => boolean
   hasRecentOutput: (terminalSessionId: string) => boolean
-}): TerminalWorktreeSnapshot {
+}): TerminalFilesystemTargetSnapshot {
   const sessions = buildTerminalSessionSummaries(input)
   const bellCount = sessions.reduce((count, session) => count + (session.hasBell ? 1 : 0), 0)
   const outputActiveCount = sessions.reduce((count, session) => count + (session.hasRecentOutput ? 1 : 0), 0)
   return {
-    terminalWorktreeKey: input.terminalWorktreeKey,
+    terminalFilesystemTargetKey: input.terminalFilesystemTargetKey,
     selectedDescriptor: input.selectedDescriptor,
     sessions,
     count: sessions.length,
@@ -32,7 +32,7 @@ export function buildTerminalWorktreeSnapshot(input: {
 }
 
 function buildTerminalSessionSummaries(input: {
-  terminalWorktreeKey: string
+  terminalFilesystemTargetKey: string
   sessions: TerminalSessionLike[]
   selectedTerminalSessionId: string | null
   getCachedSnapshot: (terminalSessionId: string) => TerminalSnapshot | null
@@ -47,7 +47,7 @@ function buildTerminalSessionSummaries(input: {
     return {
       type: 'terminal',
       terminalSessionId: session.descriptor.terminalSessionId,
-      terminalWorktreeKey: input.terminalWorktreeKey,
+      terminalFilesystemTargetKey: input.terminalFilesystemTargetKey,
       index: session.descriptor.index,
       title: summarizeTerminalTitle(snapshot, session.descriptor.index),
       fullTitle: fullTerminalTitle(snapshot, session.descriptor.index),

@@ -13,7 +13,7 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { addResolvedWorkspace } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import {
   branchSnapshot,
   flushIpc,
@@ -625,14 +625,14 @@ describe('repo lifecycle', () => {
   test('closeWorkspace clears only terminal selections canonically owned by that Workspace', async () => {
     const workspaceA = seedRepoWithReadModelForTest({ id: REPO_A, branches: [] })
     const workspaceB = seedRepoWithReadModelForTest({ id: REPO_B, branches: [] })
-    const keyA = formatTerminalWorktreeKey(REPO_A, REPO_A)
-    const keyB = formatTerminalWorktreeKey(REPO_B, REPO_B)
+    const keyA = formatTerminalFilesystemTargetKey(REPO_A, REPO_A)
+    const keyB = formatTerminalFilesystemTargetKey(REPO_B, REPO_B)
     const malformedPrefixKey = `${REPO_A}\0not-a-workspace-locator`
     useWorkspacesStore.setState({
       workspaces: { [REPO_A]: workspaceA, [REPO_B]: workspaceB },
       workspaceOrder: [REPO_A, REPO_B],
       restoredWorkspaceId: REPO_A,
-      selectedTerminalSessionIdByTerminalWorktree: {
+      selectedTerminalSessionIdByTerminalFilesystemTarget: {
         [keyA]: 'terminal-session-a',
         [keyB]: 'terminal-session-b',
         [malformedPrefixKey]: 'terminal-session-malformed',
@@ -641,7 +641,7 @@ describe('repo lifecycle', () => {
 
     await useWorkspacesStore.getState().closeWorkspace(REPO_A)
 
-    expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalWorktree).toEqual({
+    expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget).toEqual({
       [keyB]: 'terminal-session-b',
       [malformedPrefixKey]: 'terminal-session-malformed',
     })

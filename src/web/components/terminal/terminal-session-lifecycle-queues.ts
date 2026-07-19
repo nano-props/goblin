@@ -25,16 +25,19 @@ export interface TerminalCreateQueueAdmission<TResult = string> {
 }
 
 export class TerminalSessionLifecycleQueues<TBase, TOptions, TResult = string> {
-  private readonly createEntriesByWorktree = new Map<string, TerminalCreateQueueEntry<TBase, TOptions, TResult>[]>()
+  private readonly createEntriesByFilesystemTarget = new Map<
+    string,
+    TerminalCreateQueueEntry<TBase, TOptions, TResult>[]
+  >()
 
   enqueueCreate(input: {
-    terminalWorktreeKey: string
+    terminalFilesystemTargetKey: string
     base: TBase
     options: TOptions
     isSameRequest: (existing: TOptions, next: TOptions) => boolean
-    flush: (terminalWorktreeKey: string) => void
+    flush: (terminalFilesystemTargetKey: string) => void
   }): TerminalCreateQueueAdmission<TResult> {
-    const queue = this.createQueue(input.terminalWorktreeKey)
+    const queue = this.createQueue(input.terminalFilesystemTargetKey)
     const existing = queue.find((entry) => input.isSameRequest(entry.options, input.options))
     if (existing) return { promise: existing.promise, ownsAdmission: false }
     let resolve!: (result: TResult) => void
@@ -53,54 +56,61 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions, TResult = string> {
       flushing: false,
       creating: false,
     })
-    if (wasEmpty) input.flush(input.terminalWorktreeKey)
+    if (wasEmpty) input.flush(input.terminalFilesystemTargetKey)
     return { promise, ownsAdmission: true }
   }
 
-  getCreate(terminalWorktreeKey: string): TerminalCreateQueueEntry<TBase, TOptions, TResult> | undefined {
-    return this.createEntriesByWorktree.get(terminalWorktreeKey)?.[0]
+  getCreate(terminalFilesystemTargetKey: string): TerminalCreateQueueEntry<TBase, TOptions, TResult> | undefined {
+    return this.createEntriesByFilesystemTarget.get(terminalFilesystemTargetKey)?.[0]
   }
 
-  hasCreate(terminalWorktreeKey: string): boolean {
-    return (this.createEntriesByWorktree.get(terminalWorktreeKey)?.length ?? 0) > 0
+  hasCreate(terminalFilesystemTargetKey: string): boolean {
+    return (this.createEntriesByFilesystemTarget.get(terminalFilesystemTargetKey)?.length ?? 0) > 0
   }
 
-  deleteCreate(terminalWorktreeKey: string, expected?: TerminalCreateQueueEntry<TBase, TOptions, TResult>): boolean {
-    const queue = this.createEntriesByWorktree.get(terminalWorktreeKey)
+  deleteCreate(
+    terminalFilesystemTargetKey: string,
+    expected?: TerminalCreateQueueEntry<TBase, TOptions, TResult>,
+  ): boolean {
+    const queue = this.createEntriesByFilesystemTarget.get(terminalFilesystemTargetKey)
     if (!queue || queue.length === 0) return false
     if (!expected) {
-      this.createEntriesByWorktree.delete(terminalWorktreeKey)
+      this.createEntriesByFilesystemTarget.delete(terminalFilesystemTargetKey)
       return true
     }
     const index = queue.indexOf(expected)
     if (index < 0) return false
     queue.splice(index, 1)
-    if (queue.length === 0) this.createEntriesByWorktree.delete(terminalWorktreeKey)
+    if (queue.length === 0) this.createEntriesByFilesystemTarget.delete(terminalFilesystemTargetKey)
     return index === 0
   }
 
-  rejectCreatesForWorktree(terminalWorktreeKey: string, error: unknown, options: { includeActive: boolean }): boolean {
-    const queue = this.createEntriesByWorktree.get(terminalWorktreeKey)
+  rejectCreatesForFilesystemTarget(
+    terminalFilesystemTargetKey: string,
+    error: unknown,
+    options: { includeActive: boolean },
+  ): boolean {
+    const queue = this.createEntriesByFilesystemTarget.get(terminalFilesystemTargetKey)
     if (!queue || queue.length === 0) return false
     const start = options.includeActive ? 0 : 1
     const rejected = queue.splice(start)
-    if (queue.length === 0) this.createEntriesByWorktree.delete(terminalWorktreeKey)
+    if (queue.length === 0) this.createEntriesByFilesystemTarget.delete(terminalFilesystemTargetKey)
     for (const pending of rejected) pending.reject(error)
     return rejected.length > 0
   }
 
   rejectAll(error: unknown): void {
-    for (const queue of this.createEntriesByWorktree.values()) {
+    for (const queue of this.createEntriesByFilesystemTarget.values()) {
       for (const pending of queue) pending.reject(error)
     }
-    this.createEntriesByWorktree.clear()
+    this.createEntriesByFilesystemTarget.clear()
   }
 
-  private createQueue(terminalWorktreeKey: string): TerminalCreateQueueEntry<TBase, TOptions, TResult>[] {
-    const queue = this.createEntriesByWorktree.get(terminalWorktreeKey)
+  private createQueue(terminalFilesystemTargetKey: string): TerminalCreateQueueEntry<TBase, TOptions, TResult>[] {
+    const queue = this.createEntriesByFilesystemTarget.get(terminalFilesystemTargetKey)
     if (queue) return queue
     const next: TerminalCreateQueueEntry<TBase, TOptions, TResult>[] = []
-    this.createEntriesByWorktree.set(terminalWorktreeKey, next)
+    this.createEntriesByFilesystemTarget.set(terminalFilesystemTargetKey, next)
     return next
   }
 }

@@ -243,7 +243,7 @@ function emitBellForKey(projection: TerminalSessionProjection, terminalSessionId
   ;(projection as any).bellState.handleBell(
     {
       terminalSessionId,
-      terminalWorktreeKey: WORKTREE_KEY,
+      terminalFilesystemTargetKey: WORKTREE_KEY,
       index: 1,
       workspaceId: REPO_ROOT,
       presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
@@ -338,7 +338,7 @@ describe('TerminalSessionProjection create flow', () => {
     )
 
     await projection.createTerminal(terminalBase())
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
 
     expect(
       projection.reconcileServerSessionsSnapshot(
@@ -347,7 +347,7 @@ describe('TerminalSessionProjection create flow', () => {
         'client_local',
       ),
     ).toBe(false)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
   })
 
   test('materializes an unseen unchanged reuse without advancing catalog coverage', async () => {
@@ -363,7 +363,7 @@ describe('TerminalSessionProjection create flow', () => {
     await projection.createTerminal(terminalBase())
 
     expect(projection.terminalSessionsCatalogCoverageRevision(scope)).toBe(2)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
     expect((projection as any).sessions.get('term-111111111111111111111').currentRuntimeBinding()).toEqual({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
@@ -419,7 +419,7 @@ describe('TerminalSessionProjection create flow', () => {
     })
 
     await vi.waitFor(() => {
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(true)
     })
     expect(mocks.createMock).not.toHaveBeenCalled()
 
@@ -444,7 +444,7 @@ describe('TerminalSessionProjection create flow', () => {
     })
 
     await vi.waitFor(() => {
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(true)
     })
     const createExpectation = expect(create).rejects.toThrow('terminal session projection destroyed')
     projection.destroy()
@@ -454,10 +454,10 @@ describe('TerminalSessionProjection create flow', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(mocks.createMock).not.toHaveBeenCalled()
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(false)
   })
 
-  test('deduplicates identical in-flight creates for the same worktree', async () => {
+  test('deduplicates identical in-flight creates for the same filesystem target', async () => {
     const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     mocks.createMock.mockReset()
     mocks.createMock.mockReturnValueOnce(first.promise)
@@ -527,7 +527,7 @@ describe('TerminalSessionProjection create flow', () => {
         resourceDisposition,
         runtimeProjectionApplied: true,
       })
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
     },
   )
 
@@ -567,7 +567,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.setBadgeMock).toHaveBeenCalledWith(0)
   })
 
-  test('keeps the worktree pending while create is in flight with registered host geometry', async () => {
+  test('keeps the filesystem target pending while create is in flight with registered host geometry', async () => {
     const { promise, resolve } = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     mocks.createMock.mockReturnValueOnce(promise)
     const host = document.createElement('div')
@@ -577,13 +577,13 @@ describe('TerminalSessionProjection create flow', () => {
     const pending = projection.createTerminal(terminalBase())
 
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(true)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
 
     resolve(makeCreateResult())
     await expect(pending).resolves.toBe('term-111111111111111111111')
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(false)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
   })
 
   test('clears createPending when create rejects', async () => {
@@ -593,8 +593,8 @@ describe('TerminalSessionProjection create flow', () => {
     projection.registerHost(WORKTREE_KEY, host)
 
     await expect(projection.createTerminal(terminalBase())).rejects.toThrow('boom')
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(false)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
   test.each(['created', 'reused', 'restored'] as const)(
@@ -617,14 +617,14 @@ describe('TerminalSessionProjection create flow', () => {
         runtimeProjectionApplied: false,
       })
       expect(mocks.closeMock).not.toHaveBeenCalled()
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
     },
   )
 
   test('creates with default startup geometry when no host geometry is available yet', async () => {
     const pending = projection.createTerminal(terminalBase())
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(true)
 
     await expect(pending).resolves.toBe('term-111111111111111111111')
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
@@ -642,7 +642,7 @@ describe('TerminalSessionProjection create flow', () => {
     mocks.createMock.mockReturnValueOnce(promise)
     const pending = projection.createTerminal(terminalBase())
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(true)
     expect((projection as any).lifecycleQueues.hasCreate(WORKTREE_KEY)).toBe(true)
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
 
@@ -653,7 +653,7 @@ describe('TerminalSessionProjection create flow', () => {
     projection.destroy()
     await expectation
     expect((projection as any).lifecycleQueues.hasCreate(WORKTREE_KEY)).toBe(false)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(false)
   })
 
   test('destroy does not close a server create result that resolves after the queue entry is gone', async () => {
@@ -689,7 +689,7 @@ describe('TerminalSessionProjection create flow', () => {
       rows: 24,
       clientId: 'client_local',
     })
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(false)
     await expect(pending).resolves.toBe('term-111111111111111111111')
   })
 
@@ -706,7 +706,7 @@ describe('TerminalSessionProjection create flow', () => {
     const pending = projection.createTerminal(terminalBase())
 
     await expect(pending).resolves.toBe('term-111111111111111111111')
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).createPending).toBe(false)
     expect(mocks.createMock).toHaveBeenCalledWith({
       target: terminalBase().target,
       kind: 'primary',
@@ -726,7 +726,7 @@ describe('TerminalSessionProjection create flow', () => {
     projection.registerHost(WORKTREE_KEY, host)
     await projection.createTerminal(terminalBase())
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -734,8 +734,8 @@ describe('TerminalSessionProjection create flow', () => {
       terminalSessionId: 'term-111111111111111111111',
     })
 
-    // The local session is gone; the worktree snapshot is empty.
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
+    // The local session is gone; the filesystem target snapshot is empty.
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
   })
 
   test('durable close: exact runtime matching does not require the pty reverse index', async () => {
@@ -744,7 +744,7 @@ describe('TerminalSessionProjection create flow', () => {
     projection.registerHost(WORKTREE_KEY, host)
     await projection.createTerminal(terminalBase())
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
     ;(projection as any).terminalSessionIdByTerminalRuntimeSessionId.clear()
 
     projection.handleSessionClosed({
@@ -753,7 +753,7 @@ describe('TerminalSessionProjection create flow', () => {
       terminalSessionId: 'term-111111111111111111111',
     })
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
   })
 
   test('durable close: runtime mismatch does not delete the durable candidate', async () => {
@@ -769,7 +769,7 @@ describe('TerminalSessionProjection create flow', () => {
       terminalSessionId: 'term-111111111111111111111',
     })
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
   })
 
   test('caps pending server bells for unknown sessions', () => {
@@ -871,7 +871,7 @@ describe('TerminalSessionProjection create flow', () => {
     ;(projection as any).bellState.handleBell(
       {
         terminalSessionId,
-        terminalWorktreeKey: WORKTREE_KEY,
+        terminalFilesystemTargetKey: WORKTREE_KEY,
         index: 1,
         workspaceId: REPO_ROOT,
         branch: BRANCH,
@@ -883,7 +883,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     projection.setRuntimeMembershipIndex(runtimeMembershipIndexFromEntries([]))
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
     expect(mocks.setBadgeMock).toHaveBeenLastCalledWith(0)
   })
 
@@ -956,6 +956,6 @@ describe('TerminalSessionProjection create flow', () => {
       runtimeMembershipIndexFromEntries([{ id: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }]),
     )
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
   })
 })

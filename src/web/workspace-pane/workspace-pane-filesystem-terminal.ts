@@ -1,4 +1,4 @@
-import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
@@ -15,7 +15,10 @@ export function showCreatedWorkspacePaneFilesystemTerminal(
   if (target.kind === 'workspace-root') {
     if (presentation.kind !== 'workspace-root') return false
     const state = useWorkspacesStore.getState()
-    state.setSelectedTerminal(formatTerminalWorktreeKeyForPath(target.workspaceId, target.rootId), terminalSessionId)
+    state.setSelectedTerminal(
+      formatTerminalFilesystemTargetKeyForPath(target.workspaceId, target.rootId),
+      terminalSessionId,
+    )
     state.setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: target.workspaceId }, 'terminal')
     return true
   }

@@ -36,7 +36,6 @@ export type TerminalSessionBase =
       target: Extract<TerminalExecutionTarget, { kind: 'workspace-root' }>
       presentation: Extract<TerminalPresentation, { kind: 'workspace-root' }>
     }
-
   | {
       target: Extract<TerminalExecutionTarget, { kind: 'git-worktree' }>
       presentation: Extract<TerminalPresentation, { kind: 'git-worktree' }>
@@ -59,7 +58,7 @@ export function terminalSessionBase(
 export interface TerminalExecutionCoordinates {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
-  worktreeId: WorkspaceId
+  executionRootId: WorkspaceId
 }
 
 export interface WorkspaceRuntimeScope {
@@ -72,7 +71,7 @@ export function terminalExecutionCoordinates(target: TerminalExecutionTarget): T
   return {
     workspaceId: target.workspaceId,
     workspaceRuntimeId: target.workspaceRuntimeId,
-    worktreeId: target.kind === 'workspace-root' ? target.workspaceId : target.root,
+    executionRootId: target.kind === 'workspace-root' ? target.workspaceId : target.root,
   }
 }
 

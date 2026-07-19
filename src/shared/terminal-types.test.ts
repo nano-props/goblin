@@ -21,7 +21,7 @@ describe('terminal execution target projections', () => {
     expect(terminalExecutionCoordinates(target)).toEqual({
       workspaceId: workspace,
       workspaceRuntimeId: 'workspace-runtime-test',
-      worktreeId: worktree,
+      executionRootId: worktree,
     })
     expect(terminalExecutionPath(target)).toBe(executionPath)
   })

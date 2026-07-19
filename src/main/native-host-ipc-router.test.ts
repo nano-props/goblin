@@ -316,7 +316,7 @@ describe('main repo ipc cancellation', () => {
       restoredWorkspaceId: 'goblin+file:///repo',
       zenMode: false,
       workspacePaneSize: 50,
-      selectedTerminalSessionIdByTerminalWorktree: {},
+      selectedTerminalSessionIdByTerminalFilesystemTarget: {},
       preferredWorkspacePaneTabByTargetByWorkspace: {},
       filetreeViewStateByWorktreeByWorkspace: {},
     }
@@ -335,7 +335,7 @@ describe('main repo ipc cancellation', () => {
       restoredWorkspaceId: '/repo',
       zenMode: false,
       workspacePaneSize: 50,
-      selectedTerminalSessionIdByTerminalWorktree: {},
+      selectedTerminalSessionIdByTerminalFilesystemTarget: {},
       preferredWorkspacePaneTabByTargetByWorkspace: {},
       filetreeViewStateByWorktreeByWorkspace: {},
     })

@@ -9,7 +9,7 @@ import {
 } from '#/shared/workspace-pane.ts'
 import { parseWorkspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
-import { parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { parseTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import type { RestorableWorkspaceState, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
 import { persistedFiletreeViewStateByWorktreeByWorkspaceForSession } from '#/web/filetree-session-state.ts'
 import type { FiletreeInteractionSnapshot } from '#/web/stores/workspaces/filetree-interaction-state.ts'
@@ -72,8 +72,8 @@ export function clientWorkspaceStateFromRestorableWorkspaceState(input: {
     restoredWorkspaceId: restorableWorkspaceState.restoredWorkspaceId,
     zenMode: restorableWorkspaceState.zenMode,
     workspacePaneSize: restorableWorkspaceState.workspacePaneSize,
-    selectedTerminalSessionIdByTerminalWorktree: selectedTerminalSessionsForClientWorkspace(
-      restorableWorkspaceState.selectedTerminalSessionIdByTerminalWorktree,
+    selectedTerminalSessionIdByTerminalFilesystemTarget: selectedTerminalSessionsForClientWorkspace(
+      restorableWorkspaceState.selectedTerminalSessionIdByTerminalFilesystemTarget,
       restorationProjections,
     ),
     preferredWorkspacePaneTabByTargetByWorkspace: preferredWorkspacePaneTabsForClientWorkspace(
@@ -148,9 +148,9 @@ function clientWorkspaceWithStubBaseline(
   if (stubWorkspaceIds.size === 0) return clientWorkspace
   return {
     ...clientWorkspace,
-    selectedTerminalSessionIdByTerminalWorktree: mergeBaselineSelectedTerminals(
-      clientWorkspace.selectedTerminalSessionIdByTerminalWorktree,
-      baseline.selectedTerminalSessionIdByTerminalWorktree,
+    selectedTerminalSessionIdByTerminalFilesystemTarget: mergeBaselineSelectedTerminals(
+      clientWorkspace.selectedTerminalSessionIdByTerminalFilesystemTarget,
+      baseline.selectedTerminalSessionIdByTerminalFilesystemTarget,
       stubWorkspaceIds,
     ),
     preferredWorkspacePaneTabByTargetByWorkspace: mergeBaselineWorkspaceMap(
@@ -187,11 +187,11 @@ function mergeBaselineSelectedTerminals(
   stubWorkspaceIds: ReadonlySet<string>,
 ): Record<string, string> {
   let merged = current
-  for (const [terminalWorktreeKey, terminalSessionId] of Object.entries(baseline)) {
-    const workspaceId = parseTerminalWorktreeKey(terminalWorktreeKey)?.workspaceId
+  for (const [terminalFilesystemTargetKey, terminalSessionId] of Object.entries(baseline)) {
+    const workspaceId = parseTerminalFilesystemTargetKey(terminalFilesystemTargetKey)?.workspaceId
     if (!workspaceId || !stubWorkspaceIds.has(workspaceId)) continue
     if (merged === current) merged = { ...current }
-    merged[terminalWorktreeKey] = terminalSessionId
+    merged[terminalFilesystemTargetKey] = terminalSessionId
   }
   return merged
 }
@@ -264,23 +264,25 @@ function workspacePaneTabsTargetKeyBelongsToWorkspace(
 }
 
 function selectedTerminalSessionsForClientWorkspace(
-  selectedTerminalSessionIdByTerminalWorktree: Record<string, string>,
+  selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>,
   workspaces: Record<string, ClientWorkspaceTargetProjection | undefined>,
 ): Record<string, string> {
   const persisted: Record<string, string> = {}
-  for (const [terminalWorktreeKey, terminalSessionId] of Object.entries(selectedTerminalSessionIdByTerminalWorktree)) {
-    const parsed = parseTerminalWorktreeKey(terminalWorktreeKey)
+  for (const [terminalFilesystemTargetKey, terminalSessionId] of Object.entries(
+    selectedTerminalSessionIdByTerminalFilesystemTarget,
+  )) {
+    const parsed = parseTerminalFilesystemTargetKey(terminalFilesystemTargetKey)
     if (!parsed || !terminalSessionId) continue
     const workspace = workspaces[parsed.workspaceId]
     if (!workspace) continue
-    if (parsed.worktreeId === parsed.workspaceId) {
-      persisted[terminalWorktreeKey] = terminalSessionId
+    if (parsed.executionRootId === parsed.workspaceId) {
+      persisted[terminalFilesystemTargetKey] = terminalSessionId
       continue
     }
-    const worktreePath = parseCanonicalWorkspaceLocator(parsed.worktreeId)?.path
+    const worktreePath = parseCanonicalWorkspaceLocator(parsed.executionRootId)?.path
     if (!worktreePath) continue
     if (!workspace.gitTargets?.branches.some((branch) => branch.worktree?.path === worktreePath)) continue
-    persisted[terminalWorktreeKey] = terminalSessionId
+    persisted[terminalFilesystemTargetKey] = terminalSessionId
   }
   return persisted
 }
@@ -290,7 +292,7 @@ function selectedTerminalSessionsForClientWorkspace(
  *  subsequent local updates flow through useClientWorkspacePersistence. */
 interface RestoredWorkspaceStateFromClientWorkspace extends Pick<
   RestorableWorkspaceState,
-  'restoredWorkspaceId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalWorktree'
+  'restoredWorkspaceId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalFilesystemTarget'
 > {
   preferredWorkspacePaneTabByTargetByWorkspace: ClientWorkspaceState['preferredWorkspacePaneTabByTargetByWorkspace']
 }
@@ -303,7 +305,8 @@ export function restoreRestorableWorkspaceStateFromClientWorkspace(
     restoredWorkspaceId,
     zenMode: clientWorkspace.zenMode,
     workspacePaneSize: clientWorkspace.workspacePaneSize,
-    selectedTerminalSessionIdByTerminalWorktree: clientWorkspace.selectedTerminalSessionIdByTerminalWorktree,
+    selectedTerminalSessionIdByTerminalFilesystemTarget:
+      clientWorkspace.selectedTerminalSessionIdByTerminalFilesystemTarget,
     preferredWorkspacePaneTabByTargetByWorkspace: clientWorkspace.preferredWorkspacePaneTabByTargetByWorkspace,
   }
 }

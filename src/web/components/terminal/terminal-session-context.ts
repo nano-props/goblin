@@ -3,14 +3,14 @@ import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
   TerminalSnapshot,
-  TerminalWorktreeSnapshot,
+  TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
 
 export const TerminalSessionContext = createContext<TerminalSessionContextValue | null>(null)
 export const TerminalSessionReadContext = createContext<TerminalSessionReadContextValue | null>(null)
 
-export const EMPTY_TERMINAL_WORKTREE_SNAPSHOT: TerminalWorktreeSnapshot = {
-  terminalWorktreeKey: '',
+export const EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT: TerminalFilesystemTargetSnapshot = {
+  terminalFilesystemTargetKey: '',
   selectedDescriptor: null,
   sessions: [],
   count: 0,

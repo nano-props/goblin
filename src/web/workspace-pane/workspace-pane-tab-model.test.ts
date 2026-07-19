@@ -16,14 +16,14 @@ import {
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
-import { formatTerminalWorktreeKeyForPath } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/goblin-workspace-pane-tab-model-repo')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/tmp/goblin-workspace-pane-tab-model-worktree'
-const WORKTREE_KEY = formatTerminalWorktreeKeyForPath(WORKSPACE_ID, WORKTREE_PATH)
+const WORKTREE_KEY = formatTerminalFilesystemTargetKeyForPath(WORKSPACE_ID, WORKTREE_PATH)
 
 function requiredEntryIdentity(entry: WorkspacePaneTabEntry | null): string {
   if (!entry) throw new Error('expected workspace pane tab entry')
@@ -977,7 +977,7 @@ function terminalView(terminalSessionId: string, index: number, selected: boolea
   return {
     type: 'terminal',
     terminalSessionId,
-    terminalWorktreeKey: WORKTREE_KEY,
+    terminalFilesystemTargetKey: WORKTREE_KEY,
     index,
     title: terminalSessionId,
     phase: 'open',

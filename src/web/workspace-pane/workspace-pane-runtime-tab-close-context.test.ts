@@ -71,8 +71,8 @@ function terminalCommandBridge({
 }): TerminalSessionCommandBridge {
   const createTerminal = vi.fn(async () => 'term-111111111111111111111')
   return {
-    terminalWorktreeSnapshot: () => ({
-      terminalWorktreeKey: 'repo\0worktree',
+    terminalFilesystemTargetSnapshot: () => ({
+      terminalFilesystemTargetKey: 'repo\0worktree',
       selectedDescriptor: null,
       sessions: [],
       count: 0,
