@@ -3,8 +3,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createTerminalBellState } from '#/web/components/terminal/terminal-bell-state.ts'
 import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
-import { terminalDescriptorWorktreeKey } from '#/web/components/terminal/terminal-descriptor.ts'
-import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
+import { terminalSessionBase } from '#/shared/terminal-types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
@@ -73,8 +72,7 @@ describe('terminal bell state', () => {
       title: 'repo',
       body: 'feature/test\nzsh',
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: terminalDescriptorWorktreeKey(descriptor),
-      workspaceId: terminalSessionCoordinates(descriptor).workspaceId,
+      session: terminalSessionBase(descriptor.target, descriptor.presentation),
     })
 
     hasFocus.mockRestore()
@@ -100,8 +98,7 @@ describe('terminal bell state', () => {
       title: 'repo',
       body: 'feature/test\n~/Developer/goblin — npm run dev',
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: terminalDescriptorWorktreeKey(descriptor),
-      workspaceId: terminalSessionCoordinates(descriptor).workspaceId,
+      session: terminalSessionBase(descriptor.target, descriptor.presentation),
     })
 
     hasFocus.mockRestore()

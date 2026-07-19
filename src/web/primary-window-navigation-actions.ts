@@ -310,7 +310,7 @@ function restoreWorkspacePresentationOrOpenDashboard(
   const state = useWorkspacesStore.getState()
   const workspace = state.workspaces[workspaceId]
   const entry = state.navigationHistoryByWorkspace[workspaceId]?.current ?? null
-  // Creating a worktree is a transient workflow, not a repo workspace to resume.
+  // Creating a worktree is a transient workflow, not a resumable workspace presentation.
   // A non-Git workspace may resume only capability-invariant presentations;
   // stale Git-scoped history must not prevent picker activation.
   const entryCanResume =

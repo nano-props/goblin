@@ -143,7 +143,7 @@ export class WorkspacePaneLayoutAggregate {
   private readonly restoreTransaction: WorkspacePaneLayoutRestoreTransaction
   private readonly overlay: WorkspacePaneEpochOverlay
   private readonly clocks = new Map<string, CanonicalClockState>()
-  private readonly operationQueuesByRepoRoot = new Map<string, PQueue>()
+  private readonly operationQueuesByWorkspaceId = new Map<string, PQueue>()
 
   constructor(options: {
     repository: WorkspacePaneLayoutRepository
@@ -159,10 +159,10 @@ export class WorkspacePaneLayoutAggregate {
     workspaceId: WorkspaceId,
     task: (operation: WorkspacePaneLayoutOperation) => Promise<T> | T,
   ): Promise<T> {
-    let queue = this.operationQueuesByRepoRoot.get(workspaceId)
+    let queue = this.operationQueuesByWorkspaceId.get(workspaceId)
     if (!queue) {
       queue = new PQueue({ concurrency: 1 })
-      this.operationQueuesByRepoRoot.set(workspaceId, queue)
+      this.operationQueuesByWorkspaceId.set(workspaceId, queue)
     }
     try {
       return await queue.add(() =>
@@ -177,14 +177,14 @@ export class WorkspacePaneLayoutAggregate {
           closeEpoch: (scope) => this.closeEpoch(scope),
           commitProjectionTargets: (input) => this.commitProjectionTargets(input),
           indexedAdmissionLeases: (scope) => this.overlay.indexedAdmissionLeases(scope),
-          clearPhysicalIdentity: (scopedRepoRoot, identity) =>
-            this.overlay.clearPhysicalIdentity(scopedRepoRoot, identity),
+          clearPhysicalIdentity: (scopedWorkspaceId, identity) =>
+            this.overlay.clearPhysicalIdentity(scopedWorkspaceId, identity),
         }),
       )
     } finally {
       void queue.onIdle().then(() => {
-        if (this.operationQueuesByRepoRoot.get(workspaceId) !== queue) return
-        if (queue.size === 0 && queue.pending === 0) this.operationQueuesByRepoRoot.delete(workspaceId)
+        if (this.operationQueuesByWorkspaceId.get(workspaceId) !== queue) return
+        if (queue.size === 0 && queue.pending === 0) this.operationQueuesByWorkspaceId.delete(workspaceId)
       })
     }
   }

@@ -1,5 +1,5 @@
 import {
-  isProjectedRestoredWorkspaceRuntime,
+  hasRestoredWorkspaceGitProjection,
   type WorkspaceTabsRestoreResult,
   type RestoredWorkspaceRuntime,
   type WorkspaceRuntimeRestoreSnapshot,
@@ -94,11 +94,10 @@ function createRestorableWorkspaceLifecycleActions(
             rankById,
           )
           const workspace = workspaces[restoredWorkspace.workspaceId]
-          // Stub leases (projection: null) skip the post-hydration projection
-          // refresh — that's the entire point of the active-only restore. The
-          // lazy `useRestoreWorkspaceTabsOnView` hook fires the first refresh when
-          // the user navigates to a stub workspace.
-          if (workspace && isProjectedRestoredWorkspaceRuntime(restoredWorkspace)) {
+          // Only server-projected Git data starts an immediate read-model refresh.
+          // Deferred Git projections are loaded on view; filesystem-only workspaces
+          // remain complete without a Git projection.
+          if (workspace && hasRestoredWorkspaceGitProjection(restoredWorkspace)) {
             initialRefreshes.push({ id: workspace.id, workspaceRuntimeId: workspace.workspaceRuntimeId })
           }
           const nextRestoredWorkspaceId = restoredWorkspaceIdAfterWorkspaceHydration(
@@ -131,7 +130,7 @@ function createRestorableWorkspaceLifecycleActions(
         seedRepoProjectionQueryData(
           restoredWorkspace.workspaceId,
           restoredWorkspace.workspaceRuntimeId,
-          restoredWorkspace.projection,
+          restoredWorkspace.gitProjection,
         )
         acceptRepoProjectionReadModel(
           set,
@@ -139,12 +138,12 @@ function createRestorableWorkspaceLifecycleActions(
           {
             repoRoot: restoredWorkspace.workspaceId,
             workspaceRuntimeId: restoredWorkspace.workspaceRuntimeId,
-            projection: restoredWorkspace.projection,
+            projection: restoredWorkspace.gitProjection,
           },
           { scope: 'repo-read-model' },
         )
         if (
-          isProjectedRestoredWorkspaceRuntime(restoredWorkspace) ||
+          hasRestoredWorkspaceGitProjection(restoredWorkspace) ||
           workspaceGitUnavailable(restoredWorkspace.workspaceProbe)
         ) {
           applyRestoredPreferredWorkspacePaneTabs(
@@ -207,7 +206,7 @@ function createRestorableWorkspaceLifecycleActions(
       })
       if (!promoted) return false
 
-      if (!isProjectedRestoredWorkspaceRuntime(restoredWorkspace)) {
+      if (!hasRestoredWorkspaceGitProjection(restoredWorkspace)) {
         writeWorkspacePaneTabsSnapshotQueryData(
           restoredWorkspace.workspaceId,
           restoredWorkspace.workspaceRuntimeId,
@@ -218,7 +217,7 @@ function createRestorableWorkspaceLifecycleActions(
       seedRepoProjectionQueryData(
         restoredWorkspace.workspaceId,
         restoredWorkspace.workspaceRuntimeId,
-        restoredWorkspace.projection,
+        restoredWorkspace.gitProjection,
       )
       writeWorkspacePaneTabsSnapshotQueryData(
         restoredWorkspace.workspaceId,
@@ -231,7 +230,7 @@ function createRestorableWorkspaceLifecycleActions(
         {
           repoRoot: restoredWorkspace.workspaceId,
           workspaceRuntimeId: restoredWorkspace.workspaceRuntimeId,
-          projection: restoredWorkspace.projection,
+          projection: restoredWorkspace.gitProjection,
         },
         { scope: 'repo-read-model' },
       )
@@ -309,7 +308,7 @@ function resolvedWorkspaceFromRestoredRuntime(restored: RestoredWorkspaceRuntime
   const session = {
     entry: restored.entry,
     projectionState:
-      isProjectedRestoredWorkspaceRuntime(restored) || workspaceSettledWithoutGit
+      hasRestoredWorkspaceGitProjection(restored) || workspaceSettledWithoutGit
         ? ('projected' as const)
         : ('stub' as const),
   }

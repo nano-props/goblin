@@ -189,7 +189,7 @@ describe('settings routes', () => {
         repoRoot: 'goblin+file:///repo-active',
         workspaceRuntimeId: 'repo_runtime_test',
         name: 'repo-active',
-        projection: {
+        gitProjection: {
           snapshot: { current: 'main', branches: [] },
           pullRequests: null,
           operations: { operations: [], loadedAt: 0 },

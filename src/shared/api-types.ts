@@ -51,6 +51,7 @@ import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap
 import type { WorkspaceSettingsEntry } from '#/shared/workspace-settings.ts'
 import type {
   WorkspaceCapabilities,
+  WorkspaceGitReadyProbeState,
   WorkspacePaneFilesystemExecutionTarget,
   WorkspaceProbeState,
 } from '#/shared/workspace-runtime.ts'
@@ -159,22 +160,24 @@ type RestoredWorkspaceTransport =
       remoteLifecycle: Extract<RemoteWorkspaceRuntimeLifecycle, { kind: 'ready' | 'failed' }>
     }
 
-export type ProjectedRestoredWorkspaceRuntime = RestoredWorkspaceRuntimeBase & RestoredWorkspaceTransport & {
-  projection: WorkspaceRuntimeProjection
+export type GitProjectedRestoredWorkspaceRuntime = Omit<RestoredWorkspaceRuntimeBase, 'workspaceProbe'> &
+  RestoredWorkspaceTransport & {
+    workspaceProbe: WorkspaceGitReadyProbeState
+    gitProjection: GitWorkspaceRuntimeProjection
+  }
+
+export type RestoredWorkspaceRuntimeWithoutGitProjection = RestoredWorkspaceRuntimeBase & RestoredWorkspaceTransport & {
+  // Git may be conclusively unavailable or its projection may be deferred.
+  // Workspace session projection state is derived separately from the probe.
+  gitProjection: null
 }
 
-export type StubRestoredWorkspaceRuntime = RestoredWorkspaceRuntimeBase & RestoredWorkspaceTransport & {
-  // Stub leases have a validated runtime identity but no projection. They are
-  // projected lazily when the user navigates to the workspace.
-  projection: null
-}
+export type RestoredWorkspaceRuntime = GitProjectedRestoredWorkspaceRuntime | RestoredWorkspaceRuntimeWithoutGitProjection
 
-export type RestoredWorkspaceRuntime = ProjectedRestoredWorkspaceRuntime | StubRestoredWorkspaceRuntime
-
-export function isProjectedRestoredWorkspaceRuntime(
+export function hasRestoredWorkspaceGitProjection(
   workspace: RestoredWorkspaceRuntime,
-): workspace is ProjectedRestoredWorkspaceRuntime {
-  return workspace.projection !== null
+): workspace is GitProjectedRestoredWorkspaceRuntime {
+  return workspace.gitProjection !== null
 }
 
 export interface WorkspaceRuntimeRestoreSnapshot {
@@ -369,7 +372,7 @@ export interface RepoOperationsSnapshot {
   loadedAt: number
 }
 
-export interface WorkspaceRuntimeProjection {
+export interface GitWorkspaceRuntimeProjection {
   snapshot: RepoSnapshot | null
   pullRequests: PullRequestEntry[] | null
   operations: RepoOperationsSnapshot
@@ -445,7 +448,7 @@ export interface AppIpcHandlers {
       workspaceRuntimeId: string
       branch?: string
       mode?: PullRequestFetchMode
-    }) => Promise<WorkspaceRuntimeProjection>
+    }) => Promise<GitWorkspaceRuntimeProjection>
     operations: (input: {
       cwd?: WorkspaceId
       workspaceRuntimeId?: string

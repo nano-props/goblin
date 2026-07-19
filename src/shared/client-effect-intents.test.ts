@@ -24,8 +24,15 @@ describe('isClientEffectIntent', () => {
     expect(
       isClientEffectIntent({
         type: 'terminal-bell-click',
-        workspaceId: 'goblin+file:///tmp/repo',
         terminalSessionId: 'term-111111111111111111111',
+        session: {
+          target: {
+            kind: 'workspace-root',
+            workspaceId: 'goblin+file:///tmp/repo',
+            workspaceRuntimeId: 'workspace-runtime-test',
+          },
+          presentation: { kind: 'workspace-root' },
+        },
       }),
     ).toBe(true)
     expect(
@@ -36,7 +43,21 @@ describe('isClientEffectIntent', () => {
       }),
     ).toBe(false)
     expect(
-      isClientEffectIntent({ type: 'terminal-bell-click', workspaceId: 'goblin+file:///tmp/repo', terminalSessionId: 1 }),
+      isClientEffectIntent({ type: 'terminal-bell-click', terminalSessionId: 1 }),
+    ).toBe(false)
+    expect(
+      isClientEffectIntent({
+        type: 'terminal-bell-click',
+        terminalSessionId: 'term-111111111111111111111',
+        session: {
+          target: {
+            kind: 'workspace-root',
+            workspaceId: 'goblin+file:///tmp/repo',
+            workspaceRuntimeId: 'workspace-runtime-test',
+          },
+          presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'main' } },
+        },
+      }),
     ).toBe(false)
   })
 

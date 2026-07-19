@@ -186,7 +186,7 @@ describe('settings-client', () => {
         repoRoot: 'goblin+file:///tmp/routed-repo',
         workspaceRuntimeId: 'repo_runtime_test',
         name: 'routed-repo',
-        projection: {
+        gitProjection: {
           snapshot: { current: 'main', branches: [] },
           status: [],
           pullRequests: null,

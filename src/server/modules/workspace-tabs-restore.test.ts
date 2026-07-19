@@ -145,7 +145,7 @@ describe('restoreWorkspaceTabs', () => {
       workspaceRuntimeId: 'repo-runtime-test',
       name: 'repo',
     })
-    expect(result.workspace.projection).not.toBeNull()
+    expect(result.workspace.gitProjection).not.toBeNull()
     expect(result.snapshot).toEqual({ revision: 5, entries: [] })
     expect(mocks.probeWorkspace).not.toHaveBeenCalled()
     expect(mocks.acquireWorkspaceRuntimeLease).not.toHaveBeenCalled()
@@ -194,7 +194,7 @@ describe('restoreWorkspaceTabs', () => {
     })
 
     expect(result.snapshot).toEqual({ revision: 0, entries: [] })
-    expect(result.workspace.projection).not.toBeNull()
+    expect(result.workspace.gitProjection).not.toBeNull()
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
       workspaceId: 'goblin+file:///repo',
@@ -224,7 +224,7 @@ describe('restoreWorkspaceTabs', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.workspace).toMatchObject({ projection: null, workspaceProbe: { status: 'ready' } })
+    expect(result.workspace).toMatchObject({ gitProjection: null, workspaceProbe: { status: 'ready' } })
     expect(mocks.readRepoProjection).not.toHaveBeenCalled()
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).toHaveBeenCalledWith({
       userId: 'user-test',
@@ -296,7 +296,7 @@ describe('restoreWorkspaceTabs', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.workspace.projection).toBeNull()
+    expect(result.workspace.gitProjection).toBeNull()
     expect(mocks.readRepoProjection).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
       workspaceId: entry.id,
@@ -454,7 +454,7 @@ describe('restoreWorkspaceTabs', () => {
       workspaceRuntimeId: 'repo-runtime-test',
       workspacePaneTabsHost,
     })
-    expect(result.workspace).toMatchObject({ workspaceId: LOCAL_WORKSPACE_ID, projection: null })
+    expect(result.workspace).toMatchObject({ workspaceId: LOCAL_WORKSPACE_ID, gitProjection: null })
     expect(result.snapshot).toBeNull()
     expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
     expect(mocks.acquireWorkspaceRuntimeLease).not.toHaveBeenCalled()
@@ -493,7 +493,7 @@ describe('restoreWorkspaceTabs', () => {
     expect(result.workspace).toMatchObject({
       workspaceId: remoteEntry.id,
       remoteLifecycle: { kind: 'ready', attemptId: 3, target: remoteEntry.ref },
-      projection: null,
+      gitProjection: null,
     })
     expect(result.snapshot).toBeNull()
     expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
@@ -533,7 +533,7 @@ describe('restoreWorkspaceTabs', () => {
       workspaceId: remoteEntry.id,
       workspaceProbe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
       remoteLifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable' },
-      projection: null,
+      gitProjection: null,
     })
     expect(result.snapshot).toBeNull()
     expect(mocks.acquireWorkspaceRuntimeLease).not.toHaveBeenCalled()

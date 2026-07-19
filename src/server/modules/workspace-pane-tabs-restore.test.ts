@@ -30,7 +30,7 @@ describe('workspace pane layout restore admission', () => {
         },
         diagnostics: [],
       },
-      projection: {
+      gitProjection: {
         snapshot: null,
         pullRequests: null,
         operations: { operations: [], loadedAt: 0 },

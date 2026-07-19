@@ -596,7 +596,7 @@ function restoredRuntimeForWorkspace(
         },
         diagnostics: [],
       },
-      projection: {
+      gitProjection: {
         snapshot: {
           current: 'main',
           branches: [

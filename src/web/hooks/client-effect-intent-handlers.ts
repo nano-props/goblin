@@ -30,6 +30,7 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
@@ -71,22 +72,29 @@ export function handleTerminalBellClickIntent(
   event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
   deps: TerminalBellIntentDeps,
 ): void {
-  const repo = useWorkspacesStore.getState().workspaces[event.workspaceId]
-  const branchModel = repo && event.terminalWorktreeKey ? readRepoBranchQueryProjection(repo) : null
-  const plan = createTerminalBellIntentPlan(repo, branchModel, event)
+  const workspaceId = terminalSessionCoordinates(event.session).workspaceId
+  const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
+  const branchModel = workspace && event.session.target.kind === 'git-worktree' ? readRepoBranchQueryProjection(workspace) : null
+  const plan = createTerminalBellIntentPlan(workspace, branchModel, event)
   if (plan.kind === 'noop' || plan.kind === 'unavailable') return
   deps.closeAllOverlays()
   switch (plan.kind) {
+    case 'show-workspace-root-terminal':
+      deps.navigation.showWorkspaceRootPaneTab?.(plan.workspaceId, {
+        kind: 'terminal',
+        terminalSessionId: plan.terminalSessionId,
+      })
+      return
     case 'show-worktree-terminal':
       void dispatchShowWorkspacePaneTerminalRouteAction({
-        workspaceId: plan.repoId,
+        workspaceId: plan.workspaceId,
         branchName: plan.branch,
         terminalSessionId: plan.terminalSessionId,
         navigation: deps.navigation,
       })
       return
     case 'show-detached-worktree-terminal':
-      deps.navigation.showRepoWorktreeTerminalSession?.(plan.repoId, plan.worktreePath, plan.terminalSessionId)
+      deps.navigation.showRepoWorktreeTerminalSession?.(plan.workspaceId, plan.worktreePath, plan.terminalSessionId)
       return
   }
 }
@@ -95,7 +103,7 @@ export async function handleAppLevelClientIntent(
   event: ClientEffectIntent,
   deps: SharedClientIntentDeps,
 ): Promise<boolean> {
-  // App-level intents are allowed even when no workspace repo is visible.
+  // App-level intents are allowed even when no workspace is visible.
   const plan = createAppLevelIntentPlan(event, {
     overlayBlocked: deps.isOverlayOpen() || isShortcutBlockingLayerOpen(),
   })

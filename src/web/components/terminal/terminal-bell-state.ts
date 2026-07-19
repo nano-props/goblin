@@ -2,8 +2,7 @@ import { lastPathSegment } from '#/web/lib/paths.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import type { TerminalBellPolicyEvent, TerminalDescriptor } from '#/web/components/terminal/types.ts'
 import { getRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
-import { terminalPresentationBranch, terminalSessionCoordinates } from '#/shared/terminal-types.ts'
-import { terminalDescriptorWorktreeKey } from '#/web/components/terminal/terminal-descriptor.ts'
+import { terminalPresentationBranch, terminalSessionBase, terminalSessionCoordinates } from '#/shared/terminal-types.ts'
 const BELL_NOTIFICATION_THROTTLE_MS = 5000
 
 export interface TerminalBellState {
@@ -76,8 +75,7 @@ export function createTerminalBellState(
           title: repoName,
           body: bodyParts.join('\n'),
           terminalSessionId: descriptor.terminalSessionId,
-          terminalWorktreeKey: terminalDescriptorWorktreeKey(descriptor),
-          workspaceId: terminalSessionCoordinates(descriptor).workspaceId,
+          session: terminalSessionBase(descriptor.target, descriptor.presentation),
         })
         .catch(() => {})
     },

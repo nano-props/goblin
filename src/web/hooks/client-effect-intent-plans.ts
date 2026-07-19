@@ -1,5 +1,6 @@
-import { parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { terminalExecutionCoordinates } from '#/shared/terminal-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
@@ -31,16 +32,17 @@ type ClientWorkspaceIntent = Extract<
 export type TerminalBellIntentPlan =
   | { kind: 'noop' }
   | { kind: 'unavailable'; reason: 'branch-read-model-unavailable' }
+  | { kind: 'show-workspace-root-terminal'; workspaceId: WorkspaceId; terminalSessionId: string }
   | {
       kind: 'show-worktree-terminal'
-      repoId: WorkspaceId
+      workspaceId: WorkspaceId
       branch: string
       terminalSessionId: string
       terminalWorktreeKey: string
     }
   | {
       kind: 'show-detached-worktree-terminal'
-      repoId: WorkspaceId
+      workspaceId: WorkspaceId
       worktreePath: string
       terminalSessionId: string
     }
@@ -94,34 +96,43 @@ interface WorkspaceIntentPlanContext {
 }
 
 export function createTerminalBellIntentPlan(
-  repo: Pick<WorkspaceState, 'id'> | undefined,
+  workspace: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'> | undefined,
   branchReadModel: RepoBranchReadModelData | null,
   event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
 ): TerminalBellIntentPlan {
-  if (!repo) return { kind: 'noop' }
-  const parsedKey = event.terminalWorktreeKey ? parseTerminalWorktreeKey(event.terminalWorktreeKey) : null
-  if (parsedKey && parsedKey.workspaceId === repo.id && event.terminalSessionId) {
-    if (!branchReadModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
-    const worktreePath = parseCanonicalWorkspaceLocator(parsedKey.worktreeId)?.path
-    const branch = worktreePath
-      ? branchReadModel.branches.find((candidate) => candidate.worktree?.path === worktreePath)
-      : null
-    if (branch) {
+  if (!workspace) return { kind: 'noop' }
+  const coordinates = terminalExecutionCoordinates(event.session.target)
+  if (coordinates.workspaceId === workspace.id && coordinates.workspaceRuntimeId === workspace.workspaceRuntimeId) {
+    if (event.session.target.kind === 'workspace-root' && event.session.presentation.kind === 'workspace-root') {
       return {
-        kind: 'show-worktree-terminal',
-        repoId: repo.id,
-        branch: branch.name,
+        kind: 'show-workspace-root-terminal',
+        workspaceId: workspace.id,
         terminalSessionId: event.terminalSessionId,
-        terminalWorktreeKey: event.terminalWorktreeKey!,
       }
     }
-    if (worktreePath && branchReadModel.worktreesByPath[worktreePath]) {
+    if (event.session.target.kind !== 'git-worktree' || event.session.presentation.kind !== 'git-worktree') {
+      return { kind: 'noop' }
+    }
+    if (!branchReadModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
+    const worktreePath = parseCanonicalWorkspaceLocator(event.session.target.root)?.path
+    if (!worktreePath || !branchReadModel.worktreesByPath[worktreePath]) return { kind: 'noop' }
+    const head = event.session.presentation.head
+    if (head.kind === 'branch') {
+      const branch = branchReadModel.branches.find((candidate) => candidate.name === head.branchName)
+      if (branch?.worktree?.path !== worktreePath) return { kind: 'noop' }
       return {
-        kind: 'show-detached-worktree-terminal',
-        repoId: repo.id,
-        worktreePath,
+        kind: 'show-worktree-terminal',
+        workspaceId: workspace.id,
+        branch: head.branchName,
         terminalSessionId: event.terminalSessionId,
+        terminalWorktreeKey: formatTerminalWorktreeKey(coordinates.workspaceId, coordinates.worktreeId),
       }
+    }
+    return {
+      kind: 'show-detached-worktree-terminal',
+      workspaceId: workspace.id,
+      worktreePath,
+      terminalSessionId: event.terminalSessionId,
     }
   }
   return { kind: 'noop' }

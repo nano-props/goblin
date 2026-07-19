@@ -11,7 +11,7 @@ import {
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
+import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -26,7 +26,7 @@ describe('repo projection read-model effects', () => {
   function acceptedProjection(
     branch: string | null = null,
     mode: 'summary' | 'full' = 'full',
-  ): WorkspaceRuntimeProjection {
+  ): GitWorkspaceRuntimeProjection {
     const loadedAt = Date.now()
     return {
       snapshot: {
@@ -144,7 +144,7 @@ describe('repo projection read-model effects', () => {
       workspaceProbe: createGitWorkspaceProbeForTest(),
     })
     const loadedAt = 123
-    const firstProjection: WorkspaceRuntimeProjection = {
+    const firstProjection: GitWorkspaceRuntimeProjection = {
       ...acceptedProjection(),
       snapshot: {
         branches: [createBranchSnapshot('feature/a')],
@@ -153,7 +153,7 @@ describe('repo projection read-model effects', () => {
       operations: { operations: [], loadedAt },
       loadedAt,
     }
-    const secondProjection: WorkspaceRuntimeProjection = {
+    const secondProjection: GitWorkspaceRuntimeProjection = {
       ...firstProjection,
       snapshot: {
         branches: [createBranchSnapshot('feature/b')],

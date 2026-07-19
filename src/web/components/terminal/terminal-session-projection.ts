@@ -1,9 +1,8 @@
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import {
   terminalExecutionCoordinates,
+  terminalSessionBase,
   terminalSessionCoordinates,
-  type TerminalPresentation,
-  type TerminalExecutionTarget,
   type TerminalAttachResult,
   type TerminalCreateResult,
   type TerminalRestartResult,
@@ -124,10 +123,4 @@ function createSessionSummaryFromCreate(
     return { ...common, target, presentation: result.presentation }
   }
   throw new Error('terminal create target and presentation disagree')
-}
-
-function terminalSessionBase(target: TerminalExecutionTarget, presentation: TerminalPresentation): TerminalSessionBase {
-  if (target.kind === 'workspace-root' && presentation.kind === 'workspace-root') return { target, presentation }
-  if (target.kind === 'git-worktree' && presentation.kind === 'git-worktree') return { target, presentation }
-  throw new Error('terminal target and presentation disagree')
 }

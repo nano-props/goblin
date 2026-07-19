@@ -16,7 +16,7 @@ import {
 import type {
   PullRequestEntry,
   RepoOperationsSnapshot,
-  WorkspaceRuntimeProjection,
+  GitWorkspaceRuntimeProjection,
   RepoWorktreeStatusSnapshot,
   RepoServerOperationState,
   RepoSnapshot,
@@ -258,7 +258,7 @@ async function readRepoProjectionSections(
 export async function readRepoProjection(
   cwd: WorkspaceId,
   options: RepoProjectionReadOptions = {},
-): Promise<WorkspaceRuntimeProjection> {
+): Promise<GitWorkspaceRuntimeProjection> {
   const branch = typeof options.branch === 'string' && options.branch.length > 0 ? options.branch : null
   const mode: PullRequestFetchMode = options.mode === 'summary' ? 'summary' : 'full'
   const includePullRequests = !!branch || mode === 'summary'

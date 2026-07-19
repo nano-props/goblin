@@ -202,7 +202,7 @@ describe('restoreServerWorkspace', () => {
     expect(result.runtime.workspaces).toEqual([
       expect.objectContaining({
         workspaceId: 'goblin+file:///repo/src',
-        projection: null,
+        gitProjection: null,
         workspaceProbe: expect.objectContaining({
           capabilities: expect.objectContaining({ git: { status: 'unavailable' } }),
         }),
@@ -292,7 +292,7 @@ describe('restoreServerWorkspace', () => {
       expect.objectContaining({
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-test',
-        projection: null,
+        gitProjection: null,
       }),
     ])
     expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
@@ -324,7 +324,7 @@ describe('restoreServerWorkspace', () => {
         entry,
         workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-test',
-        projection: null,
+        gitProjection: null,
       }),
     ])
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
@@ -374,7 +374,7 @@ describe('restoreServerWorkspace', () => {
     expect(result.runtime.workspaces[0]).toMatchObject({
       workspaceId: remoteEntry.id,
       workspaceRuntimeId: 'repo-runtime-test',
-      projection: null,
+      gitProjection: null,
       workspaceProbe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
       remoteLifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable' },
     })

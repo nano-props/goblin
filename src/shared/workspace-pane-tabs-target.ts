@@ -128,15 +128,15 @@ export function parseWorkspacePaneTabsTargetIdentityKey(key: string): WorkspaceP
   }
   if (parts.length !== 3) return null
   const [workspaceId, kind, value] = parts
-  const canonicalRepoRoot = canonicalWorkspaceLocator(workspaceId)
-  if (canonicalRepoRoot !== workspaceId || !value) return null
+  const canonicalWorkspaceId = canonicalWorkspaceLocator(workspaceId)
+  if (canonicalWorkspaceId !== workspaceId || !value) return null
   if (kind === 'branch') {
-    return isValidBranch(value) ? { kind, workspaceId: canonicalRepoRoot, branchName: value } : null
+    return isValidBranch(value) ? { kind, workspaceId: canonicalWorkspaceId, branchName: value } : null
   }
   if (kind === 'worktree') {
     const worktreeId = canonicalWorkspaceLocator(value)
-    return worktreeId === value && workspaceLocatorsShareTransport(canonicalRepoRoot, worktreeId)
-      ? { kind, workspaceId: canonicalRepoRoot, worktreeId }
+    return worktreeId === value && workspaceLocatorsShareTransport(canonicalWorkspaceId, worktreeId)
+      ? { kind, workspaceId: canonicalWorkspaceId, worktreeId }
       : null
   }
   return null

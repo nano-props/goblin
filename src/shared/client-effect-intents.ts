@@ -2,7 +2,14 @@ import { isSettingsPage, type SettingsPage } from '#/shared/settings-pages.ts'
 import { normalizeWorkspaceSessionEntry, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import { isWorkspacePaneTabType, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { isValidTerminalSessionBase } from '#/shared/terminal-validators.ts'
+
+type TerminalBellClickIntent = {
+  type: 'terminal-bell-click'
+  terminalSessionId: string
+  session: TerminalSessionBase
+}
 
 export type ClientEffectIntent =
   | { type: 'open-workspace-requested' }
@@ -25,7 +32,7 @@ export type ClientEffectIntent =
   | { type: 'lang-pref-set-requested'; pref: LangPref }
   | { type: 'clear-recent-workspaces-requested' }
   | { type: 'open-recent-workspace-requested'; entry: WorkspaceSessionEntry }
-  | { type: 'terminal-bell-click'; workspaceId: WorkspaceId; terminalSessionId?: string; terminalWorktreeKey?: string }
+  | TerminalBellClickIntent
   | { type: 'external-open-enqueued' }
 
 export type ClientEffectIntentType = ClientEffectIntent['type']
@@ -63,11 +70,8 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
       return isWorkspaceSessionEntry(event.entry)
     case 'terminal-bell-click':
       return (
-        typeof event.workspaceId === 'string' &&
-        // Reject the old generic key payload; bell routing needs explicit terminal identifiers.
-        !Object.prototype.hasOwnProperty.call(event, 'key') &&
-        (event.terminalSessionId === undefined || typeof event.terminalSessionId === 'string') &&
-        (event.terminalWorktreeKey === undefined || typeof event.terminalWorktreeKey === 'string')
+        typeof event.terminalSessionId === 'string' &&
+        isValidTerminalSessionBase(event.session)
       )
     default:
       return false

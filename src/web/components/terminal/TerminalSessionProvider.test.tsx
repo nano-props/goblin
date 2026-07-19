@@ -962,8 +962,7 @@ describe('TerminalSessionProvider', () => {
         title: 'goblin-terminal-provider-repo',
         body: 'feature/worktree\n~/Developer/goblin — npm run dev',
         terminalSessionId: 'term-111111111111111111111',
-        terminalWorktreeKey,
-        workspaceId: REPO_ID,
+        session: base,
       })
 
       await act(async () => {
@@ -1032,8 +1031,7 @@ describe('TerminalSessionProvider', () => {
         title: 'goblin-terminal-provider-repo',
         body: 'feature/worktree\nzsh',
         terminalSessionId: 'term-111111111111111111111',
-        terminalWorktreeKey,
-        workspaceId: REPO_ID,
+        session: base,
       })
     } finally {
       hasFocus.mockRestore()
@@ -1078,8 +1076,7 @@ describe('TerminalSessionProvider', () => {
         title: 'goblin-terminal-provider-repo',
         body: 'feature/worktree\nbuild running',
         terminalSessionId: 'term-111111111111111111111',
-        terminalWorktreeKey,
-        workspaceId: REPO_ID,
+        session: repoTerminalBase(),
       })
     } finally {
       hasFocus.mockRestore()
@@ -1255,8 +1252,7 @@ describe('TerminalSessionProvider', () => {
         title: 'goblin-terminal-provider-repo',
         body: 'feature/worktree\n~/Developer/goblin — npm run dev',
         terminalSessionId: 'term-111111111111111111111',
-        terminalWorktreeKey,
-        workspaceId: REPO_ID,
+        session: base,
       })
     } finally {
       hasFocus.mockRestore()

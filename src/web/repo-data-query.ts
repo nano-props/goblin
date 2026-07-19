@@ -10,7 +10,7 @@ import {
 } from '#/web/repo-client.ts'
 import type {
   RepoOperationsSnapshot,
-  WorkspaceRuntimeProjection,
+  GitWorkspaceRuntimeProjection,
   RepoServerOperationState,
   RepoWorktreeStatusSnapshot,
 } from '#/shared/api-types.ts'
@@ -306,7 +306,7 @@ async function fetchRepoProjectionReadModel(
   mode: PullRequestFetchMode,
   signal: AbortSignal,
   queryClient: QueryClient,
-): Promise<WorkspaceRuntimeProjection> {
+): Promise<GitWorkspaceRuntimeProjection> {
   const startedVersion = markRepoProjectionFetchStarted(repoRoot, workspaceRuntimeId, branch, mode, queryClient)
   const projection = await getRepoProjection(repoRoot, workspaceRuntimeId, branch, { mode }, signal)
   signal.throwIfAborted()
@@ -326,7 +326,7 @@ export function getRepoProjectionPlaceholderData(
   branch?: string | null,
   mode?: PullRequestFetchMode,
   queryClient: QueryClient = primaryWindowQueryClient,
-): WorkspaceRuntimeProjection | undefined {
+): GitWorkspaceRuntimeProjection | undefined {
   const requestedBranch = branch || null
   const requestedMode = mode ?? 'full'
   const cached = findRepoProjectionPlaceholderSource(
@@ -390,11 +390,11 @@ function findRepoProjectionPlaceholderSource(
   branch: string | null,
   mode: PullRequestFetchMode,
   queryClient: QueryClient,
-): WorkspaceRuntimeProjection | undefined {
+): GitWorkspaceRuntimeProjection | undefined {
   const candidates = queryClient
-    .getQueriesData<WorkspaceRuntimeProjection>({ queryKey: repoProjectionQueryPrefix(repoRoot, workspaceRuntimeId) })
+    .getQueriesData<GitWorkspaceRuntimeProjection>({ queryKey: repoProjectionQueryPrefix(repoRoot, workspaceRuntimeId) })
     .map(([, projection]) => projection)
-    .filter((projection): projection is WorkspaceRuntimeProjection => !!projection?.snapshot)
+    .filter((projection): projection is GitWorkspaceRuntimeProjection => !!projection?.snapshot)
   candidates.sort(
     (a, b) => repoProjectionPlaceholderRank(a, branch, mode) - repoProjectionPlaceholderRank(b, branch, mode),
   )
@@ -402,7 +402,7 @@ function findRepoProjectionPlaceholderSource(
 }
 
 function repoProjectionPlaceholderRank(
-  projection: WorkspaceRuntimeProjection,
+  projection: GitWorkspaceRuntimeProjection,
   branch: string | null,
   mode: PullRequestFetchMode,
 ): number {
@@ -604,7 +604,7 @@ function updateRepoProjectionOperationsQueryData(
     .findAll({ queryKey: repoProjectionQueryPrefix(repoRoot, workspaceRuntimeId) })
   for (const query of projectionQueries) {
     if (query.state.isInvalidated) continue
-    queryClient.setQueryData<WorkspaceRuntimeProjection>(query.queryKey, (current) =>
+    queryClient.setQueryData<GitWorkspaceRuntimeProjection>(query.queryKey, (current) =>
       current ? { ...current, operations } : current,
     )
   }
@@ -616,8 +616,8 @@ export function getRepoProjectionQueryData(
   branch: string | null | undefined,
   mode: PullRequestFetchMode | undefined,
   queryClient: QueryClient = primaryWindowQueryClient,
-): WorkspaceRuntimeProjection | undefined {
-  return queryClient.getQueryData<WorkspaceRuntimeProjection>(
+): GitWorkspaceRuntimeProjection | undefined {
+  return queryClient.getQueryData<GitWorkspaceRuntimeProjection>(
     repoProjectionQueryKey(repoRoot, workspaceRuntimeId, branch, mode),
   )
 }
@@ -645,7 +645,7 @@ export function setRepoProjectionQueryData(
   workspaceRuntimeId: string,
   branch: string | null | undefined,
   mode: PullRequestFetchMode | undefined,
-  projection: WorkspaceRuntimeProjection,
+  projection: GitWorkspaceRuntimeProjection,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
   queryClient.setQueryData(repoProjectionQueryKey(repoRoot, workspaceRuntimeId, branch, mode), projection)
@@ -655,10 +655,10 @@ export function setRepoProjectionQueryData(
 export function seedRepoProjectionQueryData(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  projection: WorkspaceRuntimeProjection | null,
+  projection: GitWorkspaceRuntimeProjection | null,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  // Stub leases (non-active repos at cold start) carry `projection: null`.
+  // A null Git projection is either deferred or conclusively unavailable.
   // Nothing to seed — the lazy restore will fill the cache when the user
   // navigates to the repo.
   if (!projection) return
@@ -695,7 +695,7 @@ async function beginRepoProjectionReadModelRefresh(input: RepoProjectionRefreshR
 
 async function fetchRepoProjectionReadModelOnce(
   input: RepoProjectionRefreshReadInput,
-): Promise<WorkspaceRuntimeProjection> {
+): Promise<GitWorkspaceRuntimeProjection> {
   const projectionQueryOptions = repoProjectionQueryOptions(
     input.repoRoot,
     input.workspaceRuntimeId,
@@ -736,9 +736,9 @@ function repoProjectionReadCurrent(input: RepoProjectionRefreshReadInput): boole
 
 async function fetchRepoProjectionReadModelUntilCurrent(
   input: RepoProjectionRefreshReadInput,
-): Promise<WorkspaceRuntimeProjection> {
+): Promise<GitWorkspaceRuntimeProjection> {
   for (;;) {
-    let projection: WorkspaceRuntimeProjection
+    let projection: GitWorkspaceRuntimeProjection
     try {
       projection = await fetchRepoProjectionReadModelOnce(input)
     } catch (err) {
@@ -760,7 +760,7 @@ export async function refreshRepoProjectionReadModel(
   branch: string | null | undefined,
   mode: PullRequestFetchMode | undefined,
   options: { signal?: AbortSignal; queryClient?: QueryClient } = {},
-): Promise<WorkspaceRuntimeProjection> {
+): Promise<GitWorkspaceRuntimeProjection> {
   options.signal?.throwIfAborted()
   const queryClient = options.queryClient ?? primaryWindowQueryClient
   const requestedBranch = normalizeProjectionBranch(branch)

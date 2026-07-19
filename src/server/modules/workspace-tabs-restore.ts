@@ -21,7 +21,11 @@ import {
   type WorkspaceCapabilityTransitionHost,
 } from '#/server/workspace-capability-transition-host.ts'
 import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
-import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
+import {
+  workspaceGitAvailable,
+  type WorkspaceProbeState,
+  type WorkspaceSettledProbeState,
+} from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface RestoreWorkspaceTabsInput {
@@ -98,11 +102,10 @@ async function projectWorkspace(
         name: lifecycle.name,
         remoteLifecycle: lifecycle.lifecycle,
         workspaceProbe,
-        projection: null,
+        gitProjection: null,
       }
     }
-    if (workspaceProbe.status !== 'ready') return null
-    if (workspaceProbe.capabilities.git.status === 'unavailable') {
+    if (!workspaceGitAvailable(workspaceProbe)) {
       return {
         entry,
         workspaceId: entry.id,
@@ -110,7 +113,7 @@ async function projectWorkspace(
         name: lifecycle.name,
         remoteLifecycle: lifecycle.lifecycle,
         workspaceProbe,
-        projection: null,
+        gitProjection: null,
       }
     }
     const projection = await readRepoProjection(entry.id, {
@@ -127,7 +130,7 @@ async function projectWorkspace(
         name: lifecycle.name,
         remoteLifecycle: lifecycle.lifecycle,
         workspaceProbe,
-        projection: null,
+        gitProjection: null,
       }
     }
     return {
@@ -137,7 +140,7 @@ async function projectWorkspace(
       name: lifecycle.name,
       remoteLifecycle: lifecycle.lifecycle,
       workspaceProbe,
-      projection,
+      gitProjection: projection,
     }
   }
   let probe = workspaceProbeStateForRuntime(input.userId, entry.id, input.workspaceRuntimeId)
@@ -165,7 +168,7 @@ async function projectWorkspace(
     probe = authoritativeProbe
   }
   if (probe.status !== 'ready') return null
-  if (probe.capabilities.git.status === 'unavailable') {
+  if (!workspaceGitAvailable(probe)) {
     return {
       entry,
       workspaceId: entry.id,
@@ -173,7 +176,7 @@ async function projectWorkspace(
       name: probe.name ?? workspaceDisplayName(entry.id),
       remoteLifecycle: null,
       workspaceProbe: probe,
-      projection: null,
+      gitProjection: null,
     }
   }
   const projection = await readRepoProjection(entry.id, {
@@ -190,7 +193,7 @@ async function projectWorkspace(
       name: probe.name ?? workspaceDisplayName(entry.id),
       remoteLifecycle: null,
       workspaceProbe: probe,
-      projection: null,
+      gitProjection: null,
     }
   }
   return {
@@ -200,7 +203,7 @@ async function projectWorkspace(
     name: probe.name ?? workspaceDisplayName(entry.id),
     remoteLifecycle: null,
     workspaceProbe: probe,
-    projection,
+    gitProjection: projection,
   }
 }
 

@@ -176,7 +176,14 @@ describe('preload goblinNative bridge', () => {
       terminalSessionId: 'term-testtesttesttesttest0',
       title: 'Goblin',
       body: 'Bell',
-      repoRoot: '/repo',
+      session: {
+        target: {
+          kind: 'workspace-root',
+          workspaceId: 'goblin+file:///workspace',
+          workspaceRuntimeId: 'workspace-runtime-test',
+        },
+        presentation: { kind: 'workspace-root' },
+      },
     })
     await goblinNative.terminal.sendTestNotification({ title: 'Goblin', body: 'Test' })
     goblinNative.terminal.setBadge(2)

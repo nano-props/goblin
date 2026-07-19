@@ -82,7 +82,7 @@ describe('session restore runtime ownership', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.workspace).toMatchObject({ workspaceId: REPO_ROOT, projection: null })
+    expect(result.workspace).toMatchObject({ workspaceId: REPO_ROOT, gitProjection: null })
     expect(result.snapshot).toBeNull()
     expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
     expect(isCurrentWorkspaceRuntime(USER_ID, REPO_ROOT, lease.workspaceRuntimeId)).toBe(true)

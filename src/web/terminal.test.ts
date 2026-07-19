@@ -829,16 +829,21 @@ describe('terminal web host client', () => {
         title: 'repo',
         body: 'feature/test\\nzsh',
         terminalSessionId,
-        workspaceId: WORKSPACE_ID,
+        session: {
+          target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+          presentation: { kind: 'workspace-root' },
+        },
       }),
     ).resolves.toBe(true)
     wsMock.notificationInstances[0]?.onclick?.()
 
     expect(bellClick).toHaveBeenCalledWith({
       type: 'terminal-bell-click',
-      workspaceId: 'goblin+file:///tmp/repo',
       terminalSessionId,
-      terminalWorktreeKey: undefined,
+      session: {
+        target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        presentation: { kind: 'workspace-root' },
+      },
     })
     dispose()
     resetClientLocalEventsForTests()

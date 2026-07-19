@@ -19,7 +19,7 @@ import {
   seedRepoShellForTest,
 } from '#/web/test-utils/bridge.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
+import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
@@ -28,7 +28,7 @@ function Harness({ queryClient }: { queryClient?: QueryClient }) {
   return null
 }
 
-function projection(loadedAt: number, current = 'main'): WorkspaceRuntimeProjection {
+function projection(loadedAt: number, current = 'main'): GitWorkspaceRuntimeProjection {
   return {
     snapshot: { branches: [createBranchSnapshot(current)], current },
     pullRequests: null,
@@ -92,11 +92,11 @@ describe('repo projection query effects', () => {
   test('skips projection fetches invalidated while in flight', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const pruneTerminals = vi.fn(async () => ({ pruned: 0, remaining: 0 }))
-    const releases: Array<(projection: WorkspaceRuntimeProjection) => void> = []
+    const releases: Array<(projection: GitWorkspaceRuntimeProjection) => void> = []
     installGoblinTestBridge({
       'terminal.prune': pruneTerminals,
       'repo.projection': () =>
-        new Promise<WorkspaceRuntimeProjection>((resolve) => {
+        new Promise<GitWorkspaceRuntimeProjection>((resolve) => {
           releases.push(resolve)
         }),
     })
@@ -144,11 +144,11 @@ describe('repo projection query effects', () => {
   test('skips projection fetches invalidated by repo data invalidations', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const pruneTerminals = vi.fn(async () => ({ pruned: 0, remaining: 0 }))
-    const releases: Array<(projection: WorkspaceRuntimeProjection) => void> = []
+    const releases: Array<(projection: GitWorkspaceRuntimeProjection) => void> = []
     installGoblinTestBridge({
       'terminal.prune': pruneTerminals,
       'repo.projection': () =>
-        new Promise<WorkspaceRuntimeProjection>((resolve) => {
+        new Promise<GitWorkspaceRuntimeProjection>((resolve) => {
           releases.push(resolve)
         }),
     })
@@ -202,11 +202,11 @@ describe('repo projection query effects', () => {
   test('rejects stale projection successes when the effect mounts after the fetch started', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const pruneTerminals = vi.fn(async () => ({ pruned: 0, remaining: 0 }))
-    const releases: Array<(projection: WorkspaceRuntimeProjection) => void> = []
+    const releases: Array<(projection: GitWorkspaceRuntimeProjection) => void> = []
     installGoblinTestBridge({
       'terminal.prune': pruneTerminals,
       'repo.projection': () =>
-        new Promise<WorkspaceRuntimeProjection>((resolve) => {
+        new Promise<GitWorkspaceRuntimeProjection>((resolve) => {
           releases.push(resolve)
         }),
     })

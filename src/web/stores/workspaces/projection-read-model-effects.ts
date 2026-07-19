@@ -5,7 +5,7 @@ import { updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
 import { persistRepoSnapshotCacheEntry } from '#/web/stores/workspaces/persistence.ts'
 import { applyRepoSnapshotShellState } from '#/web/stores/workspaces/refresh-state.ts'
 import { finishDataLoadError } from '#/web/stores/workspaces/repo-data-load-state.ts'
-import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
+import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -13,7 +13,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 interface AcceptedRepoProjectionReadModel {
   repoRoot: WorkspaceId
   workspaceRuntimeId: string
-  projection: WorkspaceRuntimeProjection | null
+  projection: GitWorkspaceRuntimeProjection | null
 }
 
 type AcceptRepoProjectionReadModelScope = 'query-cache' | 'repo-read-model'
@@ -24,14 +24,14 @@ interface AcceptRepoProjectionReadModelOptions {
 
 interface CoreRepoProjectionAcceptanceSignature {
   readLoadedAt: number
-  snapshot: WorkspaceRuntimeProjection['snapshot']
-  pullRequests: WorkspaceRuntimeProjection['pullRequests']
+  snapshot: GitWorkspaceRuntimeProjection['snapshot']
+  pullRequests: GitWorkspaceRuntimeProjection['pullRequests']
 }
 
 const acceptedCoreRepoProjectionSignaturesByKey = new Map<string, CoreRepoProjectionAcceptanceSignature>()
 
 function acceptedProjectionKey(
-  input: AcceptedRepoProjectionReadModel & { projection: WorkspaceRuntimeProjection },
+  input: AcceptedRepoProjectionReadModel & { projection: GitWorkspaceRuntimeProjection },
 ): string {
   return [
     input.repoRoot,
@@ -41,14 +41,14 @@ function acceptedProjectionKey(
   ].join('\0')
 }
 
-function authoritativeProjection(projection: WorkspaceRuntimeProjection): boolean {
+function authoritativeProjection(projection: GitWorkspaceRuntimeProjection): boolean {
   // Warm-start placeholders are seeded with loadedAt=0. They can hydrate the
   // query cache, but they must not be treated as an authoritative server read.
   return projection.loadedAt > 0
 }
 
 function coreProjectionAcceptanceSignature(
-  projection: WorkspaceRuntimeProjection,
+  projection: GitWorkspaceRuntimeProjection,
 ): CoreRepoProjectionAcceptanceSignature {
   return {
     readLoadedAt: projection.loadedAt,
@@ -69,7 +69,7 @@ function sameCoreProjectionAcceptanceSignature(
 }
 
 function markCoreProjectionAccepted(
-  input: AcceptedRepoProjectionReadModel & { projection: WorkspaceRuntimeProjection },
+  input: AcceptedRepoProjectionReadModel & { projection: GitWorkspaceRuntimeProjection },
 ): boolean {
   const key = acceptedProjectionKey(input)
   const signature = coreProjectionAcceptanceSignature(input.projection)
@@ -90,7 +90,7 @@ export function acceptRepoProjectionReadModel(
   options: AcceptRepoProjectionReadModelOptions,
 ): void {
   const { repoRoot, workspaceRuntimeId, projection } = input
-  // Stub leases (non-active repos at cold start) carry `null`. Nothing to
+  // Deferred or unavailable Git projections carry `null`. Nothing to
   // accept — the lazy restore will fill the projection on navigation.
   if (!projection) return
   if (!authoritativeProjection(projection)) return

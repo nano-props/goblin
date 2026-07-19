@@ -10,6 +10,7 @@ import type {
   TerminalControllerStatus,
   TerminalCreateResult,
   TerminalNotifyBellInput,
+  TerminalSessionBase,
   TerminalSessionPhase,
   TerminalSessionSummary,
   TerminalSessionsSnapshot,
@@ -104,13 +105,6 @@ const TerminalPruneInputSchema = v.strictObject({
   workspaceId: WorkspaceIdSchema,
   workspaceRuntimeId: WorkspaceRuntimeIdSchema,
 })
-const TerminalNotifyBellInputSchema = v.strictObject({
-  title: v.pipe(v.string(), v.minLength(1), v.maxLength(200)),
-  body: v.pipe(v.string(), v.minLength(1), v.maxLength(500)),
-  terminalSessionId: v.optional(v.pipe(v.string(), v.minLength(1))),
-  terminalWorktreeKey: v.optional(v.pipe(v.string(), v.minLength(1))),
-  workspaceId: WorkspaceIdSchema,
-})
 const TerminalPresentationSchema = v.variant('kind', [
   v.strictObject({ kind: v.literal('workspace-root') }),
   v.strictObject({
@@ -127,6 +121,19 @@ const TerminalPresentationSchema = v.variant('kind', [
     ]),
   }),
 ])
+const TerminalSessionBaseSchema = v.pipe(
+  v.strictObject({
+    target: WorkspacePaneFilesystemExecutionTargetSchema,
+    presentation: TerminalPresentationSchema,
+  }),
+  v.check((base) => base.target.kind === base.presentation.kind, 'Terminal target and presentation disagree'),
+)
+const TerminalNotifyBellInputSchema = v.strictObject({
+  title: v.pipe(v.string(), v.minLength(1), v.maxLength(200)),
+  body: v.pipe(v.string(), v.minLength(1), v.maxLength(500)),
+  terminalSessionId: v.pipe(v.string(), v.minLength(1)),
+  session: TerminalSessionBaseSchema,
+})
 
 export const TerminalSessionSummarySchema = v.strictObject({
   terminalRuntimeSessionId: v.string(),
@@ -431,6 +438,10 @@ export function isValidTerminalClientId(value: unknown): value is string {
 
 export function isValidTerminalNotifyBellInput(value: unknown): value is TerminalNotifyBellInput {
   return v.safeParse(TerminalNotifyBellInputSchema, value).success
+}
+
+export function isValidTerminalSessionBase(value: unknown): value is TerminalSessionBase {
+  return v.safeParse(TerminalSessionBaseSchema, value).success
 }
 
 export function isValidTerminalTestNotificationInput(value: unknown): value is TerminalTestNotificationInput {

@@ -110,7 +110,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     )
   })
 
-  test('non-active repos are validated stubs — no projection read, projection: null', async () => {
+  test('non-active repos are validated stubs — no projection read, gitProjection: null', async () => {
     const workspace: ServerWorkspaceState = {
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [
@@ -151,8 +151,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const repos = result.runtime.workspaces
     const active = repos.find((r) => r.workspaceId === 'goblin+file:///repo-active')!
     const stub = repos.find((r) => r.workspaceId === 'goblin+file:///repo-stub')!
-    expect(active.projection).not.toBeNull()
-    expect(stub.projection).toBeNull()
+    expect(active.gitProjection).not.toBeNull()
+    expect(stub.gitProjection).toBeNull()
     expect(stub.workspaceRuntimeId).toBe('runtime-goblin_file____repo_stub')
     expect(stub.name).toBe('repo')
     // The non-active Git workspace has no complete target authority yet, so
@@ -319,8 +319,8 @@ describe('restoreServerWorkspace — active-only restore', () => {
       signal: undefined,
     })
     expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
-    expect(result.runtime.workspaces.find((r) => r.workspaceId === 'goblin+file:///repo-a')?.projection).toBeNull()
-    expect(result.runtime.workspaces.find((r) => r.workspaceId === 'goblin+file:///repo-b')?.projection).not.toBeNull()
+    expect(result.runtime.workspaces.find((r) => r.workspaceId === 'goblin+file:///repo-a')?.gitProjection).toBeNull()
+    expect(result.runtime.workspaces.find((r) => r.workspaceId === 'goblin+file:///repo-b')?.gitProjection).not.toBeNull()
   })
 
   test('restores a non-active nested directory as a plain Workspace', async () => {
@@ -359,7 +359,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(result.runtime.workspaces).toHaveLength(2)
     expect(result.runtime.workspaces[1]).toMatchObject({
       workspaceId: 'goblin+file:///repo-stub/src',
-      projection: null,
+      gitProjection: null,
       workspaceProbe: { capabilities: { git: { status: 'unavailable' } } },
     })
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).toHaveBeenCalledWith({
@@ -412,7 +412,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       entry: remoteEntry,
       workspaceId: remoteEntry.id,
       name: 'prod:repo',
-      projection: null,
+      gitProjection: null,
     })
     expect(mocks.runRemoteWorkspaceLifecycleWrite).toHaveBeenCalledOnce()
   })
@@ -485,7 +485,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.runtime.workspaces[0]).toMatchObject({ projection: null, workspaceProbe: { status: 'ready' } })
+    expect(result.runtime.workspaces[0]).toMatchObject({ gitProjection: null, workspaceProbe: { status: 'ready' } })
     expect(mocks.readRepoProjection).not.toHaveBeenCalled()
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).not.toHaveBeenCalled()
     expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()

@@ -48,9 +48,33 @@ describe('shared terminal validators', () => {
       isValidTerminalNotifyBellInput({
         title: 'Build finished',
         body: 'done',
-        workspaceId: 'goblin+file:///repo',
+        terminalSessionId: 'term-111111111111111111111',
+        session: {
+          target: {
+            kind: 'workspace-root',
+            workspaceId: 'goblin+file:///repo',
+            workspaceRuntimeId: 'workspace-runtime-test',
+          },
+          presentation: { kind: 'workspace-root' },
+        },
       }),
     ).toBe(true)
+    expect(
+      isValidTerminalNotifyBellInput({
+        title: 'Build finished',
+        body: 'done',
+        terminalSessionId: 'term-111111111111111111111',
+        session: {
+          target: {
+            kind: 'workspace-root',
+            workspaceId: 'goblin+file:///repo',
+            workspaceRuntimeId: 'workspace-runtime-test',
+          },
+          presentation: { kind: 'workspace-root' },
+          index: 1,
+        },
+      }),
+    ).toBe(false)
     expect(
       isValidTerminalNotifyBellInput({
         title: '',
@@ -69,7 +93,15 @@ describe('shared terminal validators', () => {
       isValidTerminalNotifyBellInput({
         title: 'Build finished',
         body: 'done',
-        workspaceId: 'goblin+file:///C:/repo',
+        terminalSessionId: 'term-111111111111111111111',
+        session: {
+          target: {
+            kind: 'workspace-root',
+            workspaceId: 'goblin+file:///C:/repo',
+            workspaceRuntimeId: 'workspace-runtime-test',
+          },
+          presentation: { kind: 'workspace-root' },
+        },
       }),
     ).toBe(true)
     expect(

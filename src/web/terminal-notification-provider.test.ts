@@ -15,7 +15,10 @@ const bellInput = {
   title: 'repo',
   body: 'feature/test\nzsh',
   terminalSessionId: 'term-111111111111111111111',
-  workspaceId: WORKSPACE_ID,
+  session: {
+    target: { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test' },
+    presentation: { kind: 'workspace-root' as const },
+  },
 }
 
 const testNotificationInput = {
@@ -76,9 +79,8 @@ describe('terminal notification provider', () => {
     expect(wsMock.notificationInstances).toHaveLength(1)
     expect(bellClick).toHaveBeenCalledWith({
       type: 'terminal-bell-click',
-      workspaceId: WORKSPACE_ID,
       terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: undefined,
+      session: bellInput.session,
     })
     dispose()
   })

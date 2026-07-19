@@ -1,9 +1,9 @@
-// React error boundary for the current repo body. Without this, a render
-// crash inside any repo workspace view (BranchNavigator / StatusList / commit
+// React error boundary for the current workspace surface. Without this, a render
+// crash inside any workspace view (navigator / status / files / terminal
 // detail) would unmount the whole shell and show a blank window.
 //
-// We re-mount on `resetKey` change — App.tsx passes the current repo id
-// as the key, so navigating to a different repo clears any prior crash
+// We re-mount on `resetKey` change — App.tsx passes the current workspace id
+// as the key, so navigating to a different workspace clears any prior crash
 // without the user having to restart the app.
 
 import type { ErrorInfo, ReactNode } from 'react'

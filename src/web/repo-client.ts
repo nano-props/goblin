@@ -3,7 +3,7 @@ import { SERVER_REQUEST_TIMEOUT_ERROR, postServerJson } from '#/web/lib/server-f
 import type {
   CloneRepoResult,
   RepoOperationsSnapshot,
-  WorkspaceRuntimeProjection,
+  GitWorkspaceRuntimeProjection,
   RepoWorktreeStatusSnapshot,
   RepoLogResponse,
 } from '#/shared/api-types.ts'
@@ -94,7 +94,7 @@ export async function getRepoProjection(
   branch?: string | null,
   options?: { mode?: PullRequestFetchMode },
   signal?: AbortSignal,
-): Promise<WorkspaceRuntimeProjection> {
+): Promise<GitWorkspaceRuntimeProjection> {
   return await postServerJson(
     '/api/repo/projection',
     { cwd, workspaceRuntimeId, branch: branch || undefined, mode: options?.mode },

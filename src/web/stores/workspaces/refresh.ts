@@ -7,7 +7,7 @@ import { refreshRepoProjectionReadModel } from '#/web/repo-data-query.ts'
 import { readRepoBranchSnapshotQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { acceptRepoProjectionReadModel } from '#/web/stores/workspaces/projection-read-model-effects.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
-import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
+import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -39,7 +39,7 @@ async function runRepoProjectionReadModelRefresh(
     targets: [{ key: 'repoReadModel', reason: 'repo-read-model' }],
     task: (signal) => refreshRepoProjectionReadModel(id, workspaceRuntimeId, null, 'full', { signal }),
     errorFromResult: (projection) => (projection.snapshot ? null : 'error.failed-read-repo'),
-    onResult: (projection: WorkspaceRuntimeProjection, ctx) => {
+    onResult: (projection: GitWorkspaceRuntimeProjection, ctx) => {
       if (!ctx.isCurrent()) return
       acceptRepoProjectionReadModel(
         store.set,

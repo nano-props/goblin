@@ -1,4 +1,4 @@
-import type { WorkspaceRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
+import type { GitWorkspaceRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
 import type { BranchSnapshotInfo, PullRequestInfo } from '#/web/types.ts'
 import {
   createBranchSnapshot,
@@ -31,8 +31,8 @@ export function pullRequestWithHealth(number: number): PullRequestInfo {
 
 export function repoProjection(
   snapshot: RepoSnapshot | null,
-  options: Partial<Pick<WorkspaceRuntimeProjection, 'pullRequests' | 'operations' | 'requested' | 'loadedAt'>> = {},
-): WorkspaceRuntimeProjection {
+  options: Partial<Pick<GitWorkspaceRuntimeProjection, 'pullRequests' | 'operations' | 'requested' | 'loadedAt'>> = {},
+): GitWorkspaceRuntimeProjection {
   return {
     snapshot,
     pullRequests: options.pullRequests ?? null,

@@ -54,7 +54,7 @@ interface Options {
   currentBranchName?: string | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   onShowHelp: () => void
-  /** Returns true when workspace shortcuts should not affect the repo view. */
+  /** Returns true when workspace shortcuts should not affect the workspace view. */
   isWorkspaceShortcutSuppressed: () => boolean
   isSettingsOpen: () => boolean
   onExitSettings: () => void

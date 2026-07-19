@@ -33,7 +33,7 @@ import {
   setRepoWorktreeStatusQueryData,
 } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
+import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
@@ -67,8 +67,8 @@ function repoCurrentBranch(): string | null {
 function cachedRepoProjection(
   workspaceRuntimeId: string,
   branchName: string | null = null,
-): WorkspaceRuntimeProjection | undefined {
-  return primaryWindowQueryClient.getQueryData<WorkspaceRuntimeProjection>(
+): GitWorkspaceRuntimeProjection | undefined {
+  return primaryWindowQueryClient.getQueryData<GitWorkspaceRuntimeProjection>(
     repoProjectionQueryKey(REPO_ID, workspaceRuntimeId, branchName, 'full'),
   )
 }
@@ -326,7 +326,7 @@ describe('remote fetch timestamps', () => {
         diagnostics: [],
       },
     })
-    const projectionResponse = Promise.withResolvers<WorkspaceRuntimeProjection>()
+    const projectionResponse = Promise.withResolvers<GitWorkspaceRuntimeProjection>()
     const projection = vi.fn(() => projectionResponse.promise)
     ipcHandlers['repo.projection'] = projection
 
@@ -898,7 +898,7 @@ describe('projection refresh request ordering', () => {
     'status errors stay query-local when %s completes',
     async (completionOrder) => {
       const workspaceRuntimeId = seedRepo([branch('old')])
-      let resolveProjection!: (projection: WorkspaceRuntimeProjection) => void
+      let resolveProjection!: (projection: GitWorkspaceRuntimeProjection) => void
       let rejectStatus!: (error: Error) => void
       ipcHandlers['repo.projection'] = () =>
         new Promise((resolve) => {

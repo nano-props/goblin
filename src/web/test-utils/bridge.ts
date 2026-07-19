@@ -32,7 +32,7 @@ import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-gua
 import { disposeAllRepoOperationSchedulers } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
-import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
+import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import type { RemoteWorkspaceConnectionLifecycle, RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { resetAcceptedRepoProjectionReadModelState } from '#/web/stores/workspaces/projection-read-model-effects.ts'
@@ -1388,7 +1388,7 @@ export function seedRepoReadModelQueryData(
     status?: WorktreeStatus[]
   },
 ): void {
-  const projection: WorkspaceRuntimeProjection = {
+  const projection: GitWorkspaceRuntimeProjection = {
     snapshot: {
       branches: readModel.branches,
       current: readModel.currentBranch,

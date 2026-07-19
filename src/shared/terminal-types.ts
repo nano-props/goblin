@@ -36,10 +36,25 @@ export type TerminalSessionBase =
       target: Extract<TerminalExecutionTarget, { kind: 'workspace-root' }>
       presentation: Extract<TerminalPresentation, { kind: 'workspace-root' }>
     }
+
   | {
       target: Extract<TerminalExecutionTarget, { kind: 'git-worktree' }>
       presentation: Extract<TerminalPresentation, { kind: 'git-worktree' }>
     }
+
+/** Constructs a transport-safe session base and enforces target/presentation agreement. */
+export function terminalSessionBase(
+  target: TerminalExecutionTarget,
+  presentation: TerminalPresentation,
+): TerminalSessionBase {
+  if (target.kind === 'workspace-root' && presentation.kind === 'workspace-root') {
+    return { target, presentation }
+  }
+  if (target.kind === 'git-worktree' && presentation.kind === 'git-worktree') {
+    return { target, presentation }
+  }
+  throw new Error('terminal target and presentation disagree')
+}
 
 export interface TerminalExecutionCoordinates {
   workspaceId: WorkspaceId
@@ -251,13 +266,14 @@ export interface TerminalSessionInput {
   terminalRuntimeSessionId: string
 }
 
-export interface TerminalNotifyBellInput {
+type TerminalNotifyBellFields = {
   title: string
   body: string
-  terminalSessionId?: string
-  terminalWorktreeKey?: string
-  workspaceId: WorkspaceId
+  terminalSessionId: string
+  session: TerminalSessionBase
 }
+
+export type TerminalNotifyBellInput = TerminalNotifyBellFields
 
 export interface TerminalTestNotificationInput {
   title: string

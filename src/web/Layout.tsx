@@ -152,7 +152,7 @@ function AuthenticatedWorkspaceShell() {
   // even before the workspace projection has hydrated into the store.
   const routedWorkspaceId = routeContext ? workspaceIdFromSlug(routeContext.workspaceSlug) : null
   // `hydratedRouteWorkspaceId` means the routed workspace is present in the hydrated workspace store and
-  // can safely drive refreshes, dialogs, and commands that need repo data.
+  // can safely drive refreshes, dialogs, and commands that need workspace runtime data.
   const hydratedRouteWorkspaceId = useWorkspacesStore((s) => {
     return routedWorkspaceId ? (s.workspaces[routedWorkspaceId]?.id ?? null) : null
   })

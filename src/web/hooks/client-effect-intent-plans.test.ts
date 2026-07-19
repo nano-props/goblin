@@ -55,27 +55,93 @@ describe('client effect intent plans', () => {
 
     const plan = createTerminalBellIntentPlan(repo, readRepoBranchQueryProjection(repo), {
       type: 'terminal-bell-click',
-      workspaceId: repo.id,
       terminalSessionId: 'term-222222222222222222222',
-      terminalWorktreeKey: formatTerminalWorktreeKeyForPath(GIT_WORKSPACE_ID, '/tmp/repo-feature'),
+      session: {
+        target: {
+          kind: 'git-worktree',
+          workspaceId: repo.id,
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+          root: workspaceIdForTest('goblin+file:///tmp/repo-feature'),
+        },
+        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/test' } },
+      },
     })
 
     expect(plan).toEqual({
       kind: 'show-worktree-terminal',
-      repoId: repo.id,
+      workspaceId: repo.id,
       branch: 'feature/test',
       terminalSessionId: 'term-222222222222222222222',
       terminalWorktreeKey: formatTerminalWorktreeKeyForPath(GIT_WORKSPACE_ID, '/tmp/repo-feature'),
     })
   })
 
-  test('marks worktree terminal bell intent unavailable when the branch read model is missing', () => {
-    const plan = createTerminalBellIntentPlan({ id: workspaceIdForTest('goblin+file:///tmp/repo') }, null, {
+  test('creates a workspace-root terminal bell plan without a Git read model', () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///workspace')
+    const plan = createTerminalBellIntentPlan({ id: workspaceId, workspaceRuntimeId: 'workspace-runtime-test' }, null, {
       type: 'terminal-bell-click',
-      workspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
-      terminalSessionId: 'term-222222222222222222222',
-      terminalWorktreeKey: formatTerminalWorktreeKeyForPath(GIT_WORKSPACE_ID, '/tmp/repo-feature'),
+      terminalSessionId: 'term-111111111111111111111',
+      session: {
+        target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: 'workspace-runtime-test' },
+        presentation: { kind: 'workspace-root' },
+      },
     })
+
+    expect(plan).toEqual({
+      kind: 'show-workspace-root-terminal',
+      workspaceId,
+      terminalSessionId: 'term-111111111111111111111',
+    })
+  })
+
+  test('keeps a Git main-worktree bell on its branch presentation', () => {
+    resetWorkspacesStore()
+    const repo = seedRepoWithReadModelForTest({
+      id: 'goblin+file:///tmp/repo',
+      currentBranch: 'main',
+      currentBranchName: 'main',
+      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo' } })],
+    })
+
+    const plan = createTerminalBellIntentPlan(repo, readRepoBranchQueryProjection(repo), {
+      type: 'terminal-bell-click',
+      terminalSessionId: 'term-111111111111111111111',
+      session: {
+        target: {
+          kind: 'git-worktree',
+          workspaceId: repo.id,
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+          root: repo.id,
+        },
+        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'main' } },
+      },
+    })
+
+    expect(plan).toMatchObject({
+      kind: 'show-worktree-terminal',
+      workspaceId: repo.id,
+      branch: 'main',
+    })
+  })
+
+  test('marks worktree terminal bell intent unavailable when the branch read model is missing', () => {
+    const plan = createTerminalBellIntentPlan(
+      { id: workspaceIdForTest('goblin+file:///tmp/repo'), workspaceRuntimeId: 'workspace-runtime-test' },
+      null,
+      {
+        type: 'terminal-bell-click',
+        terminalSessionId: 'term-222222222222222222222',
+        session: {
+          target: {
+            kind: 'git-worktree',
+            workspaceId: GIT_WORKSPACE_ID,
+            workspaceRuntimeId: 'workspace-runtime-test',
+            root: workspaceIdForTest('goblin+file:///tmp/repo-feature'),
+          },
+          presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/test' } },
+        },
+      },
+    )
 
     expect(plan).toEqual({ kind: 'unavailable', reason: 'branch-read-model-unavailable' })
   })
@@ -83,7 +149,7 @@ describe('client effect intent plans', () => {
   test('routes a detached worktree bell through its authoritative catalog entry', () => {
     const worktreePath = '/workspace/detached'
     const plan = createTerminalBellIntentPlan(
-      { id: DETACHED_WORKSPACE_ID },
+      { id: DETACHED_WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test' },
       {
         branches: [],
         currentBranch: 'main',
@@ -94,18 +160,110 @@ describe('client effect intent plans', () => {
       },
       {
         type: 'terminal-bell-click',
-        workspaceId: DETACHED_WORKSPACE_ID,
         terminalSessionId: 'term-333333333333333333333',
-        terminalWorktreeKey: formatTerminalWorktreeKeyForPath(DETACHED_WORKSPACE_ID, worktreePath),
+        session: {
+          target: {
+            kind: 'git-worktree',
+            workspaceId: DETACHED_WORKSPACE_ID,
+            workspaceRuntimeId: 'workspace-runtime-test',
+            root: workspaceIdForTest('goblin+file:///workspace/detached'),
+          },
+          presentation: { kind: 'git-worktree', head: { kind: 'detached' } },
+        },
       },
     )
 
     expect(plan).toEqual({
       kind: 'show-detached-worktree-terminal',
-      repoId: DETACHED_WORKSPACE_ID,
+      workspaceId: DETACHED_WORKSPACE_ID,
       worktreePath,
       terminalSessionId: 'term-333333333333333333333',
     })
+  })
+
+  test('keeps detached presentation authoritative when the current catalog associates the path with a branch', () => {
+    const worktreePath = '/workspace/detached'
+    const plan = createTerminalBellIntentPlan(
+      { id: DETACHED_WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test' },
+      {
+        branches: [createBranchSnapshot('feature/later', { worktree: { path: worktreePath } })],
+        currentBranch: 'main',
+        status: [{ path: worktreePath, isMain: false, entries: [] }],
+        worktreesByPath: {
+          [worktreePath]: { path: worktreePath, isMain: false, isDirty: false, changeCount: 0 },
+        },
+      },
+      {
+        type: 'terminal-bell-click',
+        terminalSessionId: 'term-444444444444444444444',
+        session: {
+          target: {
+            kind: 'git-worktree',
+            workspaceId: DETACHED_WORKSPACE_ID,
+            workspaceRuntimeId: 'workspace-runtime-test',
+            root: workspaceIdForTest('goblin+file:///workspace/detached'),
+          },
+          presentation: { kind: 'git-worktree', head: { kind: 'detached' } },
+        },
+      },
+    )
+
+    expect(plan).toMatchObject({ kind: 'show-detached-worktree-terminal', worktreePath })
+  })
+
+  test('rejects bell identities from a stale Workspace runtime', () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///workspace')
+    const plan = createTerminalBellIntentPlan(
+      { id: workspaceId, workspaceRuntimeId: 'workspace-runtime-current' },
+      null,
+      {
+        type: 'terminal-bell-click',
+        terminalSessionId: 'term-555555555555555555555',
+        session: {
+          target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: 'workspace-runtime-stale' },
+          presentation: { kind: 'workspace-root' },
+        },
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'noop' })
+  })
+
+  test('rejects a branch presentation whose worktree no longer matches the execution target', () => {
+    resetWorkspacesStore()
+    const repo = seedRepoWithReadModelForTest({
+      id: 'goblin+file:///tmp/repo',
+      currentBranch: 'main',
+      currentBranchName: 'main',
+      branchSnapshots: [createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } })],
+    })
+    const otherPath = '/tmp/repo-other'
+    const plan = createTerminalBellIntentPlan(
+      repo,
+      {
+        branches: [createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } })],
+        currentBranch: 'main',
+        status: [{ path: otherPath, isMain: false, entries: [] }],
+        worktreesByPath: {
+          [otherPath]: { path: otherPath, isMain: false, isDirty: false, changeCount: 0 },
+        },
+      },
+      {
+        type: 'terminal-bell-click',
+        terminalSessionId: 'term-666666666666666666666',
+        session: {
+          target: {
+            kind: 'git-worktree',
+            workspaceId: repo.id,
+            workspaceRuntimeId: repo.workspaceRuntimeId,
+            root: workspaceIdForTest('goblin+file:///tmp/repo-other'),
+          },
+          presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/test' } },
+        },
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'noop' })
   })
 
   test('suppresses recent repo open when overlays block the action', () => {

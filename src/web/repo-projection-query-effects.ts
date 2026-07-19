@@ -6,19 +6,7 @@ import {
   parseRepoProjectionQueryKey,
   setRepoOperationsQueryData,
 } from '#/web/repo-data-query.ts'
-import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
-
-function isRepoRuntimeProjection(value: unknown): value is WorkspaceRuntimeProjection {
-  if (!value || typeof value !== 'object') return false
-  const projection = value as Partial<WorkspaceRuntimeProjection>
-  return (
-    typeof projection.loadedAt === 'number' &&
-    !!projection.operations &&
-    typeof projection.operations === 'object' &&
-    !!projection.requested &&
-    typeof projection.requested === 'object'
-  )
-}
+import type { GitWorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 
 export function useRepoProjectionQueryEffects(queryClient: QueryClient = primaryWindowQueryClient): void {
   useEffect(() => {
@@ -40,8 +28,8 @@ export function useRepoProjectionQueryEffects(queryClient: QueryClient = primary
       const parsed = parseRepoProjectionQueryKey(event.query.queryKey)
       if (!parsed) return
       if (event.action.type !== 'success') return
-      const data = event.query.state.data
-      if (!isRepoRuntimeProjection(data)) return
+      const data = queryClient.getQueryData<GitWorkspaceRuntimeProjection>(event.query.queryKey)
+      if (!data) return
       if (event.action.manual !== true && data.loadedAt > 0) {
         setRepoOperationsQueryData(parsed.repoRoot, parsed.workspaceRuntimeId, false, data.operations, queryClient)
       }

@@ -40,7 +40,7 @@ interface EpochState {
 export class WorkspacePaneEpochOverlay {
   private readonly epochs = new Map<string, EpochState>()
   private readonly targetsByPhysicalKey = new Map<string, Map<string, WorkspacePaneEpochTargetRef>>()
-  private readonly epochsByRepoRoot = new Map<string, Map<string, WorkspacePaneEpochScope>>()
+  private readonly epochsByWorkspaceId = new Map<string, Map<string, WorkspacePaneEpochScope>>()
 
   fork(): WorkspacePaneEpochOverlay {
     const fork = new WorkspacePaneEpochOverlay()
@@ -51,7 +51,7 @@ export class WorkspacePaneEpochOverlay {
   replaceWith(source: WorkspacePaneEpochOverlay): void {
     this.epochs.clear()
     this.targetsByPhysicalKey.clear()
-    this.epochsByRepoRoot.clear()
+    this.epochsByWorkspaceId.clear()
     for (const [key, state] of source.epochs) {
       this.epochs.set(key, {
         overlayRevision: state.overlayRevision,
@@ -67,8 +67,8 @@ export class WorkspacePaneEpochOverlay {
         new Map([...refs].map(([refKey, ref]) => [refKey, cloneTargetRef(ref)])),
       )
     }
-    for (const [workspaceId, epochs] of source.epochsByRepoRoot) {
-      this.epochsByRepoRoot.set(workspaceId, new Map([...epochs].map(([key, scope]) => [key, { ...scope }])))
+    for (const [workspaceId, epochs] of source.epochsByWorkspaceId) {
+      this.epochsByWorkspaceId.set(workspaceId, new Map([...epochs].map(([key, scope]) => [key, { ...scope }])))
     }
   }
 
@@ -85,9 +85,9 @@ export class WorkspacePaneEpochOverlay {
       physicalLeasesByTarget: new Map(sourceState.physicalLeasesByTarget),
     }
     this.epochs.set(key, state)
-    const active = this.epochsByRepoRoot.get(scope.workspaceId) ?? new Map<string, WorkspacePaneEpochScope>()
+    const active = this.epochsByWorkspaceId.get(scope.workspaceId) ?? new Map<string, WorkspacePaneEpochScope>()
     active.set(key, { ...scope })
-    this.epochsByRepoRoot.set(scope.workspaceId, active)
+    this.epochsByWorkspaceId.set(scope.workspaceId, active)
     const refPrefix = `${key}\0`
     for (const [physicalKey, refs] of source.targetsByPhysicalKey) {
       for (const [refKey, ref] of refs) {
@@ -180,7 +180,7 @@ export class WorkspacePaneEpochOverlay {
   }
 
   activeEpochs(workspaceId: WorkspaceId): WorkspacePaneEpochScope[] {
-    return Array.from(this.epochsByRepoRoot.get(workspaceId)?.values() ?? []).map((scope) => ({ ...scope }))
+    return Array.from(this.epochsByWorkspaceId.get(workspaceId)?.values() ?? []).map((scope) => ({ ...scope }))
   }
 
   isActive(scope: WorkspacePaneEpochScope): boolean {
@@ -188,7 +188,7 @@ export class WorkspacePaneEpochOverlay {
   }
 
   epochsForUser(userId: string): WorkspacePaneEpochScope[] {
-    return Array.from(this.epochsByRepoRoot.values()).flatMap((epochs) =>
+    return Array.from(this.epochsByWorkspaceId.values()).flatMap((epochs) =>
       Array.from(epochs.values())
         .filter((scope) => scope.userId === userId)
         .map((scope) => ({ ...scope })),
@@ -207,9 +207,9 @@ export class WorkspacePaneEpochOverlay {
       this.removePhysicalTarget(physicalWorktreeAdmissionLeaseKey(lease), scope, targetKey)
     }
     this.epochs.delete(key)
-    const active = this.epochsByRepoRoot.get(scope.workspaceId)
+    const active = this.epochsByWorkspaceId.get(scope.workspaceId)
     active?.delete(key)
-    if (active?.size === 0) this.epochsByRepoRoot.delete(scope.workspaceId)
+    if (active?.size === 0) this.epochsByWorkspaceId.delete(scope.workspaceId)
   }
 
   private state(scope: WorkspacePaneEpochScope): EpochState {
@@ -222,9 +222,9 @@ export class WorkspacePaneEpochOverlay {
         physicalLeasesByTarget: new Map(),
       }
       this.epochs.set(key, state)
-      const active = this.epochsByRepoRoot.get(scope.workspaceId) ?? new Map<string, WorkspacePaneEpochScope>()
+      const active = this.epochsByWorkspaceId.get(scope.workspaceId) ?? new Map<string, WorkspacePaneEpochScope>()
       active.set(key, { ...scope })
-      this.epochsByRepoRoot.set(scope.workspaceId, active)
+      this.epochsByWorkspaceId.set(scope.workspaceId, active)
     }
     return state
   }

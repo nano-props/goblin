@@ -56,7 +56,7 @@ const appDataClientMocks = vi.hoisted(() => ({
       workspaceId: 'goblin+file:///tmp/repo-a',
       workspaceRuntimeId: 'repo_runtime_test',
       name: 'repo-a',
-      projection: {
+      gitProjection: {
         snapshot: { current: 'main', branches: [] },
         pullRequests: null,
         operations: { operations: [], loadedAt: 0 },
@@ -134,7 +134,7 @@ describe('settings actions', () => {
         workspaceId: 'goblin+file:///tmp/repo-a',
         workspaceRuntimeId: 'repo_runtime_test',
         name: 'repo-a',
-        projection: {
+        gitProjection: {
           snapshot: { current: 'main', branches: [] },
           pullRequests: null,
           operations: { operations: [], loadedAt: 0 },
