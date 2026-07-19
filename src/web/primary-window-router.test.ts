@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { createElement, Fragment, type ReactNode } from 'react'
 import { Outlet } from '@tanstack/react-router'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -8,9 +8,26 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 const appMocks = vi.hoisted(() => ({ render: vi.fn() }))
 
 vi.mock('#/web/App.tsx', () => ({
-  App: (props: { routeWorkspaceView?: { kind: string } | null }) => {
+  App: (props: {
+    routeWorkspaceView?: { kind: string; workspaceId: WorkspaceId } | null
+    onCancelRepoNewWorktree?: (workspaceId: WorkspaceId) => void
+  }) => {
     appMocks.render(props.routeWorkspaceView?.kind ?? null)
-    return createElement('div', { 'data-testid': 'routed-app' }, props.routeWorkspaceView?.kind ?? 'none')
+    return createElement(
+      'div',
+      { 'data-testid': 'routed-app' },
+      props.routeWorkspaceView?.kind ?? 'none',
+      props.routeWorkspaceView?.kind === 'newWorktree'
+        ? createElement(
+            'button',
+            {
+              type: 'button',
+              onClick: () => props.onCancelRepoNewWorktree?.(props.routeWorkspaceView!.workspaceId),
+            },
+            'cancel new worktree',
+          )
+        : null,
+    )
   },
 }))
 
@@ -30,7 +47,7 @@ import {
   applyPrimaryWindowSettingsRouteChange,
   PrimaryWindowRouterProvider,
 } from '#/web/primary-window-router.tsx'
-import { repoSlugFromId, worktreeSlugFromPath } from '#/web/repo-route-slugs.ts'
+import { workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
@@ -51,10 +68,10 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-const REPO_A_ID = workspaceIdForTest('goblin+file:///repo-a')
-const REPO_B_ID = workspaceIdForTest('goblin+file:///repo-b')
-const MISSING_REPO_ID = workspaceIdForTest('goblin+file:///missing')
-const WORKSPACE_REPO_ID = workspaceIdForTest('goblin+file:///workspace/repo')
+const WORKSPACE_A_ID = workspaceIdForTest('goblin+file:///workspace-a')
+const WORKSPACE_B_ID = workspaceIdForTest('goblin+file:///workspace-b')
+const MISSING_WORKSPACE_ID = workspaceIdForTest('goblin+file:///missing')
+const GIT_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace/repo')
 const ROUTE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///route-workspace')
 const DEEP_LINK_WORKSPACE_ID = workspaceIdForTest('goblin+file:///deep-link-workspace')
 
@@ -64,58 +81,59 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  navigateBrowser('/')
   appMocks.render.mockClear()
   vi.restoreAllMocks()
 })
 
 describe('primary window initial route', () => {
-  test('prefers the restored repo over the first repo in order', () => {
-    const repoA = emptyWorkspace(REPO_A_ID, 'repo-a', 'repo-runtime-a')
-    const repoB = emptyWorkspace(REPO_B_ID, 'repo-b', 'repo-runtime-b')
+  test('prefers the restored workspace over the first workspace in order', () => {
+    const workspaceA = emptyWorkspace(WORKSPACE_A_ID, 'workspace-a', 'workspace-runtime-a')
+    const workspaceB = emptyWorkspace(WORKSPACE_B_ID, 'workspace-b', 'workspace-runtime-b')
 
     expect(
       initialWorkspaceRouteSlugFromStore({
-        restoredWorkspaceId: REPO_B_ID,
-        workspaceOrder: [REPO_A_ID, REPO_B_ID],
-        workspaces: { [REPO_A_ID]: repoA, [REPO_B_ID]: repoB },
+        restoredWorkspaceId: WORKSPACE_B_ID,
+        workspaceOrder: [WORKSPACE_A_ID, WORKSPACE_B_ID],
+        workspaces: { [WORKSPACE_A_ID]: workspaceA, [WORKSPACE_B_ID]: workspaceB },
         workspaceMembershipReady: true,
       }),
-    ).toBe(repoSlugFromId(REPO_B_ID))
+    ).toBe(workspaceSlugFromId(WORKSPACE_B_ID))
   })
 
-  test('waits for workspace membership restore instead of routing to the first partial repo', () => {
-    const repoA = emptyWorkspace(REPO_A_ID, 'repo-a', 'repo-runtime-a')
+  test('waits for workspace membership restore instead of routing to the first partial workspace', () => {
+    const workspaceA = emptyWorkspace(WORKSPACE_A_ID, 'workspace-a', 'workspace-runtime-a')
 
     expect(
       initialWorkspaceRouteSlugFromStore({
         restoredWorkspaceId: null,
-        workspaceOrder: [REPO_A_ID],
-        workspaces: { [REPO_A_ID]: repoA },
+        workspaceOrder: [WORKSPACE_A_ID],
+        workspaces: { [WORKSPACE_A_ID]: workspaceA },
         workspaceMembershipReady: false,
       }),
     ).toBeNull()
   })
 
-  test('falls back to the first ordered repo when restore has settled without a restored repo', () => {
-    const repoA = emptyWorkspace(REPO_A_ID, 'repo-a', 'repo-runtime-a')
+  test('falls back to the first ordered workspace when restore has settled without a restored workspace', () => {
+    const workspaceA = emptyWorkspace(WORKSPACE_A_ID, 'workspace-a', 'workspace-runtime-a')
 
     expect(
       initialWorkspaceRouteSlugFromStore({
-        restoredWorkspaceId: MISSING_REPO_ID,
-        workspaceOrder: [REPO_A_ID],
-        workspaces: { [REPO_A_ID]: repoA },
+        restoredWorkspaceId: MISSING_WORKSPACE_ID,
+        workspaceOrder: [WORKSPACE_A_ID],
+        workspaces: { [WORKSPACE_A_ID]: workspaceA },
         workspaceMembershipReady: true,
       }),
-    ).toBe(repoSlugFromId(REPO_A_ID))
+    ).toBe(workspaceSlugFromId(WORKSPACE_A_ID))
   })
 })
 
 describe('workspace route view derivation', () => {
   test('derives a routed workspace view directly from the URL slug without store hydration', () => {
-    const repoSlug = repoSlugFromId(DEEP_LINK_WORKSPACE_ID)
+    const workspaceSlug = workspaceSlugFromId(DEEP_LINK_WORKSPACE_ID)
 
     expect(
-      workspaceRouteViewFromSlugChildRoute(repoSlug, { dashboard: true, branchSlug: null, newWorktree: false }),
+      workspaceRouteViewFromSlugChildRoute(workspaceSlug, { dashboard: true, branchSlug: null, newWorktree: false }),
     ).toEqual({
       kind: 'dashboard',
       workspaceId: DEEP_LINK_WORKSPACE_ID,
@@ -123,18 +141,24 @@ describe('workspace route view derivation', () => {
   })
 
   test('returns null only when the workspace URL slug itself is invalid', () => {
-    expect(workspaceRouteViewFromSlugChildRoute('%', { dashboard: true, branchSlug: null, newWorktree: false })).toBeNull()
+    expect(
+      workspaceRouteViewFromSlugChildRoute('%', { dashboard: true, branchSlug: null, newWorktree: false }),
+    ).toBeNull()
   })
 
   test('uses the workspace root as an empty route view', () => {
-    expect(workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, { dashboard: false, branchSlug: null, newWorktree: false })).toEqual({
+    expect(
+      workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, { dashboard: false, branchSlug: null, newWorktree: false }),
+    ).toEqual({
       kind: 'empty',
       workspaceId: ROUTE_WORKSPACE_ID,
     })
   })
 
   test('maps child routes to stable workspace route views', () => {
-    expect(workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, { dashboard: true, branchSlug: null, newWorktree: false })).toEqual({
+    expect(
+      workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, { dashboard: true, branchSlug: null, newWorktree: false }),
+    ).toEqual({
       kind: 'dashboard',
       workspaceId: ROUTE_WORKSPACE_ID,
     })
@@ -146,12 +170,18 @@ describe('workspace route view derivation', () => {
         newWorktree: false,
       }),
     ).toEqual({ kind: 'workspace-root', workspaceId: ROUTE_WORKSPACE_ID })
-    expect(workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, { dashboard: false, branchSlug: null, newWorktree: true })).toEqual({
+    expect(
+      workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, { dashboard: false, branchSlug: null, newWorktree: true }),
+    ).toEqual({
       kind: 'newWorktree',
       workspaceId: ROUTE_WORKSPACE_ID,
     })
     expect(
-      workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, { dashboard: false, branchSlug: 'ZmVhdHVyZS9h', newWorktree: false }),
+      workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, {
+        dashboard: false,
+        branchSlug: 'ZmVhdHVyZS9h',
+        newWorktree: false,
+      }),
     ).toEqual({
       kind: 'branch',
       workspaceId: ROUTE_WORKSPACE_ID,
@@ -204,7 +234,7 @@ describe('workspace route view derivation', () => {
 
   test('maps a detached worktree terminal URL to a filesystem surface', () => {
     expect(
-      workspaceRouteViewFromChildRoute(WORKSPACE_REPO_ID, {
+      workspaceRouteViewFromChildRoute(GIT_WORKSPACE_ID, {
         dashboard: false,
         branchSlug: null,
         worktreeSlug: worktreeSlugFromPath('/workspace/detached'),
@@ -213,49 +243,93 @@ describe('workspace route view derivation', () => {
       }),
     ).toEqual({
       kind: 'worktree',
-      workspaceId: WORKSPACE_REPO_ID,
+      workspaceId: GIT_WORKSPACE_ID,
       worktreePath: '/workspace/detached',
       workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-333333333333333333333' },
     })
   })
 })
 
-describe('repo route capability admission', () => {
+describe('workspace route capability admission', () => {
   test.each([
-    ['branch surface', (repoSlug: string) => `/repo/${repoSlug}/branch/bWFpbg`],
-    ['new-worktree surface', (repoSlug: string) => `/repo/${repoSlug}/worktree/new`],
+    ['branch surface', (workspaceSlug: string) => `/workspace/${workspaceSlug}/branch/bWFpbg`],
+    [
+      'worktree surface',
+      (workspaceSlug: string) =>
+        `/workspace/${workspaceSlug}/worktree/${worktreeSlugFromPath('/tmp/plain-router-worktree')}`,
+    ],
+    ['new-worktree surface', (workspaceSlug: string) => `/workspace/${workspaceSlug}/worktree/new`],
   ])('redirects a non-Git %s to Dashboard without mounting the rejected surface', async (_label, pathForSlug) => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-router-workspace')
-    seedRepoCapability(workspaceId, 'unavailable')
+    seedWorkspaceCapability(workspaceId, 'unavailable')
     render(createElement(PrimaryWindowRouterProvider))
     appMocks.render.mockClear()
 
-    navigateBrowser(pathForSlug(repoSlugFromId(workspaceId)))
+    navigateBrowser(pathForSlug(workspaceSlugFromId(workspaceId)))
 
-    await waitFor(() => expect(window.location.pathname).toBe(`/repo/${repoSlugFromId(workspaceId)}/dashboard`))
+    await waitFor(() =>
+      expect(window.location.pathname).toBe(`/workspace/${workspaceSlugFromId(workspaceId)}/dashboard`),
+    )
     await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('dashboard'))
     expect(appMocks.render).not.toHaveBeenCalledWith('branch')
+    expect(appMocks.render).not.toHaveBeenCalledWith('worktree')
     expect(appMocks.render).not.toHaveBeenCalledWith('newWorktree')
+  })
+
+  test('resolves a workspace root deep link before the router mounts', async () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/cold-workspace')
+    seedWorkspaceCapability(workspaceId, 'unavailable')
+    navigateBrowser(`/workspace/${workspaceSlugFromId(workspaceId)}/root`)
+
+    render(createElement(PrimaryWindowRouterProvider))
+
+    await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('workspace-root'))
+  })
+
+  test('resolves a Git worktree terminal deep link before the router mounts', async () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/cold-git-workspace')
+    seedWorkspaceCapability(workspaceId, 'available')
+    const worktreeSlug = worktreeSlugFromPath('/tmp/cold-git-worktree')
+    navigateBrowser(`/workspace/${workspaceSlugFromId(workspaceId)}/worktree/${worktreeSlug}/terminal/terminal-test`)
+
+    render(createElement(PrimaryWindowRouterProvider))
+
+    await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('worktree'))
+  })
+
+  test('returns from new-worktree to the originating workspace route through the real router', async () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/return-workspace')
+    seedWorkspaceCapability(workspaceId, 'available')
+    const workspaceSlug = workspaceSlugFromId(workspaceId)
+    const returnTo = `/workspace/${workspaceSlug}/branch/bWFpbg/tab/status`
+    navigateBrowser(`/workspace/${workspaceSlug}/worktree/new?returnTo=${encodeURIComponent(returnTo)}`)
+    const view = render(createElement(PrimaryWindowRouterProvider))
+
+    await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('newWorktree'))
+    fireEvent.click(view.getByRole('button', { name: 'cancel new worktree' }))
+
+    await waitFor(() => expect(window.location.pathname).toBe(returnTo))
+    await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('branch'))
   })
 
   test('keeps an explicitly selected workspace surface when Git capability becomes available', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/git-router-workspace')
-    seedRepoCapability(workspaceId, 'available')
+    seedWorkspaceCapability(workspaceId, 'available')
     render(createElement(PrimaryWindowRouterProvider))
     appMocks.render.mockClear()
 
-    navigateBrowser(`/repo/${repoSlugFromId(workspaceId)}/workspace`)
+    navigateBrowser(`/workspace/${workspaceSlugFromId(workspaceId)}/root`)
 
-    await waitFor(() => expect(window.location.pathname).toBe(`/repo/${repoSlugFromId(workspaceId)}/workspace`))
+    await waitFor(() => expect(window.location.pathname).toBe(`/workspace/${workspaceSlugFromId(workspaceId)}/root`))
     await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('workspace-root'))
     expect(appMocks.render).not.toHaveBeenCalledWith('dashboard')
   })
 })
 
-function seedRepoCapability(workspaceId: WorkspaceId, gitStatus: 'available' | 'unavailable') {
+function seedWorkspaceCapability(workspaceId: WorkspaceId, gitStatus: 'available' | 'unavailable') {
   resetWorkspacesStore()
-  const repo = emptyWorkspace(workspaceId, 'workspace', 'runtime-router-test')
-  acceptWorkspaceProbeState(repo, {
+  const workspace = emptyWorkspace(workspaceId, 'workspace', 'runtime-router-test')
+  acceptWorkspaceProbeState(workspace, {
     status: 'ready',
     name: 'workspace',
     capabilities: {
@@ -269,7 +343,7 @@ function seedRepoCapability(workspaceId: WorkspaceId, gitStatus: 'available' | '
     diagnostics: [],
   })
   useWorkspacesStore.setState({
-    workspaces: { [workspaceId]: repo },
+    workspaces: { [workspaceId]: workspace },
     workspaceOrder: [workspaceId],
     workspaceMembershipReady: true,
   })
@@ -280,11 +354,14 @@ function navigateBrowser(pathname: string) {
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
-describe('repo route context derivation', () => {
-  test('keeps repo context when a branch slug is malformed', () => {
+describe('workspace route context derivation', () => {
+  test('keeps workspace context when a branch slug is malformed', () => {
     expect(
       workspaceRouteContextFromMatches([
-        { routeId: '/repo/$repoSlug/branch/$branchSlug', params: { repoSlug: 'L3JlcG8', branchSlug: '%' } },
+        {
+          routeId: '/workspace/$workspaceSlug/branch/$branchSlug',
+          params: { workspaceSlug: 'L3JlcG8', branchSlug: '%' },
+        },
       ]),
     ).toEqual({ kind: 'empty', workspaceSlug: 'L3JlcG8' })
   })

@@ -41,11 +41,7 @@ import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
-import {
-  branchNameFromSlug,
-  workspaceIdFromSlug,
-  worktreePathFromSlug,
-} from '#/web/repo-route-slugs.ts'
+import { branchNameFromSlug, workspaceIdFromSlug, worktreePathFromSlug } from '#/web/workspace-route-slugs.ts'
 import { returnToFromHref, usePrimaryWindowRouteActions } from '#/web/primary-window-route-navigation.ts'
 import {
   usePrimaryWindowHistoryPresentationObserver,
@@ -351,13 +347,13 @@ type WorkspaceRouteContext =
 export function workspaceRouteContextFromMatches(
   matches: Array<{ routeId: string; params: Record<string, string> }>,
 ): WorkspaceRouteContext | null {
-  const repoMatch = [...matches].reverse().find((match) => typeof match.params.repoSlug === 'string')
-  if (!repoMatch) return null
+  const workspaceMatch = [...matches].reverse().find((match) => typeof match.params.workspaceSlug === 'string')
+  if (!workspaceMatch) return null
 
-  const workspaceSlug = repoMatch.params.repoSlug
+  const workspaceSlug = workspaceMatch.params.workspaceSlug
   if (!workspaceSlug) return null
 
-  const branchSlug = repoMatch.params.branchSlug
+  const branchSlug = workspaceMatch.params.branchSlug
   if (branchSlug) {
     const branchName = branchNameFromSlug(branchSlug)
     return branchName
@@ -370,7 +366,7 @@ export function workspaceRouteContextFromMatches(
       : { kind: 'empty', workspaceSlug }
   }
 
-  const worktreeSlug = repoMatch.params.worktreeSlug
+  const worktreeSlug = workspaceMatch.params.worktreeSlug
   if (worktreeSlug) {
     const worktreePath = worktreePathFromSlug(worktreeSlug)
     return worktreePath
@@ -378,9 +374,9 @@ export function workspaceRouteContextFromMatches(
       : { kind: 'empty', workspaceSlug }
   }
 
-  if (repoMatch.routeId.includes('/worktree/new')) return { kind: 'newWorktree', workspaceSlug }
-  if (repoMatch.routeId.includes('/dashboard')) return { kind: 'dashboard', workspaceSlug }
-  if (repoMatch.routeId.includes('/workspace')) return { kind: 'workspace-root', workspaceSlug }
+  if (workspaceMatch.routeId.includes('/worktree/new')) return { kind: 'newWorktree', workspaceSlug }
+  if (workspaceMatch.routeId.includes('/dashboard')) return { kind: 'dashboard', workspaceSlug }
+  if (workspaceMatch.routeId.includes('/root')) return { kind: 'workspace-root', workspaceSlug }
   return { kind: 'empty', workspaceSlug }
 }
 

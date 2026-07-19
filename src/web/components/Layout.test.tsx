@@ -238,9 +238,9 @@ describe('authenticatedAppShellMode', () => {
 
   test('workspace routes wait for authenticated boot before mounting runtime', () => {
     expect(authenticatedAppShellMode('/', restoringWorkspaceState)).toBe('workspace-restore')
-    expect(authenticatedAppShellMode('/repo/repo/dashboard', restoringWorkspaceState)).toBe('workspace-restore')
-    expect(authenticatedAppShellMode('/repo/repo/dashboard', readyState)).toBe('workspace-ready')
-    expect(authenticatedAppShellMode('/repo/repo/dashboard', failedState)).toBe('workspace-failed')
+    expect(authenticatedAppShellMode('/workspace/repo/dashboard', restoringWorkspaceState)).toBe('workspace-restore')
+    expect(authenticatedAppShellMode('/workspace/repo/dashboard', readyState)).toBe('workspace-ready')
+    expect(authenticatedAppShellMode('/workspace/repo/dashboard', failedState)).toBe('workspace-failed')
   })
 })
 

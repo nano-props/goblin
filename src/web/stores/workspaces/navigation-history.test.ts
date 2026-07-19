@@ -211,11 +211,11 @@ describe('workspace navigation history', () => {
 
   test('treats a new-worktree return target as part of the route identity', () => {
     const store = useWorkspacesStore.getState()
-    store.recordWorkspaceNavigation(newWorktreeEntry('/repo/repo-slug/branch/feature-a'))
-    store.recordWorkspaceNavigation(newWorktreeEntry('/repo/repo-slug/dashboard'))
+    store.recordWorkspaceNavigation(newWorktreeEntry('/workspace/repo-slug/branch/feature-a'))
+    store.recordWorkspaceNavigation(newWorktreeEntry('/workspace/repo-slug/dashboard'))
 
-    expect(history().current).toEqual(newWorktreeEntry('/repo/repo-slug/dashboard'))
-    expect(history().backStack).toEqual([newWorktreeEntry('/repo/repo-slug/branch/feature-a')])
+    expect(history().current).toEqual(newWorktreeEntry('/workspace/repo-slug/dashboard'))
+    expect(history().backStack).toEqual([newWorktreeEntry('/workspace/repo-slug/branch/feature-a')])
   })
 })
 

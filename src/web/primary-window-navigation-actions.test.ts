@@ -73,7 +73,9 @@ describe('createPrimaryWindowNavigationActions', () => {
       const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
       const terminalKey = formatTerminalWorktreeKeyForPath(REPO_ID, REPO_ID)
       useWorkspacesStore.getState().setSelectedTerminal(terminalKey, 'term-111111111111111111111')
-      useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
+      useWorkspacesStore
+        .getState()
+        .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
       const navigation = routeNavigation()
       vi.mocked(navigation.openWorkspaceRootPane).mockImplementation((_repoId, options) => {
         if (accepted && commit) options?.onCommit?.()
@@ -607,7 +609,7 @@ describe('createPrimaryWindowNavigationActions', () => {
   test('does not resume a repo at its new-worktree workflow', () => {
     useWorkspacesStore.getState().recordWorkspaceNavigation({
       workspaceId: REPO_B_ID,
-      route: { kind: 'newWorktree', returnTo: '/repo/repo-b/branch/main' },
+      route: { kind: 'newWorktree', returnTo: '/workspace/repo-b/branch/main' },
     })
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
@@ -871,7 +873,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     const navigation = routeNavigation()
     const target = {
       workspaceId: REPO_A_ID,
-      route: { kind: 'newWorktree' as const, returnTo: '/repo/repo-a/branch/main' },
+      route: { kind: 'newWorktree' as const, returnTo: '/workspace/repo-a/branch/main' },
     }
     const traversal = historyTraversal(target)
     const peekWorkspaceNavigation = vi.fn(() => traversal)
@@ -891,7 +893,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(commitWorkspaceNavigation).toHaveBeenCalledWith(traversal)
     expect(navigation.openRepoNewWorktree).toHaveBeenCalledWith(
       REPO_A_ID,
-      presentationOptions({ returnTo: '/repo/repo-a/branch/main' }),
+      presentationOptions({ returnTo: '/workspace/repo-a/branch/main' }),
     )
   })
 

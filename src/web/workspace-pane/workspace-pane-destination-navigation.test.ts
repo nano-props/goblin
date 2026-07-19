@@ -188,7 +188,7 @@ describe('workspace pane destination navigation', () => {
     await Promise.resolve()
 
     observePrimaryWindowHistoryNavigation({
-      href: '/repo/current/tab/history',
+      href: '/workspace/current/tab/history',
       state: {},
       action: { type: 'PUSH' },
     })
@@ -204,7 +204,7 @@ describe('workspace pane destination navigation', () => {
       async (_repoId, _branchName, _route, options) => {
         const token = options?.presentationToken
         if (!token) return false
-        const href = '/repo/destination/tab/status'
+        const href = '/workspace/destination/tab/status'
         const navigationId = registerPrimaryWindowNavigation(token, href, options.onCommit)
         if (!navigationId) return false
         observePrimaryWindowHistoryNavigation({

@@ -13,7 +13,12 @@ import { App, type WorkspaceRouteView } from '#/web/App.tsx'
 import { Layout, WorkspaceSessionRestoreGate } from '#/web/Layout.tsx'
 import { isSettingsPage } from '#/shared/settings-pages.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
-import { branchNameFromSlug, workspaceIdFromSlug, repoSlugFromId, worktreePathFromSlug } from '#/web/repo-route-slugs.ts'
+import {
+  branchNameFromSlug,
+  workspaceIdFromSlug,
+  workspaceSlugFromId,
+  worktreePathFromSlug,
+} from '#/web/workspace-route-slugs.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspacesStore } from '#/web/stores/workspaces/types.ts'
 import {
@@ -37,59 +42,59 @@ const indexRoute = createRoute({
   component: IndexRoute,
 })
 
-const repoRoute = createRoute({
+const workspaceRoute = createRoute({
   getParentRoute: () => layoutRoute,
-  path: '/repo/$repoSlug',
-  component: RepoRoute,
+  path: '/workspace/$workspaceSlug',
+  component: WorkspaceRoute,
 })
 
-const repoDashboardRoute = createRoute({
-  getParentRoute: () => repoRoute,
+const workspaceDashboardRoute = createRoute({
+  getParentRoute: () => workspaceRoute,
   path: 'dashboard',
 })
 
-const repoWorkspaceRoute = createRoute({
-  getParentRoute: () => repoRoute,
-  path: 'workspace',
+const workspaceRootRoute = createRoute({
+  getParentRoute: () => workspaceRoute,
+  path: 'root',
 })
 
-const repoBranchRoute = createRoute({
-  getParentRoute: () => repoRoute,
+const gitBranchRoute = createRoute({
+  getParentRoute: () => workspaceRoute,
   path: 'branch/$branchSlug',
 })
 
-const repoBranchIndexRoute = createRoute({
-  getParentRoute: () => repoBranchRoute,
+const gitBranchIndexRoute = createRoute({
+  getParentRoute: () => gitBranchRoute,
   path: '/',
 })
 
-const repoBranchTabRoute = createRoute({
-  getParentRoute: () => repoBranchRoute,
+const gitBranchTabRoute = createRoute({
+  getParentRoute: () => gitBranchRoute,
   path: 'tab/$tabKey',
 })
 
-const repoBranchTerminalRoute = createRoute({
-  getParentRoute: () => repoBranchRoute,
+const gitBranchTerminalRoute = createRoute({
+  getParentRoute: () => gitBranchRoute,
   path: 'terminal/$terminalSessionId',
 })
 
-const repoWorktreeNewRoute = createRoute({
-  getParentRoute: () => repoRoute,
+const gitWorktreeNewRoute = createRoute({
+  getParentRoute: () => workspaceRoute,
   path: 'worktree/new',
 })
 
-const repoWorktreeRoute = createRoute({
-  getParentRoute: () => repoRoute,
+const gitWorktreeRoute = createRoute({
+  getParentRoute: () => workspaceRoute,
   path: 'worktree/$worktreeSlug',
 })
 
-const repoWorktreeTerminalRoute = createRoute({
-  getParentRoute: () => repoWorktreeRoute,
+const gitWorktreeTerminalRoute = createRoute({
+  getParentRoute: () => gitWorktreeRoute,
   path: 'terminal/$terminalSessionId',
 })
 
-const repoWorktreeTabRoute = createRoute({
-  getParentRoute: () => repoWorktreeRoute,
+const gitWorktreeTabRoute = createRoute({
+  getParentRoute: () => gitWorktreeRoute,
   path: 'tab/$tabKey',
 })
 
@@ -116,7 +121,7 @@ function IndexRoute() {
   const firstWorkspaceSlug = useWorkspacesStore(initialWorkspaceRouteSlugFromStore)
   const navigation = useWorkspaceRouteNavigation()
   if (firstWorkspaceSlug) {
-    return <Navigate to="/repo/$repoSlug/dashboard" params={{ repoSlug: firstWorkspaceSlug }} replace />
+    return <Navigate to="/workspace/$workspaceSlug/dashboard" params={{ workspaceSlug: firstWorkspaceSlug }} replace />
   }
   return (
     <WorkspaceSessionRestoreGate>
@@ -129,34 +134,34 @@ export function initialWorkspaceRouteSlugFromStore(
   state: Pick<WorkspacesStore, 'restoredWorkspaceId' | 'workspaceOrder' | 'workspaces' | 'workspaceMembershipReady'>,
 ): string | null {
   const restoredWorkspace = state.restoredWorkspaceId ? state.workspaces[state.restoredWorkspaceId] : null
-  if (restoredWorkspace) return repoSlugFromId(restoredWorkspace.id)
+  if (restoredWorkspace) return workspaceSlugFromId(restoredWorkspace.id)
   if (!state.workspaceMembershipReady) return null
   const firstWorkspaceId = state.workspaceOrder[0]
   const firstWorkspace = firstWorkspaceId ? state.workspaces[firstWorkspaceId] : null
-  return firstWorkspace ? repoSlugFromId(firstWorkspace.id) : null
+  return firstWorkspace ? workspaceSlugFromId(firstWorkspace.id) : null
 }
 
-function RepoRoute() {
-  const { repoSlug } = repoRoute.useParams()
-  const dashboardMatch = useMatch({ from: repoDashboardRoute.id, shouldThrow: false })
-  const workspaceMatch = useMatch({ from: repoWorkspaceRoute.id, shouldThrow: false })
-  const branchMatch = useMatch({ from: repoBranchRoute.id, shouldThrow: false })
-  const branchTabMatch = useMatch({ from: repoBranchTabRoute.id, shouldThrow: false })
-  const branchTerminalMatch = useMatch({ from: repoBranchTerminalRoute.id, shouldThrow: false })
-  const newWorktreeMatch = useMatch({ from: repoWorktreeNewRoute.id, shouldThrow: false })
-  const worktreeMatch = useMatch({ from: repoWorktreeRoute.id, shouldThrow: false })
-  const worktreeTerminalMatch = useMatch({ from: repoWorktreeTerminalRoute.id, shouldThrow: false })
-  const worktreeTabMatch = useMatch({ from: repoWorktreeTabRoute.id, shouldThrow: false })
+function WorkspaceRoute() {
+  const { workspaceSlug } = workspaceRoute.useParams()
+  const dashboardMatch = useMatch({ from: workspaceDashboardRoute.id, shouldThrow: false })
+  const workspaceMatch = useMatch({ from: workspaceRootRoute.id, shouldThrow: false })
+  const branchMatch = useMatch({ from: gitBranchRoute.id, shouldThrow: false })
+  const branchTabMatch = useMatch({ from: gitBranchTabRoute.id, shouldThrow: false })
+  const branchTerminalMatch = useMatch({ from: gitBranchTerminalRoute.id, shouldThrow: false })
+  const newWorktreeMatch = useMatch({ from: gitWorktreeNewRoute.id, shouldThrow: false })
+  const worktreeMatch = useMatch({ from: gitWorktreeRoute.id, shouldThrow: false })
+  const worktreeTerminalMatch = useMatch({ from: gitWorktreeTerminalRoute.id, shouldThrow: false })
+  const worktreeTabMatch = useMatch({ from: gitWorktreeTabRoute.id, shouldThrow: false })
   const navigation = useWorkspaceRouteNavigation()
-  const workspaceId = workspaceIdFromSlug(repoSlug)
+  const workspaceId = workspaceIdFromSlug(workspaceSlug)
   const gitUnavailable = useWorkspacesStore((state) => {
     const workspace = workspaceId ? state.workspaces[workspaceId] : null
     return workspace?.capability.kind === 'filesystem'
   })
   if (gitUnavailable && (branchMatch || worktreeMatch || newWorktreeMatch)) {
-    return <Navigate to="/repo/$repoSlug/dashboard" params={{ repoSlug }} replace />
+    return <Navigate to="/workspace/$workspaceSlug/dashboard" params={{ workspaceSlug }} replace />
   }
-  const routeWorkspaceView = workspaceRouteViewFromSlugChildRoute(repoSlug, {
+  const routeWorkspaceView = workspaceRouteViewFromSlugChildRoute(workspaceSlug, {
     dashboard: !!dashboardMatch,
     workspace: !!workspaceMatch,
     branchSlug: branchMatch?.params.branchSlug ?? null,
@@ -175,7 +180,7 @@ function RepoRoute() {
 }
 
 export function workspaceRouteViewFromSlugChildRoute(
-  repoSlug: string,
+  workspaceSlug: string,
   childRoute: {
     dashboard: boolean
     workspace?: boolean
@@ -188,7 +193,7 @@ export function workspaceRouteViewFromSlugChildRoute(
     newWorktree: boolean
   },
 ): WorkspaceRouteView | null {
-  const workspaceId = workspaceIdFromSlug(repoSlug)
+  const workspaceId = workspaceIdFromSlug(workspaceSlug)
   return workspaceId ? workspaceRouteViewFromChildRoute(workspaceId, childRoute) : null
 }
 
@@ -264,7 +269,8 @@ export function primaryWindowRouterCallbacks(routeActions: PrimaryWindowRouteNav
     onOpenWorkspaceNavigator: (workspaceId: WorkspaceId) => routeActions.openWorkspaceNavigator(workspaceId),
     onOpenWorkspaceRootPane: (workspaceId: WorkspaceId) => routeActions.openWorkspaceRootPane(workspaceId),
     onOpenWorkspaceDashboard: (workspaceId: WorkspaceId) => routeActions.openWorkspaceDashboard(workspaceId),
-    onOpenRepoBranch: (workspaceId: WorkspaceId, branchName: string) => openWorkspacePaneRoute(routeActions, workspaceId, branchName),
+    onOpenRepoBranch: (workspaceId: WorkspaceId, branchName: string) =>
+      openWorkspacePaneRoute(routeActions, workspaceId, branchName),
     onOpenRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.openRepoNewWorktree(workspaceId),
     onCancelRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.cancelRepoNewWorktree(workspaceId),
     onReplaceRepoBranch: (workspaceId: WorkspaceId, branchName: string) =>
@@ -294,12 +300,12 @@ function SettingsRoute() {
 const primaryWindowRouteTree = rootRoute.addChildren([
   layoutRoute.addChildren([
     indexRoute,
-    repoRoute.addChildren([
-      repoDashboardRoute,
-      repoWorkspaceRoute,
-      repoBranchRoute.addChildren([repoBranchIndexRoute, repoBranchTabRoute, repoBranchTerminalRoute]),
-      repoWorktreeRoute.addChildren([repoWorktreeTerminalRoute, repoWorktreeTabRoute]),
-      repoWorktreeNewRoute,
+    workspaceRoute.addChildren([
+      workspaceDashboardRoute,
+      workspaceRootRoute,
+      gitBranchRoute.addChildren([gitBranchIndexRoute, gitBranchTabRoute, gitBranchTerminalRoute]),
+      gitWorktreeRoute.addChildren([gitWorktreeTerminalRoute, gitWorktreeTabRoute]),
+      gitWorktreeNewRoute,
     ]),
     settingsIndexRoute,
     settingsRoute,

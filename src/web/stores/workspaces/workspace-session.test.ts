@@ -672,7 +672,7 @@ describe('repo lifecycle', () => {
     useWorkspacesStore.getState().recordWorkspaceNavigation({ workspaceId: REPO_A, route: { kind: 'dashboard' } })
     useWorkspacesStore.getState().recordWorkspaceNavigation({
       workspaceId: REPO_B,
-      route: { kind: 'newWorktree', returnTo: '/repo/repo-b/dashboard' },
+      route: { kind: 'newWorktree', returnTo: '/workspace/repo-b/dashboard' },
     })
 
     await useWorkspacesStore.getState().closeWorkspace(REPO_A)
@@ -681,7 +681,7 @@ describe('repo lifecycle', () => {
     expect(history[REPO_A]).toBeUndefined()
     expect(history[REPO_B]?.current).toEqual({
       workspaceId: REPO_B,
-      route: { kind: 'newWorktree', returnTo: '/repo/repo-b/dashboard' },
+      route: { kind: 'newWorktree', returnTo: '/workspace/repo-b/dashboard' },
     })
   })
 })
