@@ -13,7 +13,7 @@ beforeEach(() => localStorage.clear())
 afterEach(() => vi.restoreAllMocks())
 
 describe('client workspace persistence', () => {
-  test('accepts canonical repo locators without Node path APIs', () => {
+  test('accepts canonical workspace IDs without Node path APIs', () => {
     expect(normalizeClientWorkspaceState({ restoredWorkspaceId: 'goblin+file:///repo' }).restoredWorkspaceId).toBe(
       'goblin+file:///repo',
     )
@@ -61,6 +61,37 @@ describe('client workspace persistence', () => {
     const raw = JSON.parse(localStorage.getItem('goblin.workspace') ?? '{}')
     expect(raw).not.toHaveProperty('openWorkspaceEntries')
     expect(raw).not.toHaveProperty('workspacePaneTabsByTargetByWorkspace')
+  })
+
+  test('preserves Windows workspace identities throughout nested presentation state on a non-Windows host', () => {
+    const workspaceId = 'goblin+file:///C:/workspace'
+    const worktreeId = 'goblin+file:///C:/workspace-feature'
+    const terminalKey = `${workspaceId}\0${worktreeId}`
+    const rootTargetKey = `${workspaceId}\0workspace-root`
+
+    expect(
+      normalizeClientWorkspaceState({
+        restoredWorkspaceId: workspaceId,
+        selectedTerminalSessionIdByTerminalWorktree: { [terminalKey]: 'terminal-session-test' },
+        preferredWorkspacePaneTabByTargetByWorkspace: {
+          [workspaceId]: { [rootTargetKey]: 'files' },
+        },
+        filetreeViewStateByWorktreeByWorkspace: {
+          [workspaceId]: {
+            [worktreeId]: { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 2 },
+          },
+        },
+      }),
+    ).toMatchObject({
+      restoredWorkspaceId: workspaceId,
+      selectedTerminalSessionIdByTerminalWorktree: { [terminalKey]: 'terminal-session-test' },
+      preferredWorkspacePaneTabByTargetByWorkspace: { [workspaceId]: { [rootTargetKey]: 'files' } },
+      filetreeViewStateByWorktreeByWorkspace: {
+        [workspaceId]: {
+          [worktreeId]: { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 2 },
+        },
+      },
+    })
   })
 
   test('normalizes malformed local presentation to safe defaults', async () => {

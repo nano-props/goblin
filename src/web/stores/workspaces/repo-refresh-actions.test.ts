@@ -7,6 +7,9 @@ import {
   requestVisibleWorkspaceStatusRefresh,
 } from '#/web/stores/workspaces/repo-refresh-actions.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 
 vi.mock('#/web/stores/workspaces/worktree-status-refresh.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('#/web/stores/workspaces/worktree-status-refresh.ts')>()
@@ -66,7 +69,7 @@ describe('repo refresh actions', () => {
 
     await handleRepoInvalidationRefresh(
       store,
-      { repoId: 'goblin+file:///repo', query: 'repo-snapshot' },
+      { repoId: WORKSPACE_ID, query: 'repo-snapshot' },
       'repo-runtime-test-9',
     )
 

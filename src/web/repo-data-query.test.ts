@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   getRepoOperationsQueryData,
   getRepoProjectionPlaceholderData,
@@ -187,7 +188,7 @@ describe('repo projection query data', () => {
       operations: [
         {
           id: 'repo-op-1',
-          repoId: '/tmp/repo',
+          repoId: workspaceIdForTest('goblin+file:///workspace'),
           workspaceRuntimeId: null,
           kind: 'fetch' as const,
           phase: 'running' as const,

@@ -14,6 +14,7 @@
 
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type CreateWorktreeMode =
   | { kind: 'newBranch'; newBranch: string; baseRef: string }
@@ -27,7 +28,7 @@ export interface CreateWorktreeInput {
 
 /** Wire-shape envelope used by the IPC bridge: includes `cwd` on top of the canonical input. */
 export interface CreateWorktreeIpcInput extends CreateWorktreeInput {
-  cwd: string
+  cwd: WorkspaceId
   workspaceRuntimeId: string
   worktreeBootstrap: WorktreeBootstrapDecision
 }

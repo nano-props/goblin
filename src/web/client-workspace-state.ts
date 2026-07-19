@@ -3,7 +3,6 @@ import type {
   FiletreeSessionViewState,
   NativeClientWorkspaceReadResult,
 } from '#/shared/api-types.ts'
-import { toSafeCanonicalRepoLocator } from '#/shared/repo-locator.ts'
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 import { isWorkspacePaneSessionTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneSessionTabType } from '#/shared/workspace-pane.ts'
@@ -12,7 +11,11 @@ import { sessionLog } from '#/web/logger.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { invokeNativeIpcPath } from '#/web/native-host-client.ts'
 import { parseTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import { canonicalWorkspaceLocator, workspaceLocatorsShareTransport } from '#/shared/workspace-locator.ts'
+import {
+  canonicalWorkspaceLocator,
+  toSafeCanonicalWorkspaceId,
+  workspaceLocatorsShareTransport,
+} from '#/shared/workspace-locator.ts'
 import { parseWorkspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 const CLIENT_WORKSPACE_STORAGE_KEY = 'goblin.workspace'
@@ -58,7 +61,7 @@ export function normalizeClientWorkspaceState(value: unknown): ClientWorkspaceSt
   const raw = value as Partial<ClientWorkspaceState>
   const layout = normalizeWorkspaceSessionLayoutState(raw)
   return {
-    restoredWorkspaceId: toSafeCanonicalRepoLocator(raw.restoredWorkspaceId),
+    restoredWorkspaceId: toSafeCanonicalWorkspaceId(raw.restoredWorkspaceId),
     ...layout,
     selectedTerminalSessionIdByTerminalWorktree: normalizeSelectedTerminals(
       raw.selectedTerminalSessionIdByTerminalWorktree,
@@ -86,15 +89,15 @@ function normalizePreferredTabs(value: unknown): ClientWorkspaceState['preferred
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const result: ClientWorkspaceState['preferredWorkspacePaneTabByTargetByWorkspace'] = {}
   for (const [workspaceId, rawByTarget] of Object.entries(value)) {
-    const safeRepoRoot = toSafeCanonicalRepoLocator(workspaceId)
-    if (!safeRepoRoot || !rawByTarget || typeof rawByTarget !== 'object' || Array.isArray(rawByTarget)) continue
+    const safeWorkspaceId = toSafeCanonicalWorkspaceId(workspaceId)
+    if (!safeWorkspaceId || !rawByTarget || typeof rawByTarget !== 'object' || Array.isArray(rawByTarget)) continue
     const byTarget: Record<string, WorkspacePaneSessionTabType | null> = {}
     for (const [targetKey, preferredTab] of Object.entries(rawByTarget)) {
       const normalized = preferredTabFromUnknown(preferredTab)
       const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
-      if (normalized !== undefined && target?.workspaceId === safeRepoRoot) byTarget[targetKey] = normalized
+      if (normalized !== undefined && target?.workspaceId === safeWorkspaceId) byTarget[targetKey] = normalized
     }
-    if (Object.keys(byTarget).length > 0) result[safeRepoRoot] = byTarget
+    if (Object.keys(byTarget).length > 0) result[safeWorkspaceId] = byTarget
   }
   return result
 }
@@ -107,20 +110,20 @@ function normalizeFiletreeState(value: unknown): ClientWorkspaceState['filetreeV
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const result: ClientWorkspaceState['filetreeViewStateByWorktreeByWorkspace'] = {}
   for (const [workspaceId, rawByWorktree] of Object.entries(value)) {
-    const safeRepoRoot = toSafeCanonicalRepoLocator(workspaceId)
-    if (!safeRepoRoot || !rawByWorktree || typeof rawByWorktree !== 'object' || Array.isArray(rawByWorktree)) continue
+    const safeWorkspaceId = toSafeCanonicalWorkspaceId(workspaceId)
+    if (!safeWorkspaceId || !rawByWorktree || typeof rawByWorktree !== 'object' || Array.isArray(rawByWorktree)) continue
     const byWorktree: Record<string, FiletreeSessionViewState> = {}
     for (const [worktreeId, rawSnapshot] of Object.entries(rawByWorktree)) {
       const snapshot = normalizeFiletreeSnapshot(rawSnapshot)
       if (
         canonicalWorkspaceLocator(worktreeId) === worktreeId &&
-        workspaceLocatorsShareTransport(safeRepoRoot, worktreeId) &&
+        workspaceLocatorsShareTransport(safeWorkspaceId, worktreeId) &&
         snapshot
       ) {
         byWorktree[worktreeId] = snapshot
       }
     }
-    if (Object.keys(byWorktree).length > 0) result[safeRepoRoot] = byWorktree
+    if (Object.keys(byWorktree).length > 0) result[safeWorkspaceId] = byWorktree
   }
   return result
 }

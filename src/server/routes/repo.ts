@@ -1,4 +1,10 @@
-import { getBackgroundSyncRepos, setBackgroundSyncRepos } from '#/server/modules/background-sync.ts'
+import {
+  beginBackgroundSyncRegistration,
+  commitBackgroundSyncRegistration,
+  finishBackgroundSyncRegistration,
+  getBackgroundSyncRepos,
+  prepareBackgroundSync,
+} from '#/server/modules/background-sync.ts'
 import { serverRepoNodeLog } from '#/node/logger.ts'
 import {
   readRepoProjection,
@@ -28,7 +34,11 @@ import {
 } from '#/server/modules/invalidation-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
-import { workspaceRuntimeHasGitCapability } from '#/server/modules/workspace-runtimes.ts'
+import {
+  isCurrentWorkspaceRuntimeMembership,
+  workspaceRuntimeClientHasMemberships,
+  workspaceRuntimeHasGitCapability,
+} from '#/server/modules/workspace-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { workspaceLocatorForPath, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import { IpcError, type RepoLogResponse } from '#/shared/api-types.ts'
@@ -44,6 +54,7 @@ import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { readWorkspaceDirectoryOverview } from '#/server/modules/workspace-directory-overview.ts'
+import { resolveRepoSource } from '#/server/modules/repo-source.ts'
 
 // Soft-fail envelope returned by `jsonOr` for every repo action that
 // doesn't have a more specific success shape. Keep this in one place
@@ -331,19 +342,82 @@ export function createRepoRoutes(options: {
     )
   })
   app.post('/background-sync-repos', async (c) => {
-    const { repoIds } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.backgroundSyncRepos, c)
-    return c.json(
-      await jsonOr(
-        async () => {
-          await setBackgroundSyncRepos(repoIds)
-          return { ok: true, repoIds: getBackgroundSyncRepos(), intervalSec: await getServerFetchIntervalSec() }
-        },
-        { ok: true as const, repoIds: [], intervalSec: 0 },
-        'background-sync-repos',
-      ),
-    )
+    const { clientId, revision, targets } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.backgroundSyncRepos, c)
+    const userId = requiredUserId(userIdFromContext(c))
+    if (targets.length === 0 && !workspaceRuntimeClientHasMemberships(userId, clientId)) {
+      return c.json(await backgroundSyncResponse(userId))
+    }
+    for (const target of targets) {
+      requireCurrentWorkspaceRuntime(userId, target.workspaceId, target.workspaceRuntimeId)
+      requireCurrentWorkspaceRuntimeMembership(userId, clientId, target.workspaceId, target.workspaceRuntimeId)
+      assertGitCapability(userId, target.workspaceId, target.workspaceRuntimeId)
+    }
+    const admission = beginBackgroundSyncRegistration(userId, clientId, revision, targets)
+    if (!admission) return c.json(await backgroundSyncResponse(userId))
+    const signal = AbortSignal.any([c.req.raw.signal, admission.signal])
+    try {
+      return c.json(
+        await runtimeReadJsonOrThrow(
+          userId,
+          async () => {
+            await prepareBackgroundSync()
+            signal.throwIfAborted()
+            for (const target of targets) {
+              signal.throwIfAborted()
+              requireCurrentWorkspaceRuntime(userId, target.workspaceId, target.workspaceRuntimeId)
+              requireCurrentWorkspaceRuntimeMembership(userId, clientId, target.workspaceId, target.workspaceRuntimeId)
+              assertGitCapability(userId, target.workspaceId, target.workspaceRuntimeId)
+              const source = await resolveRepoSource(target.workspaceId, {
+                workspaceRuntimeId: target.workspaceRuntimeId,
+              })
+              const snapshot = await source.getSnapshot(signal)
+              signal.throwIfAborted()
+              if (snapshot?.remote?.hasRemotes !== true) {
+                throw new IpcError({ code: 'BAD_REQUEST', message: 'error.no-remote-url' })
+              }
+            }
+            for (const target of targets) {
+              requireCurrentWorkspaceRuntime(userId, target.workspaceId, target.workspaceRuntimeId)
+              requireCurrentWorkspaceRuntimeMembership(userId, clientId, target.workspaceId, target.workspaceRuntimeId)
+              assertGitCapability(userId, target.workspaceId, target.workspaceRuntimeId)
+            }
+            signal.throwIfAborted()
+            commitBackgroundSyncRegistration(admission)
+            return await backgroundSyncResponse(userId)
+          },
+          'background-sync-repos',
+          signal,
+        ),
+      )
+    } finally {
+      finishBackgroundSyncRegistration(admission)
+    }
   })
   return app
+}
+
+function requiredUserId(userId: string | null | undefined): string {
+  if (!userId) throw new IpcError({ code: 'UNAUTHORIZED', message: 'Unauthorized' })
+  return userId
+}
+
+async function backgroundSyncResponse(userId: string) {
+  return {
+    ok: true as const,
+    repoIds: getBackgroundSyncRepos(userId),
+    intervalSec: await getServerFetchIntervalSec(),
+  }
+}
+
+function requireCurrentWorkspaceRuntimeMembership(
+  userId: string,
+  clientId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+): void {
+  if (!isCurrentWorkspaceRuntimeMembership(userId, workspaceId, workspaceRuntimeId, clientId)) {
+    throw new IpcError({ code: 'BAD_REQUEST', message: 'error.repo-runtime-stale' })
+  }
 }
 
 function publishPullFilesystemInvalidations(

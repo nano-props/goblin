@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { backgroundSyncRepoIdsFromStore } from '#/web/hooks/useBackgroundFetch.ts'
+import { backgroundSyncTargetsFromStore } from '#/web/hooks/useBackgroundFetch.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
@@ -10,7 +10,7 @@ const REMOTE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///remote-workspace'
 const LOCAL_WORKSPACE_ID = workspaceIdForTest('goblin+file:///local-workspace')
 const UNAVAILABLE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///unavailable-workspace')
 
-describe('backgroundSyncRepoIdsFromStore', () => {
+describe('backgroundSyncTargetsFromStore', () => {
   test('keeps the visible remotely backed repo registered while local refresh data loads are busy', () => {
     const repo = createRepo({
       id: REMOTE_WORKSPACE_ID,
@@ -22,8 +22,8 @@ describe('backgroundSyncRepoIdsFromStore', () => {
     repo.capability.git.operations.repoReadModel.phase = 'running'
 
     expect(
-      backgroundSyncRepoIdsFromStore({ workspaces: { [REMOTE_WORKSPACE_ID]: repo } }, REMOTE_WORKSPACE_ID),
-    ).toEqual([REMOTE_WORKSPACE_ID])
+      backgroundSyncTargetsFromStore({ workspaces: { [REMOTE_WORKSPACE_ID]: repo } }, REMOTE_WORKSPACE_ID),
+    ).toEqual([{ workspaceId: REMOTE_WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test' }])
   })
 
   test('only registers the current repo and excludes local-only and unavailable repos', () => {
@@ -39,7 +39,7 @@ describe('backgroundSyncRepoIdsFromStore', () => {
     })
 
     expect(
-      backgroundSyncRepoIdsFromStore(
+      backgroundSyncTargetsFromStore(
         {
           workspaces: { [LOCAL_WORKSPACE_ID]: localOnly, [UNAVAILABLE_WORKSPACE_ID]: unavailable },
         },
@@ -47,12 +47,30 @@ describe('backgroundSyncRepoIdsFromStore', () => {
       ),
     ).toEqual([])
     expect(
-      backgroundSyncRepoIdsFromStore(
+      backgroundSyncTargetsFromStore(
         {
           workspaces: { [LOCAL_WORKSPACE_ID]: localOnly, [UNAVAILABLE_WORKSPACE_ID]: unavailable },
         },
         UNAVAILABLE_WORKSPACE_ID,
       ),
+    ).toEqual([])
+  })
+
+  test('does not register a plain Workspace', () => {
+    const workspace = emptyWorkspace(LOCAL_WORKSPACE_ID, 'workspace', 'workspace-runtime-test')
+    acceptWorkspaceProbeState(workspace, {
+      status: 'ready',
+      name: 'workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [],
+    })
+
+    expect(
+      backgroundSyncTargetsFromStore({ workspaces: { [LOCAL_WORKSPACE_ID]: workspace } }, LOCAL_WORKSPACE_ID),
     ).toEqual([])
   })
 })
@@ -62,7 +80,7 @@ function createRepo(input: {
   remote: { hasRemotes: boolean; hasGitHubRemote: boolean }
   availability: WorkspaceState['availability']
 }): WorkspaceState {
-  const repo = emptyWorkspace(input.id, 'repo', 'repo-runtime-test')
+  const repo = emptyWorkspace(input.id, 'repo', 'workspace-runtime-test')
   const readyRepo: WorkspaceState = {
     ...repo,
     availability: input.availability,

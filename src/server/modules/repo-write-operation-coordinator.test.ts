@@ -5,9 +5,20 @@ import {
   repoWriteOperationCoordinatorStatsForTests,
   resetRepoWriteOperationCoordinatorForTests,
 } from '#/server/modules/repo-write-operation-coordinator.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
+const LINKED_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace-linked')
+const SLOW_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace-slow')
+const FAST_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace-fast')
+const WORKSPACE_BOUNDARY_KEY = '/workspace/.git'
+const LINKED_WORKSPACE_BOUNDARY_KEY = '/workspace-linked/.git'
 
 const mocks = vi.hoisted(() => ({
-  resolveRepoWriteBoundaryKey: vi.fn(async (repoId: string) => repoId),
+  resolveRepoWriteBoundaryKey: vi.fn(
+    async (workspaceId: WorkspaceId, _signal?: AbortSignal): Promise<string> => workspaceId,
+  ),
   publishRepoQueryInvalidation: vi.fn(),
 }))
 
@@ -22,7 +33,7 @@ vi.mock('#/server/modules/invalidation-broker.ts', () => ({
 beforeEach(() => {
   resetRepoWriteOperationCoordinatorForTests()
   mocks.resolveRepoWriteBoundaryKey.mockReset()
-  mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (repoId: string) => repoId)
+  mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (workspaceId) => workspaceId)
   mocks.publishRepoQueryInvalidation.mockReset()
   vi.useFakeTimers()
   vi.setSystemTime(0)
@@ -35,14 +46,14 @@ afterEach(() => {
 describe('repo write operation coordinator', () => {
   test('does not block an unrelated repo behind slow boundary resolution', async () => {
     const slowBoundary = Promise.withResolvers<string>()
-    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (repoId: string) => {
-      if (repoId === '/tmp/repo-slow') return await slowBoundary.promise
-      return repoId
+    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (workspaceId) => {
+      if (workspaceId === SLOW_WORKSPACE_ID) return await slowBoundary.promise
+      return workspaceId
     })
     const slowWork = enqueueRepoWriteOperation(
-      '/tmp/repo-slow',
+      SLOW_WORKSPACE_ID,
       undefined,
-      { repoId: '/tmp/repo-slow', kind: 'fetch', source: 'background' },
+      { repoId: SLOW_WORKSPACE_ID, kind: 'fetch', source: 'background' },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true })
@@ -52,9 +63,9 @@ describe('repo write operation coordinator', () => {
 
     await expect(
       enqueueRepoWriteOperation(
-        '/tmp/repo-fast',
+        FAST_WORKSPACE_ID,
         undefined,
-        { repoId: '/tmp/repo-fast', kind: 'fetch', source: 'background' },
+        { repoId: FAST_WORKSPACE_ID, kind: 'fetch', source: 'background' },
         (operation) => async () => {
           operation.start()
           operation.settle({ ok: true })
@@ -63,23 +74,23 @@ describe('repo write operation coordinator', () => {
       ),
     ).resolves.toEqual({ ok: true, message: 'fast' })
 
-    slowBoundary.resolve('/tmp/repo-slow')
+    slowBoundary.resolve('/workspace-slow/.git')
     await expect(slowWork).resolves.toEqual({ ok: true, message: 'slow' })
   })
 
   test('does not register an operation when boundary resolution is aborted', async () => {
     const caller = new AbortController()
     mocks.resolveRepoWriteBoundaryKey.mockImplementation(
-      async (_repoId: string, signal?: AbortSignal) =>
+      async (_workspaceId, signal?: AbortSignal) =>
         await new Promise<string>((_resolve, reject) => {
           signal?.addEventListener('abort', () => reject(new Error('cancelled')), { once: true })
         }),
     )
 
     const work = enqueueRepoWriteOperation(
-      '/tmp/repo',
+      WORKSPACE_ID,
       caller.signal,
-      { repoId: '/tmp/repo', kind: 'fetch', source: 'background' },
+      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
       () => async () => ({ ok: true, message: 'unexpected' }),
     )
     caller.abort()
@@ -95,13 +106,13 @@ describe('repo write operation coordinator', () => {
   })
 
   test('serializes aliases that concurrently resolve to one physical boundary', async () => {
-    mocks.resolveRepoWriteBoundaryKey.mockResolvedValue('/tmp/repo/.git')
+    mocks.resolveRepoWriteBoundaryKey.mockResolvedValue(WORKSPACE_BOUNDARY_KEY)
     const releaseFirst = Promise.withResolvers<void>()
     const order: string[] = []
     const first = enqueueRepoWriteOperation(
-      '/tmp/repo',
+      WORKSPACE_ID,
       undefined,
-      { repoId: '/tmp/repo', kind: 'fetch', source: 'background' },
+      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
       (operation) => async () => {
         operation.start()
         order.push('first-start')
@@ -112,9 +123,9 @@ describe('repo write operation coordinator', () => {
       },
     )
     const second = enqueueRepoWriteOperation(
-      '/tmp/repo-linked',
+      LINKED_WORKSPACE_ID,
       undefined,
-      { repoId: '/tmp/repo-linked', kind: 'fetch', source: 'background' },
+      { repoId: LINKED_WORKSPACE_ID, kind: 'fetch', source: 'background' },
       (operation) => async () => {
         operation.start()
         order.push('second')
@@ -132,9 +143,9 @@ describe('repo write operation coordinator', () => {
   test('settles operations when the queued task throws', async () => {
     await expect(
       enqueueRepoWriteOperation(
-        '/tmp/repo',
+        WORKSPACE_ID,
         undefined,
-        { repoId: '/tmp/repo', kind: 'delete-branch', source: 'user' },
+        { repoId: WORKSPACE_ID, kind: 'delete-branch', source: 'user' },
         (operation) => async () => {
           operation.start()
           throw new Error('boom')
@@ -142,9 +153,9 @@ describe('repo write operation coordinator', () => {
       ),
     ).rejects.toThrow('boom')
 
-    await expect(listRepoWriteOperationsForRepo('/tmp/repo', { includeSettled: true })).resolves.toMatchObject([
+    await expect(listRepoWriteOperationsForRepo(WORKSPACE_ID, { includeSettled: true })).resolves.toMatchObject([
       {
-        repoId: '/tmp/repo',
+        repoId: WORKSPACE_ID,
         kind: 'delete-branch',
         phase: 'failed',
         error: { message: 'boom' },
@@ -158,9 +169,9 @@ describe('repo write operation coordinator', () => {
 
   test('filters write operations by runtime while retaining repo-scoped operations', async () => {
     await enqueueRepoWriteOperation(
-      '/tmp/repo',
+      WORKSPACE_ID,
       undefined,
-      { repoId: '/tmp/repo', kind: 'fetch', source: 'background' },
+      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true, message: 'repo-scoped' })
@@ -168,9 +179,9 @@ describe('repo write operation coordinator', () => {
       },
     )
     await enqueueRepoWriteOperation(
-      '/tmp/repo',
+      WORKSPACE_ID,
       undefined,
-      { repoId: '/tmp/repo', workspaceRuntimeId: 'repo-runtime-current', kind: 'delete-branch', source: 'user' },
+      { repoId: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-current', kind: 'delete-branch', source: 'user' },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true, message: 'current' })
@@ -178,9 +189,9 @@ describe('repo write operation coordinator', () => {
       },
     )
     await enqueueRepoWriteOperation(
-      '/tmp/repo',
+      WORKSPACE_ID,
       undefined,
-      { repoId: '/tmp/repo', workspaceRuntimeId: 'repo-runtime-stale', kind: 'remove-worktree', source: 'user' },
+      { repoId: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-stale', kind: 'remove-worktree', source: 'user' },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true, message: 'stale' })
@@ -189,7 +200,10 @@ describe('repo write operation coordinator', () => {
     )
 
     await expect(
-      listRepoWriteOperationsForRepo('/tmp/repo', { workspaceRuntimeId: 'repo-runtime-current', includeSettled: true }),
+      listRepoWriteOperationsForRepo(WORKSPACE_ID, {
+        workspaceRuntimeId: 'repo-runtime-current',
+        includeSettled: true,
+      }),
     ).resolves.toMatchObject([
       { kind: 'fetch', workspaceRuntimeId: null },
       { kind: 'delete-branch', workspaceRuntimeId: 'repo-runtime-current' },
@@ -198,12 +212,12 @@ describe('repo write operation coordinator', () => {
 
   test('keeps settled write operations globally bounded', async () => {
     for (let index = 0; index < 105; index += 1) {
-      const repoId = `/tmp/repo-${index}`
+      const workspaceId = workspaceIdForTest(`goblin+file:///workspace-${index}`)
       vi.setSystemTime(1_000 + index)
       await enqueueRepoWriteOperation(
-        repoId,
+        workspaceId,
         undefined,
-        { repoId, kind: 'fetch', source: 'background' },
+        { repoId: workspaceId, kind: 'fetch', source: 'background' },
         (operation) => async () => {
           operation.start()
           operation.settle({ ok: true, message: 'ok' })
@@ -213,18 +227,22 @@ describe('repo write operation coordinator', () => {
     }
 
     await expect(listRepoWriteOperationsForRepo(undefined, { includeSettled: true })).resolves.toHaveLength(100)
-    await expect(listRepoWriteOperationsForRepo('/tmp/repo-0', { includeSettled: true })).resolves.toEqual([])
-    await expect(listRepoWriteOperationsForRepo('/tmp/repo-104', { includeSettled: true })).resolves.toMatchObject([
-      { repoId: '/tmp/repo-104', kind: 'fetch', phase: 'done' },
+    await expect(
+      listRepoWriteOperationsForRepo(workspaceIdForTest('goblin+file:///workspace-0'), { includeSettled: true }),
+    ).resolves.toEqual([])
+    await expect(
+      listRepoWriteOperationsForRepo(workspaceIdForTest('goblin+file:///workspace-104'), { includeSettled: true }),
+    ).resolves.toMatchObject([
+      { repoId: workspaceIdForTest('goblin+file:///workspace-104'), kind: 'fetch', phase: 'done' },
     ])
   })
 
   test('runs cancellable network operations inside the repo write runtime', async () => {
     let resolveFetch!: (value: { ok: true; message: string }) => void
     const work = enqueueRepoWriteOperation(
-      '/tmp/repo',
+      WORKSPACE_ID,
       undefined,
-      { repoId: '/tmp/repo', kind: 'fetch', source: 'background' },
+      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
       (_operation, context) => async () =>
         await context.runNetworkOperation(
           () =>
@@ -235,9 +253,9 @@ describe('repo write operation coordinator', () => {
     )
 
     await vi.waitFor(async () => {
-      await expect(listRepoWriteOperationsForRepo('/tmp/repo')).resolves.toMatchObject([
+      await expect(listRepoWriteOperationsForRepo(WORKSPACE_ID)).resolves.toMatchObject([
         {
-          repoId: '/tmp/repo',
+          repoId: WORKSPACE_ID,
           kind: 'fetch',
           phase: 'running',
           source: 'background',
@@ -247,8 +265,8 @@ describe('repo write operation coordinator', () => {
 
     resolveFetch({ ok: true, message: 'ok' })
     await expect(work).resolves.toEqual({ ok: true, message: 'ok' })
-    await expect(listRepoWriteOperationsForRepo('/tmp/repo')).resolves.toEqual([])
-    await expect(listRepoWriteOperationsForRepo('/tmp/repo', { includeSettled: true })).resolves.toMatchObject([
+    await expect(listRepoWriteOperationsForRepo(WORKSPACE_ID)).resolves.toEqual([])
+    await expect(listRepoWriteOperationsForRepo(WORKSPACE_ID, { includeSettled: true })).resolves.toMatchObject([
       {
         kind: 'fetch',
         phase: 'done',
@@ -258,16 +276,16 @@ describe('repo write operation coordinator', () => {
   })
 
   test('publishes repo-runtime invalidations to known sibling repos sharing a write boundary', async () => {
-    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (repoId: string) =>
-      repoId === '/tmp/repo' || repoId === '/tmp/repo-linked' ? '/tmp/repo/.git' : repoId,
+    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (workspaceId) =>
+      workspaceId === WORKSPACE_ID || workspaceId === LINKED_WORKSPACE_ID ? WORKSPACE_BOUNDARY_KEY : workspaceId,
     )
-    await expect(listRepoWriteOperationsForRepo('/tmp/repo-linked')).resolves.toEqual([])
+    await expect(listRepoWriteOperationsForRepo(LINKED_WORKSPACE_ID)).resolves.toEqual([])
     mocks.publishRepoQueryInvalidation.mockClear()
 
     await enqueueRepoWriteOperation(
-      '/tmp/repo',
+      WORKSPACE_ID,
       undefined,
-      { repoId: '/tmp/repo', kind: 'fetch', source: 'background' },
+      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true, message: 'ok' })
@@ -276,31 +294,31 @@ describe('repo write operation coordinator', () => {
     )
 
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
-      repoId: '/tmp/repo',
+      repoId: WORKSPACE_ID,
       query: 'repo-runtime',
     })
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
-      repoId: '/tmp/repo-linked',
+      repoId: LINKED_WORKSPACE_ID,
       query: 'repo-runtime',
     })
   })
 
   test('stops invalidating a repo after it resolves to another write boundary', async () => {
-    let linkedBoundary = '/tmp/repo/.git'
-    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (repoId: string) => {
-      if (repoId === '/tmp/repo') return '/tmp/repo/.git'
-      if (repoId === '/tmp/repo-linked') return linkedBoundary
-      return repoId
+    let linkedBoundary = WORKSPACE_BOUNDARY_KEY
+    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (workspaceId) => {
+      if (workspaceId === WORKSPACE_ID) return WORKSPACE_BOUNDARY_KEY
+      if (workspaceId === LINKED_WORKSPACE_ID) return linkedBoundary
+      return workspaceId
     })
-    await expect(listRepoWriteOperationsForRepo('/tmp/repo-linked')).resolves.toEqual([])
-    linkedBoundary = '/tmp/repo-linked/.git'
-    await expect(listRepoWriteOperationsForRepo('/tmp/repo-linked')).resolves.toEqual([])
+    await expect(listRepoWriteOperationsForRepo(LINKED_WORKSPACE_ID)).resolves.toEqual([])
+    linkedBoundary = LINKED_WORKSPACE_BOUNDARY_KEY
+    await expect(listRepoWriteOperationsForRepo(LINKED_WORKSPACE_ID)).resolves.toEqual([])
     mocks.publishRepoQueryInvalidation.mockClear()
 
     await enqueueRepoWriteOperation(
-      '/tmp/repo',
+      WORKSPACE_ID,
       undefined,
-      { repoId: '/tmp/repo', kind: 'fetch', source: 'background' },
+      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true, message: 'ok' })
@@ -309,11 +327,11 @@ describe('repo write operation coordinator', () => {
     )
 
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
-      repoId: '/tmp/repo',
+      repoId: WORKSPACE_ID,
       query: 'repo-runtime',
     })
     expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalledWith({
-      repoId: '/tmp/repo-linked',
+      repoId: LINKED_WORKSPACE_ID,
       query: 'repo-runtime',
     })
   })
@@ -325,9 +343,9 @@ describe('repo write operation coordinator', () => {
       resolveTaskSignal = resolve
     })
     const work = enqueueRepoWriteOperation(
-      '/tmp/repo',
+      WORKSPACE_ID,
       caller.signal,
-      { repoId: '/tmp/repo', kind: 'fetch', source: 'user' },
+      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'user' },
       (_operation, context) => async () =>
         await context.runNetworkOperation(
           (signal) =>
@@ -339,7 +357,7 @@ describe('repo write operation coordinator', () => {
     )
 
     await vi.waitFor(async () => {
-      await expect(listRepoWriteOperationsForRepo('/tmp/repo')).resolves.toMatchObject([
+      await expect(listRepoWriteOperationsForRepo(WORKSPACE_ID)).resolves.toMatchObject([
         {
           kind: 'fetch',
           phase: 'running',
@@ -351,7 +369,7 @@ describe('repo write operation coordinator', () => {
 
     await expect(taskSignalReady).resolves.toMatchObject({ aborted: true })
     await expect(work).resolves.toEqual({ ok: false, message: 'cancelled' })
-    await expect(listRepoWriteOperationsForRepo('/tmp/repo', { includeSettled: true })).resolves.toMatchObject([
+    await expect(listRepoWriteOperationsForRepo(WORKSPACE_ID, { includeSettled: true })).resolves.toMatchObject([
       {
         kind: 'fetch',
         phase: 'failed',

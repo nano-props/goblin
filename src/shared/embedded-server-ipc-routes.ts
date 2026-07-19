@@ -25,6 +25,7 @@ export const EMBEDDED_SERVER_IPC_ROUTES = {
   'workspace.openEditor': { route: '/api/workspace/open-editor', method: 'POST' },
   'workspace.openInFinder': { route: '/api/workspace/open-in-finder', method: 'POST' },
   'repo.openUrl': { route: '/api/repo/open-url', method: 'POST' },
+  'repo.backgroundSyncRepos': { route: '/api/repo/background-sync-repos', method: 'POST' },
   'remote.listSshHosts': { route: '/api/remote/ssh-hosts', method: 'GET' },
   'remote.resolveTarget': { route: '/api/remote/resolve-target', method: 'POST' },
   'remote.listPathSuggestions': { route: '/api/remote/path-suggestions', method: 'POST' },

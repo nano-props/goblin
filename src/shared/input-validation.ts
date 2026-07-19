@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { MAX_REPO_LOCATOR_LENGTH } from '#/shared/repo-locator.ts'
+import { MAX_WORKSPACE_LOCATOR_LENGTH } from '#/shared/workspace-locator.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
   isRemoteWorkspaceId,
@@ -15,7 +15,7 @@ import {
   type WorkspaceLocatorPlatform,
 } from '#/shared/workspace-locator.ts'
 
-export const MAX_IPC_PATH_LENGTH = MAX_REPO_LOCATOR_LENGTH
+export const MAX_IPC_PATH_LENGTH = MAX_WORKSPACE_LOCATOR_LENGTH
 export const MAX_IPC_BRANCH_LENGTH = 1024
 
 export function isValidAbsolutePath(value: unknown): value is string {
@@ -44,7 +44,7 @@ export function toSafeSessionPath(value: unknown): string | null {
   return path.normalize(value)
 }
 
-export function isValidWorkspaceLocatorInput(value: unknown): value is string {
+export function isValidWorkspaceLocatorInput(value: unknown): value is WorkspaceId {
   return toSafeWorkspaceLocator(value) !== null
 }
 

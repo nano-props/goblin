@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { RepoSource } from '#/server/modules/repo-source.ts'
 import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
 import type { LogEntry, WorktreeStatus } from '#/shared/git-types.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 const mocks = vi.hoisted(() => ({
   runWithRepoSource: vi.fn(),
@@ -37,7 +40,7 @@ type ReadSource = Pick<
 
 function makeSource(overrides: Partial<ReadSource> = {}): ReadSource {
   const base: ReadSource = {
-    id: 'goblin+file:///tmp/repo',
+    id: WORKSPACE_ID,
     kind: 'local',
     probe: () => Promise.resolve({ ok: true }),
     getSnapshot: () => Promise.resolve<RepoSnapshot | null>(null),
@@ -93,7 +96,7 @@ describe('getRepoLog', () => {
     const signal = new AbortController().signal
 
     await expect(
-      getRepoLog('goblin+file:///tmp/repo', 'feature/work', { count: 30, skip: 0, signal }),
+      getRepoLog(WORKSPACE_ID, 'feature/work', { count: 30, skip: 0, signal }),
     ).resolves.toEqual(entries)
     expect(getLog).toHaveBeenCalledWith('feature/work', { count: 30, skip: 0, signal })
   })
@@ -105,7 +108,7 @@ describe('getRepoLog', () => {
     )
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
 
-    await expect(getRepoLog('goblin+file:///tmp/repo', 'feature/work')).resolves.toEqual([])
+    await expect(getRepoLog(WORKSPACE_ID, 'feature/work')).resolves.toEqual([])
     expect(getLog).toHaveBeenCalledWith('feature/work', { count: 100, skip: 0, signal: undefined })
   })
 })
@@ -132,7 +135,7 @@ describe('getRepoWorktreeBootstrapPreview', () => {
     const { getRepoWorktreeBootstrapPreview } = await import('#/server/modules/repo-read-paths.ts')
     const signal = new AbortController().signal
 
-    await expect(getRepoWorktreeBootstrapPreview('goblin+file:///tmp/repo', { signal })).resolves.toMatchObject({
+    await expect(getRepoWorktreeBootstrapPreview(WORKSPACE_ID, { signal })).resolves.toMatchObject({
       ok: true,
       preview: { hasOperations: true },
     })
@@ -166,7 +169,7 @@ describe('readRepoProjection', () => {
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
     const signal = new AbortController().signal
 
-    const result = await readRepoProjection('goblin+file:///tmp/repo', { branch: 'feature/a', mode: 'full', signal })
+    const result = await readRepoProjection(WORKSPACE_ID, { branch: 'feature/a', mode: 'full', signal })
 
     expect(result).toMatchObject({
       snapshot,
@@ -180,7 +183,7 @@ describe('readRepoProjection', () => {
       mode: 'full',
       signal: expect.any(AbortSignal),
     })
-    expect(mocks.listRepoWriteOperationsForRepo).toHaveBeenCalledWith('goblin+file:///tmp/repo', {
+    expect(mocks.listRepoWriteOperationsForRepo).toHaveBeenCalledWith(WORKSPACE_ID, {
       signal,
       workspaceRuntimeId: undefined,
     })
@@ -190,7 +193,7 @@ describe('readRepoProjection', () => {
     mocks.listRepoWriteOperationsForRepo.mockResolvedValue([
       {
         id: 'op-current',
-        repoId: 'goblin+file:///tmp/repo',
+        repoId: WORKSPACE_ID,
         workspaceRuntimeId: 'repo-runtime-current',
         kind: 'fetch',
         source: 'background',
@@ -204,7 +207,7 @@ describe('readRepoProjection', () => {
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
     const signal = new AbortController().signal
 
-    const result = await readRepoProjection('goblin+file:///tmp/repo', {
+    const result = await readRepoProjection(WORKSPACE_ID, {
       signal,
       workspaceRuntimeId: 'repo-runtime-current',
     })
@@ -212,7 +215,7 @@ describe('readRepoProjection', () => {
     expect(result.operations.operations).toMatchObject([
       { id: 'op-current', workspaceRuntimeId: 'repo-runtime-current' },
     ])
-    expect(mocks.listRepoWriteOperationsForRepo).toHaveBeenCalledWith('goblin+file:///tmp/repo', {
+    expect(mocks.listRepoWriteOperationsForRepo).toHaveBeenCalledWith(WORKSPACE_ID, {
       signal,
       workspaceRuntimeId: 'repo-runtime-current',
     })
@@ -225,7 +228,7 @@ describe('readRepoProjection', () => {
     )
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
 
-    const result = await readRepoProjection('goblin+file:///tmp/repo')
+    const result = await readRepoProjection(WORKSPACE_ID)
 
     expect(result).toMatchObject({
       snapshot: null,
@@ -236,14 +239,14 @@ describe('readRepoProjection', () => {
   })
 
   test('reads one complete repo-runtime-scoped worktree status snapshot', async () => {
-    const status: WorktreeStatus[] = [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [] }]
+    const status: WorktreeStatus[] = [{ path: '/workspace', branch: 'main', isMain: true, entries: [] }]
     const getStatus = vi.fn(() => Promise.resolve(status))
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(asRepoSource(makeSource({ getStatus }))),
     )
     const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
 
-    const result = await readRepoWorktreeStatus('goblin+file:///tmp/repo', { workspaceRuntimeId: 'repo-runtime-test' })
+    const result = await readRepoWorktreeStatus(WORKSPACE_ID, { workspaceRuntimeId: 'repo-runtime-test' })
 
     expect(result).toMatchObject({ workspaceRuntimeId: 'repo-runtime-test', status })
     expect(result.loadedAt).toEqual(expect.any(Number))
@@ -256,7 +259,7 @@ describe('readRepoProjection', () => {
     controller.abort()
 
     await expect(
-      readRepoWorktreeStatus('goblin+file:///tmp/repo', {
+      readRepoWorktreeStatus(WORKSPACE_ID, {
         workspaceRuntimeId: 'repo-runtime-test',
         signal: controller.signal,
       }),
@@ -282,7 +285,7 @@ describe('readRepoProjection', () => {
     )
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
 
-    const result = await readRepoProjection('goblin+file:///tmp/repo', { mode: 'summary' })
+    const result = await readRepoProjection(WORKSPACE_ID, { mode: 'summary' })
 
     expect(result).toMatchObject({
       pullRequests,
@@ -311,7 +314,7 @@ describe('repo projection section deadlines', () => {
       ),
     )
     const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
-    const promise = readRepoWorktreeStatus('goblin+file:///tmp/repo', {
+    const promise = readRepoWorktreeStatus(WORKSPACE_ID, {
       workspaceRuntimeId: 'repo-runtime-test',
       timeoutMs: 50,
     })
@@ -336,7 +339,7 @@ describe('repo projection section deadlines', () => {
       ),
     )
     const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
-    const promise = readRepoWorktreeStatus('goblin+file:///tmp/repo', {
+    const promise = readRepoWorktreeStatus(WORKSPACE_ID, {
       workspaceRuntimeId: 'repo-runtime-test',
       timeoutMs: 50,
     })
@@ -362,7 +365,7 @@ describe('repo projection section deadlines', () => {
       ),
     )
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
-    const result = await readRepoProjection('goblin+file:///tmp/repo', { branch: 'feature/a', timeoutMs: 5_000 })
+    const result = await readRepoProjection(WORKSPACE_ID, { branch: 'feature/a', timeoutMs: 5_000 })
     expect(result).toMatchObject({ snapshot, pullRequests: null })
   })
 
@@ -383,7 +386,7 @@ describe('repo projection section deadlines', () => {
       ),
     )
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
-    const promise = readRepoProjection('goblin+file:///tmp/repo', { branch: 'feature/a', timeoutMs: 50 })
+    const promise = readRepoProjection(WORKSPACE_ID, { branch: 'feature/a', timeoutMs: 50 })
     const rejected = expect(promise).rejects.toThrow('aborted')
     // Advance the fake clock past the section deadline.
     await vi.advanceTimersByTimeAsync(75)
@@ -407,7 +410,7 @@ describe('repo projection section deadlines', () => {
       ),
     )
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
-    const promise = readRepoProjection('goblin+file:///tmp/repo', { timeoutMs: 0 })
+    const promise = readRepoProjection(WORKSPACE_ID, { timeoutMs: 0 })
     // Give the microtask queue a chance to wire up.
     await Promise.resolve()
     // A fresh, never-aborting signal is still wired through to the
@@ -449,7 +452,7 @@ describe('repo projection section deadlines', () => {
     )
     const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
     const controller = new AbortController()
-    const promise = readRepoProjection('goblin+file:///tmp/repo', {
+    const promise = readRepoProjection(WORKSPACE_ID, {
       branch: 'feature/a',
       signal: controller.signal,
     })

@@ -14,6 +14,8 @@ import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 
 const REPO_REQUEST_TIMEOUT_MS = {
   gitNetwork: 240_000,
@@ -23,6 +25,9 @@ const REPO_REQUEST_TIMEOUT_MS = {
   worktreeCreate: 15 * 60_000,
   patch: 15 * 60_000,
 } as const
+
+const BACKGROUND_SYNC_REVISION_STORAGE_KEY = 'goblin:background-sync-registration-revision'
+let fallbackBackgroundSyncRevision = 0
 
 async function runRepoReadWithStableErrorKey<T>(read: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   try {
@@ -264,6 +269,28 @@ export async function openRepoUrl(cwd: string, workspaceRuntimeId: string, targe
   return opened.ok ? { ok: true, message: '' } : opened
 }
 
-export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {
-  await postServerJson('/api/repo/background-sync-repos', { repoIds })
+export async function setBackgroundSyncRepos(targets: GitBackgroundSyncTarget[], signal?: AbortSignal): Promise<void> {
+  await postServerJson(
+    '/api/repo/background-sync-repos',
+    {
+      clientId: readOrCreateWebTerminalClientId(),
+      revision: nextBackgroundSyncRegistrationRevision(),
+      targets,
+    },
+    { signal },
+  )
+}
+
+function nextBackgroundSyncRegistrationRevision(): number {
+  const clockRevision = Date.now() * 1000
+  try {
+    const stored = Number(window.sessionStorage.getItem(BACKGROUND_SYNC_REVISION_STORAGE_KEY))
+    const canIncrementStored = Number.isSafeInteger(stored) && stored > 0 && stored < Number.MAX_SAFE_INTEGER
+    const next = Math.max(canIncrementStored ? stored + 1 : 1, clockRevision)
+    window.sessionStorage.setItem(BACKGROUND_SYNC_REVISION_STORAGE_KEY, String(next))
+    return next
+  } catch {
+    fallbackBackgroundSyncRevision = Math.max(fallbackBackgroundSyncRevision + 1, clockRevision)
+    return fallbackBackgroundSyncRevision
+  }
 }

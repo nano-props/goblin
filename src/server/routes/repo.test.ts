@@ -6,6 +6,7 @@ import {
   clearWorkspaceRuntimesForUser,
   commitWorkspaceProbeState,
   listWorkspaceRuntimes,
+  releaseWorkspaceRuntime,
   runSerializedWorkspaceRefresh,
 } from '#/server/modules/workspace-runtimes.ts'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
@@ -13,6 +14,7 @@ import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/repo')
+const CLIENT_ID = 'client-read-test'
 
 const mocks = vi.hoisted(() => ({
   probeRepo: vi.fn(),
@@ -32,16 +34,23 @@ const mocks = vi.hoisted(() => ({
   deleteRepoBranch: vi.fn(),
   removeCapturedRepoWorktree: vi.fn(),
   openRepoUrl: vi.fn(),
-  setBackgroundSyncRepos: vi.fn(),
+  beginBackgroundSyncRegistration: vi.fn(),
+  commitBackgroundSyncRegistration: vi.fn(),
+  finishBackgroundSyncRegistration: vi.fn(),
+  prepareBackgroundSync: vi.fn(),
   getBackgroundSyncRepos: vi.fn(),
   getServerFetchIntervalSec: vi.fn(),
   publishRepoQueryInvalidation: vi.fn(),
   publishUserWorkspaceFilesystemInvalidation: vi.fn(),
   publishUserWorkspaceRuntimeInvalidation: vi.fn(),
+  getBackgroundSyncSnapshot: vi.fn(),
 }))
 
 vi.mock('#/server/modules/background-sync.ts', () => ({
-  setBackgroundSyncRepos: mocks.setBackgroundSyncRepos,
+  beginBackgroundSyncRegistration: mocks.beginBackgroundSyncRegistration,
+  commitBackgroundSyncRegistration: mocks.commitBackgroundSyncRegistration,
+  finishBackgroundSyncRegistration: mocks.finishBackgroundSyncRegistration,
+  prepareBackgroundSync: mocks.prepareBackgroundSync,
   getBackgroundSyncRepos: mocks.getBackgroundSyncRepos,
   getBackgroundSyncDiagnostics: vi.fn(),
 }))
@@ -76,6 +85,9 @@ vi.mock('#/server/modules/invalidation-broker.ts', () => ({
   publishUserWorkspaceFilesystemInvalidation: mocks.publishUserWorkspaceFilesystemInvalidation,
   publishUserWorkspaceRuntimeInvalidation: mocks.publishUserWorkspaceRuntimeInvalidation,
 }))
+vi.mock('#/server/modules/repo-source.ts', () => ({
+  resolveRepoSource: vi.fn(async () => ({ getSnapshot: mocks.getBackgroundSyncSnapshot })),
+}))
 vi.mock('#/server/common/identity.ts', () => ({
   userIdFromContext: () => 'user-test',
 }))
@@ -93,8 +105,14 @@ beforeEach(() => {
     },
     diagnostics: [],
   })
+  mocks.beginBackgroundSyncRegistration.mockImplementation((userId, clientId, revision, targets) => {
+    const controller = new AbortController()
+    return { userId, clientId, revision, targets, signal: controller.signal }
+  })
+  mocks.commitBackgroundSyncRegistration.mockReturnValue(true)
   mocks.probeWorkspace.mockImplementation(mocks.probeLocalWorkspace)
   mocks.pullRepoBranch.mockResolvedValue({ ok: true, message: '' })
+  mocks.getBackgroundSyncSnapshot.mockResolvedValue({ remote: { hasRemotes: true } })
 })
 
 function createTestRepoRoutes(
@@ -126,7 +144,7 @@ function createTestRepoRoutes(
 }
 
 async function openTestWorkspaceRuntime(repoRoot = WORKSPACE_ID): Promise<string> {
-  const workspaceRuntimeId = acquireWorkspaceRuntime('user-test', repoRoot, 'client-read-test')
+  const workspaceRuntimeId = acquireWorkspaceRuntime('user-test', repoRoot, CLIENT_ID)
   commitWorkspaceProbeState({
     userId: 'user-test',
     workspaceId: repoRoot,
@@ -655,6 +673,188 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 })
 
 describe('repo routes — POST body validation (action endpoints)', () => {
+  test('admits only canonical WorkspaceIds into background Git sync', async () => {
+    const app = createTestRepoRoutes()
+    mocks.getBackgroundSyncRepos.mockReturnValue([WORKSPACE_ID])
+    mocks.getServerFetchIntervalSec.mockResolvedValue(30)
+
+    const accepted = await app.request(
+      new Request('http://localhost/background-sync-repos', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          clientId: CLIENT_ID,
+          revision: 1,
+          targets: [{ workspaceId: WORKSPACE_ID, workspaceRuntimeId: await openTestWorkspaceRuntime() }],
+        }),
+      }),
+    )
+    const rejected = await app.request(
+      new Request('http://localhost/background-sync-repos', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          clientId: CLIENT_ID,
+          revision: 1,
+          targets: [{ workspaceId: '/tmp/workspace', workspaceRuntimeId: 'workspace-runtime-test' }],
+        }),
+      }),
+    )
+
+    expect(accepted.status).toBe(200)
+    expect(mocks.commitBackgroundSyncRegistration).toHaveBeenCalledOnce()
+    expect(mocks.beginBackgroundSyncRegistration).toHaveBeenCalledWith('user-test', CLIENT_ID, 1, [
+      { workspaceId: WORKSPACE_ID, workspaceRuntimeId: expect.stringMatching(/^workspace-runtime-/) },
+    ])
+    expect(mocks.commitBackgroundSyncRegistration).toHaveBeenCalledWith(
+      mocks.beginBackgroundSyncRegistration.mock.results[0]?.value,
+    )
+    expect(rejected.status).toBe(400)
+  })
+
+  test('rejects background sync without a current remote-backed Git runtime', async () => {
+    const app = createTestRepoRoutes()
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+    mocks.getBackgroundSyncSnapshot.mockResolvedValueOnce({ remote: { hasRemotes: false } })
+
+    const localOnly = await app.request(
+      new Request('http://localhost/background-sync-repos', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          clientId: CLIENT_ID,
+          revision: 1,
+          targets: [{ workspaceId: WORKSPACE_ID, workspaceRuntimeId }],
+        }),
+      }),
+    )
+    const stale = await app.request(
+      new Request('http://localhost/background-sync-repos', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          clientId: CLIENT_ID,
+          revision: 1,
+          targets: [{ workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-stale' }],
+        }),
+      }),
+    )
+
+    expect(localOnly.status).toBe(400)
+    expect(stale.status).toBe(400)
+    expect(mocks.commitBackgroundSyncRegistration).not.toHaveBeenCalled()
+  })
+
+  test('rejects background sync for a plain Workspace runtime', async () => {
+    const app = createTestRepoRoutes()
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-workspace')
+    const clientId = 'client-background-sync-test'
+    const workspaceRuntimeId = acquireWorkspaceRuntime('user-test', workspaceId, clientId)
+    commitWorkspaceProbeState({
+      userId: 'user-test',
+      workspaceId,
+      workspaceRuntimeId,
+      probe: {
+        status: 'ready',
+        name: 'plain-workspace',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'unavailable' },
+        },
+        diagnostics: [],
+      },
+    })
+
+    const response = await app.request(
+      new Request('http://localhost/background-sync-repos', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ clientId, revision: 1, targets: [{ workspaceId, workspaceRuntimeId }] }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    expect(mocks.commitBackgroundSyncRegistration).not.toHaveBeenCalled()
+  })
+
+  test('does not register a runtime that closes while background sync prepares', async () => {
+    const app = createTestRepoRoutes()
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+    const prepare = { finish: null as (() => void) | null }
+    mocks.prepareBackgroundSync.mockImplementationOnce(
+      async () =>
+        await new Promise<void>((resolve) => {
+          prepare.finish = resolve
+        }),
+    )
+
+    const responsePromise = app.request(
+      new Request('http://localhost/background-sync-repos', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          clientId: CLIENT_ID,
+          revision: 1,
+          targets: [{ workspaceId: WORKSPACE_ID, workspaceRuntimeId }],
+        }),
+      }),
+    )
+    await vi.waitFor(() => expect(mocks.prepareBackgroundSync).toHaveBeenCalledOnce())
+    releaseWorkspaceRuntime('user-test', WORKSPACE_ID, workspaceRuntimeId, CLIENT_ID)
+    prepare.finish?.()
+
+    const response = await responsePromise
+    expect(response.status).toBe(400)
+    expect(mocks.commitBackgroundSyncRegistration).not.toHaveBeenCalled()
+  })
+
+  test('does not run admission work for an older client revision', async () => {
+    const app = createTestRepoRoutes()
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+    mocks.beginBackgroundSyncRegistration.mockReturnValueOnce(null)
+
+    const response = await app.request(
+      new Request('http://localhost/background-sync-repos', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          clientId: CLIENT_ID,
+          revision: 1,
+          targets: [{ workspaceId: WORKSPACE_ID, workspaceRuntimeId }],
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.prepareBackgroundSync).not.toHaveBeenCalled()
+    expect(mocks.getBackgroundSyncSnapshot).not.toHaveBeenCalled()
+    expect(mocks.commitBackgroundSyncRegistration).not.toHaveBeenCalled()
+  })
+
+  test('does not commit an empty registration after its HTTP request is cancelled', async () => {
+    const app = createTestRepoRoutes()
+    await openTestWorkspaceRuntime()
+    const prepare = Promise.withResolvers<void>()
+    mocks.prepareBackgroundSync.mockReturnValueOnce(prepare.promise)
+    const controller = new AbortController()
+    const responsePromise = app.request(
+      new Request('http://localhost/background-sync-repos', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ clientId: CLIENT_ID, revision: 1, targets: [] }),
+        signal: controller.signal,
+      }),
+    )
+    await vi.waitFor(() => expect(mocks.prepareBackgroundSync).toHaveBeenCalledOnce())
+
+    controller.abort('superseded')
+    prepare.resolve()
+    await Promise.resolve(responsePromise).catch(() => null)
+
+    expect(mocks.commitBackgroundSyncRegistration).not.toHaveBeenCalled()
+  })
+
   test('returns 400 when fetch body includes caller-controlled operation kind', async () => {
     const app = createTestRepoRoutes()
     const response = await app.request(

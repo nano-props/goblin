@@ -8,10 +8,11 @@ import type {
   RepoServerOperationTarget,
 } from '#/shared/api-types.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface BeginRepoServerOperationInput {
   id?: string
-  repoId?: string | null
+  repoId?: WorkspaceId | null
   workspaceRuntimeId?: string | null
   kind: RepoServerOperationKind
   source: RepoServerOperationSource
@@ -21,7 +22,7 @@ interface BeginRepoServerOperationInput {
 }
 
 interface ListRepoServerOperationsOptions {
-  repoId?: string
+  repoId?: WorkspaceId
   workspaceRuntimeId?: string
   includeSettled?: boolean
 }

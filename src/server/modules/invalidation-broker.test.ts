@@ -13,6 +13,8 @@ import {
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('invalidation broker', () => {
+  const workspaceId = workspaceIdForTest('goblin+file:///workspace')
+
   beforeEach(() => {
     disconnectAllInvalidationSockets()
   })
@@ -24,7 +26,7 @@ describe('invalidation broker', () => {
     registerInvalidationSocket(second)
 
     disconnectAllInvalidationSockets()
-    publishRepoQueryInvalidation({ repoId: 'repo_1', query: 'repo-snapshot' })
+    publishRepoQueryInvalidation({ repoId: workspaceId, query: 'repo-snapshot' })
 
     expect(first.close).toHaveBeenCalledWith(1001, 'server shutting down')
     expect(second.close).toHaveBeenCalledWith(1001, 'server shutting down')
@@ -54,7 +56,7 @@ describe('invalidation broker', () => {
     registerInvalidationSocket(first, 'user_a')
     registerInvalidationSocket(second, 'user_b')
 
-    publishUserRepoQueryInvalidation('user_a', { repoId: 'repo_1', query: 'repo-runtime' })
+    publishUserRepoQueryInvalidation('user_a', { repoId: workspaceId, query: 'repo-runtime' })
 
     expect(first.send).toHaveBeenCalledOnce()
     expect(second.send).not.toHaveBeenCalled()

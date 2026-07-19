@@ -6,6 +6,7 @@
 import * as v from 'valibot'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import type {
   BranchSnapshotInfo,
   ExecResult,
@@ -348,7 +349,7 @@ export interface RepoServerOperationError {
 
 export interface RepoServerOperationState {
   id: string
-  repoId: string | null
+  repoId: WorkspaceId | null
   workspaceRuntimeId: string | null
   kind: RepoServerOperationKind
   phase: RepoServerOperationPhase
@@ -415,14 +416,14 @@ export type IpcEvent =
 export interface AppIpcHandlers {
   workspace: {
     runtimeOpen: (
-      input: ({ workspaceId: string } | { workspaceInput: string }) & { clientId: string },
+      input: ({ workspaceId: WorkspaceId } | { workspaceInput: string }) & { clientId: string },
     ) => Promise<WorkspaceRuntimeOpenResponse>
     runtimeReconcile: (input: {
       clientId: string
-      workspaceIds: string[]
+      workspaceIds: WorkspaceId[]
     }) => Promise<WorkspaceRuntimeMembershipReconcileResult>
     runtimeList: () => Promise<WorkspaceRuntimesSnapshot>
-    runtimeClose: (input: { workspaceId: string; workspaceRuntimeId: string; clientId: string }) => Promise<{
+    runtimeClose: (input: { workspaceId: WorkspaceId; workspaceRuntimeId: string; clientId: string }) => Promise<{
       ok: boolean
       released: boolean
       runtimeClosed: boolean
@@ -438,29 +439,29 @@ export interface AppIpcHandlers {
     openInFinder: (input: { target: WorkspacePaneFilesystemExecutionTarget }) => Promise<ExecResult>
   }
   repo: {
-    probe: (input: { cwd: string }) => Promise<ProbeResult>
+    probe: (input: { cwd: WorkspaceId }) => Promise<ProbeResult>
     clone: (input: { url: string; parentPath: string; directoryName: string }) => Promise<CloneRepoResult>
     projection: (input: {
-      cwd: string
+      cwd: WorkspaceId
       workspaceRuntimeId: string
       branch?: string
       mode?: PullRequestFetchMode
     }) => Promise<WorkspaceRuntimeProjection>
     operations: (input: {
-      cwd?: string
+      cwd?: WorkspaceId
       workspaceRuntimeId?: string
       includeSettled?: boolean
     }) => Promise<RepoOperationsSnapshot>
-    patch: (input: { cwd: string; workspaceRuntimeId: string; worktreePath: string }) => Promise<ExecResult>
+    patch: (input: { cwd: WorkspaceId; workspaceRuntimeId: string; worktreePath: string }) => Promise<ExecResult>
     deleteBranch: (input: {
-      cwd: string
+      cwd: WorkspaceId
       workspaceRuntimeId: string
       branch: string
       force?: boolean
       deleteUpstream?: boolean
     }) => Promise<ExecResult>
     removeWorktree: (input: {
-      cwd: string
+      cwd: WorkspaceId
       workspaceRuntimeId: string
       branch: string
       worktreePath: string
@@ -470,20 +471,24 @@ export interface AppIpcHandlers {
     }) => Promise<ExecResult>
     createWorktree: (input: CreateWorktreeIpcInput) => Promise<ExecResult>
     worktreeBootstrapPreview: (input: {
-      cwd: string
+      cwd: WorkspaceId
       workspaceRuntimeId: string
     }) => Promise<WorktreeBootstrapPreviewResult>
-    remoteBranches: (input: { cwd: string; workspaceRuntimeId: string }) => Promise<string[]>
+    remoteBranches: (input: { cwd: WorkspaceId; workspaceRuntimeId: string }) => Promise<string[]>
     pull: (input: {
-      cwd: string
+      cwd: WorkspaceId
       workspaceRuntimeId: string
       branch: string
       worktreePath?: string
     }) => Promise<ExecResult>
-    push: (input: { cwd: string; workspaceRuntimeId: string; branch: string }) => Promise<ExecResult>
-    fetch: (input: { cwd: string; workspaceRuntimeId: string }) => Promise<ExecResult>
-    openUrl: (input: { cwd: string; workspaceRuntimeId: string; target: RepoUrlTarget }) => Promise<ExecResult>
-    openRemote: (input: { cwd: string; branch?: string }) => Promise<ExecResult>
+    push: (input: { cwd: WorkspaceId; workspaceRuntimeId: string; branch: string }) => Promise<ExecResult>
+    fetch: (input: { cwd: WorkspaceId; workspaceRuntimeId: string }) => Promise<ExecResult>
+    openUrl: (input: { cwd: WorkspaceId; workspaceRuntimeId: string; target: RepoUrlTarget }) => Promise<ExecResult>
+    backgroundSyncRepos: (input: { clientId: string; revision: number; targets: GitBackgroundSyncTarget[] }) => Promise<{
+      ok: true
+      repoIds: WorkspaceId[]
+      intervalSec: number
+    }>
   }
   remote: {
     listSshHosts: () => Promise<SshConfigHostsResult>
@@ -539,11 +544,8 @@ export type NativeHostIpcPath = {
 const FiniteNumber = v.pipe(v.number(), v.finite())
 const PortNumber = v.pipe(FiniteNumber, v.integer(), v.minValue(1), v.maxValue(65535))
 
-/** Primitive valibot schema for `{ cwd: string }`. */
+/** Canonical WorkspaceId envelope shared by Git procedures. */
 export const CwdInput = v.object({ cwd: WorkspaceIdSchema })
-
-/** Primitive valibot schema for `{ cwd, branch }`. */
-export const BranchInput = v.object({ cwd: v.string(), branch: v.string() })
 
 export const RemoteWorkspaceTargetSchema = v.object({
   id: WorkspaceIdSchema,

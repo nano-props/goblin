@@ -12,8 +12,9 @@ import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/work
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REPO_ID = 'goblin+file:///tmp/repo-activity-control-component'
+const REPO_ID = workspaceIdForTest('goblin+file:///workspace/repo-activity-control-component')
 
 beforeEach(() => {
   resetWorkspacesStore()

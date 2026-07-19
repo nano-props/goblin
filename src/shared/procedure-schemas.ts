@@ -4,7 +4,7 @@
 // `parseIpcInput` (see `#/shared/api-types.ts`) using the schemas
 // declared here, so the request contract is defined once.
 //
-// Primitive reusable schemas (CwdInput, BranchInput, Remote*Schema)
+// Primitive reusable schemas (CwdInput and Remote*Schema)
 // live in `#/shared/api-types.ts` next to the IPC types they describe.
 
 import * as v from 'valibot'
@@ -21,6 +21,7 @@ import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/workspace-settings.t
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import { WorkspacePaneFilesystemExecutionTargetSchema } from '#/shared/workspace-pane-tabs-validators.ts'
+import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 
 const StringArray = v.array(v.string())
 const TerminalAppSchema = v.picklist(['ghostty', 'terminal', 'windowsTerminal'])
@@ -153,7 +154,20 @@ export const REPO_PROCEDURE_SCHEMAS = {
     workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     target: RepoUrlTargetSchema,
   }),
-  backgroundSyncRepos: v.object({ repoIds: StringArray }),
+  backgroundSyncRepos: v.object({
+    clientId: ClientIdSchema,
+    revision: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(Number.MAX_SAFE_INTEGER)),
+    targets: v.pipe(
+      v.array(
+        v.object({
+          workspaceId: WorkspaceIdSchema,
+          workspaceRuntimeId: WorkspaceRuntimeIdSchema,
+        }),
+      ),
+      v.maxLength(100),
+      v.transform((targets): GitBackgroundSyncTarget[] => targets),
+    ),
+  }),
   probe: CwdInput,
   log: v.object({
     cwd: WorkspaceIdSchema,

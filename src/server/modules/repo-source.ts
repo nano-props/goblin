@@ -91,6 +91,7 @@ import {
 import {
   formatWorkspaceLocator,
   parseWorkspaceLocator,
+  type WorkspaceId,
   type WorkspaceLocatorPlatform,
 } from '#/shared/workspace-locator.ts'
 import {
@@ -111,7 +112,7 @@ export interface RepoMutationResult extends ExecResult {
    * Repo session ids whose repo snapshot changed even when the final
    * command result is a partial failure after an earlier write succeeded.
    */
-  affectedRepoIds?: readonly string[]
+  affectedRepoIds?: readonly WorkspaceId[]
   /** Filesystem roots whose checked-out contents changed during the mutation. */
   affectedWorktreePaths?: readonly string[]
 }
@@ -189,7 +190,7 @@ export async function resolveRemoteWorkspaceTarget(
 }
 
 export async function runWithRepoSource<T>(
-  cwd: string,
+  cwd: WorkspaceId,
   task: (source: Awaited<ReturnType<typeof resolveRepoSource>>) => Promise<T>,
   runtime?: RepoSourceRuntimeContext,
 ): Promise<T> {
@@ -197,7 +198,7 @@ export async function runWithRepoSource<T>(
 }
 
 export async function runWithCapturedRepoSource<T>(
-  cwd: string,
+  cwd: WorkspaceId,
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
   task: (source: Awaited<ReturnType<typeof resolveRepoSource>>) => Promise<T>,
   runtime?: RepoSourceRuntimeContext,
@@ -210,7 +211,7 @@ export async function runWithCapturedRepoSource<T>(
   )
 }
 
-export async function resolveRepoSource(repoId: string, runtime?: RepoSourceRuntimeContext): Promise<RepoSource> {
+export async function resolveRepoSource(repoId: WorkspaceId, runtime?: RepoSourceRuntimeContext): Promise<RepoSource> {
   const locator = parseWorkspaceLocator(repoId, serverWorkspaceLocatorPlatform())
   if (!locator) throw new Error('error.workspace-locator-malformed')
   return locator.transport === 'ssh'
@@ -235,14 +236,14 @@ function repoWriteBoundaryKey(boundary: RepoWriteBoundary): string {
   return exhaustive
 }
 
-async function resolveLocalRepoWriteBoundary(repoId: string, signal?: AbortSignal): Promise<RepoWriteBoundary> {
+async function resolveLocalRepoWriteBoundary(repoId: WorkspaceId, signal?: AbortSignal): Promise<RepoWriteBoundary> {
   const locator = parseWorkspaceLocator(repoId, serverWorkspaceLocatorPlatform())
   if (!locator || locator.transport !== 'file') throw new Error('error.workspace-locator-malformed')
   const commonDir = await getRepoCommonDir(locator.path, { signal })
   return commonDir ? { kind: 'local-git', commonDir } : { kind: 'local-path', repoPath: path.resolve(locator.path) }
 }
 
-async function resolveRemoteRepoWriteBoundary(repoId: string, signal?: AbortSignal): Promise<RepoWriteBoundary> {
+async function resolveRemoteRepoWriteBoundary(repoId: WorkspaceId, signal?: AbortSignal): Promise<RepoWriteBoundary> {
   try {
     const target = await resolveRemoteWorkspaceTarget(repoId)
     const writeGroupPath = await getRemoteRepoWriteGroupPath(target, { signal })
@@ -255,7 +256,7 @@ async function resolveRemoteRepoWriteBoundary(repoId: string, signal?: AbortSign
   }
 }
 
-export async function resolveRepoWriteBoundaryKey(repoId: string, signal?: AbortSignal): Promise<string> {
+export async function resolveRepoWriteBoundaryKey(repoId: WorkspaceId, signal?: AbortSignal): Promise<string> {
   return repoWriteBoundaryKey(
     isRemoteWorkspaceId(repoId)
       ? await resolveRemoteRepoWriteBoundary(repoId, signal)
@@ -263,12 +264,12 @@ export async function resolveRepoWriteBoundaryKey(repoId: string, signal?: Abort
   )
 }
 
-function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonly string[]): RepoMutationResult {
+function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonly WorkspaceId[]): RepoMutationResult {
   const unique = Array.from(new Set(affectedRepoIds.filter((repoId) => repoId.length > 0)))
   return unique.length > 0 ? { ...result, affectedRepoIds: unique } : result
 }
 
-function localWorktreeRepoIds(worktrees: WorktreeInfo[]): string[] {
+function localWorktreeRepoIds(worktrees: WorktreeInfo[]): WorkspaceId[] {
   return worktrees.flatMap((worktree) => {
     if (worktree.isBare) return []
     const id = localWorkspaceId(worktree.path)
@@ -276,12 +277,15 @@ function localWorktreeRepoIds(worktrees: WorktreeInfo[]): string[] {
   })
 }
 
-function localWorkspaceId(worktreePath: string): string | null {
+function localWorkspaceId(worktreePath: string): WorkspaceId | null {
   const platform = serverWorkspaceLocatorPlatform()
   return formatWorkspaceLocator({ transport: 'file', platform, path: worktreePath }, platform)
 }
 
-function remoteWorktreeRepoIds(target: RemoteWorkspaceTarget, worktreePaths: readonly string[] | undefined): string[] {
+function remoteWorktreeRepoIds(
+  target: RemoteWorkspaceTarget,
+  worktreePaths: readonly string[] | undefined,
+): WorkspaceId[] {
   if (!worktreePaths) return []
   return worktreePaths.flatMap((remotePath) => {
     const ref = normalizeRemoteWorkspaceRef({ alias: target.alias, remotePath })
@@ -289,7 +293,7 @@ function remoteWorktreeRepoIds(target: RemoteWorkspaceTarget, worktreePaths: rea
   })
 }
 
-async function readLocalAffectedRepoIds(repoId: string, signal?: AbortSignal): Promise<string[]> {
+async function readLocalAffectedRepoIds(repoId: string, signal?: AbortSignal): Promise<WorkspaceId[]> {
   try {
     return localWorktreeRepoIds(await getWorktrees(repoId, { includeStatus: false, signal }))
   } catch {
@@ -301,7 +305,7 @@ async function readRemoteAffectedRepoIds(
   target: RemoteWorkspaceTarget,
   signal?: AbortSignal,
   run?: RemoteGitRunner,
-): Promise<string[]> {
+): Promise<WorkspaceId[]> {
   try {
     return remoteWorktreeRepoIds(target, await getRemoteRepoWorktreePaths(target, { signal, run }))
   } catch {

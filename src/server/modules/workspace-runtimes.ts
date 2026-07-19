@@ -39,6 +39,14 @@ export interface WorkspaceRuntimeMembershipAcquiredEvent {
   clientId: string
 }
 
+export interface WorkspaceRuntimeMembershipReleasedEvent {
+  userId: string
+  clientId: string
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
+  hasRemainingMemberships: boolean
+}
+
 export interface WorkspaceRuntimeEntry {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
@@ -81,6 +89,7 @@ export interface RemoteWorkspaceTerminalCommitPlan {
 const workspaceRuntimesByUser = new Map<string, Map<WorkspaceId, WorkspaceRuntimeState>>()
 const workspaceRuntimeClosedListeners = new Set<(event: WorkspaceRuntimeClosedEvent) => void>()
 const workspaceRuntimeMembershipAcquiredListeners = new Set<(event: WorkspaceRuntimeMembershipAcquiredEvent) => void>()
+const workspaceRuntimeMembershipReleasedListeners = new Set<(event: WorkspaceRuntimeMembershipReleasedEvent) => void>()
 const workspaceRuntimeLogger = serverLogger.child({ tag: 'workspace-runtime' })
 
 function workspaceRuntimeStateByUser(userId: string): Map<WorkspaceId, WorkspaceRuntimeState> {
@@ -185,6 +194,7 @@ function releaseWorkspaceRuntimeMembershipForCurrentState(
     return { released: false, runtimeClosed: false }
   }
   state.members.delete(clientId)
+  emitWorkspaceRuntimeMembershipReleasedFor(userId, clientId, lease.workspaceId, lease.workspaceRuntimeId)
   if (state.members.size > 0) return { released: true, runtimeClosed: false }
   if (state.activeWorkspaceLifecycleOperations > 0) return { released: true, runtimeClosed: false }
   stopWorkspaceRuntimeEpoch(state)
@@ -231,6 +241,12 @@ export function expireWorkspaceRuntimeMembershipLease(
       continue
     }
     state.members.delete(lease.clientId)
+    emitWorkspaceRuntimeMembershipReleasedFor(
+      lease.userId,
+      lease.clientId,
+      entry.workspaceId,
+      entry.workspaceRuntimeId,
+    )
     if (state.members.size > 0 || state.activeWorkspaceLifecycleOperations > 0) continue
     const workspaceRuntimeId = stopWorkspaceRuntimeEpoch(state)
     if (!workspaceRuntimeId) continue
@@ -275,7 +291,9 @@ export function replaceWorkspaceRuntimeMembershipsForClient(
     for (const [workspaceId, state] of states) {
       if (desired.has(state.workspaceId)) continue
       const workspaceRuntimeId = state.currentWorkspaceRuntimeId
-      if (!workspaceRuntimeId || !state.members.delete(clientId) || state.members.size > 0) continue
+      if (!workspaceRuntimeId || !state.members.delete(clientId)) continue
+      emitWorkspaceRuntimeMembershipReleasedFor(userId, clientId, state.workspaceId, workspaceRuntimeId)
+      if (state.members.size > 0) continue
       if (state.activeWorkspaceLifecycleOperations > 0) continue
       stopWorkspaceRuntimeEpoch(state)
       closed.push({ userId, workspaceId: state.workspaceId, workspaceRuntimeId })
@@ -480,6 +498,10 @@ export function isCurrentWorkspaceRuntimeMembership(
 ): boolean {
   const state = workspaceRuntimesByUser.get(userId)?.get(workspaceId)
   return state?.currentWorkspaceRuntimeId === workspaceRuntimeId && state.members.has(clientId)
+}
+
+export function workspaceRuntimeClientHasMemberships(userId: string, clientId: string): boolean {
+  return [...(workspaceRuntimesByUser.get(userId)?.values() ?? [])].some((state) => state.members.has(clientId))
 }
 
 export async function failRemoteWorkspaceLifecycle(input: {
@@ -836,6 +858,15 @@ export function onWorkspaceRuntimeMembershipAcquired(
   }
 }
 
+export function onWorkspaceRuntimeMembershipReleased(
+  listener: (event: WorkspaceRuntimeMembershipReleasedEvent) => void,
+): () => void {
+  workspaceRuntimeMembershipReleasedListeners.add(listener)
+  return () => {
+    workspaceRuntimeMembershipReleasedListeners.delete(listener)
+  }
+}
+
 function emitWorkspaceRuntimeClosed(event: WorkspaceRuntimeClosedEvent): void {
   for (const listener of workspaceRuntimeClosedListeners) {
     try {
@@ -857,4 +888,33 @@ function emitWorkspaceRuntimeMembershipAcquired(event: WorkspaceRuntimeMembershi
       )
     }
   }
+}
+
+function emitWorkspaceRuntimeMembershipReleased(event: WorkspaceRuntimeMembershipReleasedEvent): void {
+  for (const listener of workspaceRuntimeMembershipReleasedListeners) {
+    try {
+      listener(event)
+    } catch (err) {
+      workspaceRuntimeLogger.warn(
+        { err, userId: event.userId, clientId: event.clientId, workspaceId: event.workspaceId },
+        'membership release listener failed',
+      )
+    }
+  }
+}
+
+function emitWorkspaceRuntimeMembershipReleasedFor(
+  userId: string,
+  clientId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+): void {
+  const hasRemainingMemberships = workspaceRuntimeClientHasMemberships(userId, clientId)
+  emitWorkspaceRuntimeMembershipReleased({
+    userId,
+    clientId,
+    workspaceId,
+    workspaceRuntimeId,
+    hasRemainingMemberships,
+  })
 }

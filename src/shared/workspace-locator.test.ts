@@ -3,8 +3,26 @@ import {
   canonicalWorkspaceLocator,
   formatWorkspaceLocator,
   parseWorkspaceLocator,
+  toSafeCanonicalWorkspaceId,
   workspaceLocatorForPath,
 } from '#/shared/workspace-locator.ts'
+
+describe('toSafeCanonicalWorkspaceId', () => {
+  it.each(['goblin+file:///workspace', 'goblin+ssh://host/workspace'])('preserves canonical locator %s', (locator) =>
+    expect(toSafeCanonicalWorkspaceId(locator)).toBe(locator),
+  )
+
+  it.each(['', '/workspace', 'C:\\workspace', 'C:/workspace', '\\\\server\\workspace', 'relative/workspace', 'workspace\0suffix'] as const)(
+    'rejects invalid locator %s',
+    (locator) => {
+      expect(toSafeCanonicalWorkspaceId(locator)).toBeNull()
+    },
+  )
+
+  it('rejects canonical-looking locators beyond the wire identity limit', () => {
+    expect(toSafeCanonicalWorkspaceId(`goblin+file:///${'a'.repeat(4096)}`)).toBeNull()
+  })
+})
 
 describe('workspace locator codec', () => {
   it.each([

@@ -95,28 +95,31 @@ function isValidCloneDirectoryName(value: unknown): value is string {
   )
 }
 
-function repoSnapshotInvalidationEvent(cwd: string) {
-  return { repoId: cwd, query: 'repo-snapshot' as const }
+function repoSnapshotInvalidationEvent(workspaceId: WorkspaceId) {
+  return { repoId: workspaceId, query: 'repo-snapshot' as const }
 }
 
-function publishRepoSnapshotInvalidation(cwd: string): void {
-  publishRepoQueryInvalidation(repoSnapshotInvalidationEvent(cwd))
+function publishRepoSnapshotInvalidation(workspaceId: WorkspaceId): void {
+  publishRepoQueryInvalidation(repoSnapshotInvalidationEvent(workspaceId))
 }
 
-async function publishSnapshotInvalidationAfterMutation(cwd: string, result: RepoMutationResult): Promise<ExecResult> {
-  return execResultOnly(publishSnapshotInvalidationForMutation(cwd, result))
+async function publishSnapshotInvalidationAfterMutation(
+  workspaceId: WorkspaceId,
+  result: RepoMutationResult,
+): Promise<ExecResult> {
+  return execResultOnly(publishSnapshotInvalidationForMutation(workspaceId, result))
 }
 
-function publishSnapshotInvalidationForMutation(cwd: string, result: RepoMutationResult): RepoMutationResult {
+function publishSnapshotInvalidationForMutation(workspaceId: WorkspaceId, result: RepoMutationResult): RepoMutationResult {
   const affectedRepoIds = result.affectedRepoIds ?? []
   if (result.ok || result.repositoryStateChanged || affectedRepoIds.length > 0) {
-    publishRepoSnapshotInvalidations(cwd, affectedRepoIds)
+    publishRepoSnapshotInvalidations(workspaceId, affectedRepoIds)
   }
   return result
 }
 
-function publishRepoSnapshotInvalidations(cwd: string, affectedRepoIds: readonly string[]): void {
-  const uniqueRepoIds = Array.from(new Set([cwd, ...affectedRepoIds].filter((repoId) => repoId.length > 0)))
+function publishRepoSnapshotInvalidations(workspaceId: WorkspaceId, affectedRepoIds: readonly WorkspaceId[]): void {
+  const uniqueRepoIds = Array.from(new Set([workspaceId, ...affectedRepoIds]))
   for (const repoId of uniqueRepoIds) {
     publishRepoSnapshotInvalidation(repoId)
   }
@@ -127,7 +130,7 @@ function execResultOnly(result: RepoMutationResult & { affectedWorktreePaths?: r
 }
 
 async function runUserNetworkMutation(
-  cwd: string,
+  cwd: WorkspaceId,
   signal: AbortSignal | undefined,
   operationKind: 'pull' | 'push',
   target: { branch?: string; worktreePath?: string } | null,
@@ -175,7 +178,7 @@ function createWorktreeTargetBranch(input: CreateWorktreeInput): string {
 }
 
 async function runRepoServerWriteOperation<T extends ExecResult>(options: {
-  repoId: string
+  repoId: WorkspaceId
   workspaceRuntimeId?: string
   kind: RepoServerOperationKind
   target?: RepoServerOperationTarget | null
@@ -276,7 +279,7 @@ export async function cloneRepo(
 }
 
 export async function fetchRepo(
-  cwd: string,
+  cwd: WorkspaceId,
   kind: NetworkOpKind = 'user',
   signal?: AbortSignal,
   workspaceRuntimeId?: string,
@@ -308,7 +311,7 @@ export async function fetchRepo(
 }
 
 export async function pullRepoBranch(
-  cwd: string,
+  cwd: WorkspaceId,
   branch: string,
   worktreePath?: string,
   signal?: AbortSignal,
@@ -333,7 +336,7 @@ export async function pullRepoBranch(
 }
 
 export async function pushRepoBranch(
-  cwd: string,
+  cwd: WorkspaceId,
   branch: string,
   signal?: AbortSignal,
   options: { workspaceRuntimeId?: string } = {},
@@ -357,12 +360,11 @@ export async function pushRepoBranch(
 }
 
 export async function createRepoWorktree(
-  cwd: string,
+  cwd: WorkspaceId,
   input: CreateWorktreeInput,
   signal?: AbortSignal,
   options?: { workspaceRuntimeId?: string; worktreeBootstrap?: WorktreeBootstrapDecision },
 ): Promise<ExecResult> {
-  if (!isValidWorkspaceLocatorInput(cwd)) return { ok: false, message: 'error.invalid-arguments' }
   const repoId = toSafeWorkspaceLocator(cwd)
   if (!repoId) return { ok: false, message: 'error.invalid-arguments' }
   const normalized = normalizeCreateWorktreeInput(input)
@@ -398,27 +400,22 @@ export async function createRepoWorktree(
 }
 
 async function syncWorktreeBootstrapTrustAfterSuccessfulRun(
-  repoId: string,
+  repoId: WorkspaceId,
   decision: WorktreeBootstrapDecision,
   result: RepoMutationResult,
 ): Promise<RepoMutationResult> {
   if (!result.ok || decision.kind !== 'run') return result
   try {
     const workspaceSettings = await getServerWorkspaceSettings()
-    const workspaceId = toSafeWorkspaceLocator(repoId)
-    const currentlyTrusted = workspaceId
-      ? isWorkspaceWorktreeBootstrapConfigTrusted(workspaceSettings, workspaceId, decision.configHash)
-      : false
+    const currentlyTrusted = isWorkspaceWorktreeBootstrapConfigTrusted(workspaceSettings, repoId, decision.configHash)
     if (decision.configTrusted) {
       if (currentlyTrusted) return result
-      if (!workspaceId) throw new Error('invalid workspace id after bootstrap mutation')
-      await trustServerWorkspaceWorktreeBootstrapConfig({ workspaceId, configHash: decision.configHash })
+      await trustServerWorkspaceWorktreeBootstrapConfig({ workspaceId: repoId, configHash: decision.configHash })
       publishSettingsInvalidation(['settings-snapshot'])
       return result
     }
     if (!currentlyTrusted) return result
-    if (!workspaceId) throw new Error('invalid workspace id after bootstrap mutation')
-    if (await untrustServerWorkspaceWorktreeBootstrapConfig({ workspaceId, configHash: decision.configHash })) {
+    if (await untrustServerWorkspaceWorktreeBootstrapConfig({ workspaceId: repoId, configHash: decision.configHash })) {
       publishSettingsInvalidation(['settings-snapshot'])
     }
     return result
@@ -428,7 +425,7 @@ async function syncWorktreeBootstrapTrustAfterSuccessfulRun(
 }
 
 export async function getRepoRemoteBranches(
-  cwd: string,
+  cwd: WorkspaceId,
   options: { signal?: AbortSignal; workspaceRuntimeId?: string } = {},
 ): Promise<string[]> {
   if (!isValidWorkspaceLocatorInput(cwd)) return []
@@ -440,7 +437,7 @@ export async function getRepoRemoteBranches(
 }
 
 export async function deleteRepoBranch(
-  cwd: string,
+  cwd: WorkspaceId,
   branch: string,
   options?: { force?: boolean; deleteUpstream?: boolean },
   signal?: AbortSignal,
@@ -465,7 +462,7 @@ export async function deleteRepoBranch(
 }
 
 export async function removeRepoWorktree(
-  cwd: string,
+  cwd: WorkspaceId,
   input: {
     branch: string
     worktreePath: string
@@ -480,7 +477,7 @@ export async function removeRepoWorktree(
 }
 
 export async function removeCapturedRepoWorktree(
-  cwd: string,
+  cwd: WorkspaceId,
   input: {
     branch: string
     worktreePath: string
@@ -497,7 +494,7 @@ export async function removeCapturedRepoWorktree(
 }
 
 async function removeRepoWorktreeWithBinding(
-  cwd: string,
+  cwd: WorkspaceId,
   input: {
     branch: string
     worktreePath: string
@@ -560,7 +557,7 @@ async function removeRepoWorktreeWithBinding(
 }
 
 export async function openRepoUrl(
-  cwd: string,
+  cwd: WorkspaceId,
   target: RepoUrlTarget,
   signal?: AbortSignal,
   options: { workspaceRuntimeId?: string } = {},

@@ -8,8 +8,9 @@ import {
 } from '#/web/hooks/branch-action-state.ts'
 import { idleOperation } from '#/web/stores/workspaces/operations.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REPO_ID = 'goblin+file:///tmp/goblin-branch-action-state'
+const REPO_ID = workspaceIdForTest('goblin+file:///workspace/branch-action-state')
 
 describe('branch action state projection', () => {
   test('maps active server branch operations onto the branch action operation shape', () => {

@@ -13,10 +13,11 @@ import {
   nextRepoOperationId,
   settleRepoOperationTargets,
 } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { RepoOperationsSnapshot, RepoServerOperationState } from '#/shared/api-types.ts'
 
-const REPO_ID = 'goblin+file:///tmp/goblin-repo-activity-model'
+const REPO_ID = workspaceIdForTest('goblin+file:///workspace/repo-activity-model')
 
 describe('repo activity model', () => {
   test('marks the primary refresh control busy from user server fetch operations', () => {

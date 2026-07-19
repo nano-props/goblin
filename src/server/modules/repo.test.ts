@@ -2,10 +2,14 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { PullRequestInfo } from '#/shared/git-types.ts'
 import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-const REPO_ID = 'goblin+file:///tmp/repo'
-const LINKED_REPO_ID = 'goblin+file:///tmp/repo-linked'
-const WORKTREE_REPO_ID = 'goblin+file:///tmp/repo-worktree'
+const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo')
+const LINKED_REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-linked')
+const WORKTREE_REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-worktree')
+const MISSING_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/missing')
+const FILE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/file')
+const PRIVATE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/private')
 
 const successfulRemovalLifecycle = {
   beforeRemove: async () => ({ ok: true as const, message: '' }),
@@ -37,11 +41,9 @@ const mocks = vi.hoisted(() => ({
   isAncestor: vi.fn(),
   fetchAll: vi.fn(),
   cloneGitRepo: vi.fn(),
-  getBackgroundSyncRepos: vi.fn(),
   pullBranch: vi.fn(),
   pushBranch: vi.fn(),
   removeWorktree: vi.fn(),
-  setBackgroundSyncRepos: vi.fn(),
   publishRepoQueryInvalidation: vi.fn(),
   publishSettingsInvalidation: vi.fn(),
   bootstrapWorktreeAfterCreate: vi.fn(),
@@ -171,11 +173,6 @@ vi.mock('#/system/git/pull-requests.ts', () => ({
 vi.mock('#/server/modules/invalidation-broker.ts', () => ({
   publishRepoQueryInvalidation: mocks.publishRepoQueryInvalidation,
   publishSettingsInvalidation: mocks.publishSettingsInvalidation,
-}))
-
-vi.mock('#/server/modules/background-sync.ts', () => ({
-  getBackgroundSyncRepos: mocks.getBackgroundSyncRepos,
-  setBackgroundSyncRepos: mocks.setBackgroundSyncRepos,
 }))
 
 beforeEach(async () => {
@@ -849,7 +846,7 @@ describe('probeRepo path errors', () => {
     mocks.fsStat.mockRejectedValueOnce({ code: 'ENOENT' })
 
     const { probeRepo } = await import('#/server/modules/repo-read-paths.ts')
-    await expect(probeRepo('goblin+file:///tmp/missing')).resolves.toEqual({
+    await expect(probeRepo(MISSING_WORKSPACE_ID)).resolves.toEqual({
       ok: false,
       message: 'error.path-not-found',
     })
@@ -859,7 +856,7 @@ describe('probeRepo path errors', () => {
     mocks.fsStat.mockResolvedValueOnce({ isDirectory: () => false })
 
     const { probeRepo } = await import('#/server/modules/repo-read-paths.ts')
-    await expect(probeRepo('goblin+file:///tmp/file')).resolves.toEqual({
+    await expect(probeRepo(FILE_WORKSPACE_ID)).resolves.toEqual({
       ok: false,
       message: 'error.path-not-directory',
     })
@@ -869,7 +866,7 @@ describe('probeRepo path errors', () => {
     mocks.fsAccess.mockRejectedValueOnce({ code: 'EACCES' })
 
     const { probeRepo } = await import('#/server/modules/repo-read-paths.ts')
-    await expect(probeRepo('goblin+file:///tmp/private')).resolves.toEqual({
+    await expect(probeRepo(PRIVATE_WORKSPACE_ID)).resolves.toEqual({
       ok: false,
       message: 'error.path-permission-denied',
     })
@@ -1640,19 +1637,6 @@ describe('repo mutation invalidation publishing', () => {
     expect(result).toEqual({ ok: false, message: 'error.invalid-path' })
     expect(mocks.createWorktree).not.toHaveBeenCalled()
     expectNoRepoSnapshotInvalidations()
-  })
-
-  test('createRepoWorktree rejects malformed mode input', async () => {
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
-
-    const result = await createRepoWorktree(REPO_ID, {
-      worktreePath: '/tmp/repo-worktree',
-      // @ts-expect-error — exercise the runtime normalization path
-      mode: { kind: 'unknown' },
-    })
-
-    expect(result).toEqual({ ok: false, message: 'error.invalid-arguments' })
-    expect(mocks.createWorktree).not.toHaveBeenCalled()
   })
 
   test('deleteRepoBranch publishes snapshot invalidation after success', async () => {

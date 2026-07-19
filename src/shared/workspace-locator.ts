@@ -21,6 +21,20 @@ const POSIX_DRIVE_PATH_RE = /^\/[A-Za-z]:\//
 const CONTROL_RE = /[\u0000-\u001f\u007f]/
 const UNPAIRED_SURROGATE_RE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/
 
+export const MAX_WORKSPACE_LOCATOR_LENGTH = 4096
+
+export function toSafeCanonicalWorkspaceId(value: unknown): WorkspaceId | null {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > MAX_WORKSPACE_LOCATOR_LENGTH ||
+    value.includes('\0')
+  ) {
+    return null
+  }
+  return canonicalWorkspaceLocator(value)
+}
+
 export function parseWorkspaceLocator(
   input: string,
   platform: WorkspaceLocatorPlatform,

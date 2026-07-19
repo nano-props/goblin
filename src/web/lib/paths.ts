@@ -2,7 +2,7 @@ import { homeDirectory } from '#/web/app-shell-client.ts'
 import {
   formatRemoteWorktreeLocator,
   formatWorkspaceDisplayLocation as formatSharedWorkspaceDisplayLocation,
-} from '#/shared/repo-locator.ts'
+} from '#/shared/workspace-display-location.ts'
 import { tildifyPath, untildifyPath } from '#/shared/paths.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
