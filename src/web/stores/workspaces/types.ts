@@ -298,23 +298,32 @@ interface WorkspaceLifecycleActions {
    * Returns the new outcome, or `null` for non-remote ids.
    */
   retryRemoteWorkspaceConnection: (id: WorkspaceId) => Promise<{ ok: boolean; reason?: string } | null>
-  /** Updates the selected target's workspace pane tab type. The store does not project
-   *  against terminal session count, worktree presence, or opened workspace pane tabs;
-   *  the UI resolves the active pane at read time so session restore preserves
-   *  target-scoped user intent. */
-  setWorkspacePaneTab: (id: WorkspaceId, branch: string, tab: WorkspacePaneTabType | null) => void
-  setWorkspacePaneTabForTarget: (target: WorkspacePaneTabsTarget, tab: WorkspacePaneTabType | null) => void
-  setBranchViewMode: (id: WorkspaceId, viewMode: BranchViewMode) => void
-  setLastResult: (id: WorkspaceId, result: ExecResult, workspaceRuntimeId: string, options?: RepoResultEventOptions) => void
-  clearEvents: (id: WorkspaceId, eventIds: number[]) => void
   hydrateRestoredWorkspaceRuntime: (
     runtime: WorkspaceRuntimeRestoreSnapshot,
     options?: WorkspaceHydrationOptions,
   ) => Promise<void>
   promoteRestoredWorkspace: (result: WorkspaceTabsRestoreResult) => boolean
-  /** Clear the fetchFailed flag — called by manual fetch success and
-   *  by an explicit refresh, so a stale badge doesn't follow the user
-   *  around forever. */
+}
+
+interface WorkspacePanePreferenceActions {
+  /** Updates the selected target's workspace pane tab type. The store does not project
+   *  against terminal session count, worktree presence, or opened workspace pane tabs;
+   *  the UI resolves the active pane at read time so session restore preserves
+   *  target-scoped user intent. */
+  setWorkspacePaneTabForTarget: (target: WorkspacePaneTabsTarget, tab: WorkspacePaneTabType | null) => void
+}
+
+interface GitWorkspaceProjectionActions {
+  setWorkspacePaneTab: (id: WorkspaceId, branch: string, tab: WorkspacePaneTabType | null) => void
+  setBranchViewMode: (id: WorkspaceId, viewMode: BranchViewMode) => void
+  setLastResult: (
+    id: WorkspaceId,
+    result: ExecResult,
+    workspaceRuntimeId: string,
+    options?: RepoResultEventOptions,
+  ) => void
+  clearEvents: (id: WorkspaceId, eventIds: number[]) => void
+  /** Clear the fetchFailed flag after a successful Git fetch or explicit Git refresh. */
   clearFetchFailed: (id: WorkspaceId, workspaceRuntimeId: string) => void
 }
 
@@ -339,6 +348,8 @@ export interface WorkspacesStore
     RestorableWorkspaceActions,
     LocalWorkspaceActions,
     WorkspaceLifecycleActions,
+    WorkspacePanePreferenceActions,
+    GitWorkspaceProjectionActions,
     GitWorkspaceMutationActions {}
 
 export type WorkspacesSet = StoreApi<WorkspacesStore>['setState']

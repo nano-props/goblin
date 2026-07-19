@@ -34,12 +34,12 @@ export function WorkspaceRootNavigator({ workspaceId, selected, onSelect }: Work
   const actionVisible = compact || menuOpen
   const workspace = useWorkspacesStore(
     useShallow((state) => {
-      const repo = state.workspaces[workspaceId]
-      const probe = repo?.capability.probe
+      const workspace = state.workspaces[workspaceId]
+      const probe = workspace?.capability.probe
       return {
         name: probe?.status === 'ready' ? probe.name : formatWorkspaceDisplayLocation(workspaceId),
         terminalAvailable: workspaceTerminalAvailable(probe),
-        workspaceRuntimeId: repo?.workspaceRuntimeId ?? null,
+        workspaceRuntimeId: workspace?.workspaceRuntimeId ?? null,
         capabilities: probe?.status === 'ready' ? probe.capabilities : null,
       }
     }),

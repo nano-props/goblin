@@ -36,10 +36,8 @@ type RestorableWorkspaceActions = Pick<
   | 'setSelectedTerminal'
 >
 
-type RuntimeWorkspacePreferenceActions = Pick<
-  WorkspacesStore,
-  'setBranchViewMode' | 'setWorkspacePaneTab' | 'setWorkspacePaneTabForTarget'
->
+type WorkspacePanePreferenceActions = Pick<WorkspacesStore, 'setWorkspacePaneTabForTarget'>
+type GitWorkspacePreferenceActions = Pick<WorkspacesStore, 'setBranchViewMode' | 'setWorkspacePaneTab'>
 type WorkspaceNavigationHistoryActions = Pick<
   WorkspacesStore,
   'recordWorkspaceNavigation' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'
@@ -131,33 +129,31 @@ function createRestorableWorkspaceActions(set: WorkspacesSet): RestorableWorkspa
   }
 }
 
-function createRuntimeWorkspacePreferenceActions(
+function setWorkspacePaneTabForTarget(
   set: WorkspacesSet,
-  get: WorkspacesGet,
-): RuntimeWorkspacePreferenceActions {
-  // Shared post-write effects for view preferences that affect warm restore or
-  // visible branch data. Centralized so each preference write stays coherent.
-  function afterWorkspacePreferenceChange(id: string, workspaceRuntimeId: string): void {
-    const repo = get().workspaces[id]
-    if (!repo) return
-    persistRepoSnapshotCacheEntry(set, repo, workspaceRuntimeId)
-  }
-
-  function setWorkspacePaneTabForTarget(target: WorkspacePaneTabsTarget, tab: WorkspacePaneTabType | null): void {
-    let changed = false
-    let workspaceRuntimeId: string | undefined
-    set((s) => {
-      const repo = s.workspaces[target.workspaceId]
-      if (!repo || preferredWorkspacePaneTabForTarget(repo.ui, target) === tab) return s
-      changed = true
-      workspaceRuntimeId = repo.workspaceRuntimeId
-      return replaceWorkspaceState(s, repo, (r) => {
-        r.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(r.ui, target, tab)
-      })
+  target: WorkspacePaneTabsTarget,
+  tab: WorkspacePaneTabType | null,
+): void {
+  set((state) => {
+    const workspace = state.workspaces[target.workspaceId]
+    if (!workspace || preferredWorkspacePaneTabForTarget(workspace.ui, target) === tab) return state
+    return replaceWorkspaceState(state, workspace, (nextWorkspace) => {
+      nextWorkspace.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
+        nextWorkspace.ui,
+        target,
+        tab,
+      )
     })
-    if (changed && workspaceRuntimeId !== undefined) afterWorkspacePreferenceChange(target.workspaceId, workspaceRuntimeId)
-  }
+  })
+}
 
+function createWorkspacePanePreferenceActions(set: WorkspacesSet): WorkspacePanePreferenceActions {
+  return {
+    setWorkspacePaneTabForTarget: (target, tab) => setWorkspacePaneTabForTarget(set, target, tab),
+  }
+}
+
+function createGitWorkspacePreferenceActions(set: WorkspacesSet, get: WorkspacesGet): GitWorkspacePreferenceActions {
   return {
     setBranchViewMode(id: string, viewMode: BranchViewMode) {
       let changed = false
@@ -172,21 +168,21 @@ function createRuntimeWorkspacePreferenceActions(
           gitWorkspaceProjection(r).ui.branchViewMode = viewMode
         })
       })
-      if (changed && workspaceRuntimeId !== undefined) afterWorkspacePreferenceChange(id, workspaceRuntimeId)
+      if (changed && workspaceRuntimeId !== undefined) {
+        persistRepoSnapshotCacheEntry(set, get().workspaces[id], workspaceRuntimeId)
+      }
     },
 
     setWorkspacePaneTab(id: string, branch: string, tab: WorkspacePaneTabType | null) {
-      // Persists the user's target-scoped preferred pane selection verbatim.
-      // Opening/closing branch tabs is owned by explicit open/close actions;
-      // this action only changes the target-scoped preferred tab/empty pane.
       const repo = get().workspaces[id]
       if (!repo) return
       const branchModel = requireRepoBranchSnapshotQueryProjection(repo)
-      const target = workspacePaneTabsTargetForRepoBranch({ workspaceId: repo.id, branches: branchModel.branches }, branch)
-      if (target) setWorkspacePaneTabForTarget(target, tab)
+      const target = workspacePaneTabsTargetForRepoBranch(
+        { workspaceId: repo.id, branches: branchModel.branches },
+        branch,
+      )
+      if (target) setWorkspacePaneTabForTarget(set, target, tab)
     },
-
-    setWorkspacePaneTabForTarget,
   }
 }
 
@@ -197,10 +193,10 @@ function createWorkspaceNavigationHistoryActions(
   return {
     recordWorkspaceNavigation(entry, options) {
       set((s) => {
-        const currentRepoHistory = navigationHistoryForRepo(s.navigationHistoryByWorkspace[entry.workspaceId])
-        if (workspaceNavigationHistoryEntryEqual(currentRepoHistory.current, entry)) return s
+        const currentWorkspaceHistory = navigationHistoryForWorkspace(s.navigationHistoryByWorkspace[entry.workspaceId])
+        if (workspaceNavigationHistoryEntryEqual(currentWorkspaceHistory.current, entry)) return s
         const restoredHistory = options?.browserHistoryTraversal
-          ? navigationHistoryWithRestoredEntry(currentRepoHistory, entry, options.browserHistoryTraversal)
+          ? navigationHistoryWithRestoredEntry(currentWorkspaceHistory, entry, options.browserHistoryTraversal)
           : null
         if (restoredHistory) {
           return {
@@ -214,43 +210,43 @@ function createWorkspaceNavigationHistoryActions(
           return {
             navigationHistoryByWorkspace: {
               ...s.navigationHistoryByWorkspace,
-              [entry.workspaceId]: navigationHistoryWithReplacedCurrentEntry(currentRepoHistory, entry),
+              [entry.workspaceId]: navigationHistoryWithReplacedCurrentEntry(currentWorkspaceHistory, entry),
             },
           }
         }
-        if (workspaceNavigationHistoryEntryCanReplaceCurrent(currentRepoHistory.current, entry)) {
+        if (workspaceNavigationHistoryEntryCanReplaceCurrent(currentWorkspaceHistory.current, entry)) {
           return {
             navigationHistoryByWorkspace: {
               ...s.navigationHistoryByWorkspace,
               [entry.workspaceId]: {
-                ...currentRepoHistory,
+                ...currentWorkspaceHistory,
                 current: entry,
               },
             },
           }
         }
 
-        const nextRepoHistory: WorkspaceNavigationHistoryState = {
+        const nextWorkspaceHistory: WorkspaceNavigationHistoryState = {
           current: entry,
-          backStack: currentRepoHistory.current
-            ? [...currentRepoHistory.backStack, currentRepoHistory.current].slice(
+          backStack: currentWorkspaceHistory.current
+            ? [...currentWorkspaceHistory.backStack, currentWorkspaceHistory.current].slice(
                 -MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES,
               )
-            : currentRepoHistory.backStack,
+            : currentWorkspaceHistory.backStack,
           forwardStack: [],
         }
 
         return {
           navigationHistoryByWorkspace: {
             ...s.navigationHistoryByWorkspace,
-            [entry.workspaceId]: nextRepoHistory,
+            [entry.workspaceId]: nextWorkspaceHistory,
           },
         }
       })
     },
 
     peekWorkspaceNavigation(workspaceId, direction) {
-      const history = navigationHistoryForRepo(get().navigationHistoryByWorkspace[workspaceId])
+      const history = navigationHistoryForWorkspace(get().navigationHistoryByWorkspace[workspaceId])
       const target = direction === 'back' ? (history.backStack.at(-1) ?? null) : (history.forwardStack[0] ?? null)
       if (!target || !history.current) return null
       return { workspaceId, direction, current: history.current, target }
@@ -259,19 +255,21 @@ function createWorkspaceNavigationHistoryActions(
     commitWorkspaceNavigation(traversal) {
       let committed = false
       set((s) => {
-        const currentRepoHistory = navigationHistoryForRepo(s.navigationHistoryByWorkspace[traversal.workspaceId])
+        const currentWorkspaceHistory = navigationHistoryForWorkspace(
+          s.navigationHistoryByWorkspace[traversal.workspaceId],
+        )
         const nextTarget =
           traversal.direction === 'back'
-            ? (currentRepoHistory.backStack.at(-1) ?? null)
-            : (currentRepoHistory.forwardStack[0] ?? null)
+            ? (currentWorkspaceHistory.backStack.at(-1) ?? null)
+            : (currentWorkspaceHistory.forwardStack[0] ?? null)
         if (
           !nextTarget ||
-          !workspaceNavigationHistoryEntryEqual(currentRepoHistory.current, traversal.current) ||
+          !workspaceNavigationHistoryEntryEqual(currentWorkspaceHistory.current, traversal.current) ||
           !workspaceNavigationHistoryEntryEqual(nextTarget, traversal.target)
         )
           return s
         committed = true
-        const nextHistory = commitWorkspaceNavigationTraversal(currentRepoHistory, traversal)
+        const nextHistory = commitWorkspaceNavigationTraversal(currentWorkspaceHistory, traversal)
         return {
           navigationHistoryByWorkspace: {
             ...s.navigationHistoryByWorkspace,
@@ -302,7 +300,9 @@ function commitWorkspaceNavigationTraversal(
   }
 }
 
-function navigationHistoryForRepo(state: WorkspaceNavigationHistoryState | undefined): WorkspaceNavigationHistoryState {
+function navigationHistoryForWorkspace(
+  state: WorkspaceNavigationHistoryState | undefined,
+): WorkspaceNavigationHistoryState {
   return state ?? { current: null, backStack: [], forwardStack: [] }
 }
 
@@ -375,7 +375,8 @@ function navigationHistoryWithForwardStackEntry(
 export function createSelectionActions(set: WorkspacesSet, get: WorkspacesGet) {
   return {
     ...createRestorableWorkspaceActions(set),
-    ...createRuntimeWorkspacePreferenceActions(set, get),
+    ...createWorkspacePanePreferenceActions(set),
+    ...createGitWorkspacePreferenceActions(set, get),
     ...createWorkspaceNavigationHistoryActions(set, get),
   }
 }

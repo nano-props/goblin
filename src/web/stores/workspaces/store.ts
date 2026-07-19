@@ -18,7 +18,7 @@
 import { create } from 'zustand'
 import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware'
 import { createBranchActions } from '#/web/stores/workspaces/branch-actions.ts'
-import { createCommitActions } from '#/web/stores/workspaces/commit.ts'
+import { createGitWorkspaceProjectionActions } from '#/web/stores/workspaces/git-workspace-projection-actions.ts'
 import { createWorkspaceSessionActions } from '#/web/stores/workspaces/workspace-session.ts'
 import { createSelectionActions } from '#/web/stores/workspaces/selection.ts'
 import { createTabOpenerActions } from '#/web/stores/workspaces/tab-opener.ts'
@@ -119,7 +119,7 @@ export const useWorkspacesStore = create<WorkspacesStore>()(
       ...createSelectionActions(set, get),
       ...createTabOpenerActions(set),
       ...createBranchActions(set, get),
-      ...createCommitActions(set),
+      ...createGitWorkspaceProjectionActions(set),
     }),
     {
       // The persisted payload is only the Git repo snapshot warm cache. Keep
