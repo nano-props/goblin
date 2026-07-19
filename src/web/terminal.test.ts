@@ -262,7 +262,7 @@ describe('terminal web host client', () => {
     expect(request).toMatchObject({
       type: 'request',
       action: 'prune',
-      input: { repoRoot: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      input: { workspaceId: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
     })
     socket?.emitMessage(
       JSON.stringify({
@@ -316,7 +316,7 @@ describe('terminal web host client', () => {
       expect(request).toMatchObject({
         type: 'request',
         action: 'prune',
-        input: { repoRoot: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        input: { workspaceId: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       })
       const expectation = expect(prunePromise).rejects.toThrow('App realtime request timed out')
 
@@ -362,7 +362,7 @@ describe('terminal web host client', () => {
       expect(request).toMatchObject({
         type: 'request',
         action: 'prune',
-        input: { repoRoot: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        input: { workspaceId: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       })
       socket.send = vi.fn(() => {
         throw new Error('send failed')
@@ -397,7 +397,7 @@ describe('terminal web host client', () => {
       expect(request).toMatchObject({
         type: 'request',
         action: 'prune',
-        input: { repoRoot: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        input: { workspaceId: 'goblin+file:///tmp/repo', workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
       })
       const expectation = expect(prunePromise).rejects.toThrow('App realtime request timed out')
 
@@ -443,7 +443,7 @@ describe('terminal web host client', () => {
           terminalRuntimeSessionId: 'pty_1',
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
-          repoRoot: 'goblin+file:///tmp/repo',
+          workspaceId: 'goblin+file:///tmp/repo',
           canonicalTitle: '~/Developer/goblin — npm run dev',
         },
       }),
@@ -469,7 +469,7 @@ describe('terminal web host client', () => {
           terminalRuntimeSessionId: 'pty_1',
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
-          repoRoot: 'goblin+file:///tmp/repo',
+          workspaceId: 'goblin+file:///tmp/repo',
           processName: 'zsh',
           canonicalTitle: null,
         },
@@ -482,7 +482,7 @@ describe('terminal web host client', () => {
           terminalRuntimeSessionId: 'pty_1',
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
-          repoRoot: 'goblin+file:///tmp/repo',
+          workspaceId: 'goblin+file:///tmp/repo',
           workspaceRuntimeId: 'repo-runtime-1',
         },
       }),
@@ -494,7 +494,7 @@ describe('terminal web host client', () => {
           terminalRuntimeSessionId: 'pty_1',
           terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
-          repoRoot: 'goblin+file:///tmp/repo',
+          workspaceId: 'goblin+file:///tmp/repo',
           workspaceRuntimeId: 'repo-runtime-1',
           controller: null,
           canonicalCols: 100,
@@ -518,7 +518,7 @@ describe('terminal web host client', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'sessions-changed',
-        repoRoot: 'goblin+file:///tmp/repo',
+        workspaceId: 'goblin+file:///tmp/repo',
         workspaceRuntimeId: 'repo-runtime-test',
         revision: 1,
       }),
@@ -527,7 +527,7 @@ describe('terminal web host client', () => {
       JSON.stringify({
         type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
         change: 'invalidation',
-        repoRoot: 'goblin+file:///tmp/repo',
+        workspaceId: 'goblin+file:///tmp/repo',
       }),
     )
 
@@ -588,7 +588,7 @@ describe('terminal web host client', () => {
     expect(onWorkspaceTabsChanged).toHaveBeenCalledWith({
       type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
       change: 'invalidation',
-      repoRoot: 'goblin+file:///tmp/repo',
+      workspaceId: 'goblin+file:///tmp/repo',
     })
 
     disposeOutput()

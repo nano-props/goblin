@@ -85,15 +85,15 @@ const AppRealtimeNonTerminalClientMessageSchema = v.variant('type', [
 ])
 
 const AppRealtimeNonTerminalServerMessageSchema = v.variant('type', [
-  v.object({
+  v.strictObject({
     type: v.literal(WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
     change: v.literal('invalidation'),
-    repoRoot: WorkspaceIdSchema,
+    workspaceId: WorkspaceIdSchema,
   }),
-  v.object({
+  v.strictObject({
     type: v.literal(WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
     change: v.literal('revision'),
-    repoRoot: WorkspaceIdSchema,
+    workspaceId: WorkspaceIdSchema,
     workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
   }),

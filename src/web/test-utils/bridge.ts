@@ -971,7 +971,8 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       write: async (input) => callTerminalHandler('terminal.write', input),
       resize: async (input) => callTerminalHandler('terminal.resize', input),
       takeover: async (input) => callTerminalHandler('terminal.takeover', input),
-      pruneTerminals: async (workspaceId) => callTerminalHandler('terminal.prune', { workspaceId }),
+      pruneTerminals: async (workspaceId, workspaceRuntimeId) =>
+        callTerminalHandler('terminal.prune', { workspaceId, workspaceRuntimeId }),
       recoverSessions: async (input) => callTerminalHandler('terminal.recoverSessions', input),
       notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
       sendTestNotification: async () => true,

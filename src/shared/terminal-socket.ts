@@ -102,21 +102,3 @@ export type TerminalSocketResponseMessage =
 
 export type TerminalSocketServerMessage = TerminalRealtimeMessage | TerminalSocketResponseMessage
 export type TerminalClientMessage = TerminalSocketRequestMessage
-
-export function terminalRealtimeWireValue(message: TerminalRealtimeMessage): object {
-  switch (message.type) {
-    case 'bell':
-    case 'title':
-    case 'exit': {
-      const { workspaceId, ...event } = message.event
-      return { ...message, event: { ...event, repoRoot: workspaceId } }
-    }
-    case 'sessions-changed':
-    case 'session-closed': {
-      const { workspaceId, ...event } = message
-      return { ...event, repoRoot: workspaceId }
-    }
-    default:
-      return message
-  }
-}

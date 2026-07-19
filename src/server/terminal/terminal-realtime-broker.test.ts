@@ -6,11 +6,13 @@ import {
   type TerminalClientPresenceChange,
 } from '#/server/terminal/terminal-realtime-broker.ts'
 import { BufferedAppRealtimeSocket } from '#/server/realtime/buffered-app-realtime-socket.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const USER_A = 'user_a'
 const USER_B = 'user_b'
 const TEST_NOW = new Date('2026-06-24T00:00:00Z')
 const HEARTBEAT_SILENCE_MS = HEARTBEAT_DEADLINE_MS + HEARTBEAT_INTERVAL_MS
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 function createBroker(
   options: {
@@ -149,6 +151,26 @@ describe('terminal realtime broker', () => {
         outputEra: 0,
         processName: 'zsh',
       },
+    })
+  })
+
+  test('serializes workspace identity without a legacy repo field', () => {
+    const broker = createBroker()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    broker.registerSocket('client_workspace', USER_A, socket)
+
+    broker.broadcastToUser(USER_A, {
+      type: 'sessions-changed',
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: 'workspace-runtime-test',
+      revision: 3,
+    })
+
+    expect(JSON.parse(String(socket.send.mock.calls[0]?.[0]))).toEqual({
+      type: 'sessions-changed',
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: 'workspace-runtime-test',
+      revision: 3,
     })
   })
 

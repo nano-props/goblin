@@ -8,6 +8,7 @@ import {
   isValidTerminalRuntimeSessionId,
   normalizeTerminalClientMessage,
   normalizeTerminalCreateResult,
+  normalizeTerminalRealtimeMessage,
   normalizeTerminalSessionsSnapshot,
   normalizeTerminalSize,
   normalizeTerminalSocketServerMessage,
@@ -47,13 +48,34 @@ describe('shared terminal validators', () => {
       isValidTerminalNotifyBellInput({
         title: 'Build finished',
         body: 'done',
-        repoRoot: 'goblin+file:///repo',
+        workspaceId: 'goblin+file:///repo',
       }),
     ).toBe(true)
     expect(
       isValidTerminalNotifyBellInput({
         title: '',
         body: 'done',
+        workspaceId: 'goblin+file:///repo',
+      }),
+    ).toBe(false)
+    expect(
+      isValidTerminalNotifyBellInput({
+        title: 'Build finished',
+        body: 'done',
+        workspaceId: '/repo',
+      }),
+    ).toBe(false)
+    expect(
+      isValidTerminalNotifyBellInput({
+        title: 'Build finished',
+        body: 'done',
+        workspaceId: 'goblin+file:///C:/repo',
+      }),
+    ).toBe(true)
+    expect(
+      isValidTerminalNotifyBellInput({
+        title: 'Build finished',
+        body: 'done',
         repoRoot: 'goblin+file:///repo',
       }),
     ).toBe(false)
@@ -61,16 +83,10 @@ describe('shared terminal validators', () => {
       isValidTerminalNotifyBellInput({
         title: 'Build finished',
         body: 'done',
-        repoRoot: '/repo',
+        workspaceId: 'goblin+file:///repo',
+        repoRoot: 'goblin+file:///repo',
       }),
     ).toBe(false)
-    expect(
-      isValidTerminalNotifyBellInput({
-        title: 'Build finished',
-        body: 'done',
-        repoRoot: 'goblin+file:///C:/repo',
-      }),
-    ).toBe(true)
 
     expect(isValidTerminalTestNotificationInput({ title: 'Goblin', body: 'Notifications are working' })).toBe(true)
     expect(isValidTerminalTestNotificationInput({ title: '', body: 'Notifications are working' })).toBe(false)
@@ -355,7 +371,7 @@ describe('shared terminal validators', () => {
         requestId: 'request_125',
         action: 'prune',
         input: {
-          repoRoot: 'goblin+file:///repo',
+          workspaceId: 'goblin+file:///repo',
         },
       }),
     ).toBeNull()
@@ -366,11 +382,119 @@ describe('shared terminal validators', () => {
         requestId: 'request_126',
         action: 'prune',
         input: {
-          repoRoot: 'goblin+file:///repo',
+          workspaceId: 'goblin+file:///repo',
           workspaceRuntimeId: 'repo-runtime-test',
         },
       }),
     ).toMatchObject({ type: 'request', action: 'prune' })
+
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'request_legacy',
+        action: 'prune',
+        input: {
+          repoRoot: 'goblin+file:///repo',
+          workspaceRuntimeId: 'repo-runtime-test',
+        },
+      }),
+    ).toBeNull()
+  })
+
+  test('rejects legacy and dual workspace identity on scoped terminal requests', () => {
+    for (const action of ['recover-sessions', 'prune'] as const) {
+      const message = {
+        type: 'request',
+        requestId: `request_${action}`,
+        action,
+        input: {
+          workspaceId: 'goblin+file:///repo',
+          workspaceRuntimeId: 'repo-runtime-test',
+        },
+      }
+      expect(normalizeTerminalClientMessage(message)).toEqual(message)
+      expect(
+        normalizeTerminalClientMessage({
+          ...message,
+          input: { ...message.input, repoRoot: message.input.workspaceId },
+        }),
+      ).toBeNull()
+      const { workspaceId, ...legacyInput } = message.input
+      expect(
+        normalizeTerminalClientMessage({ ...message, input: { ...legacyInput, repoRoot: workspaceId } }),
+      ).toBeNull()
+    }
+  })
+
+  test('rejects legacy and dual workspace identity on terminal realtime events', () => {
+    const scopedEvents = [
+      {
+        type: 'bell',
+        event: {
+          terminalRuntimeSessionId: 'pty_bell_123456789',
+          terminalRuntimeGeneration: 1,
+          terminalSessionId: 'term-bell-1111111111111111',
+          workspaceId: 'goblin+file:///repo',
+          processName: 'shell',
+          canonicalTitle: null,
+        },
+      },
+      {
+        type: 'title',
+        event: {
+          terminalRuntimeSessionId: 'pty_title_12345678',
+          terminalRuntimeGeneration: 1,
+          terminalSessionId: 'term-title-111111111111111',
+          workspaceId: 'goblin+file:///repo',
+          canonicalTitle: 'Task',
+        },
+      },
+      {
+        type: 'exit',
+        event: {
+          terminalRuntimeSessionId: 'pty_exit_123456789',
+          terminalRuntimeGeneration: 1,
+          terminalSessionId: 'term-exit-1111111111111111',
+          workspaceId: 'goblin+file:///repo',
+          workspaceRuntimeId: 'repo-runtime-test',
+        },
+      },
+    ]
+    for (const message of scopedEvents) {
+      expect(normalizeTerminalRealtimeMessage(message)).toEqual(message)
+      expect(
+        normalizeTerminalRealtimeMessage({
+          ...message,
+          event: { ...message.event, repoRoot: message.event.workspaceId },
+        }),
+      ).toBeNull()
+      const { workspaceId, ...legacyEvent } = message.event
+      expect(
+        normalizeTerminalRealtimeMessage({ ...message, event: { ...legacyEvent, repoRoot: workspaceId } }),
+      ).toBeNull()
+    }
+
+    const topLevelEvents = [
+      {
+        type: 'sessions-changed',
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-test',
+        revision: 1,
+      },
+      {
+        type: 'session-closed',
+        terminalRuntimeSessionId: 'pty_closed_1234567',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId: 'term-closed-11111111111111',
+        workspaceId: 'goblin+file:///repo',
+      },
+    ]
+    for (const message of topLevelEvents) {
+      expect(normalizeTerminalRealtimeMessage(message)).toEqual(message)
+      expect(normalizeTerminalRealtimeMessage({ ...message, repoRoot: message.workspaceId })).toBeNull()
+      const { workspaceId, ...legacyEvent } = message
+      expect(normalizeTerminalRealtimeMessage({ ...legacyEvent, repoRoot: workspaceId })).toBeNull()
+    }
   })
 
   test('rejects unsupported terminal create realtime requests', () => {
@@ -379,7 +503,7 @@ describe('shared terminal validators', () => {
       requestId: 'request_123',
       action: 'create',
       input: {
-        repoRoot: 'goblin+file:///repo',
+        workspaceId: 'goblin+file:///repo',
         presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'main' } },
         worktreePath: '/repo',
         kind: 'additional',
@@ -1002,7 +1126,7 @@ describe('shared terminal validators', () => {
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
-        repoRoot: 'goblin+file:///repo',
+        workspaceId: 'goblin+file:///repo',
       }),
     ).toEqual({
       type: 'session-closed',
@@ -1017,7 +1141,7 @@ describe('shared terminal validators', () => {
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
-        repoRoot: 'goblin+file:///repo',
+        workspaceId: 'goblin+file:///repo',
         worktreePath: '/repo/worktree',
       }),
     ).toBeNull()
@@ -1084,37 +1208,45 @@ describe('shared terminal validators', () => {
   })
 
   test('normalizes workspace tabs changed realtime messages', () => {
-    expect(
-      normalizeAppRealtimeSocketServerMessage({
+    const messages = [
+      {
         type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
-        change: 'invalidation',
-        repoRoot: 'goblin+file:///repo',
-      }),
-    ).toEqual({
-      type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
-      change: 'invalidation',
-      repoRoot: 'goblin+file:///repo',
-    })
+        change: 'invalidation' as const,
+        workspaceId: 'goblin+file:///repo',
+      },
+      {
+        type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
+        change: 'revision' as const,
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: 'repo-runtime-test',
+        revision: 4,
+      },
+    ]
+    for (const message of messages) {
+      expect(normalizeAppRealtimeSocketServerMessage(message)).toEqual(message)
+      expect(normalizeAppRealtimeSocketServerMessage({ ...message, repoRoot: message.workspaceId })).toBeNull()
+      const { workspaceId, ...legacyMessage } = message
+      expect(normalizeAppRealtimeSocketServerMessage({ ...legacyMessage, repoRoot: workspaceId })).toBeNull()
+    }
 
     expect(
       normalizeAppRealtimeSocketServerMessage({
         type: 'workspace-tabs-changed',
-        repoRoot: 'goblin+file:///repo',
+        workspaceId: 'goblin+file:///repo',
       }),
     ).toBeNull()
   })
 })
 
 describe('terminal runtime generation validation', () => {
-  test('requires a non-negative safe integer on realtime bindings', async () => {
-    const { normalizeTerminalRealtimeMessage } = await import('#/shared/terminal-validators.ts')
+  test('requires a non-negative safe integer on realtime bindings', () => {
     const message = {
       type: 'exit' as const,
       event: {
         terminalRuntimeSessionId: 'pty_generation_validation',
         terminalSessionId: 'term-generation-validation',
         terminalRuntimeGeneration: 0,
-        repoRoot: 'goblin+file:///repo',
+        workspaceId: 'goblin+file:///repo',
         workspaceRuntimeId: 'repo-runtime-validation',
       },
     }
@@ -1129,7 +1261,13 @@ describe('terminal runtime generation validation', () => {
       },
     })
     expect(
-      normalizeTerminalRealtimeMessage({ ...message, event: { ...message.event, repoRoot: undefined } }),
+      normalizeTerminalRealtimeMessage({ ...message, event: { ...message.event, workspaceId: undefined } }),
+    ).toBeNull()
+    expect(
+      normalizeTerminalRealtimeMessage({
+        ...message,
+        event: { ...message.event, workspaceId: undefined, repoRoot: message.event.workspaceId },
+      }),
     ).toBeNull()
     expect(
       normalizeTerminalRealtimeMessage({ ...message, event: { ...message.event, workspaceRuntimeId: undefined } }),

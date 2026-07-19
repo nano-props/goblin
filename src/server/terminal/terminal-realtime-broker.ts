@@ -1,4 +1,4 @@
-import { terminalRealtimeWireValue, type TerminalRealtimeMessage } from '#/shared/terminal-socket.ts'
+import type { TerminalRealtimeMessage } from '#/shared/terminal-socket.ts'
 import {
   REALTIME_HEARTBEAT_DEADLINE_MS,
   REALTIME_HEARTBEAT_INTERVAL_MS,
@@ -20,9 +20,5 @@ export class TerminalRealtimeBroker extends RealtimeBroker<TerminalRealtimeMessa
       heartbeatTimeoutReason: 'terminal heartbeat timeout',
       ...options,
     })
-  }
-
-  protected override serializeMessage(message: TerminalRealtimeMessage): string {
-    return JSON.stringify(terminalRealtimeWireValue(message))
   }
 }

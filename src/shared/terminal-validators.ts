@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import { isWorkspaceIdWireValue, WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
+import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import type {
   TerminalClientMessage,
   TerminalRealtimeMessage,
@@ -88,8 +88,8 @@ const TerminalSessionInputSchema = v.object({
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
 })
 const WorkspaceRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
-const TerminalListSessionsInputSchema = v.object({
-  repoRoot: WorkspaceIdSchema,
+const TerminalListSessionsInputSchema = v.strictObject({
+  workspaceId: WorkspaceIdSchema,
   workspaceRuntimeId: WorkspaceRuntimeIdSchema,
 })
 export const TerminalCreateInputSchema = v.strictObject({
@@ -100,9 +100,16 @@ export const TerminalCreateInputSchema = v.strictObject({
   clientId: TerminalOptionalClientIdSchema,
   target: WorkspacePaneFilesystemExecutionTargetSchema,
 })
-const TerminalPruneInputSchema = v.object({
-  repoRoot: WorkspaceIdSchema,
+const TerminalPruneInputSchema = v.strictObject({
+  workspaceId: WorkspaceIdSchema,
   workspaceRuntimeId: WorkspaceRuntimeIdSchema,
+})
+const TerminalNotifyBellInputSchema = v.strictObject({
+  title: v.pipe(v.string(), v.minLength(1), v.maxLength(200)),
+  body: v.pipe(v.string(), v.minLength(1), v.maxLength(500)),
+  terminalSessionId: v.optional(v.pipe(v.string(), v.minLength(1))),
+  terminalWorktreeKey: v.optional(v.pipe(v.string(), v.minLength(1))),
+  workspaceId: WorkspaceIdSchema,
 })
 const TerminalPresentationSchema = v.variant('kind', [
   v.strictObject({ kind: v.literal('workspace-root') }),
@@ -252,7 +259,7 @@ const TerminalBellRealtimeEventSchema = v.strictObject({
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   terminalSessionId: v.string(),
-  repoRoot: WorkspaceIdSchema,
+  workspaceId: WorkspaceIdSchema,
   processName: v.string(),
   canonicalTitle: v.nullable(v.string()),
 })
@@ -260,14 +267,14 @@ const TerminalTitleEventSchema = v.strictObject({
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   terminalSessionId: v.string(),
-  repoRoot: WorkspaceIdSchema,
+  workspaceId: WorkspaceIdSchema,
   canonicalTitle: v.nullable(v.string()),
 })
-const TerminalExitEventSchema = v.object({
+const TerminalExitEventSchema = v.strictObject({
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   terminalSessionId: v.string(),
-  repoRoot: WorkspaceIdSchema,
+  workspaceId: WorkspaceIdSchema,
   workspaceRuntimeId: WorkspaceRuntimeIdSchema,
 })
 const TerminalSessionClosedEventSchema = v.strictObject({
@@ -275,7 +282,7 @@ const TerminalSessionClosedEventSchema = v.strictObject({
   terminalRuntimeSessionId: v.string(),
   terminalRuntimeGeneration: TerminalRuntimeGenerationSchema,
   terminalSessionId: v.string(),
-  repoRoot: WorkspaceIdSchema,
+  workspaceId: WorkspaceIdSchema,
 })
 
 export function isValidTerminalRuntimeSessionId(value: unknown): value is string {
@@ -299,14 +306,14 @@ const TerminalLifecycleEventSchema = v.object({
 })
 const TerminalRealtimeMessageVariants = [
   v.object({ type: v.literal('output'), event: TerminalOutputEventSchema }),
-  v.object({ type: v.literal('bell'), event: TerminalBellRealtimeEventSchema }),
-  v.object({ type: v.literal('title'), event: TerminalTitleEventSchema }),
-  v.object({ type: v.literal('exit'), event: TerminalExitEventSchema }),
+  v.strictObject({ type: v.literal('bell'), event: TerminalBellRealtimeEventSchema }),
+  v.strictObject({ type: v.literal('title'), event: TerminalTitleEventSchema }),
+  v.strictObject({ type: v.literal('exit'), event: TerminalExitEventSchema }),
   v.object({ type: v.literal('identity'), event: TerminalIdentityEventSchema }),
   v.object({ type: v.literal('lifecycle'), event: TerminalLifecycleEventSchema }),
-  v.object({
+  v.strictObject({
     type: v.literal('sessions-changed'),
-    repoRoot: WorkspaceIdSchema,
+    workspaceId: WorkspaceIdSchema,
     workspaceRuntimeId: WorkspaceRuntimeIdSchema,
     revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
   }),
@@ -361,13 +368,13 @@ const TerminalClientMessageSchema = v.variant('type', [
     action: v.literal('takeover'),
     input: TerminalResizeInputSchema,
   }),
-  v.object({
+  v.strictObject({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
     action: v.literal('recover-sessions'),
     input: TerminalListSessionsInputSchema,
   }),
-  v.object({
+  v.strictObject({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
     action: v.literal('prune'),
@@ -423,27 +430,7 @@ export function isValidTerminalClientId(value: unknown): value is string {
 }
 
 export function isValidTerminalNotifyBellInput(value: unknown): value is TerminalNotifyBellInput {
-  if (!value || typeof value !== 'object') return false
-  const { title, body, terminalSessionId, terminalWorktreeKey, repoRoot } = value as {
-    title?: unknown
-    body?: unknown
-    terminalSessionId?: unknown
-    terminalWorktreeKey?: unknown
-    repoRoot?: unknown
-  }
-  return (
-    typeof title === 'string' &&
-    title.length > 0 &&
-    title.length <= 200 &&
-    typeof body === 'string' &&
-    body.length > 0 &&
-    body.length <= 500 &&
-    !Object.prototype.hasOwnProperty.call(value, 'key') &&
-    (terminalSessionId === undefined || (typeof terminalSessionId === 'string' && terminalSessionId.length > 0)) &&
-    (terminalWorktreeKey === undefined ||
-      (typeof terminalWorktreeKey === 'string' && terminalWorktreeKey.length > 0)) &&
-    isWorkspaceIdWireValue(repoRoot)
-  )
+  return v.safeParse(TerminalNotifyBellInputSchema, value).success
 }
 
 export function isValidTerminalTestNotificationInput(value: unknown): value is TerminalTestNotificationInput {
@@ -483,32 +470,7 @@ export function normalizeTerminalCreateResult(value: unknown): TerminalCreateRes
 
 export function normalizeTerminalRealtimeMessage(value: unknown): TerminalRealtimeMessage | null {
   const parsed = v.safeParse(TerminalRealtimeMessageSchema, value)
-  if (!parsed.success) return null
-  const message = parsed.output
-  switch (message.type) {
-    case 'bell': {
-      const { repoRoot, ...event } = message.event
-      return { ...message, event: { ...event, workspaceId: repoRoot } }
-    }
-    case 'title': {
-      const { repoRoot, ...event } = message.event
-      return { ...message, event: { ...event, workspaceId: repoRoot } }
-    }
-    case 'exit': {
-      const { repoRoot, ...event } = message.event
-      return { ...message, event: { ...event, workspaceId: repoRoot } }
-    }
-    case 'sessions-changed': {
-      const { repoRoot, ...event } = message
-      return { ...event, workspaceId: repoRoot }
-    }
-    case 'session-closed': {
-      const { repoRoot, ...event } = message
-      return { ...event, workspaceId: repoRoot }
-    }
-    default:
-      return message
-  }
+  return parsed.success ? parsed.output : null
 }
 
 export function normalizeTerminalSocketServerMessage(value: unknown): TerminalSocketServerMessage | null {
@@ -559,9 +521,5 @@ function normalizeWithSchema<TSchema extends v.BaseSchema<unknown, unknown, v.Ba
 
 export function normalizeTerminalClientMessage(value: unknown): TerminalClientMessage | null {
   const parsed = v.safeParse(TerminalClientMessageSchema, value)
-  if (!parsed.success) return null
-  const message = parsed.output
-  if (message.action !== 'recover-sessions' && message.action !== 'prune') return message
-  const { repoRoot, ...input } = message.input
-  return { ...message, input: { ...input, workspaceId: repoRoot } }
+  return parsed.success ? parsed.output : null
 }

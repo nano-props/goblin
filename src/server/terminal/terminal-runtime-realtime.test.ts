@@ -55,7 +55,7 @@ describe('terminal realtime handlers', () => {
     buffered.pause()
     const sessionsChanged = JSON.stringify({
       type: 'sessions-changed',
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
       revision: 5,
     })
@@ -185,7 +185,7 @@ describe('terminal realtime handlers', () => {
     buffered.pause()
     const sessionsChanged = JSON.stringify({
       type: 'sessions-changed',
-      repoRoot: 'goblin+file:///repo',
+      workspaceId: 'goblin+file:///repo',
       workspaceRuntimeId: 'repo-runtime-test',
       revision: 6,
     })

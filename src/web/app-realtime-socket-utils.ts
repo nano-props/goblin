@@ -23,10 +23,6 @@ export function parseAppRealtimeSocketServerMessage(data: unknown): AppRealtimeS
 }
 
 export function encodeAppRealtimeClientMessage(message: AppRealtimeClientMessage): string {
-  if (message.type === 'request' && (message.action === 'recover-sessions' || message.action === 'prune')) {
-    const { workspaceId, ...input } = message.input
-    return JSON.stringify({ ...message, input: { ...input, repoRoot: workspaceId } })
-  }
   return JSON.stringify(message)
 }
 

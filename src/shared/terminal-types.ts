@@ -288,7 +288,7 @@ type TerminalSessionSummaryFor<Session extends TerminalSessionBase> = Session ex
 export type TerminalSessionSummary = TerminalSessionSummaryFor<TerminalSessionBase>
 
 /**
- * Versioned full terminal projection for one user/repo-runtime scope.
+ * Versioned full terminal projection for one user/workspace-runtime scope.
  *
  * This revision belongs exclusively to the terminal projection. Workspace
  * pane tab revisions must never be used to decide whether this collection is

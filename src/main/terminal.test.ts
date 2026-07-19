@@ -72,7 +72,7 @@ describe('terminal IPC', () => {
       {
         title: 'Terminal bell',
         body: 'zsh needs attention',
-        repoRoot: 'goblin+file:///tmp/repo',
+        workspaceId: 'goblin+file:///tmp/repo',
       },
       {
         sender: { id: 99, once: vi.fn() },
@@ -85,10 +85,10 @@ describe('terminal IPC', () => {
 
   test('rejects malformed bell payloads', async () => {
     await expect(
-      invoke(TERMINAL_NOTIFY_BELL_CHANNEL, { title: 1, body: 'bad', repoRoot: 'goblin+file:///tmp/repo' }),
+      invoke(TERMINAL_NOTIFY_BELL_CHANNEL, { title: 1, body: 'bad', workspaceId: 'goblin+file:///tmp/repo' }),
     ).resolves.toBe(false)
     await expect(
-      invoke(TERMINAL_NOTIFY_BELL_CHANNEL, { title: 'Terminal bell', body: 'bad', repoRoot: '/tmp/repo' }),
+      invoke(TERMINAL_NOTIFY_BELL_CHANNEL, { title: 'Terminal bell', body: 'bad', workspaceId: '/tmp/repo' }),
     ).resolves.toBe(false)
   })
 
@@ -109,7 +109,7 @@ describe('terminal IPC', () => {
       invoke(TERMINAL_NOTIFY_BELL_CHANNEL, {
         title: 'Terminal bell',
         body: 'zsh needs attention in feature',
-        repoRoot: 'goblin+file:///tmp/repo',
+        workspaceId: 'goblin+file:///tmp/repo',
       }),
     ).resolves.toBe(true)
     expect(flashFrame).toHaveBeenCalledWith(true)
@@ -133,7 +133,7 @@ describe('terminal IPC', () => {
       invoke(TERMINAL_NOTIFY_BELL_CHANNEL, {
         title: 'Terminal bell',
         body: 'zsh needs attention',
-        repoRoot: 'goblin+file:///tmp/repo',
+        workspaceId: 'goblin+file:///tmp/repo',
       }),
     ).resolves.toBe(false)
   })
@@ -152,7 +152,7 @@ describe('terminal IPC', () => {
       invoke(TERMINAL_NOTIFY_BELL_CHANNEL, {
         title: 'Terminal bell',
         body: 'zsh needs attention',
-        repoRoot: 'goblin+file:///tmp/repo',
+        workspaceId: 'goblin+file:///tmp/repo',
       }),
     ).resolves.toBe(true)
     expect(flashFrame).toHaveBeenCalledWith(true)
