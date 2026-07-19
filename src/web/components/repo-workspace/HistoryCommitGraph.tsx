@@ -1,4 +1,5 @@
 import type { LogEntry } from '#/web/types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { Skeleton } from '#/web/components/ui/skeleton.tsx'
 import { STATUS_TONE_CHIP_CLASS } from '#/web/components/ui/status-tones.ts'
@@ -20,7 +21,7 @@ export function HistoryCommitGraph({
   workspaceRuntimeId,
   entries,
 }: {
-  repoId: string
+  repoId: WorkspaceId
   workspaceRuntimeId: string
   entries: LogEntry[]
 }) {
@@ -66,7 +67,7 @@ function HistoryCommitRow({
   commit,
   position,
 }: {
-  repoId: string
+  repoId: WorkspaceId
   workspaceRuntimeId: string
   commit: HistoryCommitNode
   position: CommitPosition
@@ -98,7 +99,7 @@ function HistoryCommitContent({
   workspaceRuntimeId,
   commit,
 }: {
-  repoId: string
+  repoId: WorkspaceId
   workspaceRuntimeId: string
   commit: HistoryCommitNode
 }) {
@@ -120,7 +121,7 @@ function HistoryCommitHash({
   workspaceRuntimeId,
   commit,
 }: {
-  repoId: string
+  repoId: WorkspaceId
   workspaceRuntimeId: string
   commit: HistoryCommitNode
 }) {

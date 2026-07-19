@@ -3,10 +3,11 @@ import { invalidateRepoDataQueries, invalidateRepoRuntimeProjectionQueries } fro
 import { isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { RepoRefreshStoreAccess } from '#/web/stores/workspaces/refresh.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export function requestVisibleWorkspaceStatusRefresh(
   store: RepoRefreshStoreAccess,
-  id: string,
+  id: WorkspaceId,
   workspaceRuntimeId: string,
   branchName: string | null,
 ): boolean {

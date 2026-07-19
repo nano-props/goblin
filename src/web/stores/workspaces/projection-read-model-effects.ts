@@ -8,10 +8,10 @@ import { finishDataLoadError } from '#/web/stores/workspaces/repo-data-load-stat
 import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
-import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface AcceptedRepoProjectionReadModel {
-  repoRoot: string
+  repoRoot: WorkspaceId
   workspaceRuntimeId: string
   projection: WorkspaceRuntimeProjection | null
 }
@@ -117,9 +117,7 @@ export function acceptRepoProjectionReadModel(
   })
 
   persistRepoSnapshotCacheEntry(set, get().workspaces[repoRoot], workspaceRuntimeId)
-  const workspaceId = canonicalWorkspaceLocator(repoRoot)
-  if (!workspaceId) return
-  void terminalClient.pruneTerminals(workspaceId, workspaceRuntimeId).catch((err) => {
+  void terminalClient.pruneTerminals(repoRoot, workspaceRuntimeId).catch((err) => {
     terminalLog.warn('failed to prune repo sessions', { err })
   })
 }

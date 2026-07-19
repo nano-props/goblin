@@ -134,7 +134,7 @@ function useCreateWorktreeTrigger(repoId: WorkspaceId) {
         a.operations.branchAction.reason === b.operations.branchAction.reason &&
         a.operations.branchAction.target === b.operations.branchAction.target),
   )
-  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? '', repoShell?.workspaceRuntimeId ?? '', {
+  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? null, repoShell?.workspaceRuntimeId ?? '', {
     enabled: !!repoShell,
   })
   const branchAction = repoShell

@@ -3,9 +3,10 @@ import { openExternalUrl } from '#/web/app-shell-client.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { RepoBranchState } from '#/web/stores/workspaces/types.ts'
 import type { ExecResult } from '#/web/types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export async function openBranchExternalTarget(
-  repoId: string,
+  repoId: WorkspaceId,
   workspaceRuntimeId: string,
   branch: Pick<RepoBranchState, 'name' | 'pullRequest'>,
 ): Promise<ExecResult> {
@@ -14,7 +15,7 @@ export async function openBranchExternalTarget(
 }
 
 export async function openUpstreamBranchExternalTarget(
-  repoId: string,
+  repoId: WorkspaceId,
   workspaceRuntimeId: string,
   tracking: string,
 ): Promise<ExecResult> {

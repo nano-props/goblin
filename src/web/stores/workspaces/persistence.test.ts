@@ -19,6 +19,9 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { RepoSnapshotCacheEntry } from '#/web/stores/workspaces/types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { getRepoProjectionQueryData } from '#/web/repo-data-query.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 function cachedRepo(savedAt: number): RepoSnapshotCacheEntry {
   return {
     savedAt,
@@ -80,22 +83,22 @@ describe('normalizeRepoSnapshotCache', () => {
 describe('persistRepoSnapshotCacheEntry', () => {
   test('does not write a stale cache entry after the workspace runtime changes', () => {
     const staleRepo = seedRepoWithReadModelForTest({
-      id: 'goblin+file:///repo',
+      id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       branches: [createRepoBranch('main')],
       currentBranch: 'main',
       currentBranchName: 'main',
     })
-    seedRepoWithReadModelForTest({ id: 'goblin+file:///repo', workspaceRuntimeId: 'repo-runtime-test-2' })
+    seedRepoWithReadModelForTest({ id: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-test-2' })
 
     persistRepoSnapshotCacheEntry(useWorkspacesStore.setState, staleRepo, 'repo-runtime-test')
 
-    expect(useWorkspacesStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
+    expect(useWorkspacesStore.getState().repoSnapshotCache[WORKSPACE_ID]).toBeUndefined()
   })
 
   test('persists branch references without dynamic worktree or pull request state', () => {
     const repo = seedRepoWithReadModelForTest({
-      id: 'goblin+file:///repo',
+      id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       branchSnapshots: [
         createBranchSnapshot('feature/a', {
@@ -123,14 +126,14 @@ describe('persistRepoSnapshotCacheEntry', () => {
 
     persistRepoSnapshotCacheEntry(useWorkspacesStore.setState, repo, 'repo-runtime-test')
 
-    const cached = useWorkspacesStore.getState().repoSnapshotCache['goblin+file:///repo']
+    const cached = useWorkspacesStore.getState().repoSnapshotCache[WORKSPACE_ID]
     expect(cached?.data.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
     expect(cached?.data.branches[0]?.pullRequest).toBeUndefined()
   })
 
   test('persists the React Query branch read model when it is newer than the store projection', () => {
     const repo = seedRepoWithReadModelForTest({
-      id: 'goblin+file:///repo',
+      id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       branches: [createRepoBranch('main')],
       currentBranch: 'main',
@@ -143,7 +146,7 @@ describe('persistRepoSnapshotCacheEntry', () => {
 
     persistRepoSnapshotCacheEntry(useWorkspacesStore.setState, repo, 'repo-runtime-test')
 
-    const cached = useWorkspacesStore.getState().repoSnapshotCache['goblin+file:///repo']
+    const cached = useWorkspacesStore.getState().repoSnapshotCache[WORKSPACE_ID]
     expect(cached?.data.currentBranch).toBe('feature/query')
     expect(cached?.data.branches.map((branch) => branch.name)).toEqual(['feature/query'])
   })
@@ -167,7 +170,7 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
       }),
     ]
 
-    const workspace = emptyWorkspace('goblin+file:///repo', 'repo', 'repo-runtime-test')
+    const workspace = emptyWorkspace(WORKSPACE_ID, 'repo', 'repo-runtime-test')
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',
       name: 'repo',
@@ -201,10 +204,10 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
       }),
     ]
 
-    seedRepoProjectionQueryFromCacheEntry('goblin+file:///repo', 'repo-runtime-test', cached)
+    seedRepoProjectionQueryFromCacheEntry(WORKSPACE_ID, 'repo-runtime-test', cached)
 
-    const fullProjection = getRepoProjectionQueryData('goblin+file:///repo', 'repo-runtime-test', null, 'full')
-    const summaryProjection = getRepoProjectionQueryData('goblin+file:///repo', 'repo-runtime-test', null, 'summary')
+    const fullProjection = getRepoProjectionQueryData(WORKSPACE_ID, 'repo-runtime-test', null, 'full')
+    const summaryProjection = getRepoProjectionQueryData(WORKSPACE_ID, 'repo-runtime-test', null, 'summary')
     expect(fullProjection?.snapshot?.current).toBe('feature/a')
     expect(fullProjection?.snapshot?.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
     expect(fullProjection?.snapshot?.branches[0]?.pullRequest).toBeUndefined()

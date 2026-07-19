@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { hashKey, queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
+import { hashKey, queryOptions, skipToken, useQuery, type QueryClient } from '@tanstack/react-query'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   getRepoLog,
@@ -15,6 +15,7 @@ import type {
   RepoWorktreeStatusSnapshot,
 } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT, type PullRequestFetchMode } from '#/shared/git-types.ts'
+import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 class StaleRepoRuntimeReadError extends Error {
   constructor() {
@@ -42,7 +43,7 @@ function normalizeProjectionMode(mode?: PullRequestFetchMode): PullRequestFetchM
 }
 
 export function repoProjectionQueryKey(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   branch?: string | null,
   mode?: PullRequestFetchMode,
@@ -57,7 +58,7 @@ export function repoProjectionQueryKey(
 }
 
 export interface ParsedRepoProjectionQueryKey {
-  repoRoot: string
+  repoRoot: WorkspaceId
   workspaceRuntimeId: string
   branch: string | null
   mode: PullRequestFetchMode
@@ -70,35 +71,37 @@ export function parseRepoProjectionQueryKey(queryKey: readonly unknown[]): Parse
   const repoRoot = queryKey[1]
   const workspaceRuntimeId = queryKey[2]
   if (typeof repoRoot !== 'string' || typeof workspaceRuntimeId !== 'string') return null
+  const workspaceId = canonicalWorkspaceLocator(repoRoot)
+  if (!workspaceId) return null
   const options = queryKey[4]
   if (!options || typeof options !== 'object') return null
   const projection = options as { branch?: unknown; mode?: unknown }
   const branch = typeof projection.branch === 'string' && projection.branch.length > 0 ? projection.branch : null
   const mode = projection.mode === 'summary' ? 'summary' : 'full'
-  return { repoRoot, workspaceRuntimeId, branch, mode }
+  return { repoRoot: workspaceId, workspaceRuntimeId, branch, mode }
 }
 
-export function repoOperationsQueryKey(repoRoot: string, workspaceRuntimeId: string, includeSettled = false) {
+export function repoOperationsQueryKey(repoRoot: WorkspaceId, workspaceRuntimeId: string, includeSettled = false) {
   return ['repo-data', repoRoot, workspaceRuntimeId, 'operations', { includeSettled }] as const
 }
 
-export function repoWorktreeStatusQueryKey(repoRoot: string, workspaceRuntimeId: string) {
+export function repoWorktreeStatusQueryKey(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
   return ['repo-data', repoRoot, workspaceRuntimeId, 'worktree-status'] as const
 }
 
-export function repoDataQueryKey(repoRoot: string, workspaceRuntimeId: string) {
+export function repoDataQueryKey(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
   return ['repo-data', repoRoot, workspaceRuntimeId] as const
 }
 
-function repoProjectionQueryPrefix(repoRoot: string, workspaceRuntimeId: string) {
+function repoProjectionQueryPrefix(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
   return ['repo-data', repoRoot, workspaceRuntimeId, 'projection'] as const
 }
 
-function repoOperationsQueryPrefix(repoRoot: string, workspaceRuntimeId: string) {
+function repoOperationsQueryPrefix(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
   return ['repo-data', repoRoot, workspaceRuntimeId, 'operations'] as const
 }
 
-function runtimeProjectionInvalidationKey(repoRoot: string, workspaceRuntimeId: string): string {
+function runtimeProjectionInvalidationKey(repoRoot: WorkspaceId, workspaceRuntimeId: string): string {
   return `${repoRoot}\0${workspaceRuntimeId}`
 }
 
@@ -121,7 +124,7 @@ function repoProjectionFetchInvalidationVersionMap(queryClient: QueryClient): Ma
 }
 
 function repoProjectionFetchVersionKey(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string | null,
   mode: PullRequestFetchMode,
@@ -130,7 +133,7 @@ function repoProjectionFetchVersionKey(
 }
 
 export function getRepoRuntimeProjectionInvalidationVersion(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): number {
@@ -142,7 +145,7 @@ export function getRepoRuntimeProjectionInvalidationVersion(
 }
 
 function bumpRepoRuntimeProjectionInvalidationVersion(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   queryClient: QueryClient,
 ): void {
@@ -152,7 +155,7 @@ function bumpRepoRuntimeProjectionInvalidationVersion(
 }
 
 function markRepoProjectionFetchStarted(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string | null,
   mode: PullRequestFetchMode,
@@ -171,7 +174,7 @@ function isStaleRepoRuntimeReadError(err: unknown): boolean {
 }
 
 export function getRepoProjectionFetchInvalidationVersion(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string | null,
   mode: PullRequestFetchMode,
@@ -185,7 +188,7 @@ export function getRepoProjectionFetchInvalidationVersion(
 }
 
 export function clearRepoProjectionFetchInvalidationVersion(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string | null,
   mode: PullRequestFetchMode,
@@ -197,7 +200,7 @@ export function clearRepoProjectionFetchInvalidationVersion(
 }
 
 export function markRepoRuntimeProjectionInvalidated(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
@@ -211,7 +214,7 @@ function invalidateActiveRepoQueryKeys(queryClient: QueryClient, queryKeys: Read
 }
 
 function invalidateActiveRepoRuntimeProjectionQueries(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   queryClient: QueryClient,
   options: { excludeProjectionQueryKey?: readonly unknown[] } = {},
@@ -262,16 +265,22 @@ async function abortablePromise<T>(promise: Promise<T>, signal?: AbortSignal): P
   }
 }
 
-function repoLogQueryKey(repoRoot: string, workspaceRuntimeId: string, branch: string, count: number, skip: number) {
+function repoLogQueryKey(
+  repoRoot: WorkspaceId,
+  workspaceRuntimeId: string,
+  branch: string,
+  count: number,
+  skip: number,
+) {
   return ['repo-data', repoRoot, workspaceRuntimeId, 'log', branch, count, skip] as const
 }
 
-function repoRemoteBranchesQueryKey(repoRoot: string, workspaceRuntimeId: string) {
+function repoRemoteBranchesQueryKey(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
   return ['repo-data', repoRoot, workspaceRuntimeId, 'remote-branches'] as const
 }
 
 export function repoProjectionQueryOptions(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   branch?: string | null,
   mode?: PullRequestFetchMode,
@@ -291,7 +300,7 @@ export function repoProjectionQueryOptions(
 }
 
 async function fetchRepoProjectionReadModel(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string | null,
   mode: PullRequestFetchMode,
@@ -312,7 +321,7 @@ export function repoServerOperationActive(operation: Pick<RepoServerOperationSta
 }
 
 export function getRepoProjectionPlaceholderData(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   branch?: string | null,
   mode?: PullRequestFetchMode,
@@ -341,7 +350,7 @@ export function getRepoProjectionPlaceholderData(
   }
 }
 
-export function repoWorktreeStatusQueryOptions(repoRoot: string, workspaceRuntimeId: string) {
+export function repoWorktreeStatusQueryOptions(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
   return queryOptions({
     queryKey: repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId),
     queryFn: ({ signal, client }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, client),
@@ -352,7 +361,7 @@ export function repoWorktreeStatusQueryOptions(repoRoot: string, workspaceRuntim
 }
 
 async function fetchRepoWorktreeStatusReadModel(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   signal: AbortSignal,
   queryClient: QueryClient,
@@ -376,7 +385,7 @@ async function fetchRepoWorktreeStatusReadModel(
 }
 
 function findRepoProjectionPlaceholderSource(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string | null,
   mode: PullRequestFetchMode,
@@ -407,7 +416,7 @@ function repoProjectionPlaceholderRank(
 }
 
 function repoLogQueryOptions(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string,
   options: { count?: number; skip?: number; enabled?: boolean } = {},
@@ -422,7 +431,7 @@ function repoLogQueryOptions(
 }
 
 function repoRemoteBranchesQueryOptions(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   options: { enabled?: boolean } = {},
 ) {
@@ -434,7 +443,7 @@ function repoRemoteBranchesQueryOptions(
 }
 
 export function repoOperationsQueryOptions(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   options: { includeSettled?: boolean; enabled?: boolean } = {},
 ) {
@@ -451,7 +460,7 @@ export function repoOperationsQueryOptions(
 }
 
 async function fetchRepoOperationsReadModel(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   includeSettled: boolean,
   signal: AbortSignal,
@@ -467,30 +476,62 @@ async function fetchRepoOperationsReadModel(
 }
 
 export function useRepoProjectionReadModel(
-  repoRoot: string,
+  repoRoot: WorkspaceId | null,
   workspaceRuntimeId: string,
   branch: string | null | undefined,
   mode: PullRequestFetchMode | undefined,
   enabled: boolean,
 ) {
+  const active = enabled && repoRoot !== null
+  const requestedBranch = normalizeProjectionBranch(branch)
+  const requestedMode = normalizeProjectionMode(mode)
   const query = useQuery({
-    ...repoProjectionQueryOptions(repoRoot, workspaceRuntimeId, branch, mode),
-    enabled,
-    subscribed: enabled,
+    queryKey: [
+      'repo-data',
+      repoRoot,
+      workspaceRuntimeId,
+      'projection',
+      { branch: requestedBranch, mode: requestedMode },
+    ] as const,
+    queryFn:
+      repoRoot === null
+        ? skipToken
+        : ({ signal, client }) =>
+            fetchRepoProjectionReadModel(repoRoot, workspaceRuntimeId, requestedBranch, requestedMode, signal, client),
+    retry: (_failureCount, err) => isStaleRepoRuntimeReadError(err),
+    retryDelay: 0,
+    placeholderData: repoRoot
+      ? getRepoProjectionPlaceholderData(repoRoot, workspaceRuntimeId, requestedBranch, requestedMode)
+      : undefined,
+    staleTime: Number.POSITIVE_INFINITY,
+    enabled: active,
+    subscribed: active,
   })
   return query
 }
 
-export function useRepoWorktreeStatusReadModel(repoRoot: string, workspaceRuntimeId: string, enabled: boolean) {
+export function useRepoWorktreeStatusReadModel(
+  repoRoot: WorkspaceId | null,
+  workspaceRuntimeId: string,
+  enabled: boolean,
+) {
+  const active = enabled && repoRoot !== null
   return useQuery({
-    ...repoWorktreeStatusQueryOptions(repoRoot, workspaceRuntimeId),
-    enabled,
-    subscribed: enabled,
+    queryKey: ['repo-data', repoRoot, workspaceRuntimeId, 'worktree-status'] as const,
+    queryFn:
+      repoRoot === null
+        ? skipToken
+        : ({ signal, client }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, client),
+    retry: (_failureCount, err) => isStaleRepoRuntimeReadError(err),
+    retryDelay: 0,
+    staleTime: Number.POSITIVE_INFINITY,
+    enabled: active,
+    subscribed: active,
   })
 }
 
 export function useRepoLogQuery(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string,
   options: { count?: number; skip?: number; enabled?: boolean } = {},
@@ -499,7 +540,7 @@ export function useRepoLogQuery(
 }
 
 export function useRepoRemoteBranchesQuery(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   options: { enabled?: boolean } = {},
 ) {
@@ -507,25 +548,34 @@ export function useRepoRemoteBranchesQuery(
 }
 
 export function useRepoOperationsReadModel(
-  repoRoot: string,
+  repoRoot: WorkspaceId | null,
   workspaceRuntimeId: string,
   options: { includeSettled?: boolean; enabled?: boolean } = {},
 ) {
   const includeSettled = options.includeSettled === true
-  const enabled = options.enabled !== false
+  const enabled = options.enabled !== false && repoRoot !== null
   const query = useQuery({
-    ...repoOperationsQueryOptions(repoRoot, workspaceRuntimeId, { includeSettled, enabled }),
+    queryKey: ['repo-data', repoRoot, workspaceRuntimeId, 'operations', { includeSettled }] as const,
+    queryFn:
+      repoRoot === null
+        ? skipToken
+        : ({ signal, client }) =>
+            fetchRepoOperationsReadModel(repoRoot, workspaceRuntimeId, includeSettled, signal, client),
+    retry: (_failureCount, err) => isStaleRepoRuntimeReadError(err),
+    retryDelay: 0,
+    staleTime: Number.POSITIVE_INFINITY,
+    enabled,
     subscribed: enabled,
   })
   useEffect(() => {
-    if (!enabled || !query.data) return
+    if (!enabled || !repoRoot || !query.data) return
     if (!includeSettled) updateRepoProjectionOperationsQueryData(repoRoot, workspaceRuntimeId, query.data)
   }, [enabled, includeSettled, query.data, workspaceRuntimeId, repoRoot])
   return query
 }
 
 export function getRepoOperationsQueryData(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): RepoOperationsSnapshot | undefined {
@@ -533,7 +583,7 @@ export function getRepoOperationsQueryData(
 }
 
 export function setRepoOperationsQueryData(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   includeSettled: boolean,
   operations: RepoOperationsSnapshot,
@@ -544,7 +594,7 @@ export function setRepoOperationsQueryData(
 }
 
 function updateRepoProjectionOperationsQueryData(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   operations: RepoOperationsSnapshot,
   queryClient: QueryClient = primaryWindowQueryClient,
@@ -561,7 +611,7 @@ function updateRepoProjectionOperationsQueryData(
 }
 
 export function getRepoProjectionQueryData(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string | null | undefined,
   mode: PullRequestFetchMode | undefined,
@@ -573,7 +623,7 @@ export function getRepoProjectionQueryData(
 }
 
 export function getRepoWorktreeStatusQueryData(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): RepoWorktreeStatusSnapshot | undefined {
@@ -581,7 +631,7 @@ export function getRepoWorktreeStatusQueryData(
 }
 
 export function setRepoWorktreeStatusQueryData(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   snapshot: RepoWorktreeStatusSnapshot,
   queryClient: QueryClient = primaryWindowQueryClient,
@@ -591,7 +641,7 @@ export function setRepoWorktreeStatusQueryData(
 }
 
 export function setRepoProjectionQueryData(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string | null | undefined,
   mode: PullRequestFetchMode | undefined,
@@ -603,7 +653,7 @@ export function setRepoProjectionQueryData(
 }
 
 export function seedRepoProjectionQueryData(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   projection: WorkspaceRuntimeProjection | null,
   queryClient: QueryClient = primaryWindowQueryClient,
@@ -626,7 +676,7 @@ export function seedRepoProjectionQueryData(
 }
 
 interface RepoProjectionRefreshReadInput {
-  repoRoot: string
+  repoRoot: WorkspaceId
   workspaceRuntimeId: string
   branch: string | null
   mode: PullRequestFetchMode
@@ -705,7 +755,7 @@ async function fetchRepoProjectionReadModelUntilCurrent(
 }
 
 export async function refreshRepoProjectionReadModel(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string | null | undefined,
   mode: PullRequestFetchMode | undefined,
@@ -733,7 +783,7 @@ export async function refreshRepoProjectionReadModel(
 }
 
 export async function refreshRepoWorktreeStatusReadModel(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   options: { signal?: AbortSignal; queryClient?: QueryClient } = {},
 ): Promise<RepoWorktreeStatusSnapshot> {
@@ -762,7 +812,7 @@ export async function refreshRepoWorktreeStatusReadModel(
 }
 
 export function invalidateRepoDataQueries(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
@@ -771,7 +821,7 @@ export function invalidateRepoDataQueries(
 }
 
 export function invalidateRepoRuntimeProjectionQueries(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {

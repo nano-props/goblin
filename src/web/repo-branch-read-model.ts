@@ -13,6 +13,7 @@ import {
 import type { RepoBranchState, WorkspaceState, RepoWorktreeState } from '#/web/stores/workspaces/types.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface RepoBranchReadModelData {
   branches: RepoBranchState[]
@@ -44,7 +45,7 @@ export function repoBranchReadModelFromSnapshot(
 }
 
 export function useRepoBranchReadModel(
-  repoRoot: string,
+  repoRoot: WorkspaceId | null,
   workspaceRuntimeId: string,
   enabled: boolean,
 ): RepoBranchReadModelData | null {

@@ -9,6 +9,7 @@ import {
   type RepoOperationTarget,
 } from '#/web/stores/workspaces/operations.ts'
 import { RepoOperationCancelledError } from '#/web/stores/workspaces/operation-cancellation.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 export type RepoOperationLane = 'network' | 'read' | 'write'
 export type { RepoOperationKey, RepoOperationTarget }
 
@@ -199,8 +200,8 @@ interface RepoOperationScheduler {
   operations: Record<string, RepoOperationState | undefined>
 }
 
-const repoOperationSchedulers = new Map<string, RepoOperationScheduler>()
-const operationIdleWaiters = new Map<string, Set<() => void>>()
+const repoOperationSchedulers = new Map<WorkspaceId, RepoOperationScheduler>()
+const operationIdleWaiters = new Map<WorkspaceId, Set<() => void>>()
 
 function createRepoOperationScheduler(): RepoOperationScheduler {
   return {
@@ -214,7 +215,7 @@ function createRepoOperationScheduler(): RepoOperationScheduler {
   }
 }
 
-function getRepoOperationScheduler(repoId: string): RepoOperationScheduler {
+function getRepoOperationScheduler(repoId: WorkspaceId): RepoOperationScheduler {
   let runtime = repoOperationSchedulers.get(repoId)
   if (!runtime) {
     runtime = createRepoOperationScheduler()
@@ -223,33 +224,33 @@ function getRepoOperationScheduler(repoId: string): RepoOperationScheduler {
   return runtime
 }
 
-export function nextRepoOperationId(repoId: string): number {
+export function nextRepoOperationId(repoId: WorkspaceId): number {
   const runtime = getRepoOperationScheduler(repoId)
   return runtime.nextOperationId++
 }
 
-function ensureRepoOperation(repoId: string, key: string): RepoOperationState {
+function ensureRepoOperation(repoId: WorkspaceId, key: string): RepoOperationState {
   const operations = getRepoOperationScheduler(repoId).operations
   return (operations[key] ??= idleOperation())
 }
 
-export function repoOperation(repoId: string, key: string): RepoOperationState {
+export function repoOperation(repoId: WorkspaceId, key: string): RepoOperationState {
   return repoOperationSchedulers.get(repoId)?.operations[key] ?? idleOperation()
 }
 
-export function repoOperationBusy(repoId: string, key: string): boolean {
+export function repoOperationBusy(repoId: WorkspaceId, key: string): boolean {
   return operationBusy(repoOperation(repoId, key))
 }
 
-export function repoLocalPrimaryRefreshBusy(repoId: string): boolean {
+export function repoLocalPrimaryRefreshBusy(repoId: WorkspaceId): boolean {
   return repoOperationBusy(repoId, 'manualRefresh') || repoOperationBusy(repoId, 'fetch')
 }
 
-export function repoLocalProjectionReadBusy(repoId: string): boolean {
+export function repoLocalProjectionReadBusy(repoId: WorkspaceId): boolean {
   return repoOperationBusy(repoId, 'repoReadModel')
 }
 
-export function repoLocalRemoteFetchBlocked(repoId: string): boolean {
+export function repoLocalRemoteFetchBlocked(repoId: WorkspaceId): boolean {
   return (
     repoOperationBusy(repoId, 'fetch') ||
     repoOperationBusy(repoId, 'branchAction') ||
@@ -257,7 +258,7 @@ export function repoLocalRemoteFetchBlocked(repoId: string): boolean {
   )
 }
 
-export function repoLocalBranchActionScheduleGuard(repoId: string): {
+export function repoLocalBranchActionScheduleGuard(repoId: WorkspaceId): {
   fetchBusy: boolean
   branchOperationPhase: RepoOperationState['phase']
   projectionReadBusy: boolean
@@ -271,12 +272,12 @@ export function repoLocalBranchActionScheduleGuard(repoId: string): {
   }
 }
 
-export function repoOperationCurrent(repoId: string, key: string, operationId: number): boolean {
+export function repoOperationCurrent(repoId: WorkspaceId, key: string, operationId: number): boolean {
   return repoOperation(repoId, key).operationId === operationId
 }
 
 export function markRepoOperationTargets(
-  repoId: string,
+  repoId: WorkspaceId,
   operationId: number,
   targets: RepoOperationTarget[],
   phase: 'queued' | 'running',
@@ -300,7 +301,7 @@ export function markRepoOperationTargets(
 }
 
 export function settleRepoOperationTargets(
-  repoId: string,
+  repoId: WorkspaceId,
   operationId: number,
   targets: RepoOperationTarget[],
   error: string | null,
@@ -315,13 +316,13 @@ export function settleRepoOperationTargets(
   if (settled) notifyOperationIdleWaiters(repoId)
 }
 
-function notifyOperationIdleWaiters(repoId: string): void {
+function notifyOperationIdleWaiters(repoId: WorkspaceId): void {
   const waiters = operationIdleWaiters.get(repoId)
   if (!waiters) return
   for (const waiter of [...waiters]) waiter()
 }
 
-export function waitForRepoOperationsIdle(repoId: string, keys: string[], signal?: AbortSignal): Promise<void> {
+export function waitForRepoOperationsIdle(repoId: WorkspaceId, keys: string[], signal?: AbortSignal): Promise<void> {
   if (keys.every((key) => !repoOperationBusy(repoId, key))) return Promise.resolve()
   return new Promise((resolve, reject) => {
     let settled = false
@@ -358,7 +359,7 @@ export function waitForRepoOperationsIdle(repoId: string, keys: string[], signal
 }
 
 export function scheduleRepoOperation<T>(
-  repoId: string,
+  repoId: WorkspaceId,
   lane: RepoOperationLane,
   task: (signal: AbortSignal) => Promise<T>,
   options?: RepoOperationLaneOptions,
@@ -366,7 +367,7 @@ export function scheduleRepoOperation<T>(
   return getRepoOperationScheduler(repoId).queues[lane].add(task, options)
 }
 
-export function disposeRepoOperationScheduler(repoId: string): void {
+export function disposeRepoOperationScheduler(repoId: WorkspaceId): void {
   const runtime = repoOperationSchedulers.get(repoId)
   if (!runtime) return
   for (const queue of Object.values(runtime.queues)) queue.cancelAll()

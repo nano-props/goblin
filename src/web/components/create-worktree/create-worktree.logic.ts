@@ -10,6 +10,7 @@ import { validateBranchName } from '#/shared/refnames.ts'
 import { isResolvableRemotePathInput, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { deriveLocalBranchFromRemoteRef, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type CreateWorktreeMode = CreateWorktreeInput['mode']['kind']
 
@@ -49,7 +50,7 @@ interface CreateWorktreeDerived {
 export type Translate = (key: string, params?: Record<string, string | number>) => string
 
 interface CreateWorktreeFormRepo {
-  id: string
+  id: WorkspaceId
   branchModel: Pick<RepoBranchReadModelData, 'branches' | 'currentBranch'>
 }
 
@@ -76,7 +77,7 @@ export function deriveCreateWorktreeForm(
   const pathTrimmed = remoteTarget ? state.worktreePath.trim() : untildify(state.worktreePath.trim())
   const defaultPath = remoteTarget
     ? defaultRemoteWorktreePath(remoteTarget.remotePath, pathName)
-    : defaultWorktreePath(repo.id, pathName)
+    : defaultWorktreePath(localWorkspacePath(repo.id), pathName)
   const effectivePath = pathTrimmed || defaultPath
   const displayDefaultPath = remoteTarget ? formatWorktreePath(defaultPath, remoteTarget) : tildify(defaultPath)
   const displayEffectivePath = remoteTarget ? formatWorktreePath(effectivePath, remoteTarget) : tildify(effectivePath)
@@ -158,6 +159,14 @@ export function deriveCreateWorktreeForm(
     validPath,
     input,
   }
+}
+
+function localWorkspacePath(workspaceId: WorkspaceId): string {
+  const locator = parseCanonicalWorkspaceLocator(workspaceId)
+  if (!locator || locator.transport !== 'file') {
+    throw new Error('Local worktree creation requires a file workspace locator')
+  }
+  return locator.path
 }
 
 interface BuildInputContext {

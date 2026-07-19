@@ -5,12 +5,15 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { repoDataQueryKey } from '#/web/repo-data-query.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 const listeners = new Set<(event: any) => void>()
 const storeState = {
   workspaces: {
-    'goblin+file:///tmp/repo': {
-      id: 'goblin+file:///tmp/repo',
+    [WORKSPACE_ID]: {
+      id: WORKSPACE_ID,
       availability: { phase: 'available' },
       workspaceRuntimeId: 'repo-runtime-test-7',
       dataLoads: {
@@ -46,8 +49,8 @@ describe('useRepoStoreInvalidationRefresh', () => {
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
     listeners.clear()
     primaryWindowQueryClient.clear()
-    storeState.workspaces['goblin+file:///tmp/repo'] = {
-      id: 'goblin+file:///tmp/repo',
+    storeState.workspaces[WORKSPACE_ID] = {
+      id: WORKSPACE_ID,
       availability: { phase: 'available' },
       workspaceRuntimeId: 'repo-runtime-test-7',
       dataLoads: {
@@ -69,12 +72,12 @@ describe('useRepoStoreInvalidationRefresh', () => {
 
     await act(async () => {
       for (const listener of listeners)
-        listener({ type: 'repo-query-invalidated', repoId: 'goblin+file:///tmp/repo', query: 'repo-snapshot' })
+        listener({ type: 'repo-query-invalidated', repoId: WORKSPACE_ID, query: 'repo-snapshot' })
     })
 
     expect(invalidateSpy).toHaveBeenCalledWith(
       {
-        queryKey: repoDataQueryKey('goblin+file:///tmp/repo', 'repo-runtime-test-7'),
+        queryKey: repoDataQueryKey(WORKSPACE_ID, 'repo-runtime-test-7'),
         refetchType: 'active',
       },
       { cancelRefetch: false },
@@ -88,19 +91,19 @@ describe('useRepoStoreInvalidationRefresh', () => {
 
     await act(async () => {
       for (const listener of listeners)
-        listener({ type: 'repo-query-invalidated', repoId: 'goblin+file:///tmp/repo', query: 'repo-runtime' })
+        listener({ type: 'repo-query-invalidated', repoId: WORKSPACE_ID, query: 'repo-runtime' })
     })
 
     expect(invalidateSpy).toHaveBeenCalledWith(
       {
-        queryKey: ['repo-data', 'goblin+file:///tmp/repo', 'repo-runtime-test-7', 'projection'],
+        queryKey: ['repo-data', WORKSPACE_ID, 'repo-runtime-test-7', 'projection'],
         refetchType: 'active',
       },
       { cancelRefetch: false },
     )
     expect(invalidateSpy).toHaveBeenCalledWith(
       {
-        queryKey: ['repo-data', 'goblin+file:///tmp/repo', 'repo-runtime-test-7', 'operations'],
+        queryKey: ['repo-data', WORKSPACE_ID, 'repo-runtime-test-7', 'operations'],
         refetchType: 'active',
       },
       { cancelRefetch: false },
@@ -116,7 +119,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
       for (const listener of listeners)
         listener({
           type: 'repo-query-invalidated',
-          repoId: 'goblin+file:///tmp/repo',
+          repoId: WORKSPACE_ID,
           query: 'repo-snapshot',
           ignoredMetadata: 'repo_manual_other',
         })
@@ -124,7 +127,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
 
     expect(invalidateSpy).toHaveBeenCalledWith(
       {
-        queryKey: repoDataQueryKey('goblin+file:///tmp/repo', 'repo-runtime-test-7'),
+        queryKey: repoDataQueryKey(WORKSPACE_ID, 'repo-runtime-test-7'),
         refetchType: 'active',
       },
       { cancelRefetch: false },

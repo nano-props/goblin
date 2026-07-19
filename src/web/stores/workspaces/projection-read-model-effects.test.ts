@@ -13,6 +13,9 @@ import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceRuntimeProjection } from '#/shared/api-types.ts'
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 beforeEach(() => {
   resetWorkspacesStore()
@@ -40,7 +43,7 @@ describe('repo projection read-model effects', () => {
   test('snapshot success persists snapshot cache without triggering pull request summary backfill', () => {
     installGoblinTestBridge({})
     const repo = seedRepoShellForTest({
-      id: 'goblin+file:///repo',
+      id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
       workspaceProbe: createGitWorkspaceProbeForTest(),
@@ -54,14 +57,14 @@ describe('repo projection read-model effects', () => {
       useWorkspacesStore.setState,
       useWorkspacesStore.getState,
       {
-        repoRoot: 'goblin+file:///repo',
+        repoRoot: WORKSPACE_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,
         projection: acceptedProjection(),
       },
       { scope: 'repo-read-model' },
     )
 
-    expect(useWorkspacesStore.getState().repoSnapshotCache['goblin+file:///repo']).toMatchObject({
+    expect(useWorkspacesStore.getState().repoSnapshotCache[WORKSPACE_ID]).toMatchObject({
       data: {
         currentBranch: 'feature/a',
         branches: [{ name: 'feature/a' }, { name: 'feature/b' }],
@@ -77,7 +80,7 @@ describe('repo projection read-model effects', () => {
       },
     })
     const repo = seedRepoShellForTest({
-      id: 'goblin+file:///repo',
+      id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
       workspaceProbe: createGitWorkspaceProbeForTest(),
@@ -92,7 +95,7 @@ describe('repo projection read-model effects', () => {
         useWorkspacesStore.setState,
         useWorkspacesStore.getState,
         {
-          repoRoot: 'goblin+file:///repo',
+          repoRoot: WORKSPACE_ID,
           workspaceRuntimeId: repo.workspaceRuntimeId,
           projection: acceptedProjection(),
         },
@@ -107,7 +110,7 @@ describe('repo projection read-model effects', () => {
       'terminal.prune': pruneTerminals,
     })
     const repo = seedRepoShellForTest({
-      id: 'goblin+file:///repo',
+      id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
       workspaceProbe: createGitWorkspaceProbeForTest(),
@@ -121,7 +124,7 @@ describe('repo projection read-model effects', () => {
       useWorkspacesStore.setState,
       useWorkspacesStore.getState,
       {
-        repoRoot: 'goblin+file:///repo',
+        repoRoot: WORKSPACE_ID,
         workspaceRuntimeId: 'repo-runtime-stale',
         projection: acceptedProjection(),
       },
@@ -129,13 +132,13 @@ describe('repo projection read-model effects', () => {
     )
 
     expect(pruneTerminals).not.toHaveBeenCalled()
-    expect(useWorkspacesStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
+    expect(useWorkspacesStore.getState().repoSnapshotCache[WORKSPACE_ID]).toBeUndefined()
   })
 
   test('same-millisecond core projection changes are accepted', () => {
     installGoblinTestBridge({})
     const repo = seedRepoShellForTest({
-      id: 'goblin+file:///repo',
+      id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
       workspaceProbe: createGitWorkspaceProbeForTest(),
@@ -158,31 +161,31 @@ describe('repo projection read-model effects', () => {
       },
     }
 
-    setRepoProjectionQueryData('goblin+file:///repo', repo.workspaceRuntimeId, null, 'full', firstProjection)
+    setRepoProjectionQueryData(WORKSPACE_ID, repo.workspaceRuntimeId, null, 'full', firstProjection)
     acceptRepoProjectionReadModel(
       useWorkspacesStore.setState,
       useWorkspacesStore.getState,
       {
-        repoRoot: 'goblin+file:///repo',
+        repoRoot: WORKSPACE_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,
         projection: firstProjection,
       },
       { scope: 'repo-read-model' },
     )
 
-    setRepoProjectionQueryData('goblin+file:///repo', repo.workspaceRuntimeId, null, 'full', secondProjection)
+    setRepoProjectionQueryData(WORKSPACE_ID, repo.workspaceRuntimeId, null, 'full', secondProjection)
     acceptRepoProjectionReadModel(
       useWorkspacesStore.setState,
       useWorkspacesStore.getState,
       {
-        repoRoot: 'goblin+file:///repo',
+        repoRoot: WORKSPACE_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,
         projection: secondProjection,
       },
       { scope: 'repo-read-model' },
     )
 
-    expect(useWorkspacesStore.getState().repoSnapshotCache['goblin+file:///repo']).toMatchObject({
+    expect(useWorkspacesStore.getState().repoSnapshotCache[WORKSPACE_ID]).toMatchObject({
       data: {
         currentBranch: 'feature/b',
         branches: [{ name: 'feature/b' }],
@@ -196,18 +199,18 @@ describe('repo projection read-model effects', () => {
       'terminal.prune': pruneTerminals,
     })
     const repo = seedRepoShellForTest({
-      id: 'goblin+file:///repo',
+      id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
       workspaceProbe: createGitWorkspaceProbeForTest(),
     })
     useWorkspacesStore.setState((state) => {
-      const current = state.workspaces['goblin+file:///repo']!
+      const current = state.workspaces[WORKSPACE_ID]!
       const git = requireGitWorkspaceForTest(current).capability.git
       return {
         workspaces: {
           ...state.workspaces,
-          'goblin+file:///repo': {
+          [WORKSPACE_ID]: {
             ...current,
             capability: {
               ...current.capability,
@@ -228,7 +231,7 @@ describe('repo projection read-model effects', () => {
       useWorkspacesStore.setState,
       useWorkspacesStore.getState,
       {
-        repoRoot: 'goblin+file:///repo',
+        repoRoot: WORKSPACE_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,
         projection: acceptedProjection(null, 'summary'),
       },
@@ -236,13 +239,13 @@ describe('repo projection read-model effects', () => {
     )
 
     expect(
-      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces['goblin+file:///repo']).capability.git
-        .dataLoads.repoReadModel,
+      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[WORKSPACE_ID]).capability.git.dataLoads
+        .repoReadModel,
     ).toMatchObject({
       phase: 'loading',
       loadedAt: null,
     })
-    expect(useWorkspacesStore.getState().repoSnapshotCache['goblin+file:///repo']).toBeUndefined()
+    expect(useWorkspacesStore.getState().repoSnapshotCache[WORKSPACE_ID]).toBeUndefined()
     expect(pruneTerminals).not.toHaveBeenCalled()
   })
 })

@@ -3,6 +3,7 @@ import { refreshStatusLog } from '#/web/logger.ts'
 import { isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
 import { isExpectedRepoOperationCancellation } from '#/web/stores/workspaces/operation-cancellation.ts'
 import type { WorkspacesGet } from '#/web/stores/workspaces/types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface RepoWorktreeStatusRefreshAccess {
   get: WorkspacesGet
@@ -10,7 +11,7 @@ interface RepoWorktreeStatusRefreshAccess {
 
 function statusRefreshable(
   store: RepoWorktreeStatusRefreshAccess,
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
 ): boolean {
   const repo = store.get().workspaces[repoRoot]
@@ -19,7 +20,7 @@ function statusRefreshable(
 
 export async function refreshRepoWorktreeStatus(
   store: RepoWorktreeStatusRefreshAccess,
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
 ): Promise<void> {
   if (!statusRefreshable(store, repoRoot, workspaceRuntimeId)) return

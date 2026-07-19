@@ -22,9 +22,10 @@ import { formatRelativeTime } from '#/web/lib/dates.ts'
 import { latestRepoSyncTime } from '#/web/stores/workspaces/sync-time.ts'
 import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
 import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface Props {
-  repoId: string
+  repoId: WorkspaceId
 }
 
 const COMPLETION_VISIBLE_MS = 1500
@@ -112,7 +113,7 @@ function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
   }
 }
 
-function useRepoCompletion(repoId: string): RepoCompletion | null {
+function useRepoCompletion(repoId: WorkspaceId): RepoCompletion | null {
   const events = useWorkspacesStore((s) => {
     const workspace = s.workspaces[repoId]
     return workspace?.capability.kind === 'git' ? workspace.capability.git.events : null

@@ -7,6 +7,7 @@ import { stripBranchWorktreeMetadata } from '#/web/stores/workspaces/worktree-st
 import { seedRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchSnapshotQueryProjection, type RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
 import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
 const MAX_REPOS = 50
 const FiniteNumber = v.pipe(v.number(), v.finite())
@@ -82,7 +83,7 @@ export function restoreRepoProjectionFromCacheEntry(
 }
 
 export function seedRepoProjectionQueryFromCacheEntry(
-  repoRoot: string,
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   snapshot: RepoSnapshotCacheEntry | undefined,
 ): void {

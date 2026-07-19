@@ -222,7 +222,7 @@ function waitForBranchActionIdle(
 
 function runBranchActionIpc(
   action: RepoBranchAction,
-  repoId: string,
+  repoId: WorkspaceId,
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<ExecResult> {

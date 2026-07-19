@@ -40,11 +40,11 @@ export function joinPath(parent: string, child: string): string {
   return `${parent}${sep}${child}`
 }
 
-export function defaultWorktreePath(repoId: string, branch: string): string {
+export function defaultWorktreePath(workspacePath: string, branch: string): string {
   const slug = branch.trim().replaceAll('/', '-')
   if (!slug) return ''
-  const parent = parentDir(repoId)
-  const name = lastPathSegment(repoId) || 'worktree'
+  const parent = parentDir(workspacePath)
+  const name = lastPathSegment(workspacePath) || 'worktree'
   return parent ? joinPath(parent, `${name}-${slug}`) : `${name}-${slug}`
 }
 
@@ -56,7 +56,10 @@ export function untildify(path: string): string {
   return untildifyPath(path, homeDirectory())
 }
 
-export function formatWorkspaceDisplayLocation(workspaceId: WorkspaceId, target?: RemoteWorkspaceTarget | null): string {
+export function formatWorkspaceDisplayLocation(
+  workspaceId: WorkspaceId,
+  target?: RemoteWorkspaceTarget | null,
+): string {
   return formatSharedWorkspaceDisplayLocation(workspaceId, homeDirectory(), target)
 }
 

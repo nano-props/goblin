@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { Check, Circle, GitPullRequest, X } from 'lucide-react'
 import { throttle } from 'es-toolkit'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
@@ -184,7 +185,7 @@ export function PullRequestStatusRow({
   pullRequest,
   tooltipSide = 'right',
 }: {
-  repoId: string
+  repoId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string
   pullRequest: PullRequestInfo | undefined

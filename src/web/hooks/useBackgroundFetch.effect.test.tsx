@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
 import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
@@ -49,6 +52,30 @@ describe('useBackgroundFetch request lifecycle', () => {
     expect(secondSignal?.aborted).toBe(false)
     view.unmount()
     expect(secondSignal?.aborted).toBe(true)
+  })
+
+  test('does not call the Git registration endpoint for an initial empty or plain Workspace target', async () => {
+    const empty = renderInJsdom(<BackgroundFetchHost workspaceId={null} />)
+    await Promise.resolve()
+    expect(mocks.setBackgroundSyncRepos).not.toHaveBeenCalled()
+    empty.unmount()
+
+    const workspace = emptyWorkspace(WORKSPACE_ID, 'plain-workspace', 'workspace-runtime-plain')
+    acceptWorkspaceProbeState(workspace, {
+      status: 'ready',
+      name: 'plain-workspace',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [],
+    })
+    useWorkspacesStore.setState({ workspaces: { [WORKSPACE_ID]: workspace } })
+    const plain = renderInJsdom(<BackgroundFetchHost workspaceId={WORKSPACE_ID} />)
+    await Promise.resolve()
+    expect(mocks.setBackgroundSyncRepos).not.toHaveBeenCalled()
+    plain.unmount()
   })
 })
 

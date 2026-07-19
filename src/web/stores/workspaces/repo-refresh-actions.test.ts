@@ -10,7 +10,7 @@ import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type * as WorktreeStatusRefresh from '#/web/stores/workspaces/worktree-status-refresh.ts'
 
-const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 vi.mock('#/web/stores/workspaces/worktree-status-refresh.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof WorktreeStatusRefresh>()
@@ -21,8 +21,8 @@ function repoRefreshStoreAccess(workspaceRuntimeId = 'repo-runtime-test-9', unav
   const get: WorkspacesGet = () =>
     ({
       workspaces: {
-        'goblin+file:///repo': {
-          id: 'goblin+file:///repo',
+        [WORKSPACE_ID]: {
+          id: WORKSPACE_ID,
           workspaceRuntimeId,
           availability: unavailable
             ? { phase: 'unavailable', reason: 'offline', checkedAt: 1 }
@@ -45,23 +45,19 @@ describe('repo refresh actions', () => {
   test('requests visible status only for the current available runtime with a branch', () => {
     const store = repoRefreshStoreAccess()
 
-    expect(
-      requestVisibleWorkspaceStatusRefresh(store, 'goblin+file:///repo', 'repo-runtime-test-9', 'feature/query'),
-    ).toBe(true)
-    expect(
-      requestVisibleWorkspaceStatusRefresh(store, 'goblin+file:///repo', 'repo-runtime-stale', 'feature/query'),
-    ).toBe(false)
-    expect(requestVisibleWorkspaceStatusRefresh(store, 'goblin+file:///repo', 'repo-runtime-test-9', null)).toBe(false)
+    expect(requestVisibleWorkspaceStatusRefresh(store, WORKSPACE_ID, 'repo-runtime-test-9', 'feature/query')).toBe(true)
+    expect(requestVisibleWorkspaceStatusRefresh(store, WORKSPACE_ID, 'repo-runtime-stale', 'feature/query')).toBe(false)
+    expect(requestVisibleWorkspaceStatusRefresh(store, WORKSPACE_ID, 'repo-runtime-test-9', null)).toBe(false)
     expect(
       requestVisibleWorkspaceStatusRefresh(
         repoRefreshStoreAccess('repo-runtime-test-9', true),
-        'goblin+file:///repo',
+        WORKSPACE_ID,
         'repo-runtime-test-9',
         'feature/query',
       ),
     ).toBe(false)
     expect(refreshRepoWorktreeStatus).toHaveBeenCalledOnce()
-    expect(refreshRepoWorktreeStatus).toHaveBeenCalledWith(store, 'goblin+file:///repo', 'repo-runtime-test-9')
+    expect(refreshRepoWorktreeStatus).toHaveBeenCalledWith(store, WORKSPACE_ID, 'repo-runtime-test-9')
   })
 
   test('routes repo snapshot invalidation through query invalidation only', async () => {
@@ -72,7 +68,7 @@ describe('repo refresh actions', () => {
 
     expect(refreshRepoWorktreeStatus).not.toHaveBeenCalled()
     expect(invalidateSpy).toHaveBeenCalledWith(
-      { queryKey: repoDataQueryKey('goblin+file:///repo', 'repo-runtime-test-9'), refetchType: 'active' },
+      { queryKey: repoDataQueryKey(WORKSPACE_ID, 'repo-runtime-test-9'), refetchType: 'active' },
       { cancelRefetch: false },
     )
     invalidateSpy.mockRestore()

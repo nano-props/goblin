@@ -9,6 +9,7 @@ import { projectBranchActionRepo, type BranchActionRepo } from '#/web/hooks/bran
 import type { GitWorkspaceProjection, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 // Composed projection: branch/status/worktree data comes from the repo
 // data query; the store contributes only identity, UI, operation, and
@@ -57,7 +58,7 @@ function branchListRepoShellEqual(a: BranchListRepoShell | undefined, b: BranchL
   return true
 }
 
-export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
+export function useBranchListRepo(repoId: WorkspaceId): BranchListRepo | undefined {
   const repoShell = useStoreWithEqualityFn(
     useWorkspacesStore,
     (s) => {
@@ -85,10 +86,14 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
     },
     branchListRepoShellEqual,
   )
-  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? '', repoShell?.workspaceRuntimeId ?? '', {
+  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? null, repoShell?.workspaceRuntimeId ?? '', {
     enabled: !!repoShell,
   })
-  const branchReadModel = useRepoBranchReadModel(repoShell?.id ?? '', repoShell?.workspaceRuntimeId ?? '', !!repoShell)
+  const branchReadModel = useRepoBranchReadModel(
+    repoShell?.id ?? null,
+    repoShell?.workspaceRuntimeId ?? '',
+    !!repoShell,
+  )
   if (!repoShell || !branchReadModel) return undefined
   return {
     ...projectBranchActionRepo(repoShell, operationsReadModel.data?.operations),

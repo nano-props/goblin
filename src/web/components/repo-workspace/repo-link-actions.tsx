@@ -2,9 +2,10 @@ import { useMemo, type ComponentProps } from 'react'
 import { throttle } from 'es-toolkit'
 import { openRepoUrl } from '#/web/repo-client.ts'
 import { StatusLink, type Tone } from '#/web/components/workspace-pane/status-ui.tsx'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 type CommitHashLinkProps = Omit<ComponentProps<'button'>, 'type' | 'children' | 'onClick'> & {
-  repoId: string
+  repoId: WorkspaceId
   workspaceRuntimeId: string
   hash: string
   shortHash?: string

@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   ArrowDown,
   ArrowUp,
@@ -127,7 +128,7 @@ function UpstreamLink({
   title,
   tone,
 }: {
-  repoId: string
+  repoId: WorkspaceId
   workspaceRuntimeId: string
   tracking: string
   title: string

@@ -6,6 +6,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { PullRequestStatusRow } from '#/web/components/repo-workspace/PullRequestStatusRow.tsx'
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import { createPullRequest } from '#/web/test-utils/bridge.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 // Pass-through i18n with minimal translations for the keys this component
 // reads at render time. The stub interpolates `{name}` placeholders from
@@ -37,7 +38,7 @@ vi.mock('#/web/hooks/openBranchExternalTarget.ts', () => ({
 
 const openExternalMock = vi.mocked(openBranchExternalTarget)
 
-const REPO_ID = 'goblin+file:///tmp/goblin-pr-row-test-repo'
+const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-pr-row-test'
 const BRANCH_NAME = 'feature/pr'
 

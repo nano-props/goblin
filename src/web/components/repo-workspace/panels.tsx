@@ -1,5 +1,6 @@
 import { FolderTree } from 'lucide-react'
 import type { ReactNode } from 'react'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
@@ -174,7 +175,7 @@ function BranchHistoryTab({
   workspacePaneId,
   panelLabel,
 }: {
-  repoId: string
+  repoId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string
   workspacePaneId: string

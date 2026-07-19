@@ -5,7 +5,8 @@ import { repoOperation, repoOperationBusy } from '#/web/stores/workspaces/repo-o
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetWorkspacesStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-projection.test-utils.ts'
-const REPO_ID = 'goblin+file:///tmp/goblin-operation-runner-test-repo'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+const REPO_ID = workspaceIdForTest('goblin+file:///workspace/operation-runner')
 
 beforeEach(() => {
   resetWorkspacesStore()

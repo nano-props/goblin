@@ -12,12 +12,13 @@ import type { RepoOperationTarget } from '#/web/stores/workspaces/operation-runn
 import type { WorkspaceState, WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import type { RepoOperationLane } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { gitWorkspaceProjection, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-projection.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 type RepoDraft = Draft<WorkspaceState>
 
 interface RunLatestDataLoadOperationOptions<T> {
   set: WorkspacesSet
   get: WorkspacesGet
-  id: string
+  id: WorkspaceId
   workspaceRuntimeId: string
   lane: RepoOperationLane
   operationKey: string

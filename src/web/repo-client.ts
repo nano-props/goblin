@@ -59,7 +59,7 @@ export async function cloneRepository(
 }
 
 export async function getRepoLog(
-  cwd: string,
+  cwd: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string,
   options?: { count?: number; skip?: number; signal?: AbortSignal },
@@ -81,7 +81,7 @@ export async function getRepoLog(
 }
 
 export async function getRepoRemoteBranches(
-  cwd: string,
+  cwd: WorkspaceId,
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<string[]> {
@@ -89,7 +89,7 @@ export async function getRepoRemoteBranches(
 }
 
 export async function getRepoProjection(
-  cwd: string,
+  cwd: WorkspaceId,
   workspaceRuntimeId: string,
   branch?: string | null,
   options?: { mode?: PullRequestFetchMode },
@@ -103,7 +103,7 @@ export async function getRepoProjection(
 }
 
 export async function getRepoWorktreeStatus(
-  cwd: string,
+  cwd: WorkspaceId,
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<RepoWorktreeStatusSnapshot> {
@@ -114,7 +114,7 @@ export async function getRepoWorktreeStatus(
 }
 
 export async function getRepoOperations(
-  cwd: string,
+  cwd: WorkspaceId,
   workspaceRuntimeId: string,
   options?: { includeSettled?: boolean; signal?: AbortSignal },
 ): Promise<RepoOperationsSnapshot> {
@@ -126,7 +126,7 @@ export async function getRepoOperations(
 }
 
 export async function fetchRepo(
-  cwd: string,
+  cwd: WorkspaceId,
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<{ ok: boolean; message: string }> {
@@ -141,7 +141,7 @@ export async function fetchRepo(
 }
 
 export async function pullRepoBranch(
-  cwd: string,
+  cwd: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string,
   worktreePath?: string,
@@ -155,7 +155,7 @@ export async function pullRepoBranch(
 }
 
 export async function pushRepoBranch(
-  cwd: string,
+  cwd: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string,
   signal?: AbortSignal,
@@ -171,7 +171,7 @@ export async function pushRepoBranch(
 }
 
 export async function createRepoWorktree(
-  cwd: string,
+  cwd: WorkspaceId,
   workspaceRuntimeId: string,
   input: CreateWorktreeInput,
   worktreeBootstrap: WorktreeBootstrapDecision,
@@ -185,7 +185,7 @@ export async function createRepoWorktree(
 }
 
 export async function getRepoWorktreeBootstrapPreview(
-  cwd: string,
+  cwd: WorkspaceId,
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<WorktreeBootstrapPreviewResult> {
@@ -193,7 +193,7 @@ export async function getRepoWorktreeBootstrapPreview(
 }
 
 export async function deleteRepoBranch(
-  cwd: string,
+  cwd: WorkspaceId,
   workspaceRuntimeId: string,
   branch: string,
   options?: { force?: boolean; deleteUpstream?: boolean },
@@ -207,7 +207,7 @@ export async function deleteRepoBranch(
 }
 
 export async function removeRepoWorktree(
-  cwd: string,
+  cwd: WorkspaceId,
   workspaceRuntimeId: string,
   options: {
     branch: string
@@ -229,7 +229,7 @@ export async function removeRepoWorktree(
 }
 
 export async function getRepoPatch(
-  cwd: string,
+  cwd: WorkspaceId,
   workspaceRuntimeId: string,
   worktreePath: string,
   signal?: AbortSignal,
@@ -241,15 +241,19 @@ export async function getRepoPatch(
   )
 }
 
-export async function openRepoUrl(cwd: string, workspaceRuntimeId: string, target: RepoUrlTarget): Promise<ExecResult> {
-  const result = await postServerJson<{ cwd: string; workspaceRuntimeId: string; target: RepoUrlTarget }, ExecResult>(
-    '/api/repo/open-url',
-    {
-      cwd,
-      workspaceRuntimeId,
-      target,
-    },
-  )
+export async function openRepoUrl(
+  cwd: WorkspaceId,
+  workspaceRuntimeId: string,
+  target: RepoUrlTarget,
+): Promise<ExecResult> {
+  const result = await postServerJson<
+    { cwd: WorkspaceId; workspaceRuntimeId: string; target: RepoUrlTarget },
+    ExecResult
+  >('/api/repo/open-url', {
+    cwd,
+    workspaceRuntimeId,
+    target,
+  })
   if (!result.ok || !result.message) return result
   const opened = await openExternalUrl(result.message)
   return opened.ok ? { ok: true, message: '' } : opened

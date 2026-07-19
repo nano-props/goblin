@@ -16,10 +16,11 @@ import {
   type RepoOperationTarget,
 } from '#/web/stores/workspaces/operations.ts'
 import type { WorkspaceState, WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 export type { RepoOperationTarget }
 
 export interface RepoOperationContext {
-  id: string
+  id: WorkspaceId
   workspaceRuntimeId: string
   operationId: number
   isCurrent: () => boolean
@@ -30,7 +31,7 @@ export interface RepoOperationContext {
 interface RepoOperationBaseFields<T> {
   set: WorkspacesSet
   get: WorkspacesGet
-  id: string
+  id: WorkspaceId
   workspaceRuntimeId?: string
   lane: RepoOperationLane
   priority: number
@@ -65,7 +66,7 @@ type InternalRepoOperationOptions<T> =
 
 function operationCurrent(
   get: WorkspacesGet,
-  id: string,
+  id: WorkspaceId,
   workspaceRuntimeId: string,
   operationId: number,
   target: RepoOperationTarget,
@@ -74,7 +75,7 @@ function operationCurrent(
   return !!repo && repo.workspaceRuntimeId === workspaceRuntimeId && repoOperationCurrent(id, target.key, operationId)
 }
 
-function anyTargetBusy(id: string, targets: RepoOperationTarget[]) {
+function anyTargetBusy(id: WorkspaceId, targets: RepoOperationTarget[]) {
   return targets.some((target) => repoOperationBusy(id, target.key))
 }
 

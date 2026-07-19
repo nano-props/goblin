@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { setBackgroundSyncRepos } from '#/web/repo-client.ts'
 import { isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { WorkspaceState, WorkspacesStore } from '#/web/stores/workspaces/types.ts'
@@ -29,6 +29,7 @@ export function backgroundSyncTargetsFromStore(
 }
 
 export function useBackgroundFetch({ currentWorkspaceId }: { currentWorkspaceId: WorkspaceId | null }) {
+  const hasDeclaredGitTarget = useRef(false)
   const currentWorkspace = useWorkspacesStore((state) =>
     currentWorkspaceId ? state.workspaces[currentWorkspaceId] : undefined,
   )
@@ -48,11 +49,17 @@ export function useBackgroundFetch({ currentWorkspaceId }: { currentWorkspaceId:
 
   useEffect(() => {
     if (!hasServer) return
-    const controller = new AbortController()
     const targets = fetchEnabled && eligibleTarget ? [eligibleTarget] : []
-    void setBackgroundSyncRepos(targets, controller.signal).catch((err: unknown) => {
-      if (!controller.signal.aborted) goblinLog.warn('background sync registration failed', { err })
-    })
+    if (targets.length === 0 && !hasDeclaredGitTarget.current) return
+    const controller = new AbortController()
+    if (targets.length > 0) hasDeclaredGitTarget.current = true
+    void setBackgroundSyncRepos(targets, controller.signal)
+      .then(() => {
+        if (targets.length === 0) hasDeclaredGitTarget.current = false
+      })
+      .catch((err: unknown) => {
+        if (!controller.signal.aborted) goblinLog.warn('background sync registration failed', { err })
+      })
     return () => controller.abort('background-sync-target-changed')
   }, [eligibleTarget, fetchEnabled, hasServer])
 }

@@ -123,8 +123,8 @@ export function useBranchActionDialogDisplay<P>(
 ): BranchActionDialogDisplay<P> {
   const entry = useLastNonNull(slot)
   const slotRepo = slot ? workspaces[slot.repoId] : null
-  const branchReadModel = useRepoBranchReadModel(slot?.repoId ?? '', slotRepo?.workspaceRuntimeId ?? '', !!slotRepo)
-  const operationsReadModel = useRepoOperationsReadModel(slot?.repoId ?? '', slotRepo?.workspaceRuntimeId ?? '', {
+  const branchReadModel = useRepoBranchReadModel(slot?.repoId ?? null, slotRepo?.workspaceRuntimeId ?? '', !!slotRepo)
+  const operationsReadModel = useRepoOperationsReadModel(slot?.repoId ?? null, slotRepo?.workspaceRuntimeId ?? '', {
     enabled: slotRepo?.capability.kind === 'git',
   })
   const liveContext = slot
